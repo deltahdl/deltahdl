@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -12,6 +14,7 @@
 #include "elaborator/queue_dim.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -24,6 +27,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -316,6 +320,41 @@ bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   // property of the running object, `sum(f)` passing the object's array.
   return !formal.unpacked_dims.empty() &&
          TryBindPropertyArrayArg(call_arg, formal, ctx, arena);
+}
+
+// The names of the element variables of the one-dimensional shape `info`
+// stands for under `name`, interned: the tables they key keep the view.
+static std::vector<std::string_view> ElementNames(std::string_view name,
+                                                  const ArrayInfo& info,
+                                                  Arena& arena) {
+  std::vector<std::string_view> names;
+  for (uint32_t k = 0; k < info.size; ++k) {
+    names.emplace_back(*arena.Create<std::string>(
+        std::string(name) + "[" + std::to_string(info.lo + k) + "]"));
+  }
+  return names;
+}
+
+void KeepStaticArrayFormal(const ModuleItem* func, const FunctionArg& formal,
+                           SimContext& ctx, Arena& arena) {
+  if (func == nullptr || !func->is_static || func->is_automatic) return;
+  if (formal.direction == Direction::kOutput &&
+      RestoreStaticAggregate(func->name, formal.name, ctx)) {
+    if (const ArrayInfo* info = ctx.FindArrayInfo(formal.name)) {
+      for (std::string_view elem : ElementNames(formal.name, *info, arena)) {
+        if (Variable* kept = ctx.FindStaticFuncVar(func->name, elem))
+          ctx.AliasLocalVariable(elem, kept);
+      }
+    }
+    return;
+  }
+  RetainStaticAggregate(func->name, formal.name, ctx, arena);
+  if (const ArrayInfo* info = ctx.FindArrayInfo(formal.name)) {
+    for (std::string_view elem : ElementNames(formal.name, *info, arena)) {
+      if (Variable* var = ctx.FindLocalVariable(elem))
+        ctx.SaveStaticFuncVar(func->name, elem, var);
+    }
+  }
 }
 
 }  // namespace delta

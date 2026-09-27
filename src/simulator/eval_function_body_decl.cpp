@@ -16,6 +16,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
 
@@ -299,34 +300,49 @@ static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
 }
 
+// §13.3.2 (printed page 339) and §13.4.2 (printed 344): the variable of a
+// static local is kept in its subroutine's static frame, and the queue,
+// associative array or shape its declaration made is kept beside it
+// (RetainStaticAggregate); a later call's declaration refers to both again.
 static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
                                   SimContext& ctx, Arena& arena) {
   auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
   if (existing) {
     ctx.AliasLocalVariable(stmt->var_name, existing);
+    RestoreStaticAggregate(func_name, stmt->var_name, ctx);
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
                                stmt->var_init, ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
   ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
+  RetainStaticAggregate(func_name, stmt->var_name, ctx, arena);
 }
 
-void ExecFuncVarDecl(const Stmt* stmt, std::string_view static_frame,
-                     SimContext& ctx, Arena& arena) {
+void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
+                     Arena& arena) {
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;
   }
   if (stmt->var_is_static) {
-    ExecFuncVarDeclStatic(stmt, static_frame, ctx, arena);
+    ExecFuncVarDeclStatic(stmt, frame.name, ctx, arena);
     return;
   }
-  if (ctx.FindLocalVariable(stmt->var_name)) return;
+  // §13.4.2: a static subroutine's frame is pushed holding the variables the
+  // last call left (SimContext::PushStaticScope), so its local is found here
+  // and its aggregate is referred to again.
+  if (ctx.FindLocalVariable(stmt->var_name)) {
+    if (frame.is_static_sub)
+      RestoreStaticAggregate(frame.name, stmt->var_name, ctx);
+    return;
+  }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
                                stmt->var_init, ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
+  if (frame.is_static_sub)
+    RetainStaticAggregate(frame.name, stmt->var_name, ctx, arena);
 }
 
 }  // namespace delta

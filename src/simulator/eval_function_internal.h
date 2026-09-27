@@ -34,16 +34,23 @@ class Arena;
 // resolved kind this far.
 bool DeclaredTypeIs4State(const DataType& type);
 
+// The static frame a subroutine body's locals are kept in: `name`, the key
+// its static locals are kept under -- the subroutine's name, qualified by the
+// class level declaring it for a method (StaticLocalFrame in
+// eval_function_body.cpp) -- and whether the subroutine itself is static,
+// which makes a local declared with no lifetime static too (§13.4.2).
+struct StaticFrame {
+  std::string_view name;
+  bool is_static_sub = false;
+};
+
 // §13.3 and §13.4 with §6.8: executes the variable declaration `stmt` of the
 // body of a subroutine -- the local's storage, kinds, default and
-// initializer, kept across calls for a static one (§13.4.2) under
-// `static_frame`, the key the subroutine's static locals are kept under:
-// the subroutine's name, qualified by the class level declaring it for a
-// method (StaticLocalFrame in eval_function_body.cpp). Defined in
-// eval_function_body_decl.cpp; called by the statement executor in
+// initializer, kept across calls for a static one (§13.4.2) in `frame`.
+// Defined in eval_function_body_decl.cpp; called by the statement executor in
 // eval_function_body.cpp.
-void ExecFuncVarDecl(const Stmt* stmt, std::string_view static_frame,
-                     SimContext& ctx, Arena& arena);
+void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
+                     Arena& arena);
 
 // §6.18 with §7.2.1: binds the variable `var_name` to the layout its typedef
 // name `type` stands for, where the name is a registered structure or union

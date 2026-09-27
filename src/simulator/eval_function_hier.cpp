@@ -393,7 +393,10 @@ Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
   Variable* found = ctx.FindStaticFuncVar(target.func->name, var);
   if (found == nullptr) {
     ctx.PushStaticScope(target.func->name);
-    ExecFuncVarDecl(decl, target.func->name, ctx, arena);
+    ExecFuncVarDecl(decl,
+                    {target.func->name,
+                     target.func->is_static && !target.func->is_automatic},
+                    ctx, arena);
     ctx.PopStaticScope(target.func->name);
     found = ctx.FindStaticFuncVar(target.func->name, var);
   }

@@ -208,4 +208,63 @@ TEST(TaskMemorySim, StaticTaskConcurrentInvocationsShareStorage) {
   LowerRunAndCheck(f, design, {{"r1", 22u}, {"r2", 22u}});
 }
 
+// §13.3.2: variables of a static task, "including input, output, and inout
+// type arguments, shall retain their values between invocations". An output
+// queue formal is copied nothing into, so the second call pushes onto what
+// the first left in it, and the actual receives both elements.
+TEST(TaskMemorySim, StaticTaskOutputQueueFormalRetainsValue) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  task add(output int o[$], input int v);\n"
+      "    o.push_back(v);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    add(q, 3);\n"
+      "    add(q, 4);\n"
+      "    result = q.size() * 100 + q[0] * 10 + q[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 234u);
+}
+
+TEST(TaskMemorySim, StaticFunctionOutputFixedFormalRetainsValue) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int f[2];\n"
+      "  int result;\n"
+      "  function void acc(output int a[2], input int v);\n"
+      "    a[0] = a[0] + v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    acc(f, 2);\n"
+      "    acc(f, 3);\n"
+      "    result = f[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 5u);
+}
+
+// A static task's queue local is kept between invocations as a scalar is.
+TEST(TaskMemorySim, StaticTaskQueueLocalRetainsValue) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  task grow(output int n);\n"
+      "    int q[$];\n"
+      "    q.push_back(7);\n"
+      "    n = q.size();\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    grow(result);\n"
+      "    grow(result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
 }  // namespace

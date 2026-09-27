@@ -783,6 +783,7 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
     }
     if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)], param,
                                    ctx, arena)) {
+      KeepStaticArrayFormal(func, param, ctx, arena);
       continue;
     }
     BindValueArg(param, {expr, ai, {}}, func, ctx, arena);

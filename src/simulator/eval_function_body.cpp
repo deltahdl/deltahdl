@@ -58,6 +58,9 @@ struct FuncExecCtx {
   // type. ExecFuncReturn reads zero as "leave the expression's own vector
   // alone".
   uint32_t ret_width;
+  // §13.4.2: whether the subroutine is static, so a local declared with no
+  // lifetime is static storage kept between calls (ExecFuncVarDecl).
+  bool is_static_sub = false;
 };
 
 // Where control goes once a statement of the body has run (§12.8): on to
@@ -621,7 +624,8 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       }
       return FuncFlow::kNext;
     case StmtKind::kVarDecl:
-      ExecFuncVarDecl(stmt, exec.static_frame, exec.ctx, exec.arena);
+      ExecFuncVarDecl(stmt, {exec.static_frame, exec.is_static_sub}, exec.ctx,
+                      exec.arena);
       return FuncFlow::kNext;
     case StmtKind::kIf:
       return ExecFuncIf(stmt, exec);
@@ -733,7 +737,13 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // body constructs, recorded as a body local's is.
   ShapeClassReturnVariable(func, ret_var, ctx, arena);
   std::string_view static_frame = StaticLocalFrame(func, ctx, arena);
-  FuncExecCtx exec{ret_var, func->name, static_frame, ctx, arena, ret_width};
+  FuncExecCtx exec{ret_var,
+                   func->name,
+                   static_frame,
+                   ctx,
+                   arena,
+                   ret_width,
+                   func->is_static && !func->is_automatic};
   BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
   // the body's own statement list has no loop to act on it; the body ends

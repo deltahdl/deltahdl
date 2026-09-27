@@ -242,4 +242,104 @@ TEST(FunctionLifetimeSim, ThisQualifiedCallStatementWritesOwnProperty) {
   EXPECT_EQ(val, 2u);
 }
 
+// §13.4.2: a static function's items are statically allocated, so a queue it
+// declares keeps its elements from one call to the next: the second call
+// pushes onto the element the first left.
+TEST(FunctionLifetimeSim, StaticFunctionQueueLocalKeptBetweenCalls) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int grow();\n"
+      "    int q[$];\n"
+      "    q.push_back(7);\n"
+      "    return q.size();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    void'(grow());\n"
+      "    result = grow();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
+TEST(FunctionLifetimeSim, StaticFunctionAssociativeLocalKeptBetweenCalls) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int note(int k);\n"
+      "    int m[int];\n"
+      "    m[k] = 1;\n"
+      "    return m.num();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    void'(note(1));\n"
+      "    result = note(2);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
+// A fixed-size array local keeps its elements too: `a[0]++` counts calls.
+TEST(FunctionLifetimeSim, StaticFunctionFixedArrayLocalKeptBetweenCalls) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function int count();\n"
+      "    int a[2];\n"
+      "    a[0]++;\n"
+      "    return a[0];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    void'(count());\n"
+      "    void'(count());\n"
+      "    result = count();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 3u);
+}
+
+// §13.4.2: an automatic function's items are allocated for each call, so its
+// queue starts empty every time.
+TEST(FunctionLifetimeSim, AutomaticFunctionQueueLocalFreshEachCall) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function automatic int grow();\n"
+      "    int q[$];\n"
+      "    q.push_back(7);\n"
+      "    return q.size();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    void'(grow());\n"
+      "    result = grow();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
+// A package function is static by default as a module's is.
+TEST(FunctionLifetimeSim, PackageFunctionQueueLocalKeptBetweenCalls) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  function int grow();\n"
+      "    int q[$];\n"
+      "    q.push_back(7);\n"
+      "    return q.size();\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    void'(p::grow());\n"
+      "    result = p::grow();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
 }  // namespace

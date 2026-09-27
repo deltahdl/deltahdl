@@ -149,6 +149,17 @@ ArrayInfo ClassArrayShape(const ClassArrayRef& ref);
 bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                      SimContext& ctx, Arena& arena);
 
+// §13.3.2 (printed page 339): the formals of a static subroutine `func`,
+// "including input, output, and inout type arguments", "retain their values
+// between invocations". An array formal TryBindArrayArg bound is kept as the
+// subroutine's static storage (RetainStaticAggregate), its element variables
+// in the static frame; an output formal, into which the call copies nothing,
+// refers to what the last call left instead of the default it was bound at.
+// Nothing for an automatic subroutine. Defined in
+// eval_function_args_array.cpp.
+void KeepStaticArrayFormal(const ModuleItem* func, const FunctionArg& formal,
+                           SimContext& ctx, Arena& arena);
+
 // §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
 // value is passed as its handle, so the actual of a `mailbox m` or
 // `semaphore s` formal of the subroutine `func` is read for the object it is

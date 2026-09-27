@@ -27,6 +27,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/stmt_result.h"
 #include "simulator/virtual_interface.h"
 
@@ -682,6 +683,8 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                            stmt->var_name);
     if (existing) {
       ctx.AliasLocalVariable(stmt->var_name, existing);
+      RestoreStaticAggregate(StaticFrameOf(stmt, func_name, ctx),
+                             stmt->var_name, ctx);
       return true;
     }
   } else if (!stmt->var_is_automatic) {
@@ -781,9 +784,13 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     if (!var->is_4state) CoerceTo2State(var->value);
   }
 
+  // §13.3.2 (printed page 339): the queue, associative array or shape a
+  // static local's declaration made is kept with it (RetainStaticAggregate),
+  // and the next activation refers to it again (TryReuseExistingDeclVar).
   if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
-    ctx.SaveStaticFuncVar(StaticFrameOf(stmt, func_name, ctx), stmt->var_name,
-                          var);
+    std::string_view frame = StaticFrameOf(stmt, func_name, ctx);
+    ctx.SaveStaticFuncVar(frame, stmt->var_name, var);
+    RetainStaticAggregate(frame, stmt->var_name, ctx, arena);
   }
 }
 
