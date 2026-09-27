@@ -49,6 +49,16 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
                                 SimContext& ctx, Arena& arena);
 
+// §8.25 (printed pages 203-204 of IEEE 1800-2023): a class declaration whose
+// extends clause writes a `#(...)` list, `class D2 #(type P = real) extends C
+// #(integer);`, extends the specialization of the base that list names, so a
+// static member it reaches through the base is that specialization's own. Its
+// own type, which §8.25.1 makes its default specialization, is given that
+// specialization as its base here, once it is registered, with each of its
+// own parameters the list names standing for the default the declaration
+// gives it. A clause naming a type parameter or writing no list is left alone.
+void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena);
+
 // §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
 // resolves to a type only after elaboration, so a list of actuals naming a
 // type parameter of the class that writes it names a different specialization

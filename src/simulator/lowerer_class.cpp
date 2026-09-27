@@ -569,6 +569,7 @@ static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
   PopulateClassType(info, nested, {kNoItems, constants}, ctx, arena);
   RecordClassPackage(info, outer->package, ctx);
   ctx.RegisterClassType(info->name, info);
+  BindDeclarationBase(info, ctx, arena);
   LowerNestedClasses(info, nested, constants, ctx, arena);
 }
 
@@ -650,6 +651,9 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   // §6.18 with §8.3: the class's typedefs naming a class, its own included,
   // bound before InitClassStaticProperties runs its methods.
   RegisterClassScopeTypedefAliases(info, ctx_, arena_);
+  // §8.25: an extends clause writing a `#(...)` list names a specialization
+  // of the base, found once the class is registered under its own name.
+  BindDeclarationBase(info, ctx_, arena_);
   LowerNestedClasses(info, cls, constants, ctx_, arena_);
 }
 

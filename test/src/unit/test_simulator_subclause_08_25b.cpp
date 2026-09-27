@@ -788,4 +788,34 @@ TEST(ClassSim, SpecializationsOfMatchingTypeActualsAreOneType) {
   EXPECT_EQ(out, "2 1 1 2\n");
 }
 
+// §8.25 (printed pages 203-204): a class may extend a specialization of a
+// parameterized class, `class D2 #(type P = real) extends C #(integer);` in the
+// clause's own example, and each specialization has its own static members, so
+// the `tag` D2 reaches through its base -- written in D2's method and in the
+// method D2 inherits from C -- is C#(integer)'s, and the default
+// specialization's stays 0. The declaration's own type took the generic C as
+// its base, whose statics are the default specialization's, and both writes
+// landed there.
+TEST(ClassSim, DeclarationExtendingASpecializationReachesItsStatics) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = bit);\n"
+      "  static int tag = 0;\n"
+      "  function void add(int v); tag += v; endfunction\n"
+      "endclass\n"
+      "class D2 #(type P = real) extends C #(integer);\n"
+      "  function void bump(); tag = 7; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    D2 d = new;\n"
+      "    d.bump();\n"
+      "    d.add(2);\n"
+      "    $display(\"%0d %0d\", C#()::tag, C#(integer)::tag);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 9\n");
+}
+
 }  // namespace

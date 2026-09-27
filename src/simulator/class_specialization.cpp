@@ -302,6 +302,14 @@ void QualifyHolderTypedef(const ClassTypeInfo* holder, DataType& actual) {
   actual.scope_name = holder->name;
 }
 
+// §8.25: the name of the generic class the class named `name` specializes,
+// the part of a specialization's name ahead of the `#(` SpecializationOf
+// appends its list after; `name` itself for a class that is no
+// specialization.
+std::string_view GenericNameOf(std::string_view name) {
+  return name.substr(0, name.find("#("));
+}
+
 // §8.25: the class `spec` extends, where its declaration's extends clause
 // names one of the class's own type parameters, is the one this set of actuals
 // binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
@@ -327,11 +335,14 @@ void BindSpecializationBase(ClassTypeInfo* spec,
   const ClassDecl* decl = spec->decl;
   if (!decl->base_class_type_params.empty() &&
       decl->type_param_names.count(decl->base_class) == 0) {
-    // Asked for again by its own name, the copy holding its base for reading
-    // alone.
-    ClassTypeInfo* base = spec->parent != nullptr
-                              ? ctx.FindClassType(spec->parent->name)
-                              : nullptr;
+    // Asked for again by its generic's name, the copy holding its base for
+    // reading alone, and the base BindDeclarationBase gave the declaration
+    // being a specialization already, named by the generic's name and its
+    // list.
+    ClassTypeInfo* base =
+        spec->parent != nullptr
+            ? ctx.FindClassType(GenericNameOf(spec->parent->name))
+            : nullptr;
     if (base == nullptr) return;
     spec->parent = SpecializationOf(
         base,
@@ -655,6 +666,39 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   RegisterClassScopeTypedefAliases(spec, ctx, arena);
   InitSpecializationStaticProperties(spec, ctx, arena);
   return spec;
+}
+
+void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena) {
+  const ClassDecl* decl = info->decl;
+  if (decl == nullptr || info->parent == nullptr ||
+      decl->base_class_type_params.empty() ||
+      decl->type_param_names.count(decl->base_class) != 0) {
+    return;
+  }
+  ClassTypeInfo* base = ctx.FindClassType(info->parent->name);
+  if (base == nullptr) return;
+  // A value actual may name one of the class's own value parameters, `extends
+  // C #(N)`, which stands for the default the declaration gives it, bound as
+  // InitSpecializationStaticProperties binds a specialization's.
+  if (!info->package.empty()) ctx.PushScope(info->package);
+  ctx.PushScope();
+  for (const auto& [pname, pexpr] : decl->params) {
+    if (decl->type_param_names.count(pname) != 0) continue;
+    auto entry = info->static_properties.find(std::string(pname));
+    if (entry == info->static_properties.end()) continue;
+    ctx.CreateLocalVariable(pname, entry->second.width)->value = entry->second;
+  }
+  ClassTypeInfo* spec = SpecializationOf(
+      base, ActualsUnderSpecialization(info, decl->base_class_type_params, ctx),
+      ctx, arena);
+  ctx.PopScope();
+  if (!info->package.empty()) ctx.PopScope();
+  if (spec == nullptr || spec == base) return;
+  info->parent = spec;
+  // The vtable was built against the generic base, so an entry the base
+  // declares is re-owned by the specialization, whose statics its body then
+  // reads.
+  OwnVTableEntries(info);
 }
 
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
