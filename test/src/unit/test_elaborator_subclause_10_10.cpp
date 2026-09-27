@@ -574,4 +574,79 @@ TEST(UnpackedArrayConcatElaboration,
                             5, "10.10"));
 }
 
+// §10.10 with §7.10: a `{...}` assigned to a queue a begin-end block declares
+// is an unpacked array concatenation, whose items may be unsized, as one
+// assigned to a module's queue is. The elaborator knew a module's arrays alone
+// and reported each item under §11.4.12.
+TEST(UnpackedArrayConcatElaboration, BlockLocalQueueTargetAdmitsUnsizedItems) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef int q_t[$];\n"
+      "  initial begin\n"
+      "    int r[$];\n"
+      "    q_t u;\n"
+      "    r = {1, 2};\n"
+      "    u = {3, 4, 5};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration,
+     FunctionLocalQueueTargetAdmitsUnsizedItems) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f();\n"
+      "    int r[$];\n"
+      "    r = {1, 2};\n"
+      "    return r.size();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A block's queue hides a module's scalar of its name within the block, and
+// the module's queue is the target again once the block is left.
+TEST(UnpackedArrayConcatElaboration, BlockLocalQueueHidesModuleScalar) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int s;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    begin int s[$]; s = {1, 2}; end\n"
+      "    q = {1, 2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// And a block's scalar hides a module's queue: `{1, 2}` assigned to it is a
+// vector concatenation, where §11.4.12 bars an unsized constant.
+TEST(UnpackedArrayConcatElaboration, BlockLocalScalarHidesModuleQueueError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    int q;\n"
+      "    q = {1, 2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unsized constant is not allowed in a "
+                            "concatenation",
+                            5, "11.4.12"));
+}
+
 }  // namespace

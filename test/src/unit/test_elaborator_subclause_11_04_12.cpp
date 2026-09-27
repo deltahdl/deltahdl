@@ -384,4 +384,38 @@ TEST(ConcatenationElaboration,
       "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
 }
 
+// §10.5: a block item declaration's initializer is a procedural assignment to
+// the variable, so an unsized constant in a `{...}` initializing a scalar is
+// reported as one in `x = {1, 2}` is. The initializer was never looked at.
+TEST(ConcatenationElaboration, UnsizedInBlockScalarDeclInitError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = {1, 2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 3, "11.4.12"));
+}
+
+// Initializing an unpacked array, the `{...}` is an unpacked array
+// concatenation (§10.10), whose items may be unsized.
+TEST(ConcatenationElaboration, UnsizedInBlockArrayDeclInitAllowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int q[$] = {1, 2};\n"
+      "    int a[2] = {3, 4};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

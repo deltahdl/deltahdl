@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -32,7 +34,7 @@ struct Expr;
 // boundary the standard draws for itself: no declaration here elaborates
 // anything, and none is reached from anywhere but Elaborator's validation
 // drivers. The definitions were already gathered in
-// src/elaborator/elaborator_validate_operations.cpp and the two files beside
+// src/elaborator/elaborator_validate_operations.cpp and the files beside
 // it, so the header a group is declared in is now the one its definitions live
 // in.
 //
@@ -137,6 +139,12 @@ class ElaboratorOperationRules : public ElaboratorData {
   bool IsUnpackedArrayConcatTarget(const Expr* lhs) const;
   void WalkExprForUnsizedInConcat(const Expr* expr);
   void WalkStmtsForUnsizedInConcat(const Stmt* s);
+  void CheckBlockVarInitUnsizedInConcat(const Stmt* s);
+  // The variables the statements WalkStmtsForUnsizedInConcat is inside
+  // declare, innermost last, each with whether it is an unpacked array: a
+  // block's declaration hides a module's of the same name for the rest of the
+  // block (§6.21, §23.9), and var_array_info_ knows the module's alone.
+  std::vector<std::pair<std::string_view, bool>> block_decls_;
 
   void ValidateSelectOnConcatLvalue(const ModuleDecl* decl);
   void CheckSelectOnConcatLvalue(const Expr* lhs);
