@@ -393,6 +393,25 @@ TEST(SdfMultipleAnnotations, IncrementSectionModifiesTheEarlierAnnotation) {
   EXPECT_EQ(pd->delays[1], 66u);
 }
 
+// §32.5 (printed pages 929-930): constructs annotate in the order the file
+// writes them, and one DELAY section may hold more than one deltype, so an
+// INCREMENT written after an ABSOLUTE in the same section adds to it, as it
+// does from a section of its own above. Only the first deltype of a section was
+// read, and the ABSOLUTE's 35 and 61 stood.
+TEST(SdfMultipleAnnotations, IncrementDeltypeInTheSameSectionModifies) {
+  Design d;
+  ASSERT_TRUE(d.Build(kLiteralPathSrc));
+
+  const SdfAnnotationResult kResult =
+      d.Annotate(SdfCellText("(DELAY (ABSOLUTE (IOPATH A Z (35) (61)))"
+                             " (INCREMENT (IOPATH A Z (5) (5))))"));
+  EXPECT_TRUE(kResult.warnings.empty());
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 40u);
+  EXPECT_EQ(pd->delays[1], 66u);
+}
+
 // §32.5 (printed page 929) with §32.7 (printed pages 930-931, whose example
 // increments by (-4) and (-5)): an INCREMENT adds the value the file wrote,
 // sign included, so -2 after an ABSOLUTE 35 and 61 leaves 33 and 59, and one
@@ -497,6 +516,21 @@ TEST(SdfMultipleAnnotations, IncrementLabelModifiesTheEarlierLabel) {
   d.Annotate(
       SdfCellText("(LABEL (ABSOLUTE (cap 30))) (LABEL (INCREMENT (cap 5)))"));
 
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 35u);
+}
+
+// The same run written as two lbl_types of one LABEL section, which SDF's
+// LABEL admits as DELAY admits more than one deltype: the INCREMENT still adds
+// to the ABSOLUTE before it. Only the first lbl_type of a section was read.
+TEST(SdfMultipleAnnotations, IncrementLabelTypeInTheSameSectionModifies) {
+  Design d;
+  ASSERT_TRUE(d.Build(kSpecparamPathSrc));
+
+  const SdfAnnotationResult kResult = d.Annotate(
+      SdfCellText("(LABEL (ABSOLUTE (cap 30)) (INCREMENT (cap 5)))"));
+  EXPECT_TRUE(kResult.warnings.empty());
   const auto* pd = d.Path("A", "Z");
   ASSERT_NE(pd, nullptr);
   EXPECT_EQ(pd->delays[0], 35u);

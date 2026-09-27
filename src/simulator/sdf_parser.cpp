@@ -622,24 +622,30 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
   Expect(s, SdfTokKind::kRParen);
 }
 
-// Parses the body of a DELAY section, whose leading keyword selects whether the
-// delays it lists replace or add to the ones already in place.
+// Parses the body of a DELAY section: one or more deltypes, each of whose
+// leading keyword selects whether the delays it lists replace or add to the
+// ones already in place. §32.5 (printed pages 929-930) has them annotate in
+// the order written, so an INCREMENT after an ABSOLUTE in one section adds to
+// it; read as a section of one deltype, the second was taken for the section's
+// end and dropped.
 //
-// §32.3: a leading keyword this annotator does not recognize makes the whole
-// section data it is unable to annotate, so it is reported and skipped. Reading
-// its contents as an absolute delay list anyway would push delays onto module
+// §32.3: a leading keyword this annotator does not recognize makes that deltype
+// data it is unable to annotate, so it is reported and skipped. Reading its
+// contents as an absolute delay list anyway would push delays onto module
 // paths under a mode the SDF file never asked for.
 static void ParseDelaySpec(std::string_view& s, SdfCell& cell, SdfFile& file) {
-  Expect(s, SdfTokKind::kLParen);
-  auto mode = NextSdfToken(s);
-  if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
-    file.unannotatable.emplace_back(mode.text);
-    SkipSdfParen(s);
+  while (true) {
     SkipWhitespace(s);
-    if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
-    return;
+    if (s.empty() || s[0] != '(') break;
+    Expect(s, SdfTokKind::kLParen);
+    auto mode = NextSdfToken(s);
+    if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
+      file.unannotatable.emplace_back(mode.text);
+      SkipSdfParen(s);
+      continue;
+    }
+    ParseDelaySection(s, cell, file, mode.text == "INCREMENT");
   }
-  ParseDelaySection(s, cell, file, mode.text == "INCREMENT");
   Expect(s, SdfTokKind::kRParen);
 }
 
@@ -682,21 +688,14 @@ static SdfDelayValue ParseLabelValue(std::string_view& s) {
   return dv;
 }
 
-static void ParseLabelSection(std::string_view& s, SdfCell& cell,
-                              SdfFile& file) {
-  SkipWhitespace(s);
-  if (s.empty() || s[0] != '(') {
-    Expect(s, SdfTokKind::kRParen);
-    return;
-  }
-  Expect(s, SdfTokKind::kLParen);
+// One lbl_type of a LABEL section, its leading `(` already read: the mode, and
+// the specparam values it lists in that mode, through its closing `)`. A mode
+// this annotator does not know is reported and skipped.
+static void ParseLabelType(std::string_view& s, SdfCell& cell, SdfFile& file) {
   auto mode = NextSdfToken(s);
-
   if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
     file.unannotatable.emplace_back("LABEL");
     SkipSdfParen(s);
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
     return;
   }
   const bool kIncrement = (mode.text == "INCREMENT");
@@ -716,6 +715,19 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
                     cell.specparams.size() - 1);
   }
   Expect(s, SdfTokKind::kRParen);
+}
+
+// A LABEL section holds one or more lbl_types, as a DELAY section holds one or
+// more deltypes, and §32.5 annotates them in the order written; read as a
+// section of one, a second was taken for the section's end.
+static void ParseLabelSection(std::string_view& s, SdfCell& cell,
+                              SdfFile& file) {
+  while (true) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] != '(') break;
+    Expect(s, SdfTokKind::kLParen);
+    ParseLabelType(s, cell, file);
+  }
   Expect(s, SdfTokKind::kRParen);
 }
 
