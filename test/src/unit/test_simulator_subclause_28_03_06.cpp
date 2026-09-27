@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -125,6 +127,155 @@ TEST(GateArrayRuntime, DistributedTerminalChangeReevaluatesEachElement) {
   // 1100 & 0101 == 0100
   EXPECT_EQ(w.aval & 0xFu, 0x4u);
   EXPECT_EQ(w.bval & 0xFu, 0x0u);
+}
+
+// §28.3.6 (printed page 833), Example 2: `driver`'s `bufif0 ar[3:0] (out, in,
+// en)` on the module's own vector ports and `driver_equiv`'s four buffers, each
+// on one bit-select of those ports, are "equivalent except for indexed instance
+// names", so the two drive the same values onto the nets the parent connects,
+// and both output z once the shared enable turns them off.
+TEST(GateArrayRuntime, ExampleTwoDriverAndDriverEquivAgree) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module driver (in, out, en);\n"
+      "  input [3:0] in;\n"
+      "  output [3:0] out;\n"
+      "  input en;\n"
+      "  bufif0 ar[3:0] (out, in, en);\n"
+      "endmodule\n"
+      "module driver_equiv (in, out, en);\n"
+      "  input [3:0] in;\n"
+      "  output [3:0] out;\n"
+      "  input en;\n"
+      "  bufif0 ar3 (out[3], in[3], en);\n"
+      "  bufif0 ar2 (out[2], in[2], en);\n"
+      "  bufif0 ar1 (out[1], in[1], en);\n"
+      "  bufif0 ar0 (out[0], in[0], en);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [3:0] in = 4'b1010;\n"
+      "  logic en = 0;\n"
+      "  wire [3:0] o1, o2;\n"
+      "  driver d1 (in, o1, en);\n"
+      "  driver_equiv d2 (in, o2, en);\n"
+      "  initial begin\n"
+      "    #1 $display(\"o1=%b o2=%b\", o1, o2);\n"
+      "    in = 4'b0110;\n"
+      "    #1 $display(\"o1=%b o2=%b\", o1, o2);\n"
+      "    en = 1;\n"
+      "    #1 $display(\"o1=%b o2=%b\", o1, o2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "o1=1010 o2=1010\n"
+            "o1=0110 o2=0110\n"
+            "o1=zzzz o2=zzzz\n");
+}
+
+// §28.3.6: an array of xor gates inside a module, on the module's vector ports
+// (§23.2.2), takes each bit of the ports to its own instance, the LSB to the
+// right-hand index, and re-evaluates each instance when the parent changes an
+// input after time 0.
+TEST(GateArrayRuntime, ArrayOnASubmodulesVectorPortsDistributesPerBit) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m (output [3:0] y, input [3:0] a, b);\n"
+      "  xor g[3:0] (y, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [3:0] a = 4'b1100, b = 4'b1111;\n"
+      "  wire [3:0] y;\n"
+      "  m i (y, a, b);\n"
+      "  initial begin\n"
+      "    #1 $display(\"y=%b\", y);\n"
+      "    b = 4'b0010;\n"
+      "    #1 $display(\"y=%b\", y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "y=0011\n"
+            "y=1110\n");
+}
+
+// §28.3.6 with §23.2.2: the array's range may be written with the module's
+// parameter, `not g[N-1:0] (y, a)` under `#(8)`, and still takes one bit of
+// each eight-bit port per instance.
+TEST(GateArrayRuntime, ArrayRangeFromAModuleParameterOnItsPorts) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module inv #(parameter N = 2) (output [N-1:0] y, input [N-1:0] a);\n"
+      "  not g[N-1:0] (y, a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] y;\n"
+      "  logic [7:0] a = 8'b11000011;\n"
+      "  inv #(8) i (y, a);\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    #1 n = 0;\n"
+      "    for (int k = 0; k < 8; k++) n += y[k];\n"
+      "    $display(\"y=%b n=%0d\", y, n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=00111100 n=4\n");
+}
+
+// §28.3.6: a single gate's input terminal may be any expression, a bit-select
+// of the module's input port or of a wire continuously assigned from it
+// included, and follows the port when the parent changes it.
+TEST(GateArrayRuntime, GateInputOnABitSelectOfAnInputPort) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m (output y0, y1, y2, y3, input [1:0] a);\n"
+      "  wire [1:0] t = a;\n"
+      "  not ga (y0, a[0]);\n"
+      "  not gb (y1, a[1]);\n"
+      "  not gc (y2, t[0]);\n"
+      "  not gd (y3, t[1]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [1:0] a2 = 2'b10;\n"
+      "  wire y0, y1, y2, y3;\n"
+      "  m i (y0, y1, y2, y3, a2);\n"
+      "  initial begin\n"
+      "    #1 $display(\"y0=%b y1=%b y2=%b y3=%b\", y0, y1, y2, y3);\n"
+      "    a2 = 2'b01;\n"
+      "    #1 $display(\"y0=%b y1=%b y2=%b y3=%b\", y0, y1, y2, y3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "y0=1 y1=0 y2=1 y3=0\n"
+            "y0=0 y1=1 y2=0 y3=1\n");
+}
+
+// §28.3.6: a single gate's output terminal may be a bit-select of the module's
+// vector output port, and each gate drives its own bit of the net the parent
+// connects.
+TEST(GateArrayRuntime, GateOutputOnABitSelectOfAnOutputPort) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m (output [1:0] y, input a);\n"
+      "  not g0 (y[0], a);\n"
+      "  buf g1 (y[1], a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a = 1;\n"
+      "  wire [1:0] y;\n"
+      "  m i (y, a);\n"
+      "  initial begin\n"
+      "    #1 $display(\"y=%b\", y);\n"
+      "    a = 0;\n"
+      "    #1 $display(\"y=%b\", y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "y=10\n"
+            "y=01\n");
 }
 
 }  // namespace
