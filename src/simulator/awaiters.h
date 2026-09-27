@@ -598,17 +598,30 @@ struct InertialDelayAwaiter {
   // Arms cancel-on-change watchers on every named variable. The first change
   // before the timeout wins the shared `fired` guard and resumes immediately,
   // leaving `expired` false so await_resume reports the inertial cancellation.
+  // The change is written by another process, which is the current one when
+  // the watcher runs, so the waiting one is made current for the resume and
+  // the writer restored after it, as EventAwaiter::ResumeMaybeReactive does:
+  // resumed as the writer, a delayed assignment inside an instance
+  // re-evaluated its operands, and armed its next wait, under the writer's
+  // instance prefix -- the parent's `a` for the instance's input port `a` --
+  // and missed every later change of its own ports (§28.16, printed page 856,
+  // with §23.2.2); and left current once it suspended again, it made the
+  // writer, the port's own assignment, arm its next wait under the instance's
+  // prefix, so the port stopped following the parent.
   void ArmCancelWatchers(std::coroutine_handle<> h, Process* proc) {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value.Capture(var->value);
       auto f2 = fired;
-      var->AddWatcher([h, proc, f2]() mutable {
+      var->AddWatcher([h, proc, f2, &ctx = ctx]() mutable {
         if (*f2) return true;
         *f2 = true;
         if (proc && !proc->active) return true;
+        auto* writer = ctx.CurrentProcess();
+        if (proc) ctx.SetCurrentProcess(proc);
         h.resume();
+        ctx.SetCurrentProcess(writer);
         return true;
       });
     }

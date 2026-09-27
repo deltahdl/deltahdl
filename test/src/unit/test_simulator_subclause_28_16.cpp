@@ -620,4 +620,142 @@ TEST(GateNetDelays, ProductionNetDelayIgnoresAnUnselectedGenerateBlock) {
             105u);
 }
 
+// §28.16 (printed page 856): a gate delay is "the signal propagation delay
+// from any gate input to the gate output", and the input ports of the module
+// holding the gate are its inputs like any net (§23.2.2). The parent writes the
+// ports after time 0 under names of its own, `a` and `c` for the ports `a` and
+// `b`, in one time step, and the gate's output follows 4 later.
+TEST(GateNetDelays, DelayedGateFollowsInputPortsWrittenInOneStep) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub (output y, input a, b);\n"
+      "  and #4 g (y, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire y;\n"
+      "  logic a = 0, c = 0;\n"
+      "  sub s1 (y, a, c);\n"
+      "  initial begin\n"
+      "    #10 a = 1; c = 1;\n"
+      "    #3 $display(\"t=%0t y=%b\", $time, y);\n"
+      "    #2 $display(\"t=%0t y=%b\", $time, y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=13 y=0\n"
+            "t=15 y=1\n");
+}
+
+// §28.16: a port change that leaves the gate's output where it is, `a` rising
+// while `b` holds the and at 0, is still an input change, and the gate goes on
+// following its ports afterwards: `b` rising a step later drives the output 1
+// after the delay, and `b` falling drives it 0 again.
+TEST(GateNetDelays, DelayedGateFollowsPortsAfterAnEvaluationThatHolds) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub (output y, input a, b);\n"
+      "  and #4 g (y, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire y;\n"
+      "  logic a = 0, c = 0;\n"
+      "  sub s1 (y, a, c);\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "    #1 c = 1;\n"
+      "    #5 $display(\"t=%0t y=%b\", $time, y);\n"
+      "    c = 0;\n"
+      "    #5 $display(\"t=%0t y=%b\", $time, y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=16 y=1\n"
+            "t=21 y=0\n");
+}
+
+// §28.16 with §23.10: the delay may be a parameter of the module holding the
+// gate, `and #(D)`, set by each instance's override -- 4 by position and 9 by
+// name -- and each instance's output follows its ports after its own delay.
+TEST(GateNetDelays, ParameterDelayOfASubmoduleGateFollowsItsPorts) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub #(parameter D = 2) (output y, input a, b);\n"
+      "  and #(D) g (y, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire y, z;\n"
+      "  logic a = 0;\n"
+      "  sub #(4) s1 (y, a, a);\n"
+      "  sub #(.D(9)) s2 (z, a, a);\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "    #3 $display(\"t=%0t y=%b z=%b\", $time, y, z);\n"
+      "    #2 $display(\"t=%0t y=%b z=%b\", $time, y, z);\n"
+      "    #5 $display(\"t=%0t y=%b z=%b\", $time, y, z);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=13 y=0 z=0\n"
+            "t=15 y=1 z=0\n"
+            "t=20 y=1 z=1\n");
+}
+
+// §28.16 names net delays beside gate delays, and §10.3.3 gives a continuous
+// assignment's delay the same inertial treatment: `assign #4 y = a & b` inside
+// a module follows the module's input ports as the gate does.
+TEST(GateNetDelays, DelayedAssignFollowsInputPorts) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub (output y, input a, b);\n"
+      "  assign #4 y = a & b;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire y;\n"
+      "  logic a = 0, c = 0;\n"
+      "  sub s1 (y, a, c);\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "    #1 c = 1;\n"
+      "    #10 $display(\"t=%0t y=%b\", $time, y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "t=21 y=1\n");
+}
+
+// §23.2.2: an input port follows what the parent connects to it for as long
+// as the run lasts, including after a change of the port has met a delayed
+// gate's pending transition inside the instance: the port `b` goes on following
+// `b` of the parent, and the gate's output with it. The change at 10 falls in
+// the time slot the gate's x->0 of time 0 matures in, and §4.7 (printed page
+// 69) lets the two be taken "in any order", so whether a 0 is seen at 10 is
+// left open; the 1 by 20 and the 0 at 40 are not.
+TEST(GateNetDelays, InputPortKeepsFollowingAfterItCancelsAPendingTransition) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module mycell(input a, input b, output w);\n"
+      "  and #10 (w, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a, b; wire tw;\n"
+      "  mycell u(.a(a), .b(b), .w(tw));\n"
+      "  initial begin\n"
+      "    a = 1; b = 0;\n"
+      "    #10 b = 1;\n"
+      "    #15 $display(\"t=%0t u.b=%b w=%b\", $time, u.b, tw);\n"
+      "    #5 b = 0;\n"
+      "    #5 $display(\"t=%0t u.b=%b w=%b\", $time, u.b, tw);\n"
+      "    #10 $display(\"t=%0t u.b=%b w=%b\", $time, u.b, tw);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=25 u.b=1 w=1\n"
+            "t=35 u.b=0 w=1\n"
+            "t=45 u.b=0 w=0\n");
+}
+
 }  // namespace
