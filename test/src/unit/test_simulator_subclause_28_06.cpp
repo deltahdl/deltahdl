@@ -311,4 +311,64 @@ TEST(TristateGateSim, StrongHAgainstAWeakerZeroRendersTheTwoDigitForm) {
             "56X\n");
 }
 
+// §28.6 (printed page 837): a bufif1 is a three-state driver, and one inside a
+// module driving the module's inout port (§23.2.2) is one driver of the net the
+// port is connected to, resolved with the net's other drivers by strength
+// (§28.12.1): the enabled instance's strong value wins over the pullup, and
+// with both instances disabled the pullup alone drives the bus.
+TEST(TristateGateSim, InoutPortDriversResolveWithAPullup) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module drv (inout w, input d, en);\n"
+      "  bufif1 g (w, d, en);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire bus;\n"
+      "  pullup (bus);\n"
+      "  logic d1 = 1, e1 = 1, d2 = 0, e2 = 0;\n"
+      "  drv a (bus, d1, e1);\n"
+      "  drv b (bus, d2, e2);\n"
+      "  initial begin\n"
+      "    #1 $display(\"bus=%b %v\", bus, bus);\n"
+      "    e1 = 0; e2 = 1;\n"
+      "    #1 $display(\"bus=%b %v\", bus, bus);\n"
+      "    e2 = 0;\n"
+      "    #1 $display(\"bus=%b %v\", bus, bus);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "bus=1 St1\n"
+            "bus=0 St0\n"
+            "bus=1 Pu1\n");
+}
+
+// §28.6: the disabled bufif1 of one driver outputs z, which leaves the net to
+// the enabled one, whether the two are both inside instances on inout ports or
+// one is a top-level gate declared ahead of the instance holding the other.
+TEST(TristateGateSim, InoutPortDriverResolvesWithAGateDeclaredBeforeIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module drv (inout w, input d, en);\n"
+      "  bufif1 g (w, d, en);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire w1, w3;\n"
+      "  logic one = 1, zero = 0, e1 = 1, e2 = 0;\n"
+      "  drv a1 (w1, one, e1);\n"
+      "  drv a2 (w1, zero, e2);\n"
+      "  bufif1 c1 (w3, one, e1);\n"
+      "  drv c2 (w3, zero, e2);\n"
+      "  initial begin\n"
+      "    #1 $display(\"w1=%b w3=%b\", w1, w3);\n"
+      "    e1 = 0; e2 = 1;\n"
+      "    #1 $display(\"w1=%b w3=%b\", w1, w3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "w1=1 w3=1\n"
+            "w1=0 w3=0\n");
+}
+
 }  // namespace
