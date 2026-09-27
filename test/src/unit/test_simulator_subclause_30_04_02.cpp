@@ -179,4 +179,36 @@ TEST(SpecifyPathSim, AssignReadingAnInterfacePortFollowsIt) {
             "t=20 y=0\n");
 }
 
+// §30.4.2 (printed page 873): Syntax 30-3's specify_input_terminal_descriptor
+// and specify_output_terminal_descriptor are `identifier [ [
+// constant_range_expression ] ]`, so a terminal may be a bit-select of a
+// vector port, and `(a[0] => y[0]) = 2; (a[1] => y[1]) = 5` are two paths,
+// each bit taking its own path's delay. The two collapsed into the last path
+// declared and bit 0 moved after 5.
+TEST(SimpleModulePathRun, BitSelectTerminalsDeclareOnePathPerBit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mybus(input [1:0] a, output [1:0] y);\n"
+                       "  assign y = a;\n"
+                       "  specify\n"
+                       "    (a[0] => y[0]) = 2;\n"
+                       "    (a[1] => y[1]) = 5;\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [1:0] a;\n"
+                       "  wire [1:0] ty;\n"
+                       "  mybus u(.a(a), .y(ty));\n"
+                       "  always @(ty) if ($time >= 8)\n"
+                       "    $display(\"t=%0t y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 2'b00;\n"
+                       "    #10 a[0] = 1;\n"
+                       "    #10 a[1] = 1;\n"
+                       "    #10 a[0] = 0;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=12 y=01\nt=25 y=11\nt=32 y=10\n");
+}
+
 }  // namespace
