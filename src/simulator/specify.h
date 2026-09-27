@@ -34,6 +34,10 @@ struct RegisteredPathDecl {
   const SpecifyPathDecl* decl = nullptr;
   std::string inst_prefix;
   std::size_t path_index = 0;
+  // Which of the declaration's sources and destinations the path runs
+  // between, a full connection declaring one path per pair (§30.4.6).
+  std::size_t src_index = 0;
+  std::size_t dst_index = 0;
 };
 
 // §32.4.3: a system timing check declaration together with the module instance

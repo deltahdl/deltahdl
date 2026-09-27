@@ -193,8 +193,9 @@ void SpecifyManager::RebuildPathDelaysForSpecparam(
     // whichever process called $sdf_annotate.
     InstancePrefixOverride scope(specparam_ctx_->InstancePrefixOverride(),
                                  registered.inst_prefix);
-    PathDelay pd = BuildPathDelayFromDecl(*registered.decl, *specparam_ctx_,
-                                          *specparam_arena_);
+    PathDelay pd = BuildPathDelayFromDecl(
+        *registered.decl, *specparam_ctx_, *specparam_arena_,
+        registered.src_index, registered.dst_index);
     // The rebuilt path replaces the entry its declaration made, at the
     // instance the declaration was registered under (§30.4), keeping the pulse
     // limits that entry holds.
@@ -515,8 +516,13 @@ void SpecifyManager::ResolvePulseControlSpecparams(
 void SpecifyManager::ApplyPathSpecificPulseControl(
     const PulseControlSpecparam& s) {
   for (auto& pd : path_delays_) {
-    if (s.input == std::string_view(pd.src_port) &&
-        s.output == std::string_view(pd.dst_port) &&
+    // The declaration's first terminals name every path it declares; a path no
+    // declaration made names itself.
+    std::string_view input =
+        pd.decl_src_port.empty() ? pd.src_port : pd.decl_src_port;
+    std::string_view output =
+        pd.decl_dst_port.empty() ? pd.dst_port : pd.decl_dst_port;
+    if (s.input == input && s.output == output &&
         s.inst_prefix == std::string_view(pd.inst_prefix)) {
       ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
     }

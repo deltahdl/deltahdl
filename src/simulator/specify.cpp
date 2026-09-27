@@ -817,20 +817,32 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
                                           SimContext& ctx, Arena& arena,
                                           bool default_pulse_limits,
                                           std::string_view inst_prefix) {
-  PathDelay pd = BuildPathDelayFromDecl(decl, ctx, arena);
-  // §30.4 names a path's terminals by the declaring module's own port names, so
-  // the instance is what tells two instances of one cell apart.
-  pd.inst_prefix = inst_prefix;
-  if (default_pulse_limits) InitDefaultPulseLimits(pd);
-  // §30.5.3 (printed page 885): every declared path is a path of its own, a
-  // second declaration between the same terminals among them, and where more
-  // than one is active for a transition the least of their delays is used, so
-  // a declaration adds its path rather than overwriting one it shares
-  // terminals, an edge or a condition with. The instance and the entry travel
-  // with the declaration so RebuildPathDelaysForSpecparam replaces that very
-  // entry.
-  path_decls_.push_back({&decl, std::string(inst_prefix), path_delays_.size()});
-  path_delays_.push_back(std::move(pd));
+  // §30.4.6 (printed page 880): a full connection declares a path from every
+  // source to every destination, and a parallel one the path between its two.
+  const bool kFull = decl.path_kind == SpecifyPathKind::kFull;
+  const std::size_t kSources =
+      kFull ? std::max<std::size_t>(decl.src_ports.size(), 1) : 1;
+  const std::size_t kDestinations =
+      kFull ? std::max<std::size_t>(decl.dst_ports.size(), 1) : 1;
+  for (std::size_t src = 0; src < kSources; ++src) {
+    for (std::size_t dst = 0; dst < kDestinations; ++dst) {
+      PathDelay pd = BuildPathDelayFromDecl(decl, ctx, arena, src, dst);
+      // §30.4 names a path's terminals by the declaring module's own port
+      // names, so the instance is what tells two instances of one cell apart.
+      pd.inst_prefix = inst_prefix;
+      if (default_pulse_limits) InitDefaultPulseLimits(pd);
+      // §30.5.3 (printed page 885): every declared path is a path of its own,
+      // a second declaration between the same terminals among them, and where
+      // more than one is active for a transition the least of their delays is
+      // used, so a declaration adds its paths rather than overwriting one it
+      // shares terminals, an edge or a condition with. The instance, the entry
+      // and the terminals travel with the declaration so
+      // RebuildPathDelaysForSpecparam replaces that very entry.
+      path_decls_.push_back(
+          {&decl, std::string(inst_prefix), path_delays_.size(), src, dst});
+      path_delays_.push_back(std::move(pd));
+    }
+  }
 }
 
 void SpecifyManager::BindDesignSpecparams(std::vector<std::string> names,

@@ -40,6 +40,16 @@ struct PathDelay {
   // one vector apart, and what an IOPATH naming `a[1]` is matched against.
   std::string src_select;
   std::string dst_select;
+  // §30.7.1 (printed page 888): the first path input and first path output
+  // terminal of the declaration this path came from. "When a module path
+  // declaration declares multiple paths, the PATHPULSE$ specparam shall only be
+  // specified for the first path input terminal and the first path output
+  // terminal", and the limits it gives "shall apply to all other paths in the
+  // multiple path declaration", so a path-specific PATHPULSE$ is matched
+  // against these. Empty on a path no declaration made, which is matched by
+  // its own terminals.
+  std::string decl_src_port;
+  std::string decl_dst_port;
   // The hierarchical prefix of the module instance whose specify block declared
   // this path, ending in a `.` and empty for a module elaborated as a top.
   // §30.3 puts a specify block inside a module declaration and §30.4 has it
@@ -89,9 +99,12 @@ class Scheduler;
 // value is treated as zero, and the resulting one/two/three/six/twelve values
 // are distributed across all twelve transition slots per Table 30-2. Each is a
 // count of the declaring module's time unit and lands in the design's ticks
-// (§22.7). Defined in specify_register.cpp.
+// (§22.7). `src_index` and `dst_index` pick the source and destination of the
+// path among the declaration's terminals, one path of a full connection
+// (§30.4.6). Defined in specify_register.cpp.
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
-                                 Arena& arena);
+                                 Arena& arena, std::size_t src_index = 0,
+                                 std::size_t dst_index = 0);
 
 // §32.4.3: the names a module introduced as specparams. These are the only
 // names an SDF LABEL section has anything to annotate, so collecting them is

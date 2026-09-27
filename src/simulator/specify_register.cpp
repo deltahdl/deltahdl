@@ -70,15 +70,18 @@ static uint64_t PathDelayTicks(const Logic4Vec& value, const TimeScale& scale,
 }
 
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
-                                 Arena& arena) {
+                                 Arena& arena, std::size_t src_index,
+                                 std::size_t dst_index) {
   PathDelay pd;
-  if (!decl.src_ports.empty()) {
-    pd.src_port = TerminalName(decl.src_ports.front());
-    pd.src_select = TerminalSelectText(decl.src_ports.front(), ctx, arena);
+  if (src_index < decl.src_ports.size()) {
+    pd.src_port = TerminalName(decl.src_ports[src_index]);
+    pd.src_select = TerminalSelectText(decl.src_ports[src_index], ctx, arena);
+    pd.decl_src_port = TerminalName(decl.src_ports.front());
   }
-  if (!decl.dst_ports.empty()) {
-    pd.dst_port = TerminalName(decl.dst_ports.front());
-    pd.dst_select = TerminalSelectText(decl.dst_ports.front(), ctx, arena);
+  if (dst_index < decl.dst_ports.size()) {
+    pd.dst_port = TerminalName(decl.dst_ports[dst_index]);
+    pd.dst_select = TerminalSelectText(decl.dst_ports[dst_index], ctx, arena);
+    pd.decl_dst_port = TerminalName(decl.dst_ports.front());
   }
   pd.path_kind = decl.path_kind;
   pd.edge = decl.edge;
