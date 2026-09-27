@@ -119,6 +119,12 @@ struct Variable {
   // "changed at time zero", and only paths watched by the same arming are ever
   // compared against each other.
   uint64_t last_change_ticks = 0;
+  // §30.5.3 again, for a path whose input is a select of this variable,
+  // `(a[1] => y)`: the time each bit last changed, by storage offset, which is
+  // the input such a path transitions on. Sized and written by the same watcher
+  // only where some registered path's source is a select of this variable, and
+  // empty everywhere else.
+  std::vector<uint64_t> bit_change_ticks;
 
   bool is_forced = false;
   Logic4Vec forced_value{};

@@ -5,13 +5,19 @@
 
 #include "simulator/module_path_delay.h"
 
+#include <algorithm>
+#include <bit>
+#include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <unordered_set>
+#include <system_error>
+#include <unordered_map>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -89,6 +95,44 @@ bool PathStartsAtOneOf(const PathDelay& pd,
   return false;
 }
 
+// The bounds a path terminal's select spells (PathDelay::src_select), "[1]"
+// read as [1:1] and "[3:2]" as written; false for an empty select and for text
+// of any other shape.
+bool SelectBounds(std::string_view select, int64_t& left, int64_t& right) {
+  if (select.size() < 3 || select.front() != '[' || select.back() != ']')
+    return false;
+  select = select.substr(1, select.size() - 2);
+  const size_t kColon = select.find(':');
+  std::string_view lhs = select.substr(0, kColon);
+  std::string_view rhs =
+      kColon == std::string_view::npos ? lhs : select.substr(kColon + 1);
+  auto parse = [](std::string_view text, int64_t& out) {
+    auto [stop, ec] =
+        std::from_chars(text.data(), text.data() + text.size(), out);
+    return ec == std::errc() && stop == text.data() + text.size();
+  };
+  return parse(lhs, left) && parse(rhs, right);
+}
+
+// Records `now` as the change time of each bit of `var` that differs from
+// `seen`, the value the watcher last recorded, a bit being one that differs
+// in either its value or its unknown plane.
+void RecordChangedBits(Variable& var, const std::vector<Logic4Word>& seen,
+                       uint64_t now) {
+  const size_t kWords = std::min<size_t>(var.value.nwords, seen.size());
+  for (size_t i = 0; i < kWords; ++i) {
+    uint64_t diff = (var.value.words[i].aval ^ seen[i].aval) |
+                    (var.value.words[i].bval ^ seen[i].bval);
+    while (diff != 0) {
+      const size_t kOffset =
+          i * 64 + static_cast<size_t>(std::countr_zero(diff));
+      if (kOffset < var.bit_change_ticks.size())
+        var.bit_change_ticks[kOffset] = now;
+      diff &= diff - 1;
+    }
+  }
+}
+
 }  // namespace
 
 uint8_t ModulePathTransitionSlot(const Logic4Vec& from, const Logic4Vec& to) {
@@ -113,9 +157,31 @@ bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output) {
 // has never changed reads, and the two need not be told apart: §30.5.3 compares
 // these times against each other, and a source that never moved is never the
 // most recent unless every candidate is in the same position.
+//
+// A path whose input is a select of the variable, `(a[1] => y)`, transitions
+// when those bits do, so it reads the latest change among them
+// (Variable::bit_change_ticks). Timed by the whole vector, the paths from a[0]
+// and a[1] both moved at every change of either bit, and the smaller delay
+// governed a transition only the other bit had made.
 static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
   const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);
-  return var != nullptr ? var->last_change_ticks : 0;
+  if (var == nullptr) return 0;
+  int64_t left = 0;
+  int64_t right = 0;
+  if (var->bit_change_ticks.empty() ||
+      !SelectBounds(pd.src_select, left, right)) {
+    return var->last_change_ticks;
+  }
+  const PackedRange kRange = var->DeclaredRange();
+  uint64_t latest = 0;
+  for (int64_t idx = std::min(left, right); idx <= std::max(left, right);
+       ++idx) {
+    if (!kRange.Contains(idx)) continue;
+    auto offset = static_cast<size_t>(kRange.OffsetOf(idx));
+    if (offset < var->bit_change_ticks.size())
+      latest = std::max(latest, var->bit_change_ticks[offset]);
+  }
+  return latest;
 }
 
 // §30.5.3's condition half for a candidate that is not an ifnone path: "either
@@ -207,7 +273,11 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
 //
 // It returns false so that NotifyWatchers re-arms it: a module path source may
 // transition any number of times before the run ends.
-static void WatchSourceVariable(Variable* var, SimContext& ctx) {
+//
+// `per_bit` asks for each bit's change time as well, which a path whose input
+// is a select of the variable reads (Variable::bit_change_ticks).
+static void WatchSourceVariable(Variable* var, SimContext& ctx, bool per_bit) {
+  if (per_bit) var->bit_change_ticks.assign(var->value.width, 0);
   auto seen = std::make_shared<std::vector<Logic4Word>>(
       var->value.words, var->value.words + var->value.nwords);
   var->AddWatcher([var, &ctx, seen]() {
@@ -217,8 +287,10 @@ static void WatchSourceVariable(Variable* var, SimContext& ctx) {
                 var->value.words[i].bval != (*seen)[i].bval;
     }
     if (changed) {
+      const uint64_t kNow = ctx.CurrentTime().ticks;
+      if (!var->bit_change_ticks.empty()) RecordChangedBits(*var, *seen, kNow);
       seen->assign(var->value.words, var->value.words + var->value.nwords);
-      var->last_change_ticks = ctx.CurrentTime().ticks;
+      var->last_change_ticks = kNow;
     }
     return false;
   });
@@ -226,13 +298,16 @@ static void WatchSourceVariable(Variable* var, SimContext& ctx) {
 
 void WatchModulePathSources(const SpecifyManager& mgr, SimContext& ctx) {
   // One watcher per source terminal however many paths start there, since the
-  // time recorded is the variable's and not the path's.
-  std::unordered_set<std::string> armed;
+  // time recorded is the variable's and not the path's; it times each bit too
+  // where any of those paths starts at a select of the terminal.
+  std::unordered_map<std::string, bool> sources;
   for (const PathDelay& pd : mgr.GetPathDelays()) {
-    std::string qualified = pd.inst_prefix + pd.src_port;
-    if (!armed.insert(qualified).second) continue;
+    bool& per_bit = sources[pd.inst_prefix + pd.src_port];
+    per_bit = per_bit || !pd.src_select.empty();
+  }
+  for (const auto& [qualified, per_bit] : sources) {
     Variable* var = ctx.FindVariable(qualified);
-    if (var != nullptr) WatchSourceVariable(var, ctx);
+    if (var != nullptr) WatchSourceVariable(var, ctx, per_bit);
   }
 }
 

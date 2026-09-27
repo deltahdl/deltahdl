@@ -208,4 +208,38 @@ TEST(ModulePathActivityOrder, AnEnabledLastInputTakesItsOwnPathDelay) {
   EXPECT_EQ(out, "at 48 y=0\ny=1 t=56\nat 60 y=1\n");
 }
 
+// §30.5.3 (printed page 885) selects the paths "whose input has transitioned
+// most recently in time", and the input of `(a[1] => y)` is the bit a[1], not
+// the vector a. So a rise of a[1] at t=20 reaches y over a[1]'s 9, its fall at
+// t=40 likewise, and a rise of a[0] at t=60 over a[0]'s 3. Timed by the vector,
+// both paths moved at every change and the smaller delay, 3, governed all
+// three.
+TEST(ModulePathActivityOrder, APathFromABitIsTimedByThatBit) {
+  SimFixture f;
+  std::string out = RunCapture(R"(module dut(input [1:0] a, output y);
+  logic [1:0] sa;
+  logic armed;
+  assign a = sa;
+  assign y = a[0] | a[1];
+  specify
+    (a[0] => y) = 3;
+    (a[1] => y) = 9;
+  endspecify
+  always @(y) begin
+    if (armed) $display("y=%b t=%0d", y, $time);
+  end
+  initial begin
+    armed = 1'b0;
+    sa = 2'b00;
+    #10 armed = 1'b1;
+    #10 sa[1] = 1'b1;
+    #20 sa[1] = 1'b0;
+    #20 sa[0] = 1'b1;
+  end
+endmodule
+)",
+                               f);
+  EXPECT_EQ(out, "y=1 t=29\ny=0 t=49\ny=1 t=63\n");
+}
+
 }  // namespace
