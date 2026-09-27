@@ -523,6 +523,7 @@ static void RecordTriregChargeStrengths(Net& net) {
 }
 
 static void ResolveTriregCharge(Net& net, Scheduler* sched) {
+  if (net.was_driven) net.holds_charge = true;
   RecordTriregChargeStrengths(net);
   // §28.16.2.1: the decay process ends when "the delay specified by charge
   // decay time elapses, and the trireg net makes a transition from 1 or 0 to
@@ -571,9 +572,30 @@ static void AppendTriPullDriver(std::vector<Logic4Vec>& drivers,
   strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
 }
 
-static void ResolveStrengthDriven(Net& net, Arena& arena) {
+// §28.15.2: whether a trireg's charge strength outranks the strength of every
+// driver of it that drives anything but high impedance, which is what keeps it
+// in the charge storage state while those drivers are on.
+static bool ChargeOutranksDrivers(const Net& net) {
+  for (size_t i = 0; i < net.drivers.size(); ++i) {
+    if (AllDriversZ({net.drivers[i]})) continue;
+    if (i >= net.driver_strengths.size()) return false;
+    const DriverStrength& ds = net.driver_strengths[i];
+    if (std::max(ds.s0, ds.s1) >= net.charge_strength) return false;
+  }
+  return true;
+}
+
+// `charge`, where given, is the value a trireg in the charge storage state
+// holds, which §28.15.2 has drive the net at the trireg's charge strength
+// alongside its drivers.
+static void ResolveStrengthDriven(Net& net, Arena& arena,
+                                  const Logic4Vec* charge = nullptr) {
   std::vector<Logic4Vec> drivers = net.drivers;
   std::vector<DriverStrength> strengths = net.driver_strengths;
+  if (charge != nullptr) {
+    drivers.push_back(*charge);
+    strengths.push_back({net.charge_strength, net.charge_strength});
+  }
   AppendTriPullDriver(drivers, strengths, net.type, net.resolved->value.width,
                       arena);
 
@@ -716,14 +738,23 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
       net.type == NetType::kSupply1;
   if (net.drivers.empty() && !needs_resolution_when_undriven) return;
 
+  const Logic4Vec* charge = nullptr;
   if (net.type == NetType::kTrireg && !AllDriversZ(net.drivers)) {
     ++net.decay_generation;
+    // §28.15.2 (printed page 855) with §28.12.1's Table 28-7: a trireg holding
+    // charge drives at its charge strength, so its stored value stands against
+    // a weaker driver -- a `large` charge outranks a `weak` one -- and it stays
+    // in the charge storage state for as long as it does. Resolved from its
+    // drivers alone, a `bufif1 (weak1, weak0)` driving 0 overwrote a large 1.
+    if (net.holds_charge) charge = &net.resolved->value;
+    net.holds_charge = net.holds_charge && ChargeOutranksDrivers(net);
+    net.was_driven = !net.holds_charge;
   }
 
   if (ResolveSpecialNet(net, arena, sched)) return;
 
   if (!net.is_user_nettype && !net.driver_strengths.empty()) {
-    ResolveStrengthDriven(net, arena);
+    ResolveStrengthDriven(net, arena, charge);
     return;
   }
 
