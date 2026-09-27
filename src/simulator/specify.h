@@ -26,12 +26,14 @@ class SimContext;
 // delay expression reads, and the rebuilt path has to be filed back at the
 // instance the declaration came from. §30.4 has a module path name its
 // terminals by the declaring module's own port names, so the declaration alone
-// spells a path identically for every instance of the cell: a rebuild left at
-// the empty prefix is filed beside the declared path rather than replacing it,
-// SpecifyManager::AddPathDelay comparing PathDelay::inst_prefix.
+// spells a path identically for every instance of the cell, and §30.5.3 keeps
+// two declarations between the same terminals as two paths: the rebuilt path
+// replaces the entry of SpecifyManager's paths the declaration made,
+// `path_index`, which nothing removes.
 struct RegisteredPathDecl {
   const SpecifyPathDecl* decl = nullptr;
   std::string inst_prefix;
+  std::size_t path_index = 0;
 };
 
 // §32.4.3: a system timing check declaration together with the module instance

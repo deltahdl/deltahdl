@@ -206,4 +206,51 @@ TEST(ActiveModulePathSelection, FallTakesTheFallDelayOfTheLaterInputA) {
   EXPECT_EQ(out, "s65=1\ny=0@69\ns73=0\n");
 }
 
+// A gate whose clk-to-q paths are `paths`, clk rising at 30 and falling at 60
+// with data held 1, printing each change of q from 20 on.
+std::string TwoPathGate(const std::string& paths) {
+  return "module mygate(input clk, input data, output q);\n"
+         "  assign q = clk & data;\n"
+         "  specify\n" +
+         paths +
+         "  endspecify\n"
+         "endmodule\n"
+         "module top;\n"
+         "  logic clk, data;\n"
+         "  wire tq;\n"
+         "  mygate u(.clk(clk), .data(data), .q(tq));\n"
+         "  always @(tq) if ($time >= 20) $display(\"t=%0t q=%b\", $time, "
+         "tq);\n"
+         "  initial begin\n"
+         "    clk = 0; data = 1;\n"
+         "    #30 clk = 1;\n"
+         "    #30 clk = 0;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §30.5.3 (printed page 885): two unconditional paths declared between the
+// same terminals are both paths of the module and both active, so each
+// transition takes the smaller of their delays for it: the rise min(10, 20) and
+// the fall min(5, 6). The second declaration replaced the first, and q rose at
+// 50 and fell at 66.
+TEST(ActivePathSelectionRun, SameTerminalPathsAreBothKept) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(TwoPathGate("    (clk => q) = (10, 5);\n"
+                                   "    (clk => q) = (20, 6);\n"),
+                       f),
+            "t=40 q=1\nt=65 q=0\n");
+}
+
+// The smaller rise and the smaller fall come from different declarations, so
+// neither path alone gives both: q rises with the first's 10 and falls with the
+// second's 5.
+TEST(ActivePathSelectionRun, EachTransitionTakesItsOwnSmallestDelay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(TwoPathGate("    (clk => q) = (10, 6);\n"
+                                   "    (clk => q) = (20, 5);\n"),
+                       f),
+            "t=40 q=1\nt=65 q=0\n");
+}
+
 }  // namespace

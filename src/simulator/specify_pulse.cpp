@@ -38,6 +38,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_internal.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/specify_timing_check.h"
@@ -194,11 +195,12 @@ void SpecifyManager::RebuildPathDelaysForSpecparam(
                                  registered.inst_prefix);
     PathDelay pd = BuildPathDelayFromDecl(*registered.decl, *specparam_ctx_,
                                           *specparam_arena_);
-    // The rebuilt path is filed back at the instance the declaration was
-    // registered under (§30.4): AddPathDelay compares PathDelay::inst_prefix,
-    // so a rebuild at the empty prefix lands beside the declared path.
+    // The rebuilt path replaces the entry its declaration made, at the
+    // instance the declaration was registered under (§30.4), keeping the pulse
+    // limits that entry holds.
     pd.inst_prefix = registered.inst_prefix;
-    AddPathDelay(std::move(pd), /*preserve_pulse_limits=*/true);
+    ReplacePathDelayPreservingPulse(path_delays_[registered.path_index],
+                                    std::move(pd), {true, true});
   }
 }
 

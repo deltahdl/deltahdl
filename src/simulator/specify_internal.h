@@ -7,6 +7,8 @@
 
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
 #include "simulator/specify_timing_check.h"
 
 namespace delta {
@@ -48,6 +50,11 @@ void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
                                  uint8_t reject_pct, uint8_t error_pct,
                                  uint64_t (&reject_limit)[12],
                                  uint64_t (&error_limit)[12]);
+// Overwrites `existing` with `replacement`, holding back whichever pulse
+// (reject/error) limits `retain` names at the values `existing` already had.
+// Defined in specify.cpp.
+void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
+                                     PathDelayPulseRetention retain);
 std::string SpecifyConditionText(const Expr* cond);
 bool SpecifyConditionsMatch(std::string_view a, std::string_view b);
 

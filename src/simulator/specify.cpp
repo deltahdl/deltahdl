@@ -272,10 +272,6 @@ bool StateDependentPathConditionEnables(Logic4Word condition_lsb) {
   return (condition_lsb.aval & 1u) != 0u;
 }
 
-namespace {
-
-// Overwrites `existing` with `replacement`, holding back whichever pulse
-// (reject/error) limits `retain` names at the values `existing` already had.
 void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
                                      PathDelayPulseRetention retain) {
   uint64_t saved_reject[12];
@@ -299,6 +295,8 @@ void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
     existing.error_limit_source = saved_error_source;
   }
 }
+
+namespace {
 
 // Nonconditional update: overwrites every existing path delay between the same
 // ports, but keeps each entry's original condition/ifnone (and whichever pulse
@@ -824,11 +822,15 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
   // the instance is what tells two instances of one cell apart.
   pd.inst_prefix = inst_prefix;
   if (default_pulse_limits) InitDefaultPulseLimits(pd);
-  AddPathDelay(std::move(pd));
-  // The instance travels with the declaration because
-  // RebuildPathDelaysForSpecparam files a rebuilt path back at the instance the
-  // declaration came from, §30.4 spelling it identically in every instance.
-  path_decls_.push_back({&decl, std::string(inst_prefix)});
+  // §30.5.3 (printed page 885): every declared path is a path of its own, a
+  // second declaration between the same terminals among them, and where more
+  // than one is active for a transition the least of their delays is used, so
+  // a declaration adds its path rather than overwriting one it shares
+  // terminals, an edge or a condition with. The instance and the entry travel
+  // with the declaration so RebuildPathDelaysForSpecparam replaces that very
+  // entry.
+  path_decls_.push_back({&decl, std::string(inst_prefix), path_delays_.size()});
+  path_delays_.push_back(std::move(pd));
 }
 
 void SpecifyManager::BindDesignSpecparams(std::vector<std::string> names,
