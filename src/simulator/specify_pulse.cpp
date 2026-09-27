@@ -336,6 +336,15 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec,
   }
 }
 
+uint64_t SpecifyManager::StoredSpecparamValue(std::string_view inst_prefix,
+                                              const std::string& name) const {
+  if (specparam_ctx_ == nullptr || !IsDeclaredSpecparam(inst_prefix, name))
+    return 0;
+  Variable* storage =
+      specparam_ctx_->FindVariable(std::string(inst_prefix) + name);
+  return storage != nullptr ? storage->value.ToUint64() : 0;
+}
+
 void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta,
                                              std::string_view inst_prefix) {
   std::string name = std::move(delta.name);
@@ -349,10 +358,15 @@ void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta,
     new_value = specparam_values_[it->second].value + added;
     specparam_values_[it->second].value = new_value;
   } else {
+    // §32.4.3 (printed page 927) with §32.5 (printed page 929): an INCREMENT
+    // modifies what the specparam holds, which before any LABEL reaches it is
+    // the value its declaration gave it. Taken as 0, `(INCREMENT (cap (3)))`
+    // on `specparam cap = 1` made cap 3 rather than 4.
+    new_value = StoredSpecparamValue(inst_prefix, name) + added;
     specparam_index_[key] = specparam_values_.size();
     SpecparamValue stored;
     stored.name = name;
-    stored.value = added;
+    stored.value = new_value;
     specparam_values_.push_back(std::move(stored));
   }
   ApplyAnnotatedSpecparam(inst_prefix, name, new_value);

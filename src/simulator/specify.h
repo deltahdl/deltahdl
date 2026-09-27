@@ -535,6 +535,13 @@ class SpecifyManager {
   bool IsDeclaredSpecparam(std::string_view inst_prefix,
                            std::string_view name) const;
 
+  // §32.4.3 with §32.5: the value the specparam `name` of the instance
+  // `inst_prefix` names holds in the run's storage, which before any LABEL
+  // reaches it is the value its declaration gave it; 0 where it is no declared
+  // specparam or no storage answers for it.
+  uint64_t StoredSpecparamValue(std::string_view inst_prefix,
+                                const std::string& name) const;
+
   // §32.4.4: place one already-resolved (source, load) pair's delay, either
   // replacing what is there or adding to it for an INCREMENT section.
   void PlaceInterconnectDelay(const SdfInterconnectAnnotation& annotation,

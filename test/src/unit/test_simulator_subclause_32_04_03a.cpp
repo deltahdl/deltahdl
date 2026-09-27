@@ -413,6 +413,20 @@ TEST(SdfSpecparamReevaluation, PathDelayExpressionFollowsEverySuccessiveValue) {
   EXPECT_EQ(d.mgr.GetPathDelay("a", "z"), 45u);  // 2 * 21 + 3
 }
 
+// §32.4.3 (printed page 927) with §32.5 (printed page 929): an INCREMENT
+// modifies what the specparam holds, and a LABEL that is the first to reach it
+// finds the value the declaration gave it, so `(INCREMENT (cap 1))` on the
+// declared 5 makes cap 6 and the path 2 * 6 + 3. Taken as an ABSOLUTE 1 when no
+// earlier LABEL had annotated cap, it made the path 5.
+TEST(SdfSpecparamReevaluation, FirstIncrementAddsToTheDeclaredValue) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPathSrc));
+  ASSERT_EQ(d.mgr.GetPathDelay("a", "z"), 13u);  // the declared 2 * 5 + 3
+
+  d.Annotate(SdfLabel("(INCREMENT (cap 1))"));
+  EXPECT_EQ(d.mgr.GetPathDelay("a", "z"), 15u);  // 2 * 6 + 3
+}
+
 // §32.4.3: an expression containing more than one specparam is reevaluated for
 // whichever of them the annotation changed, and each reevaluation reads the
 // current value of the others.
