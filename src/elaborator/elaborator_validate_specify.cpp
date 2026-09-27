@@ -84,9 +84,17 @@ TerminalRole DestRole() {
 
 // The signal scope of one module: its declared ports plus the net/var
 // declarations that are local signals (not ports).
+// The names a module's body declares: the nets and variables that are no port
+// (`local`), and the non-ANSI ports it declares again as variables, which
+// §23.2.2.1 lets make such a port a variable (`variable_ports`).
+struct ModuleSignals {
+  SignalSet local;
+  SignalSet variable_ports;
+};
+
 struct SignalScope {
   const PortMap& port_map;
-  const SignalSet& local_signals;
+  const ModuleSignals& signals;
   const IfaceMap& iface_map;
 };
 
@@ -156,9 +164,9 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
 }
 
 // Validates a path terminal that resolves to a declared port `p`: checks the
-// ref-port prohibition, direction compatibility, and (for sources) the net
-// requirement. Emits at most one diagnostic.
-void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
+// ref-port prohibition and direction compatibility, answering whether it
+// reported either.
+bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            SourceLoc loc, const TerminalRole& tr,
                            DiagEngine& diag) {
   // §25.6 is where "A ref port cannot be used as a terminal in a specify
@@ -172,7 +180,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            "terminal in a specify block",
                            t.name),
                Subclause("25.6"));
-    return;
+    return true;
   }
   if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
     diag.Error(loc,
@@ -180,16 +188,24 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            "connected to an {} port",
                            tr.role, t.name, tr.dir_phrase),
                Subclause("30.4.1"));
-    return;
+    return true;
   }
-  if (tr.require_net) {
-    bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
-    if (is_var) {
-      diag.Error(loc,
-                 std::format("module path source '{}' must be a net", t.name),
-                 Subclause("30.4.1"));
-    }
+  return false;
+}
+
+// §23.2.2.3 (printed page 735): "An implicit data type declaration implies a
+// net unless the var keyword is used", so a non-ANSI `input a;` is a net -- the
+// standard's own specify examples declare their ports that way -- unless the
+// body declares it again as a variable (§23.2.2.1) or it was written with
+// `var`. The ANSI header marks its implicit ports as nets; a non-ANSI
+// declaration leaves its data type implicit instead, which read as a variable
+// refused `(a => q)` as a path from no net.
+bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
+  if (p.data_type.is_net || p.data_type.is_interconnect) return false;
+  if (p.data_type.kind == DataTypeKind::kImplicit && !p.has_explicit_var) {
+    return signals.variable_ports.contains(p.name);
   }
+  return true;
 }
 
 // Validates one terminal of a module path: it must name a port whose direction
@@ -207,10 +223,15 @@ void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
   }
   auto it = scope.port_map.find(t.name);
   if (it != scope.port_map.end()) {
-    CheckPathTerminalPort(it->second, t, loc, tr, diag);
+    if (CheckPathTerminalPort(it->second, t, loc, tr, diag)) return;
+    if (tr.require_net && PortIsVariable(*it->second, scope.signals)) {
+      diag.Error(loc,
+                 std::format("module path source '{}' must be a net", t.name),
+                 Subclause("30.4.1"));
+    }
     return;
   }
-  if (scope.local_signals.contains(t.name)) {
+  if (scope.signals.local.contains(t.name)) {
     diag.Error(loc,
                std::format("module path {} '{}' is not connected "
                            "to an {} port",
@@ -228,17 +249,24 @@ PortMap BuildPortMap(const ModuleDecl* mod) {
   return port_map;
 }
 
-// Collects net/var declarations that are local signals (not ports).
-SignalSet BuildLocalSignals(const ModuleDecl* mod, const PortMap& port_map) {
-  SignalSet local_signals;
+// Collects the module's net and variable declarations: those that are no
+// port, and the variables declaring a port again.
+ModuleSignals BuildLocalSignals(const ModuleDecl* mod,
+                                const PortMap& port_map) {
+  ModuleSignals signals;
   for (auto* mi : mod->items) {
-    if ((mi->kind == ModuleItemKind::kNetDecl ||
-         mi->kind == ModuleItemKind::kVarDecl) &&
-        !mi->name.empty() && !port_map.contains(mi->name)) {
-      local_signals.insert(mi->name);
+    if ((mi->kind != ModuleItemKind::kNetDecl &&
+         mi->kind != ModuleItemKind::kVarDecl) ||
+        mi->name.empty()) {
+      continue;
+    }
+    if (!port_map.contains(mi->name)) {
+      signals.local.insert(mi->name);
+    } else if (mi->kind == ModuleItemKind::kVarDecl) {
+      signals.variable_ports.insert(mi->name);
     }
   }
-  return local_signals;
+  return signals;
 }
 
 // A timing-check terminal may not name a ref port. §25.6: an interface signal
@@ -270,9 +298,9 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
 
 // Validates all source and destination terminals of one path declaration.
 void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
-                            const SignalSet& local_signals,
+                            const ModuleSignals& signals,
                             const IfaceMap& iface_map, DiagEngine& diag) {
-  SignalScope scope{port_map, local_signals, iface_map};
+  SignalScope scope{port_map, signals, iface_map};
   for (const auto& t : si->path.src_ports) {
     CheckSpecifyPathTerminal(t, si->loc, scope, SourceRole(), diag);
   }
@@ -284,10 +312,10 @@ void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
 // Validates the terminals of one specify item (path declaration or timing
 // check); other item kinds are ignored.
 void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
-                               const SignalSet& local_signals,
+                               const ModuleSignals& signals,
                                const IfaceMap& iface_map, DiagEngine& diag) {
   if (si->kind == SpecifyItemKind::kPathDecl) {
-    CheckPathDeclTerminals(si, port_map, local_signals, iface_map, diag);
+    CheckPathDeclTerminals(si, port_map, signals, iface_map, diag);
   } else if (si->kind == SpecifyItemKind::kTimingCheck) {
     CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, port_map,
                         iface_map, diag);
@@ -299,12 +327,12 @@ void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
 // Pass: validate every path-source, path-destination, and timing-check terminal
 // against the module's port directions.
 void ValidatePathTerminals(const ModuleDecl* mod, const PortMap& port_map,
-                           const SignalSet& local_signals,
+                           const ModuleSignals& signals,
                            const IfaceMap& iface_map, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     for (auto* si : item->specify_items) {
-      CheckSpecifyItemTerminals(si, port_map, local_signals, iface_map, diag);
+      CheckSpecifyItemTerminals(si, port_map, signals, iface_map, diag);
     }
   }
 }
@@ -718,9 +746,9 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
 void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
                               DiagEngine& diag) {
   PortMap port_map = BuildPortMap(mod);
-  SignalSet local_signals = BuildLocalSignals(mod, port_map);
+  ModuleSignals signals = BuildLocalSignals(mod, port_map);
 
-  ValidatePathTerminals(mod, port_map, local_signals, iface_map, diag);
+  ValidatePathTerminals(mod, port_map, signals, iface_map, diag);
   ValidateIfnonePaths(mod, diag);
   ValidateEdgePathConsistency(mod, diag);
   ValidateEdgePathUniqueness(mod, diag);

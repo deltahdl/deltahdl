@@ -189,4 +189,45 @@ TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
       ReportedError(f.diag.Diagnostics(), "must be a net", 3, "30.4.1"));
 }
 
+// §23.2.2.3 (printed page 735): "An implicit data type declaration implies a
+// net unless the var keyword is used", so a non-ANSI `input a;` -- the way the
+// standard's own specify examples declare their ports -- is a net and a legal
+// path source (§30.4.1). Its data type was left implicit rather than marked a
+// net, and the path was refused as a path from a variable.
+TEST(SpecifyTerminalElaboration, NonAnsiInputWithNoTypeIsANetSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module mybuf(q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  assign q = a;\n"
+      "  specify\n"
+      "    (a => q) = (6, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.2.2.1 lets a non-ANSI port be declared again in the body, and declared
+// again as a variable it is one, which a path source may not be.
+TEST(SpecifyTerminalElaboration, NonAnsiInputRedeclaredAsAVariable) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module mybuf(q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  reg a;\n"
+      "  assign q = a;\n"
+      "  specify\n"
+      "    (a => q) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path source 'a' must be a net", 7,
+                            "30.4.1"));
+}
+
 }  // namespace
