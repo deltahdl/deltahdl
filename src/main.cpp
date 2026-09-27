@@ -162,6 +162,12 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   delta::PreprocConfig pp_config;
   pp_config.include_dirs = opts.include_dirs;
   pp_config.defines = opts.defines;
+  // §34.3 (printed page 949): a tool processing source text decrypts the
+  // decryption envelopes it meets with the key the user supplies, so the keys
+  // given on the command line are the ones a reading run opens them with, as
+  // an --encrypt run seals them under the same two.
+  pp_config.protect_key = opts.protect.exchange_key;
+  pp_config.protect_keys = opts.protect.keys;
   delta::Preprocessor preproc(src_mgr, diag, std::move(pp_config));
 
   PreprocResult result;
