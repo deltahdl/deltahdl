@@ -346,4 +346,74 @@ TEST(UdpInstanceSim,
             "0011");
 }
 
+// §29.8 (printed page 868): "Instances of UDPs are specified inside modules in
+// the same manner as gates", with up to two delays, and a module holding one
+// is instantiated like any other (§23.3), so `and2 #1` inside `w` follows its
+// inputs one unit late exactly as the same instance at the top does. The
+// child's delayed instance never left its first value.
+TEST(UdpInstanceDelayRun, DelayedUdpInsideAChildModuleFollowsItsInputs) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive and2 (y, a, b);\n"
+                       "  output y;\n"
+                       "  input a, b;\n"
+                       "  table\n"
+                       "    1 1 : 1 ;\n"
+                       "    0 ? : 0 ;\n"
+                       "    ? 0 : 0 ;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module w (output o, input i1, i2);\n"
+                       "  and2 #1 u(o, i1, i2);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  reg a = 0, b = 1; wire y, yt;\n"
+                       "  w i(y, a, b);\n"
+                       "  and2 #1 ut(yt, a, b);\n"
+                       "  initial begin\n"
+                       "    #5 $display(\"%b %b\", y, yt);\n"
+                       "    a = 1; #3 $display(\"%b %b\", y, yt);\n"
+                       "    b = 0; #3 $display(\"%b %b\", y, yt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 0\n1 1\n0 0\n");
+}
+
+// The same for a sequential UDP whose delay is the enclosing module's
+// parameter: the stage built with `#(1)` moves q1 one unit after the clock, so
+// the stage clocked by the same edge samples q1's old value. The delayed stage
+// never updated.
+TEST(UdpInstanceDelayRun, ParameterDelayedSequentialUdpInsideAStageUpdates) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("primitive dffi (q, clk, d);\n"
+                 "  output q; reg q;\n"
+                 "  input clk, d;\n"
+                 "  initial q = 1'b1;\n"
+                 "  table\n"
+                 "    (01) 0 : ? : 0 ;\n"
+                 "    (01) 1 : ? : 1 ;\n"
+                 "    (0?) 1 : 1 : 1 ;\n"
+                 "    (0?) 0 : 0 : 0 ;\n"
+                 "    (?0) ? : ? : - ;\n"
+                 "    ? (?" "?) : ? : - ;\n"
+                 "  endtable\n"
+                 "endprimitive\n"
+                 "module stage #(parameter D = 0) (output q, input clk, d);\n"
+                 "  dffi #D u(q, clk, d);\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  reg clk = 0, d = 0; wire q1, q2;\n"
+                 "  stage #(1) s1(q1, clk, d);\n"
+                 "  stage #(0) s2(q2, clk, s1.q);\n"
+                 "  initial begin\n"
+                 "    #1 $display(\"%b %b\", q1, q2);\n"
+                 "    clk = 1; #2 $display(\"%b %b\", q1, s2.q);\n"
+                 "    clk = 0; #1 clk = 1; #2 $display(\"%b %b\", q1, q2);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 1\n0 1\n0 0\n");
+}
+
 }  // namespace
