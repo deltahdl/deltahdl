@@ -321,4 +321,121 @@ TEST(PulseControlResolution, StandardExampleUnparenthesizedLimitReachesPath) {
   EXPECT_EQ(unnamed->error_limit[0], 3u);
 }
 
+// A buffer from a to y whose specify block is `specify_body`, driven 1 at 0,
+// 0 at 10 and 1 at 14, printing each change of y after time 0.
+std::string BufferPulseDesign(const std::string& specify_body) {
+  return "module mybuf(input a, output y);\n"
+         "  assign y = a;\n"
+         "  specify\n" +
+         specify_body +
+         "  endspecify\n"
+         "endmodule\n"
+         "module top;\n"
+         "  logic a;\n"
+         "  wire ty;\n"
+         "  mybuf u(.a(a), .y(ty));\n"
+         "  always @(ty) if ($time > 0) $display(\"t=%0t y=%b\", $time, ty);\n"
+         "  initial begin\n"
+         "    a = 1;\n"
+         "    #10 a = 0;\n"
+         "    #4 a = 1;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §30.7.1 (printed pages 887-888): the standard's own `PATHPULSE$ = 3;`, with
+// no terminals, sets both limits of every path of the module, so a 4-wide
+// pulse through a path of 7 passes: y falls at 17 and rises at 21. With the
+// default limits, the delay itself, it was rejected.
+TEST(PulseControlRun, NonspecificLimitReachesEveryPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n"
+                                         "    specparam PATHPULSE$ = 3;\n"),
+                       f),
+            "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
+}
+
+// §30.7.1: `PATHPULSE$ = 0` makes both limits 0, so no pulse is filtered and
+// the 2-wide pulse a (7, 9) path makes of a 4-wide input propagates.
+TEST(PulseControlRun, ZeroLimitsLetEveryPulsePropagate) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = 0;\n"
+                                         "    (a => y) = (7, 9);\n"),
+                       f),
+            "t=7 y=1\nt=19 y=0\nt=21 y=1\n");
+}
+
+// §30.7.1 with §30.7 (printed page 886): `PATHPULSE$ = (1, 5)` sets the reject
+// limit 1 and the error limit 5 apart, so the 2-wide pulse, at or above the
+// one and below the other, is filtered to x.
+TEST(PulseControlRun, PulseBetweenTheLimitsIsFilteredToX) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = (1, 5);\n"
+                                         "    (a => y) = (7, 9);\n"),
+                       f),
+            "t=7 y=1\nt=19 y=x\nt=21 y=1\n");
+}
+
+// §30.7.1 (printed page 887): where both forms appear "the path-specific
+// specparams shall take precedence for the specified paths", so a's path
+// propagates its pulse under (0, 0) while b's, under the nonspecific 3, rejects
+// its own: y stays 1 through b's pulse.
+TEST(PulseControlRun, PathSpecificLimitsTakePrecedence) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module myand(input a, input b, output y);\n"
+                       "  assign y = a & b;\n"
+                       "  specify\n"
+                       "    specparam PATHPULSE$a$y = (0, 0);\n"
+                       "    specparam PATHPULSE$ = 3;\n"
+                       "    (a => y) = (7, 9);\n"
+                       "    (b => y) = (7, 9);\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic a, b;\n"
+                       "  wire ty;\n"
+                       "  myand u(.a(a), .b(b), .y(ty));\n"
+                       "  always @(ty) if ($time > 0)\n"
+                       "    $display(\"t=%0t y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 1; b = 1;\n"
+                       "    #10 a = 0;\n"
+                       "    #4 a = 1;\n"
+                       "    #26 b = 0;\n"
+                       "    #4 b = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=7 y=1\nt=19 y=0\nt=21 y=1\n");
+}
+
+// §30.7.1 (printed page 888): for a statement declaring several paths, the
+// PATHPULSE$ naming its first input and first output applies to every path it
+// declares, so under PATHPULSE$clr$q = (0, 4) a 2-wide pulse through pre in
+// `(clr, pre *> q) = 4` is filtered to x from 14 to 16.
+TEST(PulseControlRun, MultiplePathStatementTakesItsFirstTerminalsLimits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mycell(input clr, input pre, output q);\n"
+                       "  assign q = clr & pre;\n"
+                       "  specify\n"
+                       "    (clr, pre *> q) = 4;\n"
+                       "    specparam PATHPULSE$clr$q = (0, 4);\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clr, pre;\n"
+                       "  wire tq;\n"
+                       "  mycell u(.clr(clr), .pre(pre), .q(tq));\n"
+                       "  always @(tq) if ($time > 0)\n"
+                       "    $display(\"t=%0t q=%b\", $time, tq);\n"
+                       "  initial begin\n"
+                       "    clr = 1; pre = 1;\n"
+                       "    #10 pre = 0;\n"
+                       "    #2 pre = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=4 q=1\nt=14 q=x\nt=16 q=1\n");
+}
+
 }  // namespace
