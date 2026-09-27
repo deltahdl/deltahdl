@@ -1,0 +1,3 @@
+=== RTLIR Dump ===
+module lint_only_dump_ir: 0 ports, 0 nets, 1 vars, 0 assigns, 1 processes, 0 children
+lint pass: no errors

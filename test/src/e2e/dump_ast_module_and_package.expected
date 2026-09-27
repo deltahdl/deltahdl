@@ -1,0 +1,5 @@
+=== AST Dump ===
+module dump_ast_module_and_package: 2 ports, 1 items
+module dump_ast_top: 0 ports, 4 items
+package dump_ast_pkg: 2 items
+o=1

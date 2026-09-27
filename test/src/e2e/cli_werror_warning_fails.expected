@@ -1,0 +1,3 @@
+test/src/e2e/cli_werror_warning_fails.sv:6:3: error: always_comb may infer latched behavior; ensure all paths assign all outputs (§9.2.2.2)
+    always_comb if (a) b = 1;
+    ^
