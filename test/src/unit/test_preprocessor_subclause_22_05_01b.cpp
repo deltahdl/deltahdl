@@ -512,3 +512,62 @@ TEST(Preprocessor, ArgumentsContinueOverALineHoldingOnlyAUsage) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1 1;"), std::string::npos);
 }
+
+// §22.5.1 (printed page 710) forbids macro substitution within a string
+// literal. After each usage it expands, the inline expander recounts the quotes
+// from the start of the line to learn whether what follows is inside a string,
+// so a line whose very first character opens a string still has the usage
+// after that string expanded and the usage inside the next string kept.
+TEST(Preprocessor, LineOpeningWithAStringKeepsLaterStringsUnexpanded) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ONE 1\n"
+      "\"a\" `ONE \"`ONE\" `ONE\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"a\" 1 \"`ONE\" 1"), std::string::npos);
+}
+
+// The same recount steps over a quote a backslash escapes, which stands inside
+// the string rather than closing it, so the string holding it still ends at
+// its own closing quote.
+TEST(Preprocessor, EscapedQuoteBeforeAUsageClosesNoString) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ONE 1\n"
+      "x = \"a\\\"b\" `ONE \"`ONE\" `ONE\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("x = \"a\\\"b\" 1 \"`ONE\" 1"), std::string::npos);
+}
+
+// A block comment in the macro text is not part of the text substituted, and it
+// runs to the first "*/": an asterisk inside it that no slash follows does not
+// end it.
+TEST(Preprocessor, AsteriskInsideAMacroTextBlockCommentEndsNothing) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M a /* x*y */ b\n"
+      "int v = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("x*y"), std::string::npos);
+  EXPECT_EQ(result.find("y */"), std::string::npos);
+  EXPECT_NE(result.find("int v = a"), std::string::npos);
+  EXPECT_NE(result.find("b;"), std::string::npos);
+}
+
+// A function-like macro's name ending the source after other text has no line
+// after it to carry its list, so the usage is rejected as one written without
+// the parentheses §22.5.1 requires.
+TEST(Preprocessor, FunctionLikeNameEndingTheSourceAfterTextIsRejected) {
+  PreprocFixture f;
+  Preprocess(
+      "`define FUNC(a=5) a\n"
+      "int x = `FUNC",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parentheses required for function-like macro "
+                            "'FUNC'",
+                            2, "22.5.1"));
+}
