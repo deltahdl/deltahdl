@@ -310,7 +310,13 @@ static bool IsDriveStrengthToken(TokenKind k) {
 // instead of reporting the strength keyword as a missing expression or the
 // parenthesis as a missing net name. Nothing records it: §10.3.4 gives a
 // strength in this position no meaning to record.
-void Parser::ReportDriveStrengthAfterDelay(const Expr* delay) {
+//
+// §28.3.2 (printed page 831) states the same order for a gate instance -- the
+// strength "shall follow the gate type keyword and precede any delay
+// specification" -- so a gate's delay is followed by the same check, reported
+// under `subclause`, the rule the construct being parsed falls under.
+void Parser::ReportDriveStrengthAfterDelay(const Expr* delay,
+                                           std::string_view subclause) {
   if (delay == nullptr || !Check(TokenKind::kLParen)) {
     return;
   }
@@ -324,10 +330,10 @@ void Parser::ReportDriveStrengthAfterDelay(const Expr* delay) {
     return;
   }
   diag_.Error(loc, "drive strength shall precede any delay specified",
-              Subclause("10.3.4"));
+              Subclause(subclause));
   uint8_t s0 = 0, s1 = 0;
   ParseDriveStrength(s0, s1);
-  Expect(TokenKind::kRParen, Subclause("10.3.4"));
+  Expect(TokenKind::kRParen, Subclause(subclause));
 }
 
 void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {

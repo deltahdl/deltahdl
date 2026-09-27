@@ -515,6 +515,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   Expr* delay_decay = nullptr;
   ParseGateDelay(delay, delay_fall, delay_decay);
   ValidateGateDelay(gate_kind, loc, delay, delay_decay, diag_);
+  ReportDriveStrengthAfterDelay(delay, "28.3.2");
 
   std::vector<std::string_view> array_names;
   auto parse_instance = [&]() -> ModuleItem* {

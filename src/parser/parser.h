@@ -507,7 +507,8 @@ class Parser {
 
   uint8_t ParseChargeStrength();
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
-  void ReportDriveStrengthAfterDelay(const Expr* delay);
+  void ReportDriveStrengthAfterDelay(const Expr* delay,
+                                     std::string_view subclause = "10.3.4");
   void ParseNetStrength(DataType& dtype);
   void ParseVectoredScalared(DataType& dtype);
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);

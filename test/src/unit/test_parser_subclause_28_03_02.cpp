@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "model_gate_declaration.h"
@@ -56,16 +59,39 @@ TEST(GateInstStrengthParsing, StrengthPrecedesDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 5u);
 }
 
+// §28.3.2 (printed page 831): the strength specification "shall follow the
+// gate type keyword and precede any delay specification", so a strength after
+// `#5` is reported under that rule, once, at its opening parenthesis, and the
+// instance after it still parses. Read as the terminal list, its keywords were
+// reported as missing expressions under §11.2 and the instance name as a
+// missing semicolon.
 TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
       "  and #5 (strong0, strong1) g(y, a, b);\n"
       "endmodule");
-  // Syntax 28-1 puts the drive strength before the delay, so a parenthesized
-  // group after `#5` is the terminal list; the strength keywords standing there
-  // are rejected as expressions, and §11.2 is the subclause that report names.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength shall precede any delay specified",
+                            3, "28.3.2"));
+  EXPECT_EQ(std::count_if(r.diags.begin(), r.diags.end(),
+                          [](const Diagnostic& d) {
+                            return d.severity == DiagSeverity::kError;
+                          }),
+            1);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->items.size(), 4u);
+}
+
+// A parenthesis after a gate's delay that opens no strength is the terminal
+// list of an unnamed instance, and parses as one.
+TEST(GateInstStrengthParsing, TerminalListAfterDelayStillParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and #5 (y, a, b);\n"
+      "endmodule");
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(GateInstStrengthParsing, SingleStrengthRejectedOnNonPullGate) {
