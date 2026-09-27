@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Start or stop the standing reminders, with or without the loop that works through open issues. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders. Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>", "start reminders-only" or "stop"; every "start" form but "reminders-only" also takes `--skip-label <label>`, repeatable.
+description: Start, restart or stop the standing reminders, with or without the loop that works through open issues. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders or to switch from one form to another ("restart autopilot", "switch to reminders only"). Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>", "start reminders-only", the same four forms after "restart", or "stop"; every "start" or "restart" form but "reminders-only" also takes `--skip-label <label>`, repeatable.
 ---
 
 # Autopilot
@@ -59,6 +59,14 @@ Any form but `reminders-only` may be followed by `--skip-label <label>`, once pe
 For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the seven standing reminders only.
 
 Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the batch the command's first issue seeds.
+
+## Restart
+
+`restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
+
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the seven standing reminders only.
+
+Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the batch the command's first issue seeds.
 
 ## Batches
 
