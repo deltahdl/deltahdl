@@ -843,4 +843,31 @@ TEST(GateNetDelays, DisabledThreeStateGateTurnsOffAfterItsTurnOffDelay) {
             "t=7 v=z HiZ\n");
 }
 
+// §10.3.3 (printed page 250), whose scalar delays are "treated in the same
+// way as for gate delays": "In situations where a right-hand operand changes
+// before a previous change has had time to propagate to the left-hand side",
+// the new value is evaluated, and "If this right-hand side value differs from
+// the value currently scheduled to propagate to the left-hand side, then the
+// currently scheduled propagation event is descheduled." An or #30 whose input
+// rises at 15 has its 1 due at 45; the input falls again at 35, the 0 now
+// evaluated differs from the pending 1, and the 1 is descheduled -- a 20-unit
+// pulse is shorter than the 30-unit delay and never reaches the output, only
+// the 0 landing, 30 after the fall.
+TEST(GateNetDelays, PulseShorterThanTheGateDelayNeverReachesTheOutput) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  logic d; wire tq;\n"
+      "  or #30 (tq, d, 1'b0);\n"
+      "  always @(tq) if ($time > 0) $display(\"t=%0t q=%b\", $time, tq);\n"
+      "  initial begin\n"
+      "    d = 0;\n"
+      "    #15 d = 1;\n"
+      "    #20 d = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "t=65 q=0\n");
+}
+
 }  // namespace
