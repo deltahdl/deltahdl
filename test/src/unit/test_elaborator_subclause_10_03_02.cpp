@@ -363,4 +363,43 @@ TEST(ContAssignStatementElaboration, VarInitializerAndContAssignNames10_3_2) {
       "variable 'v' has both an initializer and a continuous", 3, "10.3.2"));
 }
 
+// §10.3.2 with A.8.3 (printed page 1210): a continuous assignment's net lvalue
+// takes a constant_select, and a constant_part_select_range includes the
+// constant_indexed_range `constant_expression +: constant_expression` and its
+// `-:` form, so an indexed part-select whose base and width are constant --
+// literals, or a parameter -- is a target like `a[3:0]`.
+TEST(ContAssignStatementElaboration,
+     ConstantIndexedPartSelectTargetsElaborate) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  parameter P = 5;\n"
+      "  tri [7:0] a, b;\n"
+      "  assign a[1 -: 4] = 4'b0011;\n"
+      "  assign b[P +: 2] = 2'b10;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.3.2: an indexed part-select whose base is a variable is no
+// constant_indexed_range, so as a continuous assignment's target it is still
+// reported under the subclause.
+TEST(ContAssignStatementElaboration,
+     VariableBaseIndexedPartSelectTargetErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic [2:0] i;\n"
+      "  tri [7:0] c;\n"
+      "  assign c[i +: 2] = 2'b11;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continuous assignment left-hand side requires a "
+                            "constant select expression",
+                            4, "10.3.2"));
+}
+
 }  // namespace

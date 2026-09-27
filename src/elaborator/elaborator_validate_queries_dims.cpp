@@ -198,8 +198,16 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
   }
 }
 
+// A.8.3 (printed page 1210): a constant_part_select_range is a constant_range
+// or a constant_indexed_range, `constant_expression +: constant_expression` or
+// its `-:` form, so an indexed part-select whose base and width are both
+// constant is a constant select like `a[3:0]`. Refused whatever its operands,
+// `assign a[1 -: 4] = ...` was reported as wanting a constant select.
 static bool IsConstantBitSelect(const Expr* e, const ScopeMap& scope) {
-  if (e->is_part_select_plus || e->is_part_select_minus) return false;
+  if (e->is_part_select_plus || e->is_part_select_minus) {
+    return ConstEvalInt(e->index, scope).has_value() &&
+           ConstEvalInt(e->index_end, scope).has_value();
+  }
   if (e->index && e->index_end) return true;
   if (e->index && !e->index_end) {
     return ConstEvalInt(e->index, scope).has_value();
