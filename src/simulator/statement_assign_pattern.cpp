@@ -813,13 +813,28 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
 // mutating method does. Announced for a property alone, and not at all by
 // the new[] arm, `q = {}`, `q = {7}` and `d = new[3]` on a declared queue or
 // array left `wait (d.size() == 3)` parked for ever.
-bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->lhs->kind != ExprKind::kIdentifier &&
-      stmt->lhs->kind != ExprKind::kMemberAccess) {
-    return false;
+//
+// §7.4 with §7.10 (printed pages 153 and 169): the target may also be one
+// element of an array whose elements are queues, `fx[0]`, `aa["k"]` or
+// `qq[0]`, which is itself a queue (ElementQueueOfSelect). The assignment
+// writes the element, so a missing associative entry is allocated (§7.8.7),
+// and the change is announced for the select as a method changing the
+// element's queue announces it.
+static QueueObject* QueueOfAssignTarget(const Expr* lhs, SimContext& ctx,
+                                        Arena& arena, ClassObject** owner) {
+  if (lhs->kind == ExprKind::kSelect) {
+    return ElementQueueOfSelect(lhs, ctx, arena, /*allocate=*/true);
   }
+  if (lhs->kind != ExprKind::kIdentifier &&
+      lhs->kind != ExprKind::kMemberAccess) {
+    return nullptr;
+  }
+  return FindQueueOfBase(lhs, ctx, arena, owner);
+}
+
+bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   ClassObject* owner = nullptr;
-  auto* q = FindQueueOfBase(stmt->lhs, ctx, arena, &owner);
+  auto* q = QueueOfAssignTarget(stmt->lhs, ctx, arena, &owner);
   if (!q) return false;
   if (stmt->rhs->kind == ExprKind::kConcatenation &&
       stmt->rhs->elements.empty()) {

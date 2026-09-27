@@ -246,6 +246,7 @@ void Elaborator::TrackVarArrayInfo(
                     {},
                     {}};
   info.is_queue = var.is_queue;
+  info.elements_are_queues = var.elements_are_queues;
   if (var.is_assoc && item->unpacked_dims[0] &&
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;

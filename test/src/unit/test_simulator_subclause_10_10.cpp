@@ -311,4 +311,36 @@ TEST(UnpackedArrayConcatSim, ArrayItemGivesDestinationItsOwnElementWords) {
   EXPECT_EQ(b0->value.words[0].aval, 0xA5u);
 }
 
+// §10.10 (printed page 264): braces assigned to a target of an unpacked array
+// type are an unpacked array concatenation, and §7.4 with §7.10 (printed pages
+// 153 and 169) makes an element selected from an array whose elements are
+// queues a queue itself -- a fixed-size array of a queue typedef, an
+// associative array of one and a queue of queues alike. The elaborator took
+// the braces for a vector concatenation, whose unsized items §11.4.12 bars, and
+// reported each of 1, 2 and 5; the run then wrote the element's own queue
+// nothing. `{qq[0], 5}` reads the element's queue as an item, contributing its
+// elements.
+TEST(UnpackedArrayConcatSim, BracesAssignedToAQueueElementFillItsQueue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef int q_t[$];\n"
+      "  q_t fx[2];\n"
+      "  q_t aa[string];\n"
+      "  int qq[$][$];\n"
+      "  initial begin\n"
+      "    fx[0] = {1, 2};\n"
+      "    aa[\"k\"] = {5};\n"
+      "    qq.push_back({});\n"
+      "    qq[0] = {qq[0], 5};\n"
+      "    qq[0] = {qq[0], 6};\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", fx[0].size(), fx[0][1],\n"
+      "             aa[\"k\"].size(), aa[\"k\"][0], qq[0].size(), qq[0][0],\n"
+      "             qq[0][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2 1 5 2 5 6\n");
+}
+
 }  // namespace

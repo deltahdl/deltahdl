@@ -545,11 +545,26 @@ static const ClassMember* FindClassProperty(const ClassDecl* cls,
 // which runs earlier in the validation order; `C::s` names the class itself.
 // The member is then read off the class's declaration: a property with an
 // unpacked dimension -- a queue's `[$]` among them -- is an unpacked array.
+//
+// §7.4 with §7.10 (printed pages 153 and 169): one element selected from an
+// array whose elements are queues is a queue, so `fx[0] = {1, 2}` on `q_t
+// fx[2]` under `typedef int q_t[$];`, `aa["k"] = {5}` on `q_t aa[string]` and
+// `qq[0] = {qq[0], 5}` on `int qq[$][$]` assign unpacked array concatenations
+// (§10.10, printed page 264), where each unsized item had been reported under
+// §11.4.12.
 bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
     const Expr* lhs) const {
   if (lhs == nullptr) return false;
   if (lhs->kind == ExprKind::kIdentifier) {
     return var_array_info_.count(lhs->text) > 0;
+  }
+  if (lhs->kind == ExprKind::kSelect) {
+    if (lhs->index_end != nullptr || lhs->base == nullptr ||
+        lhs->base->kind != ExprKind::kIdentifier) {
+      return false;
+    }
+    auto it = var_array_info_.find(lhs->base->text);
+    return it != var_array_info_.end() && it->second.elements_are_queues;
   }
   if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
       lhs->rhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||

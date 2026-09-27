@@ -125,6 +125,9 @@ class ElaboratorData {
     // the declaration and cannot be indexed by dimension.
     std::vector<DeclaredDim> declared_dims;
     bool is_queue = false;
+    // §7.4 with §7.10: each element is itself a queue, `int qq[$][$]` or
+    // `q_t fx[2]` under `typedef int q_t[$];` (RtlirVariable's own flag).
+    bool elements_are_queues = false;
   };
 
   // §23.9 (printed page 761) with §27.4 (printed 820): a module's
