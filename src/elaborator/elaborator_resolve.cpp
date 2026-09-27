@@ -582,6 +582,15 @@ void Elaborator::RegisterCuScopeItems() {
                    arena_};
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
+    // §7.4.4 (printed page 155) with §6.18: a typedef's unpacked dimensions
+    // belong to the type it names, so `ie_t x;` in a module under a
+    // compilation-unit `typedef bit ie_t[int];` is an associative array. A
+    // compilation-unit typedef is registered here and never elaborated, so
+    // the record AdoptTypedefArrayDims (elaborator_decls_var.cpp) reads was
+    // filled for a module's typedefs alone, and the declaration was a single
+    // bit whose `x[5]` was reported as a select of a scalar.
+    if (item->kind == ModuleItemKind::kTypedef && !item->unpacked_dims.empty())
+      td_array_dims_[item->name] = item->unpacked_dims;
   }
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
