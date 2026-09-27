@@ -581,14 +581,25 @@ static void CommitContAssignValue(const ContAssignParams& params,
 // concatenation and a member access each reach something other than one run of
 // one net's bits -- Example 2 of §10.3.2 writes `assign {carry_out, sum_out} =
 // ...`, which is two nets -- so they keep the direct write
-// ApplyContAssignToVariable does and are not drivers yet.
+// ApplyContAssignToVariable does and are not drivers yet. A member access that
+// names a net is the exception: `b.y` of an interface instance, or `p.y`
+// through an interface port aliased to it (§25.3.2), is that one net (§23.6),
+// and written directly it took the value with no strength and no combining
+// with the net's other drivers, where §28.12.1 (printed page 844) has the
+// stronger of two signals win.
+static Net* NetNamedBy(const Expr* e, SimContext& ctx) {
+  if (e->kind == ExprKind::kIdentifier) return ctx.FindNet(e->text);
+  if (e->kind != ExprKind::kMemberAccess) return nullptr;
+  return ctx.FindNet(HierarchicalReferenceName(e));
+}
+
 static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
   ContAssignDriver drv;
-  if (lhs->kind == ExprKind::kIdentifier) {
-    drv.net = ctx.FindNet(lhs->text);
-  } else if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr &&
-             lhs->base->kind == ExprKind::kIdentifier) {
-    Net* net = ctx.FindNet(lhs->base->text);
+  if (lhs->kind == ExprKind::kIdentifier ||
+      lhs->kind == ExprKind::kMemberAccess) {
+    drv.net = NetNamedBy(lhs, ctx);
+  } else if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr) {
+    Net* net = NetNamedBy(lhs->base, ctx);
     if (net != nullptr && net->resolved != nullptr) {
       drv.net = net;
       drv.partial = true;

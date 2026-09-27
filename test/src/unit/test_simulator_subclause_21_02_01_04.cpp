@@ -719,4 +719,72 @@ TEST(StrengthFormat, PackedElementSelectOfNetOperandToPercentVIsReported) {
                          "a select naming more than one bit of a net");
 }
 
+// §21.2.1.4 with §23.6: a net named hierarchically is the net declared in the
+// instance the name reaches, so %v reports the strength its drivers give it
+// there -- the `and` inside `sub` drives `s.y` strong, the `nor (weak1, weak0)`
+// drives `s.z` weak -- as the same net named from inside `sub` would.
+TEST(StrengthFormat, NetOfASubmoduleNamedHierarchically) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub (input a, b);\n"
+      "  wire y, z;\n"
+      "  and g1 (y, a, b);\n"
+      "  nor (weak1, weak0) g2 (z, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a = 1, b = 1;\n"
+      "  sub s (a, b);\n"
+      "  initial #1 $display(\"y=%b %v z=%b %v\", s.y, s.y, s.z, s.z);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=1 St1 z=0 We0\n");
+}
+
+// §21.2.1.4 with §23.6 and §25.3.2: gates in a module drive the nets of an
+// interface instance through the interface port connected to it, so the nets
+// named from the top through the instance, `b.y` and `b.z`, carry the
+// strengths those gates drive.
+TEST(StrengthFormat, NetOfAnInterfaceInstanceDrivenThroughItsPort) {
+  SimFixture f;
+  auto out = RunCapture(
+      "interface bus;\n"
+      "  wire y, z;\n"
+      "endinterface\n"
+      "module drv (bus b, input a, c);\n"
+      "  and g1 (b.y, a, c);\n"
+      "  nor (weak1, weak0) g2 (b.z, a, c);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus b();\n"
+      "  logic a = 1, c = 1;\n"
+      "  drv d (b, a, c);\n"
+      "  initial #1 $display(\"y=%b %v z=%b %v\", b.y, b.y, b.z, b.z);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=1 St1 z=0 We0\n");
+}
+
+// §25.3.2: an interface port named `p` connected to an instance named `i` is
+// that instance, so a gate driving `p.y` inside the module drives `i.y`, and
+// %v reports the same strength through either name.
+TEST(StrengthFormat, InterfaceNetNamedThroughThePortAndTheInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "interface bus;\n"
+      "  wire y;\n"
+      "endinterface\n"
+      "module drv (bus p, input a);\n"
+      "  buf (pull1, pull0) g1 (p.y, a);\n"
+      "  initial #2 $display(\"drv %v\", p.y);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus i();\n"
+      "  logic a = 1;\n"
+      "  drv d (i, a);\n"
+      "  initial #1 $display(\"top %v\", i.y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "top Pu1\ndrv Pu1\n");
+}
+
 }  // namespace

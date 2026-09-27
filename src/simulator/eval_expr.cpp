@@ -134,6 +134,12 @@ std::string StripRootPrefix(const std::string& name) {
   return name;
 }
 
+std::string HierarchicalReferenceName(const Expr* expr) {
+  std::string name;
+  BuildMemberName(expr, name);
+  return StripRootPrefix(name);
+}
+
 // §7.3.1: a packed union with any 4-state member has 4-state storage, so a
 // 2-state member aliases bits that may hold x/z. Reading such a member performs
 // an implicit 4-state-to-2-state conversion (x/z become 0). For 2-state storage
@@ -705,9 +711,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
       TryStaticHandleMember(expr, ctx, arena, out))
     return out;
 
-  std::string name;
-  BuildMemberName(expr, name);
-  auto resolved = StripRootPrefix(name);
+  auto resolved = HierarchicalReferenceName(expr);
   // §18.7.1: a name qualified by local:: — the local::x used to steer an inline
   // randomize()...with constraint from the calling scope — bypasses the
   // randomized object's class scope and resolves in the scope containing the

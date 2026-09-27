@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -228,6 +230,31 @@ TEST(StrengthResolutionPipeline, NetDeclInitializerDriverCombines) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);  // strong0 dominates the pull1 driver
   EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kStrong);
+}
+
+// §28.12.1 (printed page 844): of two drivers of unequal strength the stronger
+// one decides the net, and a continuous assignment to a net of an interface
+// instance, `assign (pull1, pull0) b.y = 0`, is one of that net's drivers
+// beside the `buf (weak1, weak0)` driving it through the interface port of
+// `drv`, so the pull 0 overcomes the weak 1.
+TEST(StrengthResolutionPipeline, InterfaceNetDriversCombineByStrength) {
+  SimFixture f;
+  auto out = RunCapture(
+      "interface bus;\n"
+      "  wire y;\n"
+      "endinterface\n"
+      "module drv (bus b, input a);\n"
+      "  buf (weak1, weak0) g1 (b.y, a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus b();\n"
+      "  logic a = 1;\n"
+      "  drv d (b, a);\n"
+      "  assign (pull1, pull0) b.y = 0;\n"
+      "  initial #1 $display(\"y=%b %v\", b.y, b.y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=0 Pu0\n");
 }
 
 }  // namespace

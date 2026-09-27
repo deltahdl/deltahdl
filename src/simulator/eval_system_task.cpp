@@ -528,24 +528,41 @@ static PercentVArg ClassifyNetBitSelect(const Expr* arg, const Net* net,
           static_cast<uint32_t>(range.OffsetOf(declared))};
 }
 
+// Whether `e` is a name a net can stand under: an identifier, or a dotted
+// name reaching one declared elsewhere (§23.6).
+static bool IsNetName(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess;
+}
+
+// The net such a name stands for, if any.
+static const Net* FindNamedNet(const Expr* e, SimContext& ctx) {
+  if (e->kind == ExprKind::kIdentifier) return ctx.FindNet(e->text);
+  return ctx.FindNet(HierarchicalReferenceName(e));
+}
+
 // §21.2.1.4's operand, classified. A net declared without a range is a scalar
 // (§6.9) and names its only bit. A bit-select of a vector net is a scalar
 // reference too: §11.5.1 has it address one bit of the vector, and one bit of a
 // net is the scalar whose strength the clause reports. A select that still
 // names more than one bit is not, being no more a single bit than the vector it
 // selects from.
+//
+// §23.6: a net named hierarchically, `s.y` of an instance or `b.y` of an
+// interface instance, is the net declared there, with the drivers and the
+// strength it has there, so it is looked up by the name the read of it resolves
+// by. Asked for by an identifier alone, it named no net and printed nothing.
 static PercentVArg ClassifyPercentVArg(const Expr* arg, SimContext& ctx,
                                        Arena& arena) {
-  if (arg->kind == ExprKind::kIdentifier) {
-    const Net* net = ctx.FindNet(arg->text);
+  if (IsNetName(arg)) {
+    const Net* net = FindNamedNet(arg, ctx);
     if (net == nullptr || net->resolved == nullptr) return {};
     if (!IsScalarNet(*net->resolved)) return {PercentVArgKind::kVectorNet};
     return {PercentVArgKind::kNetBit, net, 0};
   }
   if (arg->kind != ExprKind::kSelect || arg->base == nullptr ||
-      arg->base->kind != ExprKind::kIdentifier)
+      !IsNetName(arg->base))
     return {};
-  const Net* net = ctx.FindNet(arg->base->text);
+  const Net* net = FindNamedNet(arg->base, ctx);
   if (net == nullptr || net->resolved == nullptr) return {};
   if (arg->index_end != nullptr) return {PercentVArgKind::kNetMultibitSelect};
   return ClassifyNetBitSelect(arg, net, ctx, arena);

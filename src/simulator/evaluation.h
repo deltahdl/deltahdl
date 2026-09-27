@@ -287,6 +287,11 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
+// §23.6: the name a hierarchical reference `s.y` or `$root.top.s.y` stands
+// under -- its components joined by dots, with a leading `$root.<top>.`
+// stripped -- which is the key EvalMemberAccess reads a variable by and a net
+// declared in an instance is stored under. Defined in eval_expr.cpp.
+std::string HierarchicalReferenceName(const Expr* expr);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 // Evaluates `lhs inside { elem }` for one set member, returning 1 for a match,
