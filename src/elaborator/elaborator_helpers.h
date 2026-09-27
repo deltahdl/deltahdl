@@ -364,6 +364,19 @@ void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
 std::string_view NestedClassKey(const DataType& dtype,
                                 const CompilationUnit* unit, Arena& arena);
 
+// §14.11 (printed page 361): reports a ## written in a package's task or
+// function, or in a method of a class the package declares, none of which has
+// a default clocking. Defined in elaborator_validate_clocking.cpp.
+void ValidatePackageCycleDelays(const CompilationUnit* unit, DiagEngine& diag);
+
+// §26.3 (printed page 808): the key the simulator holds a package's class
+// under, `p::C`, when `dtype` is written `p::C` and the package `p` declares a
+// class named `C`; empty for any other type. The package scope resolution
+// operator reaches the class without an import of the package. Defined in
+// elaborator_validate_struct_types.cpp.
+std::string_view PackageClassKey(const DataType& dtype,
+                                 const CompilationUnit* unit, Arena& arena);
+
 // §8.25: rewrites `dtype` in place when it names a member of a specialization
 // of a parameterized class, substituting the arguments DataType::type_params
 // carries for the class's own parameters. Returns false, leaving `dtype`

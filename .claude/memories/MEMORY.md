@@ -14,6 +14,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none of them.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
 - [Closing keywords fire on push](issue-closing-keywords-fire-on-push.md) — nine words close an issue from anywhere in a message, brackets included; reserve them for the finishing commit.
+- [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — a 64-issue, 103 KB message closed none; once the runs are clean, check each closed and close by hand where it did not take.
 - [One closing keyword per issue](one-closing-keyword-per-issue.md) — a keyword binds to one `#N`; repeat it on its own line per issue.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
 - [The form of an issue reference](closing-keyword-form.md) — write `Closes #N` to close, `Refs #N` or `See #N` to mention.

@@ -439,6 +439,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   DefaultPackageTaskFuncLifetimes();
 
+  ValidatePackageCycleDelays(unit_, diag_);
+
   // After RegisterCuScopeItems above, which is what fills cu_param_scope_ with
   // the compilation-unit and package parameters the check folds against.
   ValidatePackageValueParams();

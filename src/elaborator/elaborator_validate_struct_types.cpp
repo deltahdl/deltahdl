@@ -268,6 +268,22 @@ std::string_view NestedClassKey(const DataType& dtype,
   return {};
 }
 
+std::string_view PackageClassKey(const DataType& dtype,
+                                 const CompilationUnit* unit, Arena& arena) {
+  if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return {};
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != dtype.scope_name) continue;
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl ||
+          item->class_decl->name != dtype.type_name)
+        continue;
+      return *arena.Create<std::string>(std::string(dtype.scope_name) +
+                                        "::" + std::string(dtype.type_name));
+    }
+  }
+  return {};
+}
+
 static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
                                           std::string_view member_name) {
   for (const auto* m : cls->members) {

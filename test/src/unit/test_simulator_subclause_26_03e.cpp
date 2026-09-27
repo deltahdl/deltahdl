@@ -245,4 +245,52 @@ TEST(PackageImportSim,
             7u);
 }
 
+// §26.3 (printed page 808) with §8.7 and §13.3: `p::C c = new;` in a module
+// that imports nothing from p constructs an object of p's class, so the task
+// called through it runs its body and consumes its `#3` before the call
+// returns: $time reads 3. The handle was left null, the call ran nothing and
+// $time read 0.
+TEST(PackageImportSim, PackageQualifiedClassHandleWithoutImportRunsItsTask) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C;\n"
+                      "    task t(); #3; endtask\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  p::C c = new;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    c.t();\n"
+                      "    y = $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// §26.3 with §8.7 and §8.5: the same handle declared bare and assigned by a
+// procedural `c = new` holds an object whose property initializer ran and
+// whose function writes its property: 4 * 10 + 7. A null handle read 0.
+TEST(PackageImportSim,
+     PackageQualifiedClassHandleWithoutImportRunsItsFunction) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C;\n"
+                      "    int x = 4;\n"
+                      "    function void f(); x = 7; endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  p::C c;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    c = new;\n"
+                      "    y = c.x * 10;\n"
+                      "    c.f();\n"
+                      "    y = y + c.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            47u);
+}
+
 }  // namespace

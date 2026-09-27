@@ -674,4 +674,71 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInForkArmErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 9, "14.11"));
 }
 
+// §14.11 (printed page 361) asks for a default clocking of "the current
+// module, interface, checker, or program". A package is none of these, so a
+// ## in a method of a class it declares has none, and the default clocking of
+// the module that imports the class and calls the method does not supply one.
+TEST(CycleDelayElab, PackageClassMethodErrors) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pk;\n"
+             "  class C;\n"
+             "    task run; ##1; endtask\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module t;\n"
+             "  import pk::*;\n"
+             "  logic clk;\n"
+             "  default clocking cb @(posedge clk);\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    C h = new;\n"
+             "    h.run();\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 3, "14.11"));
+}
+
+// §14.11: the same holds for a task the package declares itself, and for a
+// method of a class nested in a package's class (§8.23).
+TEST(CycleDelayElab, PackageTaskAndNestedClassMethodError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pk;\n"
+             "  task automatic wait1; ##1; endtask\n"
+             "  class O;\n"
+             "    class I;\n"
+             "      task go; ##2; endtask\n"
+             "    endclass\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module t;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 5, "14.11"));
+}
+
+// §14.11: a package whose class methods and tasks write no ## draws no report.
+TEST(CycleDelayElab, PackageWithoutCycleDelayNoError) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package pk;\n"
+             "  task automatic wait1; #1; endtask\n"
+             "  class C;\n"
+             "    task run; #1; endtask\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module t;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace

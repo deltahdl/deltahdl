@@ -200,4 +200,29 @@ TEST(PackageImport, OwnGeneratedEnumConstantShadowsAWildcardImportsInAPackage) {
   EXPECT_EQ(m->resolved_value, 1);
 }
 
+// §26.3 (printed page 808): the package scope resolution operator reaches a
+// package's class without an import, so `p::C c;` in a module that imports
+// nothing from p declares a handle of p's class, under the "p::C" key the
+// simulator holds the class by. The elaborator marked a variable a handle only
+// when the type's bare name was one the module's scope reached, which a class
+// of a package the module does not import is not, so `c` was left a value of
+// no class and its `new` constructed nothing.
+TEST(PackageScopeReference, PackageQualifiedClassDeclaresAHandleWithoutImport) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  p::C c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].class_type_name, "p::C");
+}
+
 }  // namespace

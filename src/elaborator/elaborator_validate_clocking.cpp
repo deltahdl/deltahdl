@@ -13,9 +13,11 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -528,6 +530,21 @@ static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
   }
 }
 
+// Reports each item of `roots` that writes a ##, once per item.
+static void ReportCycleDelayRoots(const std::vector<ProceduralRoot>& roots,
+                                  DiagEngine& diag) {
+  // A subroutine contributes one root per statement of its body, so a second ##
+  // in the same task would otherwise earn a second report at the same location.
+  const ModuleItem* reported = nullptr;
+  for (const auto& root : roots) {
+    if (root.item == reported || !HasCycleDelay(root.body)) continue;
+    reported = root.item;
+    diag.Error(root.item->loc,
+               "cycle delay (##) requires a default clocking block",
+               Subclause("14.11"));
+  }
+}
+
 void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
   bool has_default = false;
   for (const auto* item : decl->items) {
@@ -540,15 +557,35 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
   if (has_default) return;
   std::vector<ProceduralRoot> roots;
   CollectProceduralRoots(decl->items, roots);
-  // A subroutine contributes one root per statement of its body, so a second ##
-  // in the same task would otherwise earn a second report at the same location.
-  const ModuleItem* reported = nullptr;
-  for (const auto& root : roots) {
-    if (root.item == reported || !HasCycleDelay(root.body)) continue;
-    reported = root.item;
-    diag_.Error(root.item->loc,
-                "cycle delay (##) requires a default clocking block",
-                Subclause("14.11"));
+  ReportCycleDelayRoots(roots, diag_);
+}
+
+// The roots of every method body `cls` declares, and those of the classes
+// nested in it (§8.23).
+static void CollectClassMethodRoots(const ClassDecl* cls,
+                                    std::vector<ProceduralRoot>& out) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr)
+      CollectSubroutineRoots(m->method, out);
+    if (m->kind == ClassMemberKind::kClassDecl && m->nested_class != nullptr)
+      CollectClassMethodRoots(m->nested_class, out);
+  }
+}
+
+// §14.11 (printed page 361): a ## with no default clocking "for the current
+// module, interface, checker, or program" is an error. A package is none of
+// these and cannot declare a clocking block, so a ## in one of its tasks or in
+// a method of one of its classes has no default clocking to count, whatever
+// clocking the module that calls it declares as its default.
+void ValidatePackageCycleDelays(const CompilationUnit* unit, DiagEngine& diag) {
+  for (const auto* pkg : unit->packages) {
+    std::vector<ProceduralRoot> roots;
+    CollectProceduralRoots(pkg->items, roots);
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kClassDecl && item->class_decl)
+        CollectClassMethodRoots(item->class_decl, roots);
+    }
+    ReportCycleDelayRoots(roots, diag);
   }
 }
 
