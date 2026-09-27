@@ -176,18 +176,20 @@ TEST(BufNotSimulation, ProductionNotFallingOutputUsesSecondDelaySlot) {
 }
 
 // Two delays: an output transition to x uses the smaller of the two delays,
-// regardless of which slot holds it. Both delay orderings settle the x output
-// at t=6 (input edge at t=3 plus the smaller delay 3), which distinguishes the
-// min from either fixed slot: an "always rise" bug would give t=11 for #(8,3),
-// and an "always fall" bug would give t=11 for #(3,8).
+// regardless of which slot holds it. The output, x until its first transition
+// (§28.16), has fallen to 0 by t=8 under either ordering. Both orderings then
+// settle the x output at t=13 (input edge at t=10 plus the smaller delay 3),
+// which distinguishes the min from either fixed slot: an "always rise" bug
+// would give t=18 for #(8,3), and an "always fall" bug would give t=18 for
+// #(3,8).
 TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerFall) {
   SimFixture f;
   auto* design = ElaborateBufNot(
       f,
-      "  buf #(8, 3) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'bx; end\n");
+      "  buf #(8, 3) g(y, a);\n  initial begin a = 1'b0; #10 a = 1'bx; end\n");
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 6u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 13u);
   auto b = ReadResolvedBit(f, "y");
   EXPECT_EQ(b.aval, 1u);
   EXPECT_EQ(b.bval, 1u);
@@ -197,10 +199,10 @@ TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerRise) {
   SimFixture f;
   auto* design = ElaborateBufNot(
       f,
-      "  buf #(3, 8) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'bx; end\n");
+      "  buf #(3, 8) g(y, a);\n  initial begin a = 1'b0; #10 a = 1'bx; end\n");
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 6u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 13u);
   auto b = ReadResolvedBit(f, "y");
   EXPECT_EQ(b.aval, 1u);
   EXPECT_EQ(b.bval, 1u);

@@ -378,8 +378,9 @@ TEST(NInputGateDelay, ProductionTwoDelayAndGateFallTransitionUsesSecondSlot) {
 }
 
 // §28.4: the smaller of the two delays applies to output transitions to x. The
-// AND output at 1 goes to x when an input becomes x at t=3; the transition
-// completes at 3 + min(4, 9) = 7, and the output settles to x.
+// AND output, x until its first transition (§6.6), rises to 1 at 0 + 4 = 4
+// and goes to x when an input becomes x at t=5; the transition completes at
+// 5 + min(4, 9) = 9, and the output settles to x.
 TEST(NInputGateDelay, ProductionTwoDelayAndGateTransitionToXUsesSmallerSlot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -387,12 +388,12 @@ TEST(NInputGateDelay, ProductionTwoDelayAndGateTransitionToXUsesSmallerSlot) {
       "  reg a, b;\n"
       "  wire y;\n"
       "  and #(4, 9) g(y, a, b);\n"
-      "  initial begin a = 1'b1; b = 1'b1; #3 b = 1'bx; end\n"
+      "  initial begin a = 1'b1; b = 1'b1; #5 b = 1'bx; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 9u);
   auto* net = f.ctx.FindNet("y");
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
