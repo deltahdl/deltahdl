@@ -220,11 +220,24 @@ void SimContext::AliasMailbox(std::string_view alias_name,
 // and a primitive's output found no net -- while a top-level net of the same
 // name took every one of them. The unprefixed lookup stays as the answer for a
 // net of the enclosing scope.
+// §23.9: a bare name is looked for in the instance's own scope, and the step
+// out to the enclosing module's is taken only where FindVariable takes it --
+// with no instance prefix in force, for a dotted §23.8 name, for a name a
+// package import bound flat, and inside a module §23.4 declares within the one
+// instantiating it. Taken from any instance, a child's `assign dout = ...` on
+// an `output logic [3:0] dout` port, whose storage is a variable rather than a
+// net under the child's prefix, found the parent's like-named net and drove
+// it, leaving the connected net undriven (§23.3.2.2).
 Net* SimContext::FindNet(std::string_view name) {
   std::string prefix = ActiveInstancePrefix();
   if (!prefix.empty()) {
     auto prefixed = nets_.find(prefix + std::string(name));
     if (prefixed != nets_.end()) return prefixed->second;
+  }
+  if (!prefix.empty() && name.find('.') == std::string_view::npos &&
+      !IsImportedName(name) &&
+      nested_decl_scopes_.count(std::string(prefix)) == 0) {
+    return nullptr;
   }
   auto it = nets_.find(name);
   return (it != nets_.end()) ? it->second : nullptr;
