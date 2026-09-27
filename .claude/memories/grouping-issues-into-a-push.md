@@ -31,7 +31,7 @@ A push solves a batch made of every open issue that shares one matter. The matte
    - An issue that turns out to need a person's decision is labelled for one. Its edits come out of the tree before the commit.
    - A finding made on the way joins the batch when it is of the batch's matter. Otherwise it seeds the next batch ([[solving-what-a-session-finds]]).
 4. **Commit.** Commit once.
-   - The subject joins each issue's leading clause with `; `.
+   - The subject joins each issue's leading clause with a semicolon and a space.
    - The body gives each issue its own paragraph.
    - The message ends with one `Closes #N` line per issue ([[one-closing-keyword-per-issue]]).
 5. **Push and read the run.** When the run goes red, trace each failing job to the issue whose change it names, and fix it per [[fixing-a-red-run]]. When an issue's fix cannot be repaired, revert it and reopen the issue per [[a-revert-does-not-reopen]].
