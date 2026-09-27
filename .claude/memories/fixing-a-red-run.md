@@ -11,4 +11,4 @@ Fix a red run in the session that finds it, whoever caused it.
 
 **Why:** A change is unverified until the jobs that build and test have actually run, and a conclusion of `failure` reads the same whether the change broke something or inherited a break. A skipped job reports neither pass nor fail. So an inherited failure hides the change's own result for as long as it stands. A pre-existing failure is a task, not a disposition.
 
-**How to apply:** `gh run view --log-failed` tells a break the change caused from one it inherited. Fix it — see [solving-what-a-session-finds](solving-what-a-session-finds.md). A failing `sv-tests-coverage` job in `.github/workflows/deltahdl.yml` is no exception.
+**How to apply:** `gh run view --log-failed` tells a break the change caused from one it inherited. Fix it — see [solving-what-a-session-finds](solving-what-a-session-finds.md). A failing `sv-tests-coverage` job in `.github/workflows/deltahdl.yml` is no exception. The fix goes in a push of its own, before the next batch of issues ([[grouping-issues-into-a-push]]). Pushed together, a second red run could not say whether the fix or the batch broke it.

@@ -7,7 +7,8 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main`; there are no pull requests here.
-- [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds a matter solved end to end or carried out in full, never one step of it.
+- [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds a matter solved end to end, or a batch of issues of one matter solved in full, never one step of either.
+- [Grouping issues into one push](grouping-issues-into-a-push.md) — every open issue of one clause and one `src/` subsystem, bounded by the matter and never by a count, solved uncommitted and committed once; CI, build, shared-fixture and red-run fixes go alone.
 - [Draining the push queue first](draining-the-push-queue-first.md) — while commits sit unpushed, take no new issue; squash them in queue order, never by file-disjointness, and push until none are left.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none of them.
@@ -65,7 +66,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands.
-- [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it.
+- [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it, in a push of its own before the next batch.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [The sv-tests build exception](the-sv-tests-build-exception.md) — build only to run one already-failing file, only for the stdout the log drops.
