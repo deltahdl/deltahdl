@@ -746,9 +746,10 @@ void RecordInvocationCommandLine(int argc, char* argv[]) {
 // §J.4.1: the bootstrap file -sv_liblist names has a syntax of its own -- the
 // first line holds #!SV_LIBRARIES, each later line one entry or a comment --
 // and a file that departs from it is reported at the line that does, before
-// anything the file lists would be loaded. ParseForeignCodeBootstrap's
-// description opens "line N: ", which the position of the report carries, so
-// the text after it is what is reported. False where any file is at fault.
+// anything the file lists would be loaded. ParseForeignCodeBootstrap opens
+// every description it gives with "line N: ", so the number is read from there
+// unchecked for the position of the report, and the text after it is what is
+// reported. False where any file is at fault.
 bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
                                  delta::SourceManager& src_mgr,
                                  delta::DiagEngine& diag,
@@ -781,10 +782,8 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
     uint32_t line = 1;
     std::string message = file.error;
     std::size_t colon = message.find(": ");
-    if (message.rfind("line ", 0) == 0 && colon != std::string::npos) {
-      std::from_chars(message.data() + 5, message.data() + colon, line);
-      message = message.substr(colon + 2);
-    }
+    std::from_chars(message.data() + 5, message.data() + colon, line);
+    message = message.substr(colon + 2);
     uint32_t file_id = src_mgr.AddFile(liblist.path, std::move(content));
     diag.Error(delta::SourceLoc{file_id, line, 1}, message,
                delta::Subclause("J.4.1"));

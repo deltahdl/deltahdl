@@ -1,0 +1,2 @@
+-sv_liblist
+test/src/e2e/bootstrap_entry_missing_library.bootstrap

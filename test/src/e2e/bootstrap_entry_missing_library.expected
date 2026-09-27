@@ -1,0 +1,1 @@
+<unknown location>: error: object code file 'mylibs/lib1', named by a bootstrap entry, is not there with the platform's shared library extension appended (§J.4)
