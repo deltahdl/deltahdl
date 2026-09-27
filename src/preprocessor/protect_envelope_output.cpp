@@ -224,11 +224,11 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   //
   // It is written as the string §34.5.24.1 spells the expression with rather
   // than as a source spelled it, which is for carrying an author's
-  // pragma_value back out unchanged. The value here is this file's own identifier rather than anything a source
-  // wrote, and written bare it would be no pragma_value at all: §22.5.1 admits
-  // a simple identifier, and x-deltahdl-stream holds a character that ends one,
-  // so every envelope would carry a line Preprocessor::HandlePragma reports as
-  // an illegal token.
+  // pragma_value back out unchanged. The value here is this file's own
+  // identifier rather than anything a source wrote, and written bare it would
+  // be no pragma_value at all: §22.5.1 admits a simple identifier, and
+  // x-deltahdl-stream holds a character that ends one, so every envelope would
+  // carry a line Preprocessor::HandlePragma reports as an illegal token.
   if (signed_envelope) {
     std::string_view stated = ProtectPragmaValueBody(envelope.key_method);
     text->append("`pragma protect ").append(kKeyMethodKeyword).append("=\"");

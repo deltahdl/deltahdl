@@ -33,7 +33,6 @@
 
 #include "fixture_protect_encoding.h"
 #include "preprocessor/protect_encoding.h"
-#include "preprocessor/protect_keywords.h"
 
 using namespace delta;
 
