@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
@@ -536,6 +537,21 @@ static const ClassMember* FindClassProperty(const ClassDecl* cls,
   return nullptr;
 }
 
+// §7.4 with §7.10 (printed pages 153 and 169): whether `sel` selects one
+// element of an array `arrays` records as one whose elements are queues, which
+// makes the element a queue.
+static bool SelectsQueueElement(
+    const Expr* sel,
+    const std::unordered_map<std::string_view, ElaboratorData::VarArrayInfo>&
+        arrays) {
+  if (sel->index_end != nullptr || sel->base == nullptr ||
+      sel->base->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  auto it = arrays.find(sel->base->text);
+  return it != arrays.end() && it->second.elements_are_queues;
+}
+
 // The elaborator classified a `{...}` right-hand side by its target and knew a
 // bare name alone, so `h.q = {4, 5}` and `C::s = {5, 15, 25}` on a queue
 // property were reported as vector concatenations of unsized constants where
@@ -558,14 +574,8 @@ bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
   if (lhs->kind == ExprKind::kIdentifier) {
     return var_array_info_.count(lhs->text) > 0;
   }
-  if (lhs->kind == ExprKind::kSelect) {
-    if (lhs->index_end != nullptr || lhs->base == nullptr ||
-        lhs->base->kind != ExprKind::kIdentifier) {
-      return false;
-    }
-    auto it = var_array_info_.find(lhs->base->text);
-    return it != var_array_info_.end() && it->second.elements_are_queues;
-  }
+  if (lhs->kind == ExprKind::kSelect)
+    return SelectsQueueElement(lhs, var_array_info_);
   if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
       lhs->rhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
       lhs->rhs->kind != ExprKind::kIdentifier) {
