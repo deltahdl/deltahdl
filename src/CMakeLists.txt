@@ -99,6 +99,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/single_pass_compile.cpp
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
+    elaborator/elaborator_extern_modules.cpp
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
     elaborator/elaborator_items_checker_rules.cpp
@@ -342,6 +343,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/specify_timing_violation.cpp
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
+    simulator/sdf_parser_timing_check.cpp
     simulator/svdpi.cpp
     simulator/svdpi_sv31a.cpp
     simulator/sv_vpi_user.cpp

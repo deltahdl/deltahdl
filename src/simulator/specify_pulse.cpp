@@ -15,6 +15,11 @@
 // well, writing and reading the interconnect_delays_ and path_delays_ the
 // limits above are placed on.
 //
+// The free functions ahead of those members -- ClassifyPulse, the negative
+// pulse schedule and the pulse limits a path starts with or a PATHPULSE$
+// specparam, a global limit or an SDF entry gives it -- are §30.7's rules for
+// one path's limits, split out of src/simulator/specify.cpp.
+//
 // §31's violation checks -- SpecifyManager::CheckSetupViolation and the other
 // Check*Violation members -- stand in
 // src/simulator/specify_timing_violation.cpp.
@@ -39,6 +44,125 @@
 #include "simulator/variable.h"
 
 namespace delta {
+
+uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
+                                  uint64_t distributed_delay_sum) {
+  return std::max(module_path_delay, distributed_delay_sum);
+}
+
+PulseClassification ClassifyPulse(uint64_t pulse_width, uint64_t reject_limit,
+                                  uint64_t error_limit) {
+  if (pulse_width >= error_limit) return PulseClassification::kPropagate;
+  if (pulse_width >= reject_limit) return PulseClassification::kForceX;
+  return PulseClassification::kReject;
+}
+
+uint64_t FilteredPulseLeadingXTime(PulseStyle style, uint64_t detect_time,
+                                   uint64_t scheduled_leading_time) {
+  return style == PulseStyle::kOnDetect ? detect_time : scheduled_leading_time;
+}
+
+bool IsNegativePulse(uint64_t leading_time, uint64_t trailing_time) {
+  return trailing_time < leading_time;
+}
+
+NegativePulseSchedule ScheduleNegativePulse(ShowCancelled mode,
+                                            PulseStyle style,
+                                            uint64_t detect_time,
+                                            uint64_t scheduled_leading_time) {
+  // noshowcancelled: cancel the leading edge with no x indication.
+  if (mode == ShowCancelled::kNoshowcancelled) {
+    return {/*force_x=*/false, /*x_time=*/0};
+  }
+  // showcancelled: drive the output to x. The style decides only when the to-x
+  // transition is scheduled (on-event replaces the leading edge schedule,
+  // on-detect advances it to the detection moment).
+  return {/*force_x=*/true, FilteredPulseLeadingXTime(style, detect_time,
+                                                      scheduled_leading_time)};
+}
+
+void InitDefaultPulseLimits(PathDelay& pd) {
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = pd.delays[i];
+    pd.error_limit[i] = pd.delays[i];
+  }
+  pd.reject_limit_source = PulseLimitSource::kDefault;
+  pd.error_limit_source = PulseLimitSource::kDefault;
+}
+
+// §30.7: whether a source may set a limit some source already set. A source
+// outranked by what already stands leaves it, so applying the three in any
+// order settles on the same limits.
+static bool PulseLimitSourceWins(PulseLimitSource standing,
+                                 PulseLimitSource source) {
+  return static_cast<uint8_t>(source) >= static_cast<uint8_t>(standing);
+}
+
+// §30.7.1: a PATHPULSE$ specparam sets the limits, and §30.7.2 puts it above
+// the global invocation options. SDF annotation outranks it (§30.7.3), so a
+// path already annotated keeps what the annotation gave it.
+void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
+                               uint64_t error) {
+  const uint64_t kEffectiveError = has_error ? error : reject;
+  if (PulseLimitSourceWins(pd.reject_limit_source,
+                           PulseLimitSource::kPathpulse)) {
+    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = reject;
+    pd.reject_limit_source = PulseLimitSource::kPathpulse;
+  }
+  if (PulseLimitSourceWins(pd.error_limit_source,
+                           PulseLimitSource::kPathpulse)) {
+    for (int i = 0; i < 12; ++i) pd.error_limit[i] = kEffectiveError;
+    pd.error_limit_source = PulseLimitSource::kPathpulse;
+  }
+}
+
+// Derives the twelve reject and error limits from the twelve delays and the
+// pulse-limit percentages in effect. §32.4.4 puts interconnect delays under the
+// same pulse-limit rules a specify path delay follows, so both derive their
+// limits here rather than each carrying its own arithmetic.
+void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
+                                 uint8_t reject_pct, uint8_t error_pct,
+                                 uint64_t (&reject_limit)[12],
+                                 uint64_t (&error_limit)[12]) {
+  if (error_pct < reject_pct) error_pct = reject_pct;
+  for (int i = 0; i < 12; ++i) {
+    reject_limit[i] = delays[i] * reject_pct / 100;
+    error_limit[i] = delays[i] * error_pct / 100;
+  }
+}
+
+// §30.7.2: the invocation options' percentages, which both a PATHPULSE$
+// specparam and an SDF annotation outrank, so a path either of them has already
+// set keeps what it was given.
+void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
+                            uint8_t error_pct) {
+  uint64_t derived_reject[12];
+  uint64_t derived_error[12];
+  DerivePulseLimitsFromDelays(pd.delays, reject_pct, error_pct, derived_reject,
+                              derived_error);
+  if (PulseLimitSourceWins(pd.reject_limit_source, PulseLimitSource::kGlobal)) {
+    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = derived_reject[i];
+    pd.reject_limit_source = PulseLimitSource::kGlobal;
+  }
+  if (PulseLimitSourceWins(pd.error_limit_source, PulseLimitSource::kGlobal)) {
+    for (int i = 0; i < 12; ++i) pd.error_limit[i] = derived_error[i];
+    pd.error_limit_source = PulseLimitSource::kGlobal;
+  }
+}
+
+// §30.7.3: SDF annotation of the pulse limits, which takes precedence over a
+// PATHPULSE$ specparam and over the global invocation options alike, so this
+// one writes whatever already stands.
+void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
+                         uint64_t error) {
+  const uint64_t kEffectiveError = has_error ? error : reject;
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = reject;
+    pd.error_limit[i] = kEffectiveError;
+  }
+  pd.reject_limit_source = PulseLimitSource::kSdf;
+  pd.error_limit_source = PulseLimitSource::kSdf;
+}
 
 // True when any expression of `exprs` reads one of the changed specparams.
 template <typename Exprs>

@@ -1,0 +1,175 @@
+// §23.5 (printed page 752): an extern module declaration gives a module's
+// name, parameters and ports ahead of its definition, and the definition has
+// to match it -- port count, port kinds and types, and parameters -- or take
+// its header wholesale through `.*`. ResolveExternModules checks each
+// module that has such a declaration against it. Split out of
+// elaborator_resolve.cpp, which resolves the rest of the compilation unit's
+// cross-references.
+
+#include <cstddef>
+#include <format>
+#include <string_view>
+
+#include "common/diagnostic.h"
+#include "elaborator/elaborator.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
+
+namespace delta {
+
+// Two port data types correspond for extern-declaration matching when they
+// share a base kind, signedness, and (for named types) the same type name.
+// Packed/unpacked dimension sizes are parameter-dependent expressions that are
+// not yet evaluated here, so only the dimension-independent attributes that the
+// parser records are compared.
+static bool ExternPortTypesEquivalent(const DataType& a, const DataType& b) {
+  return a.kind == b.kind && a.is_signed == b.is_signed &&
+         a.type_name == b.type_name;
+}
+
+// Returns the matching extern declaration for an actual module, or nullptr.
+static ModuleDecl* FindExternDeclFor(const ModuleDecl* mod,
+                                     CompilationUnit* unit) {
+  for (auto* other : unit->modules) {
+    if (other->is_extern && other->name == mod->name) return other;
+  }
+  return nullptr;
+}
+
+// §23.5: checks that each port of the actual module corresponds to the extern
+// declaration in name, direction, and (when both sides state it) type. Reports
+// the first mismatch found.
+static void CheckExternPortMatch(const ModuleDecl* mod,
+                                 const ModuleDecl* extern_decl,
+                                 DiagEngine& diag) {
+  for (size_t i = 0; i < mod->ports.size(); ++i) {
+    const PortDecl& ep = extern_decl->ports[i];
+    const PortDecl& mp = mod->ports[i];
+    if (!mp.name.empty() && !ep.name.empty() && mp.name != ep.name) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' port '{}' at position {} does not "
+                             "match extern declaration port '{}'",
+                             mod->name, mp.name, i, ep.name),
+                 Subclause("23.5"));
+      break;
+    }
+    // §23.5 requires the extern declaration to match the actual module in the
+    // equivalent types of corresponding ports. Direction and data type are
+    // only compared when the extern header states them: a non-ANSI extern
+    // port list supplies names and positions alone and leaves the type to the
+    // actual definition, so an unspecified side is treated as a match.
+    if (ep.direction != Direction::kNone && mp.direction != Direction::kNone &&
+        ep.direction != mp.direction) {
+      diag.Error(mp.loc,
+                 std::format("module '{}' port '{}' direction does not match "
+                             "extern declaration",
+                             mod->name, mp.name),
+                 Subclause("23.5"));
+      break;
+    }
+    if (ep.data_type.kind != DataTypeKind::kImplicit &&
+        mp.data_type.kind != DataTypeKind::kImplicit &&
+        !ExternPortTypesEquivalent(ep.data_type, mp.data_type)) {
+      diag.Error(mp.loc,
+                 std::format("module '{}' port '{}' type does not match "
+                             "extern declaration",
+                             mod->name, mp.name),
+                 Subclause("23.5"));
+      break;
+    }
+  }
+}
+
+// §23.5: checks the parameter list of the actual module against the extern
+// declaration by name, position, and parameter kind (type vs. value). Reports
+// the first mismatch found.
+static void CheckExternParamMatch(const ModuleDecl* mod,
+                                  const ModuleDecl* extern_decl,
+                                  DiagEngine& diag) {
+  if (extern_decl->params.size() != mod->params.size()) {
+    diag.Error(
+        mod->range.start,
+        std::format("module '{}' parameter count ({}) does not match "
+                    "extern declaration ({})",
+                    mod->name, mod->params.size(), extern_decl->params.size()),
+        Subclause("23.5"));
+    return;
+  }
+  // The parameter lists must also correspond by name and position.
+  for (size_t i = 0; i < mod->params.size(); ++i) {
+    std::string_view mp_name = mod->params[i].first;
+    std::string_view ep_name = extern_decl->params[i].first;
+    if (!mp_name.empty() && !ep_name.empty() && mp_name != ep_name) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' parameter '{}' at position {} "
+                             "does not match extern declaration "
+                             "parameter '{}'",
+                             mod->name, mp_name, i, ep_name),
+                 Subclause("23.5"));
+      break;
+    }
+    // §23.5 also calls for equivalent parameter types. A type parameter and
+    // a value parameter at the same position are not equivalent, so the
+    // two declarations must agree on whether each entry is a type
+    // parameter.
+    bool mp_is_type = mod->type_param_names.count(mp_name) != 0;
+    bool ep_is_type = extern_decl->type_param_names.count(ep_name) != 0;
+    if (mp_is_type != ep_is_type) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' parameter '{}' at position {} "
+                             "does not match the parameter kind of the "
+                             "extern declaration",
+                             mod->name, mp_name, i),
+                 Subclause("23.5"));
+      break;
+    }
+  }
+}
+
+// §23.5: `.*` places the extern declaration's header on the module. When the
+// extern is ANSI the body declares no ports, so the extern's (typed,
+// directioned) ports are imported directly; when the extern is non-ANSI the
+// body supplied the directions via non-ANSI port declarations, which already
+// populated mod->ports, so those are kept rather than overwritten with the
+// extern's name-only ports. §6.20.3: a type parameter's default type is carried
+// in param_types (parallel to params), so it is imported alongside the names --
+// otherwise a `.*` module whose ports are typed by an imported type parameter
+// would leave that parameter with no default type.
+static void ImportExternWildcardHeader(ModuleDecl* mod,
+                                       const ModuleDecl* extern_decl) {
+  if (mod->ports.empty()) mod->ports = extern_decl->ports;
+  if (!mod->params.empty() || extern_decl->params.empty()) return;
+  mod->params = extern_decl->params;
+  mod->param_types = extern_decl->param_types;
+  mod->type_param_names = extern_decl->type_param_names;
+  mod->has_param_port_list = extern_decl->has_param_port_list;
+}
+
+void Elaborator::ResolveExternModules() {
+  for (auto* mod : unit_->modules) {
+    if (mod->is_extern) continue;
+
+    ModuleDecl* extern_decl = FindExternDeclFor(mod, unit_);
+    if (!extern_decl) continue;
+
+    if (mod->has_wildcard_ports) {
+      ImportExternWildcardHeader(mod, extern_decl);
+      continue;
+    }
+
+    if (extern_decl->ports.size() != mod->ports.size()) {
+      diag_.Error(
+          mod->range.start,
+          std::format("module '{}' port count ({}) does not match "
+                      "extern declaration ({})",
+                      mod->name, mod->ports.size(), extern_decl->ports.size()),
+          Subclause("23.5"));
+      continue;
+    }
+    CheckExternPortMatch(mod, extern_decl, diag_);
+    CheckExternParamMatch(mod, extern_decl, diag_);
+  }
+}
+
+}  // namespace delta
