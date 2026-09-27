@@ -51,7 +51,7 @@ TEST(MixedPathDistributedDelay, NoModulePathUsesDistributedDelay) {
 // Figure 30-3 of §30.6 (printed page 885) run: the cell's d reaches q through
 // an `and #0` and an `or` of delay `or_delay`, and its module path from d to q
 // is 22, d rising at 40 and falling at 80.
-std::string Figure30_3(const std::string& or_delay) {
+std::string Figure30Dash3Cell(const std::string& or_delay) {
   return "module mycell(input a, input b, input c, input d, output q);\n"
          "  wire w1, w2;\n"
          "  and #0 (w1, a, b);\n"
@@ -82,14 +82,16 @@ std::string Figure30_3(const std::string& or_delay) {
 // assignment drove, and q followed d by the gates' 1 alone.
 TEST(MixedPathDistributedDelayRun, ModulePathLargerWinsOverGates) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(Figure30_3("1"), f), "t=22 q=0\nt=62 q=1\nt=102 q=0\n");
+  EXPECT_EQ(RunCapture(Figure30Dash3Cell("1"), f),
+            "t=22 q=0\nt=62 q=1\nt=102 q=0\n");
 }
 
 // The other way round: with an `or #30` the gates' 30 is the larger of the two
 // and q follows d by 30.
 TEST(MixedPathDistributedDelayRun, GatesLargerWinOverModulePath) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(Figure30_3("30"), f), "t=30 q=0\nt=70 q=1\nt=110 q=0\n");
+  EXPECT_EQ(RunCapture(Figure30Dash3Cell("30"), f),
+            "t=30 q=0\nt=70 q=1\nt=110 q=0\n");
 }
 
 }  // namespace

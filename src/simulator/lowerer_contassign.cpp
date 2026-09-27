@@ -765,6 +765,20 @@ static ExecTask CommitAfterInterconnectDelay(
   co_return StmtResult::kDone;
 }
 
+// The name a module path declared in this instance gives this assignment's
+// target: the net the driver resolves against, under the instance prefix,
+// which is what PathDelay::inst_prefix and PathDelay::dst_port together spell.
+// An output port's connection names the port it carries the delays of instead,
+// and an assignment inside the instance whose port's connection carries them
+// names nothing.
+static std::string ModulePathOutputName(const ContAssignParams& params) {
+  if (!params.module_path_port.empty()) return params.module_path_port;
+  if (params.path_delayed_at_connection) return {};
+  std::string_view target_name = ContAssignTargetName(params.lhs);
+  if (target_name.empty()) return {};
+  return params.inst_prefix + std::string(target_name);
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs) co_return;
@@ -791,20 +805,9 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     drv.first = false;
   }
 
-  // The name a module path declared in this instance gives this assignment's
-  // target: the net the driver resolves against, under the instance prefix,
-  // which is what PathDelay::inst_prefix and PathDelay::dst_port together
-  // spell. Built once outside the loop because ModulePathDrive::output is a
-  // view of it.
-  // An output port's connection names the port it carries the delays of
-  // instead, and an assignment inside the instance whose port's connection
-  // carries them names nothing.
-  std::string_view target_name = ContAssignTargetName(params.lhs);
-  std::string path_output = params.module_path_port;
-  if (path_output.empty() && !target_name.empty() &&
-      !params.path_delayed_at_connection) {
-    path_output = params.inst_prefix + std::string(target_name);
-  }
+  // Built once outside the loop because ModulePathDrive::output is a view of
+  // it.
+  std::string path_output = ModulePathOutputName(params);
 
   std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {
     CommitContAssignValue(params, drv, v, ctx, arena);
