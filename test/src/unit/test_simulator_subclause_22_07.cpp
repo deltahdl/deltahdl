@@ -188,3 +188,66 @@ TEST(TimescaleSimulation, GateDelayCountsItsOwnModulesUnit) {
           f),
       "y=1 2000\n");
 }
+
+// §22.7 (printed page 717): under `timescale 1 ns / 1 ps "Delays are rounded to
+// real numbers with three decimal places", the precision and not the unit
+// deciding, so under 1ns / 100ps a #1.46 is 1.5 ns: $realtime reads 1.50 and
+// $time, an integer (§20.3.1), 2. The delay was rounded to the whole unit and
+// both read 1.
+TEST(TimescaleSimulation, RealDelayRoundsToThePrecision) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 1ns / 100ps\n"
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    #1.46;\n"
+                           "    $display(\"%0.2f %0d\", $realtime, $time);\n"
+                           "    $printtimescale;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           f),
+      "1.50 2\nTime scale of (t) is 1ns / 100ps\n");
+}
+
+// §22.7 (printed page 717), the clause's own module: under `timescale 10 ns /
+// 1 ns, "The value of parameter d is rounded from 1.55 to 1.6 according to the
+// time precision", so `#d set = 0;` assigns at 16 ns and `#d set = 1;` at
+// 32 ns, $realtime reading 1.6 and 3.2 of the 10 ns unit. Neither assignment
+// waited at all, and a real literal, a real parameter and a real variable
+// written as delay controls each rounded to the whole unit.
+TEST(TimescaleSimulation, ClauseExampleRealParameterDelaysAssignments) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 10 ns / 1 ns\n"
+                                 "module test;\n"
+                                 "  logic set;\n"
+                                 "  parameter d = 1.55;\n"
+                                 "  initial begin\n"
+                                 "    #d set = 0;\n"
+                                 "    $display(\"%0.1f\", $realtime);\n"
+                                 "    #d set = 1;\n"
+                                 "    $display(\"%0.1f\", $realtime);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "1.6\n3.2\n");
+  SimFixture g;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 10 ns / 1 ns\n"
+                           "module t;\n"
+                           "  parameter d = 1.55;\n"
+                           "  parameter real e = 1.55;\n"
+                           "  real r = 1.55;\n"
+                           "  int k;\n"
+                           "  initial begin\n"
+                           "    #1.55 $display(\"lit %0.2f\", $realtime);\n"
+                           "    #d $display(\"param %0.2f\", $realtime);\n"
+                           "    #e $display(\"realparam %0.2f\", $realtime);\n"
+                           "    #r $display(\"realvar %0.2f\", $realtime);\n"
+                           "    #d k = 1;\n"
+                           "    #2 $display(\"int %0.2f\", $realtime);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           g),
+      "lit 1.60\nparam 3.20\nrealparam 4.80\nrealvar 6.40\n"
+      "int 10.00\n");
+}
