@@ -75,7 +75,10 @@ UdpDecl* NearestUdpInSearchOrder(const CompilationUnit* unit,
     if (u->name != name) continue;
     if (LibraryExcludedBySelectedList(u->library, order, strict)) continue;
     size_t pos = LibrarySearchPosition(u->library, order);
-    if (nearest == nullptr || pos < *nearest_pos) {
+    // A definition answers before an extern prototype of it in one library.
+    const bool kDefinesPrototype = nearest != nullptr && pos == *nearest_pos &&
+                                   nearest->is_extern && !u->is_extern;
+    if (nearest == nullptr || pos < *nearest_pos || kDefinesPrototype) {
       nearest = u;
       *nearest_pos = pos;
     }

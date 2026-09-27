@@ -557,10 +557,15 @@ std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {
 
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
                           CompilationUnit* unit) {
+  // The definition, where one follows or precedes an extern prototype of the
+  // primitive (Syntax 29-1), else the prototype.
+  UdpDecl* prototype = nullptr;
   for (auto* udp : unit->udps) {
-    if (udp->library == library && udp->name == cell) return udp;
+    if (udp->library != library || udp->name != cell) continue;
+    if (!udp->is_extern) return udp;
+    prototype = udp;
   }
-  return nullptr;
+  return prototype;
 }
 
 bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,

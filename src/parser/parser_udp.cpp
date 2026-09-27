@@ -845,6 +845,7 @@ UdpDecl* Parser::ParseUdpDecl() {
 
 UdpDecl* Parser::ParseExternUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
+  udp->is_extern = true;
   udp->range.start = CurrentLoc();
   Expect(TokenKind::kKwPrimitive, Subclause("29.3"));
   udp->name = ExpectIdentifier(Subclause("29.3.1")).text;

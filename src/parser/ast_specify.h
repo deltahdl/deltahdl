@@ -147,6 +147,11 @@ struct UdpTableRow {
 struct UdpDecl {
   std::string_view name;
   SourceRange range;
+  // Syntax 29-1 (printed page 861): `extern udp_nonansi_declaration` and
+  // `extern udp_ansi_declaration` declare a primitive's ports without its
+  // body, so a prototype names the primitive a definition of the same name
+  // gives the table of, and is no second definition (§3.13).
+  bool is_extern = false;
   std::vector<Attribute> attrs;
   std::string_view output_name;
   std::vector<std::string_view> input_names;

@@ -96,8 +96,10 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
     check_def(p->library, p->name, p->range, Subclause("3.13"));
   for (auto* i : unit->interfaces)
     check_def(i->library, i->name, i->range, Subclause("3.13"));
+  // Syntax 29-1's extern UDP declaration is a prototype in the same way.
   for (auto* u : unit->udps)
-    check_def(u->library, u->name, u->range, Subclause("3.13"));
+    if (!u->is_extern)
+      check_def(u->library, u->name, u->range, Subclause("3.13"));
 
   // The config loop runs last, so a name a config shares with a design element
   // of any other kind is always the later insertion and is always reported
