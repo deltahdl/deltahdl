@@ -513,6 +513,22 @@ void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
 
 }  // namespace
 
+// §32.4.1 (printed page 925): an SDF port written with a select, `a[1]` or
+// `b[3:2]`, as the bare name a path's terminal is recorded under and the
+// select PathDelay::src_select spells; the whole spelling as the name, and no
+// select, where it carries none.
+static void SplitSdfPortSelect(const std::string& port, std::string& name,
+                               std::string& select) {
+  const size_t kOpen = port.find('[');
+  if (kOpen == std::string::npos || kOpen == 0 || port.back() != ']') {
+    name = port;
+    select.clear();
+    return;
+  }
+  name = port.substr(0, kOpen);
+  select = port.substr(kOpen);
+}
+
 // §32.4.1: an IOPATH names its terminals by the cell's own port names, so the
 // path it reaches is told from the identically spelled path of another instance
 // of the same cell by PathDelay::inst_prefix alone. The prefix the cell's
@@ -521,8 +537,8 @@ void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
 void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
                             SpecifyManager& mgr, SdfMtm mtm) {
   PathDelay pd;
-  pd.src_port = io.src_port;
-  pd.dst_port = io.dst_port;
+  SplitSdfPortSelect(io.src_port, pd.src_port, pd.src_select);
+  SplitSdfPortSelect(io.dst_port, pd.dst_port, pd.dst_select);
   pd.inst_prefix = inst_prefix;
   pd.edge = io.src_edge;
 

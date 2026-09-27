@@ -866,4 +866,67 @@ TEST(SdfDelayMapping, IopathEdgeMustMatchThePathsEdge) {
   EXPECT_EQ(q->delays[0], 11u);
 }
 
+// ---------------------------------------------------------------------------
+// An IOPATH port written with a select names the path declared with it.
+// ---------------------------------------------------------------------------
+
+// Two paths from bits of one vector to one output, and a path from a part of
+// another vector, so a select can be checked against the path declared with a
+// different one and against a whole-port entry.
+const char* const kSelectDesign =
+    "module t(input [1:0] a, input [3:0] b, output y, output z);\n"
+    "  specify\n"
+    "    (a[0] => y) = 2;\n"
+    "    (a[1] => y) = 3;\n"
+    "    (b[3:2] *> z) = 4;\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+const PathDelay* PathSelecting(const SpecifyManager& mgr, std::string_view src,
+                               std::string_view select) {
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == src && pd.src_select == select) return &pd;
+  }
+  return nullptr;
+}
+
+// §32.4.1 (printed page 925): an IOPATH's ports match the declared path's
+// terminals, a select included, so `(IOPATH a[1] y (7))` lands on the path
+// from a[1] and leaves a[0]'s at 2, and `(IOPATH b[3:2] z (8))` on the path
+// from that part of b. The declared paths were recorded by port name alone, so
+// the second bit's path replaced the first, and the entry named no path.
+TEST(SdfDelayMapping, IopathWithASelectReachesThePathDeclaredWithIt) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kSelectDesign, f, mgr));
+  ASSERT_NE(PathSelecting(mgr, "a", "[0]"), nullptr);
+  ASSERT_NE(PathSelecting(mgr, "a", "[1]"), nullptr);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[0]")->delays[0], 2u);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[1]")->delays[0], 3u);
+
+  SdfFile file;
+  ASSERT_TRUE(
+      ParseSdf(DelaySdf("(IOPATH a[1] y (7)) (IOPATH b[3:2] z (8))"), file));
+  EXPECT_TRUE(file.unannotatable.empty());
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[1]")->delays[0], 7u);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[0]")->delays[0], 2u);
+  ASSERT_NE(PathSelecting(mgr, "b", "[3:2]"), nullptr);
+  EXPECT_EQ(PathSelecting(mgr, "b", "[3:2]")->delays[0], 8u);
+}
+
+// §32.4.1: an entry naming the whole port reaches every path declared from a
+// select of it, and each keeps the select it was declared with.
+TEST(SdfDelayMapping, WholePortIopathReachesEveryPathFromItsSelects) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kSelectDesign, f, mgr));
+
+  AnnotateFileOnto(DelaySdf("(IOPATH a y (9))"), mgr);
+  ASSERT_NE(PathSelecting(mgr, "a", "[0]"), nullptr);
+  ASSERT_NE(PathSelecting(mgr, "a", "[1]"), nullptr);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[0]")->delays[0], 9u);
+  EXPECT_EQ(PathSelecting(mgr, "a", "[1]")->delays[0], 9u);
+}
+
 }  // namespace

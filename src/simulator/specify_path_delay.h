@@ -32,6 +32,14 @@ enum class PulseLimitSource : uint8_t {
 struct PathDelay {
   std::string src_port;
   std::string dst_port;
+  // §32.4.1: the select each terminal was written with, spelled as an SDF
+  // port_instance spells one -- "[1]" for a bit-select, "[3:2]" for a
+  // part-select, an indexed part-select as the part it covers -- and empty for
+  // a whole port. The ports above hold the bare names, which is what the run
+  // looks the terminals up by; these are what tell the paths from two bits of
+  // one vector apart, and what an IOPATH naming `a[1]` is matched against.
+  std::string src_select;
+  std::string dst_select;
   // The hierarchical prefix of the module instance whose specify block declared
   // this path, ending in a `.` and empty for a module elaborated as a top.
   // §30.3 puts a specify block inside a module declaration and §30.4 has it

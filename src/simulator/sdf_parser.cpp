@@ -141,7 +141,19 @@ static std::string ParseSdfPort(std::string_view& s) {
     return "";
   }
   auto tok = NextSdfToken(s);
-  return std::string(tok.text);
+  std::string port(tok.text);
+  // §32.4.1: a port may be written with a part-select, `b[3:2]`, whose colon
+  // the lexer takes as a token of its own; the rest of the select, up to its
+  // closing bracket, is joined back onto the name.
+  if (port.find('[') != std::string::npos &&
+      port.find(']') == std::string::npos && !s.empty() && s[0] == ':') {
+    size_t close = s.find(']');
+    if (close != std::string_view::npos) {
+      port += s.substr(0, close + 1);
+      s.remove_prefix(close + 1);
+    }
+  }
+  return port;
 }
 
 static void SkipSdfParen(std::string_view& s) {

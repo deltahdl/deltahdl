@@ -66,14 +66,38 @@ void ExpandTransitionDelays(PathDelay& pd) {
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
 }
 
+// §32.4.1 (printed page 925): the select the specify path terminal `t` was
+// written with, spelled as PathDelay::src_select describes; empty for a whole
+// port. An indexed part-select, `a[i +: 2]`, is spelled as the part it covers.
+static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
+                                      Arena& arena) {
+  if (t.range_kind == SpecifyRangeKind::kNone || t.range_left == nullptr)
+    return {};
+  const int64_t kLeft = SelectBoundValue(EvalExpr(t.range_left, ctx, arena));
+  if (t.range_kind == SpecifyRangeKind::kBitSelect || t.range_right == nullptr)
+    return "[" + std::to_string(kLeft) + "]";
+  const int64_t kRight = SelectBoundValue(EvalExpr(t.range_right, ctx, arena));
+  int64_t msb = kLeft;
+  int64_t lsb = kRight;
+  if (t.range_kind == SpecifyRangeKind::kPlusIndexed) {
+    msb = kLeft + kRight - 1;
+    lsb = kLeft;
+  } else if (t.range_kind == SpecifyRangeKind::kMinusIndexed) {
+    lsb = kLeft - kRight + 1;
+  }
+  return "[" + std::to_string(msb) + ":" + std::to_string(lsb) + "]";
+}
+
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena) {
   PathDelay pd;
   if (!decl.src_ports.empty()) {
     pd.src_port = std::string(decl.src_ports.front().name);
+    pd.src_select = TerminalSelectText(decl.src_ports.front(), ctx, arena);
   }
   if (!decl.dst_ports.empty()) {
     pd.dst_port = std::string(decl.dst_ports.front().name);
+    pd.dst_select = TerminalSelectText(decl.dst_ports.front(), ctx, arena);
   }
   pd.path_kind = decl.path_kind;
   pd.edge = decl.edge;
@@ -358,6 +382,8 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
   for (auto& existing : path_delays) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
+        existing.src_select == delay.src_select &&
+        existing.dst_select == delay.dst_select &&
         (!match_inst_prefix || existing.inst_prefix == delay.inst_prefix)) {
       std::string saved_cond = existing.condition;
       bool saved_ifnone = existing.is_ifnone;
@@ -371,22 +397,42 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
 }
 
 // §32.4.1 (printed page 925): whether the SDF entry `entry` names the declared
-// path `existing` by its edge. An entry whose source was written with an edge,
-// `(IOPATH (posedge clk) q ...)`, names the path declared with that edge; one
-// written with none names the path whatever edge it was declared with.
-bool SdfEdgeNamesPath(const PathDelay& existing, const PathDelay& entry) {
-  return entry.edge == SpecifyEdge::kNone || existing.edge == entry.edge;
+// path `existing` by what it wrote on the ports beyond their names -- ports
+// and instance being compared by each caller. An entry whose source was
+// written with an edge, `(IOPATH (posedge clk) q ...)`, names the path
+// declared with that edge, and one whose port was written with a select,
+// `(IOPATH a[1] y ...)`, the path declared with that select; one written with
+// neither names the path whatever edge or select it was declared with.
+bool SdfEntryNamesPath(const PathDelay& existing, const PathDelay& entry) {
+  return (entry.edge == SpecifyEdge::kNone || existing.edge == entry.edge) &&
+         (entry.src_select.empty() ||
+          existing.src_select == entry.src_select) &&
+         (entry.dst_select.empty() || existing.dst_select == entry.dst_select);
+}
+
+// §32.3: an entry that names no declared path is still kept, under the ports as
+// the SDF file wrote them, so that one written with a select -- whose ports
+// hold the bare names while it is matched -- is not taken at run time for a
+// path from the whole port.
+PathDelay SdfEntryAsWritten(PathDelay entry) {
+  entry.src_port += entry.src_select;
+  entry.dst_port += entry.dst_select;
+  entry.src_select.clear();
+  entry.dst_select.clear();
+  return entry;
 }
 
 // §32.4.1: an SDF entry carries delays and pulse limits and nothing of the
 // path's shape, so the path it lands on keeps what its declaration gave it --
-// its kind, its edge and its condition, as text and as the expression §30.5.3
-// selects on. Replaced whole, an edge-sensitive path took the entry's edge,
-// none, and a conditional one lost the expression.
+// its kind, its edge, its selects and its condition, as text and as the
+// expression §30.5.3 selects on. Replaced whole, an edge-sensitive path took
+// the entry's edge, none, and a conditional one lost the expression.
 void ReplaceWithSdfDelays(PathDelay& existing, PathDelay entry,
                           PathDelayPulseRetention retain) {
   entry.path_kind = existing.path_kind;
   entry.edge = existing.edge;
+  entry.src_select = existing.src_select;
+  entry.dst_select = existing.dst_select;
   entry.condition = existing.condition;
   entry.condition_expr = existing.condition_expr;
   entry.is_ifnone = existing.is_ifnone;
@@ -405,7 +451,7 @@ bool AnnotateNonconditionalSdfPaths(std::vector<PathDelay>& path_delays,
     if (existing.src_port == entry.src_port &&
         existing.dst_port == entry.dst_port &&
         existing.inst_prefix == entry.inst_prefix &&
-        SdfEdgeNamesPath(existing, entry)) {
+        SdfEntryNamesPath(existing, entry)) {
       ReplaceWithSdfDelays(existing, entry, retain);
       matched = true;
     }
@@ -439,6 +485,8 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   for (auto& existing : path_delays_) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port &&
+        existing.src_select == delay.src_select &&
+        existing.dst_select == delay.dst_select &&
         existing.inst_prefix == delay.inst_prefix &&
         SpecifyConditionsMatch(existing.condition, delay.condition) &&
         existing.condition_expr == delay.condition_expr &&
@@ -459,7 +507,7 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
     // entry matching none is still kept, which is how §32.3 chose to hold on to
     // delay data that finds no home.
     if (!AnnotateNonconditionalSdfPaths(path_delays_, delay, retain))
-      path_delays_.push_back(std::move(delay));
+      path_delays_.push_back(SdfEntryAsWritten(std::move(delay)));
     return true;
   }
   // §32.4.1: a conditional entry may land *only* on a path between those same
@@ -475,7 +523,7 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
         existing.inst_prefix == delay.inst_prefix &&
         SpecifyConditionsMatch(existing.condition, delay.condition) &&
         existing.is_ifnone == delay.is_ifnone &&
-        SdfEdgeNamesPath(existing, delay)) {
+        SdfEntryNamesPath(existing, delay)) {
       ReplaceWithSdfDelays(existing, std::move(delay), retain);
       return true;
     }
@@ -503,7 +551,7 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
         existing.inst_prefix == delta.inst_prefix &&
-        SdfEdgeNamesPath(existing, delta)) {
+        SdfEntryNamesPath(existing, delta)) {
       AddPathDelayValues(existing, delta);
       matched = true;
     }
@@ -521,7 +569,7 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
         existing.inst_prefix == delta.inst_prefix &&
         SpecifyConditionsMatch(existing.condition, delta.condition) &&
         existing.is_ifnone == delta.is_ifnone &&
-        SdfEdgeNamesPath(existing, delta)) {
+        SdfEntryNamesPath(existing, delta)) {
       AddPathDelayValues(existing, delta);
       return true;
     }
@@ -538,7 +586,7 @@ bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
     // AnnotateSdfIopathEntry (simulator/sdf_annotate_entry.cpp) stamped onto
     // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
     if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
-      path_delays_.push_back(delta);
+      path_delays_.push_back(SdfEntryAsWritten(delta));
     }
     return true;
   }
