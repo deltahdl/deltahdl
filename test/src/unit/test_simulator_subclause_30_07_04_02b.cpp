@@ -139,4 +139,42 @@ TEST(NegativePulseAtOutput, ShowcancelledOnDetectDrivesXFromDetection) {
   EXPECT_EQ(out, "at25=x\nat31=x\nat40=1\n");
 }
 
+// §30.7.4.2 Example 3 (printed page 894): a showcancelled and a
+// pulsestyle_ondetect declaration may each name a list of outputs, and each
+// applies to every output named. Both outputs' negative pulses show x from the
+// detection of the pulse until the cancelled leading edge's time: `out` from 11
+// to 16 on its (4, 6) path, `out_b` from 31 to 37 on its (4, 7) path.
+TEST(NegativePulseAtOutput, ListFormDeclarationsApplyToEachOutput) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module mypair(input a, input b, output out, output out_b);\n"
+                 "  assign out = a;\n"
+                 "  assign out_b = b;\n"
+                 "  specify\n"
+                 "    showcancelled out, out_b;\n"
+                 "    pulsestyle_ondetect out, out_b;\n"
+                 "    (a => out) = (4, 6);\n"
+                 "    (b => out_b) = (4, 7);\n"
+                 "  endspecify\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  logic a, b;\n"
+                 "  wire t1, t2;\n"
+                 "  mypair u(.a(a), .b(b), .out(t1), .out_b(t2));\n"
+                 "  always @(t1) if ($time > 8)\n"
+                 "    $display(\"t=%0t out=%b\", $time, t1);\n"
+                 "  always @(t2) if ($time > 8)\n"
+                 "    $display(\"t=%0t out_b=%b\", $time, t2);\n"
+                 "  initial begin\n"
+                 "    a = 1; b = 1;\n"
+                 "    #10 a = 0;\n"
+                 "    #1 a = 1;\n"
+                 "    #19 b = 0;\n"
+                 "    #1 b = 1;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "t=11 out=x\nt=16 out=1\nt=31 out_b=x\nt=37 out_b=1\n");
+}
+
 }  // namespace

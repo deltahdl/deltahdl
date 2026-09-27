@@ -164,4 +164,36 @@ TEST(PulseFilterStyleSim, OndetectGovernsPulseClassifiedToXFromSource) {
       kScheduled);
 }
 
+// §30.7.4.1 (printed page 889) run end to end: on-detect filtering turns the
+// pulse's leading edge into a transition to x, "but the time of the leading
+// edge is changed to occur immediately upon detection of the pulse". A 4-wide
+// negative pulse on a (7, 9) path whose PATHPULSE$ = (1, 5) filters it to x is
+// detected at 14, when the input rises again, so y goes x at 14 rather than at
+// the leading edge's scheduled 19, and leaves x at the trailing edge's 21.
+TEST(PulseStyleRun, OnDetectDrivesAFilteredPulseXFromItsDetection) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mybuf(input a, output y);\n"
+                       "  assign y = a;\n"
+                       "  specify\n"
+                       "    pulsestyle_ondetect y;\n"
+                       "    specparam PATHPULSE$ = (1, 5);\n"
+                       "    (a => y) = (7, 9);\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic a;\n"
+                       "  wire ty;\n"
+                       "  mybuf u(.a(a), .y(ty));\n"
+                       "  always @(ty) if ($time > 0)\n"
+                       "    $display(\"t=%0t y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 1;\n"
+                       "    #10 a = 0;\n"
+                       "    #4 a = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=7 y=1\nt=14 y=x\nt=21 y=1\n");
+}
+
 }  // namespace
