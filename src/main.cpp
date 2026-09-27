@@ -323,7 +323,9 @@ bool LoadLibraryMaps(const delta::CliOptions& opts,
     std::vector<std::string> errors;
     bool loaded = lib_map.LoadMapFile(map_file, &errors);
     for (const auto& err : errors) std::cerr << "error: " << err << "\n";
-    if (!loaded || !errors.empty()) return false;
+    // LibraryMap::LoadMapFile returns false on every path that records an
+    // error, so `loaded` alone says whether the file was read.
+    if (!loaded) return false;
   }
   return true;
 }

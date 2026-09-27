@@ -1,0 +1,5 @@
+--load-lib
+sc.lib
+--top
+sc_top
+--parse-only

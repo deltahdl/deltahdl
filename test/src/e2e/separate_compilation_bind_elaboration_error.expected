@@ -1,0 +1,3 @@
+sc.lib:5:11: error: undeclared identifier 'undeclared_x' (§23.9)
+    initial undeclared_x = 1;
+            ^

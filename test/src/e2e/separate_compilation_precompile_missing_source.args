@@ -1,0 +1,5 @@
+--precompile-into
+sc_lib
+--precompile-out
+sc.lib
+nosuch.sv

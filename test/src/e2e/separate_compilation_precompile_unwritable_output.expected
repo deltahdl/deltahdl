@@ -1,0 +1,1 @@
+could not precompile test/src/e2e/separate_compilation_precompile_unwritable_output.sv into sc_no_such_dir/sc.lib

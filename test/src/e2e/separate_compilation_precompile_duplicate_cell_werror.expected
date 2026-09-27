@@ -1,0 +1,1 @@
+<unknown location>: error: 'sc_dup' is compiled into library 'sc_lib' more than once in this invocation; the last one is kept (§33.3.1)
