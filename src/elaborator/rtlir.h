@@ -341,8 +341,9 @@ struct RtlirContAssign {
   // scale rather than a value, so the strength a drive carries depends on the
   // control and on the value the gate would transmit. `three_state_pass` is
   // that value, the data terminal as the gate passes it, so a notif's inversion
-  // is already in it. Null for every assignment that is not one of §28.6's four
-  // gates.
+  // is already in it. §28.7's four MOS switches carry them too, Table 28-6
+  // giving an unknown control the same L and H. Null for every other
+  // assignment.
   Expr* three_state_ctrl = nullptr;
   Expr* three_state_pass = nullptr;
   // §32.4.4: when this assignment is the §23.3.2 input port connection of a

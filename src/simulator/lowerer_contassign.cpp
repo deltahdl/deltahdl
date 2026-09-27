@@ -223,14 +223,16 @@ static GateBit LowGateBit(const Logic4Vec& v) {
 // all three cases, and the strength is what tells them apart.
 //
 // A control of 0 or 1 leaves the gate driving what Table 28-5's first two
-// columns give at the strength its declaration named, which is the strength
-// passed in.
+// columns give at the strength it drives with, which is `drive`: the strength
+// its declaration named, or for a MOS switch the strength of what it passes
+// (§28.13), which Table 28-6's L and H then put on one side of the scale.
 static DriverStrength ThreeStateGateStrength(const ContAssignParams& params,
+                                             DriverStrength drive,
                                              SimContext& ctx, Arena& arena) {
   GateBit ctrl = LowGateBit(EvalExpr(params.three_state_ctrl, ctx, arena));
-  if (ctrl == GateBit::kZero || ctrl == GateBit::kOne) return params.ds;
+  if (ctrl == GateBit::kZero || ctrl == GateBit::kOne) return drive;
   GateBit passed = LowGateBit(EvalExpr(params.three_state_pass, ctx, arena));
-  DriverStrength one_sided = params.ds;
+  DriverStrength one_sided = drive;
   if (passed == GateBit::kZero) {
     one_sided.s1 = Strength::kHighz;
     return one_sided;
@@ -239,16 +241,12 @@ static DriverStrength ThreeStateGateStrength(const ContAssignParams& params,
     one_sided.s0 = Strength::kHighz;
     return one_sided;
   }
-  return params.ds;
+  return drive;
 }
 
 static DriverStrength ComputeEffectiveDriverStrength(
     const ContAssignParams& params, SimContext& ctx) {
   DriverStrength effective_ds = params.ds;
-  if (params.three_state_ctrl != nullptr &&
-      params.three_state_pass != nullptr) {
-    return ThreeStateGateStrength(params, ctx, ctx.GetArena());
-  }
   if ((params.nonresistive_switch || params.resistive_switch) &&
       params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
     auto* data_net = ctx.FindNet(params.data_input->text);
@@ -259,6 +257,10 @@ static DriverStrength ComputeEffectiveDriverStrength(
       effective_ds.s0 = reduce(ns.s0_hi);
       effective_ds.s1 = reduce(ns.s1_hi);
     }
+  }
+  if (params.three_state_ctrl != nullptr &&
+      params.three_state_pass != nullptr) {
+    return ThreeStateGateStrength(params, effective_ds, ctx, ctx.GetArena());
   }
   return effective_ds;
 }

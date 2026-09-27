@@ -706,4 +706,37 @@ TEST(WiredLogicModel, WiredOrOfZeroWithUnknownAtEqualLevelGivesUnknown) {
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
 }
 
+// §28.12.4 (printed page 853): "When ambiguous strength signals combine in
+// wired logic, it is necessary to consider the results of all combinations of
+// each of the strength levels in the first signal with each of the strength
+// levels in the second signal." An L at the strong level from a switch with an
+// unknown control, a pull 0 and a pullup: on a wire the L's 0 and the pull 0
+// give 650; on a wand every combination is a 0, St0 or the pull pair's wired
+// AND, so 650 with value 0; on a wor the pull pair's wired OR is a pull 1, so
+// 65X.
+TEST(WiredLogicPipeline, AmbiguousDriverCombinesOverAllLevels) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire s1; wand wa; wor wo;\n"
+      "  logic zero = 0, g = 1'bx;\n"
+      "  pmos p1 (s1, zero, g);\n"
+      "  buf (pull1, pull0) b1 (s1, zero);\n"
+      "  pmos p2 (wa, zero, g);\n"
+      "  buf (pull1, pull0) b2 (wa, zero);\n"
+      "  pullup (wa);\n"
+      "  pmos p3 (wo, zero, g);\n"
+      "  buf (pull1, pull0) b3 (wo, zero);\n"
+      "  pullup (wo);\n"
+      "  initial begin\n"
+      "    #1 $display(\"s1=%b %v\", s1, s1);\n"
+      "    $display(\"wa=%b %v wo=%b %v\", wa, wa, wo, wo);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "s1=0 650\n"
+            "wa=0 650 wo=x 65X\n");
+}
+
 }  // namespace

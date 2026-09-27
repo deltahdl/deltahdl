@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_switch_settle.h"
@@ -389,6 +391,32 @@ TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(v->value.words[0].bval & 1u, 1u);
+}
+
+// §28.7 Table 28-6 (printed page 839): with a control of x or z an nmos or a
+// pmos passes a 0 as L and a 1 as H -- "a result that has a value 0 or z" and
+// "a value 1 or z" -- which §21.2.1.4 renders with the data's strength and the
+// letter; a strong variable as data gives StL and StH, where the switch drove
+// an unqualified StX.
+TEST(MosSwitchSimulation, UnknownControlPassesLAndH) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire n, p;\n"
+      "  logic d, c;\n"
+      "  nmos g1 (n, d, c);\n"
+      "  pmos g2 (p, d, c);\n"
+      "  initial begin\n"
+      "    d = 0; c = 1'bx;\n"
+      "    #1 $display(\"%v %v\", n, p);\n"
+      "    d = 1; c = 1'bz;\n"
+      "    #1 $display(\"%v %v\", n, p);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "StL StL\n"
+            "StH StH\n");
 }
 
 }  // namespace

@@ -209,6 +209,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/design_scopes.cpp
     simulator/driver_update.cpp
     simulator/net.cpp
+    simulator/net_bit_outcomes.cpp
     simulator/net_strength.cpp
     simulator/switch_network.cpp
     simulator/scheduler.cpp

@@ -577,4 +577,84 @@ TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
   EXPECT_EQ(ResolvedStrengthOf("  assign (pull0, pull1) y = 1'bx;\n"), "PuX\n");
 }
 
+// §28.12.2 (printed page 847), Figure 28-11's upper combination: a switch with
+// an unknown control passing a strong 1 is an H, and with a pullup on the same
+// net it "produces a signal with a value of 1 and a range of strengths (651)",
+// every state the two leave the net in being a 1 -- St1 where the switch
+// passes, Pu1 where it does not.
+TEST(StrengthResolution, SourceFigure2811UpperCombinationIs651) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire u;\n"
+      "  logic a = 1, b = 1'bx;\n"
+      "  pmos p (u, a, b);\n"
+      "  pullup (u);\n"
+      "  initial #1 $display(\"u=%b %v\", u, u);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "u=1 651\n");
+}
+
+// Figure 28-11's lower combination: a pulldown passed through a switch with an
+// unknown control is an L at the pull level, and with a weak 0 beside it the
+// net has "a value 0 and a range of strengths (530)".
+TEST(StrengthResolution, SourceFigure2811LowerCombinationIs530) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire l, pd;\n"
+      "  logic g = 1'bx, d = 0;\n"
+      "  pulldown (pd);\n"
+      "  pmos p (l, pd, g);\n"
+      "  and (strong1, weak0) a (l, d, d);\n"
+      "  initial #1 $display(\"l=%b %v\", l, l);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "l=0 530\n");
+}
+
+// Figure 28-14: the upper and lower combinations on one net give "an unknown
+// with a range (56x) determined by the extremes of the two signals". The L's
+// pull 0 meets the pullup's pull 1 where neither switch passes, so the 0 side
+// reaches the pull level; combined with the pullup first, the L was dropped
+// as no stronger than it, and the net read 36X.
+TEST(StrengthResolution, SourceFigure2814CombinesBothAt56X) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire y, pd;\n"
+      "  logic a = 1, b = 1'bx, g = 1'bx, d = 0;\n"
+      "  pmos p1 (y, a, b);\n"
+      "  pullup (y);\n"
+      "  pulldown (pd);\n"
+      "  pmos p2 (y, pd, g);\n"
+      "  and (strong1, weak0) an (y, d, d);\n"
+      "  initial #1 $display(\"y=%b %v\", y, y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=x 56X\n");
+}
+
+// Figure 28-16 (printed page 848): an and gate declared (strong1, highz0) with
+// one input x drives StH, and with a weak 0 beside it the net is "the range
+// (36x)" of Figure 28-19; an H beside a pullup alone stays 651, the weak 0
+// being reached only where the H is z and the pullup is not.
+TEST(StrengthResolution, SourceFigure2816StrongHWithWeakZeroIs36X) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire y, w;\n"
+      "  logic a = 1, b = 1'bx, zero = 0;\n"
+      "  and (strong1, highz0) n1 (y, a, b);\n"
+      "  and (strong1, weak0) n2 (y, zero, zero);\n"
+      "  pmos p (w, a, b);\n"
+      "  pullup (w);\n"
+      "  and (strong1, weak0) n3 (w, zero, zero);\n"
+      "  initial #1 $display(\"y=%b %v w=%b %v\", y, y, w, w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=x 36X w=1 651\n");
+}
+
 }  // namespace

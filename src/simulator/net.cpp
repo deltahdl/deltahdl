@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/net_bit_outcomes.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
 
@@ -602,13 +603,21 @@ static void ResolveStrengthDriven(Net& net, Arena& arena,
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
   net.resolved_strength = NetStrength{};
   for (uint32_t b = 0; b < result.width; ++b) {
-    ResolveStrengthBit(drivers, strengths, result, b, net.type);
     // §28.12 resolves each bit of a net on its own, and the strength of the
     // signal it resolves to is a property of that bit. A net reports one pair,
     // so each bit's contribution is folded into it rather than one bit being
-    // taken to speak for the rest.
+    // taken to speak for the rest. A bit some driver drives at x -- an L, an H
+    // or an x at two strengths -- is resolved over the states those drivers
+    // stand for (simulator/net_bit_outcomes.h says why).
     NetStrength bit_strength;
-    ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    if (AnyDriverUnknownAt(drivers, b)) {
+      SetBit(result, b,
+             ResolveBitOverDriverStates(drivers, strengths, net.type, b,
+                                        bit_strength));
+    } else {
+      ResolveStrengthBit(drivers, strengths, result, b, net.type);
+      ComputeSingleBitStrength(drivers, strengths, bit_strength, net.type, b);
+    }
     net.bit_strengths.push_back(bit_strength);
     WidenNetStrengthOverBit(net.resolved_strength, bit_strength);
   }

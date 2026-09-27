@@ -522,6 +522,12 @@ static void ElaborateMosGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
     ca.data_input = data;
   }
+  // §28.7 Table 28-6 (printed page 839): a MOS switch whose control is x or z
+  // passes a 0 as L and a 1 as H, as §28.6's three-state gates do, so its two
+  // terminals travel with the assignment the same way; what it passes is the
+  // data terminal itself.
+  ca.three_state_ctrl = ctrl;
+  ca.three_state_pass = data;
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
 }
