@@ -818,4 +818,30 @@ TEST(ClassSim, DeclarationExtendingASpecializationReachesItsStatics) {
   EXPECT_EQ(out, "0 9\n");
 }
 
+// §8.25 (printed page 203): a property whose packed dimension names a value
+// parameter is as wide as the specialization binds the parameter, as the
+// clause's `bit [size-1:0] a` is ten bits in `vector #(10)`. So `v` is 16 bits
+// under `C #(16)` and holds 65535 after `'1`, and 8 bits under the default
+// specialization `C #()` (§8.25.1, printed page 205), holding 255. The
+// specialization copied the default's width, and both read 255 and 8.
+TEST(ClassSim, ValueParameterPropertyTakesItsSpecializationsWidth) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(int W = 8);\n"
+      "  logic [W-1:0] v;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(16) c16;\n"
+      "  C #() c8;\n"
+      "  initial begin\n"
+      "    c16 = new; c16.v = '1;\n"
+      "    c8 = new; c8.v = '1;\n"
+      "    $display(\"%0d %0d %0d %0d\", c16.v, $bits(c16.v), c8.v,\n"
+      "             $bits(c8.v));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "65535 16 255 8\n");
+}
+
 }  // namespace

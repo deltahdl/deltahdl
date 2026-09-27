@@ -10,6 +10,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -614,6 +616,63 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
   }
 }
 
+// §6.20.1: the property `name` the class body of `decl` declares, null where
+// it declares none; a parameter carried as a property member (is_param) is no
+// property.
+const ClassMember* DeclaredProperty(const ClassDecl* decl,
+                                    std::string_view name) {
+  for (const auto* m : decl->members) {
+    if (m->kind == ClassMemberKind::kProperty && !m->is_param &&
+        m->name == name)
+      return m;
+  }
+  return nullptr;
+}
+
+// §8.25 with §7.4.1: the constants a property's packed dimension folds against
+// under the specialization `spec` -- the compilation unit's, the value each of
+// its header parameters takes (`values`), and then the parameters of the
+// class body, which may name them (§6.20.1) -- as ClassParamScope in
+// lowerer_class.cpp gathers them at the declaration's defaults.
+ScopeMap SpecializationParamScope(const ClassTypeInfo* spec,
+                                  const ParamValues& values) {
+  ScopeMap scope;
+  if (spec->unit_constants != nullptr) scope = *spec->unit_constants;
+  for (const auto& [pname, value] : values)
+    scope[pname] = SelectBoundValue(value);
+  for (const auto* member : spec->decl->members) {
+    if (member->kind != ClassMemberKind::kProperty || !member->is_param ||
+        member->init_expr == nullptr) {
+      continue;
+    }
+    if (auto v = ConstEvalInt(member->init_expr, scope))
+      scope[member->name] = *v;
+  }
+  return scope;
+}
+
+// §8.25 (printed page 203): a property whose packed dimension names a value
+// parameter, the clause's `bit [size-1:0] a`, is as wide as the
+// specialization binds the parameter, ten bits in `vector #(10)`. The table a
+// specialization copies was sized at the declaration's defaults
+// (CollectClassMembers in lowerer_class.cpp), which are the default
+// specialization's (§8.25.1), so `logic [W-1:0] v` stayed 8 bits under
+// `C #(16)`. Each property the class declares is folded again with the
+// specialization's own values; one whose type does not fold -- a name, a type
+// parameter, which SizeTypeParamProperties sizes -- is left as it was.
+void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values) {
+  if (values.empty()) return;
+  ScopeMap scope = SpecializationParamScope(spec, values);
+  for (auto& prop : spec->properties) {
+    const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
+    if (member == nullptr) continue;
+    uint32_t width = EvalTypeWidth(member->data_type, {}, scope);
+    if (width == 0) continue;
+    prop.width = width;
+    prop.width_is_declared = true;
+  }
+}
+
 }  // namespace
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
@@ -649,6 +708,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
+  SizeValueParamProperties(spec, values);
   BindSpecializationBase(spec, spelled, ctx, arena);
   OwnVTableEntries(spec);
   for (auto& [pname, value] : values)

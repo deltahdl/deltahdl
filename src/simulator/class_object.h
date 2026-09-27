@@ -80,6 +80,12 @@ struct ClassTypeInfo {
   // parameters from, and this is what it reads instead
   // (BindTypeParamActuals in eval_class_params.cpp).
   const std::vector<DataType>* param_actuals = nullptr;
+  // §7.4.1 with §8.25: the constants of the compilation unit the lowerer folded
+  // each property's packed dimensions against (RtlirDesign::unit_constants),
+  // beneath the class's own parameters. A specialization folds them again with
+  // its own parameter values laid over these (SpecializationOf); null where the
+  // class was built with none.
+  const std::unordered_map<std::string_view, int64_t>* unit_constants = nullptr;
 
   struct PropertyInfo {
     std::string_view name;

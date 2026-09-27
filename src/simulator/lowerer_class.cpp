@@ -504,6 +504,7 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
                               const ClassDeclScope& scope, SimContext& ctx,
                               Arena& arena) {
   if (!cls->base_class.empty()) info->parent = BaseClassOf(cls, ctx);
+  info->unit_constants = &scope.constants;
   for (const auto& ref : cls->extends_interfaces) {
     auto* iface = ctx.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
