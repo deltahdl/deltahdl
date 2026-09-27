@@ -667,4 +667,28 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 7u}, {"c", 9u}});
 }
 
+// §8.25.1 (printed page 205) with §8.25 (printed page 204) and §8.10 (printed
+// pages 186-187): a static task named through a specialization runs in that
+// specialization's scope, so the static property it reads bare is the
+// specialization's own copy, initialized from its own value parameter:
+// `C#(4)::t(a)` writes 4 and `C#(7)::t(b)` 7. Run under the class declaration,
+// whose copy no specialization's actual initializes, each wrote 0.
+TEST(ParameterizedScopeResolutionSim,
+     StaticTaskOfASpecializationReadsItsOwnStaticProperty) {
+  EXPECT_EQ(RunAndGet("class C #(int N = 1);\n"
+                      "  static int s = N;\n"
+                      "  static task t(output int r); r = s; endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int a, b, out;\n"
+                      "  initial begin\n"
+                      "    C#(4)::t(a);\n"
+                      "    C#(7)::t(b);\n"
+                      "    out = a * 100 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            4u * 100u + 7u);
+}
+
 }  // namespace

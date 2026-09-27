@@ -33,6 +33,13 @@ namespace delta {
 // in; false for any other call. A static task named through a handle,
 // `h.t(...)`, resolves through ResolveInstanceMethod as an instance task does,
 // the handle standing for the class (§8.10).
+//
+// §8.25.1 (printed page 205) with §8.25 (printed page 204): a scope carrying a
+// `#(...)` list, `C#(4)::t(...)`, names one specialization, which has its own
+// static properties, so the task runs in that specialization's scope, as
+// TryEvalParameterizedScopeCall in eval_function.cpp runs a static function so
+// named. Run in the class declaration's, `static int s = N` read bare in the
+// task was the declaration's copy, which no actual initializes, and read 0.
 static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
                                      Arena& arena, InstanceMethodInfo& call) {
   const Expr* access = expr->lhs;
@@ -45,6 +52,12 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
   if (class_key.empty()) return false;
   const ClassTypeInfo* cls = ctx.FindClassType(class_key);
   if (cls == nullptr) return false;
+  if (access->lhs != nullptr && !access->lhs->elements.empty()) {
+    if (const ClassTypeInfo* spec =
+            ScopeNamedSpecialization(access->lhs, ctx, arena)) {
+      cls = spec;
+    }
+  }
   auto it = cls->methods.find(std::string(access->rhs->text));
   if (it == cls->methods.end()) return false;
   call.obj = nullptr;
