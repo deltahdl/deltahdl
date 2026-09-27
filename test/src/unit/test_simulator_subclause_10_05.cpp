@@ -245,4 +245,154 @@ TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
   EXPECT_EQ(o->value.ToUint64(), 10u);
 }
 
+// §10.5 makes a variable declaration assignment a procedural assignment to the
+// declared variable, and §10.9 and §10.10 make an assignment pattern or a
+// `{...}` assigned to an unpacked array fill its elements. A declaration in a
+// begin-end block assigned its initializer to the element-width carrier alone,
+// so the array stayed zero or empty.
+TEST(VariableInitSim, BlockFixedArrayInitFromPattern) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    int a[3] = '{7, 8, 9};\n"
+                      "    r = a[0] * 100 + a[1] * 10 + a[2];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            789u);
+}
+
+TEST(VariableInitSim, BlockFixedArrayInitFromDefaultPattern) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    int a[2] = '{default: 5};\n"
+                      "    r = a[0] + a[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            10u);
+}
+
+TEST(VariableInitSim, BlockQueueInitFromConcatenation) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    int q[$] = {1, 2};\n"
+                      "    q.push_back(3);\n"
+                      "    r = q.size() * 10 + q[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            32u);
+}
+
+TEST(VariableInitSim, BlockDynamicArrayInitFromPattern) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    int d[] = '{4, 5, 6};\n"
+                      "    r = d.size() * 10 + d[2];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            36u);
+}
+
+TEST(VariableInitSim, BlockAssocArrayInitFromPattern) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    int m[string] = '{\"x\": 1, \"y\": 2};\n"
+                      "    r = m.num() * 10 + m[\"y\"];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            22u);
+}
+
+// A queue or array of strings is an array like any other (§7.10 with §6.16),
+// and the declaration in a block made the carrier alone, so an assignment or
+// an initializer reached no queue.
+TEST(VariableInitSim, BlockStringQueueInitAndAssign) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    string p[$] = '{\"a\", \"b\"};\n"
+                      "    string s[$];\n"
+                      "    s = {\"c\", \"d\", \"e\"};\n"
+                      "    r = p.size() * 10 + s.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            23u);
+}
+
+// The same declarations in an automatic function's body.
+TEST(VariableInitSim, FunctionLocalArrayInits) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function automatic int f();\n"
+                      "    int a[3] = '{7, 8, 9};\n"
+                      "    int q[$] = {1, 2};\n"
+                      "    int d[] = '{4, 5, 6};\n"
+                      "    return a[2] * 100 + q.size() * 10 + d.size();\n"
+                      "  endfunction\n"
+                      "  initial r = f();\n"
+                      "endmodule\n",
+                      "r"),
+            923u);
+}
+
+// The initializer is evaluated once, on the array: a call in it runs once.
+TEST(VariableInitSim, BlockArrayInitEvaluatedOnce) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int cnt = 0;\n"
+                      "  function int bump(); cnt++; return 7; endfunction\n"
+                      "  initial begin\n"
+                      "    int q[$] = {bump()};\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "cnt"),
+            1u);
+}
+
+// §6.21: a static variable's initializer is executed once, an automatic
+// one's on every entry to its scope.
+TEST(VariableInitSim, StaticBlockQueueInitRunsOnce) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    for (int i = 0; i < 3; i++) begin\n"
+                      "      static int q[$] = {1};\n"
+                      "      automatic int a[$] = {1};\n"
+                      "      q.push_back(i);\n"
+                      "      a.push_back(i);\n"
+                      "      r = q.size() * 10 + a.size();\n"
+                      "    end\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            42u);
+}
+
+// §13.3.2: a static function's local keeps its value between calls, so its
+// initializer runs on the first call alone.
+TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int f();\n"
+                      "    int q[$] = {1, 2};\n"
+                      "    q.push_back(3);\n"
+                      "    return q.size();\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    r = f();\n"
+                      "    r = r * 10 + f();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            34u);
+}
+
 }  // namespace

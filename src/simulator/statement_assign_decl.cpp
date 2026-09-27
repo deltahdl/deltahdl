@@ -28,6 +28,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/static_aggregate.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/virtual_interface.h"
 
@@ -375,36 +376,6 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
 // dimension reached CreateBlockArrayElements, which reads no bounds off it
 // and built nothing, so a block's or a subroutine body's `int d[]` had no
 // store: new[] sized nothing and the element read 0.
-//
-// §7.5.1 (printed 158): the new[] constructor may stand as the declaration
-// assignment's right-hand side, sizing the array and copying the optional
-// initialization array, as Lowerer::LowerDynArrayNewInit does for a module's
-// `int d[] = new[3]`. A block's initializer was evaluated onto the carrier
-// variable alone -- InitializeDeclVariable below and CreateFuncLocalVar
-// (eval_function_body.cpp) treat every initializer of a declaration with
-// unpacked dimensions so -- and the array stayed empty, `d.size()` reading 0.
-// The initializer is run as the assignment `d = new[3]` it stands for
-// (§6.8), through the new[] arm of TryQueueBlockingAssign, which sizes,
-// default-initializes and copies as the executed statement does.
-static void SizeBlockDynArrayFromInit(const Stmt* stmt, Arena& arena,
-                                      SimContext& ctx) {
-  const Expr* init = stmt->var_init;
-  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new" ||
-      init->args.empty()) {
-    return;
-  }
-  auto* target = arena.Create<Expr>();
-  target->kind = ExprKind::kIdentifier;
-  target->range = stmt->range;
-  target->text = stmt->var_name;
-  auto* assign = arena.Create<Stmt>();
-  assign->kind = StmtKind::kBlockingAssign;
-  assign->range = stmt->range;
-  assign->lhs = target;
-  assign->rhs = stmt->var_init;
-  TryQueueBlockingAssign(assign, ctx, arena);
-}
-
 static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
                                 SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
@@ -418,8 +389,35 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   info.elem_width = elem_width;
   info.is_4state = is_4state;
   ctx.RegisterArrayInScope(stmt->var_name, info);
-  SizeBlockDynArrayFromInit(stmt, arena, ctx);
   return true;
+}
+
+// §10.5 (printed page 256): "The variable declaration assignment is a special
+// case of procedural assignment as it assigns a value to a variable", and
+// §10.9 and §10.10 (printed 260 and 264) make an assignment pattern or a
+// `{...}` assigned to an unpacked array fill its elements. The initializer of
+// a declaration with unpacked dimensions went onto the element-width carrier
+// alone -- the one exception being the `d = new[3]` of a dynamic array -- so
+// a block's or a subroutine body's `int a[3] = '{7, 8, 9}`, `int q[$] = {1,
+// 2}`, `int d[] = '{4, 5, 6}` and `int m[string] = '{"x": 1}` left the array
+// as the declaration made it, empty or zero. The initializer is run as the
+// assignment it is, through the procedure's own blocking assignment
+// (ExecImmediateBlockingAssign), which fills, sizes and constructs as the
+// statement `a = '{7, 8, 9}` does. A static local's declaration is executed
+// once (TryReuseExistingDeclVar and ExecFuncVarDecl refer to the kept
+// variable afterwards), so its initializer is, as §6.21 requires.
+void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->var_init == nullptr || stmt->var_unpacked_dims.empty()) return;
+  auto* target = arena.Create<Expr>();
+  target->kind = ExprKind::kIdentifier;
+  target->range = stmt->range;
+  target->text = stmt->var_name;
+  auto* assign = arena.Create<Stmt>();
+  assign->kind = StmtKind::kBlockingAssign;
+  assign->range = stmt->range;
+  assign->lhs = target;
+  assign->rhs = stmt->var_init;
+  ExecImmediateBlockingAssign(assign, ctx, arena);
 }
 
 // §7.10 and §7.4.2: the storage a declaration's unpacked dimensions ask for
@@ -624,6 +622,11 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
   if (width == 0 && DeclaredTypeIsString(stmt->var_decl_type, ctx)) {
     CreateVarInScope(stmt->var_name, 0, is_signed, ctx);
     ctx.RegisterStringVariable(stmt->var_name);
+    // §7.10 with §6.16: a queue or an array of strings is as much an array
+    // as one of ints, and its elements hold strings of no fixed width. This
+    // branch made the carrier alone, so `string s[$]; s = {"a", "b"};` in a
+    // block left s.size() 0 and s[1] reading a stray element variable.
+    CreateDeclAggregate(stmt, 0, ctx, arena);
   } else {
     if (width == 0) width = 32;
     if (is_real && width < 64) width = 64;
@@ -711,8 +714,8 @@ struct DeclaredObject {
 // Applies 4-state coercion and the optional initializer to a freshly created
 // variable, then records it in its static frame when it is static.
 //
-// §6.8 executes a declaration's initializer "as if the assignment were made
-// from an initial procedure", which §10.8 makes an assignment-like context, so
+// §10.5 (printed page 256) makes a declaration's initializer "a special case of
+// procedural assignment", which §10.8 makes an assignment-like context, so
 // §10.7 truncates or extends it into the width the declaration established. A
 // Logic4Vec carries its own width, so writing the value straight over the
 // variable put the expression's width in the declaration's place instead:
@@ -739,9 +742,9 @@ struct DeclaredObject {
 // A declaration carrying an unpacked dimension is left as it was. Its variable
 // is the element-width carrier that CreateBlockQueue and
 // CreateBlockArrayElements size the real storage from rather than an object the
-// initializer is assigned to, and `int a[3] = '{1,2,3}` evaluates to the
-// ninety-six bits of a concatenation, which one element's width has nothing to
-// say about.
+// initializer is assigned to; AssignDeclAggregateInit has already assigned the
+// initializer to the array itself, and evaluating it again here would run its
+// side effects twice.
 static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
@@ -760,7 +763,7 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     var->value = MakeAllX(arena, var->value.width);
     var->value.is_signed = var->is_signed;
   }
-  if (stmt->var_init) {
+  if (stmt->var_init && stmt->var_unpacked_dims.empty()) {
     Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
     // §11.4.14 (printed page 291): a streaming concatenation initializing a
     // fixed-size variable is left-aligned in it, widened with zero bits on
@@ -770,16 +773,13 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     // the left to the declared width and leave nothing to widen: taken so,
     // `bit [127:0] d = {<< 32 {a, b, c}}` held the 96-bit stream
     // right-aligned and `int d = {<<{a, b, c}}` was accepted.
-    if (stmt->var_init->kind == ExprKind::kStreamingConcat &&
-        stmt->var_unpacked_dims.empty() && !var->is_string && !obj.is_real &&
-        obj.declared_width > 0) {
+    if (stmt->var_init->kind == ExprKind::kStreamingConcat && !var->is_string &&
+        !obj.is_real && obj.declared_width > 0) {
       val = WidenStreamPackToFixedTarget(
           val, obj.declared_width, stmt->var_init->range.start, ctx, arena);
     }
-    if (stmt->var_unpacked_dims.empty()) {
-      uint32_t target = obj.is_real ? var->value.width : obj.declared_width;
-      val = ConvertRealForKnownLhs(val, obj.is_real, target, arena);
-    }
+    uint32_t target = obj.is_real ? var->value.width : obj.declared_width;
+    val = ConvertRealForKnownLhs(val, obj.is_real, target, arena);
     var->value = val;
     if (!var->is_4state) CoerceTo2State(var->value);
   }
@@ -860,6 +860,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // declaration's range; this is the same fact for a procedure's.
     if (!is_virtual_interface)
       RecordDeclaredRange(stmt->var_decl_type, var, ctx, arena);
+    AssignDeclAggregateInit(stmt, ctx, arena);
     InitializeDeclVariable(stmt, {var, width, is_real}, func_name, ctx, arena);
   }
   return StmtResult::kDone;

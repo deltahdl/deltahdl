@@ -287,16 +287,28 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
 // vector, and since the elaborator now gives a procedural declaration the
 // dimensions its typedef carries, `q_t qu;` reaches here with the same
 // dimensions and the same need.
+//
+// §10.5 (printed page 256): the initializer of such a declaration is assigned
+// to the array made here (AssignDeclAggregateInit) rather than evaluated onto
+// the carrier, which CarrierInit keeps it from.
 static void CreateFuncLocalAggregate(const Stmt* stmt, Variable* var,
                                      SimContext& ctx, Arena& arena) {
   if (var == nullptr) return;
   CreateDeclAggregate(stmt, var->value.width, ctx, arena);
+  AssignDeclAggregateInit(stmt, ctx, arena);
+}
+
+// The initializer the element-width carrier CreateFuncLocalVar makes takes:
+// none where the declaration has unpacked dimensions, the array itself taking
+// it in CreateFuncLocalAggregate.
+static const Expr* CarrierInit(const Stmt* stmt) {
+  return stmt->var_unpacked_dims.empty() ? stmt->var_init : nullptr;
 }
 
 static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
-                               stmt->var_init, ctx, arena);
+                               CarrierInit(stmt), ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
 }
 
@@ -313,7 +325,7 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
-                               stmt->var_init, ctx, arena);
+                               CarrierInit(stmt), ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
   ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
   RetainStaticAggregate(func_name, stmt->var_name, ctx, arena);
@@ -339,7 +351,7 @@ void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
-                               stmt->var_init, ctx, arena);
+                               CarrierInit(stmt), ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
   if (frame.is_static_sub)
     RetainStaticAggregate(frame.name, stmt->var_name, ctx, arena);

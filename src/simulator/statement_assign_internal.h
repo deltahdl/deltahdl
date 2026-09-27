@@ -155,6 +155,10 @@ class LhsIndexPin {
 // outside one.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena);
+// §10.5 (printed page 256): a procedural declaration's initializer, where the
+// declaration has unpacked dimensions, assigned to the array
+// CreateDeclAggregate made as the statement `name = init` would assign it.
+void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_decl.cpp; also used by the module-scope
 // declaration lowering in lowerer_var.cpp. §8.25: records the parameter value
