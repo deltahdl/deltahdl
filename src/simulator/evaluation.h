@@ -333,6 +333,13 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // answers both.
 bool SystemCallNamesARegisteredTask(const Expr* expr);
 
+// The time unit and precision a delay or a time read is counted in (§22.7):
+// the compilation unit's inside a subroutine it declares (§3.14.2.3), else the
+// module's of the instance the running process stands in (Annex D.10's
+// invoking module), else the current scope's. Defined in
+// eval_systask_time.cpp.
+const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx);
+
 // §20.4.2: build the report line $printtimescale displays for `expr` against
 // the timescale state in `ctx` (see eval_function.cpp for the format).
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);

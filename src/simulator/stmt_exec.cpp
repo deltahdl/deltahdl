@@ -188,7 +188,9 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 
   // Delay form, or none: the update event is created when the delay expires.
   uint64_t delay = 0;
-  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  if (stmt->delay) {
+    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+  }
   auto time = ctx.CurrentTime();
   time.ticks += delay;
   ScheduleNbEventTrigger(var, event_name, time, reactive, ctx);

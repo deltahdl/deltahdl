@@ -172,8 +172,14 @@ struct RtlirNet {
   // which the declaration writes as its third delay: "The third delay in a
   // trireg net declaration shall specify the charge decay time." Only a trireg
   // carries one, because §28.16.2 gives the third delay of every other net to
-  // "the delay in a transition to the z logic state" instead.
+  // "the delay in a transition to the z logic state" instead. The lowerer
+  // scales the count by the declaring module's time unit (§22.7).
   uint64_t decay_ticks = 0;
+  // The decay time as written where it has a fractional part, `#(0, 0, 2.5)`,
+  // in the same units, for §3.14.1 to round to the module's precision rather
+  // than to a whole unit; decay_ticks holds it rounded to a whole unit.
+  bool decay_is_real = false;
+  double decay_real = 0.0;
 
   // Whether this net decays at all, which a count of zero cannot say.
   // §28.16.2.1 makes the decay a process that ends when "the delay specified by

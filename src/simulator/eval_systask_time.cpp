@@ -33,6 +33,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 // §37.82: the VPI model reaches the $timeformat() call that set the active time
 // format, so the run stands one up as the task runs.
@@ -50,7 +51,7 @@ namespace delta {
 // design's time precision itself plays no part in that rounding.
 static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
   uint64_t ticks = ctx.CurrentTime().ticks;
-  const TimeScale& scale = ctx.CurrentTimeScale();
+  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
   int prec_order = static_cast<int>(ctx.StepTimeUnit());
   int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
@@ -67,7 +68,7 @@ static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
 // integer (e.g. a 16 ns time under a 10 ns unit yields 1.6, not 2).
 static double CurrentTimeInModuleUnitsReal(SimContext& ctx) {
   uint64_t ticks = ctx.CurrentTime().ticks;
-  const TimeScale& scale = ctx.CurrentTimeScale();
+  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
   int prec_order = static_cast<int>(ctx.StepTimeUnit());
   int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
@@ -119,7 +120,7 @@ static std::string_view TimescaleArgName(const Expr* arg) {
 Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   bool want_precision = (name == "$timeprecision");
-  const TimeScale* scale = &ctx.CurrentTimeScale();
+  const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
   bool use_sim_time_unit = false;
   if (!expr->args.empty() && expr->args[0] != nullptr) {
     std::string_view target = TimescaleArgName(expr->args[0]);
@@ -176,6 +177,28 @@ static std::string TimeOrderToUnitString(int order) {
   return std::string(mantissa) + unit;
 }
 
+// Annex D.10: the time unit of the module of the instance the running process
+// stands in, reached by the prefix the process carries, which the lowerer
+// registered as the instance's path below the top; the top module's own unit,
+// which CurrentTimeScale holds, when the process stands in the top or when none
+// is running. The prefix ends in the dot that joins it to a name, which no
+// registered path carries.
+//
+// §3.14.2.3 (printed page 60) makes the compilation-unit scope a time scope of
+// its own, whose unit "can only be set by a timeunit declaration, not a
+// `timescale directive", so a subroutine it declares -- a method of a class it
+// declares among them -- runs in that unit whichever instance calls it.
+const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
+  if (const Scope* frame = ctx.PackageFrame();
+      frame != nullptr && frame->package == "$unit") {
+    return ctx.CompUnitTimeScale();
+  }
+  std::string prefix = ctx.ActiveInstancePrefix();
+  if (!prefix.empty()) prefix.pop_back();
+  if (const TimeScale* found = ctx.FindScopeTimeScale(prefix)) return *found;
+  return ctx.CurrentTimeScale();
+}
+
 // §20.4.2: assemble the line $printtimescale displays for `expr`, reading the
 // timescale model in `ctx`. The output names the targeted design element and
 // reports its time unit and precision in the fixed format
@@ -186,7 +209,7 @@ static std::string TimeOrderToUnitString(int order) {
 // shown in place of a design-element name.
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
   std::string name;
-  const TimeScale* scale = &ctx.CurrentTimeScale();
+  const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
   bool use_sim_time_unit = false;
   if (!expr->args.empty() && expr->args[0] != nullptr) {
     std::string_view target = TimescaleArgName(expr->args[0]);
@@ -202,7 +225,15 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
         scale = found;
     }
   } else {
+    // §20.4.2: with no argument the report is of the current scope, which for
+    // a process standing in an instance below the top is that instance, named
+    // by its path from the top.
     name = ctx.CurrentScopeName();
+    std::string prefix = ctx.ActiveInstancePrefix();
+    if (!prefix.empty()) {
+      prefix.pop_back();
+      name += "." + prefix;
+    }
   }
   int unit_order = 0;
   int prec_order = 0;

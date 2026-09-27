@@ -319,7 +319,7 @@ uint64_t DelayTicksFromValue(const Logic4Vec& val) {
 }
 
 uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx) {
-  const TimeScale& scale = ctx.CurrentTimeScale();
+  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   TimeUnit precision = ctx.GlobalPrecision();
   if (val.is_real) {
     // §3.14.1: a real delay is rounded to the nearest multiple of the design

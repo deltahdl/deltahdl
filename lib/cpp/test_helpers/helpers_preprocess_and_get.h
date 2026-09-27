@@ -3,11 +3,14 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 #include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "lexer/lexer.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
@@ -61,6 +64,37 @@ inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, {});
   return RunPreprocessedSim(f, fid, var_name, pp, prop);
+}
+
+// Runs `src` as deltahdl's driver does: preprocessed, parsed, given what the
+// preprocessor recorded in force at each design element's header -- its
+// `timescale among it -- and the compilation unit's last `timescale, as
+// ApplyPreprocMetadata in src/main.cpp gives them, then elaborated with its
+// last module as the top, lowered and simulated. Returns what the run wrote to
+// stdout; a source that does not elaborate writes nothing.
+inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto preprocessed = pp.Preprocess(fid);
+  auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
+  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag,
+              TextOrigin::kPreprocessorOutput);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  ApplyModuleDirectives(cu, pp.ModuleDirectivesList());
+  cu->preproc_timescale = pp.CurrentTimescale();
+  cu->has_preproc_timescale = pp.HasTimescale();
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
+  if (design != nullptr) {
+    Lowerer lowerer(f.ctx, f.arena, f.diag);
+    lowerer.Lower(design);
+    f.scheduler.Run();
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
 // The same, for a §22.14 test: `body` is wrapped in a real `begin_keywords

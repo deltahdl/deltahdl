@@ -233,6 +233,18 @@ inline void ApplyModuleDirectives(
       break;
     }
   }
+  // §22.7: the `timescale in force at a module's, interface's or program's
+  // header is the one it takes.
+  for (const auto* list : {&cu->modules, &cu->interfaces, &cu->programs}) {
+    for (auto* mod : *list) {
+      for (const auto& d : directives) {
+        if (mod->name != d.module) continue;
+        mod->has_directive_timescale = d.has_timescale;
+        mod->directive_timescale = d.timescale;
+        break;
+      }
+    }
+  }
 }
 
 // Every design element §3.2 defines, which is what §33.2.1 makes a cell.

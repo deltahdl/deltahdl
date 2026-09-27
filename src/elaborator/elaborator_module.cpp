@@ -152,12 +152,18 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 
   // §20.4.1: capture the time unit/precision $timeunit/$timeprecision report
-  // for this element. A local timeunit/timeprecision declaration wins;
-  // otherwise the compilation unit's value applies, and absent both the 1 ns /
-  // 1 ns default of the TimeScale struct stands in.
+  // for this element. §3.14.2.3 (printed page 60) orders the sources: a local
+  // timeunit/timeprecision declaration wins; "Else, if a `timescale directive
+  // has been previously specified (within the compilation unit), then the time
+  // unit shall be set to the units of the last `timescale directive"; else the
+  // compilation unit's value applies, and absent all three the 1 ns / 1 ns
+  // default of the TimeScale struct stands in.
   if (decl->has_timeunit) {
     mod->timescale.unit = decl->time_unit;
     mod->timescale.magnitude = decl->time_unit_magnitude;
+  } else if (decl->has_directive_timescale) {
+    mod->timescale.unit = decl->directive_timescale.unit;
+    mod->timescale.magnitude = decl->directive_timescale.magnitude;
   } else if (unit->has_cu_timeunit) {
     mod->timescale.unit = unit->cu_time_unit;
     mod->timescale.magnitude = unit->cu_time_unit_magnitude;
@@ -165,6 +171,9 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   if (decl->has_timeprecision) {
     mod->timescale.precision = decl->time_prec;
     mod->timescale.prec_magnitude = decl->time_prec_magnitude;
+  } else if (decl->has_directive_timescale) {
+    mod->timescale.precision = decl->directive_timescale.precision;
+    mod->timescale.prec_magnitude = decl->directive_timescale.prec_magnitude;
   } else if (unit->has_cu_timeprecision) {
     mod->timescale.precision = unit->cu_time_prec;
     mod->timescale.prec_magnitude = unit->cu_time_prec_magnitude;

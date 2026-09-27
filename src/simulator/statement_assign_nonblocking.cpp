@@ -25,6 +25,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 
 namespace delta {
@@ -219,7 +220,9 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   SampleConcatElements(elems, arena);
 
   uint64_t delay = 0;
-  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  if (stmt->delay) {
+    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+  }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   NbaScheduleSlot slot{ctx.CurrentTime() + SimTime{delay}, nba_region, ctx,
                        arena};
@@ -336,7 +339,9 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   NbaSample sample = SampleNonblockingRhs(stmt, ctx, arena);
   uint64_t delay = 0;
-  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  if (stmt->delay) {
+    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+  }
   ScheduleNonblockingAssign(stmt, sample, delay, ctx, arena);
   return StmtResult::kDone;
 }

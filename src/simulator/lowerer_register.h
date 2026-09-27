@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 
@@ -39,6 +40,13 @@ struct Variable;
 // copy of every port, and the rule cannot depend on where in the hierarchy the
 // port sits.
 bool PortDefaultsToZero(const RtlirPort& port);
+
+// §22.7 with §28.16.2.2: a trireg's charge decay time is a count of the time
+// unit of the module declaring it, `scale`; this is that time in ticks of the
+// design's global precision, a fractional one rounded to the module's
+// precision (§3.14.1). Shared by the top's nets and an instance's.
+uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
+                       TimeUnit precision);
 
 // §11.5.1: record how a select on this storage resolves an index -- the
 // outermost packed dimension of the declaration `dt` exactly as written, since

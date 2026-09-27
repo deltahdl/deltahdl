@@ -214,7 +214,7 @@ double ScaleScannedTime(double d, SimContext& ctx) {
   // representation error so a decimal .5 boundary does not round down.
   double scaled = d * p;
   d = std::floor(scaled + 0.5 + std::fabs(scaled) * 1e-12) / p;
-  const TimeScale& ts = ctx.CurrentTimeScale();
+  const TimeScale& ts = ActiveInstanceTimeScale(ctx);
   d *= std::pow(10.0, tf.units_number - static_cast<int>(ts.unit));
   if (ts.magnitude != 0) d /= ts.magnitude;
   return d;

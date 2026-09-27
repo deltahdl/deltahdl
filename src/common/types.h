@@ -274,6 +274,10 @@ struct ModuleDirectives {
   uint32_t strength = 0;
   bool has_strength = false;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
+  // §3.14.2.3 b): the `timescale directive last read before the header, which
+  // sets the element's time unit and precision where it declares neither.
+  bool has_timescale = false;
+  TimeScale timescale;
 };
 
 // Which member of a min:typ:max expression is selected. §11.11 orders the

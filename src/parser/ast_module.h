@@ -814,6 +814,11 @@ struct ModuleDecl {
   int time_prec_magnitude = 1;
   bool has_timeunit = false;
   bool has_timeprecision = false;
+  // §3.14.2.3 b): the `timescale in force at the header, put here by
+  // ApplyModuleDirectives, which the element takes for whichever of its unit
+  // and precision it does not declare.
+  bool has_directive_timescale = false;
+  TimeScale directive_timescale;
 };
 
 struct PackageDecl {

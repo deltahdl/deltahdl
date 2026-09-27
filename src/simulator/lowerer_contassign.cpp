@@ -42,6 +42,7 @@
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
@@ -192,9 +193,14 @@ struct ContAssignDrivenValue {
 static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
                                               SimContext& ctx, Arena& arena) {
   ContAssignDelays d;
-  d.rise = EvalExpr(exprs.rise, ctx, arena).ToUint64();
-  d.fall = exprs.fall ? EvalExpr(exprs.fall, ctx, arena).ToUint64() : 0;
-  d.decay = exprs.decay ? EvalExpr(exprs.decay, ctx, arena).ToUint64() : 0;
+  // §22.7: each delay, the charge decay time among them, counts the time unit
+  // of the module declaring it, and the ticks it waits are the design's.
+  d.rise = DelayValueToTicks(EvalExpr(exprs.rise, ctx, arena), ctx);
+  d.fall =
+      exprs.fall ? DelayValueToTicks(EvalExpr(exprs.fall, ctx, arena), ctx) : 0;
+  d.decay = exprs.decay
+                ? DelayValueToTicks(EvalExpr(exprs.decay, ctx, arena), ctx)
+                : 0;
   d.has_fall = exprs.fall != nullptr;
   d.has_decay = exprs.decay != nullptr;
   return d;

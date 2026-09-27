@@ -555,14 +555,15 @@ static void TrackCellModuleName(std::string_view trimmed,
   }
 }
 
-// The module a header line declares, or empty for a header of another design
-// element.
+// The module, interface or program a header line declares, or empty for a
+// header of another design element. The three are what §3.14.2.3 gives a time
+// unit and precision of their own besides a package, and all three are parsed
+// into a ModuleDecl, which is where ApplyModuleDirectives puts them.
 static std::string_view DeclaredModuleName(std::string_view trimmed) {
-  if (trimmed.starts_with("module ")) {
-    return ExtractModuleName(trimmed, "module ");
-  }
-  if (trimmed.starts_with("macromodule ")) {
-    return ExtractModuleName(trimmed, "macromodule ");
+  for (std::string_view keyword :
+       {"module ", "macromodule ", "interface ", "program "}) {
+    if (trimmed.starts_with(keyword))
+      return ExtractModuleName(trimmed, keyword);
   }
   return {};
 }
@@ -573,12 +574,15 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
     // Annex E: each of its directives applies to the modules that follow
     // it, so the decay time, charge strength and delay mode in force at this
     // header are the ones this module takes, whatever a later directive sets.
+    // §22.7 (printed page 716) rules the same of `timescale, which "specifies
+    // the time unit and time precision of the design elements that follow it".
     auto module_name = DeclaredModuleName(trimmed);
     if (!module_name.empty()) {
       module_directives_.push_back(
           {std::string(module_name), default_decay_time_,
            default_decay_time_infinite_, default_trireg_strength_,
-           has_default_trireg_strength_, delay_mode_directive_});
+           has_default_trireg_strength_, delay_mode_directive_, has_timescale_,
+           current_timescale_});
     }
     ++design_element_depth_;
   }

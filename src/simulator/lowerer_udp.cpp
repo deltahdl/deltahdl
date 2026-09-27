@@ -37,6 +37,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/udp_eval.h"
 
 namespace delta {
@@ -188,9 +189,9 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
 static uint64_t SelectUdpDelay(const RtlirUdpInst& inst, char out,
                                SimContext& ctx, Arena& arena) {
   if (inst.delay == nullptr) return 0;
-  uint64_t rise = EvalExpr(inst.delay, ctx, arena).ToUint64();
+  uint64_t rise = DelayValueToTicks(EvalExpr(inst.delay, ctx, arena), ctx);
   if (inst.delay_fall == nullptr) return rise;
-  uint64_t fall = EvalExpr(inst.delay_fall, ctx, arena).ToUint64();
+  uint64_t fall = DelayValueToTicks(EvalExpr(inst.delay_fall, ctx, arena), ctx);
   if (out == '0') return fall;
   if (out == '1') return rise;
   return std::min(rise, fall);

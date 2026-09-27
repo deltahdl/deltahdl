@@ -187,12 +187,22 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   ctx.SetLoweringInstancePrefix(own);
 }
 
+uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
+                       TimeUnit precision) {
+  if (net.decay_is_real) {
+    return RealDelayToTicks(net.decay_real, scale, precision);
+  }
+  return DelayToTicks(net.decay_ticks, scale, precision);
+}
+
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   for (const auto& net : mod->nets) {
     auto* created = ctx.CreateNet(
         net.name, net.net_type, net.width,
-        NetSpec{net.charge_strength, net.decay_ticks, net.decays,
-                net.is_user_nettype, net.resolve_func, net.is_signed});
+        NetSpec{net.charge_strength,
+                NetDecayTicks(net, mod->timescale, ctx.GlobalPrecision()),
+                net.decays, net.is_user_nettype, net.resolve_func,
+                net.is_signed});
     RecordPackedRange(net.dtype, created->resolved, ctx, arena);
     // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
     // w`, is laid out from the aggregate its declaration carries so a member

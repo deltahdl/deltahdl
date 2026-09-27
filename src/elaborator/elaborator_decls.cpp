@@ -469,6 +469,7 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
     return;
   }
   auto decay_ticks = ConstEvalInt(item->net_delay_decay, scope);
+  std::optional<double> decay_real;
   if (!decay_ticks) {
     // A.2.2.3 writes delay_value over "unsigned_number | real_number |
     // ps_identifier | time_literal | 1step", so a decay time with a decimal
@@ -476,10 +477,11 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
     // §3.14.1 says what it becomes: "the time precision specifies how delay
     // values are rounded before being used in simulation", and "if the
     // precision is the same as the time units, then delay values are rounded
-    // off to whole numbers (integers)". decay_ticks is a raw tick count that
-    // nothing scales later, so the rounding happens here, to the nearest whole
-    // count with ties away from zero -- the same std::llround §6.12.1 already
-    // gives an integer parameter set from a real.
+    // off to whole numbers (integers)". decay_ticks holds it rounded to the
+    // nearest whole count with ties away from zero -- the same std::llround
+    // §6.12.1 already gives an integer parameter set from a real -- and the
+    // value itself is kept beside it for the lowerer to round to the module's
+    // precision when it scales the time into the design's ticks.
     //
     // The fold is reached from here rather than from ConstEvalFull. A
     // kRealLiteral case there would answer every ConstEvalInt caller in the
@@ -489,6 +491,7 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
     // would each start accepting a real that rounds.
     if (auto real_ticks = ConstEvalReal(item->net_delay_decay, scope)) {
       decay_ticks = std::llround(*real_ticks);
+      decay_real = real_ticks;
     }
   }
   if (!decay_ticks) {
@@ -512,6 +515,10 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
   // reading of it makes (#3378).
   if (*decay_ticks < 0) return;
   net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
+  if (decay_real) {
+    net.decay_is_real = true;
+    net.decay_real = *decay_real;
+  }
   // §28.16.2.2 gives the meaning "never decays" to a declaration with no third
   // delay, so a declaration that wrote one decays whatever it wrote -- zero
   // included, which §28.16.2.1 makes the transition to x happening at once.
