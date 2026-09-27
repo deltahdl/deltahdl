@@ -1,6 +1,7 @@
 #include "simulator/net_bit_outcomes.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
