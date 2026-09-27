@@ -399,6 +399,7 @@ class Preprocessor {
   bool StartGatheredProtectBlock(std::string_view line, SourceLoc loc);
   // Adds a further line to the block being gathered.
   void AppendGatheredProtectBlockLine(std::string_view line);
+  std::string_view GatheredBlockLine(std::string_view line) const;
   // Reads the block gathered so far as the keyword that announced it, and
   // leaves nothing gathered. Does nothing where no block is being gathered.
   void FinishGatheredProtectBlock(int depth, std::string& output);

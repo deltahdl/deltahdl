@@ -363,6 +363,14 @@ bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
                 Subclause("34.5.9.2"));
     return false;
   }
+  // A raw block is gathered as its lines joined by the breaks between them,
+  // and whether the break ending its last line is a byte of the data as well
+  // is what the stated count says: a writer counting it states one more than
+  // the lines hold without it.
+  if (encoding.enctype == kRawEnctype && encoding.has_bytes &&
+      encoding.bytes == bytes->size() + 1) {
+    bytes->push_back('\n');
+  }
   if (!ProtectEncodedValueHasStatedSize(encoding, bytes->size())) {
     diag_.Error(loc,
                 "protect pragma value stands for a different number of bytes "
@@ -584,13 +592,25 @@ bool Preprocessor::StartGatheredProtectBlock(std::string_view line,
   if (StartsWithPragmaDirective(line)) return false;
   gathering_block_ = kind;
   gathering_block_loc_ = loc;
-  gathering_block_text_.assign(Trim(line));
+  gathering_block_text_.assign(GatheredBlockLine(line));
   return true;
 }
 
 void Preprocessor::AppendGatheredProtectBlockLine(std::string_view line) {
   gathering_block_text_.push_back('\n');
-  gathering_block_text_.append(Trim(line));
+  gathering_block_text_.append(GatheredBlockLine(line));
+}
+
+// §34.5.9.2 with Table 34-2 (printed pages 956-957): under "raw" no encoding
+// is performed, so the block is its text exactly as written, indentation and
+// trailing blanks being bytes of it like any other. Every other scheme writes
+// characters of its own alphabet, around which blanks are the page's rather
+// than the data's. Trimmed under raw as well, a block written with indentation
+// -- §34.3.1's own example among them -- could be read at no count the writer
+// stated for it.
+std::string_view Preprocessor::GatheredBlockLine(std::string_view line) const {
+  if (ProtectEncodingInEffect().enctype == kRawEnctype) return line;
+  return Trim(line);
 }
 
 void Preprocessor::FinishGatheredProtectBlock(int depth, std::string& output) {

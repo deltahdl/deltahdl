@@ -770,4 +770,45 @@ TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
+// A raw data block of three lines, the second indented, under a count stated
+// with `bytes`.
+std::string IndentedRawBlockUnder(std::string_view bytes) {
+  std::string src =
+      "`pragma protect data_method=\"des-cbc\", begin_protected\n";
+  src.append("`pragma protect encoding=(enctype=\"raw\", bytes=");
+  src.append(bytes).append("), data_block\n");
+  src.append("ab\n  cd\nef\n");
+  src.append("`pragma protect end_protected\n");
+  return src;
+}
+
+// §34.5.9.2 with Table 34-2 (printed pages 956-957): "raw" performs no
+// encoding, so the block is its text as written -- the indentation of its
+// second line and the break ending each line are bytes of it -- and
+// `ab`/`  cd`/`ef` is eleven. Read at that count the block reaches the cipher,
+// and it is the key that fails. Gathered with every line trimmed, the block
+// was read as eight bytes, so eleven drew the count error and §34.3.1's own
+// indented raw example could be read at no count its writer could state.
+TEST(ProtectEncodingDecryptionInput, ARawBlockIsItsTextAsWritten) {
+  PreprocFixture f;
+  std::string src = IndentedRawBlockUnder("11");
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 3,
+      "34.3.2"));
+}
+
+// The count the trimmed lines held is no count of the block written.
+TEST(ProtectEncodingDecryptionInput, ARawBlockIsNotReadAtItsTrimmedCount) {
+  PreprocFixture f;
+  std::string src = IndentedRawBlockUnder("8");
+  Preprocess(src, f, HoldingTheKey());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "protect pragma value stands for a different "
+                            "number of bytes from the one the encoding in "
+                            "effect states",
+                            3, "34.5.9.2"));
+}
+
 }  // namespace
