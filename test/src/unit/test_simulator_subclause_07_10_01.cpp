@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -578,6 +579,30 @@ TEST(QueueOps, PushedElementsTakeTheElementWidth) {
   auto* s = f.ctx.FindVariable("s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(static_cast<int32_t>(s->value.ToUint64()), -1);
+}
+
+// §7.10 (printed page 169): `$` in a queue's index stands for the queue's last
+// index, so `q[$] = 9` overwrites the last element, and §7.10.1 (printed page
+// 170) makes the write to `q[$+1]` legal, so `q[$+1] = 4` appends. The
+// statements run whole here, through the store that evaluates the target's
+// index once for every writer (§10.4.1): `$` has a value only while the queue
+// writer binds it, so an index naming it is left for that writer to evaluate,
+// where evaluating it ahead of the writer read an unbound `$`.
+TEST(QueueOps, DollarIndexedStatementsWriteLastAndAppend) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    q = '{1, 2, 3};\n"
+      "    q[$] = 9;\n"
+      "    q[$+1] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", q.size(), q[0], q[1], q[2], "
+      "q[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 1 2 9 4\n");
 }
 
 }  // namespace

@@ -29,14 +29,40 @@ struct IndexWalk {
 
 }  // namespace
 
-// Whether pinning `node` for a blocking store would change nothing: a node
-// some caller has pinned already, whose value EvalExpr returns without
-// evaluating it, a literal, or a bare name of a variable, whose evaluation
-// reads one value and stores nothing. A bare name that is no variable may be a
-// method's call (§13.5.5) or a let's expansion (§11.12), each evaluating more
-// than the name shows, so it is pinned like any other expression.
+// Whether `expr` names `$` anywhere within it, which in a queue's index stands
+// for the queue's last index (§7.10, printed page 169) and has that value only
+// while the writer of the queue it indexes binds it (EvalQueueIndex,
+// OfQueueElement).
+static bool MentionsDollar(const Expr* expr) {
+  if (expr == nullptr) return false;
+  if (expr->kind == ExprKind::kIdentifier && expr->text == "$") return true;
+  const Expr* const kEdges[] = {
+      expr->lhs,        expr->rhs,  expr->condition, expr->true_expr,
+      expr->false_expr, expr->base, expr->index,     expr->index_end};
+  for (const Expr* edge : kEdges) {
+    if (MentionsDollar(edge)) return true;
+  }
+  for (const Expr* arg : expr->args) {
+    if (MentionsDollar(arg)) return true;
+  }
+  for (const Expr* element : expr->elements) {
+    if (MentionsDollar(element)) return true;
+  }
+  return false;
+}
+
+// Whether pinning `node` for a blocking store would change nothing, or would be
+// wrong: a node some caller has pinned already, whose value EvalExpr returns
+// without evaluating it, a literal, or a bare name of a variable, whose
+// evaluation reads one value and stores nothing. A bare name that is no
+// variable may be a method's call (§13.5.5) or a let's expansion (§11.12), each
+// evaluating more than the name shows, so it is pinned like any other
+// expression. An index naming `$` is left to the queue writer that gives `$`
+// its value: evaluated here, ahead of that writer, `$` names nothing, and
+// `q[$+1] = x` pinned that rather than the index one past the last element.
 static bool IndexIsSettled(const Expr* node, SimContext& ctx) {
   if (ctx.FindDeferredArgSnapshot(node) != nullptr) return true;
+  if (MentionsDollar(node)) return true;
   if (node->kind == ExprKind::kIntegerLiteral) return true;
   return node->kind == ExprKind::kIdentifier &&
          NameDenotesVariable(IdentifierLookupKey(node), ctx);
