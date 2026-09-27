@@ -33,6 +33,9 @@ struct SdfToken {
   // §32.7: `num_val` is the magnitude alone, so a number written with a
   // leading minus sign is told apart from the same number written without one.
   bool is_negative = false;
+  // The magnitude exactly as written, a fraction or an exponent included;
+  // `num_val` is it rounded to a whole number.
+  double real_val = 0.0;
 };
 
 void SkipWhitespace(std::string_view& s);

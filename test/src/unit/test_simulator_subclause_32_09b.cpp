@@ -448,6 +448,38 @@ TEST(SdfAnnotateTask, CellWithNoInstancePathIsTheRegion) {
   EXPECT_EQ(DelayIn(d, "b."), kDeclaredDelay);
 }
 
+// §32.2 (printed page 924) leaves the SDF file's own format to IEEE 1497,
+// whose values are real numbers in the unit the file's TIMESCALE header names,
+// 1 ns where it names none; the annotator scales them into the design's
+// precision, 1 ps under `timeprecision 1ps`, so the path holds that many ticks.
+// A (TIMESCALE 100ps) file's 30 is 3 ns, a file with no header has its 4 in ns,
+// and 2.5 under (TIMESCALE 1ns) is 2.5 ns. Each was taken as ticks of the
+// precision whatever the header said -- 30 and 4 ps -- and 2.5 stopped the
+// number lexer at its decimal point.
+TEST(SdfAnnotateTask, ValuesAreScaledFromTheFilesTimescaleToThePrecision) {
+  const std::string kUnits = "  timeunit 1ns; timeprecision 1ps;\n";
+  std::string timed = TwoCellDesign("\"%s\"");
+  for (const std::string kHeader :
+       {"module timed_cell(input A, output Z);\n", "module top;\n"}) {
+    timed.insert(timed.find(kHeader) + kHeader.size(), kUnits);
+  }
+  auto run = [&](const std::string& name, const std::string& file) {
+    const std::string kSdf = WriteTempFile(name, file);
+    std::string src = timed;
+    src.replace(src.find("%s"), 2, kSdf);
+    SdfDesign d;
+    EXPECT_TRUE(BuildAndRun(d, src));
+    return DelayIn(d, "a.");
+  };
+  EXPECT_EQ(run("ts_100ps.sdf",
+                DelayFile(" (TIMESCALE 100ps)" + CellRecord("top/a", "30"))),
+            3000u);
+  EXPECT_EQ(run("ts_default.sdf", DelayFile(CellRecord("top/a", "4"))), 4000u);
+  EXPECT_EQ(run("ts_real.sdf",
+                DelayFile(" (TIMESCALE 1 ns)" + CellRecord("top/a", "2.5"))),
+            2500u);
+}
+
 // A design whose `mid` holds a cell `inner` and is instantiated twice, with
 // `call` placed in mid's initial block when `call_in_mid` is set and in top's
 // otherwise.

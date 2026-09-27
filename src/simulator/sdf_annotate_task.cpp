@@ -110,6 +110,12 @@ bool ParseSdfScaleFactors(std::string_view text, SdfScaleFactors& out) {
   return true;
 }
 
+// A magnitude as the file wrote it: the exact real value where the lexer kept
+// one, else the whole number a value built from an integer alone carries.
+static double ExactMagnitude(uint64_t whole, double real) {
+  return real > 0.0 ? real : static_cast<double>(whole);
+}
+
 static uint64_t RoundToTicks(double scaled) {
   if (scaled <= 0.0) return 0;
   return static_cast<uint64_t>(std::floor(scaled + 0.5));
@@ -128,25 +134,28 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
   SdfDelayValue out;
   switch (type) {
     case SdfScaleType::kFromMtm:
-      src_min = static_cast<double>(value.min_val);
-      src_typ = static_cast<double>(value.typ_val);
-      src_max = static_cast<double>(value.max_val);
+      src_min = ExactMagnitude(value.min_val, value.min_real);
+      src_typ = ExactMagnitude(value.typ_val, value.typ_real);
+      src_max = ExactMagnitude(value.max_val, value.max_real);
       out.min_negative = value.min_negative;
       out.typ_negative = value.typ_negative;
       out.max_negative = value.max_negative;
       break;
     case SdfScaleType::kFromMinimum:
-      src_min = src_typ = src_max = static_cast<double>(value.min_val);
+      src_min = src_typ = src_max =
+          ExactMagnitude(value.min_val, value.min_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.min_negative;
       break;
     case SdfScaleType::kFromTypical:
-      src_min = src_typ = src_max = static_cast<double>(value.typ_val);
+      src_min = src_typ = src_max =
+          ExactMagnitude(value.typ_val, value.typ_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.typ_negative;
       break;
     case SdfScaleType::kFromMaximum:
-      src_min = src_typ = src_max = static_cast<double>(value.max_val);
+      src_min = src_typ = src_max =
+          ExactMagnitude(value.max_val, value.max_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.max_negative;
       break;
@@ -194,6 +203,15 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     dev.turnoff = ApplySdfScaling(dev.turnoff, type, factors);
     for (auto& v : dev.values) v = ApplySdfScaling(v, type, factors);
   }
+}
+
+// How many ticks of `precision_seconds` one unit of an SDF file whose
+// TIMESCALE is `file_seconds` makes, 1 ns where the file named none; 1 where no
+// precision is given, leaving the values as the file wrote them.
+static double SdfUnitRatio(double file_seconds, double precision_seconds) {
+  if (precision_seconds <= 0.0) return 1.0;
+  const double kFileUnit = file_seconds > 0.0 ? file_seconds : 1e-9;
+  return kFileUnit / precision_seconds;
 }
 
 SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
@@ -369,6 +387,29 @@ bool ReadSdfAnnotateConfigFile(std::string_view path, SdfAnnotateConfig& out) {
   return true;
 }
 
+// The file a call annotates: its values scaled by the call's scale factors
+// (§32.9) and, IEEE 1497 putting them in the unit the file's TIMESCALE names
+// (1 ns where it names none) while a delay is counted in ticks of the design's
+// precision, by the one unit over the other. A LABEL's value is a specparam's,
+// which the module's own expressions read in the module's time unit rather
+// than in ticks, so the LABEL values take the call's scale factors alone.
+static SdfFile ScaleSdfFileForRun(const SdfFile& file,
+                                  const ResolvedSdfAnnotateArgs& resolved,
+                                  double precision_seconds) {
+  SdfScaleFactors factors = resolved.factors;
+  const double kUnits = SdfUnitRatio(file.timescale_seconds, precision_seconds);
+  factors.min_factor *= kUnits;
+  factors.typ_factor *= kUnits;
+  factors.max_factor *= kUnits;
+  SdfFile scaled = ScaleSdfFile(file, resolved.scale_type, factors);
+  if (kUnits == 1.0) return scaled;
+  const SdfFile kPlain =
+      ScaleSdfFile(file, resolved.scale_type, resolved.factors);
+  for (std::size_t i = 0; i < scaled.cells.size(); ++i)
+    scaled.cells[i].specparams = kPlain.cells[i].specparams;
+  return scaled;
+}
+
 SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
                                        SpecifyManager& mgr,
                                        SdfMtm tool_default) {
@@ -409,7 +450,7 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
   }
 
   const SdfFile kScaled =
-      ScaleSdfFile(file, kResolved.scale_type, kResolved.factors);
+      ScaleSdfFileForRun(file, kResolved, args.precision_seconds);
   const SdfMtm kMtm = ResolveSdfMtm(kResolved.mtm, tool_default);
   SdfAnnotationResult annotated = AnnotateSdfToManager(
       kScaled, mgr, kMtm, args.region_prefix, args.design_root);
@@ -529,6 +570,10 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   // The root every hierarchical name in the run counts from. Lowerer::Lower
   // sets it to the top module's own name.
   args.design_root = ctx.CurrentScopeName();
+  // The tick an annotated delay is counted in, which the file's values are
+  // scaled into from its TIMESCALE.
+  args.precision_seconds =
+      std::pow(10.0, static_cast<int>(ctx.GlobalPrecision()));
 
   // §32.9: module_instance names a level of the design hierarchy rather than a
   // readable value, so it is taken as the name it writes, and the region is

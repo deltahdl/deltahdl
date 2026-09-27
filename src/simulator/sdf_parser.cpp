@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -43,19 +45,53 @@ static SdfToken LexString(std::string_view& s) {
 // annotates is written with. The token's text keeps the sign, so a caller
 // rendering the token back as source writes what the file wrote, while the
 // value and the sign are reported apart.
+// The length of the run of digits starting at `pos` in `s`.
+static size_t DigitRun(std::string_view s, size_t pos) {
+  size_t len = 0;
+  while (pos + len < s.size() && (std::isdigit(s[pos + len]) != 0)) ++len;
+  return len;
+}
+
+// §32.2 (printed page 924) with IEEE 1497: an SDF number is a real number, a
+// fraction and an exponent allowed, `2.5` and `1e3` among them. Read as digits
+// alone, `2.5` stopped at the decimal point and the rest of its entry was
+// reported as constructs that could not be annotated.
+// The length of the number whose digits start at `first_digit` of `s`, its
+// fraction and exponent included; `whole` is cleared where it has either.
+static size_t NumberLength(std::string_view s, size_t first_digit,
+                           bool& whole) {
+  size_t len = first_digit + DigitRun(s, first_digit);
+  if (len < s.size() && s[len] == '.') {
+    len += 1 + DigitRun(s, len + 1);
+    whole = false;
+  }
+  if (len >= s.size() || (s[len] != 'e' && s[len] != 'E')) return len;
+  size_t exponent = len + 1;
+  if (exponent < s.size() && (s[exponent] == '+' || s[exponent] == '-'))
+    ++exponent;
+  const size_t kDigits = DigitRun(s, exponent);
+  if (kDigits == 0) return len;
+  whole = false;
+  return exponent + kDigits;
+}
+
 static SdfToken LexNumber(std::string_view& s) {
   const size_t kFirstDigit = (!s.empty() && s[0] == '-') ? 1 : 0;
-  size_t len = kFirstDigit;
-  while (len < s.size() && (std::isdigit(s[len]) != 0)) ++len;
+  bool whole = true;
+  const size_t kLen = NumberLength(s, kFirstDigit, whole);
   SdfToken tok;
   tok.kind = SdfTokKind::kNumber;
-  tok.text = s.substr(0, len);
-  tok.num_val = 0;
+  tok.text = s.substr(0, kLen);
   tok.is_negative = kFirstDigit == 1;
-  for (size_t i = kFirstDigit; i < len; ++i) {
-    tok.num_val = tok.num_val * 10 + (s[i] - '0');
+  const std::string kMagnitude(s.substr(kFirstDigit, kLen - kFirstDigit));
+  tok.real_val = std::strtod(kMagnitude.c_str(), nullptr);
+  if (whole) {
+    for (char digit : kMagnitude)
+      tok.num_val = tok.num_val * 10 + (digit - '0');
+  } else {
+    tok.num_val = static_cast<uint64_t>(std::llround(tok.real_val));
   }
-  s.remove_prefix(len);
+  s.remove_prefix(kLen);
   return tok;
 }
 
@@ -101,6 +137,9 @@ static void ParseSdfDelayTypMax(std::string_view& s, const SdfToken& first,
   dv.min_val = first.num_val;
   dv.typ_val = first.num_val;
   dv.max_val = first.num_val;
+  dv.min_real = first.real_val;
+  dv.typ_real = first.real_val;
+  dv.max_real = first.real_val;
   dv.min_negative = first.is_negative;
   dv.typ_negative = first.is_negative;
   dv.max_negative = first.is_negative;
@@ -111,12 +150,14 @@ static void ParseSdfDelayTypMax(std::string_view& s, const SdfToken& first,
     auto typ = NextSdfToken(s);
     if (typ.kind == SdfTokKind::kNumber) {
       dv.typ_val = typ.num_val;
+      dv.typ_real = typ.real_val;
       dv.typ_negative = typ.is_negative;
     }
     Expect(s, SdfTokKind::kColon);
     auto max_tok = NextSdfToken(s);
     if (max_tok.kind == SdfTokKind::kNumber) {
       dv.max_val = max_tok.num_val;
+      dv.max_real = max_tok.real_val;
       dv.max_negative = max_tok.is_negative;
     }
   }
@@ -684,6 +725,7 @@ static SdfDelayValue ParseLabelValue(std::string_view& s) {
     dv.min_val = num.num_val;
     dv.typ_val = num.num_val;
     dv.max_val = num.num_val;
+    dv.min_real = dv.typ_real = dv.max_real = num.real_val;
   }
   return dv;
 }
@@ -765,6 +807,25 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
   return cell;
 }
 
+// IEEE 1497's TIMESCALE header, its leading `(` and keyword already read: the
+// unit the file's values are in, in seconds, through its closing `)`. The
+// number and the unit may be written together, `100ps`, or apart, `100 ps`.
+// Zero for a unit it does not name, which leaves the file at the 1 ns default.
+static double ParseSdfTimescale(std::string_view& s) {
+  const SdfToken kNumber = NextSdfToken(s);
+  SkipWhitespace(s);
+  std::string_view unit;
+  if (!s.empty() && s[0] != ')') unit = NextSdfToken(s).text;
+  Expect(s, SdfTokKind::kRParen);
+  static constexpr std::pair<std::string_view, double> kUnits[] = {
+      {"s", 1.0},   {"ms", 1e-3},  {"us", 1e-6},
+      {"ns", 1e-9}, {"ps", 1e-12}, {"fs", 1e-15}};
+  for (const auto& [name, seconds] : kUnits) {
+    if (unit == name) return kNumber.real_val * seconds;
+  }
+  return 0.0;
+}
+
 bool ParseSdf(std::string_view input, SdfFile& out) {
   if (!Expect(input, SdfTokKind::kLParen)) return false;
   auto delayfile = NextSdfToken(input);
@@ -783,6 +844,8 @@ bool ParseSdf(std::string_view input, SdfFile& out) {
       auto design = NextSdfToken(input);
       out.design = std::string(design.text);
       Expect(input, SdfTokKind::kRParen);
+    } else if (kw.text == "TIMESCALE") {
+      out.timescale_seconds = ParseSdfTimescale(input);
     } else if (kw.text == "CELL") {
       out.cells.push_back(ParseCell(input, out));
     } else {

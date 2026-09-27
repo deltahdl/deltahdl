@@ -172,4 +172,45 @@ TEST(SdfScaling, ScalingKeepsEachMembersSign) {
   EXPECT_TRUE(typ.max_negative);
 }
 
+// §32.2 (printed page 924) with IEEE 1497: an SDF delay value is a real number,
+// so `(2.5)` and `(1.3)` are read whole -- the exact magnitude beside the
+// rounded one -- rather than stopping the lexer at the decimal point, and the
+// header's TIMESCALE, written with or without a space before its unit, is the
+// unit they are in.
+TEST(SdfRealValues, RealValuesAndTheTimescaleHeaderAreRead) {
+  SdfFile file;
+  ASSERT_TRUE(ParseSdf(R"(
+    (DELAYFILE
+      (TIMESCALE 100ps)
+      (CELL (CELLTYPE "buf") (INSTANCE u1)
+        (DELAY (ABSOLUTE (IOPATH A Z (2.5) (1.3))))))
+  )",
+                       file));
+  EXPECT_TRUE(file.unannotatable.empty());
+  EXPECT_DOUBLE_EQ(file.timescale_seconds, 100e-12);
+  ASSERT_EQ(file.cells.size(), 1u);
+  ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
+  EXPECT_DOUBLE_EQ(file.cells[0].iopaths[0].rise.typ_real, 2.5);
+  EXPECT_DOUBLE_EQ(file.cells[0].iopaths[0].fall.typ_real, 1.3);
+
+  SdfFile spaced;
+  ASSERT_TRUE(ParseSdf("(DELAYFILE (TIMESCALE 1 ns))", spaced));
+  EXPECT_DOUBLE_EQ(spaced.timescale_seconds, 1e-9);
+  SdfFile none;
+  ASSERT_TRUE(ParseSdf("(DELAYFILE)", none));
+  EXPECT_DOUBLE_EQ(none.timescale_seconds, 0.0);
+}
+
+// Scaling reads the exact magnitude, so 2.5 in ns scaled into ps ticks is 2500
+// rather than the 3000 its rounded magnitude would give.
+TEST(SdfRealValues, ScalingReadsTheExactMagnitude) {
+  SdfDelayValue v;
+  v.min_val = v.typ_val = v.max_val = 3;
+  v.min_real = v.typ_real = v.max_real = 2.5;
+  SdfScaleFactors f;
+  f.min_factor = f.typ_factor = f.max_factor = 1000.0;
+  auto out = ApplySdfScaling(v, SdfScaleType::kFromMtm, f);
+  EXPECT_EQ(out.typ_val, 2500u);
+}
+
 }  // namespace

@@ -30,6 +30,15 @@ struct SdfDelayValue {
   bool min_negative = false;
   bool typ_negative = false;
   bool max_negative = false;
+
+  // §32.2 (printed page 924) leaves the file's format to IEEE 1497, whose
+  // values are real numbers: the magnitudes exactly as written, `2.5` beside
+  // the 3 the fields above round it to. Scaling into the design's precision
+  // reads these, so a fraction survives it. Zero where a value was set from an
+  // integer alone, which the fields above then answer for.
+  double min_real = 0.0;
+  double typ_real = 0.0;
+  double max_real = 0.0;
 };
 
 struct SdfIopath {
@@ -208,6 +217,10 @@ struct SdfCell {
 struct SdfFile {
   std::string version;
   std::string design;
+  // The unit the file's values are in, in seconds, as its TIMESCALE header
+  // names it, `(TIMESCALE 100ps)` being 1e-10; zero where the file has no
+  // header, IEEE 1497 then putting its values in 1 ns.
+  double timescale_seconds = 0.0;
   std::vector<SdfCell> cells;
 
   std::vector<std::string> unannotatable;
@@ -302,6 +315,10 @@ struct SdfAnnotateTaskArgs {
   // from the root while PathDelay::inst_prefix counts from below it, and only
   // the root's own name says where one becomes the other.
   std::string design_root;
+  // The design's time precision in seconds, the tick an annotated delay is
+  // counted in, into which the file's values are scaled from its TIMESCALE;
+  // zero leaves them as the file wrote them.
+  double precision_seconds = 0.0;
   // §32.9: the instance prefix, in PathDelay::inst_prefix's spelling, of the
   // region the annotation runs at -- the level module_instance names, else the
   // instance of the module holding the call -- which cell paths are read from.
