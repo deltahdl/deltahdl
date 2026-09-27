@@ -117,6 +117,15 @@ struct RtlirPort {
   // the value the port's variable holds before any procedure runs, as a
   // variable declaration's initializer is. Null for every other port.
   Expr* init_value = nullptr;
+  // §23.2.2.2: the port expression of an explicitly named port, `r[3:0]` of
+  // `.P1(r[3:0])`, which is what the port stands for inside the module; the
+  // connection is joined to it rather than to storage of the port's own. Null
+  // for a port written without one.
+  Expr* port_expr = nullptr;
+  // §23.2.2.1: for a non-ANSI port written as a select of a declared vector,
+  // `a[7:4]` of `input [7:0] a`, the width of that vector, which the port's
+  // own width -- four -- does not give. 0 for every other port.
+  uint32_t selected_width = 0;
   std::vector<ResolvedAttribute> attrs;
   // The number of unpacked dimensions the port declaration wrote, whether or
   // not each one folded to constants. A count larger than unpacked_dims.size()
@@ -161,6 +170,9 @@ struct RtlirNet {
   // line up with the declaration and sizes nothing.
   uint32_t num_unpacked_dims = 0;
   std::vector<uint32_t> unpacked_dim_sizes;
+  // The bounds of each of those dimensions, as written, so that `n[2]` names
+  // one element of the array whichever way round its range runs.
+  std::vector<RtlirUnpackedDim> unpacked_dims;
 
   bool is_signed = false;
   std::vector<uint32_t> driver_indices;
@@ -508,6 +520,10 @@ struct RtlirParamDecl {
   // name would answer none of them.
   std::string_view gen_block_prefix;
   Expr* default_value = nullptr;
+  // A.2.1.1's param_assignment gives the parameter { variable_dimension }: the
+  // unpacked dimensions a parameter array was declared with, null for one
+  // declared without.
+  const std::vector<Expr*>* unpacked_dims = nullptr;
   // §23.10.2 with §6.20.2: the expression an instance's parameter value
   // assignment, or a configuration's (§33.4.3), gave this parameter, written
   // in the instantiating module, and null while the value is the declaration's
@@ -630,6 +646,9 @@ struct RtlirPortBinding {
   Direction direction;
   Expr* connection = nullptr;
   uint32_t width = 1;
+  // The bound port's RtlirPort::port_expr, what the connection is joined to
+  // inside the instance. Null for a port without one.
+  Expr* port_expr = nullptr;
 };
 
 struct RtlirModuleInst {

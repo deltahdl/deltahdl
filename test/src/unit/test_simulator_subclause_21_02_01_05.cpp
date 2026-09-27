@@ -239,4 +239,45 @@ TEST(HierarchicalNameFormat, SubroutineWithinInstanceComposesPath) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.u1.show\n");
 }
 
+// §21.2.1.5 with §27.4 (printed page 820): an instance a loop generate
+// creates in each iteration is named through the block instance, `g[0].pi`,
+// and so is one in a conditional block, `c.mc`, and every instance below
+// either -- a module's own loop block, `h[1].l2`, inside one reached through
+// `g[0].c`. %m printed the flat key the instance's storage is filed under,
+// `top.g_0_pi` and `top.c_mc`.
+TEST(HierarchicalNameFormat, InstanceInAGenerateBlockIsNamedThroughIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p(input var int v);\n"
+                       "  initial #1 $display(\"%m\");\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  int arr[2];\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                       "    p pi(arr[i]);\n"
+                       "  end\n"
+                       "  if (1) begin : c\n"
+                       "    p mc(arr[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "top.g[0].pi\ntop.g[1].pi\ntop.c.mc\n");
+  SimFixture g;
+  EXPECT_EQ(RunCapture("module leaf; initial $display(\"%m\"); endmodule\n"
+                       "module mid;\n"
+                       "  leaf l();\n"
+                       "  for (genvar j = 0; j < 2; j++) begin : h\n"
+                       "    leaf l2();\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  for (genvar i = 0; i < 1; i++) begin : g\n"
+                       "    if (1) begin : c\n"
+                       "      mid m();\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       g),
+            "top.g[0].c.m.l\ntop.g[0].c.m.h[0].l2\ntop.g[0].c.m.h[1].l2\n");
+}
+
 }  // namespace

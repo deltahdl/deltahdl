@@ -76,14 +76,21 @@ struct ParserPortHelpers {
     // the (name-only) extern ports. Guarded by has_wildcard_ports so the normal
     // non-ANSI path (where every body declaration must match a header port) is
     // unaffected.
-    if (!found && mod.has_wildcard_ports) {
-      PortDecl np;
-      np.name = name;
-      np.direction = dir;
-      np.data_type = dtype;
-      np.unpacked_dims = dims;
-      np.loc = loc;
+    if (found) return;
+    PortDecl np;
+    np.name = name;
+    np.direction = dir;
+    np.data_type = dtype;
+    np.unpacked_dims = dims;
+    np.loc = loc;
+    // §23.2.2.1 (printed page 733), Example 5: in `renamed_concat(.a({b, c}),
+    // f, .g(h[1]))` the body's `input b, c;` and `output [1:0] h;` declare the
+    // objects ports a and g stand for; the elaborator declares them from these
+    // and gives an explicitly named port the direction of what it names.
+    if (mod.has_wildcard_ports) {
       mod.ports.push_back(np);
+    } else {
+      mod.port_expr_objects.push_back(np);
     }
   }
 

@@ -82,13 +82,18 @@ inline std::string VpiFlatName(const std::string& prefix,
 }
 
 // Every scope of the design, visited outward from each top module under the
-// flat instance path the simulator keys that scope's objects under. A top
-// carries the empty prefix, having no instantiation over it to be named by.
+// flat instance path the simulator keys that scope's objects under. The first
+// top carries the empty prefix, having no instantiation over it to be named
+// by; a later one is keyed under its own name, as Lowerer::LowerParallelTop
+// lowers it.
 template <typename Visit>
 void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
   std::vector<std::pair<const RtlirModule*, std::string>> work;
   work.reserve(design->top_modules.size());
-  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
+  for (auto* top : design->top_modules) {
+    bool first = top == design->top_modules.front();
+    work.emplace_back(top, first ? std::string() : std::string(top->name));
+  }
 
   while (!work.empty()) {
     auto [mod, prefix] = work.back();

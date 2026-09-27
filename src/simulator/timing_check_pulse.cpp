@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "parser/ast_specify.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -80,6 +81,7 @@ TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
   if (!edge.descriptors.empty()) {
     TimingCheckEdge opposite;
     opposite.edge = edge.edge;
+    opposite.select = edge.select;
     opposite.descriptors.reserve(edge.descriptors.size());
     for (const std::pair<char, char>& descriptor : edge.descriptors) {
       opposite.descriptors.emplace_back(descriptor.second, descriptor.first);
@@ -87,10 +89,10 @@ TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
     return opposite;
   }
   if (edge.edge == SpecifyEdge::kPosedge) {
-    return TimingCheckEdge{SpecifyEdge::kNegedge, {}};
+    return TimingCheckEdge{SpecifyEdge::kNegedge, {}, edge.select};
   }
   if (edge.edge == SpecifyEdge::kNegedge) {
-    return TimingCheckEdge{SpecifyEdge::kPosedge, {}};
+    return TimingCheckEdge{SpecifyEdge::kPosedge, {}, edge.select};
   }
   return edge;
 }

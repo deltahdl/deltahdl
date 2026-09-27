@@ -449,14 +449,23 @@ struct ContTarget {
 // are left out: CheckAlwaysCombMultiDriver already covers them at element
 // granularity. The initial, always and final procedures §9.2 defines have no
 // such second pass, so all three are gathered here.
+//
+// §6.5 (printed page 90) makes the rule one of variables alone: "A net can be
+// written by one or more continuous assignments", whose values its net type
+// resolves, so a target rooted at one of the module's nets, `nets`, is not
+// gathered -- `assign a[0] = 1; assign a[0] = 0;` on `wire [3:0] a` is two
+// drivers of one bit, and on `wor r[2]` two drivers of r[0].
 static void CollectAggregateDriverTargets(
     const ModuleDecl* decl, const ScopeMap& scope,
-    std::vector<ContTarget>& conts,
+    const std::unordered_set<std::string>& nets, std::vector<ContTarget>& conts,
     std::unordered_set<std::string>& proc_prefixes) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
       std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
-      if (prefix.empty()) continue;
+      if (prefix.empty() ||
+          nets.contains(prefix.substr(0, prefix.find_first_of(".[")))) {
+        continue;
+      }
       bool aggregate = prefix.find('.') != std::string::npos ||
                        prefix.find('[') != std::string::npos;
       conts.push_back({std::move(prefix), aggregate, item->loc});
@@ -529,7 +538,14 @@ void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
   std::vector<ContTarget> conts;
   std::unordered_set<std::string> proc_prefixes;
-  CollectAggregateDriverTargets(decl, scope, conts, proc_prefixes);
+  std::unordered_set<std::string> nets;
+  if (mod != nullptr) {
+    for (const auto& net : mod->nets) nets.emplace(net.name);
+    for (const auto& port : mod->ports) {
+      if (port.net_type != NetType::kNone) nets.emplace(port.name);
+    }
+  }
+  CollectAggregateDriverTargets(decl, scope, nets, conts, proc_prefixes);
   CheckOverlappingContTargets(conts, diag_);
   CheckContProcElementMix(conts, proc_prefixes, diag_);
 }

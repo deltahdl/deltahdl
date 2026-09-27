@@ -29,10 +29,11 @@
 namespace delta {
 
 // §8.10 with §8.23: a static task named through the class scope, `C::t(...)`
-// or `p::C::t(...)`, resolved to the task and the class whose scope it runs
-// in; false for any other call. A static task named through a handle,
-// `h.t(...)`, resolves through ResolveInstanceMethod as an instance task does,
-// the handle standing for the class (§8.10).
+// or `p::C::t(...)`, or by the scoped name alone, `C::t;`, the empty
+// parentheses being optional (§13.5.5, printed page 351), resolved to the task
+// and the class whose scope it runs in; false for any other call. A static task
+// named through a handle, `h.t(...)`, resolves through ResolveInstanceMethod as
+// an instance task does, the handle standing for the class (§8.10).
 //
 // §8.25.1 (printed page 205) with §8.25 (printed page 204): a scope carrying a
 // `#(...)` list, `C#(4)::t(...)`, names one specialization, which has its own
@@ -42,7 +43,7 @@ namespace delta {
 // task was the declaration's copy, which no actual initializes, and read 0.
 static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
                                      Arena& arena, InstanceMethodInfo& call) {
-  const Expr* access = expr->lhs;
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
       !access->is_scope_resolution || access->rhs == nullptr ||
       access->rhs->kind != ExprKind::kIdentifier) {

@@ -36,6 +36,7 @@
 #include "simulator/cover_results.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
+#include "simulator/file_monitor.h"
 #include "simulator/net.h"
 #include "simulator/output_log.h"
 #include "simulator/scheduler.h"
@@ -571,10 +572,6 @@ class SimContext : public DeclaredNameTables,
   // each operation records its own outcome here: a failing operation stores an
   // error code with a textual description, and one that completes normally
   // erases the record so $ferror then returns zero and clears its str output.
-  struct FileIoError {
-    int32_t code = 0;
-    std::string msg;
-  };
   void SetFileIoError(uint32_t fd, int32_t code, std::string msg);
   void ClearFileIoError(uint32_t fd);
   const FileIoError* GetFileIoError(uint32_t fd) const;
@@ -591,6 +588,11 @@ class SimContext : public DeclaredNameTables,
   // §21.3.4.1: what $ungetc pushed onto a descriptor not open for reading, for
   // $fgetc to return last-pushed first; a readable one's host stream holds it.
   std::string& FdPushback(uint32_t fd) { return fd_pushback_[fd]; }
+  // §21.3.2: the $fmonitor tasks set up so far; CloseFile cancels a closed
+  // descriptor's.
+  std::vector<std::unique_ptr<FileMonitor>>& FileMonitors() {
+    return file_monitors_;
+  }
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
@@ -765,10 +767,10 @@ class SimContext : public DeclaredNameTables,
   void SetActiveMonitor(const Expr* call);
   const Expr* ActiveMonitor() const { return active_monitor_; }
 
-  // §33.7: the instance-path prefix the active display list was written in,
-  // recorded with the list so each redisplay reports that instance's binding.
-  void SetMonitorBindingScope(std::string prefix);
-  std::string_view MonitorBindingScope() const;
+  // §33.7: a stand-in for the active display list's caller (deferred_caller.h),
+  // recorded with the list so each redisplay reads it where it was written.
+  void SetMonitorCaller(std::shared_ptr<Process> caller);
+  Process* MonitorCaller() const { return monitor_caller_.get(); }
   uint64_t MonitorGeneration() const { return monitor_generation_; }
 
   // The monitor flag is toggled by $monitoron/$monitoroff and is on by
@@ -841,8 +843,8 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Stmt*, const Stmt*> class_typedef_shaped_decls_;
 
   const Expr* active_monitor_ = nullptr;
-  // §33.7: the instance the active display list was written in (see above).
-  std::string monitor_binding_scope_;
+  // §33.7: the caller of the active display list (see above).
+  std::shared_ptr<Process> monitor_caller_;
   uint64_t monitor_generation_ = 0;
   bool monitor_enabled_ = true;
   bool monitor_display_pending_ = false;
@@ -870,6 +872,7 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<uint32_t, FileIoError> fileio_errors_;
   std::unordered_set<uint32_t> fd_eof_detected_;
   std::unordered_map<uint32_t, std::string> fd_pushback_;
+  std::vector<std::unique_ptr<FileMonitor>> file_monitors_;
   // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels_ = {};
   bool stdio_descriptors_ready_ = false;

@@ -9,6 +9,7 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
+#include "parser/ast_expr.h"
 #include "parser/parser.h"
 
 namespace {
@@ -35,6 +36,197 @@ int64_t ResolvedParam(const RtlirModule* m, std::string_view name) {
     if (p.name == name) return p.resolved_value;
   }
   return -1;
+}
+
+// The override expression the named parameter of `m` was given, or nullptr.
+const Expr* OverrideExpr(const RtlirModule* m, std::string_view name) {
+  for (const auto& p : m->params) {
+    if (p.name == name) return p.override_expr;
+  }
+  return nullptr;
+}
+
+// §33.4.3: "A localparam declared in a configuration shall be assigned a value
+// and shall only be set to a literal value", so an override naming one hands
+// the instance that literal itself. A six-character string is 48 bits, which a
+// 32- or 64-bit folded value would cut to its last characters.
+TEST(ConfigLocalparamLiteral, StringLocalparamReachesTheInstanceWhole) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module adder #(parameter ID = \"id\", W = 8); endmodule\n"
+      "module top; adder a1(); endmodule\n"
+      "config cfg;\n"
+      "  localparam ID = \"abcdef\";\n"
+      "  localparam W = 100;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.ID(ID), .W(W));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  const Expr* id = OverrideExpr(child, "ID");
+  ASSERT_NE(id, nullptr);
+  EXPECT_EQ(id->kind, ExprKind::kStringLiteral);
+  EXPECT_NE(id->text.find("abcdef"), std::string_view::npos) << id->text;
+  EXPECT_EQ(ResolvedParam(child, "W"), 100);
+}
+
+// The width of the variable named `name` in `m`, or 0.
+uint32_t VariableWidth(const RtlirModule* m, std::string_view name) {
+  for (const auto& v : m->variables) {
+    if (v.name == name) return v.width;
+  }
+  return 0;
+}
+
+// §33.4.3 with Syntax 33-4: a use clause's named_parameter_assignment may set a
+// type parameter, its value a data type, and the configured instance then
+// elaborates with that type (§6.20.3): a variable of type T is 16 bits wide.
+TEST(ConfigParamOverride, TypeParameterSetByNamedAssignment) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module holder #(parameter type T = byte); T v; endmodule\n"
+      "module top; holder h(); endmodule\n"
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.h use #(.T(shortint));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(VariableWidth(child, "v"), 16u);
+}
+
+// The configuration's assignment takes precedence over the instantiation's.
+TEST(ConfigParamOverride, TypeParameterOverrideBeatsTheInstantiation) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module holder #(parameter type T = byte); T v; endmodule\n"
+      "module top; holder #(.T(int)) h(); endmodule\n"
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.h use #(.T(shortint));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(VariableWidth(child, "v"), 16u);
+}
+
+// §33.4.3 (printed page 940): "Parameters identifiers shall be resolved
+// starting in the parent scope of the instance", so `top.WIDTH` in the
+// override of top.a1 is top's WIDTH, whether top declares it in its
+// parameter port list or in its body.
+TEST(ConfigParamOverride, HierarchicalReferenceToTheParentsHeaderParameter) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top #(parameter WIDTH = 16); adder a1(); endmodule\n"
+      "config cfg1;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(top.WIDTH));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(ResolvedParam(child, "W"), 16);
+}
+
+TEST(ConfigParamOverride, HierarchicalReferenceToTheParentsBodyParameter) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top; parameter WIDTH = 16; adder a1(); endmodule\n"
+      "config cfg1;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(top.WIDTH));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(ResolvedParam(child, "W"), 16);
+}
+
+// §33.4.3 Example 4: the hierarchical `top4.S` is the parent's S even where the
+// configuration declares a localparam S of its own, which the bare `S` names.
+TEST(ConfigParamOverride, HierarchicalReferenceIsNotTheConfigsLocalparam) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top4; parameter S = 16; adder a1(); endmodule\n"
+      "config cfg2;\n"
+      "  localparam S = 24;\n"
+      "  design top4;\n"
+      "  instance top4.a1 use #(.W(top4.S));\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(ResolvedParam(child, "W"), 16);
+}
+
+// An index in such a name may be a config localparam: `top.PARR[I]` with
+// `localparam I = 2` is the third element of top's parameter array.
+TEST(ConfigParamOverride, HierarchicalParameterArrayIndexedByALocalparam) {
+  ElabFixture f;
+  auto* child =
+      ConfigElabFirstChild(f,
+                           "module adder #(parameter W = 8); endmodule\n"
+                           "module top;\n"
+                           "  parameter int PARR[3] = '{10, 20, 30};\n"
+                           "  adder a1();\n"
+                           "endmodule\n"
+                           "config cfg;\n"
+                           "  localparam I = 2;\n"
+                           "  design top;\n"
+                           "  instance top.a1 use #(.W(top.PARR[I]));\n"
+                           "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(ResolvedParam(child, "W"), 30);
+}
+
+// Config-elaborates `src` through its first configuration and returns the
+// design's one top-level module.
+RtlirModule* ConfigElabTop(ElabFixture& f, const std::string& src) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  f.has_errors = f.diag.HasErrors();
+  if (!design || design->top_modules.size() != 1) return nullptr;
+  return design->top_modules[0];
+}
+
+// §33.4.3 Example 3: an instance clause naming the top-level cell alone sets
+// that cell's own parameters, one declared in its parameter port list and one
+// declared in its body alike.
+TEST(ConfigParamOverride, InstanceClauseOnTheTopCellSetsAHeaderParameter) {
+  ElabFixture f;
+  auto* top = ConfigElabTop(f,
+                            "module top #(parameter WIDTH = 16); endmodule\n"
+                            "config cfg1;\n"
+                            "  design top;\n"
+                            "  instance top use #(.WIDTH(32));\n"
+                            "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(ResolvedParam(top, "WIDTH"), 32);
+}
+
+TEST(ConfigParamOverride, InstanceClauseOnTheTopCellSetsABodyParameter) {
+  ElabFixture f;
+  auto* top = ConfigElabTop(f,
+                            "module top; parameter WIDTH = 16; endmodule\n"
+                            "config cfg1;\n"
+                            "  design top;\n"
+                            "  instance top use #(.WIDTH(32));\n"
+                            "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(ResolvedParam(top, "WIDTH"), 32);
 }
 
 TEST(ConfigLocalparamLiteral, NonLiteralLocalparamRejected) {

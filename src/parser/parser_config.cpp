@@ -1,9 +1,12 @@
 #include <format>
+#include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -152,6 +155,24 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   }
 }
 
+// Every config_rule_statement pairs a selection clause with an expansion
+// clause: an inst_clause or a cell_clause is legal only when followed by a
+// liblist_clause or a use_clause. A bare 'instance <path>;' or 'cell <name>;'
+// matches no grammar alternative.
+void Parser::ParseSelectionExpansion(ConfigRule* rule,
+                                     std::string_view selection) {
+  if (Check(TokenKind::kKwLiblist)) {
+    ParseLiblistClause(rule);
+  } else if (Check(TokenKind::kKwUse)) {
+    ParseUseClause(rule);
+  } else {
+    diag_.Error(CurrentLoc(),
+                std::format("{} selection requires a 'liblist' or 'use' clause",
+                            selection),
+                Subclause("33.4.1"));
+  }
+}
+
 ConfigRule* Parser::ParseConfigRule() {
   auto* rule = arena_.Create<ConfigRule>();
   // Taken before the first token is consumed, so the position is the
@@ -178,18 +199,7 @@ ConfigRule* Parser::ParseConfigRule() {
     Consume();
     rule->kind = ConfigRuleKind::kInstance;
     rule->inst_path = ParseDottedPath();
-    // Every config_rule_statement pairs a selection clause with an expansion
-    // clause: an inst_clause is legal only when followed by a liblist_clause or
-    // a use_clause. A bare 'instance <path>;' matches no grammar alternative.
-    if (Check(TokenKind::kKwLiblist)) {
-      ParseLiblistClause(rule);
-    } else if (Check(TokenKind::kKwUse)) {
-      ParseUseClause(rule);
-    } else {
-      diag_.Error(CurrentLoc(),
-                  "instance selection requires a 'liblist' or 'use' clause",
-                  Subclause("33.4.1"));
-    }
+    ParseSelectionExpansion(rule, "instance");
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
     rule->kind = ConfigRuleKind::kCell;
@@ -200,18 +210,7 @@ ConfigRule* Parser::ParseConfigRule() {
     } else {
       rule->cell_name = first;
     }
-    // As with an inst_clause, a cell_clause is legal only when followed by a
-    // liblist_clause or a use_clause; a bare 'cell <name>;' is not a
-    // config_rule_statement.
-    if (Check(TokenKind::kKwLiblist)) {
-      ParseLiblistClause(rule);
-    } else if (Check(TokenKind::kKwUse)) {
-      ParseUseClause(rule);
-    } else {
-      diag_.Error(CurrentLoc(),
-                  "cell selection requires a 'liblist' or 'use' clause",
-                  Subclause("33.4.1"));
-    }
+    ParseSelectionExpansion(rule, "cell");
   }
   Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
   return rule;
@@ -224,18 +223,21 @@ ConfigDecl* Parser::ParseConfigDecl() {
   decl->name = Expect(TokenKind::kIdentifier, Subclause("33.4.1")).text;
   Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
 
-  // Optional 'localparam <id> = <expr>;' declarations precede the design
-  // statement and rules in a config_declaration.
+  // Syntax 33-4 (printed page 938) opens a config_declaration with
+  // `{ local_parameter_declaration ; }`, and A.2.1.1 gives that declaration a
+  // data_type_or_implicit and a list_of_param_assignments, so `localparam int
+  // S = 24, T = 8;` is as much a config's as `localparam S = 24;`. They are
+  // read as any localparam declaration is, and each value assignment is kept.
   auto parse_local_params = [this, decl]() {
     // Check(kKwLocalparam) is already false at EOF (the current token is kEof),
     // so an explicit !AtEnd() guard would be redundant here.
     while (Check(TokenKind::kKwLocalparam)) {
-      Consume();
-      auto pname = ExpectIdentifier(Subclause("33.4.3")).text;
-      Expect(TokenKind::kEq, Subclause("33.4.3"));
-      auto* val = ParseExpr();
-      decl->local_params.emplace_back(pname, val);
-      Expect(TokenKind::kSemicolon, Subclause("33.4.3"));
+      std::vector<ModuleItem*> items;
+      ParseParamDecl(items);
+      for (auto* item : items) {
+        if (item->kind != ModuleItemKind::kParamDecl) continue;
+        decl->local_params.emplace_back(item->name, item->init_expr);
+      }
     }
   };
 

@@ -173,4 +173,56 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
+// §33.3.1 (printed page 937): "If multiple cells with the same name map to the
+// same library, then the last cell encountered shall be written to the
+// library", encountering a cell after it was compiled being "a recompiling of
+// the cell". The adder a second compile writes, with a parameter W the first
+// lacked, is the one the library holds, and top keeps its one definition
+// beside it; the same name in another library is another cell and stays. Both
+// adders were loaded side by side, which the bind refused as a duplicate
+// definition.
+TEST(SeparateCompilationTool, RecompiledCellReplacesTheEarlierOne) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module adder; wire q1; endmodule\n"
+                               "module top; adder a(); endmodule\n",
+                               "L", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module adder; endmodule\n", "other", path));
+  ASSERT_TRUE(PrecompiledLibrary::Save(
+      "module adder #(parameter W = 1); wire q1, q2; endmodule\n", "L", path));
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  CompilationUnit target;
+  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
+  ASSERT_EQ(target.modules.size(), 3u);
+  int adders_in_l = 0;
+  for (const auto* m : target.modules) {
+    if (m->name != "adder" || m->library != "L") continue;
+    ++adders_in_l;
+    EXPECT_EQ(m->params.size(), 1u);
+  }
+  EXPECT_EQ(adders_in_l, 1);
+}
+
+// The names a compile would write into the library's definitions name space,
+// in order, which is what lets one invocation that compiles two files warn
+// that a name comes twice (§33.3.1: "In the case where multiple modules with
+// the same name are mapped to the same library in a single invocation of the
+// compiler, then a warning shall be issued").
+TEST(SeparateCompilationTool, CellNamesListsTheDefinitions) {
+  auto names = PrecompiledLibrary::CellNames(
+      "module adder; endmodule\n"
+      "interface bus; endinterface\n"
+      "package p; endpackage\n"
+      "module top; endmodule\n");
+  ASSERT_EQ(names.size(), 3u);
+  EXPECT_EQ(names[0], "adder");
+  EXPECT_EQ(names[1], "top");
+  EXPECT_EQ(names[2], "bus");
+}
+
 }  // namespace

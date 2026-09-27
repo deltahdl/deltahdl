@@ -45,6 +45,12 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   ScopeMap saved_cu_param_scope = std::move(cu_param_scope_);
   typedefs_ = pg.typedefs;
   cu_param_scope_ = pg.cu_param_scope;
+  // The block is elaborated after the instance holding it has returned, so
+  // the configuration's path to that instance and its library are put back
+  // for the instances the block holds (§33.4.1.3, §33.4.1.5).
+  std::string saved_config_path =
+      std::exchange(config_inst_path_, pg.config_inst_path);
+  std::string saved_library = std::exchange(current_library_, pg.library);
   // §23.9 judges a declaration against the scope it is written in, and a
   // generate block's enclosing scope is the module Elaborator::ElaborateModule
   // has already returned from. Install that module's names, which
@@ -136,6 +142,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   typedefs_ = std::move(saved_typedefs);
   cu_param_scope_ = std::move(saved_cu_param_scope);
   property_registry_ = std::move(saved_property_registry);
+  config_inst_path_ = std::move(saved_config_path);
+  current_library_ = std::move(saved_library);
   // Write what this generate declared back into the module's entry rather than
   // dropping it. §27.4 puts two generate block instance arrays of one module in
   // one scope, so a name one generate construct of a module declared has to be

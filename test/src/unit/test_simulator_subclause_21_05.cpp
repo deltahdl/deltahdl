@@ -384,4 +384,67 @@ TEST(WritememSim, NonMemoryNameOperandWritesNothing) {
   EXPECT_FALSE(std::ifstream(path).good());
 }
 
+// §21.5 with §8.5: the memory is any unpacked array, a class object's array
+// property included. Named bare inside the object's own methods, it is loaded
+// by $readmemh and dumped by $writememh, and the dump loads back into another
+// object's property named through a handle.
+TEST(WritememSim, ArrayPropertyNamedInAMethodIsDumped) {
+  SimFixture f;
+  std::string in_path = "/tmp/deltahdl_t2105_prop_in.mem";
+  std::string out_path = "/tmp/deltahdl_t2105_prop_out.mem";
+  SeedFile(in_path, "aa bb cc\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Mem;\n"
+      "    logic [7:0] data[0:2];\n"
+      "    function void load(string f); $readmemh(f, data); endfunction\n"
+      "    function void save(string f); $writememh(f, data); endfunction\n"
+      "  endclass\n"
+      "  Mem m1, m2;\n"
+      "  initial begin\n"
+      "    m1 = new;\n"
+      "    m1.load(\"" +
+          in_path +
+          "\");\n"
+          "    $display(\"%h %h %h\", m1.data[0], m1.data[1], m1.data[2]);\n"
+          "    m1.save(\"" +
+          out_path +
+          "\");\n"
+          "    m2 = new;\n"
+          "    $readmemh(\"" +
+          out_path +
+          "\", m2.data);\n"
+          "    $display(\"%h %h %h\", m2.data[0], m2.data[1], m2.data[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa bb cc\naa bb cc\n");
+  EXPECT_EQ(SlurpFile(out_path), "aa\nbb\ncc\n");
+  std::remove(in_path.c_str());
+  std::remove(out_path.c_str());
+}
+
+// §21.5 with §23.6: the memory dumped may be an instance's array named through
+// a hierarchical reference.
+TEST(WritememSim, HierarchicallyNamedArrayIsDumped) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_hier.mem";
+  std::string out = RunCapture(
+      "module sub; logic [7:0] mem[0:1]; endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "  initial begin\n"
+      "    u.mem[0] = 8'hab; u.mem[1] = 8'hcd;\n"
+      "    $writememh(\"" +
+          path +
+          "\", u.mem);\n"
+          "    $display(\"done\");\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "done\n");
+  EXPECT_EQ(SlurpFile(path), "ab\ncd\n");
+  std::remove(path.c_str());
+}
+
 }  // namespace

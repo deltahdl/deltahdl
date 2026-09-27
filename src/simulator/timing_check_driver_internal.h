@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_specify.h"
@@ -99,16 +100,21 @@ inline EdgeLevel LevelOfDescriptorChar(char c) {
 struct TimingCheckEdge {
   SpecifyEdge edge = SpecifyEdge::kNone;
   std::vector<std::pair<char, char>> descriptors;
+  // The bits of the signal the event is a transition of: the select its
+  // terminal was written with (A.7.3), or every bit for a whole port.
+  TerminalSelect select;
 };
 
 // The edge_control_specifier of a check's reference_event and of its
 // data_event, read off the entry the two were built into.
 inline TimingCheckEdge RefEdgeOf(const TimingCheckEntry& check) {
-  return TimingCheckEdge{check.ref_edge, check.ref_edge_descriptors};
+  return TimingCheckEdge{check.ref_edge, check.ref_edge_descriptors,
+                         check.ref_select};
 }
 
 inline TimingCheckEdge DataEdgeOf(const TimingCheckEntry& check) {
-  return TimingCheckEdge{check.data_edge, check.data_edge_descriptors};
+  return TimingCheckEdge{check.data_edge, check.data_edge_descriptors,
+                         check.data_select};
 }
 
 // Whether a change from `from` to `to` is a transition `edge` names. A value
@@ -171,15 +177,46 @@ inline bool TimingCheckEdgeMatches(const TimingCheckEdge& edge, EdgeLevel from,
 // The two vectors are the same signal read at two moments, so they are the same
 // length; the shorter is walked in case a value arrives with fewer words than
 // its width claims.
+//
+// A terminal written with a select is a transition of the selected bits alone,
+// so only the storage offsets `bits` names are walked; an empty list walks
+// every bit.
 inline bool TimingCheckSignalTransitioned(const TimingCheckEdge& edge,
                                           const std::vector<EdgeLevel>& before,
-                                          const std::vector<EdgeLevel>& after) {
-  std::size_t bits =
+                                          const std::vector<EdgeLevel>& after,
+                                          const std::vector<uint32_t>& bits) {
+  std::size_t width =
       before.size() < after.size() ? before.size() : after.size();
-  for (std::size_t bit = 0; bit < bits; ++bit) {
-    if (TimingCheckEdgeMatches(edge, before[bit], after[bit])) return true;
+  if (bits.empty()) {
+    for (std::size_t bit = 0; bit < width; ++bit) {
+      if (TimingCheckEdgeMatches(edge, before[bit], after[bit])) return true;
+    }
+    return false;
+  }
+  for (uint32_t bit : bits) {
+    if (bit < width && TimingCheckEdgeMatches(edge, before[bit], after[bit])) {
+      return true;
+    }
   }
   return false;
+}
+
+// The storage offsets of `var` a terminal's select covers, mapped through the
+// port's declared range; empty for a whole port. An index outside the range
+// names no bit.
+inline std::vector<uint32_t> SelectedBitOffsets(const TerminalSelect& select,
+                                                const Variable& var) {
+  std::vector<uint32_t> offsets;
+  if (!select.present) return offsets;
+  const PackedRange kRange = var.DeclaredRange();
+  const int64_t kLow = select.left < select.right ? select.left : select.right;
+  const int64_t kHigh = select.left < select.right ? select.right : select.left;
+  for (int64_t idx = kLow; idx <= kHigh; ++idx) {
+    if (kRange.Contains(idx)) {
+      offsets.push_back(static_cast<uint32_t>(kRange.OffsetOf(idx)));
+    }
+  }
+  return offsets;
 }
 
 // Arms on `var` a watcher that calls `on_edge` every time the variable makes
@@ -202,13 +239,14 @@ inline void WatchEdge(Variable* var, TimingCheckEdge edge,
                       std::function<void()> on_edge) {
   auto seen =
       std::make_shared<std::vector<EdgeLevel>>(LevelsOfBits(var->value));
-  var->AddWatcher(
-      [var, edge = std::move(edge), seen, on_edge = std::move(on_edge)]() {
-        std::vector<EdgeLevel> before = std::move(*seen);
-        *seen = LevelsOfBits(var->value);
-        if (TimingCheckSignalTransitioned(edge, before, *seen)) on_edge();
-        return false;
-      });
+  std::vector<uint32_t> bits = SelectedBitOffsets(edge.select, *var);
+  var->AddWatcher([var, edge = std::move(edge), bits = std::move(bits), seen,
+                   on_edge = std::move(on_edge)]() {
+    std::vector<EdgeLevel> before = std::move(*seen);
+    *seen = LevelsOfBits(var->value);
+    if (TimingCheckSignalTransitioned(edge, before, *seen, bits)) on_edge();
+    return false;
+  });
 }
 
 // Which entry a watcher was armed for, held as a position in

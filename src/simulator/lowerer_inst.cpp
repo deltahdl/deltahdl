@@ -1,14 +1,49 @@
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
+
+// §23.2.2.1 (printed page 732), Example 3: a port written `a[7:4]` names no
+// storage of its own but a select of the module's `a`, "First port is upper 4
+// bits of 'a'", whose declaration `input [7:0] a` gives its direction and
+// width. That vector is what is created for it, once however many ports select
+// from it; a port with a name is created under the name. Nothing for a port
+// that is neither.
+void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
+                       SimContext& ctx, Arena& arena) {
+  if (!port.name.empty()) {
+    CreatePortVariable(
+        *arena.Create<std::string>(prefix + std::string(port.name)), port, ctx,
+        arena);
+    return;
+  }
+  const Expr* root = port.port_expr;
+  while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+  if (root == nullptr || root->kind != ExprKind::kIdentifier ||
+      port.selected_width == 0) {
+    return;
+  }
+  RtlirPort vector = port;
+  vector.width = port.selected_width;
+  CreatePortVariable(
+      *arena.Create<std::string>(prefix + std::string(root->text)), vector, ctx,
+      arena);
+}
 
 // An output port connection the continuous-assignment lvalue writer can drive:
 // a bare net, or a part-select / element select / concatenation / member /
@@ -44,6 +79,75 @@ static const RtlirPort* FindChildPort(const RtlirModuleInst& inst,
   return nullptr;
 }
 
+// §23.2.2.2 (printed page 734): an explicitly named port specifies "elements
+// ... declared in a module" on the port list, so the port stands for its
+// expression, and its connection is joined to that expression inside the
+// instance. The copy names each object the expression reads under the
+// instance's segment, "u0.r" for r, as MakeLocalPortId names a port's own
+// storage, so that it resolves from the parent's scope where the binding is
+// lowered. A literal inside it is shared rather than copied.
+static Expr* QualifiedPortExpr(const Expr* e, const std::string& inst_seg,
+                               Arena& arena) {
+  if (e == nullptr) return nullptr;
+  auto* copy = arena.Create<Expr>(*e);
+  if (e->kind == ExprKind::kIdentifier) {
+    copy->text = *arena.Create<std::string>(inst_seg + std::string(e->text));
+    return copy;
+  }
+  // A member access names its member, which is no object of the module.
+  copy->lhs = QualifiedPortExpr(e->lhs, inst_seg, arena);
+  if (e->kind != ExprKind::kMemberAccess) {
+    copy->rhs = QualifiedPortExpr(e->rhs, inst_seg, arena);
+  }
+  copy->condition = QualifiedPortExpr(e->condition, inst_seg, arena);
+  copy->true_expr = QualifiedPortExpr(e->true_expr, inst_seg, arena);
+  copy->false_expr = QualifiedPortExpr(e->false_expr, inst_seg, arena);
+  copy->base = QualifiedPortExpr(e->base, inst_seg, arena);
+  copy->index = QualifiedPortExpr(e->index, inst_seg, arena);
+  copy->index_end = QualifiedPortExpr(e->index_end, inst_seg, arena);
+  copy->repeat_count = QualifiedPortExpr(e->repeat_count, inst_seg, arena);
+  for (auto*& element : copy->elements) {
+    element = QualifiedPortExpr(element, inst_seg, arena);
+  }
+  return copy;
+}
+
+// The name of the storage an inout or a ref port's connection is aliased to:
+// the module's own object where the port is written `ref .Y(x)`, the port's
+// name for every other port, and for one whose expression names no single
+// object of the module.
+static std::string_view PortStorageName(const RtlirPortBinding& binding) {
+  if (binding.port_expr != nullptr &&
+      binding.port_expr->kind == ExprKind::kIdentifier) {
+    return binding.port_expr->text;
+  }
+  return binding.port_name;
+}
+
+// §25.5 (printed page 787): "the modport name is hierarchical from the
+// interface instance" in a connection, `P pi(s.tb)`, which restricts the port
+// to the modport's list without naming another instance, so the port shares
+// the members of `s`. Returns the identifier naming the connected interface
+// instance, or null where the connection names none.
+static const Expr* ConnectedInterfaceInstance(const Expr* conn,
+                                              std::string_view type_name,
+                                              const CompilationUnit* cu) {
+  if (conn == nullptr) return nullptr;
+  if (conn->kind == ExprKind::kIdentifier) return conn;
+  if (conn->kind != ExprKind::kMemberAccess || conn->lhs == nullptr ||
+      conn->lhs->kind != ExprKind::kIdentifier || conn->rhs == nullptr ||
+      conn->rhs->kind != ExprKind::kIdentifier || cu == nullptr) {
+    return nullptr;
+  }
+  for (const ModuleDecl* ifc : cu->interfaces) {
+    if (ifc->name != type_name) continue;
+    for (const ModportDecl* mp : ifc->modports) {
+      if (mp->name == conn->rhs->text) return conn->lhs;
+    }
+  }
+  return nullptr;
+}
+
 // §25.3.2: an interface passed through a port shares its members with the
 // connected interface instance. Alias each member of the child interface port
 // (mem.a.member) onto the connected instance's member (sb_intf.member) so reads
@@ -57,18 +161,16 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
   if (!port || !port->is_interface_port || port->interface_type_name.empty()) {
     return false;
   }
-  if (!binding.connection ||
-      binding.connection->kind != ExprKind::kIdentifier) {
-    return false;
-  }
+  const Expr* instance = ConnectedInterfaceInstance(
+      binding.connection, port->interface_type_name, design_->compilation_unit);
+  if (instance == nullptr) return false;
   auto it = design_->all_modules.find(port->interface_type_name);
   if (it == design_->all_modules.end()) return false;
   const RtlirModule* ifc = it->second;
 
   std::string port_prefix = inst_prefix_ + std::string(inst.inst_name) + "." +
                             std::string(binding.port_name) + ".";
-  std::string conn_prefix =
-      inst_prefix_ + std::string(binding.connection->text) + ".";
+  std::string conn_prefix = inst_prefix_ + std::string(instance->text) + ".";
   for (const auto& var : ifc->variables) {
     auto* alias =
         arena_.Create<std::string>(port_prefix + std::string(var.name));
@@ -130,6 +232,179 @@ static void NameInterconnectPath(const PortConnectionPath& path,
       SdfHierName(path.inst_prefix + std::string(path.connection->text));
 }
 
+// One unpacked dimension's addresses: the smaller bound, how many there are,
+// and whether the left bound is the larger.
+struct UnpackedDimShape {
+  int64_t lo = 0;
+  uint32_t size = 0;
+  bool descending = false;
+
+  // The address `position` elements from the dimension's left bound.
+  [[nodiscard]] int64_t AddressAt(uint32_t position) const {
+    return descending ? lo + size - 1 - position : lo + position;
+  }
+};
+
+// The dimension of an array a connection names: a whole array's first, or,
+// for a select of it, `arr[k]` of `int arr[3][3]`, the one the select leaves.
+// False where the connection names no array with that many dimensions.
+static bool ConnectionDimShape(const Expr* conn, SimContext& ctx, Arena& arena,
+                               UnpackedDimShape& out) {
+  size_t depth = 0;
+  const Expr* root = conn;
+  while (root->kind == ExprKind::kSelect && root->base != nullptr &&
+         root->index_end == nullptr) {
+    root = root->base;
+    ++depth;
+  }
+  std::string_view key = ArrayRootKey(root, arena);
+  const ArrayInfo* info = key.empty() ? nullptr : ctx.FindArrayInfo(key);
+  if (info == nullptr || info->is_dynamic || info->is_queue) return false;
+  if (info->dim_sizes.empty()) {
+    out = {info->lo, info->size, info->is_descending};
+    return depth == 0;
+  }
+  if (depth >= info->dim_sizes.size()) return false;
+  out = {info->dim_los[depth], info->dim_sizes[depth],
+         depth < info->dim_descending.size() && info->dim_descending[depth]};
+  return true;
+}
+
+static Expr* MakeElementSelect(Expr* base, int64_t address, Arena& arena) {
+  auto* index = arena.Create<Expr>();
+  index->kind = ExprKind::kIntegerLiteral;
+  index->int_val = static_cast<uint64_t>(address);
+  auto* select = arena.Create<Expr>();
+  select->kind = ExprKind::kSelect;
+  select->base = base;
+  select->index = index;
+  return select;
+}
+
+// An inout or ref array port and the array it is connected to, element by
+// element, left index to left index.
+struct ArrayPortAlias {
+  std::string local;
+  std::string target;
+  UnpackedDimShape port_shape;
+  UnpackedDimShape conn_shape;
+};
+
+// §23.3.3.3 and §23.3.3.2 make an inout or a ref port one object with its
+// connection, as LowerPortBindings aliases a scalar one; an array port is so
+// element by element.
+static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
+                                   Arena& arena) {
+  for (uint32_t p = 0; p < a.port_shape.size; ++p) {
+    const std::string& local_key = *arena.Create<std::string>(
+        a.local + "[" + std::to_string(a.port_shape.AddressAt(p)) + "]");
+    std::string target =
+        a.target + "[" + std::to_string(a.conn_shape.AddressAt(p)) + "]";
+    ctx.AliasVariable(local_key, target);
+    ctx.AliasNet(local_key, target);
+  }
+}
+
+// §23.3.3.5 (printed page 748): an unpacked array port connected to an
+// unpacked array has "each element of the port connection ... matched to the
+// port left index to left index, right index to right index", and each pair
+// is connected as a port of the element's type would be: an input's element
+// takes the connection's continuously, an output's drives it, and an inout's
+// or ref's is the same storage. `input var int i[3]` on `int one[3]` reads
+// one[0] to one[2] in i[0] to i[2]; the whole array was lowered as one
+// assignment of an element's width, so the port read one value's bits. False
+// for a port that is no one-dimensional unpacked array, or a connection that
+// names no array of as many elements, which keep the scalar path.
+bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
+                                    const RtlirPortBinding& binding,
+                                    const std::string& inst_seg,
+                                    bool from_program) {
+  const RtlirPort* port = FindChildPort(inst, binding.port_name);
+  if (port == nullptr || port->num_unpacked_dims != 1 ||
+      port->unpacked_dims.size() != 1) {
+    return false;
+  }
+  const RtlirUnpackedDim& dim = port->unpacked_dims.front();
+  UnpackedDimShape port_shape{dim.Low(), dim.Size(), dim.left > dim.right};
+  UnpackedDimShape conn_shape;
+  if (!ConnectionDimShape(binding.connection, ctx_, arena_, conn_shape) ||
+      conn_shape.size != port_shape.size) {
+    return false;
+  }
+  std::string local = inst_seg + std::string(binding.port_name);
+  if (binding.direction == Direction::kInout ||
+      binding.direction == Direction::kRef) {
+    // Only a connection naming the array itself is aliased, as a scalar
+    // inout's is.
+    if (binding.connection->kind == ExprKind::kIdentifier) {
+      AliasArrayPortElements(
+          {inst_prefix_ + local,
+           inst_prefix_ + std::string(binding.connection->text), port_shape,
+           conn_shape},
+          ctx_, arena_);
+    }
+    return true;
+  }
+  bool input = binding.direction == Direction::kInput;
+  for (uint32_t p = 0; p < port_shape.size; ++p) {
+    Expr* local_elem = MakeElementSelect(MakeLocalPortId(local, arena_),
+                                         port_shape.AddressAt(p), arena_);
+    Expr* conn_elem =
+        MakeElementSelect(binding.connection, conn_shape.AddressAt(p), arena_);
+    RtlirContAssign ca;
+    ca.lhs = input ? local_elem : conn_elem;
+    ca.rhs = input ? conn_elem : local_elem;
+    ca.width = port->width;
+    LowerContAssign(ca, from_program);
+  }
+  return true;
+}
+
+// What an inout or ref port binding of one instance is joined in: the
+// instance's segment and its parent's prefix, and the connection each of the
+// instance's objects was joined to first.
+struct InoutJoinScope {
+  SimContext& ctx;
+  Arena& arena;
+  std::string local_prefix;
+  const std::string& parent_prefix;
+  std::unordered_map<std::string_view, std::string_view>& joins;
+};
+
+// §23.3.3.2 ref ports and §23.3.3.3 inout ports both share storage with the
+// connected parent signal, so the child port is aliased onto it rather than
+// lowered as a one-way continuous assignment. An inout port is a net
+// (§23.3.3.3 connects it to a net and never to a variable), and §23.3.3.7
+// merges the port's net and the connected net into one simulated net, so the
+// net map is redirected beside the variable map, as LowerAliases and
+// TryAliasInterfacePort do: a continuous assignment inside the child resolves
+// its driver through SimContext::FindNet under the child's prefix, where
+// CreatePortVariable (lowerer_register.cpp) registered the port's own net,
+// and with the variable alone aliased that net took the driver and the
+// parent's net never saw it. A ref port's connection is a variable, which
+// FindNet does not answer, so its net alias is a no-op. The keys are interned
+// in the arena because the net map holds them rather than a copy.
+//
+// §23.2.2.1 (printed page 732), Example 4: `same_port (.a(i), .b(i))` has two
+// ports on the one inout i, so the two connections are one net with i. The
+// first is joined to i; a later one joins the first.
+static void JoinInoutPortBinding(const RtlirPortBinding& binding,
+                                 const InoutJoinScope& scope) {
+  if (binding.connection->kind != ExprKind::kIdentifier) return;
+  const std::string& local = *scope.arena.Create<std::string>(
+      scope.local_prefix + std::string(PortStorageName(binding)));
+  const std::string& target = *scope.arena.Create<std::string>(
+      scope.parent_prefix + std::string(binding.connection->text));
+  auto [joined, fresh] = scope.joins.try_emplace(local, target);
+  if (!fresh) {
+    scope.ctx.AliasVariable(target, joined->second);
+    scope.ctx.AliasNet(target, joined->second);
+    return;
+  }
+  scope.ctx.AliasVariable(local, target);
+  scope.ctx.AliasNet(local, target);
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -138,35 +413,24 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   // connection (.a == .a(a)) resolves to the child's own same-named port and
   // self-assigns instead of propagating.
   std::string inst_seg = std::string(inst.inst_name) + ".";
+  std::unordered_map<std::string_view, std::string_view> inout_joins;
   for (const auto& binding : inst.port_bindings) {
     if (TryAliasInterfacePort(inst, binding)) continue;
     if (!IsConnectablePortBinding(binding)) continue;
+    if (LowerArrayPortBinding(inst, binding, inst_seg, from_program)) continue;
 
-    auto* local_id =
-        MakeLocalPortId(inst_seg + std::string(binding.port_name), arena_);
+    Expr* local_id =
+        binding.port_expr != nullptr
+            ? QualifiedPortExpr(binding.port_expr, inst_seg, arena_)
+            : MakeLocalPortId(inst_seg + std::string(binding.port_name),
+                              arena_);
 
-    // §23.3.3.2 ref ports and §23.3.3.3 inout ports both share storage with
-    // the connected parent signal, so alias the child port onto it rather than
-    // lowering a one-way continuous assignment. An inout port is a net
-    // (§23.3.3.3 connects it to a net and never to a variable), and §23.3.3.7
-    // merges the port's net and the connected net into one simulated net, so
-    // the net map is redirected beside the variable map, as LowerAliases and
-    // TryAliasInterfacePort do: a continuous assignment inside the child
-    // resolves its driver through SimContext::FindNet under the child's
-    // prefix, where CreatePortVariable (lowerer_register.cpp) registered the
-    // port's own net, and with the variable alone aliased that net took the
-    // driver and the parent's net never saw it. A ref port's connection is a
-    // variable, which FindNet does not answer, so its net alias is a no-op.
-    // The key is interned in the arena because the net map holds it rather
-    // than a copy, and a variable-kind port has no entry there yet.
+    // An inout or ref port shares its connection's storage
+    // (JoinInoutPortBinding).
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef) {
-      if (binding.connection->kind != ExprKind::kIdentifier) continue;
-      const std::string& local_qualified = *arena_.Create<std::string>(
-          inst_prefix_ + inst_seg + std::string(binding.port_name));
-      std::string target = inst_prefix_ + std::string(binding.connection->text);
-      ctx_.AliasVariable(local_qualified, target);
-      ctx_.AliasNet(local_qualified, target);
+      JoinInoutPortBinding(binding, {ctx_, arena_, inst_prefix_ + inst_seg,
+                                     inst_prefix_, inout_joins});
       continue;
     }
 

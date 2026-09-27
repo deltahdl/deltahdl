@@ -138,6 +138,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -367,6 +368,63 @@ TEST(DesignTimingCheckEvaluation, SetupInOneTimeStepReportsNothing) {
                          "endmodule\n",
                          f));
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
+}
+
+// §31.2 has a limit be a constant expression, and §22.7 a time value be read
+// in the unit of the module it is written in, so a real limit is a real
+// number of that module's units. Under `timescale 1ns/100ps a limit of 2.5 is
+// 25 precision ticks: d at 10 is inside the window ending at 12.4, and d at 20
+// is its excluded beginning for the edge at 22.5. The real was read as the
+// bit pattern of its double, a window reaching back to time 0 at every edge.
+TEST(DesignTimingCheckEvaluation, RealLimitIsTimeUnitsOfTheModule) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 1ns/100ps\n"
+                           "module top(output reg clk = 0, output reg d = 0);\n"
+                           "  reg n = 0; integer cnt = 0;\n"
+                           "  specify\n"
+                           "    $setup(d, posedge clk, 2.5, n);\n"
+                           "  endspecify\n"
+                           "  always @(n) cnt = cnt + 1;\n"
+                           "  initial begin\n"
+                           "    #10 d = 1;\n"
+                           "    #2.4 clk = 1;\n"
+                           "    #5 clk = 0;\n"
+                           "    #2.6 d = 0;\n"
+                           "    #2.5 clk = 1;\n"
+                           "    #5 $display(\"%0d\", cnt);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           f),
+      "1\n");
+}
+
+// A limit counts the declaring module's units whatever unit the instantiating
+// module drives the ports in: 5 in a `timescale 1ns/1ns cell is 5 ns under a
+// 1ps top, so d 3 ns before the edge violates and 6 ns before does not.
+TEST(DesignTimingCheckEvaluation, LimitIsInTheDeclaringModulesUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns/1ns\n"
+                                 "module dut(input clk, input d);\n"
+                                 "  reg n = 0; integer cnt = 0;\n"
+                                 "  specify\n"
+                                 "    $setup(d, posedge clk, 5, n);\n"
+                                 "  endspecify\n"
+                                 "  always @(n) cnt = cnt + 1;\n"
+                                 "endmodule\n"
+                                 "`timescale 1ps/1ps\n"
+                                 "module top;\n"
+                                 "  reg clk = 0, d = 0;\n"
+                                 "  dut u(.clk(clk), .d(d));\n"
+                                 "  initial begin\n"
+                                 "    #10000 d = 1; #3000 clk = 1;\n"
+                                 "    #8000 clk = 0;\n"
+                                 "    #10000 d = 0; #6000 clk = 1;\n"
+                                 "    #5000 $display(\"%0d\", u.cnt);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "1\n");
 }
 
 }  // namespace

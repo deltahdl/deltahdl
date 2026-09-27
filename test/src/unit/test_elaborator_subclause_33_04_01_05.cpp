@@ -9,6 +9,8 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "helpers_config_reports.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
@@ -273,6 +275,23 @@ TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   auto* leaf2 = mid2->children[0].resolved;
   ASSERT_NE(leaf2, nullptr);
   EXPECT_EQ(leaf2->library, "libR");
+}
+
+// §33.4.1.5 (printed page 939): "the specified library list is searched in the
+// specified order" for the instance a liblist clause selects. A list holding no
+// cell of the instantiated name leaves the instance unbound because of the
+// clause, and the report names the list rather than only the module, which
+// work holds.
+TEST(ConfigLiblistClause, ListHoldingNoCellReportsTheList) {
+  auto diags = ConfigElaborationReports(
+      "module adder; endmodule\n"
+      "module top; adder a1(); endmodule\n"
+      "config cfg; design work.top; instance top.a1 liblist gateLib; "
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(
+      diags,
+      "library list (gateLib) holds no cell 'adder' for instance 'top.a1'", 2,
+      "33.4.1.5"));
 }
 
 }  // namespace

@@ -86,4 +86,37 @@ TEST(ForceReleaseSim, ChildInstanceReleaseReresolvesFromTheInstancesDriver) {
   EXPECT_EQ(r->value.ToUint64(), 10u);
 }
 
+// §10.6.2 (printed page 258): "When released, the net shall immediately be
+// assigned the value determined by the drivers of the net", and a net no
+// driver reaches is z (§6.7.1). The forced 1 stood on the undriven `wire a`
+// after its release. An element of a net array is forced and released as the
+// net it is (§7.4.2): `force n[0]` holds n[0] and what reads it, `release`
+// hands it back to z, and a bit of the element v[0] goes back to its driver.
+TEST(ForceReleaseSim, ReleasedUndrivenNetAndNetArrayElementReadTheirDrivers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire a;\n"
+                       "  wire n[0:1];\n"
+                       "  wire [3:0] v[2];\n"
+                       "  wire s;\n"
+                       "  assign n[1] = 1'b1;\n"
+                       "  assign v[0] = 4'h3;\n"
+                       "  assign s = n[0];\n"
+                       "  initial begin\n"
+                       "    force a = 1'b1;\n"
+                       "    force n[0] = 1'b1;\n"
+                       "    force v[0][3] = 1'b1;\n"
+                       "    #1 $display(\"%b %b%b %b %h\", a, n[0], n[1], s, "
+                       "v[0]);\n"
+                       "    release a;\n"
+                       "    release n[0];\n"
+                       "    release v[0][3];\n"
+                       "    #1 $display(\"%b %b%b %b %h\", a, n[0], n[1], s, "
+                       "v[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 11 1 b\nz z1 z 3\n");
+}
+
 }  // namespace

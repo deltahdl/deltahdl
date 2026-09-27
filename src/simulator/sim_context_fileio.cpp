@@ -1,5 +1,7 @@
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -229,6 +231,12 @@ void SimContext::AliasMailbox(std::string_view alias_name,
 // net under the child's prefix, found the parent's like-named net and drove
 // it, leaving the connected net undriven (§23.3.2.2).
 Net* SimContext::FindNet(std::string_view name) {
+  // §23.6: a name written from $root is absolute, as FindVariable reads one.
+  constexpr std::string_view kRootPrefix = "$root.";
+  if (name.starts_with(kRootPrefix)) {
+    auto it = nets_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
+    return (it != nets_.end()) ? it->second : nullptr;
+  }
   std::string prefix = ActiveInstancePrefix();
   if (!prefix.empty()) {
     auto prefixed = nets_.find(prefix + std::string(name));
@@ -265,13 +273,26 @@ void SimContext::EnsureStdioDescriptors() {
   mcd_channels_[0] = stdout;
 }
 
+// §21.3.1 (printed page 667): a file that cannot be opened gives a zero
+// mcd or fd, and "applications can call $ferror to determine the cause of
+// the most recent error" (§21.3.7, printed page 675). The failed open is the
+// most recent operation on the descriptor it answered, 0, so the host's cause
+// is recorded there for $ferror(0, str) to report.
+static void RecordFailedOpen(SimContext& ctx) {
+  int code = errno != 0 ? errno : ENOENT;
+  ctx.SetFileIoError(0, code, std::strerror(code));
+}
+
 uint32_t SimContext::OpenFile(std::string_view filename,
                               std::string_view mode) {
   EnsureStdioDescriptors();
   std::string fname(filename);
   std::string fmode(mode);
   FILE* fp = std::fopen(fname.c_str(), fmode.c_str());
-  if (!fp) return 0;
+  if (!fp) {
+    RecordFailedOpen(*this);
+    return 0;
+  }
   // Lowest free slot in 3..0x7FFFFFFF, so $fopen reuses channels closed earlier
   // (§21.3.1).
   uint32_t slot = 3;
@@ -292,7 +313,10 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
     if (mcd_channels_[bit] == nullptr) {
       std::string fname(filename);
       FILE* fp = std::fopen(fname.c_str(), "w");
-      if (!fp) return 0;
+      if (!fp) {
+        RecordFailedOpen(*this);
+        return 0;
+      }
       mcd_channels_[bit] = fp;
       return uint32_t{1} << bit;
     }
@@ -302,7 +326,19 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
 
 void SimContext::CloseFile(uint32_t descriptor) {
   EnsureStdioDescriptors();
-  if ((descriptor & kFdMsb) != 0) {
+  // §21.3.1 (printed page 666): "Active $fmonitor and/or $fstrobe operations
+  // on a file descriptor or multichannel descriptor are implicitly cancelled
+  // by an $fclose operation". A file descriptor's monitors are the ones on
+  // that descriptor; a multichannel descriptor's are those selecting any
+  // channel it closes, which a later $fopen may hand to another file.
+  bool is_fd = (descriptor & kFdMsb) != 0;
+  for (auto& monitor : file_monitors_) {
+    bool on_closed = is_fd ? monitor->descriptor == descriptor
+                           : ((monitor->descriptor & kFdMsb) == 0 &&
+                              (monitor->descriptor & descriptor & ~1u) != 0);
+    if (on_closed) monitor->cancelled = true;
+  }
+  if (is_fd) {
     // STDIN/STDOUT/STDERR are not closable per §21.3.1.
     if (descriptor == kStdinFd || descriptor == kStdoutFd ||
         descriptor == kStderrFd) {
@@ -339,7 +375,7 @@ void SimContext::SetFileIoError(uint32_t fd, int32_t code, std::string msg) {
 
 void SimContext::ClearFileIoError(uint32_t fd) { fileio_errors_.erase(fd); }
 
-const SimContext::FileIoError* SimContext::GetFileIoError(uint32_t fd) const {
+const FileIoError* SimContext::GetFileIoError(uint32_t fd) const {
   auto it = fileio_errors_.find(fd);
   return (it != fileio_errors_.end()) ? &it->second : nullptr;
 }

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -81,6 +82,23 @@ Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                        std::string_view name);
 bool IsDisplayOrWriteTask(std::string_view name);
 void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena);
+// §21.2, §21.3.2, §21.3.3: the text a display task's argument list renders,
+// taken from `expr`'s arguments from `first` on -- a string literal a
+// template its following arguments fill, a bare expression printed under
+// `default_radix` ('d', 'b', 'o' or 'h'), an omitted argument a space. The
+// file and string output tasks accept the same arguments as $display.
+std::string RenderDisplayArgList(const Expr* expr, size_t first,
+                                 char default_radix, SimContext& ctx,
+                                 Arena& arena);
+// §21.3.3: the format `fmt`, the argument at `fmt_index` of `expr`, filled by
+// the arguments after it with every rendering a display task gives them --
+// %p's aggregate forms and %v's strengths among them.
+std::string FormatDisplayArgs(const Expr* expr, size_t fmt_index,
+                              const std::string& fmt, SimContext& ctx,
+                              Arena& arena);
+// §21.2.1.6: the %p rendering of the argument `arg` whose value is `val`.
+std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
+                         SimContext& ctx);
 void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
                       const char* prefix, std::ostream& os);
 Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx, Arena& arena);
@@ -352,6 +370,12 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
+// §13.5.3: evaluates a subroutine argument's default in the scope of the
+// subroutine's declaration, the instance the current process stands in for the
+// call, where the actuals are read in the caller's (BindActualsInCaller).
+// Defined in eval_function_args_writeback.cpp.
+Logic4Vec EvalDefaultInDeclScope(const Expr* default_value, SimContext& ctx,
+                                 Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena);
 // §13.4.1 with §6.16: marks a string-returning function's implicit variable

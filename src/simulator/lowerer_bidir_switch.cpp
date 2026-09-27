@@ -54,7 +54,7 @@ static Net* BidirTerminalNet(const Expr* e, SimContext& ctx) {
   if (e == nullptr) return nullptr;
   if (e->kind == ExprKind::kIdentifier) return ctx.FindNet(e->text);
   if (e->kind == ExprKind::kMemberAccess) {
-    return ctx.FindNet(HierarchicalReferenceName(e));
+    return FindHierarchicalNet(e, ctx);
   }
   return nullptr;
 }

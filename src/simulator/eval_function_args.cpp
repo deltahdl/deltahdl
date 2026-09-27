@@ -425,7 +425,7 @@ static ActualValue ResolveArgValue(const FunctionArg& param, const Expr* expr,
     return resolved;
   }
   resolved.value = param.default_value
-                       ? EvalExpr(param.default_value, ctx, arena)
+                       ? EvalDefaultInDeclScope(param.default_value, ctx, arena)
                        : MakeLogic4Vec(arena, 32);
   return resolved;
 }

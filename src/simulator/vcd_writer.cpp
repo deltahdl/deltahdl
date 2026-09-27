@@ -1,5 +1,6 @@
 #include "simulator/vcd_writer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
@@ -94,8 +95,9 @@ void VcdWriter::FlushDeclarations() {
   if (!buffer_decls_) return;
   buffer_decls_ = false;
   if (!ofs_.is_open()) return;
-  std::string text = decl_buf_.str();
+  std::string text = SelectedDeclarations(decl_buf_.str());
   decl_buf_.str(std::string());
+  held_decls_.clear();
   std::string commands;
   for (const auto& command : version_commands_) {
     commands += "  " + command + "\n";
@@ -112,7 +114,7 @@ void VcdWriter::FlushDeclarations() {
 void VcdWriter::WriteHeader(std::string_view timescale,
                             std::string_view dumpfile_literal) {
   if (!ofs_.is_open()) return;
-  std::ostream& out = Decl();
+  std::ostream& out = Out();
   out << "$date\n  " << CurrentDateText() << "\n$end\n";
   // §21.7.2.3: the $version section names the VCD writer and the $dumpfile call
   // that created the file. When the filename was supplied by a variable or an
@@ -157,12 +159,68 @@ static const char* VcdScopeKeyword(VcdScopeKind kind) {
 
 void VcdWriter::BeginScope(std::string_view name, VcdScopeKind kind) {
   if (!ofs_.is_open()) return;
-  Decl() << "$scope " << VcdScopeKeyword(kind) << " " << name << " $end\n";
+  auto begin = static_cast<size_t>(decl_buf_.tellp());
+  Out() << "$scope " << VcdScopeKeyword(kind) << " " << name << " $end\n";
+  HoldDecl(begin, HeldDeclKind::kScope);
 }
 
 void VcdWriter::EndScope() {
   if (!ofs_.is_open()) return;
-  Decl() << "$upscope $end\n";
+  auto begin = static_cast<size_t>(decl_buf_.tellp());
+  Out() << "$upscope $end\n";
+  HoldDecl(begin, HeldDeclKind::kUpscope);
+}
+
+void VcdWriter::HoldDecl(size_t begin, HeldDeclKind kind, size_t signal) {
+  if (!buffer_decls_) return;
+  held_decls_.push_back(
+      {begin, static_cast<size_t>(decl_buf_.tellp()), kind, signal});
+}
+
+// §21.7.1.2: $dumpvars lists "which variables to dump", and §21.7.2.3's $var
+// section "prints the names and identifier codes of the variables being
+// dumped", so a variable no call listed is not declared. A $scope section
+// declares the scope holding dumped variables; one left holding none -- the
+// sub-instance of `$dumpvars(1, t)`, or t itself when only `t.u.deep` is
+// listed and t has no variable of its own dumped -- goes with them. A dump
+// that no scope list narrowed declares everything it registered.
+std::vector<bool> VcdWriter::KeptHeldDecls() const {
+  std::vector<bool> keep(held_decls_.size(), true);
+  // The open $scope sections, innermost last, each with whether a $var kept
+  // so far sits somewhere inside it.
+  std::vector<std::pair<size_t, bool>> open;
+  auto mark_used = [&open]() {
+    if (!open.empty()) open.back().second = true;
+  };
+  for (size_t i = 0; i < held_decls_.size(); ++i) {
+    const HeldDecl& d = held_decls_[i];
+    if (d.kind == HeldDeclKind::kScope) {
+      open.emplace_back(i, false);
+    } else if (d.kind == HeldDeclKind::kVar) {
+      keep[i] = DumpsObject(signals_[d.signal]);
+      if (keep[i]) mark_used();
+    } else if (!open.empty()) {
+      auto [scope, used] = open.back();
+      open.pop_back();
+      keep[scope] = keep[i] = used;
+      if (used) mark_used();
+    }
+  }
+  return keep;
+}
+
+std::string VcdWriter::SelectedDeclarations(const std::string& text) const {
+  if (var_selection_ != VcdVarSelection::kListedObjects) return text;
+  std::vector<bool> keep = KeptHeldDecls();
+  std::string out;
+  size_t at = 0;
+  for (size_t i = 0; i < held_decls_.size(); ++i) {
+    if (keep[i]) continue;
+    out.append(text, at, held_decls_[i].begin - at);
+    at = held_decls_[i].end;
+  }
+  out.append(text, at);
+  return out;
 }
 
 // §21.7.2.3: choose the var_type keyword written in a $var declaration. Real
@@ -349,31 +407,35 @@ void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
-  WriteSignalVarDecl(Decl(), sig,
+  auto begin = static_cast<size_t>(decl_buf_.tellp());
+  WriteSignalVarDecl(Out(), sig,
                      spec.ref_name.empty() ? spec.name : spec.ref_name,
                      spec.width, port_nodes_);
+  HoldDecl(begin, HeldDeclKind::kVar, signals_.size() - 1);
 }
 
 void VcdWriter::WriteComment(std::string_view text) {
   if (!ofs_.is_open()) return;
   // The comment text -- one line or several -- sits between the $comment
   // keyword and the $end that closes the section.
-  Decl() << "$comment\n  " << text << "\n$end\n";
+  Out() << "$comment\n  " << text << "\n$end\n";
 }
 
 void VcdWriter::EndDefinitions() {
   if (!ofs_.is_open()) return;
-  Decl() << "$enddefinitions $end\n";
+  Out() << "$enddefinitions $end\n";
 }
 
 bool VcdWriter::AtSizeLimit() {
-  FlushDeclarations();
   if (size_limit_ == 0) return false;  // no limit configured
   if (limit_reached_) return true;     // already stopped
   if (!ofs_.is_open()) return false;
   std::streampos pos = ofs_.tellp();
   if (pos == std::streampos(-1)) return false;
-  if (static_cast<uint64_t>(pos) < size_limit_) return false;
+  // Text still held is on its way to the file and counts toward its size.
+  uint64_t size = static_cast<uint64_t>(pos);
+  if (buffer_decls_) size += static_cast<uint64_t>(decl_buf_.tellp());
+  if (size < size_limit_) return false;
   // The file has reached the requested byte count: note it in the dump via a
   // §21.7.2.3 $comment section and stop recording any further value changes.
   WriteComment("Dump limit of " + std::to_string(size_limit_) +
@@ -392,16 +454,15 @@ void VcdWriter::WriteTimestamp(uint64_t time) {
   // time unit; when a checkpoint already stamped this time, the value changes
   // that follow belong to the same #<time> group and no marker is repeated.
   if (have_time_ && time == last_time_) return;
-  ofs_ << "#" << time << "\n";
+  Out() << "#" << time << "\n";
   last_time_ = time;
   have_time_ = true;
 }
 
 void VcdWriter::EnsureTimestamp(uint64_t time) {
-  FlushDeclarations();
   if (!ofs_.is_open()) return;
   if (have_time_ && time == last_time_) return;
-  ofs_ << "#" << time << "\n";
+  Out() << "#" << time << "\n";
   last_time_ = time;
   have_time_ = true;
 }
@@ -457,7 +518,7 @@ void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   if (!sig.var) return;
   // The aval/bval pair is read bit-wise so x=(1,1) stays distinct from
   // z=(0,1); a numeric projection would collapse both to 0 and misreport x.
-  ofs_ << VcdBitChar(sig, 0) << sig.ident << "\n";
+  Out() << VcdBitChar(sig, 0) << sig.ident << "\n";
 }
 
 void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
@@ -475,7 +536,7 @@ void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
   }
   // No white space between the base letter and the value digits, and exactly
   // one white space between the value digits and the identifier code.
-  ofs_ << 'b' << (digits.c_str() + start) << ' ' << sig.ident << "\n";
+  Out() << 'b' << (digits.c_str() + start) << ' ' << sig.ident << "\n";
 }
 
 void VcdWriter::WriteRealChange(const VcdSignal& sig) {
@@ -487,7 +548,7 @@ void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   double d = RealVecToDouble(sig.var->value);
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.16g", d);
-  ofs_ << "r" << buf << " " << sig.ident << "\n";
+  Out() << "r" << buf << " " << sig.ident << "\n";
 }
 
 // Record what this signal has just put in the file, which is what the
@@ -516,7 +577,7 @@ void VcdWriter::WriteSignalChange(VcdSignal& sig) {
   // checkpoint or to a per-timestep change scan.
   if (sig.var && sig.var->is_event) {
     if (sig.var->triggered_ticks == last_time_) {
-      ofs_ << '1' << sig.ident << "\n";
+      Out() << '1' << sig.ident << "\n";
     }
     return;
   }
@@ -548,11 +609,11 @@ void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
   // the r-prefixed real (§21.7.2.1), so the suspend checkpoint records a real
   // variable as r0 rather than an ill-formed bit-form x.
   if (sig.var && sig.var->value.is_real) {
-    ofs_ << "r0 " << sig.ident << "\n";
+    Out() << "r0 " << sig.ident << "\n";
   } else if (sig.width == 1) {
-    ofs_ << "x" << sig.ident << "\n";
+    Out() << "x" << sig.ident << "\n";
   } else {
-    ofs_ << "bx " << sig.ident << "\n";
+    Out() << "bx " << sig.ident << "\n";
   }
 }
 
@@ -592,7 +653,6 @@ static bool HasValueChanged(const VcdSignal& sig) {
 }
 
 void VcdWriter::DumpAllValues() {
-  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
@@ -602,11 +662,11 @@ void VcdWriter::DumpAllValues() {
   // variables in the model to the VCD file", so the dump covers everything
   // from here on however it was narrowed before.
   var_selection_ = VcdVarSelection::kEveryObjectByTask;
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
     WriteSignalChange(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
 }
 
 void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
@@ -615,7 +675,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   NarrowSelectionToListed();
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
     bool wanted = false;
     for (auto name : names) {
@@ -628,7 +688,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
     sig.dump_selected = true;
     WriteSignalChange(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
 }
 
 // How many levels of hierarchy below the top module a registered signal sits:
@@ -698,18 +758,17 @@ static bool ScopeSelectsSignal(std::string_view sig_name,
 
 void VcdWriter::DumpScopeSelectedValues(
     const std::vector<std::string_view>& names, uint64_t level) {
-  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   NarrowSelectionToListed();
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
     if (!ScopeSelectsSignal(sig.name, names, level, top_scope_)) continue;
     sig.dump_selected = true;
     WriteSignalChange(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
 }
 
 // §21.7.2.4: the illustrated file places each checkpoint section after the
@@ -752,48 +811,45 @@ void VcdWriter::DumpOn(uint64_t time) {
 }
 
 void VcdWriter::DumpAll() {
-  FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   // §21.7.1.4: the checkpoint "shows the current value of all selected
   // variables" -- present value regardless of whether it changed during the
   // current time step, and no value at all for an object no $dumpvars listed.
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
   for (auto& sig : signals_) {
     if (!DumpsObject(sig)) continue;
     WriteSignalChange(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
 }
 
 void VcdWriter::DumpOff() {
-  FlushDeclarations();
   if (!ofs_.is_open()) return;
   // The checkpoint records every selected variable as x, then dumping stops so
   // that no value changes are recorded until $dumpon is executed.
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
   for (auto& sig : signals_) {
     // §21.7.1.3: "every selected variable is dumped as an x value".
     if (!DumpsObject(sig)) continue;
     WriteSignalAllX(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
   enabled_ = false;
 }
 
 void VcdWriter::DumpOn() {
-  FlushDeclarations();
   if (!ofs_.is_open()) return;
   // Recording resumes and a checkpoint of each variable's value at this time is
   // emitted so the dump reflects the current state.
   enabled_ = true;
-  ofs_ << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
+  Out() << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
   for (auto& sig : signals_) {
     // §21.7.1.3: the resumed dump covers the variables the dump covers.
     if (!DumpsObject(sig)) continue;
     WriteSignalChange(sig);
   }
-  ofs_ << "$end\n";
+  Out() << "$end\n";
 }
 
 void VcdWriter::Flush() {
@@ -812,7 +868,7 @@ void VcdWriter::WriteVcdClose(uint64_t final_time) {
   // end simulation time at the moment the file is closed. The time is written
   // as a value-change-style timestamp (#<time>), so the recorded end time
   // stands on its own even when no signal changed at that time.
-  ofs_ << "$vcdclose #" << final_time << " $end\n";
+  Out() << "$vcdclose #" << final_time << " $end\n";
 }
 
 void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,

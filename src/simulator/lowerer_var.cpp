@@ -73,10 +73,16 @@ static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
 // bits, which is the defect #3563 removed elsewhere. It is worth taking on the
 // 4-state path too, a leaf sharing one buffer with the variable its initializer
 // read being the same family again.
+//
+// §10.7 converts the item to the element's type, signedness included: `logic
+// [3:0] lv[2] = '{9, 10}` holds two unsigned elements, and the signed integer
+// literals left their signedness on the values, so lv[0] read -7 where a
+// procedural write of the same 9 reads 9.
 static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
                                      Arena& arena) {
   val = OwnRhsWords(ResizeToWidth(val, var.width, arena), arena);
   if (!var.is_4state && !var.is_string && !var.is_real) CoerceTo2State(val);
+  if (!var.is_real) val.is_signed = var.is_signed;
   return val;
 }
 

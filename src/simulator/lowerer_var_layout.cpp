@@ -54,6 +54,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     // it, the modifier where one was written and the kind's default where
     // none was (ApplyMemberType in parser_aggregate_types.cpp).
     fi.is_signed = m.is_signed;
+    if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (m.nested_type && !m.nested_type->struct_members.empty()) {
       fi.nested = BuildStructTypeInfo(m.nested_type, fw,
                                       NestedLayoutName(m, arena), arena);

@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -172,6 +174,88 @@ TEST(PortConnectionRulesForNetsSimulation,
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
+}
+
+// §23.3.3.3 (printed page 747) with §9.4.2: an event control on a net wakes on
+// a change of its value, and a net whose driver resolves to the z it already
+// holds has not changed. The issue's probes -- the net driven through a
+// program's inout port (66) and a module's (66b) by `assign data = drv` with
+// drv z until 2 -- and the same net through an explicit and an implicit output
+// net port, and driven in the module itself, each wake only at 2. Each woke at
+// time 0 too, `data=z at 0`: the net's first z carried set bits above its
+// width, and an output net port started at 0 or x, which its connection copied
+// up before the port's own driver ran.
+TEST(PortConnectionRulesForNetsSimulation, NetDrivenToTheZItHoldsDoesNotWake) {
+  const char* kDrivers[] = {
+      "program p(inout wire [7:0] data);\n"
+      "  logic [7:0] drv = 8'bz;\n"
+      "  assign data = drv;\n"
+      "  initial begin #2 drv = 8'hAA; #1; end\n"
+      "endprogram\n",
+      "module p(inout wire [7:0] data);\n"
+      "  logic [7:0] drv = 8'bz;\n"
+      "  assign data = drv;\n"
+      "  initial begin #2 drv = 8'hAA; #1; end\n"
+      "endmodule\n",
+      "module p(output wire [7:0] data);\n"
+      "  logic [7:0] drv = 8'bz;\n"
+      "  assign data = drv;\n"
+      "  initial begin #2 drv = 8'hAA; #1; end\n"
+      "endmodule\n",
+      "module p(output [7:0] data);\n"
+      "  logic [7:0] drv = 8'bz;\n"
+      "  assign data = drv;\n"
+      "  initial begin #2 drv = 8'hAA; #1; end\n"
+      "endmodule\n"};
+  for (const char* driver : kDrivers) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::string(driver) +
+                             "module top;\n"
+                             "  wire [7:0] data;\n"
+                             "  p pi(data);\n"
+                             "  always @(data) $display(\"data=%0d at %0t\", "
+                             "data, $time);\n"
+                             "endmodule\n",
+                         f),
+              "data=170 at 2\n")
+        << driver;
+  }
+  SimFixture g;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  wire [7:0] data;\n"
+                       "  wire b;\n"
+                       "  logic [7:0] d = 8'bz;\n"
+                       "  assign data = d;\n"
+                       "  assign b = 1'bz;\n"
+                       "  always @(data) $display(\"data=%0d at %0t\", data, "
+                       "$time);\n"
+                       "  always @(b) $display(\"b at %0t\", $time);\n"
+                       "  initial #2 d = 8'hAA;\n"
+                       "endmodule\n",
+                       g),
+            "data=170 at 2\n");
+}
+
+// §23.3.3.3: a net port is a net, "If left unconnected, it shall have the
+// value 'z" -- an explicit `input wire` and an implicit `input` read z, and an
+// output net port its own drivers leave undriven gives the net above z -- where
+// a variable port (§23.3.3.2) reads its type's default x. The explicit
+// `output wire` port read 0 before its drivers ran.
+TEST(PortConnectionRulesForNetsSimulation, NetPortsStartAtHighZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub(input wire [3:0] i, input var logic [3:0] "
+                       "vi,\n"
+                       "           input [3:0] ii, output wire [3:0] ow);\n"
+                       "  initial $display(\"i=%b vi=%b ii=%b ow=%b\", i, vi, "
+                       "ii, ow);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire [3:0] o;\n"
+                       "  sub s(.i(), .vi(), .ii(), .ow(o));\n"
+                       "  initial #1 $display(\"o=%b\", o);\n"
+                       "endmodule\n",
+                       f),
+            "i=zzzz vi=xxxx ii=zzzz ow=zzzz\no=zzzz\n");
 }
 
 }  // namespace

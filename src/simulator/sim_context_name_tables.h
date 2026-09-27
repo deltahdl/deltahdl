@@ -219,6 +219,13 @@ class DeclaredNameTables {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
+  // §23.6 with §27.4: the hierarchical name of the instance whose storage is
+  // keyed `prefix` ("g_0_pi."), as a path spells it -- "g[0].pi", the generate
+  // block instances it stands in among its levels -- recorded where the two
+  // differ; empty for any other instance, whose key is its name.
+  void RegisterInstancePath(std::string_view prefix, std::string path);
+  std::string_view FindInstancePath(std::string_view prefix) const;
+
   // §23.6: each top-level module is the root of a name hierarchy, and the
   // complete path to any object starts at one of them, usable from a parallel
   // hierarchy -- `m.a` written in the other top-level module n. A top's own
@@ -226,6 +233,16 @@ class DeclaredNameTables {
   // one of these names at the head of a path drops it and reads the rest.
   void RegisterTopModule(std::string_view name);
   bool IsTopModule(std::string_view name) const;
+  // §23.3.1: a top-level module after the first, keyed under its own name as
+  // an instance is (Lowerer::LowerParallelTop), so a path that starts with its
+  // name starts at the root rather than below the first top.
+  void RegisterParallelTop(std::string_view name);
+  bool IsParallelTop(std::string_view name) const;
+  // The key a name written after `$root.` is stored under: a later top's
+  // path as written, "t2.x"; the first top's with its name left off, "x" for
+  // "t1.x", its declarations being keyed under no prefix; any other name as
+  // written.
+  std::string RootedStorageKey(std::string_view rest) const;
 
   // §8.25: the parameter actuals the declaration of the class variable `var`
   // wrote in its `#(...)`, as the parser recorded them, one DataType per
@@ -315,7 +332,9 @@ class DeclaredNameTables {
   std::unordered_map<const Variable*, MailboxObject*> mailbox_handles_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+  std::unordered_map<std::string, std::string> instance_paths_;
   std::unordered_set<std::string> top_module_names_;
+  std::unordered_set<std::string> parallel_top_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>
       var_class_type_params_;
 

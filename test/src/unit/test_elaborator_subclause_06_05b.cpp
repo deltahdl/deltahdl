@@ -192,4 +192,23 @@ TEST(NetsAndVariables, TypedOutputPortIsAVariableAProcedureMayWrite) {
              f));
 }
 
+// §6.5 (printed page 90): "A net can be written by one or more continuous
+// assignments", the single-assignment rule being stated of a variable's
+// longest static prefix alone. Two continuous assignments to one bit of a
+// vector net, or to one element of a wor array, are two drivers the net type
+// resolves, and were reported as overlapping elements.
+TEST(NetsAndVariables, NetSelectTakesSeveralContinuousAssignments) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  wire [3:0] a;\n"
+             "  wor r[2];\n"
+             "  assign a[0] = 1'b1;\n"
+             "  assign a[0] = 1'b0;\n"
+             "  assign r[0] = 1'b0;\n"
+             "  assign r[0] = 1'b1;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace

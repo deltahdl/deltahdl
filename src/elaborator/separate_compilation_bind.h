@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -61,6 +62,13 @@ class SeparateCompilationBinder {
   // available to a later bind that names it, but it roots no hierarchy of its
   // own -- the tops of this design are the ones this call names.
   RtlirDesign* Bind(const std::vector<std::string_view>& top_names);
+
+  // §33.8.1: the library search order the invocation gave with -L, which an
+  // instantiated cell is looked for in when no configuration is in force.
+  // Empty leaves the libraries in the order their cells were loaded.
+  void SetLibrarySearchOrder(std::vector<std::string> order) {
+    library_order_ = std::move(order);
+  }
 
   // Binds the design the named configuration describes and returns it, or
   // nullptr having reported. This is the other thing a binding tool can be
@@ -136,6 +144,7 @@ class SeparateCompilationBinder {
   DiagEngine& diag_;
   CompilationUnit unit_;
   std::vector<MissingCell> not_precompiled_;
+  std::vector<std::string> library_order_;
 };
 
 }  // namespace delta

@@ -32,6 +32,8 @@ TEST(ConfigDefaultClause, DefaultUseClauseIsTheOnlyReport) {
       "module top;\n"
       "endmodule\n");
   EXPECT_EQ(r.diags.size(), 1u);
+  EXPECT_TRUE(ReportedError(r.diags, "use expansion clause cannot be used", 3,
+                            "33.4.1.2"));
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->modules.size(), 1u);

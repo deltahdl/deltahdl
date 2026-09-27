@@ -4,6 +4,7 @@
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/display_format_check.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -112,7 +113,13 @@ Expr* Parser::ParseSystemCall() {
     ParseSysCallArgs(call);
   }
   Expect(TokenKind::kRParen, Subclause("13.5"));
-  if (AtSelectBracket()) return ParseSelectExpr(call);
+  CheckDisplayFormatLiterals(call, diag_);
+  // A.8.4 (printed page 1211): a system function call is a primary, and a
+  // method call's root is any primary (method_call_root), so the call may be
+  // followed by a method or a select as any other primary may --
+  // `$sformatf("%s", s).len()`, `$sformatf(...).substr(0, 1).toupper()`.
+  if (Check(TokenKind::kDot) || AtSelectBracket())
+    return ParseWithClauseTail(call);
   return call;
 }
 

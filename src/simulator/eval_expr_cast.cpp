@@ -173,7 +173,7 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   // signed where the operand is. A shortreal is single precision in 32 bits
   // (MakeRealVec), which a double's pattern cut to 32 bits read back as 0.
   uint64_t raw = inner.ToUint64();
-  double d = static_cast<double>(raw);
+  auto d = static_cast<double>(raw);
   if (inner.is_signed && inner.width > 0 && inner.width < 64 &&
       ((raw >> (inner.width - 1)) & 1U) != 0U) {
     d = static_cast<double>(

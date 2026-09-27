@@ -20,6 +20,7 @@ struct Expr;
 struct ModuleItem;
 struct StructTypeInfo;
 struct TimeFormatSpec;
+struct Net;
 struct NetStrength;
 struct QueueObject;
 struct Variable;
@@ -290,8 +291,23 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
 // §23.6: the name a hierarchical reference `s.y` or `$root.top.s.y` stands
 // under -- its components joined by dots, with a leading `$root.<top>.`
 // stripped -- which is the key EvalMemberAccess reads a variable by and a net
-// declared in an instance is stored under. Defined in eval_expr.cpp.
+// declared in an instance is stored under. Defined in
+// eval_hierarchical_name.cpp.
 std::string HierarchicalReferenceName(const Expr* expr);
+// §23.3.1: the key a `$root.<top>.`-headed name is looked up by from the top
+// of the design, the name itself, and empty for a name $root does not head.
+// Defined in eval_hierarchical_name.cpp.
+std::string RootedReferenceKey(const std::string& name);
+std::string RootedReferenceKey(const Expr* expr);
+// The net a hierarchical reference names: from the top of the design for a
+// `$root`-headed one, else as HierarchicalReferenceName's key finds it.
+// Defined in eval_hierarchical_name.cpp.
+Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx);
+// The key the unpacked array an element select stands on is held under: a
+// bare or package-scoped name's (ScopedOrBareTargetKey), or a hierarchical
+// name's, `u.b` for the array b of instance u (§23.6). Empty for a base of
+// any other shape. Defined in eval_hierarchical_name.cpp.
+std::string_view ArrayRootKey(const Expr* base, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 // Evaluates `lhs inside { elem }` for one set member, returning 1 for a match,

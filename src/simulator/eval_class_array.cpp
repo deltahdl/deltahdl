@@ -252,13 +252,19 @@ bool TryWriteClassArrayElement(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!ResolveClassArray(lhs->base, ctx, arena, ref)) return false;
   Logic4Vec idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return true;
-  auto index = static_cast<int64_t>(idx_val.ToUint64());
-  if (!IndexInRange(ref, index)) return true;
+  StoreClassArrayElement(ref, static_cast<int64_t>(idx_val.ToUint64()), rhs_val,
+                         ctx, arena);
+  return true;
+}
+
+void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
+                            const Logic4Vec& value, SimContext& ctx,
+                            Arena& arena) {
+  if (!IndexInRange(ref, index)) return;
   Logic4Vec stored =
-      CoerceToPropertyType(ref.obj->type, ref.prop->name, rhs_val, arena);
+      CoerceToPropertyType(ref.obj->type, ref.prop->name, value, arena);
   ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), stored);
   ctx.NotifyClassHandleWatchers(ref.obj->handle);
-  return true;
 }
 
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {

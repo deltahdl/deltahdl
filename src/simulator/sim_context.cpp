@@ -302,11 +302,12 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // cannot spell a local or a prefixed name either, `$` starting no
   // identifier, so this stands ahead of both lookups below.
   //
-  // variables_ keys a top-level hierarchy block's own declarations under no
-  // instance prefix, so the remainder after "$root." is the key itself.
+  // variables_ keys the first top's own declarations under no instance
+  // prefix and a later top's under its name (RootedStorageKey).
   constexpr std::string_view kRootPrefix = "$root.";
   if (name.substr(0, kRootPrefix.size()) == kRootPrefix) {
-    auto it = variables_.find(name.substr(kRootPrefix.size()));
+    auto it =
+        variables_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
     if (it != variables_.end()) return it->second;
   }
 
@@ -414,21 +415,19 @@ namespace {
 
 // §6.7.1: install a net's default value before it is driven. A user-defined
 // nettype keeps the variable's existing initialization; a trireg defaults to x
-// (it holds charge, unknown until driven); every other net defaults to z.
+// (it holds charge, unknown until driven); every other net defaults to z. The
+// bits of the last storage word above the net's width are left clear, as every
+// value a driver resolves to leaves them: set, they made the net's first
+// resolution to the z it already held a change of value, and §9.4.2's event
+// control on the net woke at time 0 on none.
 void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
-  if (is_user_nettype) {
-  } else if (type == NetType::kTrireg) {
-    // Canonical Convention A: x = (aval=1, bval=1) per bit.
-    for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = ~uint64_t{0};
-      var->value.words[i].bval = ~uint64_t{0};
-    }
-  } else {
-    // z (high impedance) until driven; Convention A z = (aval=0, bval=1).
-    for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = uint64_t{0};
-      var->value.words[i].bval = ~uint64_t{0};
-    }
+  if (is_user_nettype) return;
+  // Canonical Convention A: x = (aval=1, bval=1) and z = (aval=0, bval=1).
+  bool is_x = type == NetType::kTrireg;
+  for (uint32_t i = 0; i < var->value.nwords; ++i) {
+    uint64_t mask = WordMaskWithinWidth(var->value.width, i);
+    var->value.words[i].aval = is_x ? mask : uint64_t{0};
+    var->value.words[i].bval = mask;
   }
 }
 
@@ -475,8 +474,9 @@ void SimContext::SetCurrentProcess(Process* proc) {
   if (proc == current_process_) return;
   // §37.44: a process reaching here is one the run has a thread for. This is
   // the one place every process passes through, which is what makes the list
-  // the scheduler builds the run's threads rather than some of them.
-  scheduler_.NoteThreadSwitch(proc);
+  // the scheduler builds the run's threads rather than some of them. A stand-in
+  // for the caller of a deferred display (deferred_caller.h) is no thread.
+  if (proc == nullptr || !proc->stand_in) scheduler_.NoteThreadSwitch(proc);
   // §13.3.2: SetCurrentProcess is the thread-switch primitive -- every process
   // resume is preceded by a call here. Hand the scope stack off between threads
   // so automatic-task (and block) locals stay private to each activation: park

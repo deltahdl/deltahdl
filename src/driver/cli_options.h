@@ -35,6 +35,11 @@ struct CliOptions {
   std::vector<std::string> lib_files;
 
   std::vector<std::string> lib_search_order;
+  // §33.3.1 (printed page 935): "all compliant tools shall provide a mechanism
+  // to specify one or more library map files to be used for a particular
+  // invocation of the tool". A command-line word ending in .map is one, read
+  // in the order written and ahead of every source description.
+  std::vector<std::string> library_map_files;
   // §33.5.4: "the tool that actually does the binding only needs to be given
   // the lib.cell specification for the top-level cell(s) and/or the config to
   // be used". `config` is that config, named by --config, and
@@ -64,6 +69,11 @@ struct CliOptions {
   std::vector<ForeignCodeLibList> sv_liblists;
 
   std::vector<std::pair<std::string, std::string>> defines;
+  // §21.6 (printed page 680): the plusargs, the arguments "provided to the
+  // simulation" that "are visually distinguished from other simulator
+  // arguments by their starting with the plus (+) character", each kept
+  // without that sign, which $test$plusargs and $value$plusargs match without.
+  std::vector<std::string> plus_args;
   uint64_t max_time = 0;
   // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
   // a budget rather than a rule. It exists so a design that generates more
@@ -97,6 +107,11 @@ struct CliOptions {
   // while none was selected, every application then observing this standard's
   // behavior.
   int vpi_compat_mode = 0;
+  // §31.9.4's two invocation options: the one that enables negative values in
+  // $setuphold and $recrem (--negative-timing-checks) and the one that turns
+  // every timing check off (--no-timing-checks).
+  bool negative_timing_checks = false;
+  bool no_timing_checks = false;
   // Whether an option was recognized and its argument refused. It is separate
   // from the unrecognized option ParseArgs reports, because an option that
   // names its own complaint has already printed the one a reader needs.

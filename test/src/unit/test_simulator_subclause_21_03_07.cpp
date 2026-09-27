@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "helpers_temp_file.h"
@@ -200,6 +201,39 @@ TEST(IoErrorStatus, SuccessfulOperationSupersedesEarlierError) {
       f);
   EXPECT_NE(out.find("r1=-1 r2=0 e=0 cleared=1"), std::string::npos) << out;
   std::remove(tmp.c_str());
+}
+
+// §21.3.1 (printed page 667) and §21.3.7 (printed page 675): a file that
+// cannot be opened gives a zero fd or mcd, and $ferror on that descriptor then
+// reports the failed open, the most recent operation on it, as a nonzero code
+// with a description; on a descriptor whose last operation succeeded it
+// answers 0 and clears the string.
+TEST(IoErrorStatus, FailedOpenIsReportedOnTheZeroDescriptor) {
+  SimFixture f;
+  std::string ok_path = "/tmp/deltahdl_t210307_ok.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, m, e;\n"
+      "  string msg;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"/tmp/deltahdl_no_such_dir/none.txt\", \"r\");\n"
+      "    e = $ferror(fd, msg);\n"
+      "    $display(\"%0d %0d %0d\", fd, e != 0, msg.len() > 0);\n"
+      "    m = $fopen(\"/tmp/deltahdl_no_such_dir/mcd.txt\");\n"
+      "    e = $ferror(m, msg);\n"
+      "    $display(\"%0d %0d\", m, e != 0);\n"
+      "    fd = $fopen(\"" +
+          ok_path +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"x\");\n"
+          "    e = $ferror(fd, msg);\n"
+          "    $display(\"%0d %0d\", e, msg.len());\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 1\n0 1\n0 0\n");
+  std::remove(ok_path.c_str());
 }
 
 }  // namespace

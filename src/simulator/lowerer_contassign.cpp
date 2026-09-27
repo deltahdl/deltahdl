@@ -523,7 +523,29 @@ static void CommitContAssignValue(const ContAssignParams& params,
 static Net* NetNamedBy(const Expr* e, SimContext& ctx) {
   if (e->kind == ExprKind::kIdentifier) return ctx.FindNet(e->text);
   if (e->kind != ExprKind::kMemberAccess) return nullptr;
-  return ctx.FindNet(HierarchicalReferenceName(e));
+  return FindHierarchicalNet(e, ctx);
+}
+
+// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
+// fashion as a scalar or vector net", so `assign n[1] = ...` on `wire n[0:2]`
+// drives the element n[1] as a whole, the net held under "n[1]"
+// (CreateDeclaredNet in lowerer_register.cpp). The index of a net_lvalue is a
+// constant_select (A.8.5), so the element is fixed at lowering. Null for a
+// select of anything but a net array, and for an index naming no element.
+static Net* NetArrayElementNamedBy(const Expr* e, SimContext& ctx) {
+  if (e->kind != ExprKind::kSelect || e->index_end != nullptr ||
+      e->base == nullptr || e->base->kind != ExprKind::kIdentifier ||
+      e->index == nullptr) {
+    return nullptr;
+  }
+  std::string_view name = e->base->text;
+  if (ctx.FindArrayInfo(name) == nullptr || ctx.FindNet(name) == nullptr) {
+    return nullptr;
+  }
+  Logic4Vec idx = EvalExpr(e->index, ctx, ctx.GetArena());
+  if (!idx.IsKnown()) return nullptr;
+  return ctx.FindNet(std::string(name) + "[" + std::to_string(idx.ToUint64()) +
+                     "]");
 }
 
 static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
@@ -531,8 +553,11 @@ static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kIdentifier ||
       lhs->kind == ExprKind::kMemberAccess) {
     drv.net = NetNamedBy(lhs, ctx);
+  } else if (Net* elem = NetArrayElementNamedBy(lhs, ctx)) {
+    drv.net = elem;
   } else if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr) {
     Net* net = NetNamedBy(lhs->base, ctx);
+    if (net == nullptr) net = NetArrayElementNamedBy(lhs->base, ctx);
     if (net != nullptr && net->resolved != nullptr) {
       drv.net = net;
       drv.partial = true;
@@ -686,10 +711,14 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
                                  ContAssignTransitionWidth(drv, w.params.width))
                            : 0;
 
-  // An output port's connection places the port's first value on the net
-  // above as it finds it, the net holding nothing yet for a module path to
-  // delay a transition from; the port's transitions after that are delayed.
+  // An output port's connection places its first value on the net above at
+  // once and delays later ones; where a path leads to the port that value is x,
+  // not the undriven z of §23.3.3.3 (§28.16, printed page 856, with §30.4).
   const bool kFirstAtPort = !w.params.module_path_port.empty() && drv.first;
+  if (kFirstAtPort && w.path_mgr != nullptr &&
+      !ModulePathSourcesOf(*w.path_mgr, w.path_output).empty()) {
+    val = MakeAllX(w.arena, val.width);
+  }
   if (w.path_mgr != nullptr && !kFirstAtPort &&
       !Logic4VecEqual(driven, old_val)) {
     // At the port the wait also wakes on the paths' sources, whose moves in
@@ -812,8 +841,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     drv.first = false;
   }
 
-  // Built once outside the loop because ModulePathDrive::output is a view of
-  // it.
+  // Outlives the loop, since ModulePathDrive::output is a view of it.
   std::string path_output = ModulePathOutputName(params);
 
   std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {

@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,6 +12,9 @@
 #include "parser/ast_type.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
+#include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -174,9 +178,19 @@ static void AssignInCallerScope(
 // element (CollectElementWritebacks). A tagged union formal's tag goes back
 // with its value (CollectTagWriteback), before CopiesOutOnReturn declines the
 // aliased ref formal whose tag entry is its own.
+Logic4Vec EvalDefaultInDeclScope(const Expr* default_value, SimContext& ctx,
+                                 Arena& arena) {
+  std::optional<InstancePrefixOverride> in_callee;
+  if (const Process* proc = ctx.CurrentProcess()) {
+    in_callee.emplace(ctx.InstancePrefixOverride(), proc->inst_prefix);
+  }
+  return EvalExpr(default_value, ctx, arena);
+}
+
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   std::vector<std::pair<const Expr*, Logic4Vec>> writes;
+  std::vector<std::pair<const Expr*, Logic4Vec>> default_writes;
   std::vector<ElementWriteback> element_writes;
   std::vector<TagWriteback> tag_writes;
   for (size_t i = 0; i < func->func_args.size(); ++i) {
@@ -191,12 +205,23 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
       CollectElementWritebacks(formal, actual, ctx, arena, element_writes);
       continue;
     }
-    const Expr* wb_target = actual ? actual : formal.default_value;
-    if (!wb_target) continue;
-    writes.emplace_back(wb_target, local->value);
+    if (actual != nullptr) {
+      writes.emplace_back(actual, local->value);
+    } else if (formal.default_value != nullptr) {
+      default_writes.emplace_back(formal.default_value, local->value);
+    }
   }
-  if (writes.empty() && element_writes.empty() && tag_writes.empty()) return;
-  AssignInCallerScope(writes, element_writes, tag_writes, ctx, arena);
+  if (!writes.empty() || !element_writes.empty() || !tag_writes.empty()) {
+    AssignInCallerScope(writes, element_writes, tag_writes, ctx, arena);
+  }
+  if (default_writes.empty()) return;
+  // §13.5.3: a default names its target in the scope of the declaration, the
+  // instance the process stands in for the call, not the caller's.
+  std::optional<InstancePrefixOverride> in_callee;
+  if (const Process* proc = ctx.CurrentProcess()) {
+    in_callee.emplace(ctx.InstancePrefixOverride(), proc->inst_prefix);
+  }
+  AssignInCallerScope(default_writes, {}, {}, ctx, arena);
 }
 
 }  // namespace delta

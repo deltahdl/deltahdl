@@ -51,6 +51,40 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
   }
 }
 
+// §23.3.3.1 (printed page 747): "A port that is declared as input (output)
+// but used as an output (input) or inout may be coerced to inout. If not
+// coerced to inout, a warning shall be issued." An input port the module
+// drives, `module m(input wire a); assign a = 1'b1;`, is coerced where both
+// sides are nets -- §23.3.3.3 lets an inout connect to a net and never to a
+// variable -- so the connection becomes the one net an inout's is and the
+// module's driver reaches the parent's w. CheckPortCoercion has warned by
+// then; the warning is kept, being what reports the port's use.
+void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent) {
+  if (inst.resolved == nullptr || parent == nullptr) return;
+  std::unordered_set<std::string_view> driven;
+  for (const auto& ca : inst.resolved->assigns) {
+    if (ca.lhs && ca.lhs->kind == ExprKind::kIdentifier) {
+      driven.insert(ca.lhs->text);
+    }
+  }
+  std::unordered_set<std::string_view> parent_nets;
+  for (const auto& net : parent->nets) parent_nets.insert(net.name);
+  for (auto& binding : inst.port_bindings) {
+    if (binding.direction != Direction::kInput ||
+        !driven.contains(binding.port_name) || binding.connection == nullptr ||
+        binding.connection->kind != ExprKind::kIdentifier ||
+        !parent_nets.contains(binding.connection->text)) {
+      continue;
+    }
+    const auto& ports = inst.resolved->ports;
+    auto port = std::find_if(ports.begin(), ports.end(), [&](const auto& p) {
+      return p.name == binding.port_name;
+    });
+    if (port == ports.end() || port->is_var) continue;
+    binding.direction = Direction::kInout;
+  }
+}
+
 // Looks up a child port by name; returns nullptr when no port matches.
 static const RtlirPort* FindChildPortByName(
     const std::vector<RtlirPort>& child_ports, std::string_view name) {
@@ -177,13 +211,11 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
 
 // Validates one unpacked-array port binding: the connection must be an
 // identifier naming an unpacked array with matching dimension count and sizes.
+// `conn_info` is the array the identifier names, null where it names none.
 static void CheckUnpackedArrayPortBinding(
     DiagEngine& diag, const ModuleItem* item, const RtlirPortBinding& binding,
-    const RtlirPort* port_it,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info) {
-  if (!binding.connection ||
-      binding.connection->kind != ExprKind::kIdentifier) {
+    const RtlirPort* port_it, const Elaborator::VarArrayInfo* conn) {
+  if (conn == nullptr) {
     diag.Error(item->loc,
                std::format("unpacked array port '{}' requires a matching "
                            "unpacked array connection",
@@ -192,17 +224,7 @@ static void CheckUnpackedArrayPortBinding(
     return;
   }
 
-  auto it = var_array_info.find(binding.connection->text);
-  if (it == var_array_info.end()) {
-    diag.Error(item->loc,
-               std::format("unpacked array port '{}' requires a matching "
-                           "unpacked array connection",
-                           binding.port_name),
-               Subclause("23.3.3.5"));
-    return;
-  }
-
-  const auto& conn_info = it->second;
+  const auto& conn_info = *conn;
   if (conn_info.num_unpacked_dims != port_it->num_unpacked_dims) {
     diag.Error(
         item->loc,
@@ -230,6 +252,24 @@ static void CheckUnpackedArrayPortBinding(
   }
 }
 
+// §7.4.2 (printed page 154): "Net arrays are useful for connecting to ports
+// of module instances", so the array an unpacked array port's connection names
+// is a net array as readily as a variable one, and each is recorded apart.
+using ArrayInfoMap =
+    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
+static const Elaborator::VarArrayInfo* ConnectedArrayInfo(
+    const Expr* connection, const ArrayInfoMap& vars,
+    const ArrayInfoMap& nets) {
+  if (connection == nullptr || connection->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  if (auto it = vars.find(connection->text); it != vars.end()) {
+    return &it->second;
+  }
+  auto it = nets.find(connection->text);
+  return it != nets.end() ? &it->second : nullptr;
+}
+
 void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
                                             RtlirModule*) {
@@ -241,8 +281,10 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
         FindChildPortByName(child_ports, binding.port_name);
     if (!port_it) continue;
     if (port_it->num_unpacked_dims == 0) continue;
-    CheckUnpackedArrayPortBinding(diag_, item, binding, port_it,
-                                  var_array_info_);
+    CheckUnpackedArrayPortBinding(
+        diag_, item, binding, port_it,
+        ConnectedArrayInfo(binding.connection, var_array_info_,
+                           net_array_info_));
   }
 }
 

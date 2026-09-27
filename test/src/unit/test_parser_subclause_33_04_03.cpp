@@ -78,4 +78,36 @@ TEST(ConfigEmptyParamOverride, EmptyParamListAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Syntax 33-4 opens a config with `{ local_parameter_declaration ; }`, and
+// A.2.1.1 lets that declaration name a data type before its assignments.
+TEST(ConfigLocalparam, DataTypedLocalparamParses) {
+  auto r = Parse(
+      "config c;\n"
+      "  localparam int S = 24;\n"
+      "  design work.top;\n"
+      "  instance top.a1 use #(.W(S));\n"
+      "endconfig\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  ASSERT_EQ(r.cu->configs[0]->local_params.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->local_params[0].first, "S");
+}
+
+// The same declaration's list_of_param_assignments declares each name it lists.
+TEST(ConfigLocalparam, LocalparamListDeclaresEachName) {
+  auto r = Parse(
+      "config c;\n"
+      "  localparam S = 24, T = 3;\n"
+      "  design work.top;\n"
+      "endconfig\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  const auto& params = r.cu->configs[0]->local_params;
+  ASSERT_EQ(params.size(), 2u);
+  EXPECT_EQ(params[0].first, "S");
+  EXPECT_EQ(params[1].first, "T");
+}
+
 }  // namespace

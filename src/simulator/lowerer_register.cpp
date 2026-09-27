@@ -195,19 +195,59 @@ uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
   return DelayToTicks(net.decay_ticks, scale, precision);
 }
 
+static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
+                             const TimeScale& scale, SimContext& ctx,
+                             Arena& arena) {
+  auto* created = ctx.CreateNet(
+      name, net.net_type, net.width,
+      NetSpec{net.charge_strength,
+              NetDecayTicks(net, scale, ctx.GlobalPrecision()), net.decays,
+              net.is_user_nettype, net.resolve_func, net.is_signed});
+  RecordPackedRange(net.dtype, created->resolved, ctx, arena);
+  // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
+  // w`, is laid out from the aggregate its declaration carries so a member
+  // select names a run of the net's bits, as a net port's is.
+  RegisterAggregateLayout(name, net.dtype, net.width, ctx, arena);
+  return created;
+}
+
+// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
+// fashion as a scalar or vector net", so each element is a net of its own,
+// driven and resolved apart from the others, and §6.7.1 leaves one no driver
+// reaches at z. `wire n[0:2]; assign n[1] = 1'b1;` drives n[1] alone,
+// so n[0] and n[2] read z; a single net standing for all three had n[1]
+// selecting a bit it did not have. Each address of a one-dimensional array is
+// created as the net "name[addr]", the key an array element of a variable is
+// held under (CreateArrayElements in lowerer_var.cpp), and the array's shape
+// is registered so that a select of it reads that element.
+static void CreateNetArrayElements(std::string_view name, const RtlirNet& net,
+                                   const TimeScale& scale, SimContext& ctx,
+                                   Arena& arena) {
+  if (net.num_unpacked_dims != 1 || net.unpacked_dims.size() != 1) return;
+  const RtlirUnpackedDim& dim = net.unpacked_dims.front();
+  if (dim.Low() < 0) return;
+  ArrayInfo info;
+  info.lo = static_cast<uint32_t>(dim.Low());
+  info.size = dim.Size();
+  info.elem_width = net.width;
+  info.is_descending = dim.left > dim.right;
+  ctx.RegisterArray(name, info);
+  for (uint32_t i = 0; i < info.size; ++i) {
+    auto* key = arena.Create<std::string>(std::string(name) + "[" +
+                                          std::to_string(info.lo + i) + "]");
+    CreateNetStorage(*key, net, scale, ctx, arena);
+  }
+}
+
+void CreateDeclaredNet(std::string_view name, const RtlirNet& net,
+                       const TimeScale& scale, SimContext& ctx, Arena& arena) {
+  CreateNetStorage(name, net, scale, ctx, arena);
+  CreateNetArrayElements(name, net, scale, ctx, arena);
+}
+
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   for (const auto& net : mod->nets) {
-    auto* created = ctx.CreateNet(
-        net.name, net.net_type, net.width,
-        NetSpec{net.charge_strength,
-                NetDecayTicks(net, mod->timescale, ctx.GlobalPrecision()),
-                net.decays, net.is_user_nettype, net.resolve_func,
-                net.is_signed});
-    RecordPackedRange(net.dtype, created->resolved, ctx, arena);
-    // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
-    // w`, is laid out from the aggregate its declaration carries so a member
-    // select names a run of the net's bits, as a net port's is.
-    RegisterAggregateLayout(net.name, net.dtype, net.width, ctx, arena);
+    CreateDeclaredNet(net.name, net, mod->timescale, ctx, arena);
   }
 }
 
@@ -226,6 +266,48 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
+// §23.3.3.5 (printed page 748): "each element of the port connection shall be
+// matched to the port left index to left index", so an unpacked array port is
+// an array of elements each connected apart, not one value. A one-dimensional
+// port is laid out as a declared array of its kind is, each address held as
+// the net or variable "name[addr]" (CreateDeclaredNet above, and
+// CreateArrayElements in lowerer_var.cpp) under the array's registered shape,
+// each starting at the port's default (§23.3.3.2). Held as one value of an
+// element's width, `input var int i[3]` read bits of that value for i[0] to
+// i[2]. False, creating nothing, for a port that is no such array.
+static bool CreatePortArrayElements(std::string_view name,
+                                    const RtlirPort& port, SimContext& ctx,
+                                    Arena& arena) {
+  if (port.num_unpacked_dims != 1 || port.unpacked_dims.size() != 1 ||
+      port.unpacked_dims.front().Low() < 0) {
+    return false;
+  }
+  const RtlirUnpackedDim& dim = port.unpacked_dims.front();
+  ArrayInfo info;
+  info.lo = static_cast<uint32_t>(dim.Low());
+  info.size = dim.Size();
+  info.elem_width = port.width;
+  info.is_descending = dim.left > dim.right;
+  info.is_4state = !PortDefaultsToZero(port);
+  info.elem_type_kind = port.type_kind;
+  ctx.RegisterArray(name, info);
+  for (uint32_t i = 0; i < info.size; ++i) {
+    auto* key = arena.Create<std::string>(std::string(name) + "[" +
+                                          std::to_string(info.lo + i) + "]");
+    Variable* elem = port.net_type != NetType::kNone
+                         ? ctx.CreateNet(*key, port.net_type, port.width,
+                                         NetSpec{.is_signed = port.is_signed})
+                               ->resolved
+                         : ctx.CreateVariable(*key, port.width);
+    FillWithX(elem->value);
+    if (!info.is_4state) elem->value = MakeLogic4VecVal(arena, port.width, 0);
+    elem->is_4state = info.is_4state;
+    elem->is_signed = port.is_signed;
+    RecordPackedRange(port.dtype, elem, ctx, arena);
+  }
+  return true;
+}
+
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
   // §21.7.4.3.1: an extended VCD port record takes its state characters from
@@ -234,7 +316,8 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // of whether storage already exists, because a port whose name a module-body
   // declaration already created is still a port and still faces one way.
   ctx.Vcd().SetVcdPortDirection(name, port.direction);
-  if (ctx.FindVariable(name)) return;
+  if (ctx.FindVariable(name) || ctx.FindArrayInfo(name)) return;
+  if (CreatePortArrayElements(name, port, ctx, arena)) return;
   // §23.2.2.3 decides whether a port is a net or a variable, and a port it
   // makes a net is one: its drivers resolve against each other (§28.12) and it
   // carries a strength, which is what %v (§21.2.1.4) and an extended VCD port
@@ -242,28 +325,26 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // as a net declaration, in the body -- decides nothing, so the two spellings
   // reach the same model.
   Variable* v = nullptr;
-  if (port.net_type != NetType::kNone) {
+  bool is_net = port.net_type != NetType::kNone;
+  if (is_net) {
+    // §23.3.3.3 (printed page 747): a port with a net type is a net, whose
+    // value its drivers decide, and an input of one left unconnected "shall
+    // have the value 'z" -- the z CreateNet has just installed, §6.7.1's value
+    // of a net nothing drives. It holds z until its drivers first resolve, so
+    // an output port's connection, which copies the port into the parent's
+    // net, copies z there at time 0 rather than an x or a 0 the port never
+    // held, and an event control on the parent's net sees no change.
     v = ctx.CreateNet(name, port.net_type, port.width,
                       NetSpec{.is_signed = port.is_signed})
             ->resolved;
-    // §23.3.3.2 with Table 6-7 gives a port its data type's default initial
-    // value, and that is the port's own rule: §6.7.1's undriven-net z, which
-    // CreateNet has just installed, belongs to a net no port declaration
-    // named. Putting the port's default back is what keeps a net-kind port
-    // reading what it read before it was one.
-    // §6.8, Table 6-7: an uninitialized 4-state integral object is 'x, which
-    // SimContext::CreateVariable installed and CreateNet then replaced with
-    // §6.7.1's undriven-net z. The storage is the width CreateNet was given,
-    // so FillWithX writes the same bits back that CreateVariable wrote.
-    FillWithX(v->value);
   } else {
     v = ctx.CreateVariable(name, port.width);
   }
-  // §23.3.3.2, Table 6-7: an unconnected input reads as its type's default
-  // rather than as whatever the storage happens to hold. A 4-state type's
-  // default is the x both branches above leave behind; only a 2-state one
+  // §23.3.3.2, Table 6-7: an unconnected variable input reads as its type's
+  // default rather than as whatever the storage happens to hold. A 4-state
+  // type's default is the x CreateVariable leaves behind; only a 2-state one
   // needs writing.
-  if (PortDefaultsToZero(port))
+  if (!is_net && PortDefaultsToZero(port))
     v->value = MakeLogic4VecVal(arena, port.width, 0);
   // §23.2.2.2, footnote 2: a variable output port may be initialized, and its
   // `= constant_expression` is the value it holds before any procedure runs,
@@ -302,9 +383,7 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
 
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,
                          Arena& arena) {
-  for (const auto& port : mod->ports) {
-    CreatePortVariable(port.name, port, ctx, arena);
-  }
+  for (const auto& port : mod->ports) CreatePortStorage("", port, ctx, arena);
 }
 
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {

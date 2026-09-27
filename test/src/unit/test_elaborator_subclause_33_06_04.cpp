@@ -528,8 +528,9 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseThePrimitiveIsUnbound) {
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
   // kPrimitiveTop instantiates w on its seventh line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 7,
-                            "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "default library list (rtlLib) holds no cell 'w'",
+                            7, "33.4.1.5"));
   ASSERT_EQ(mid->children.size(), 1u);
   EXPECT_EQ(mid->children[0].resolved, nullptr);
 }
@@ -622,8 +623,10 @@ TEST(ConfigInstanceClauseExample, InheritedListWithoutTheCellLeavesItUnbound) {
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "leaf", "gateLib"));
   // kNarrowedTopSource instantiates leaf on its fifth line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'leaf'",
-                            5, "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "library list (rtlLib) holds no cell 'leaf' for "
+                            "instance 'top.m1.u'",
+                            5, "33.4.1.5"));
   EXPECT_EQ(ChildBoundTo(mid, "u"), nullptr);
 }
 
@@ -661,8 +664,10 @@ TEST(ConfigInstanceClauseExample, ClauseListLackingTheCellLeavesItUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "mid", "rtlLib"));
   // kNarrowedTopSource instantiates mid on its second line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'mid'",
-                            2, "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "library list (gateLib) holds no cell 'mid' for "
+                            "instance 'top.m1'",
+                            2, "33.4.1.5"));
   EXPECT_EQ(ChildBoundTo(top, "m1"), nullptr);
 }
 
@@ -791,8 +796,9 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedPrimitiveIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
   // kSoloPrimTop instantiates w on its fourth line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 4,
-                            "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "default library list (rtlLib) holds no cell 'w'",
+                            4, "33.4.1.5"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }

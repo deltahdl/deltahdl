@@ -68,6 +68,26 @@ std::string ExtractStrArg(const Expr* arg);
 // suffix_string in eval_systask_time.cpp is unquoted the same way.
 std::string ExtractStringArg(const Expr* arg);
 std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena);
+// §23.6: a hierarchical reference such as top.mod2.net1, a chain of member
+// accesses whose names are spread across the chain, rebuilt into its dotted
+// path, outermost first -- the name an instance's object is registered
+// under. Defined in eval_system_task_dump.cpp, where $dumpvars (§21.7.1.2)
+// matches its scope arguments against it; $readmem and $writemem (§21.4,
+// §21.5) find a memory named hierarchically the same way.
+std::string FlattenHierPath(const Expr* arg);
+// §21.3.2: render the file-output task `expr` (named `name`, whose suffix
+// picks an unformatted argument's radix) and write it to every file
+// `descriptor` selects. Defined in eval_systask_io.cpp.
+void WriteFileOutputTask(const Expr* expr, uint32_t descriptor,
+                         std::string_view name, SimContext& ctx, Arena& arena);
+// §21.3.2: set up the $fmonitor task `expr` on `descriptor`. Defined in
+// eval_system_task_dump.cpp beside $monitor, whose watchers it shares.
+Logic4Vec EvalFmonitor(const Expr* expr, uint32_t descriptor,
+                       std::string_view name, SimContext& ctx, Arena& arena);
+// §21.3.2: $fstrobe's write of `expr` to `descriptor` at the end of the time
+// step. Defined in eval_system_task_dump.cpp beside $fmonitor.
+Logic4Vec EvalFstrobe(const Expr* expr, uint32_t descriptor,
+                      std::string_view name, SimContext& ctx, Arena& arena);
 std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena);
 size_t CountConsumingSpecifiers(const std::string& fmt);
 // `loc` is where the call was written, which the warning names: the count is

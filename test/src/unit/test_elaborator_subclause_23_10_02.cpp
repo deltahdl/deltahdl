@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -269,6 +272,51 @@ TEST(ModuleInstanceParameterValueAssignment,
   ASSERT_NE(n, nullptr);
   EXPECT_TRUE(n->is_resolved);
   EXPECT_EQ(n->resolved_value, 10);
+}
+
+// The resolved value of the parameter `name` of the top module's only child.
+int64_t ChildParam(const RtlirDesign* design, std::string_view name) {
+  if (design == nullptr || design->top_modules.empty() ||
+      design->top_modules[0]->children.empty()) {
+    return -1;
+  }
+  const auto* child = design->top_modules[0]->children[0].resolved;
+  if (child == nullptr) return -1;
+  for (const auto& param : child->params) {
+    if (param.name == name && param.is_resolved) return param.resolved_value;
+  }
+  return -1;
+}
+
+// A.2.1.1's param_assignment gives a parameter unpacked dimensions, and an
+// element of such a parameter array is a constant expression (§11.2.1) an
+// instance's parameter value assignment may be written with.
+TEST(ModuleInstanceParameterValueAssignment, ElementOfAParameterArray) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter W = 8) (); endmodule\n"
+      "module top;\n"
+      "  parameter int PARR[3] = '{10, 20, 30};\n"
+      "  child #(.W(PARR[2])) u0();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ChildParam(design, "W"), 30);
+}
+
+// The same with the array declared over a range of its own, [1:3], whose
+// element 1 is the pattern's first.
+TEST(ModuleInstanceParameterValueAssignment, ElementOfARangedParameterArray) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter W = 8) (); endmodule\n"
+      "module top;\n"
+      "  parameter int PARR[1:3] = '{10, 20, 30};\n"
+      "  child #(.W(PARR[1])) u0();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ChildParam(design, "W"), 10);
 }
 
 }  // namespace

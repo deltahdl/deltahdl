@@ -488,6 +488,18 @@ const std::vector<std::string>* InstanceLiblistForPath(
     const std::vector<std::pair<std::string, std::vector<std::string>>>&
         overrides);
 
+// §33.4.3: whether an expression of kind `k` is a literal, the only value a
+// configuration's localparam may be set to.
+bool IsLiteralKind(ExprKind k);
+
+// §23.6: `parent`, a hierarchical instance path, extended by an instance named
+// `inst_name` that sits inside the generate block instances `gen_steps`, each
+// of those a level of its own and a loop generate block's written with its
+// index. An unnamed generate block adds an empty level, which no written path
+// matches (§27.6).
+std::string HierInstancePath(std::string_view parent, const HierPath& gen_steps,
+                             std::string_view inst_name);
+
 // §33.2.1: the primitive named `cell` that `library` holds, or nullptr when it
 // holds no such primitive. A primitive is one of the kinds of design element a
 // library holds a cell of, and it is the one kind a search over modules,

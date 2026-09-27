@@ -10,7 +10,9 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -139,6 +141,44 @@ struct LoadContext {
   DiagEngine& diag;
 };
 
+template <typename Decl>
+void DropCells(std::vector<Decl*>& cells, std::string_view library,
+               const std::unordered_set<std::string_view>& names) {
+  std::erase_if(cells, [&](const Decl* cell) {
+    return cell->library == library && names.contains(cell->name);
+  });
+}
+
+// §33.3.1 (printed page 937): "If multiple cells with the same name map to the
+// same library, then the last cell encountered shall be written to the
+// library. This is to support a "separate-compile" use model ... where it is
+// assumed that encountering a cell after it has previously been compiled is
+// intended to be a recompiling of the cell." Each record is a later encounter
+// than every record before it, so a cell it declares replaces whatever cell of
+// that name the library already holds -- in the one namespace modules,
+// interfaces, programs, checkers, primitives and configurations share, and
+// among packages in theirs. Kept side by side, the two were one definition too
+// many for the bind.
+void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
+                            std::string_view library) {
+  std::unordered_set<std::string_view> definitions;
+  for (const auto* list :
+       {&cu.modules, &cu.interfaces, &cu.programs, &cu.checkers}) {
+    for (const auto* m : *list) definitions.insert(m->name);
+  }
+  for (const auto* u : cu.udps) definitions.insert(u->name);
+  for (const auto* c : cu.configs) definitions.insert(c->name);
+  DropCells(target.modules, library, definitions);
+  DropCells(target.interfaces, library, definitions);
+  DropCells(target.programs, library, definitions);
+  DropCells(target.checkers, library, definitions);
+  DropCells(target.udps, library, definitions);
+  DropCells(target.configs, library, definitions);
+  std::unordered_set<std::string_view> packages;
+  for (const auto* p : cu.packages) packages.insert(p->name);
+  DropCells(target.packages, library, packages);
+}
+
 // Parses one record's source into the target compilation unit, tagging cells
 // with the record's library name. Returns false on parse failure.
 bool LoadRecord(const std::filesystem::path& path, const std::string& library,
@@ -150,6 +190,7 @@ bool LoadRecord(const std::filesystem::path& path, const std::string& library,
   if (cu == nullptr || ctx.diag.HasErrors()) return false;
 
   TagCells(*cu, library, ctx.arena);
+  ReplaceRecompiledCells(ctx.target, *cu, library);
   AppendCellDeclarations(ctx.target, *cu);
   return true;
 }
@@ -176,6 +217,26 @@ bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
     return false;
   }
   return true;
+}
+
+std::vector<std::string> PrecompiledLibrary::CellNames(
+    std::string_view source) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  uint32_t fid = mgr.AddFile("<precompile>", std::string(source));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  const CompilationUnit* cu = parser.Parse();
+  std::vector<std::string> names;
+  if (cu == nullptr) return names;
+  for (const auto* list :
+       {&cu->modules, &cu->interfaces, &cu->programs, &cu->checkers}) {
+    for (const auto* m : *list) names.emplace_back(m->name);
+  }
+  for (const auto* u : cu->udps) names.emplace_back(u->name);
+  for (const auto* c : cu->configs) names.emplace_back(c->name);
+  return names;
 }
 
 bool PrecompiledLibrary::Load(const std::filesystem::path& path,

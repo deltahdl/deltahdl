@@ -492,6 +492,70 @@ TEST(SysTask, RealFormatPrecisionFromSource) {
   EXPECT_NE(out.find("3.14"), std::string::npos);
 }
 
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
+// formatting capabilities available in the C language", so C's flags apply as
+// C applies them -- `-` left-justifies in the field, `+` and a space sign a
+// non-negative value, `#` keeps the decimal point, a leading 0 on the width
+// pads with zeros after the sign -- in $display and $sformatf alike. Each
+// flag was read as the specifier and printed as `%-`, `%+` and so on.
+TEST(SysTask, RealFormatTakesCFlags) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  real x = 3.14159, n = -2.5;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $display(\"[%-10.3f][%+e][%#.0f][% f][%010.3f][%08.2f]\",\n"
+      "             x, x, x, x, x, n);\n"
+      "    s = $sformatf(\"[%-8.2f][%+.1f][% .1f]\", n, n, x);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "[3.142     ][+3.141590e+00][3.][ 3.141590][000003.142][-0002.50]\n"
+            "[-2.50   ][-2.5][ 3.1]\n");
+}
+
+// §21.2.1.1 Table 21-2 (printed page 658): "%e or %E" and the rest, with "the
+// full formatting capabilities available in the C language", so the uppercase
+// forms write C's uppercase exponent letter -- the issue's shortreal 2.5 under
+// %E is 2.500000E+00 -- under a width and precision too, and in $sformatf.
+// Each printed its exponent in lowercase.
+TEST(SysTask, UppercaseRealSpecifiersWriteUppercaseLetters) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  shortreal sr = 2.5;\n"
+      "  real r = 3.14159265, big = 1.0e10;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $display(\"%E %e\", sr, sr);\n"
+      "    $display(\"[%G][%10.2E][%F]\", big, r, r);\n"
+      "    s = $sformatf(\"%E\", r);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "2.500000E+00 2.500000e+00\n"
+            "[1E+10][  3.14E+00][3.141593]\n"
+            "3.141593E+00\n");
+}
+
+// §21.2.1.1 with §21.2.1.2: a width written with a leading 0 on an integer
+// specifier is its field width alone, the flag belonging to the real
+// specifiers; %05d pads with spaces as %5d does.
+TEST(SysTask, LeadingZeroWidthOnDecimalIsNoZeroFlag) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  initial $display(\"[%05d][%5d]\", 7, 7);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[    7][    7]\n");
+}
+
 // §21.2.1.1: each '%' specifier (other than the no-argument %m/%l/%% forms) is
 // filled by the expression that follows it, and the specifiers are filled in
 // the order they appear. Two decimal specifiers therefore consume the two

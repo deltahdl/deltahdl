@@ -5,12 +5,11 @@
 
 namespace {
 
-// §33.2: "the config is a design element, similar to a module, which exists in
-// the SystemVerilog name space." §3.13(a) forbids reusing a name in the
-// definitions name space but enumerates only the module, primitive, program and
-// interface, so a collision that involves a config rests on §33.2 and the
-// report carries §33.2.
-TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
+// §33.2.1 (printed page 935): "The optional :config extension shall be used
+// explicitly to refer to a config in the case where a config has the same name
+// as a module/primitive", so a config and a module of one name are two cells
+// of one library, told apart by the suffix, and neither is defined twice.
+TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesName) {
   ElabFixture f;
   ElabOk(
       "module foo; endmodule\n"
@@ -18,17 +17,11 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
       "  design work.foo;\n"
       "endconfig\n",
       f);
-  // The config loop in ValidateNameSpaceDefinitions runs after the module loop,
-  // so the config is the later insertion and the report stands at the `config`
-  // keyword on line 2.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'foo'", 2, "33.2"));
+  EXPECT_FALSE(f.has_errors);
 }
 
-// The same collision with the config written first. §33.2 makes the config a
-// design element in the name space whichever order the two are written in, so
-// the report is the same one and carries the same §33.2.
-TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
+// The same with the config written first.
+TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesNameWrittenFirst) {
   ElabFixture f;
   ElabOk(
       "config foo;\n"
@@ -36,14 +29,12 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
       "endconfig\n"
       "module foo; endmodule\n",
       f);
-  // The config loop still runs last, so the report stands at the `config`
-  // keyword on line 1 even though the module is written after it.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'foo'", 1, "33.2"));
+  EXPECT_FALSE(f.has_errors);
 }
 
-// Two configs of one name collide for the same §33.2 reason: both occupy the
-// SystemVerilog name space, so the second reuses a name already used there.
+// Two configs of one name collide: §33.2 puts a config in the SystemVerilog
+// name space, and no suffix tells two configs apart, so the second reuses a
+// name already used there.
 TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
   ElabFixture f;
   ElabOk(
@@ -69,9 +60,10 @@ TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
              "endconfig\n"));
 }
 
-// The name space §33.2 puts the config into is the one §3.13(a) unifies across
-// design element kinds, so an interface of the config's name collides too, and
-// the report carries §33.2.
+// §33.2: "the config is a design element, similar to a module, which exists in
+// the SystemVerilog name space", and the :config extension §33.2.1 provides
+// tells a config apart from a module or primitive only, so an interface of the
+// config's name collides, and the report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,10 +91,9 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
                             "duplicate definition of 'baz'", 3, "33.2"));
 }
 
-// §33.2: a config shares the SystemVerilog design-element name space with
-// every design element kind, primitives included, so a config name reused by
-// a primitive is a collision, reported under the same §33.2.
-TEST(ConfigDesignElementNameSpace, ConfigCollidesWithPrimitive) {
+// §33.2.1 names the primitive beside the module as the design element a
+// config may share a name with.
+TEST(ConfigDesignElementNameSpace, ConfigSharesAPrimitivesName) {
   ElabFixture f;
   ElaborateSrc(
       "primitive qux(output y, input a);\n"
@@ -113,8 +104,7 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithPrimitive) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'qux'", 5, "33.2"));
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §33.2: a design description starts at a top-level module and the source

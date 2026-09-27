@@ -205,4 +205,60 @@ TEST(UnpackedArraySimulation, ChildInstanceForeachAndSizeSeeTheArray) {
   EXPECT_EQ(r->value.ToUint64(), 4100u);
 }
 
+// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
+// fashion as a scalar or vector net", so each element is driven and resolved
+// apart from the others. `assign n[1] = 1'b1;` drives n[1] alone and leaves
+// n[0] and n[2] undriven at z; the two drivers of the wor element r[0] are
+// or-ed and r[1], driven by neither, is z; and a bit-select of an element of
+// `wire [3:0] v[2:1]` drives that one bit of it. The array was held as one
+// net of an element's width, so n[1] selected a bit it did not have and read
+// x, as did every element.
+TEST(UnpackedArraySimulation, NetArrayElementsAreNetsOfTheirOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire n[0:2];\n"
+                       "  wor r[2];\n"
+                       "  wire [3:0] v[2:1];\n"
+                       "  assign n[1] = 1'b1;\n"
+                       "  assign r[0] = 1'b0;\n"
+                       "  assign r[0] = 1'b1;\n"
+                       "  assign v[2] = 4'hA;\n"
+                       "  assign v[1][0] = 1'b1;\n"
+                       "  initial #1 $display(\"%b%b%b %b%b %b %b\", n[0], "
+                       "n[1], n[2], r[0], r[1], v[2], v[1]);\n"
+                       "endmodule\n",
+                       f),
+            "z1z 1z 1010 zzz1\n");
+}
+
+// The same elements as the targets of output ports: each instance drives the
+// one element its connection names, `.y(nouts[2])`, and an array of instances
+// over the whole array drives one element per instance, left index to left
+// index (§23.3.3.5). An element no instance drives stays z. A net array a child
+// declares is its own per instance and reads by hierarchical name.
+TEST(UnpackedArraySimulation, NetArrayElementsDrivenThroughOutputPorts) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf(input logic a, output wire y);\n"
+                       "  assign y = ~a;\n"
+                       "endmodule\n"
+                       "module sub;\n"
+                       "  wire [3:0] w[0:1];\n"
+                       "  assign w[1] = 4'h5;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire nouts[3:0];\n"
+                       "  wire o[3];\n"
+                       "  logic ins[0:2] = '{1'b1, 1'b0, 1'b1};\n"
+                       "  leaf w(.a(1'b1), .y(nouts[2]));\n"
+                       "  leaf x(.a(1'b0), .y(nouts[0]));\n"
+                       "  leaf u[2:0](.a(ins), .y(o));\n"
+                       "  sub s();\n"
+                       "  initial #1 $display(\"%b%b%b%b %b%b%b %h %h\", "
+                       "nouts[3], nouts[2], nouts[1], nouts[0], o[0], o[1], "
+                       "o[2], s.w[1], s.w[0]);\n"
+                       "endmodule\n",
+                       f),
+            "z0z1 010 5 z\n");
+}
+
 }  // namespace

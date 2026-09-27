@@ -449,4 +449,24 @@ TEST(PrimaryParsing, ErrorDynamicArrayNewAsFunctionArgument) {
   EXPECT_TRUE(ReportedError(r.diags, "'new' is not an expression", 2, "A.8.4"));
 }
 
+// A.8.4 (printed page 1211): a system function call is a primary, and a
+// method call's root is any primary, so a method may follow the call's
+// parentheses, and a select after it. `$sformatf("%s", s).len()` was reported
+// as a call missing its ')' at the '.'.
+TEST(PrimaryParsing, MethodCalledOnSystemFunctionResult) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $sformatf(\"%s\", s).len();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace

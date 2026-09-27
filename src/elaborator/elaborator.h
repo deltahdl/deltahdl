@@ -503,6 +503,7 @@ class Elaborator : public ElaboratorClassRules {
                                        RtlirModule** out_mod = nullptr);
 
   void RecomputeDependentParams(RtlirModule* mod);
+  void RefoldChildOverrides(RtlirModule* mod, const ScopeMap& mod_scope);
 
   bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                               RtlirModule* mod);
@@ -934,13 +935,12 @@ class Elaborator : public ElaboratorClassRules {
   void WalkForExportConflicts(RtlirModule* mod,
                               std::unordered_set<RtlirModule*>& visited);
 
-  // Applies any configuration parameter overrides registered for the instance
-  // currently being elaborated (named by current_inst_path_) on top of the
-  // overrides written at the instantiation, recording which parameters end up
-  // fixed by the configuration. Config overrides win over the instantiation's
-  // own values, and an empty override returns a parameter to its module
-  // default (§33.4.3).
-  void ApplyConfigParamOverrides(const ModuleDecl* child_decl,
+  // Applies the configuration's parameter overrides for `item`'s cell and then
+  // for the instance being elaborated on top of the instantiation's, recording
+  // which parameters the configuration fixed. Config overrides win over the
+  // instantiation's values; an empty one restores the default (§33.4.3).
+  void ApplyConfigParamOverrides(const ModuleItem* item,
+                                 const ModuleDecl* child_decl,
                                  ParamList& child_params,
                                  const ScopeMap& parent_scope,
                                  std::vector<std::string_view>& locked);

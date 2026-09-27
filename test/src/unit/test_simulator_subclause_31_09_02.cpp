@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/specify_timing_check.h"
 
 using namespace delta;
@@ -54,6 +57,80 @@ TEST(NegativeTimingConditionDelay, ConditionOperandsAreNotDelayed) {
       TimingCheckOperandKind::kTimestampCondition));
   EXPECT_FALSE(OperandGetsImplicitDelayedCopy(
       TimingCheckOperandKind::kTimecheckCondition));
+}
+
+// §31.9.2 (printed page 922): `$setuphold(clk, data, tsetup, thold, ntfr, ,
+// cond1)` is the pair `$setup(data, clk &&& cond1, ...)` and `$hold(clk,
+// data &&& cond1, ...)`, the timecheck_condition gating whichever event
+// transitions second. d rises 2 before clk at 12 while c1 is 0, which is no
+// setup violation; d falls 2 before clk at 32 with c1 at 1, which is one.
+TEST(SetupholdConditionsDriven, TimecheckConditionGatesTheSetupSide) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg c1 = 0; reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $setuphold(posedge clk, d, 5, 5, n, , c1);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 d = 1; #2 clk = 1;\n"
+                       "    #8 clk = 0; c1 = 1;\n"
+                       "    #10 d = 0; #2 clk = 1;\n"
+                       "    #5 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+// The timestamp_condition gates the event that transitions first: d's rise
+// at 10 under c0 = 0 opens no setup window, d's fall at 30 under c0 = 1 does.
+TEST(SetupholdConditionsDriven, TimestampConditionGatesTheSetupSide) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg c0 = 0; reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $setuphold(posedge clk, d, 5, 5, n, c0);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 d = 1; #2 clk = 1;\n"
+                       "    #8 clk = 0; c0 = 1;\n"
+                       "    #10 d = 0; #2 clk = 1;\n"
+                       "    #5 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+// On the hold side the reference edge transitions first, so the
+// timecheck_condition gates the data transition after it: d changing 2 after
+// clk at 10 while c1 is 0 is no hold violation, 2 after clk at 30 with c1 at 1
+// is one.
+TEST(SetupholdConditionsDriven, TimecheckConditionGatesTheHoldSide) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg c1 = 0; reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $setuphold(posedge clk, d, 5, 5, n, , c1);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 clk = 1; #2 d = 1;\n"
+                       "    #8 clk = 0; c1 = 1;\n"
+                       "    #10 clk = 1; #2 d = 0;\n"
+                       "    #5 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
 }
 
 }  // namespace

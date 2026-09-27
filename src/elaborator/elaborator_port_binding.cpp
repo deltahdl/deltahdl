@@ -586,6 +586,7 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
 
   binding.direction = port->direction;
   binding.width = port->width;
+  binding.port_expr = port->port_expr;
   if (bind.is_implicit && bind.conn_expr &&
       IsNameDeclared(bind.conn_expr->text, scope.parent_mod)) {
     CheckImplicitNamedPortNetTypes(kPortCtx, bind.port_name, bind.conn_expr,
@@ -669,7 +670,13 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   // (multiple drivers are permitted on a net, §23.3.3.3), and an interface-port
   // by-reference connection is not a driver at all (§25.3), so neither is
   // recorded.
+  // §23.3.3.2 (printed page 747): a ref port drives nothing either --
+  // "References to the port variable shall be treated as hierarchical
+  // references to the variable to which it is connected in its instantiation"
+  // -- so the variable keeps its initializer and may be assigned on both
+  // sides, and is not recorded.
   if (conn_expr && binding.direction != Direction::kInput &&
+      binding.direction != Direction::kRef &&
       (!port || !port->is_interface_port)) {
     RecordOutputPortDrivenVariables(conn_expr, scope.item->loc);
   }
@@ -786,6 +793,7 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
   expr->text = port.name;
   binding.connection = expr;
   if (binding.direction != Direction::kInput &&
+      binding.direction != Direction::kRef &&
       net_names_.count(port.name) == 0 &&
       !output_port_targets_.emplace(port.name, item->loc).second) {
     diag_.Error(
@@ -805,6 +813,7 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
   binding.port_name = port.name;
   binding.direction = port.direction;
   binding.width = port.width;
+  binding.port_expr = port.port_expr;
 
   if (port.is_interface_port) {
     if (port.interface_type_name.empty()) {
@@ -866,6 +875,7 @@ void Elaborator::BindTrailingInputPorts(const PortBindScope& scope) {
     binding.port_name = port.name;
     binding.direction = port.direction;
     binding.width = port.width;
+    binding.port_expr = port.port_expr;
 
     if (port.default_value) {
       binding.connection = port.default_value;

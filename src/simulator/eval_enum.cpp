@@ -293,6 +293,20 @@ static const ClassTypeInfo* ClassBehindHandle(const Expr* base, SimContext& ctx,
   return obj != nullptr ? obj->type : nullptr;
 }
 
+// §23.9 (printed page 761): the enumeration a variable read by its bare name
+// was declared with. A variable an instance below the top declares is
+// recorded under the instance's prefix (Lowerer::RegisterEnumForCast), so the
+// running instance's is asked for first; a procedure's local, recorded under
+// the bare name, is asked for by that.
+static const EnumTypeInfo* VariableEnumTypeInScope(const std::string& key,
+                                                   SimContext& ctx) {
+  if (ctx.FindLocalVariable(key) == nullptr) {
+    std::string prefixed = ctx.ActiveInstancePrefix() + key;
+    if (const auto* info = ctx.GetVariableEnumType(prefixed)) return info;
+  }
+  return ctx.GetVariableEnumType(key);
+}
+
 // A bare name: the variable it denotes, when its declaration wrote an
 // enumeration (§23.9 has a variable of the name stand ahead of a class
 // scope's member), or the member literal the variable is, a module's or a
@@ -305,7 +319,7 @@ static const EnumTypeInfo* EnumTypeOfName(const Expr* e, SimContext& ctx) {
   if (e->text == "this" || e->text == "super") return nullptr;
   std::string key = IdentifierLookupKey(e);
   if (NameDenotesVariable(key, ctx)) {
-    if (const auto* info = ctx.GetVariableEnumType(key)) return info;
+    if (const auto* info = VariableEnumTypeInScope(key, ctx)) return info;
     return EnumTypeOfLiteral(e->text, nullptr, ctx);
   }
   const ClassTypeInfo* cls = BareNameClassScope(e->text, ctx);

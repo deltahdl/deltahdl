@@ -1,0 +1,5 @@
+// The gate-level description of adder, which library_map/lib.map's `library
+// gateLib ./*.vg;` maps into gateLib (IEEE 1800-2023 §33.3.1).
+module adder;
+  initial $display("gate adder %l");
+endmodule

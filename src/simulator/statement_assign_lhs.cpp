@@ -34,6 +34,15 @@ void BuildLhsName(const Expr* expr, std::string& out) {
     out += expr->text;
     return;
   }
+  // §23.6: an element of an array of instances, `arr[1]`, is named by the
+  // instance name and its index, as the elaborator names the element.
+  if (expr->kind == ExprKind::kSelect && expr->base != nullptr &&
+      expr->index != nullptr && expr->index_end == nullptr &&
+      expr->index->kind == ExprKind::kIntegerLiteral) {
+    BuildLhsName(expr->base, out);
+    out += "[" + std::to_string(expr->index->int_val) + "]";
+    return;
+  }
   if (expr->kind == ExprKind::kMemberAccess) {
     BuildLhsName(expr->lhs, out);
     out += ".";
@@ -52,7 +61,7 @@ Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base || !lhs->index)
     return nullptr;
   if (lhs->index_end) return nullptr;
-  std::string_view key = ScopedOrBareTargetKey(lhs->base, ctx.GetArena());
+  std::string_view key = ArrayRootKey(lhs->base, ctx.GetArena());
   if (key.empty()) return nullptr;
   auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena());
   // An x or z bit anywhere in the index makes it invalid; an invalid-index
@@ -155,6 +164,11 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kMemberAccess) {
     std::string name;
     BuildLhsName(lhs, name);
+    // §23.3.1: a `$root`-headed target is found from the top of the design.
+    std::string rooted = RootedReferenceKey(name);
+    if (!rooted.empty()) {
+      if (Variable* var = ctx.FindVariable(rooted)) return var;
+    }
     auto resolved = StripRootPrefix(name);
     if (Variable* var = ctx.FindVariable(resolved)) return var;
     // §23.7: `f.x = 3` writes the static local of the function f.

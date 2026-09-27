@@ -16,7 +16,9 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_class_scope_types.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -68,22 +70,77 @@ static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
   return actual != nullptr ? DeclaredTypeWidth(*actual, ctx) : 0;
 }
 
+// The bits of every element of the fixed-size unpacked array `arg` names --
+// the array itself, or a sub-array of it that one index per dimension selects
+// from the left, `m[1]` of `logic [7:0] m [2][3]` being three elements -- or 0
+// where it names no such array.
+// §20.6.2 with §23.6: the name of the array `arg` names -- an identifier's
+// own, or the dotted path of a hierarchical reference such as u.mem naming an
+// instance's array -- and empty where `arg` is neither.
+static std::string ArrayArgName(const Expr* arg) {
+  if (arg->kind == ExprKind::kIdentifier) return std::string(arg->text);
+  if (arg->kind == ExprKind::kMemberAccess && !arg->is_scope_resolution)
+    return FlattenHierPath(arg);
+  return {};
+}
+
+static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx) {
+  size_t depth = 0;
+  while (arg->kind == ExprKind::kSelect && arg->base != nullptr &&
+         arg->index_end == nullptr) {
+    arg = arg->base;
+    ++depth;
+  }
+  std::string name = ArrayArgName(arg);
+  if (name.empty()) return 0;
+  const ArrayInfo* info = ctx.FindArrayInfo(name);
+  if (info == nullptr || info->is_dynamic || info->is_queue ||
+      info->elem_type_kind == DataTypeKind::kString) {
+    return 0;
+  }
+  std::vector<uint32_t> dims = info->dim_sizes;
+  if (dims.empty()) dims.push_back(info->size);
+  if (depth >= dims.size()) return 0;
+  uint64_t count = 1;
+  for (size_t d = depth; d < dims.size(); ++d) count *= dims[d];
+  return count * info->elem_width;
+}
+
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   auto* arg = expr->args[0];
+  // §20.6.2 (printed page 629): "the number of bits required to hold an
+  // expression as a bit stream", which for a fixed-size unpacked array is
+  // every element's bits -- 16 for `logic [7:0] m [0:1]`, of a net array as
+  // of a variable one. Read as an expression the name is one element's worth,
+  // so it is sized from the array's shape instead.
+  if (uint64_t bits = FixedArrayBits(arg, ctx); bits > 0) {
+    return MakeLogic4VecVal(arena, 32, bits);
+  }
   if (arg->kind == ExprKind::kIdentifier) {
     uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
     if (tw == 0) tw = ctx.FindTypeWidth(arg->text);
     if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
-    // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
-    // expression. Its current bit-stream size is the live element count times
-    // the per-element width, so an empty one reports 0. Both kinds keep their
-    // elements in a QueueObject, so this one lookup covers each.
-    if (auto* q = ctx.FindQueue(arg->text)) {
+  }
+  // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
+  // expression. Its current bit-stream size is the live element count times
+  // the per-element width, so an empty one reports 0. Both kinds keep their
+  // elements in a QueueObject, so this one lookup covers each, named bare or
+  // hierarchically.
+  if (std::string name = ArrayArgName(arg); !name.empty()) {
+    if (auto* q = ctx.FindQueue(name)) {
       uint64_t bits = static_cast<uint64_t>(q->elements.size()) * q->elem_width;
       return MakeLogic4VecVal(arena, 32, bits);
     }
+  }
+  // §20.6.2 with §8.5: an unpacked array property of a class object holds its
+  // elements one by one, and its bit stream is every element's, fixed-size or
+  // dynamic, named bare in a method or through a handle.
+  ClassArrayRef ref;
+  if (ResolveClassArray(arg, ctx, arena, ref)) {
+    return MakeLogic4VecVal(arena, 32,
+                            static_cast<uint64_t>(ref.size) * ref.prop->width);
   }
   auto val = EvalExpr(arg, ctx, arena);
   return MakeLogic4VecVal(arena, 32, val.width);
@@ -654,14 +711,11 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §21.3.3 N10: accept a string literal or any integral / byte-array /
   // string-typed expression as the format argument.
   std::string fmt = ResolveFormatArg(expr->args[0], ctx, arena);
-  std::vector<Logic4Vec> arg_vals;
-  for (size_t i = 1; i < expr->args.size(); ++i) {
-    arg_vals.push_back(EvalExpr(expr->args[i], ctx, arena));
-  }
-  WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size(),
+  WarnIfArgCountMismatch(ctx, "$sformatf", fmt, expr->args.size() - 1,
                          expr->range.start);
-  std::string result =
-      FormatDisplay(fmt, arg_vals, {.ctx = &ctx, .loc = expr->range.start});
+  // §21.3.3: the arguments fill the format as a display task's fill its
+  // template, the aggregate renderings of %p and the strengths of %v included.
+  std::string result = FormatDisplayArgs(expr, 0, fmt, ctx, arena);
   // §21.3.3: the result is a string, and the value carries the kind so that
   // a display or severity task handed it, `$error($sformatf(...))`, renders
   // its text rather than the number its bytes make (AppendDisplayArg in

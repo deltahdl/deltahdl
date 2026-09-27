@@ -166,4 +166,84 @@ TEST(IoStrobeSim, StrobeOfSampledValueUsesThePreponedValue) {
   EXPECT_EQ(out, "17\n");
 }
 
+// §21.2.2 (printed page 664) with §8.6 and §8.11: a $strobe inside a class
+// method displays its arguments at the end of the step as the method sees
+// them -- the object's property named bare and as this.v -- after the method
+// has returned and after the write that follows the call. Each read 0: the
+// deferred text was produced with no object in scope.
+TEST(IoStrobeSim, StrobeInAClassMethodReadsTheMethodsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class W;\n"
+      "    int v = 1;\n"
+      "    task run;\n"
+      "      $strobe(\"bare %0d this %0d\", v, this.v);\n"
+      "      v = 4;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  W w = new;\n"
+      "  initial w.run();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "bare 4 this 4\n");
+}
+
+// §21.2.2 with §13.3: the same after the method has suspended on a delay and
+// an event wait, the object being the one the resumed method runs on.
+TEST(IoStrobeSim, StrobeInAResumedClassTaskReadsTheMethodsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  event ev;\n"
+      "  class W;\n"
+      "    int v = 1;\n"
+      "    task run;\n"
+      "      $display(\"before %0d at %0t\", v, $time);\n"
+      "      #3 v = 2;\n"
+      "      $display(\"after %0d at %0t\", v, $time);\n"
+      "      @ev;\n"
+      "      v = 3;\n"
+      "      $display(\"woke %0d at %0t\", v, $time);\n"
+      "      $strobe(\"strobe %0d at %0t\", v, $time);\n"
+      "      v = 4;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  W w = new;\n"
+      "  initial w.run();\n"
+      "  initial #5 -> ev;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "before 1 at 0\nafter 2 at 3\nwoke 3 at 5\nstrobe 4 at 5\n");
+}
+
+// §21.2.2 with §21.2.1.5 and §13.3.2: the deferred text reads the scope the
+// call was made in -- %m names the named block, the task inside it, and each
+// generate block instance, and an automatic task's local keeps the value it
+// held. %m named the last process to have run, t.u.g[1], for every line, and
+// the local read 0.
+TEST(IoStrobeSim, StrobeReadsTheScopeOfItsCall) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub;\n"
+      "  int x = 3;\n"
+      "  task automatic tk;\n"
+      "    int l = 9;\n"
+      "    $strobe(\"%m %0d %0d\", x, l);\n"
+      "  endtask\n"
+      "  initial begin : blk\n"
+      "    $strobe(\"%m\");\n"
+      "    tk();\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    initial $strobe(\"%m\");\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "t.u.blk\nt.u.blk.tk 3 9\nt.u.g[0]\nt.u.g[1]\n");
+}
+
 }  // namespace

@@ -109,4 +109,70 @@ TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
+// §23.6 (printed page 754): an element of an array of instances is named by
+// the instance name and its index, `arr[1]`, and its items are reached
+// through it as any instance's. §23.3.2 writes the dimension as an
+// unpacked_dimension, so `leaf arr[2]()` is arr[0] and arr[1] (§7.4.2's
+// `[size]`); it was one instance named arr, and the name dropped its index,
+// so `arr[1].v = 11` wrote that one instance and `arr[1].v` read nothing.
+TEST(HierarchicalNames, InstanceArrayElementIsReachedByItsIndex) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf #(parameter K = 0)();\n"
+                       "  int v = K * 10 + 1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  leaf #(1) arr[2]();\n"
+                       "  leaf #(5) one();\n"
+                       "  initial begin\n"
+                       "    arr[1].v = 11;\n"
+                       "    #1 $display(\"%0d %0d %0d\", arr[1].v, arr[0].v, "
+                       "one.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 11 51\n");
+}
+
+// An element of an array written with a range and connected through ports is
+// reached the same way; each element drives its own slice of the bus.
+TEST(HierarchicalNames, RangedInstanceArrayElementIsReachedByItsIndex) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf(input i, output o);\n"
+                       "  assign o = ~i;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  reg [1:0] a = 2'b01; wire [1:0] y;\n"
+                       "  leaf arr[1:0](.i(a), .o(y));\n"
+                       "  initial #1 $display(\"%b %b %b\", y, arr[1].o, "
+                       "arr[0].o);\n"
+                       "endmodule\n",
+                       f),
+            "10 1 0\n");
+}
+
+// §11.8.1 (printed page 302) with §23.6: an operand's signedness is its
+// declaration's, reached by a simple name or a hierarchical one alike. A
+// one-bit `logic w` set to the signed literal 1 through `a.w` read back as -1
+// under %0d; a signed declaration still reads signed.
+TEST(HierarchicalNames, ReadOfAnUnsignedVariableByHierarchicalNameIsUnsigned) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface I; logic w; endinterface\n"
+                 "module sub;\n"
+                 "  logic u;\n"
+                 "  logic signed [3:0] s;\n"
+                 "  int i;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  I a();\n"
+                 "  sub b();\n"
+                 "  initial begin\n"
+                 "    a.w = 1; b.u = 1; b.s = -3; b.i = -5;\n"
+                 "    #1 $display(\"%0d %0d %0d %0d\", a.w, b.u, b.s, b.i);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 1 -3 -5\n");
+}
+
 }  // namespace

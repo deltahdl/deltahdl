@@ -221,6 +221,45 @@ TEST(DefparamElaboration, RefoldsAGenerateBlocksDefparamValueWithItsNames) {
 // `defparam u.W = 96` after it gives P every digit of the literal: M reads
 // the 3 at bits 47 down to 32 and H the 1 above bit 64. The value was
 // converted from the 5 the 32-bit range had kept of it, so M read 0.
+// §23.10.1: a defparam sets a parameter of the instance it names, and an
+// instantiation inside that instance whose assignment reads the parameter
+// hands the defparam's value down rather than the value the parameter was
+// declared with.
+TEST(DefparamElaboration, ChildAssignmentReadsTheDefparamsValue) {
+  ElabFixture f;
+  EXPECT_EQ(ParamOfModule("module leaf #(parameter W = 8); endmodule\n"
+                          "module mid;\n"
+                          "  parameter WIDTH = 32;\n"
+                          "  leaf #(.W(WIDTH)) l();\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  mid m();\n"
+                          "  defparam m.WIDTH = 64;\n"
+                          "endmodule\n",
+                          "leaf", "W", f),
+            64);
+}
+
+// The value goes on down through an instance whose own assignment reads the
+// parameter its parent's assignment set.
+TEST(DefparamElaboration, DefparamsValueReachesAGrandchildsAssignment) {
+  ElabFixture f;
+  EXPECT_EQ(ParamOfModule("module leaf #(parameter W = 8); endmodule\n"
+                          "module inner #(parameter V = 1);\n"
+                          "  leaf #(.W(V + 1)) l();\n"
+                          "endmodule\n"
+                          "module mid;\n"
+                          "  parameter WIDTH = 32;\n"
+                          "  inner #(.V(WIDTH)) i();\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  mid m();\n"
+                          "  defparam m.WIDTH = 64;\n"
+                          "endmodule\n",
+                          "leaf", "W", f),
+            65);
+}
+
 TEST(DefparamElaboration, RefoldsAnInstanceOverrideALaterDefparamWidens) {
   constexpr std::string_view kTop =
       "  c #(.P(96'h1_0000_0003_0000_0005)) u();\n"

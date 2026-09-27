@@ -1,0 +1,3 @@
+test/src/e2e/library_map/lib.map
+test/src/e2e/library_map/adder.v
+test/src/e2e/library_map/adder.vg

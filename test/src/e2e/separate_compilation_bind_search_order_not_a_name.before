@@ -1,0 +1,4 @@
+--precompile-into
+named
+--precompile-out
+named.lib

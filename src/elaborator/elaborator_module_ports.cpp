@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -388,6 +389,22 @@ static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
   }
 }
 
+// The bits a port written as a select of a declared vector names, `a[7:4]` of
+// a non-ANSI header being four, or 0 where the port is no select whose bounds
+// fold.
+static uint32_t SelectPortWidth(const Expr* expr, const ScopeMap& scope) {
+  if (expr->kind != ExprKind::kSelect) return 0;
+  if (expr->index_end == nullptr) return 1;
+  if (expr->is_part_select_plus || expr->is_part_select_minus) {
+    auto w = ConstEvalInt(expr->index_end, scope);
+    return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
+  }
+  auto left = ConstEvalInt(expr->index, scope);
+  auto right = ConstEvalInt(expr->index_end, scope);
+  if (!left || !right) return 0;
+  return static_cast<uint32_t>(std::abs(*left - *right) + 1);
+}
+
 // Fill the base (non-interface) fields of an RtlirPort from its declaration,
 // including the folded unpacked-dimension sizes.
 static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
@@ -405,6 +422,18 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.direction = port.direction;
   rp.type_kind = port.data_type.kind;
   rp.width = width;
+  // §23.2.2.1 (printed page 732), Example 3: `split_ports (a[7:4], a[3:0])`
+  // has "First port is upper 4 bits of 'a'. Second port is lower 4 bits of
+  // 'a'." Such a port is its select of the declared vector, four bits wide,
+  // and its connection is joined to that select (LowerPortBindings); taken as
+  // the whole of a, with no name to find storage by, it connected nothing.
+  if (!port.is_explicit_named && port.port_expr != nullptr) {
+    rp.port_expr = port.port_expr;
+    if (uint32_t w = SelectPortWidth(port.port_expr, scope); w > 0) {
+      rp.selected_width = width;
+      rp.width = w;
+    }
+  }
   // §11.5.1: the width above says how many bits the port has, not which bit an
   // index names. Carry the declared type wherever the port header holds a
   // packed dimension, so a select on the port can be resolved over the range as
@@ -546,6 +575,67 @@ static void RegisterPortNetNames(
   net_names.insert(port.name);
 }
 
+// Whether the module's body declares `name` as a net or a variable of its own.
+static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
+  return std::any_of(decl->items.begin(), decl->items.end(),
+                     [&](const ModuleItem* item) {
+                       return (item->kind == ModuleItemKind::kNetDecl ||
+                               item->kind == ModuleItemKind::kVarDecl) &&
+                              item->name == name;
+                     });
+}
+
+// §23.2.2.1 (printed page 733), Example 5: `renamed_concat(.a({b, c}), f,
+// .g(h[1]))` with `input b, c;` and `output [1:0] h;` in the body, where b, c
+// and h are no ports but the objects the ports a and g stand for. Each is
+// declared as its port declaration makes it -- a net of the default net type
+// for `input b`, a variable for `output reg h` -- unless the body declares it
+// again as a net or a variable, which then gives it its storage. Dropped, the
+// declarations left b, c and h undeclared inside the module.
+static void DeclarePortExprObjects(const ModuleDecl* decl, RtlirModule* mod,
+                                   PortElabContext& ctx) {
+  for (const PortDecl& obj : decl->port_expr_objects) {
+    if (BodyDeclaresObject(decl, obj.name)) continue;
+    RtlirPort rp = ElaborateOnePort(decl, obj, ctx);
+    if (rp.net_type != NetType::kNone) {
+      RtlirNet net;
+      net.name = obj.name;
+      net.loc = obj.loc;
+      net.net_type = rp.net_type;
+      net.width = rp.width;
+      net.dtype = rp.dtype;
+      net.is_signed = rp.is_signed;
+      mod->nets.push_back(net);
+      continue;
+    }
+    RtlirVariable var;
+    var.name = obj.name;
+    var.loc = obj.loc;
+    var.width = rp.width;
+    var.is_signed = rp.is_signed;
+    var.is_4state = Is4stateType(obj.data_type, ctx.typedefs);
+    var.dtype = rp.dtype;
+    mod->variables.push_back(var);
+  }
+}
+
+// The direction of the object a port expression names first, `b` of
+// `{b, c}` and `h` of `h[1]`, as its body port declaration gives it;
+// Direction::kNone where the expression names none of them.
+static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
+  while (expr != nullptr && expr->kind == ExprKind::kSelect) expr = expr->base;
+  if (expr == nullptr) return Direction::kNone;
+  if (expr->kind == ExprKind::kConcatenation) {
+    return expr->elements.empty() ? Direction::kNone
+                                  : PortExprDirection(decl, expr->elements[0]);
+  }
+  if (expr->kind != ExprKind::kIdentifier) return Direction::kNone;
+  for (const PortDecl& obj : decl->port_expr_objects) {
+    if (obj.name == expr->text) return obj.direction;
+  }
+  return Direction::kNone;
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
   FoldBodyParamsIntoPortScope(decl, param_scope);
@@ -561,10 +651,17 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                       arena_,
                       mod};
 
+  DeclarePortExprObjects(decl, mod, ctx);
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
+    // §23.2.2.1: a port of a non-ANSI header written as an expression faces
+    // the way the body declares the objects it names, `.a({b, c})` and
+    // `{c, d}` under `input b, c, d;` being inputs.
+    if (port.port_expr != nullptr && rp.direction == Direction::kNone) {
+      rp.direction = PortExprDirection(decl, port.port_expr);
+    }
     RegisterPortNetNames(decl, port, rp, interconnect_names_, net_names_);
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.

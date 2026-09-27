@@ -425,4 +425,98 @@ TEST(StringFormatTaskSim, SformatfResultDisplaysAsText) {
   EXPECT_EQ(out, "e 5\n");
 }
 
+// §21.3.3 (printed pages 668-669): $sformatf and $sformat accept the format
+// specifiers the display tasks accept, %p among them (§21.2.1.6), so a packed
+// structure formats as its assignment pattern; the other specifiers go on
+// formatting as before.
+TEST(StringFormatTaskSim, SformatfAndSformatFormatAggregatesWithP) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct packed {logic [3:0] hi; logic [3:0] lo;} ps_t;\n"
+      "  typedef struct {int a; int b;} us_t;\n"
+      "  ps_t v = '{hi:5, lo:6};\n"
+      "  us_t u = '{1, 2};\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"%p\", v);\n"
+      "    $display(s);\n"
+      "    $sformat(s, \"<%p>\", u);\n"
+      "    $display(s);\n"
+      "    s = $sformatf(\"%4b|%e|%c|%0d%%\", 4'd5, 1.5, 90, 100);\n"
+      "    $display(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{hi:5, lo:6}\n<'{a:1, b:2}>\n0101|1.500000e+00|Z|100%\n");
+}
+
+// §21.3.3 with §6.16 and A.8.4: $sformatf's result is a string, and a string
+// method is called on it where it is written, alone or in a chain --
+// `$sformatf("%s", s).len()` is 4, and the rest of the string methods read
+// the same text.
+TEST(StringFormatTaskSim, StringMethodsOnSformatfResult) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s = \"abcd\";\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", $sformatf(\"%s\", s).len());\n"
+      "    $display(\"%s\", $sformatf(\"x%sy\", s).substr(1, 2).toupper());\n"
+      "    $display(\"%0d\", $sformatf(\"%0d\", 12345).atoi() + 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\nAB\n12346\n");
+}
+
+// §21.3.3 with §21.2.1.1: $sformatf answers a string whatever its format is
+// written as -- a string variable, a string property, or a literal whose
+// argument is another $sformatf -- so the result, a bare display argument,
+// prints as its characters rather than as the integer its bytes make.
+TEST(StringFormatTaskSim, SformatfResultPrintsAsTextWhateverItsFormat) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C; string f = \"k=%0d\"; endclass\n"
+      "  C c = new;\n"
+      "  string fmt = \"m=%0d\";\n"
+      "  initial begin\n"
+      "    $display($sformatf(fmt, 4));\n"
+      "    $display($sformatf(c.f, 5));\n"
+      "    $display($sformatf(\"outer(%s)\", $sformatf(\"inner %0d\", 9)));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "m=4\nk=5\nouter(inner 9)\n");
+}
+
+// §21.3.3 with §8.5 and §8.6: the output variable of $swrite and $sformat may
+// be a class property -- a string one named bare inside a method, a string one
+// through a handle, and a packed one, which holds the text as a 32-bit
+// variable holds a string literal -- and takes the text as an assignment to
+// it would.
+TEST(StringFormatTaskSim, SwriteAndSformatWriteClassProperties) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    string s;\n"
+      "    logic [31:0] w;\n"
+      "    function void fill; $swrite(s, \"v=%0d s=%s\", 5, \"ab\"); "
+      "endfunction\n"
+      "  endclass\n"
+      "  C c = new, d = new;\n"
+      "  initial begin\n"
+      "    c.fill();\n"
+      "    $display(c.s);\n"
+      "    $swrite(d.s, \"h=%0d\", 12);\n"
+      "    $sformat(d.w, \"%s\", \"ab\");\n"
+      "    $display(\"[%s] %h\", d.s, d.w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "v=5 s=ab\n[h=12] 00006162\n");
+}
+
 }  // namespace

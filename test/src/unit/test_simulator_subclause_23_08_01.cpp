@@ -211,4 +211,63 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   EXPECT_EQ(v->value.ToUint64(), 111u);
 }
 
+// §23.8.1 (printed pages 760-761): a subroutine name is looked up "in the
+// complete compilation unit of the reference" before the search steps up, so
+// Example 1's `x = f(1)` in the unit's task t is the unit's function f, and
+// Example 2's `f()` in generate block b is b's own f. With both examples in
+// one design, t enabled from inside b called b's void f and read 0.
+TEST(TaskAndFunctionNameResolutionSimulation,
+     UnitTaskCallFromGenerateBlockReachesTheUnitFunction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  function void f();\n"
+                       "    $display(\"p::f\");\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "task t;\n"
+                       "  int x;\n"
+                       "  x = f(1);\n"
+                       "  $display(\"%0d\", x);\n"
+                       "endtask\n"
+                       "function int f(int y);\n"
+                       "  return y + 1;\n"
+                       "endfunction\n"
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  if (1) begin : b\n"
+                       "    initial begin f(); #1 t(); end\n"
+                       "    function void f();\n"
+                       "      $display(\"top.b.f\");\n"
+                       "    endfunction\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "top.b.f\n2\n");
+}
+
+// The same lookup from a top module that declares an f of its own: the
+// module's call reaches its f and the unit task's the unit's, rather than both
+// the one registered last under the bare name.
+TEST(TaskAndFunctionNameResolutionSimulation,
+     UnitTaskCallReachesTheUnitFunctionAheadOfTheCallersOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("task t;\n"
+                       "  $display(\"%0d\", f(1));\n"
+                       "endtask\n"
+                       "function int f(int y);\n"
+                       "  return y + 1;\n"
+                       "endfunction\n"
+                       "module top;\n"
+                       "  function int f(int y);\n"
+                       "    return y + 100;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d\", f(1));\n"
+                       "    t();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "101\n2\n");
+}
+
 }  // namespace

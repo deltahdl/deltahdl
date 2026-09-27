@@ -450,6 +450,8 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
+  // §21.2.3: the monitor writes its list at the end of the time step.
+  f.scheduler.Run();
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
 
@@ -461,6 +463,7 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "strobe=%0d"),
                         MakeInt(f.arena, 3)}),
            f.ctx, f.arena);
+  f.scheduler.Run();
 
   std::ifstream ifs(path);
   std::string contents((std::istreambuf_iterator<char>(ifs)),

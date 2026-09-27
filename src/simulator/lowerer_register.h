@@ -195,7 +195,15 @@ struct ParamStorageShape {
 };
 ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param);
 
+// The storage of one declared net under `name`, the net itself and, for an
+// unpacked array of nets, a net for each element.
+void CreateDeclaredNet(std::string_view name, const RtlirNet& net,
+                       const TimeScale& scale, SimContext& ctx, Arena& arena);
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
+// The storage one port of a module stands on, under `prefix`: the port's own,
+// or for a port written as a select of a declared vector, that vector's.
+void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
+                       SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 // §13.3 with §23.6: the same subroutines under the instance's prefixed key,

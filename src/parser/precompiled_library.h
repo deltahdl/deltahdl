@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace delta {
 
@@ -33,6 +35,11 @@ class PrecompiledLibrary {
   // the stream.
   static bool Save(std::string_view source, std::string_view library,
                    const std::filesystem::path& path);
+
+  // The names of the cells `source` declares in the definitions name space --
+  // modules, interfaces, programs, checkers, primitives and configurations --
+  // in the order it declares them; none where it does not parse.
+  static std::vector<std::string> CellNames(std::string_view source);
 
   // Reads every cell held at `path` into `target`, tagging each with the
   // library name it was compiled under. Cells are added to whatever `target`

@@ -8,6 +8,7 @@
 // file-I/O and class-collection state already are, so no one file carries the
 // whole of the context's implementation.
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -55,15 +56,12 @@ const std::optional<std::string>& SimContext::DeferredBindingScope() const {
 
 // §33.7: a monitored display list outlives the call that installed it and is
 // produced again on every change of a watched value, each time from outside the
-// process that wrote it. The instance the list belongs to is therefore recorded
-// once, when the list becomes the active one, and read back on every redisplay;
-// installing a new list replaces the record along with the list.
-void SimContext::SetMonitorBindingScope(std::string prefix) {
-  monitor_binding_scope_ = std::move(prefix);
-}
-
-std::string_view SimContext::MonitorBindingScope() const {
-  return monitor_binding_scope_;
+// process that wrote it. The caller -- the instance the list belongs to among
+// the rest of its context -- is therefore recorded once, when the list becomes
+// the active one, and read back on every redisplay; installing a new list
+// replaces the record along with the list.
+void SimContext::SetMonitorCaller(std::shared_ptr<Process> caller) {
+  monitor_caller_ = std::move(caller);
 }
 
 }  // namespace delta

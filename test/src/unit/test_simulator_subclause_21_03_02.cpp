@@ -135,6 +135,8 @@ TEST(IoSystemTaskTest, FstrobeWritesToFile) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "s=%0d"),
                         MakeInt(f.arena, 42)}),
            f.ctx, f.arena);
+  // §21.2.2: a strobe writes at the end of the time step.
+  f.scheduler.Run();
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
@@ -171,6 +173,8 @@ TEST(IoSystemTaskTest, FmonitorWritesToFile) {
                        {MakeInt(f.arena, fdb), MkStr(f.arena, "b=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
+  // §21.2.3: each monitor writes its list at the end of the time step.
+  f.scheduler.Run();
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fda)}), f.ctx,
            f.arena);
@@ -209,6 +213,7 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorAcceptMcd) {
                        {MakeInt(f.arena, combined), MkStr(f.arena, "y=%0d"),
                         MakeInt(f.arena, 5)}),
            f.ctx, f.arena);
+  f.scheduler.Run();
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, combined)}), f.ctx,
            f.arena);
@@ -254,6 +259,8 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
     EvalExpr(MakeSysCall(f.arena, c.task,
                          {MakeInt(f.arena, fd), MakeInt(f.arena, c.value)}),
              f.ctx, f.arena);
+    // §21.2.3: a monitor's first write comes at the end of the time step.
+    f.scheduler.Run();
     EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
              f.arena);
     EXPECT_EQ(ReadAll(path), c.expected) << "task=" << c.task;
@@ -307,6 +314,8 @@ TEST(IoSystemTaskTest, FcloseCancelsActiveStrobeAndMonitor) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
+  // §21.2.3: the monitor writes its list at the end of the time step.
+  f.scheduler.Run();
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
 
@@ -440,7 +449,7 @@ TEST(IoSystemTaskTest, FstrobeThroughFdFromSource) {
           kPath +
           "\", \"w\");\n"
           "    $fstrobe(fd, \"s=%0d\", 3);\n"
-          "    $fclose(fd);\n"
+          "    #1 $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
@@ -462,7 +471,7 @@ TEST(IoSystemTaskTest, FmonitorThroughFdFromSource) {
           kPath +
           "\", \"w\");\n"
           "    $fmonitor(fd, \"m=%0d\", 4);\n"
-          "    $fclose(fd);\n"
+          "    #1 $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
@@ -503,7 +512,9 @@ TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
 
 // §21.3.2: $fclose is the means by which an active $fstrobe/$fmonitor task is
 // cancelled; a task naming the descriptor after it is closed produces no more
-// output. Driven end-to-end from source.
+// output. Driven end-to-end from source. The monitor writes its list at the
+// end of the time step it was set up in (§21.2.3), so the close comes a step
+// later.
 TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_cancel_fmonitor.txt";
@@ -516,13 +527,293 @@ TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
           kPath +
           "\", \"w\");\n"
           "    $fmonitor(fd, \"m=%0d\", 1);\n"
-          "    $fclose(fd);\n"
+          "    #1 $fclose(fd);\n"
           "    $fmonitor(fd, \"post=%0d\", 2);\n"
           "  end\n"
           "endmodule\n",
       f);
   EXPECT_EQ(ReadAll(kPath), "m=1\n");
   std::remove(kPath.c_str());
+}
+
+// §21.3.2 (printed page 667): $fmonitor works "just like" $monitor (§21.2.3),
+// writing its list when called and again at the end of each time step in
+// which an argument changed, and "any number of $fmonitor tasks can be set up
+// to be simultaneously active": two on one descriptor each write on the
+// change, a third set up later writes beside them, and an $fclose cancels
+// all three (§21.3.1) before a later change could write again.
+TEST(IoSystemTaskTest, FmonitorsWriteOnEveryChangeUntilClosed) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_fmon_changes.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r;\n"
+      "  int v = 1;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          path +
+          "\", \"w\");\n"
+          "    $fmonitor(fd, \"A %0d\", v);\n"
+          "    $fmonitor(fd, \"B %0d\", v);\n"
+          "    #1 v = 2;\n"
+          "    #1 v = 2;\n"
+          "    $fmonitor(fd, \"C %0d\", v + 1);\n"
+          "    #1 $fclose(fd);\n"
+          "    v = 5;\n"
+          "    #1 r = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, r) > 0) $write(\"%s\", line);\n"
+          "    $fclose(r);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "A 1\nB 1\nA 2\nB 2\nC 3\n");
+  std::remove(path.c_str());
+}
+
+// §21.3.2 with §21.2.1.5: a write made at the end of a later time step still
+// reads the list in the instance the $fmonitor was written in, and its %m
+// names that instance, whichever process ran last. §21.3.1: a multichannel
+// monitor is cancelled with the channel it writes, which a later $fopen hands
+// to another file that the monitor then leaves alone.
+TEST(IoSystemTaskTest, FmonitorKeepsItsScopeAndItsChannels) {
+  SimFixture f;
+  std::string sub_path = "/tmp/deltahdl_test_fmon_sub.txt";
+  std::string mcd_path = "/tmp/deltahdl_test_fmon_mcd.txt";
+  std::string reuse_path = "/tmp/deltahdl_test_fmon_reuse.txt";
+  RunCapture(
+      "module sub(input integer fd);\n"
+      "  int x = 1;\n"
+      "  initial begin #0 $fmonitor(fd, \"x=%0d %m\", x); #2 x = 7; end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  integer fd, m, m2;\n"
+      "  int v = 1;\n"
+      "  sub u(fd);\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          sub_path +
+          "\", \"w\");\n"
+          "    m = $fopen(\"" +
+          mcd_path +
+          "\");\n"
+          "    $fmonitor(m, \"M %0d\", v);\n"
+          "    #2 v = 2;\n"
+          "    #1 $fclose(m);\n"
+          "    m2 = $fopen(\"" +
+          reuse_path +
+          "\");\n"
+          "    v = 3;\n"
+          "    #1 $fclose(fd);\n"
+          "    $fclose(m2);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(ReadAll(sub_path), "x=1 t.u\nx=7 t.u\n");
+  EXPECT_EQ(ReadAll(mcd_path), "M 1\nM 2\n");
+  EXPECT_EQ(ReadAll(reuse_path), "");
+  std::remove(sub_path.c_str());
+  std::remove(mcd_path.c_str());
+  std::remove(reuse_path.c_str());
+}
+
+// §21.3.2 with §21.2.2 (printed page 664): $fstrobe writes its arguments at
+// the end of the time step, after every blocking assignment of the step has
+// landed, so v = 2 made after the call is what the file holds; the $fwrite
+// either side of it is written at once. An $fclose in the same step cancels
+// a strobe (§21.3.1).
+TEST(IoSystemTaskTest, FstrobeWritesAtTheEndOfTheTimeStep) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_fstrobe_end.txt";
+  std::string cancelled = "/tmp/deltahdl_test_fstrobe_cancelled.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, c, r;\n"
+      "  int v = 1;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          path +
+          "\", \"w\");\n"
+          "    c = $fopen(\"" +
+          cancelled +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"w %0d\\n\", v);\n"
+          "    $fstrobe(fd, \"s %0d\", v);\n"
+          "    $fstrobe(c, \"gone %0d\", v);\n"
+          "    $fclose(c);\n"
+          "    v = 2;\n"
+          "    #1 $fwrite(fd, \"w %0d\\n\", 3);\n"
+          "    $fclose(fd);\n"
+          "    r = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, r) > 0) $write(\"%s\", line);\n"
+          "    $fclose(r);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "w 1\ns 2\nw 3\n");
+  EXPECT_EQ(ReadAll(cancelled), "");
+  std::remove(path.c_str());
+  std::remove(cancelled.c_str());
+}
+
+// §21.3.2 (printed page 667): the file output tasks "accept the same type of
+// arguments as the tasks upon which they are based" once the descriptor is
+// taken off -- every argument written in order, a literal after an expression
+// included, an expression under the task's radix where no template takes it,
+// an omitted argument as a space, and %p formatting an aggregate.
+TEST(IoSystemTaskTest, FileTasksTakeTheDisplayArgumentList) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_file_arg_list.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int a; int b;} s_t;\n"
+      "  class C; string n = \"nm\"; endclass\n"
+      "  C c = new;\n"
+      "  s_t s = '{1, 2};\n"
+      "  integer fd, r;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          path +
+          "\", \"w\");\n"
+          "    $fdisplayh(fd, 8'hff, \"|\");\n"
+          "    $fwriteb(fd, 3'd5, \"|\\n\");\n"
+          "    $fdisplay(fd, \"%p\", s);\n"
+          "    $fdisplay(fd, \"%s\", c.n, , \"x\");\n"
+          "    $fwrite(fd, \"%0d\", 5);\n"
+          "    $fwrite(fd, \"|\\n\");\n"
+          "    $fclose(fd);\n"
+          "    r = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, r) > 0) $write(\"%s\", line);\n"
+          "    $fclose(r);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ff|\n101|\n'{a:1, b:2}\nnm x\n5|\n");
+  std::remove(path.c_str());
+}
+
+// §21.3.2 with §26.2 and §26.3 (printed pages 808-811): a descriptor held in
+// a package variable is one storage location, so the one a package function's
+// $fopen assigned is the one the importing module writes through, by its bare
+// name and as fio::fd, from forked processes at different times.
+TEST(IoSystemTaskTest, DescriptorInAPackageVariableOpenedByAPackageFunction) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_package_fd.txt";
+  std::string out = RunCapture(
+      "package fio;\n"
+      "  integer fd;\n"
+      "  function automatic void open_log(string n);\n"
+      "    fd = $fopen(n, \"w\");\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import fio::*;\n"
+      "  integer rfd;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    open_log(\"" +
+          path +
+          "\");\n"
+          "    $display(\"%0d\", fd != 0);\n"
+          "    fork\n"
+          "      begin #1 $fdisplay(fio::fd, \"p1 at %0t\", $time);\n"
+          "            #2 $fdisplay(fd, \"p1 at %0t\", $time); end\n"
+          "      begin #2 $fdisplay(fd, \"p2 at %0t\", $time); end\n"
+          "    join\n"
+          "    $fclose(fd);\n"
+          "    rfd = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, rfd) > 0) $write(\"%s\", line);\n"
+          "    $fclose(rfd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\np1 at 1\np2 at 2\np1 at 3\n");
+  std::remove(path.c_str());
+}
+
+// §21.3.2 with §21.2.2 and §8.6: $fstrobe and $fmonitor called in a class
+// method write their lists at the end of the step as the method sees them --
+// the object's property bare and as this.v, a static property, and for the
+// strobe the method's local, which §13.3.2 bars from a monitor. Each wrote 0.
+TEST(IoSystemTaskTest, FstrobeAndFmonitorInAClassMethodReadTheMethodsObject) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_fstrobe_method.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, rfd;\n"
+      "  string line;\n"
+      "  class W;\n"
+      "    int v = 1;\n"
+      "    static int s = 5;\n"
+      "    task run(integer d);\n"
+      "      int loc = 7;\n"
+      "      $fstrobe(d, \"fs %0d %0d %0d %0d\", v, this.v, s, loc);\n"
+      "      $fmonitor(d, \"fm %0d %0d %0d\", v, this.v, s);\n"
+      "      v = 4;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  W w = new;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          path +
+          "\", \"w\");\n"
+          "    w.run(fd);\n"
+          "    #1 $fclose(fd);\n"
+          "    rfd = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, rfd) > 0) $write(\"%s\", line);\n"
+          "    $fclose(rfd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "fs 4 4 5 7\nfm 4 4 5\n");
+  std::remove(path.c_str());
+}
+
+// §21.3.2 with §21.2.3 and §8.5: $fmonitor works "just like" $monitor, so a
+// class property read through a handle is followed too -- written again when
+// its value changes, not when a write leaves it as it was, and no more once
+// $fclose has cancelled the monitor.
+TEST(IoSystemTaskTest, FmonitorOfAPropertyThroughAHandleFollowsItsWrites) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_test_fmonitor_property.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C; int p = 1; endclass\n"
+      "  C h = new;\n"
+      "  integer fd, rfd;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          path +
+          "\", \"w\");\n"
+          "    $fmonitor(fd, \"fm %0d\", h.p);\n"
+          "    #1 h.p = 7;\n"
+          "    #1 h.p = 7;\n"
+          "    #1 h.p = 8;\n"
+          "    #1 $fclose(fd);\n"
+          "    #1 h.p = 9;\n"
+          "    rfd = $fopen(\"" +
+          path +
+          "\", \"r\");\n"
+          "    while ($fgets(line, rfd) > 0) $write(\"%s\", line);\n"
+          "    $fclose(rfd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "fm 1\nfm 7\nfm 8\n");
+  std::remove(path.c_str());
 }
 
 }  // namespace

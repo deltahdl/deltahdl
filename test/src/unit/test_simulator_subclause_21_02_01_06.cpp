@@ -616,4 +616,106 @@ TEST(AssignmentPatternFormat, ChildInstanceArrayOfStructsPrintsNestedPatterns) {
   EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
 }
 
+// §21.2.1.6 (C7a) with §7.4 and §7.8: an element selected from an array of
+// structs is a struct and prints as a named pattern, as the whole array prints
+// it -- an associative array's `va[10]` written from a struct variable, a
+// fixed-size array's `arr[1]`, a queue's `q[0]`, in the top module and in an
+// instance -- and an element of an array of enums prints as its member name.
+// Each printed the element's bits as one number, 21474836486 for '{a:5, b:6}.
+TEST(AssignmentPatternFormat, ElementOfAnArrayOfStructsPrintsAsAPattern) {
+  auto out = RunSim(
+      "module M;\n"
+      "  typedef struct { int a; int b; } u_t;\n"
+      "  u_t va[int];\n"
+      "  initial begin\n"
+      "    va[5] = '{7, 8};\n"
+      "    $display(\"%p\", va[5]);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  typedef enum { ON, OFF } sw_e;\n"
+      "  typedef struct { int a; int b; } ab_t;\n"
+      "  ab_t vb[int];\n"
+      "  ab_t arr[2] = '{'{1, 2}, '{3, 4}};\n"
+      "  ab_t q[$] = '{'{9, 10}};\n"
+      "  sw_e ea[2];\n"
+      "  ab_t p;\n"
+      "  M m();\n"
+      "  initial begin\n"
+      "    p = '{5, 6};\n"
+      "    vb[10] = p;\n"
+      "    ea[1] = OFF;\n"
+      "    #1 $display(\"%p %p %p %p\", vb[10], arr[1], q[0], ea[1]);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{a:7, b:8}\n'{a:5, b:6} '{a:3, b:4} '{a:9, b:10} OFF\n");
+}
+
+// §21.2.1.6 (C2 with C7b): a struct member of an enum type prints as the name
+// of its value, as the enum prints on its own -- in a struct variable, in each
+// element of an array of such structs, and for an enum declared in a package.
+// Each printed the value's number, '{sw:1, n:7} for OFF.
+TEST(AssignmentPatternFormat, EnumMemberOfAStructPrintsItsName) {
+  auto out = RunSim(
+      "package pk; typedef enum { RED, GREEN } col_e; endpackage\n"
+      "module top;\n"
+      "  typedef enum { ON, OFF } switch_e;\n"
+      "  typedef struct { switch_e sw; pk::col_e c; int n; } s_t;\n"
+      "  s_t s = '{OFF, pk::GREEN, 7};\n"
+      "  s_t arr[2];\n"
+      "  initial begin\n"
+      "    arr[1] = s;\n"
+      "    $display(\"%p\", s);\n"
+      "    $display(\"%p\", arr);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out,
+            "'{sw:OFF, c:GREEN, n:7}\n"
+            "'{'{sw:ON, c:RED, n:0}, '{sw:OFF, c:GREEN, n:7}}\n");
+}
+
+// §21.2.1.6 (C5 with §10.9.1): a multidimensional unpacked array prints as a
+// pattern of the patterns of its subarrays, one level of braces per dimension,
+// down to its elements -- integers, structs and enum names alike.
+TEST(AssignmentPatternFormat,
+     MultidimensionalArrayNestsOnePatternPerDimension) {
+  auto out = RunSim(
+      "module top;\n"
+      "  typedef enum { ON, OFF } switch_e;\n"
+      "  typedef struct { int a; int b; } ab_t;\n"
+      "  int id[2][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  logic [3:0] m3[2][2][2];\n"
+      "  ab_t sa[2][2];\n"
+      "  switch_e ed[2][2] = '{'{ON, OFF}, '{OFF, ON}};\n"
+      "  initial begin\n"
+      "    foreach (m3[i, j, k]) m3[i][j][k] = i * 4 + j * 2 + k;\n"
+      "    sa[1][0] = '{5, 6};\n"
+      "    $display(\"%p\", id);\n"
+      "    $display(\"%p\", m3);\n"
+      "    $display(\"%p\", sa);\n"
+      "    $display(\"%p\", ed);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out,
+            "'{'{1, 2}, '{3, 4}}\n"
+            "'{'{'{0, 1}, '{2, 3}}, '{'{4, 5}, '{6, 7}}}\n"
+            "'{'{'{a:0, b:0}, '{a:0, b:0}}, '{'{a:5, b:6}, '{a:0, b:0}}}\n"
+            "'{'{ON, OFF}, '{OFF, ON}}\n");
+}
+
+// §21.2.1.6 with §7.6 (printed page 160): elements correspond "by the
+// left-to-right order of elements in each array", so the pattern %p prints
+// lists each dimension from its left bound -- a[3] first for int a[3:0], and in
+// dr[1:0][2:3] the subarray dr[1] first, itself from dr[1][2]. Printing from
+// the lowest address gave a pattern that, assigned back, reverses the array.
+TEST(AssignmentPatternFormat, DescendingDimensionPrintsFromItsLeftBound) {
+  auto out = RunSim(
+      "module top;\n"
+      "  int a[3:0] = '{1, 2, 3, 4};\n"
+      "  int dr[1:0][2:3] = '{'{1, 2}, '{3, 4}};\n"
+      "  initial $display(\"%p %0d %p %0d\", a, a[3], dr, dr[1][2]);\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{1, 2, 3, 4} 1 '{'{1, 2}, '{3, 4}} 1\n");
+}
+
 }  // namespace

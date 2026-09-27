@@ -746,8 +746,49 @@ static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
                   w, false};
 }
 
+// A.2.1.1 gives a param_assignment unpacked dimensions, so a parameter may be
+// an array, and a select of one element of it -- `PARR[2]` of `parameter int
+// PARR[3] = '{10, 20, 30}` -- is a constant expression (§11.2.1) whose value
+// is that element of the positional pattern the parameter was given. The
+// parameter is looked for in the module a ParamRangeRegistryGuard installed.
+static std::optional<ConstVal> ParamArrayElement(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  if (expr->index_end != nullptr || expr->base == nullptr ||
+      expr->base->kind != ExprKind::kIdentifier) {
+    return std::nullopt;
+  }
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return std::nullopt;
+  for (const auto& p : mod->params) {
+    if (p.name != expr->base->text) continue;
+    if (p.unpacked_dims == nullptr || p.unpacked_dims->size() != 1) break;
+    const Expr* value = p.override_expr ? p.override_expr : p.default_value;
+    const Expr* dim = p.unpacked_dims->front();
+    if (value == nullptr || dim == nullptr ||
+        value->kind != ExprKind::kAssignmentPattern ||
+        !value->pattern_keys.empty()) {
+      break;
+    }
+    auto idx = ConstEvalFull(expr->index, scope);
+    bool ranged =
+        dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon;
+    auto left = ConstEvalFull(ranged ? dim->lhs : nullptr, scope);
+    auto right = ConstEvalFull(ranged ? dim->rhs : dim, scope);
+    if (!idx || !right || (ranged && !left)) break;
+    int64_t lo = ranged ? left->value : 0;
+    int64_t hi = ranged ? right->value : right->value - 1;
+    int64_t offset = lo <= hi ? idx->value - lo : lo - idx->value;
+    if (offset < 0 || offset >= static_cast<int64_t>(value->elements.size())) {
+      break;
+    }
+    return ConstEvalFull(value->elements[static_cast<size_t>(offset)], scope);
+  }
+  return std::nullopt;
+}
+
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope) {
+  if (auto element = ParamArrayElement(expr, scope)) return element;
   auto base_val = ConstEvalFull(expr->base, scope);
   if (!base_val) return std::nullopt;
   auto idx = ConstEvalFull(expr->index, scope);

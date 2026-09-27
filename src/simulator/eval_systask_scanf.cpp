@@ -137,6 +137,11 @@ struct ScanDest {
   bool is_string = false;
   const ArrayInfo* byte_array = nullptr;
   std::string_view name;
+  // §21.3.4.3 with §8.5: a destination no variable of the run's tables
+  // answers -- a class property through a handle or bare in a method, an
+  // element, a field -- is scanned into a stand-in `var` holding its value,
+  // which is then assigned to this expression as `x = ...` would be.
+  const Expr* assign_back = nullptr;
 };
 
 // §21.3.4.3: store a matched character run into the destination. A string
@@ -570,6 +575,19 @@ struct ScanArgs {
   bool hit_end = false;
 };
 
+// §21.3.4.3 with §8.5: a stand-in for the destination `a`, holding the value
+// it holds so a conversion fits the field to its width, and a string where it
+// names a string property.
+ScanDest StandInScanDest(const Expr* a, ScanArgs& args) {
+  ScanDest d;
+  Logic4Vec held = EvalExpr(a, args.ctx, args.ctx.GetArena());
+  d.var = args.ctx.GetArena().Create<Variable>();
+  d.var->value = held;
+  d.is_string = held.is_string || NamesStringProperty(a, args.ctx);
+  d.assign_back = a;
+  return d;
+}
+
 // §21.3.4.3: resolve the destination that the next field assigns to. All
 // members stay null when the field is suppressed, the arguments are exhausted,
 // or the destination expression is not a plain identifier. A name that does
@@ -579,7 +597,8 @@ ScanDest ResolveScanDest(ScanArgs& args, bool suppress) {
   ScanDest d;
   if (suppress || args.ai >= args.ndest) return d;
   const Expr* a = args.dest[args.ai];
-  if (a == nullptr || a->kind != ExprKind::kIdentifier) return d;
+  if (a == nullptr) return d;
+  if (a->kind != ExprKind::kIdentifier) return StandInScanDest(a, args);
   d.name = a->text;
   // An unpacked array is checked first: its lowering keeps per-element
   // variables (and possibly a placeholder under the bare name), so the bare
@@ -593,8 +612,18 @@ ScanDest ResolveScanDest(ScanArgs& args, bool suppress) {
     return d;
   }
   d.var = args.ctx.FindVariable(a->text);
-  if (d.var != nullptr) d.is_string = args.ctx.IsStringVariable(a->text);
+  if (d.var == nullptr) return StandInScanDest(a, args);
+  d.is_string = args.ctx.IsStringVariable(a->text);
   return d;
+}
+
+// §21.3.4.3: a matched field scanned into a stand-in is assigned to the
+// destination it stands for.
+void AssignScanStandIn(const ScanDest& dst, SimContext& ctx, Arena& arena) {
+  if (dst.assign_back == nullptr || dst.var == nullptr) return;
+  Logic4Vec value = dst.var->value;
+  value.is_string = dst.is_string;
+  PerformBlockingAssign(dst.assign_back, value, ctx, arena);
 }
 
 // §21.3.4.3: the integer format specifiers (h, d, o, b, c, u, and z) shall not
@@ -735,6 +764,8 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
   ScanFieldResult result =
       DispatchScanField(lc, {cur, spec.width}, dst, args, arena);
   NoteScanEndOfInput(lc, spec, {cur, spec.width}, {before, result}, args);
+  if (result == ScanFieldResult::kMatched)
+    AssignScanStandIn(dst, args.ctx, arena);
 
   if (result == ScanFieldResult::kStop) return false;
   if (result == ScanFieldResult::kMatched && !spec.suppress) {

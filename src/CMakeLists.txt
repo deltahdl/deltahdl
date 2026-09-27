@@ -281,6 +281,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/probabilistic_distribution.cpp
     simulator/eval_fileio.cpp
     simulator/eval_format.cpp
+    simulator/eval_format_real.cpp
     simulator/eval_format_decimal.cpp
     simulator/eval_format_template.cpp
     simulator/stmt_exec.cpp
@@ -382,6 +383,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_generate_naming.cpp
     elaborator/elaborator_generate_scope.cpp
     elaborator/elaborator_import.cpp
+    elaborator/elaborator_child_type_params.cpp
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
     elaborator/elaborator_module_params.cpp
@@ -439,6 +441,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/queue_dim.cpp
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp
+    parser/display_format_check.cpp
     parser/expr_parser_calls.cpp
     parser/expr_parser_literals.cpp
     parser/parser_package_import_export.cpp
@@ -482,12 +485,16 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_systask_query.cpp
     simulator/eval_systask_readmem.cpp
     simulator/eval_systask_readmem_scan.cpp
+    simulator/eval_systask_sreadmem.cpp
     simulator/eval_systask_writemem.cpp
     simulator/eval_systask_verif.cpp
     simulator/eval_system_func.cpp
     simulator/eval_systask_time.cpp
+    simulator/deferred_caller.cpp
+    simulator/eval_format_p.cpp
     simulator/eval_system_task.cpp
     simulator/eval_system_task_dump.cpp
+    simulator/monitor_member_watch.cpp
     simulator/evaluation_ops.cpp
     simulator/wide_arith.cpp
     simulator/class_specialization.cpp
@@ -513,6 +520,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_stream.cpp
     simulator/statement_assign_stream_widen.cpp
     simulator/stmt_exec_control.cpp
+    simulator/timing_check_delayed_signals.cpp
     simulator/timing_check_driver.cpp
     simulator/timing_check_pulse.cpp
     simulator/timing_check_skew.cpp

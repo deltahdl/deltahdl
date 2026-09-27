@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -792,15 +793,28 @@ void VpiContext::AttachTopModules(const RtlirDesign* design) {
   // nothing, and §37.1's "using VPI data models" had no first step.
   if (design == nullptr) return;
 
+  // A top after the first is keyed under its own name, as an instance is
+  // (Lowerer::LowerParallelTop), so the object its contents were entered under
+  // is already its module object; it is marked a top, and is none of the first
+  // top's contents.
+  std::unordered_set<const RtlirModule*> keyed_tops;
   for (auto* top : design->top_modules) {
-    if (top == nullptr) continue;
+    if (top == nullptr || top == design->top_modules.front()) continue;
+    auto named = object_map_.find(top->name);
+    if (named == object_map_.end() || named->second == nullptr) continue;
+    named->second->top_module = true;
+    keyed_tops.insert(top);
+  }
+  for (auto* top : design->top_modules) {
+    if (top == nullptr || keyed_tops.contains(top)) continue;
     // The objects already entered under bare names are the top's contents, so
     // they become its children and it becomes their enclosing instance. They
     // stay keyed under those names, which is what the simulator keys their
     // storage on and what vpi_handle_by_name() has always answered to.
     std::vector<VpiObject*> contents;
     for (auto& [name, object] : object_map_) {
-      if (object != nullptr && object->parent == nullptr) {
+      if (object != nullptr && object->parent == nullptr &&
+          !object->top_module) {
         contents.push_back(object);
       }
     }

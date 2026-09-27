@@ -340,4 +340,36 @@ TEST(ArgumentBindingSim, PropertyThroughANullHandleInAGuardIsNoMethodCall) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §13.5.5 (printed page 351): the empty parentheses after a task's or a void
+// function's name are optional, and so are those after one named by a
+// hierarchical name, `d.T2;` taking its default argument and `d.vf;`, by a
+// package scope, `p::t;`, and by a class scope, `C::st;`. Each ran nothing.
+TEST(ArgumentBindingSim, ScopedAndHierarchicalEnablesNeedNoParentheses) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  int n;\n"
+                       "  task t; n = 4; endtask\n"
+                       "endpackage\n"
+                       "class C;\n"
+                       "  static int s;\n"
+                       "  static task st; s = 3; endtask\n"
+                       "endclass\n"
+                       "module dut;\n"
+                       "  int a;\n"
+                       "  task T2(input int x = 6); a = x; endtask\n"
+                       "  function void vf; a = 9; endfunction\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  dut d();\n"
+                       "  initial begin\n"
+                       "    p::t; $display(\"n=%0d\", p::n);\n"
+                       "    C::st; $display(\"s=%0d\", C::s);\n"
+                       "    d.T2; $display(\"a=%0d\", d.a);\n"
+                       "    d.vf; $display(\"a=%0d\", d.a);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=4\ns=3\na=6\na=9\n");
+}
+
 }  // namespace

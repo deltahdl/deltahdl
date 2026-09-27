@@ -401,4 +401,23 @@ TEST(PortConnectionRulesForVariablesElaboration,
                             4, "23.3.3.2"));
 }
 
+// §23.3.3.2 (printed page 747): a ref port's connection is referenced, not
+// driven, so the variable may carry an initializer and take procedural
+// assignments in the parent. Both were reported as §6.5 errors of a variable
+// "driven by output port".
+TEST(PortConnectionRulesForVariablesElaboration,
+     RefConnectionMayBeInitializedAndAssignedProcedurally) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("module child(ref int r);\n"
+             "  initial #1 r = 1;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  int v = 10;\n"
+             "  child c(.r(v));\n"
+             "  initial #2 v = 20;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace

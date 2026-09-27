@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_reports.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -273,6 +276,107 @@ TEST(ConfigHierarchicalRules, DelegatedDesignStatementBindsACellOfAnotherName) {
   // the lib1.mid its own instantiation declares; the delegated config's rules
   // then govern the subtree, so alt's leaf comes from libY.
   ExpectChainBindsChildAndLeaf(u.ElaborateConfig(0), "alt", "lib2", "libY");
+}
+
+// The module the instance `inst` of the design's one top binds, and the module
+// its child `f` binds, joined by a slash; empty where either is missing.
+std::string BindingsBelow(const ConfigElaboration& run, std::string_view inst) {
+  if (run.design == nullptr || run.design->top_modules.size() != 1) return {};
+  for (const auto& child : run.design->top_modules[0]->children) {
+    if (child.simple_inst_name != inst || child.resolved == nullptr) continue;
+    for (const auto& grand : child.resolved->children) {
+      if (grand.simple_inst_name != "f" || grand.resolved == nullptr) continue;
+      return std::string(child.resolved->name) + "/" +
+             std::string(grand.resolved->name);
+    }
+  }
+  return {};
+}
+
+// §33.4.1.6: "If the lib.cell to which the use clause refers is a config that
+// has the same name as a module/primitive in the same library, then the
+// optional :config suffix can be added to the lib.cell to specify the config
+// explicitly." With module sub and config sub both in work, `use work.sub`
+// binds the module and `use work.sub:config` hands the instance to the config,
+// whose rule binding sub.f to m_gate then governs that instance's child alone
+// (§33.4.2).
+TEST(ConfigHierarchicalRules, ConfigSuffixTellsAConfigFromTheModuleOfItsName) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module m; endmodule\n"
+      "module m_gate; endmodule\n"
+      "module sub; m f(); endmodule\n"
+      "module top;\n"
+      "  sub a1();\n"
+      "  sub a2();\n"
+      "endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  instance top.a1 use work.sub;\n"
+      "  instance top.a2 use work.sub:config;\n"
+      "endconfig\n"
+      "config sub;\n"
+      "  design work.sub;\n"
+      "  instance sub.f use work.m_gate;\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(BindingsBelow(run, "a1"), "sub/m");
+  EXPECT_EQ(BindingsBelow(run, "a2"), "sub/m_gate");
+}
+
+// §33.4.2 (printed page 939): "the rules specified in the config shall
+// determine the configuration of all other subinstances" of the instance
+// handed to it. cfg5's instance rule names adder.f2 from cfg5's own top, so
+// under top.a2 it rebinds f2 alone and under top.a1 nothing.
+TEST(ConfigHierarchicalRules, DelegatedInstanceRuleRebindsOnlyItsSubtree) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module m; endmodule\n"
+      "module m_gate; endmodule\n"
+      "module adder; m f(); m f2(); endmodule\n"
+      "module top;\n"
+      "  adder a1();\n"
+      "  adder a2();\n"
+      "endmodule\n"
+      "config cfg6;\n"
+      "  design work.top;\n"
+      "  instance top.a2 use work.cfg5:config;\n"
+      "endconfig\n"
+      "config cfg5;\n"
+      "  design work.adder;\n"
+      "  instance adder.f use work.m_gate;\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(BindingsBelow(run, "a1"), "adder/m");
+  EXPECT_EQ(BindingsBelow(run, "a2"), "adder/m_gate");
+}
+
+// The same for a cell rule of the config handed the instance: `cell m use
+// work.m_gate` in cfg5 binds the m beneath top.a2 and leaves top.a1's m alone.
+TEST(ConfigHierarchicalRules, DelegatedCellRuleRebindsOnlyItsSubtree) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module m; endmodule\n"
+      "module m_gate; endmodule\n"
+      "module adder; m f(); endmodule\n"
+      "module top;\n"
+      "  adder a1();\n"
+      "  adder a2();\n"
+      "endmodule\n"
+      "config cfg6;\n"
+      "  design work.top;\n"
+      "  instance top.a2 use work.cfg5:config;\n"
+      "endconfig\n"
+      "config cfg5;\n"
+      "  design work.adder;\n"
+      "  cell m use work.m_gate;\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(BindingsBelow(run, "a1"), "adder/m");
+  EXPECT_EQ(BindingsBelow(run, "a2"), "adder/m_gate");
 }
 
 }  // namespace

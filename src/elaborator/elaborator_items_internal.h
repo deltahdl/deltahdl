@@ -129,6 +129,10 @@ void ResolveUnitScopeFormalTypes(CompilationUnit* unit,
 // recorded on the module. Defined once in elaborator_items.cpp; used there and
 // by the module-instantiation/port-binding and generate translation units.
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod);
+// Whether `port` is a non-ANSI port written as a select of the vector `name`,
+// `a[7:4]`, which declares that vector as a port named a would. Defined in
+// elaborator_items.cpp.
+bool PortSelectsFrom(const RtlirPort& port, std::string_view name);
 
 // §3.12.1 with §6.21: whether the compilation-unit scope declares `name` as a
 // variable or a net, one of the items written outside every design element.
@@ -206,9 +210,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                                bool parent_is_checker, DiagEngine& diag);
 
 // §31.9.1 and §31.9.4: the net each delayed_reference and delayed_data of a
-// $setuphold or $recrem names, where the module declares none of the name, and
-// the continuous assignment copying the original signal into it. Defined in
-// elaborator_delayed_signals.cpp.
+// $setuphold or $recrem names, where the module declares none of the name.
+// Defined in elaborator_delayed_signals.cpp.
 std::vector<ModuleItem*> TimingCheckDelayedSignalItems(const ModuleDecl* decl,
                                                        Arena& arena);
 

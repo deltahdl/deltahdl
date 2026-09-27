@@ -122,6 +122,33 @@ int64_t EvalTimingCheckLimit(Expr* limit, SimContext& ctx, Arena& arena) {
   return SignExtend(value.ToUint64(), kWidth);
 }
 
+// Evaluates one timing_check_limit, or a $nochange edge offset, as a time: a
+// number of the declaring module's time units, real or integer (§31.2 has a
+// limit be a constant expression, and §22.7 a time value be read in the unit
+// of the module it is written in), scaled to the ticks of the simulation
+// precision the check compares transition times in, its sign kept. A real
+// limit was read as the bit pattern of its double, and every limit as a count
+// of precision ticks.
+int64_t EvalTimingCheckTime(Expr* limit, SimContext& ctx, Arena& arena) {
+  if (limit == nullptr) return 0;
+  Logic4Vec value = EvalExpr(limit, ctx, arena);
+  const TimeScale& kScale = ActiveInstanceTimeScale(ctx);
+  if (value.is_real) {
+    const double kReal = RealVecToDouble(value);
+    const auto kTicks = static_cast<int64_t>(RealDelayToTicks(
+        kReal < 0 ? -kReal : kReal, kScale, ctx.GlobalPrecision()));
+    return kReal < 0 ? -kTicks : kTicks;
+  }
+  const uint32_t kWidth = value.width == 0 ? 64u : value.width;
+  const int64_t kSigned = SignExtend(value.ToUint64(), kWidth);
+  const uint64_t kMagnitude = kSigned < 0
+                                  ? 0ULL - static_cast<uint64_t>(kSigned)
+                                  : static_cast<uint64_t>(kSigned);
+  const auto kTicks = static_cast<int64_t>(
+      DelayToTicks(kMagnitude, kScale, ctx.GlobalPrecision()));
+  return kSigned < 0 ? -kTicks : kTicks;
+}
+
 // §31.5: the edge_descriptor list a run reads, from the one the parser
 // collected. Syntax 31-15 writes z_or_x as any of `x`, `X`, `z` and `Z`, and
 // the clause has "edge transitions involving z ... treated the same way as edge
@@ -146,6 +173,18 @@ uint64_t UnhandledNegativeLimit(int64_t signed_limit) {
   return signed_limit < 0 ? 0u : static_cast<uint64_t>(signed_limit);
 }
 
+// A delayed signal as the check wrote it, its index evaluated.
+DelayedSignalTarget DelayedTargetOf(std::string_view name, const Expr* index,
+                                    SimContext& ctx, Arena& arena) {
+  DelayedSignalTarget target;
+  target.name = std::string(name);
+  if (index != nullptr) {
+    target.indexed = true;
+    target.index = SelectBoundValue(EvalExpr(index, ctx, arena));
+  }
+  return target;
+}
+
 }  // namespace
 
 TimingCheckEntry BuildTimingCheckUnderOptions(
@@ -153,6 +192,7 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
     const TimingCheckInvocationOptions& options) {
   TimingCheckEntry entry;
   entry.kind = decl.check_kind;
+  entry.decl = &decl;
   // A terminal written through an interface port, `b.d`, is named by both
   // names, as the module's text reads it: A.7.3's input_identifier admits
   // `interface_identifier . port_identifier`, and the signal is the member of
@@ -160,6 +200,12 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   entry.ref_signal = SpecifyTerminalName(decl.ref_terminal);
   entry.ref_edge = decl.ref_edge;
   entry.data_signal = SpecifyTerminalName(decl.data_terminal);
+  entry.ref_select = SpecifyTerminalSelect(decl.ref_terminal, ctx, arena);
+  entry.data_select = SpecifyTerminalSelect(decl.data_terminal, ctx, arena);
+  entry.delayed_ref =
+      DelayedTargetOf(decl.delayed_ref, decl.delayed_ref_expr, ctx, arena);
+  entry.delayed_data =
+      DelayedTargetOf(decl.delayed_data, decl.delayed_data_expr, ctx, arena);
   entry.data_edge = decl.data_edge;
   entry.notifier = std::string(decl.notifier);
   entry.loc = decl.loc;
@@ -200,10 +246,12 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   // is what decides whether the event enables the check at all.
   entry.ref_condition_expr = decl.ref_condition;
   entry.data_condition_expr = decl.data_condition;
+  entry.timestamp_condition_expr = decl.timestamp_cond;
+  entry.timecheck_condition_expr = decl.timecheck_cond;
 
-  const int64_t kFirst = EvalTimingCheckLimit(
+  const int64_t kFirst = EvalTimingCheckTime(
       decl.limits.empty() ? nullptr : decl.limits[0], ctx, arena);
-  const int64_t kSecond = EvalTimingCheckLimit(
+  const int64_t kSecond = EvalTimingCheckTime(
       decl.limits.size() < 2 ? nullptr : decl.limits[1], ctx, arena);
 
   // §31.4.6's Syntax 31-14 writes $nochange's two trailing operands as

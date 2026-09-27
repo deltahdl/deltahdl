@@ -836,7 +836,13 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (!expr) return nullptr;
 
-  if (expr->kind == ExprKind::kIdentifier) {
+  // §13.5.5 (printed page 351) with §23.6 and §26.3: the empty parentheses
+  // after a task's name are optional, so a hierarchical name alone, `top.T;`,
+  // and a package-scoped one, `p::t;`, enable the task as `top.T()` and
+  // `p::t()` do; left to the expression evaluator the member access was read
+  // as a variable and the task never ran.
+  if (expr->kind == ExprKind::kIdentifier ||
+      expr->kind == ExprKind::kMemberAccess) {
     return SetupTaskCallFromIdentifier(expr, ctx, arena);
   }
   if (expr->kind != ExprKind::kCall) return nullptr;

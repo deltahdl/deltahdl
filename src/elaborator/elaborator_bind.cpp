@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -212,6 +213,35 @@ static void BuildBoundPortBindings(const ModuleItem* item,
   }
 }
 
+// §23.11 (printed page 773): "All identifiers in the bind instantiation are
+// referenced from the bind target's point of view", `.*` among them, so a port
+// the wildcard reaches connects to the target's signal of its name
+// (§23.3.2.4), or else takes its default value.
+static void BuildBoundWildcardBindings(const ModuleItem* item,
+                                       const RtlirModule* resolved,
+                                       const RtlirModule* target, Arena& arena,
+                                       RtlirModuleInst& inst) {
+  for (const auto& port : resolved->ports) {
+    bool explicit_conn =
+        std::any_of(item->inst_ports.begin(), item->inst_ports.end(),
+                    [&](const auto& conn) { return conn.first == port.name; });
+    if (explicit_conn) continue;
+    RtlirPortBinding binding;
+    binding.port_name = port.name;
+    binding.direction = port.direction;
+    binding.width = port.width;
+    if (TargetHasSignal(target, port.name)) {
+      auto* expr = arena.Create<Expr>();
+      expr->kind = ExprKind::kIdentifier;
+      expr->text = port.name;
+      binding.connection = expr;
+    } else {
+      binding.connection = port.default_value;
+    }
+    if (binding.connection) inst.port_bindings.push_back(binding);
+  }
+}
+
 void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   auto* item = bd->instantiation;
   if (!item) return;
@@ -273,6 +303,9 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
 
   if (resolved) {
     BuildBoundPortBindings(item, resolved, inst);
+    if (item->inst_wildcard) {
+      BuildBoundWildcardBindings(item, resolved, target, arena_, inst);
+    }
   }
 
   target->children.push_back(inst);

@@ -117,4 +117,27 @@ TEST(SequentialBlockSimulation, ControlPassesOutAfterDelayedStatements) {
   EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
+// §9.3.1 (printed page 225) with §23.9 (printed page 761): a variable an
+// unnamed block declares in an instance below the top is that instance's, and
+// the block reads back what it writes there, `int`, a packed vector and a
+// module typedef alike, in each of two instances. The variable was stored
+// where no read from inside the instance reached, and read 0.
+TEST(SequentialBlockSimulation, UnnamedBlockLocalOfASubmoduleHoldsItsWrites) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module sub;\n"
+                 "  typedef logic [5:0] w_t;\n"
+                 "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+                 "  initial begin\n"
+                 "    int i; logic [5:0] l; w_t w; color_t c;\n"
+                 "    i = 9; l = 9; w = 9; c = BLUE;\n"
+                 "    $display(\"%m i=%0d l=%0d w=%0d wb=%0d c=%s\", i, l, "
+                 "w, $bits(w), c.name());\n"
+                 "  end\n"
+                 "endmodule\n"
+                 "module top; sub u(); sub v(); endmodule\n",
+                 f),
+      "top.u i=9 l=9 w=9 wb=6 c=BLUE\ntop.v i=9 l=9 w=9 wb=6 c=BLUE\n");
+}
+
 }  // namespace

@@ -1,0 +1,2 @@
+library rtlLib *.v;
+library gateLib ./*.vg;

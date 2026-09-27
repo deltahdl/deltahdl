@@ -96,83 +96,6 @@ std::string FormatValueAsString(const Logic4Vec& val) {
   return result;
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's specifiers "are used with real
-// numbers", so an integral operand is read for its value, converted as §6.12.1
-// (printed 110) converts an expression assigned to a real -- "Individual bits
-// that are x or z ... shall be treated as zero" -- and signed where the
-// operand is. Read as a real's bit pattern, `$display("%f", 5)` printed
-// 0.000000.
-static double OperandAsReal(const Logic4Vec& val) {
-  if (val.is_real) return RealVecToDouble(val);
-  if (val.nwords == 0 || val.width == 0) return 0.0;
-  uint64_t bits = val.words[0].aval & ~val.words[0].bval;
-  if (val.width < 64) {
-    uint64_t mask = (uint64_t{1} << val.width) - 1;
-    bits &= mask;
-    if (val.is_signed && ((bits >> (val.width - 1)) & 1U) != 0U) {
-      return static_cast<double>(static_cast<int64_t>(bits | ~mask));
-    }
-  } else if (val.is_signed) {
-    return static_cast<double>(static_cast<int64_t>(bits));
-  }
-  return static_cast<double>(bits);
-}
-
-static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
-  double d = OperandAsReal(val);
-  char buf[128];
-  if (spec == 'e') {
-    std::snprintf(buf, sizeof(buf), "%e", d);
-  } else if (spec == 'g') {
-    std::snprintf(buf, sizeof(buf), "%g", d);
-  } else {
-    std::snprintf(buf, sizeof(buf), "%f", d);
-  }
-  return buf;
-}
-
-// §21.2.1.1: the optional C-style field width and precision a format
-// specification may carry -- "%10.3g" is a minimum field width of 10 with 3
-// fractional digits. A width or precision that was not written is absent rather
-// than zero, so the renderer can substitute "no minimum" and C's default of 6.
-struct FormatFieldSpec {
-  bool has_width;
-  uint32_t width;
-  bool has_precision;
-  uint32_t precision;
-};
-
-// §21.2.1.1: Table 21-2 real specifiers carry the full C-language field-width
-// and precision capability -- e.g. "%10.3g" is a minimum field width of 10 with
-// 3 fractional digits. Reconstruct the double and render it with the parsed
-// width/precision. A width of zero means "no minimum" and, when no precision
-// was written, the C default of 6 is used, matching the plain %e/%f/%g
-// rendering.
-static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
-                                       const FormatFieldSpec& field) {
-  double d = OperandAsReal(val);
-  int w = field.has_width ? static_cast<int>(field.width) : 0;
-  int p = field.has_precision ? static_cast<int>(field.precision) : 6;
-  char buf[256];
-  // Literal format strings with variadic '*' width/precision keep the call
-  // clear of a runtime-built format template.
-  if (spec == 'e') {
-    std::snprintf(buf, sizeof(buf), "%*.*e", w, p, d);
-  } else if (spec == 'g') {
-    std::snprintf(buf, sizeof(buf), "%*.*g", w, p, d);
-  } else {
-    std::snprintf(buf, sizeof(buf), "%*.*f", w, p, d);
-  }
-  return buf;
-}
-
-static std::string FormatRealAsInt(const Logic4Vec& val) {
-  double d = RealVecToDouble(val);
-  char buf[64];
-  std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(d));
-  return buf;
-}
-
 // §21.2.1.1: the numeral of a known value of any width, every word read
 // (FormatDecimalDigits in eval_format_decimal.cpp); read through a 64-bit
 // word, a 96-bit value printed its low 64 bits.
@@ -361,7 +284,9 @@ std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
 
 std::string FormatArg(const Logic4Vec& val, char spec) {
   // Table 21-1 and Table 21-2 spell every specifier as "%x or %X", so the
-  // dispatch below works in a single case after this normalization.
+  // dispatch below works in a single case after this normalization; a real
+  // specifier keeps its case for the renderer.
+  char written = spec;
   if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
 
   if (val.is_real && spec == 'd') return FormatRealAsInt(val);
@@ -399,7 +324,7 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
     case 'e':
     case 'f':
     case 'g':
-      return FormatValueAsReal(val, spec);
+      return FormatValueAsReal(val, written);
     default:
       // A specifier that does not appear in Table 21-1 or Table 21-2 is a
       // misuse of the format string. Surface it to stderr so a test or a
@@ -660,6 +585,46 @@ static void ParseFieldWidth(const std::string& fmt, size_t& start,
   }
 }
 
+static bool IsRealSpec(char spec) {
+  return spec == 'e' || spec == 'f' || spec == 'g';
+}
+
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
+// formatting capabilities available in the C language", its flags among them.
+// From fmt[start], the character after the '%', record the run of `-`, `+`,
+// space and `#` and advance past it when the conversion it opens ends in a
+// real specifier; any other specifier takes no flag, and the run is left for
+// the specifier position to read, as before.
+static void ParseRealFlags(const std::string& fmt, size_t& start,
+                           FormatFieldSpec& field) {
+  size_t j = start;
+  FormatFieldSpec flags;
+  for (; j < fmt.size(); ++j) {
+    char c = fmt[j];
+    if (c == '-') {
+      flags.left_justify = true;
+    } else if (c == '+') {
+      flags.plus_sign = true;
+    } else if (c == ' ') {
+      flags.space_sign = true;
+    } else if (c == '#') {
+      flags.alternate = true;
+    } else {
+      break;
+    }
+  }
+  if (j == start) return;
+  size_t k = j;
+  while (k < fmt.size() && ((fmt[k] >= '0' && fmt[k] <= '9') || fmt[k] == '.'))
+    ++k;
+  if (k >= fmt.size()) return;
+  char spec = fmt[k];
+  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+  if (!IsRealSpec(spec)) return;
+  field = flags;
+  start = j;
+}
+
 // Specifiers that take no expression argument (%m, %l) substitute a scope-
 // derived token directly. Returns true when the spec was handled here; the
 // caller then leaves the argument cursor untouched.
@@ -811,8 +776,10 @@ static void AppendRenderedValue(char spec, char norm,
     out += FormatTimeUnderTimeformat(args.vals[args.vi++], widened);
     return;
   }
-  if ((norm == 'e' || norm == 'f' || norm == 'g') &&
-      (field.has_width || field.has_precision)) {
+  if (IsRealSpec(norm) &&
+      (field.has_width || field.has_precision || field.left_justify ||
+       field.plus_sign || field.space_sign || field.alternate ||
+       field.uppercase)) {
     out += FormatRealFormatted(args.vals[args.vi++], norm, field);
     return;
   }
@@ -840,8 +807,12 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   }
 
   size_t j = i + 1;
+  FormatFieldSpec field;
+  ParseRealFlags(fmt, j, field);
   bool has_width = false;
   uint32_t width = 0;
+  field.zero_pad = field.zero_pad || (j + 1 < fmt.size() && fmt[j] == '0' &&
+                                      fmt[j + 1] >= '1' && fmt[j + 1] <= '9');
   ParseFieldWidth(fmt, j, has_width, width);
 
   // §21.2.1.1: a real specifier may carry a C-style ".precision" after the
@@ -859,7 +830,10 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
 
   // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
-  // "%m or %M"); collapse to a single case before deciding what to do.
+  // "%m or %M"); collapse to a single case before deciding what to do. The
+  // case is kept for the real specifiers, which render as C's %E, %F and %G
+  // do.
+  field.uppercase = spec == 'E' || spec == 'F' || spec == 'G';
   if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
 
   // No-argument scope specifiers leave the argument cursor untouched, so report
@@ -874,7 +848,12 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return true;
   }
 
-  AppendValueArg(spec, {has_width, width, has_prec, prec}, args, out);
+  field.has_width = has_width;
+  field.width = width;
+  field.has_precision = has_prec;
+  field.precision = prec;
+  if (!IsRealSpec(spec)) field.zero_pad = false;
+  AppendValueArg(spec, field, args, out);
   i = j;
   return true;
 }

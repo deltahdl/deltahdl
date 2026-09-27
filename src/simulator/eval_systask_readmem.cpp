@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/eval_systask_readmem_internal.h"
 #include "simulator/evaluation.h"
@@ -22,20 +23,6 @@
 
 namespace delta {
 
-// §21.4: the invariant environment of one $readmem / $sreadmem invocation: the
-// simulation context, the arena that owns parsed words, and the radix selected
-// by the task name (hexadecimal for the *h forms, binary for the *b forms),
-// together with where the call was written. Carried as one unit because every
-// step of a load needs all four. A load reports against the file contents and
-// the destination array rather than against an expression, so the call is the
-// position every one of its reports names.
-struct ReadmemEnv {
-  SimContext& ctx;
-  Arena& arena;
-  bool is_hex;
-  SourceLoc loc;
-};
-
 // §21.4.2: the destination element's declared type, which governs how a parsed
 // number is fitted to an element: its bit width, whether it is 2-state (so x/z
 // collapse to 0), and, when it is an enumerated type, the element list used to
@@ -44,17 +31,6 @@ struct ReadmemElemType {
   uint32_t elem_width;
   bool two_state;
   const EnumTypeInfo* enum_info;
-};
-
-// §21.4: the optional start_addr / finish_addr task arguments. They fix the
-// initial load cursor, the load direction, and (with no @-address in the file)
-// the expected word count. `has_start` / `has_finish` record which were given;
-// $sreadmem (§D.14) always supplies both.
-struct ReadmemWindow {
-  bool has_start;
-  bool has_finish;
-  int64_t start_arg;
-  int64_t finish_arg;
 };
 
 // §21.4 / §7.4.5: a memory_name written as a slice of an unpacked array. When
@@ -516,13 +492,14 @@ struct MemSubscript {
   int64_t b;
 };
 
-// §21.4 / §7.4.5: unwinds a memory_name expression into its base array
-// identifier and the subscripts written after it, ordered leftmost (highest-
-// order) dimension first. A memory_name is a bare identifier or a chain of
+// §21.4 / §7.4.5: unwinds a memory_name expression into its base array's name
+// and the subscripts written after it, ordered leftmost (highest-order)
+// dimension first. A memory_name is an identifier -- bare, or a hierarchical
+// reference (§23.6) such as u.mem naming an instance's array -- or a chain of
 // index / slice selects rooted at one; returns false for any other expression
 // form (in which case the caller does nothing).
 static bool CollectMemSubscripts(const ReadmemEnv& env, const Expr* mn,
-                                 const Expr*& base_id,
+                                 std::string& base_name,
                                  std::vector<MemSubscript>& subs) {
   std::vector<MemSubscript>
       rev;  // outermost (rightmost) subscript collected first
@@ -541,8 +518,14 @@ static bool CollectMemSubscripts(const ReadmemEnv& env, const Expr* mn,
     }
     e = e->base;
   }
-  if (e == nullptr || e->kind != ExprKind::kIdentifier) return false;
-  base_id = e;
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier) {
+    base_name = std::string(e->text);
+  } else if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+    base_name = FlattenHierPath(e);
+  } else {
+    return false;
+  }
   subs.assign(rev.rbegin(), rev.rend());
   return true;
 }
@@ -824,18 +807,52 @@ static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
   LoadRemainingMemDims(env, req, ai, prefix, index_count);
 }
 
-static void DoMemLoad(const ReadmemEnv& env, const std::string& content,
-                      const Expr* mn, const ReadmemWindow& w) {
+// §21.4 with §8.5: a memory_name naming an unpacked array property of a class
+// object -- bare inside one of its methods, or through a handle or `this` --
+// or a lowest-dimension slice of one. The elements are the object's, so they
+// are loaded there, each coerced as a write to the property is. False where
+// `mn` names no array property, leaving the name to the module's arrays.
+static bool TryLoadClassArrayProperty(const ReadmemEnv& env,
+                                      const std::string& content,
+                                      const Expr* mn, const ReadmemWindow& w) {
+  const Expr* base = mn;
+  MemSlice slice{false, 0, 0};
+  if (mn->kind == ExprKind::kSelect && mn->index_end != nullptr &&
+      !mn->is_part_select_plus && !mn->is_part_select_minus) {
+    base = mn->base;
+    auto a = static_cast<int64_t>(
+        EvalExpr(mn->index, env.ctx, env.arena).ToUint64());
+    auto b = static_cast<int64_t>(
+        EvalExpr(mn->index_end, env.ctx, env.arena).ToUint64());
+    slice = {true, std::min(a, b), std::max(a, b)};
+  }
+  ClassArrayRef ref;
+  if (!ResolveClassArray(base, env.ctx, env.arena, ref)) return false;
+  int64_t arr_hi = ref.lo + static_cast<int64_t>(ref.size) - 1;
+  int64_t low_addr = slice.is_slice ? std::max(slice.slice_lo, ref.lo) : ref.lo;
+  int64_t high_addr =
+      slice.is_slice ? std::min(slice.slice_hi, arr_hi) : arr_hi;
+  IndexedLoadReq req{{low_addr, high_addr, slice.is_slice},
+                     {ref.prop->width, !ref.prop->is_4state, nullptr},
+                     w};
+  EvalReadmemIndexed(env, content, req, [&](int64_t addr, const Logic4Vec& v) {
+    StoreClassArrayElement(ref, addr, v, env.ctx, env.arena);
+  });
+  return true;
+}
+
+void DoMemLoad(const ReadmemEnv& env, const std::string& content,
+               const Expr* mn, const ReadmemWindow& w) {
+  if (TryLoadClassArrayProperty(env, content, mn, w)) return;
   // §21.4 / §7.4.5: memory_name is a bare unpacked array, a partially indexed
   // multidimensional array that resolves to a lesser-dimensioned array, or a
   // lowest-dimension slice of one. Unwind it to a base identifier and the
   // subscripts written after it.
-  const Expr* base_id = nullptr;
+  std::string mem_name;
   std::vector<MemSubscript> subs;
-  if (!CollectMemSubscripts(env, mn, base_id, subs)) {
+  if (!CollectMemSubscripts(env, mn, mem_name, subs)) {
     return;
   }
-  std::string mem_name(base_id->text);
 
   // §21.4.2: when the memory's element type is enumerated, the file numbers are
   // the underlying numeric values of the type's elements and each must name a
@@ -891,44 +908,6 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
   ReadmemEnv env{ctx, arena, is_hex, expr->range.start};
   DoMemLoad(env, content, expr->args[1],
             {has_start, has_finish, start_arg, finish_arg});
-  return MakeLogic4VecVal(arena, 1, 0);
-}
-
-// §D.14: $sreadmemb / $sreadmemh mirror $readmemb / $readmemh but take their
-// load data from string arguments rather than a file. The argument order
-// differs: the destination memory_name comes first, followed by the start and
-// finish addresses that bound where the data is stored, then one or more
-// strings. The strings carry the same token format as a $readmem load file, so
-// the data is concatenated and handed to the shared loader; a newline between
-// adjacent strings keeps their tokens separated.
-Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
-                       bool is_hex) {
-  // §D.14's syntax: mem_name, start_address, finish_address, and at least one
-  // string. A call short of that names no data to load, or no memory or bounds
-  // to load it into, and is reported rather than left doing nothing.
-  if (expr->args.size() < 4) {
-    ctx.GetDiag().Error(expr->range.start,
-                        std::string(is_hex ? "$sreadmemh" : "$sreadmemb") +
-                            " takes a memory name, a start address, a finish "
-                            "address, and one or more strings, and this call "
-                            "has fewer",
-                        Subclause("D.14"));
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  int64_t start_arg =
-      static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-  int64_t finish_arg =
-      static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
-
-  std::string content;
-  for (size_t i = 3; i < expr->args.size(); ++i) {
-    if (i > 3) content += '\n';
-    content += EvalStringArg(expr->args[i], ctx, arena);
-  }
-
-  ReadmemEnv env{ctx, arena, is_hex, expr->range.start};
-  DoMemLoad(env, content, expr->args[0],
-            {/*has_start=*/true, /*has_finish=*/true, start_arg, finish_arg});
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

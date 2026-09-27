@@ -339,4 +339,89 @@ TEST(IoMonitorSim, MonitorOnWithNoActiveMonitorIsSilent) {
   EXPECT_EQ(out, "");
 }
 
+// §21.2.3 with §8.6: a $monitor called in a class method displays its list at
+// the end of the step as the method sees it -- the object's property bare and
+// as this.v, and a static property. Each read 0. (§13.3.2 bars the method's
+// automatic locals from the list.)
+TEST(IoMonitorSim, MonitorInAClassMethodReadsTheMethodsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class W;\n"
+      "    int v = 1;\n"
+      "    static int s = 5;\n"
+      "    task run;\n"
+      "      $monitor(\"%0d %0d %0d\", v, this.v, s);\n"
+      "      v = 4;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  W w = new;\n"
+      "  initial w.run();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 4 5\n");
+}
+
+// §21.2.3 (printed page 665) with §8.5: a class property read through a handle
+// is an argument of the list, so a write to it -- at module level through the
+// handle, or from a class task after a delay -- redisplays the list at the end
+// of its time step. The issue's probes 95 and 24 printed `p=1` and never
+// again: the watchers were armed on variables alone, and a property is a slot
+// of its object.
+TEST(IoMonitorSim, MonitorOfAPropertyThroughAHandleFollowsItsWrites) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C; int p = 1; endclass\n"
+                       "  C h = new;\n"
+                       "  initial begin\n"
+                       "    $monitor(\"p=%0d\", h.p);\n"
+                       "    #1 h.p = 7;\n"
+                       "    #1 $display(\"end\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "p=1\np=7\nend\n");
+  SimFixture g;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    int p = 1;\n"
+                       "    task bump; #2 p = 7; endtask\n"
+                       "  endclass\n"
+                       "  C h = new;\n"
+                       "  initial begin\n"
+                       "    $monitor(\"p=%0d\", h.p);\n"
+                       "    h.bump();\n"
+                       "    #1 $display(\"end\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       g),
+            "p=1\np=7\nend\n");
+}
+
+// §21.2.3 with §8.6 and §8.9: inside a method the list's bare `p` and
+// `this.p` are the object's property and `s` the class's static one, each
+// followed; a write to a property the list does not read, `q`, displays
+// nothing.
+TEST(IoMonitorSim, MonitorInAMethodFollowsItsObjectAndStaticProperties) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    int p = 1, q = 0;\n"
+                       "    static int s = 5;\n"
+                       "    task run; $monitor(\"%0d %0d %0d\", p, this.p, s);"
+                       " endtask\n"
+                       "  endclass\n"
+                       "  C h = new;\n"
+                       "  initial begin\n"
+                       "    h.run();\n"
+                       "    #1 h.p = 2;\n"
+                       "    #1 h.q = 9;\n"
+                       "    #1 C::s = 6;\n"
+                       "    #1 $display(\"end\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1 5\n2 2 5\n2 2 6\nend\n");
+}
+
 }  // namespace

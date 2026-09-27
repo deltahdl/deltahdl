@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -458,6 +459,11 @@ class ElaboratorData {
     // is per-module state as func_decls_ is, gone by the time the generate is
     // elaborated, so the copy taken at the queue site is what names them.
     PropertyRegistry property_registry;
+    // §33.4.1.3, §33.4.1.5: the configuration's name for the instance holding
+    // the generate and that instance's library, which a rule for an instance
+    // inside the block is matched against and a search there starts from.
+    std::string config_inst_path;
+    std::string library;
   };
   std::vector<PendingGenerate> pending_generates_;
 
@@ -584,6 +590,14 @@ class ElaboratorData {
     std::string use_cell;
   };
   std::unordered_map<std::string, CellUseOverride> cell_clause_use_overrides_;
+  // §33.4.2: a cell clause of a config an instance clause hands `subtree` to,
+  // which governs the instances of `cell` beneath that instance and no others.
+  struct DelegatedCellUseOverride {
+    std::string subtree;
+    std::string cell;
+    CellUseOverride use;
+  };
+  std::vector<DelegatedCellUseOverride> delegated_cell_use_overrides_;
 
   // A cell selection clause paired with a liblist expansion clause: the named
   // cell is searched for in this ordered library list (§33.4.1.4, §33.4.1.5).
@@ -604,6 +618,21 @@ class ElaboratorData {
   std::vector<std::tuple<std::string, std::string, std::string>>
       instance_bind_overrides_;
 
+  // §33.4.1.5, §33.4.1.6 (printed page 939): reports the instantiation `item`,
+  // whose cell nothing bound, as the failure of the configuration rule in
+  // force for the instance being resolved -- the use clause whose library
+  // holds no such cell, or the library list holding no cell of the
+  // instantiated name -- and returns true. Returns false, reporting nothing,
+  // where no configuration rule governed the lookup.
+  bool ReportConfigRuleBindingNothing(CompilationUnit* unit,
+                                      const ModuleItem* item,
+                                      DiagEngine& diag) const;
+  // The library and cell the use clause in force for the instance at `path`,
+  // or else for the cell `name`, binds to; nullopt where none is in force.
+  std::optional<std::pair<std::string, std::string>> UseTargetInForce(
+      CompilationUnit* unit, const std::string& path,
+      std::string_view name) const;
+
   // A configuration's parameter overrides for one instance path (§33.4.3).
   // reset_all marks an empty "#()" list that returns every parameter to its
   // module default; within params, a null expression returns that single
@@ -618,12 +647,24 @@ class ElaboratorData {
     SourceLoc loc;
   };
   std::vector<ConfigParamOverride> instance_param_overrides_;
+  // §33.4.1.4: the same for a cell clause, applied to every instance of the
+  // cell `inst_path` then names.
+  std::vector<ConfigParamOverride> cell_param_overrides_;
 
   // Literal values of the localparams declared in the configuration being
   // elaborated, used to evaluate parameter-override expressions (§33.4.3).
   ScopeMap config_localparam_scope_;
 
   std::string current_inst_path_;
+  // §33.4.1.3 (printed page 939): "The instance name associated with the
+  // instance clause is a SystemVerilog hierarchical name, starting at the
+  // top-level module of the config". This is the instance being elaborated
+  // named that way, §23.6's path with each generate block instance it sits in
+  // a level of its own (`top.g.u`, `top.g[1].u`), which is what a
+  // configuration rule's path is matched against. current_inst_path_ runs a
+  // generate block's name into the instance's (`top.g_u`), the flattened key
+  // the simulator stores the instance under.
+  std::string config_inst_path_;
   // Library of the cell currently being elaborated; the parent cell's library
   // while its child instances are resolved (§33.4.1.5, §33.4.1.6).
   std::string current_library_;

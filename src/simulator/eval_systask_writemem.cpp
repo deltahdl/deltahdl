@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -169,6 +170,23 @@ static void WriteMemMultiDim(const WritememEval& eval,
 // memory word. §21.4.3: a multidimensional unpacked array's elements are named
 // with one subscript per dimension, so it takes the row-major walk rather than
 // the single-subscript address loop.
+// §21.5 with §8.5: the words of an unpacked array property of a class
+// object, named bare inside one of its methods or through a handle or `this`,
+// in the address window the task's arguments give.
+template <class EmitFn>
+static void WriteMemClassArray(const WritememEval& eval,
+                               const ClassArrayRef& ref, EmitFn emit) {
+  int64_t arr_hi = ref.lo + static_cast<int64_t>(ref.size) - 1;
+  if (arr_hi < ref.lo) return;
+  int64_t start_addr = 0;
+  int64_t finish_addr = 0;
+  ResolveWritememRange(eval, ref.lo, arr_hi, start_addr, finish_addr);
+  WriteMemAddressRange(
+      start_addr, finish_addr, ref.lo, arr_hi, [&](int64_t addr) {
+        emit(ReadClassArrayElement(ref, addr, eval.ctx, eval.arena));
+      });
+}
+
 template <class EmitFn>
 static void WriteMemContainer(const WritememEval& eval,
                               const std::string& mem_name, EmitFn emit) {
@@ -196,10 +214,18 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   // bytes spell the name; EvalStringArg covers all three.
   std::string filename = EvalStringArg(expr->args[0], ctx, arena);
 
-  if (expr->args[1]->kind != ExprKind::kIdentifier) {
+  ClassArrayRef class_array;
+  bool is_class_array =
+      ResolveClassArray(expr->args[1], ctx, arena, class_array);
+  // §21.5: the memory is named by an identifier, bare or hierarchical (§23.6).
+  const Expr* mem = expr->args[1];
+  bool is_hier = mem->kind == ExprKind::kMemberAccess &&
+                 !mem->is_scope_resolution && !is_class_array;
+  if (!is_class_array && !is_hier && mem->kind != ExprKind::kIdentifier) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  std::string mem_name(expr->args[1]->text);
+  std::string mem_name =
+      is_hier ? FlattenHierPath(mem) : std::string(mem->text);
 
   // §21.5.3: an associative array is a legal $writemem argument only when its
   // index type is integral (see §21.4.1) — a string-keyed array has no numeric
@@ -238,6 +264,10 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
+  if (is_class_array) {
+    WriteMemClassArray(WritememEval{expr, ctx, arena}, class_array, emit);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   WriteMemContainer(WritememEval{expr, ctx, arena}, mem_name, emit);
   return MakeLogic4VecVal(arena, 1, 0);
 }

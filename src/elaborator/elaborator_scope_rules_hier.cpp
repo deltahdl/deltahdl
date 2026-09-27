@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -209,7 +210,11 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
     }
     return false;
   };
-  return RangeHasName(
+  bool selected_by_a_port =
+      std::any_of(m->ports.begin(), m->ports.end(),
+                  [&](const RtlirPort& p) { return PortSelectsFrom(p, name); });
+  return selected_by_a_port ||
+         RangeHasName(
              m->ports, [](const RtlirPort& p) { return p.name; }, name) ||
          RangeHasName(
              m->nets, [](const RtlirNet& n) { return n.name; }, name) ||

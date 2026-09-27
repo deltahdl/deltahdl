@@ -681,6 +681,30 @@ static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
   return bit_offset;
 }
 
+// The key of the unpacked array element `e` names, or empty where it names
+// none.
+static std::string ArrayElementKeyOf(const Expr* e, SimContext& ctx) {
+  if (e->kind != ExprKind::kSelect || e->base == nullptr ||
+      e->index == nullptr || e->index_end != nullptr) {
+    return {};
+  }
+  std::string_view root = ArrayRootKey(e->base, ctx.GetArena());
+  if (root.empty() || ctx.FindArrayInfo(root) == nullptr) return {};
+  Logic4Vec idx = EvalExpr(e->index, ctx, ctx.GetArena());
+  if (HasUnknownBits(idx)) return {};
+  return std::string(root) + "[" + std::to_string(idx.ToUint64()) + "]";
+}
+
+// The key of the unpacked array element a force target stands on: the
+// element `lhs` names whole, or the one a select of `lhs` is a select of.
+static std::string ForceElementKey(const Expr* lhs, SimContext& ctx) {
+  std::string key = ArrayElementKeyOf(lhs, ctx);
+  if (key.empty() && lhs->kind == ExprKind::kSelect && lhs->base != nullptr) {
+    key = ArrayElementKeyOf(lhs->base, ctx);
+  }
+  return key;
+}
+
 // §10.6.2 gives force and release the same targets, and among them "a net, a
 // constant bit-select of a vector net, a constant part-select of a vector net":
 // all three stand on one net, which is what holds the strength the force
@@ -688,7 +712,17 @@ static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
 // to its base for that reason -- one sentence names the three forms and says
 // the same thing about them -- while a concatenation names no one net and
 // answers none.
+//
+// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
+// fashion as a scalar or vector net", so `force n[0] = 1;` on `wire n[0:1]`
+// forces the net n[0] is, and `force n[1][2] = 1;` a bit of it. Each element
+// of an unpacked array is held under its own key (CreateDeclaredNet in
+// lowerer_register.cpp), and a select naming one stands on that element
+// rather than on the array's name.
 static Net* ForceTargetNet(const Expr* lhs, SimContext& ctx) {
+  if (std::string key = ForceElementKey(lhs, ctx); !key.empty()) {
+    return ctx.FindNet(key);
+  }
   if (lhs->kind == ExprKind::kIdentifier) return ctx.FindNet(lhs->text);
   if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr &&
       lhs->base->kind == ExprKind::kIdentifier) {
@@ -726,7 +760,9 @@ static bool ProcContAssignTargetHandled(const Stmt* stmt, SimContext& ctx,
                                arena)) {
     return true;
   }
-  *var = ResolveLhsVariable(stmt->lhs, ctx);
+  std::string key = ForceElementKey(stmt->lhs, ctx);
+  *var =
+      key.empty() ? ResolveLhsVariable(stmt->lhs, ctx) : ctx.FindVariable(key);
   return *var == nullptr;
 }
 
@@ -748,7 +784,8 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   // makes; a select naming no bit of the object is given "no effect on the data
   // stored", which here is a force that holds nothing and marks nothing.
   RhsWatcherSpec spec;
-  if (stmt->lhs->kind == ExprKind::kSelect) {
+  if (stmt->lhs->kind == ExprKind::kSelect &&
+      ArrayElementKeyOf(stmt->lhs, ctx).empty()) {
     PartSelectBits dst = SelectStorageBits(*var, stmt->lhs, ctx, arena);
     if (dst.width == 0) return StmtResult::kDone;
     spec.window.src_lo = dst.src_lo;
@@ -777,6 +814,31 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
+// §10.6.2 (printed page 258): released, "the net shall immediately be
+// assigned the value determined by the drivers of the net", and §6.7.1 gives a
+// net no driver reaches the value z. Resolution leaves such a net as it finds
+// it -- a value written there by other means stands until they write again --
+// so `force a = 1; release a;` on an undriven `wire a` went on reading 1. The
+// bits the force held are put back to z here, the drivers' answer when there
+// are none; a trireg keeps them, as the charge it holds with every driver
+// off, and a net type that resolves undriven, tri0 or supply1, is resolved
+// over them.
+static void ReleaseUndrivenBits(Net& net, const ProcContAssignWindow& window) {
+  if (!net.drivers.empty() || !net.switch_drivers.empty() ||
+      net.is_user_nettype || net.type == NetType::kTrireg) {
+    return;
+  }
+  Logic4Vec& value = net.resolved->value;
+  uint32_t lo = window.dst_width == 0 ? 0 : window.dst_lo;
+  uint32_t width = window.dst_width == 0 ? value.width : window.dst_width;
+  for (uint32_t bit = lo; bit < lo + width && bit < value.width; ++bit) {
+    uint64_t mask = uint64_t{1} << (bit % 64);
+    value.words[bit / 64].aval &= ~mask;
+    value.words[bit / 64].bval |= mask;
+  }
+  net.resolved->NotifyWatchers();
+}
+
 StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -785,6 +847,8 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
+  bool was_forced = var->is_forced;
+  ProcContAssignWindow released = var->forced_window;
   var->is_forced = false;
   var->forced_window = {};
   var->proc_cont_rhs = nullptr;
@@ -798,6 +862,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
     // select named as of a whole net. The lookup followed the identifier form
     // alone, so `release bus[3];` cleared the flag and left the net holding the
     // forced value until some driver happened to notify.
+    if (was_forced) ReleaseUndrivenBits(*net, released);
     net->Resolve(arena);
   }
 

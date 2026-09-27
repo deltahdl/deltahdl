@@ -411,6 +411,35 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
 // registered; a child instantiated inside a generate block of its parent had
 // its parameters keyed under that block's prefix until
 // ElaboratorData::GenerateScopeSaver, and stood out of this scope's sight.
+// §23.10.1 (printed pages 762-763): a defparam sets a parameter of the
+// instance it names, and an instantiation inside that instance whose
+// parameter value assignment reads the parameter hands the new value down --
+// `adder #(.W(WIDTH)) a2();` under `defparam t.WIDTH = 64;` makes a2's W 64.
+// Each child parameter `mod` assigned, and no defparam has set since, is folded
+// again from its assignment against the values in scope where the
+// instantiation stands with `mod`'s own parameters as they now are, and a child
+// whose parameter so changes has its own dependents recomputed in turn.
+void Elaborator::RefoldChildOverrides(RtlirModule* mod,
+                                      const ScopeMap& mod_scope) {
+  for (auto& child : mod->children) {
+    RtlirModule* cm = child.resolved;
+    if (cm == nullptr || cm == mod) continue;
+    bool changed = false;
+    for (auto& p : cm->params) {
+      if (p.is_type_param || p.override_expr == nullptr ||
+          p.override_module != mod || p.defparam_value_expr != nullptr) {
+        continue;
+      }
+      ScopeMap scope = p.override_scope;
+      for (const auto& [name, value] : mod_scope) scope[name] = value;
+      int64_t before = p.resolved_value;
+      RefoldOverride(p, p.override_expr, scope);
+      changed = changed || p.resolved_value != before;
+    }
+    if (changed) RecomputeDependentParams(cm);
+  }
+}
+
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
@@ -430,6 +459,7 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
       RecordResolvedHighWords(p, p.default_value, scope);
     }
   }
+  RefoldChildOverrides(mod, BuildParamScope(mod, {}));
 }
 
 // Checks whether a defparam may legally override the resolved target `param`

@@ -328,39 +328,48 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   }
 }
 
-// §7.4.2: the element count and lowest index the one unpacked dimension `dim`
-// of a class property declares, a literal `[N]` addressing 0 to N-1 and a
-// range `[a:b]` addressing the smaller of a and b to the larger. Zero elements
-// for a dimension of any other form -- a dynamic array's absent bound, a
-// queue's `$`, an associative array's index type, or an expression the
-// simulator does not fold here -- which the object then models as it did, one
-// value under the property's name.
-static uint32_t FixedDimensionSize(const Expr* dim, int64_t& lo,
-                                   SimContext& ctx, Arena& arena) {
-  if (dim == nullptr) return 0;
+// §7.4.2: the one fixed unpacked dimension a class property declares -- its
+// element count, lowest index, and whether it runs from a higher left bound
+// down to a lower right one.
+struct PropertyArrayDim {
+  uint32_t size = 0;
+  int64_t lo = 0;
+  bool descending = false;
+};
+
+// §7.4.2: the dimension `dim` declares, a literal `[N]` addressing 0 to N-1
+// and a range `[a:b]` addressing the smaller of a and b to the larger. Zero
+// elements for a dimension of any other form -- a dynamic array's absent
+// bound, a queue's `$`, an associative array's index type, or an expression
+// the simulator does not fold here -- which the object then models as it did,
+// one value under the property's name.
+static PropertyArrayDim FixedDimension(const Expr* dim, SimContext& ctx,
+                                       Arena& arena) {
+  if (dim == nullptr) return {};
   if (dim->kind == ExprKind::kIntegerLiteral) {
-    lo = 0;
-    return static_cast<uint32_t>(dim->int_val);
+    return {static_cast<uint32_t>(dim->int_val), 0, false};
   }
   if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon ||
       dim->lhs == nullptr || dim->rhs == nullptr) {
-    return 0;
+    return {};
   }
   auto left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
   auto right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
-  lo = left < right ? left : right;
-  return static_cast<uint32_t>(left < right ? right - left + 1
-                                            : left - right + 1);
+  if (left < right) {
+    return {static_cast<uint32_t>(right - left + 1), left, false};
+  }
+  return {static_cast<uint32_t>(left - right + 1), right, left > right};
 }
 
 // Gives the property named `name` the unpacked dimension RecordArrayProperties
 // read for it.
 static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
-                              uint32_t size, int64_t lo, bool dynamic) {
+                              const PropertyArrayDim& dim, bool dynamic) {
   for (auto& prop : info->properties) {
     if (prop.name != name) continue;
-    prop.array_size = size;
-    prop.array_lo = lo;
+    prop.array_size = dim.size;
+    prop.array_lo = dim.lo;
+    prop.array_descending = dim.descending;
     prop.is_dynamic = dynamic;
   }
 }
@@ -381,10 +390,10 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
         item != nullptr ? item->unpacked_dims : member->unpacked_dims;
     if (dims.size() != 1) continue;
     const bool kDynamic = dims[0] == nullptr;
-    int64_t lo = 0;
-    uint32_t size = kDynamic ? 0 : FixedDimensionSize(dims[0], lo, ctx, arena);
-    if (size == 0 && !kDynamic) continue;
-    MarkArrayProperty(info, member->name, size, lo, kDynamic);
+    PropertyArrayDim dim =
+        kDynamic ? PropertyArrayDim{} : FixedDimension(dims[0], ctx, arena);
+    if (dim.size == 0 && !kDynamic) continue;
+    MarkArrayProperty(info, member->name, dim, kDynamic);
   }
 }
 

@@ -136,11 +136,16 @@ void ResolveTopHeadedPath(const std::string& path, SimContext& ctx,
 }
 
 // The path `call` names, "tk" for a bare enable or `tk;`, "u1.tk" for a
-// hierarchical one, "blk[1].triple" for one into a generate block instance;
-// empty where the call names no path a module subroutine is registered
-// under.
+// hierarchical one, with or without its parentheses (`top.T;`),
+// "blk[1].triple" for one into a generate block instance; empty where the call
+// names no path a module subroutine is registered under.
 std::string CalleePath(const Expr* call, SimContext& ctx, Arena& arena) {
   if (call->kind == ExprKind::kIdentifier) return std::string(call->text);
+  if (call->kind == ExprKind::kMemberAccess) {
+    std::string path;
+    if (!AppendHierarchicalPath(call, path, ctx, arena)) return std::string();
+    return path;
+  }
   if (!call->callee.empty()) return std::string(call->callee);
   std::string path;
   if (!AppendHierarchicalPath(call->lhs, path, ctx, arena)) {
@@ -188,6 +193,15 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
       IsPackageScopedCall(call)) {
     target.func = ctx.FindFunction(ScopedClassKey(call->lhs, arena));
     target.inst_prefix = std::move(active);
+    return target;
+  }
+  // §13.5.5 (printed page 351): `p::t;` enables the package task `p::t()`
+  // does, its empty parentheses being optional.
+  if (call->kind == ExprKind::kMemberAccess && call->is_scope_resolution) {
+    if (call->lhs != nullptr && call->lhs->elements.empty()) {
+      target.func = ctx.FindFunction(ScopedClassKey(call, arena));
+      target.inst_prefix = std::move(active);
+    }
     return target;
   }
   std::string path = CalleePath(call, ctx, arena);

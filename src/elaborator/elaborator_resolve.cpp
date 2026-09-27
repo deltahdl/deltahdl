@@ -626,6 +626,18 @@ ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
 
 std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
     std::string_view name) const {
+  // A cell clause of a config an instance was handed to is the nearer rule for
+  // the instances beneath that one (§33.4.2).
+  for (const auto& dov : delegated_cell_use_overrides_) {
+    if (dov.cell != name || !config_inst_path_.starts_with(dov.subtree + ".") ||
+        !CellUseOverrideApplies(dov.use.src_lib, name, unit_)) {
+      continue;
+    }
+    std::string_view lib = dov.use.use_lib.empty()
+                               ? std::string_view(current_library_)
+                               : std::string_view(dov.use.use_lib);
+    return FindCellInLibrary(lib, dov.use.use_cell, unit_);
+  }
   auto it = cell_clause_use_overrides_.find(std::string(name));
   if (it == cell_clause_use_overrides_.end()) return std::nullopt;
   const auto& ov = it->second;
@@ -643,9 +655,9 @@ std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
 }
 
 std::optional<ModuleDecl*> Elaborator::ResolveInstanceBindOverride() const {
-  if (current_inst_path_.empty()) return std::nullopt;
+  if (config_inst_path_.empty()) return std::nullopt;
   for (const auto& [path, ulib, ucell] : instance_bind_overrides_) {
-    if (path != current_inst_path_) continue;
+    if (path != config_inst_path_) continue;
     // An omitted target library is inherited from the parent cell (§33.4.1.6).
     std::string_view target_lib = ulib.empty()
                                       ? std::string_view(current_library_)
@@ -653,6 +665,91 @@ std::optional<ModuleDecl*> Elaborator::ResolveInstanceBindOverride() const {
     return FindCellInLibrary(target_lib, ucell, unit_);
   }
   return std::nullopt;
+}
+
+namespace {
+
+std::string JoinLibraries(const std::vector<std::string>& libs) {
+  std::string joined;
+  for (const auto& lib : libs) {
+    if (!joined.empty()) joined += ' ';
+    joined += lib;
+  }
+  return joined;
+}
+
+}  // namespace
+
+std::optional<std::pair<std::string, std::string>>
+ElaboratorData::UseTargetInForce(CompilationUnit* unit, const std::string& path,
+                                 std::string_view name) const {
+  for (const auto& [rule_path, lib, cell] : instance_use_overrides_) {
+    if (rule_path == path) return std::make_pair(lib, cell);
+  }
+  for (const auto& [rule_path, lib, cell] : instance_bind_overrides_) {
+    if (rule_path != path) continue;
+    return std::make_pair(lib.empty() ? current_library_ : lib, cell);
+  }
+  auto it = cell_clause_use_overrides_.find(std::string(name));
+  if (it != cell_clause_use_overrides_.end() &&
+      CellUseOverrideApplies(it->second.src_lib, name, unit)) {
+    const auto& ov = it->second;
+    return std::make_pair(ov.use_lib.empty() ? current_library_ : ov.use_lib,
+                          ov.use_cell);
+  }
+  return std::nullopt;
+}
+
+bool ElaboratorData::ReportConfigRuleBindingNothing(CompilationUnit* unit,
+                                                    const ModuleItem* item,
+                                                    DiagEngine& diag) const {
+  const std::string& path = config_inst_path_;
+  std::string_view name = item->inst_module;
+  if (auto use = UseTargetInForce(unit, path, name)) {
+    diag.Error(item->loc,
+               std::format("unknown module '{}': the configuration binds "
+                           "instance '{}' to {}.{}, and library '{}' holds "
+                           "no cell '{}'",
+                           name, path, use->first, use->second, use->first,
+                           use->second),
+               Subclause("33.4.1.6"));
+    return true;
+  }
+  const std::vector<std::string>* libs =
+      InstanceLiblistForPath(path, instance_liblist_overrides_);
+  if (libs == nullptr) {
+    auto it = cell_clause_liblist_overrides_.find(std::string(name));
+    if (it != cell_clause_liblist_overrides_.end()) libs = &it->second;
+  }
+  std::string_view which = "library list";
+  if (libs == nullptr &&
+      SelectedLibraryListInForce(library_order_, library_order_strict_)) {
+    libs = &library_order_;
+    which = "default library list";
+  }
+  if (libs == nullptr) return false;
+  diag.Error(
+      item->loc,
+      std::format("unknown module '{}': the configuration's {} ({}) holds "
+                  "no cell '{}' for instance '{}'",
+                  name, which, JoinLibraries(*libs), name, path),
+      Subclause("33.4.1.5"));
+  return true;
+}
+
+std::string HierInstancePath(std::string_view parent, const HierPath& gen_steps,
+                             std::string_view inst_name) {
+  std::string path(parent);
+  auto level = [&path](std::string_view name) {
+    if (!path.empty()) path.push_back('.');
+    path.append(name);
+  };
+  for (const auto& step : gen_steps) {
+    level(step.name);
+    if (step.has_index) path += std::format("[{}]", step.index);
+  }
+  level(inst_name);
+  return path;
 }
 
 const std::vector<std::string>* InstanceLiblistForPath(
@@ -728,7 +825,7 @@ static ModuleDecl* PickCandidateByGlobalOrder(
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
-  if (auto hit = FindInstanceUseOverride(current_inst_path_,
+  if (auto hit = FindInstanceUseOverride(config_inst_path_,
                                          instance_use_overrides_, unit_);
       hit.has_value()) {
     return *hit;
@@ -756,7 +853,7 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   CollectModuleCandidates(name, unit_, candidates, extern_decl);
 
   const std::vector<std::string>* override_liblist = SelectOverrideLiblist(
-      name, current_inst_path_, instance_liblist_overrides_,
+      name, config_inst_path_, instance_liblist_overrides_,
       cell_clause_liblist_overrides_);
 
   // §33.6.2: a library the default clause's list leaves out is not searched at

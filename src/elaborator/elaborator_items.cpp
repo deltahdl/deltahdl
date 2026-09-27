@@ -77,6 +77,17 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   mod->specparam_names.push_back(var.name);
 }
 
+// §23.2.2.1: a non-ANSI port written as a select of a vector, `y[7:4]` under
+// `output [7:0] y`, declares that vector as much as a port named y does, so
+// `assign y = ...` inside the module drives it rather than a net of its own.
+bool PortSelectsFrom(const RtlirPort& port, std::string_view name) {
+  if (port.selected_width == 0) return false;
+  const Expr* root = port.port_expr;
+  while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+  return root != nullptr && root->kind == ExprKind::kIdentifier &&
+         root->text == name;
+}
+
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
     if (v.name == name) return true;
@@ -85,7 +96,7 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
     if (n.name == name) return true;
   }
   for (const auto& p : mod->ports) {
-    if (p.name == name) return true;
+    if (p.name == name || PortSelectsFrom(p, name)) return true;
   }
   return false;
 }
@@ -610,7 +621,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // and property_registry_ for §16.12's instances of a named property or
       // sequence, which it fills and takes back the same way.
       pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_,
-                                    func_decls_, property_registry_});
+                                    func_decls_, property_registry_,
+                                    config_inst_path_, current_library_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:

@@ -7,9 +7,11 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaborator/command_line_bind.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_reports.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
@@ -156,6 +158,118 @@ TEST(ConfigCellClause, LibQualifiedCellClauseDoesNotApplyToOtherLibraries) {
        "rtlLib", "gateLib", "rtlLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "adder");
+}
+
+// A cell clause handing every adder to a config whose design statement binds
+// adder_gate, with the config written ahead of the one using it.
+constexpr std::string_view kCellClauseToAConfig =
+    "module adder; endmodule\n"
+    "module adder_gate; endmodule\n"
+    "module top; adder a1(); adder a2(); endmodule\n"
+    "config cfg;\n"
+    "  design work.top;\n"
+    "  cell adder use work.sub:config;\n"
+    "endconfig\n"
+    "config sub;\n"
+    "  design work.adder_gate;\n"
+    "endconfig\n";
+
+// §33.4.1.4 has a cell clause's expansion apply to every instance bound to the
+// cell, and §33.4.2 has a use clause naming a config bind what that config's
+// design statement names, so both adders become adder_gate.
+TEST(ConfigCellClause, CellUseNamingAConfigBindsItsDesignCell) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(kCellClauseToAConfig, run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  ASSERT_NE(run.design, nullptr);
+  ASSERT_EQ(run.design->top_modules.size(), 1u);
+  const auto& children = run.design->top_modules[0]->children;
+  ASSERT_EQ(children.size(), 2u);
+  for (const auto& child : children) {
+    ASSERT_NE(child.resolved, nullptr) << child.inst_name;
+    EXPECT_EQ(child.resolved->name, "adder_gate") << child.inst_name;
+  }
+}
+
+// The config a cell clause hands its instances to is delegated to, like one an
+// instance clause names, so it is not a second configuration in force.
+TEST(ConfigCellClause, ConfigACellClauseNamesIsNotInForce) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", std::string(kCellClauseToAConfig));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  ASSERT_NE(cu, nullptr);
+  auto in_force = ConfigsInForce(*cu);
+  ASSERT_EQ(in_force.size(), 1u);
+  EXPECT_EQ(in_force[0]->name, "cfg");
+}
+
+// W as elaborated for each child of the design's one top, by instance name.
+std::string WidthsOfEachChild(const ConfigElaboration& run) {
+  std::string out;
+  if (run.design == nullptr || run.design->top_modules.size() != 1) return out;
+  for (const auto& child : run.design->top_modules[0]->children) {
+    if (child.resolved == nullptr) continue;
+    for (const auto& p : child.resolved->params) {
+      if (p.name != "W") continue;
+      out += std::string(child.inst_name) + "=" +
+             std::to_string(p.resolved_value) + " ";
+    }
+  }
+  return out;
+}
+
+// §33.4.1.4 with Syntax 33-4's second use_clause form: a cell clause whose use
+// expansion carries named parameter assignments alone keeps the cell and
+// overrides the parameter on every instance of it.
+TEST(ConfigCellClause, ParameterOnlyUseOverridesEveryInstance) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module adder #(parameter ID = 0, W = 8); endmodule\n"
+      "module top; adder #(.ID(1)) x(); adder #(.ID(2)) y(); endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  cell adder use #(.W(12));\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(WidthsOfEachChild(run), "x=12 y=12 ");
+}
+
+// The third form names the cell as well as the assignments; the binding and
+// the override both reach the instance.
+TEST(ConfigCellClause, CellAndParameterUseOverridesTheInstance) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module adder #(parameter ID = 0, W = 8); endmodule\n"
+      "module top; adder #(.ID(1)) x(); endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  cell adder use work.adder #(.W(12));\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(WidthsOfEachChild(run), "x=12 ");
+}
+
+// An instance clause is the more specific selection, so where it and a cell
+// clause both set a parameter of one instance, the instance clause decides.
+TEST(ConfigCellClause, InstanceOverrideBeatsTheCellOverride) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top; adder x(); adder y(); endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  cell adder use #(.W(12));\n"
+      "  instance top.y use #(.W(20));\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(WidthsOfEachChild(run), "x=12 y=20 ");
 }
 
 }  // namespace

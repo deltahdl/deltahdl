@@ -687,6 +687,9 @@ static void CarryNetArrayDims(
   if (it == infos.end()) return;
   net.num_unpacked_dims = it->second.num_unpacked_dims;
   net.unpacked_dim_sizes = it->second.dim_sizes;
+  for (const auto& dim : it->second.declared_dims) {
+    net.unpacked_dims.push_back(RtlirUnpackedDim{dim.left, dim.right});
+  }
 }
 
 // The type a net record carries beyond its width. §11.5.1: the width says how

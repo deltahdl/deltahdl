@@ -42,6 +42,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
+#include "simulator/timing_check_delayed_signals.h"
 #include "simulator/timing_check_driver.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -699,12 +700,26 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
 // `string s = "unit"` read the calling top's own `string s` through the
 // frame's fall-through to the instance's names, 12 for "modulestring", and
 // its `s = "x"` wrote the top's s for the unit's.
-static void RegisterFreeCuFunctions(const RtlirDesign* design,
-                                    SimContext& ctx) {
+//
+// §23.8.1 (printed page 760): a subroutine name is looked up "in the complete
+// compilation unit of the reference" before the search proceeds past the
+// scope it is written in, so a bare call in a unit subroutine's body names the
+// unit's subroutine ahead of the caller's: in the standard's `task t; ... x =
+// f(1); endtask` followed by the unit's `function int f(int y)`, t's f is that
+// function whatever module or generate block enables t. Each is registered
+// under "$unit::name" as well, the key FindFunctionInPackageScope asks while
+// such a frame is in force; registered under its bare name alone, a top's own
+// f, or a generate block's the caller stood in, answered t's call.
+static void RegisterFreeCuFunctions(const RtlirDesign* design, SimContext& ctx,
+                                    Arena& arena) {
   static constexpr std::string_view kUnitScope = "$unit";
   for (auto* item : design->cu_function_decls) {
     if (!item->method_class.empty()) continue;
     ctx.RegisterFunction(item->name, item);
+    ctx.RegisterFunction(
+        *arena.Create<std::string>(std::string(kUnitScope) +
+                                   "::" + std::string(item->name)),
+        item);
     ctx.RegisterSubroutinePackage(item, kUnitScope);
   }
 }
@@ -792,6 +807,10 @@ void Lowerer::RegisterDesignTiming() {
   // anything -- a signal that transitions before it is watched leaves no
   // transition behind for the check to measure.
   WatchTimingChecks(mgr, ctx_);
+  // §31.9.1 and §31.9.4: the delayed signals the $setuphold and $recrem checks
+  // just registered name follow their originals, lagging where the option
+  // enabling negative timing checks puts a delay on them.
+  DriveTimingCheckDelayedSignals(mgr, ctx_, arena_);
 }
 
 // Annex D.11: the interactive scope consulted by the optional $scope system
@@ -848,7 +867,10 @@ void Lowerer::Lower(const RtlirDesign* design) {
     ctx_.SetCurrentScopeName(top->name);
   }
   for (auto* top : design->top_modules) {
-    RegisterScopeTimescales(top, ctx_, std::string(top->name), "");
+    // A later top is keyed under its name, as an instance (LowerParallelTop).
+    std::string below_top =
+        top == design->top_modules.front() ? "" : std::string(top->name);
+    RegisterScopeTimescales(top, ctx_, std::string(top->name), below_top);
   }
   LowerDesignData();
 
@@ -866,18 +888,21 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   InitCompilationUnitData();
   LowerCompilationUnitClasses();
-  RegisterFreeCuFunctions(design, ctx_);
+  RegisterFreeCuFunctions(design, ctx_, arena_);
   RegisterDesignScopeDpiImports(design, ctx_);
-  // §23.6: each top-level module roots a name hierarchy, and a path from a
-  // parallel hierarchy starts at its name; every top's name is recorded
-  // ahead of any lowering so a top's declaration initializer can already
-  // name another top.
-  for (auto* top : design->top_modules) ctx_.RegisterTopModule(top->name);
+  // §23.6: a path from a parallel hierarchy starts at a top's name, the first
+  // top's here and a later top's as an instance's (LowerParallelTop).
+  const auto& tops = design->top_modules;
+  if (!tops.empty()) ctx_.RegisterTopModule(tops.front()->name);
   // §26.2 with §6.21: the packages' and the unit's objects exist before the
   // first module's declaration initializer runs (lowerer_data_init.cpp).
   ConstructDesignData();
-  for (auto* mod : design->top_modules) {
-    LowerModule(mod);
+  for (auto* mod : tops) {
+    if (mod == tops.front()) {
+      LowerModule(mod);
+    } else {
+      LowerParallelTop(mod);
+    }
   }
   // §26.3: the bare names of the package classes no scope had bound, held
   // back while the modules bound their own, and the typedef names that

@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_reports.h"
 #include "helpers_reported_error.h"
 
 namespace {
@@ -104,6 +108,86 @@ TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
                             "instance path 'lib1.a' in config 'c' does not "
                             "start at a top-level cell",
                             4, "33.4.1.3"));
+}
+
+// The module bound to the instance named `inst_name` directly inside the
+// generate block `block` of the design's one top, or empty where there is none.
+std::string_view ModuleBoundInBlock(const ConfigElaboration& run,
+                                    std::string_view block,
+                                    std::string_view inst_name) {
+  if (run.design == nullptr || run.design->top_modules.size() != 1) return {};
+  for (const auto& child : run.design->top_modules[0]->children) {
+    if (child.simple_inst_name != inst_name || child.resolved == nullptr ||
+        child.gen_block_path.size() != 1 ||
+        child.gen_block_path[0].name != block) {
+      continue;
+    }
+    return child.resolved->name;
+  }
+  return {};
+}
+
+// §33.4.1.3 (printed page 939): "The instance name associated with the instance
+// clause is a SystemVerilog hierarchical name, starting at the top-level module
+// of the config", and §23.6 makes a generate block a level of such a name, so
+// `top.g.u` names the instance u inside the block g and the clause rebinds it.
+TEST(ConfigInstanceClause, InstancePathThroughAGenerateBlockIsApplied) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module m; endmodule\n"
+      "module m_gate; endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    m u();\n"
+      "  end\n"
+      "endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  instance top.g.u use work.m_gate;\n"
+      "endconfig\n",
+      run);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(ModuleBoundInBlock(run, "g", "u"), "m_gate");
+}
+
+// The flattened name the instance is stored under, `g_u`, is not a
+// hierarchical name of it, so a clause spelled that way selects nothing and
+// the instance keeps the module it was written with.
+TEST(ConfigInstanceClause, FlattenedGenerateNameSelectsNothing) {
+  ConfigElaboration run;
+  ElaborateUnderConfig(
+      "module m; endmodule\n"
+      "module m_gate; endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    m u();\n"
+      "  end\n"
+      "endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  instance top.g_u use work.m_gate;\n"
+      "endconfig\n",
+      run);
+  EXPECT_EQ(ModuleBoundInBlock(run, "g", "u"), "m");
+}
+
+// A library list a clause names for an instance inside a generate block is
+// the list that instance is searched in (§33.4.1.5).
+TEST(ConfigInstanceClause, LiblistThroughAGenerateBlockGovernsTheInstance) {
+  auto diags = ConfigElaborationReports(
+      "module m; endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    m u();\n"
+      "  end\n"
+      "endmodule\n"
+      "config cfg;\n"
+      "  design work.top;\n"
+      "  instance top.g.u liblist gateLib;\n"
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(
+      diags, "library list (gateLib) holds no cell 'm' for instance 'top.g.u'",
+      4, "33.4.1.5"));
 }
 
 }  // namespace

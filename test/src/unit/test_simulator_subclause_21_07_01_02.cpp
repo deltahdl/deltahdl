@@ -325,6 +325,51 @@ TEST_F(DumpvarsTopModuleScope, AChildNamedThroughTheTopModuleSelectsThatChild) {
   EXPECT_EQ(section.find("b10100101"), std::string::npos) << section;  // own
 }
 
+// §21.7.1.2 lists "which variables to dump", and §21.7.2.3 has the $var
+// section print "the names and identifier codes of the variables being
+// dumped". Example 1's call dumps nothing of the instances below the top
+// module, so the child's variable is not declared, and the $scope that would
+// hold it holds nothing and is not written either.
+TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelOneDeclaresOnlyItsOwnVariables) {
+  RunSource(Design("1, t"));
+  auto content = DumpFile("dump.vcd");
+  EXPECT_NE(content.find(" own $end"), std::string::npos) << content;
+  EXPECT_EQ(content.find(" val $end"), std::string::npos) << content;
+  EXPECT_EQ(content.find("$scope module c1 $end"), std::string::npos)
+      << content;
+}
+
+// A call naming one variable of an instance declares that variable alone,
+// under the scopes leading down to it, and none of the top module's own.
+TEST_F(DumpvarsTopModuleScope, ANamedChildVariableIsTheOneDeclared) {
+  RunSource(Design("0, t.c1.val"));
+  auto content = DumpFile("dump.vcd");
+  EXPECT_EQ(content.find(" own $end"), std::string::npos) << content;
+  auto t_scope = content.find("$scope module t $end");
+  auto c1_scope = content.find("$scope module c1 $end");
+  auto val = content.find(" val $end");
+  ASSERT_NE(val, std::string::npos) << content;
+  EXPECT_LT(t_scope, c1_scope) << content;
+  EXPECT_LT(c1_scope, val) << content;
+}
+
+// The file is open before the first call runs, and a second call in the same
+// time unit adds to the variables dumped, so the declarations wait for the
+// whole selection: each call's variable is declared, ahead of the
+// $enddefinitions, and both checkpoints follow it.
+TEST_F(DumpvarsTopModuleScope, TwoCallsInOneTimeUnitDeclareBothSelections) {
+  RunSource(Design("0, t.own);\n    $dumpvars(0, t.c1.val"));
+  auto content = DumpFile("dump.vcd");
+  auto end_defs = content.find("$enddefinitions");
+  ASSERT_NE(end_defs, std::string::npos) << content;
+  EXPECT_LT(content.find(" own $end"), end_defs) << content;
+  EXPECT_LT(content.find(" val $end"), end_defs) << content;
+  auto first = content.find("$dumpvars\n");
+  EXPECT_LT(end_defs, first) << content;
+  EXPECT_NE(content.find("$dumpvars\n", first + 1), std::string::npos)
+      << content;
+}
+
 // §21.7.1.2: "The $dumpvars task shall be used to list which variables to dump
 // into the file specified by $dumpfile." What a call listed therefore governs
 // the whole recording rather than the one checkpoint the call writes, so these

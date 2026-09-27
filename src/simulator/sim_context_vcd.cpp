@@ -3,6 +3,7 @@
 // claim it is. The writer decides how a declaration and a value change are
 // spelled; this file decides which objects reach it and under what type.
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -94,6 +95,22 @@ static std::string_view EnterVcdInstanceScope(
   return name.substr(start);
 }
 
+// §21.7.4.2: in the extended VCD node-information section a port that is a
+// bus prints its index range as the size field, while a single-bit port
+// prints 1. The simulator keeps the resolved bit width of the dumped
+// object -- its declaration's packed range collapsed to a width -- so a
+// multi-bit object supplies the descending range [width-1:0] as the
+// vector_index matching its declaration; a 1-bit object leaves msb/lsb
+// negative and is dumped as a scalar. A real is dumped as one %g value, not
+// a bit vector, so it keeps the scalar size. These bounds are consulted
+// only by the port-node ($dumpports) form; the 4-state $var uses the width.
+static void SetVcdPortRange(VcdSignalSpec& spec) {
+  if (spec.data_type != VcdDataType::kReal && spec.width > 1) {
+    spec.msb = static_cast<int32_t>(spec.width) - 1;
+    spec.lsb = 0;
+  }
+}
+
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
   std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
                                                            variables_.end());
@@ -156,19 +173,7 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
       spec.net_type = net->type;
       spec.net = net;
     }
-    // §21.7.4.2: in the extended VCD node-information section a port that is a
-    // bus prints its index range as the size field, while a single-bit port
-    // prints 1. The simulator keeps the resolved bit width of the dumped
-    // object -- its declaration's packed range collapsed to a width -- so a
-    // multi-bit object supplies the descending range [width-1:0] as the
-    // vector_index matching its declaration; a 1-bit object leaves msb/lsb
-    // negative and is dumped as a scalar. A real is dumped as one %g value, not
-    // a bit vector, so it keeps the scalar size. These bounds are consulted
-    // only by the port-node ($dumpports) form; the 4-state $var uses the width.
-    if (spec.data_type != VcdDataType::kReal && spec.width > 1) {
-      spec.msb = static_cast<int32_t>(spec.width) - 1;
-      spec.lsb = 0;
-    }
+    SetVcdPortRange(spec);
     vcd.RegisterSignal(spec);
   }
   for (; !open_scopes.empty(); open_scopes.pop_back()) vcd.EndScope();
@@ -200,6 +205,14 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   if (dump.writer != nullptr) return dump.writer;
   auto vcd = std::make_unique<VcdWriter>(dump.file_name);
   if (!vcd->IsOpen()) return nullptr;
+  // §21.7.1.2: $dumpvars lists "which variables to dump", may run "as often as
+  // desired" so long as every call runs at one simulation time, and §21.7.2.3
+  // declares in $var only "the variables being dumped". The file opens before
+  // any of those calls runs, so its declarations -- and the checkpoints the
+  // calls write behind them -- are held until that time unit has played out,
+  // when the whole selection is known and the declarations can be narrowed
+  // to it.
+  if (wait_for_dumpvars) vcd->BufferDeclarations();
   // §21.7 b): an extended file represents "variable changes in all states and
   // strength information", which is a different form for the node information
   // (§21.7.4.2 declares each object as $var port with an integer identifier

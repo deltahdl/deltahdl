@@ -185,4 +185,68 @@ TEST(PrimarySim, BitsOfAModuleLocalClassScopedTypedefVariable) {
   EXPECT_EQ(n->value.ToUint64(), 8u);
 }
 
+// §20.6.2 (printed page 629): $bits answers "the number of bits required to
+// hold an expression as a bit stream", which for a fixed-size unpacked array
+// is every element's: 16 for `logic [7:0] m [0:1]` and for the net array
+// `wire [7:0] w [0:1]`, 48 for `logic [7:0] md [2][3]`, 24 for its row
+// md[1], 128 for `int a [4]`. Read at run time the name was one element's
+// worth, and each answered its element's 8 or 32.
+TEST(PrimarySim, BitsOfFixedSizeUnpackedArraysCountEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] m [0:1];\n"
+                       "  wire [7:0] w [0:1];\n"
+                       "  logic [7:0] md [2][3];\n"
+                       "  int a [4];\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d\", $bits(m), "
+                       "$bits(w), $bits(md), $bits(md[1]), $bits(a));\n"
+                       "endmodule\n",
+                       f),
+            "16 16 48 24 128\n");
+}
+
+// §20.6.2 with §23.6: the same holds for an instance's array named through a
+// hierarchical reference -- 32 for u.mem, `logic [7:0] mem[2:5]`, 24 and 12
+// for u.m2, `logic [3:0] m2[2][3]`, and its row u.m2[1] -- and an instance's
+// queue counts its live elements, 96 for three ints. Each answered its
+// element's 8, 4 or 32.
+TEST(PrimarySim, BitsOfHierarchicallyNamedArraysCountEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  logic [7:0] mem[2:5];\n"
+                       "  logic [3:0] m2[2][3];\n"
+                       "  int q[$] = '{1, 2, 3};\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub u();\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", $bits(u.mem), "
+                       "$bits(u.m2), $bits(u.m2[1]), $bits(u.q));\n"
+                       "endmodule\n",
+                       f),
+            "32 24 12 96\n");
+}
+
+// §20.6.2 with §8.5: a class object's unpacked array property is sized the
+// same way -- 24 for `logic [7:0] data[1:3]` through a handle and bare in a
+// method, and 64 for a dynamic `int d[]` holding the two elements its new[]
+// gave it. Read as an expression each answered one element's 32 or 8.
+TEST(PrimarySim, BitsOfClassArrayPropertiesCountEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    logic [7:0] data[1:3];\n"
+                       "    int d[];\n"
+                       "    function int own; return $bits(data); endfunction\n"
+                       "  endclass\n"
+                       "  C m = new;\n"
+                       "  initial begin\n"
+                       "    m.d = new[2];\n"
+                       "    $display(\"%0d %0d %0d\", $bits(m.data), m.own(), "
+                       "$bits(m.d));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "24 24 64\n");
+}
+
 }  // namespace

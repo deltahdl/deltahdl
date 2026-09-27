@@ -2,7 +2,9 @@
 #include <cstddef>
 #include <format>
 #include <map>
+#include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -101,11 +103,27 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
     if (!u->is_extern)
       check_def(u->library, u->name, u->range, Subclause("3.13"));
 
-  // The config loop runs last, so a name a config shares with a design element
-  // of any other kind is always the later insertion and is always reported
-  // here, whatever order the two appear in the source.
-  for (auto* cfg : unit->configs)
-    check_def(cfg->library, cfg->name, cfg->range, Subclause("33.2"));
+  // A config shares its name with a module or primitive lawfully. §33.2.1
+  // (printed page 935): "The optional :config extension shall be used
+  // explicitly to refer to a config in the case where a config has the same
+  // name as a module/primitive", and §33.4.1.6 adds the suffix to a use
+  // clause's lib.cell for that case. A config is otherwise in the name space
+  // §33.2 puts it in, so one of an interface's or a program's name, or a second
+  // config of its own, is still a name defined twice.
+  std::map<std::pair<std::string_view, std::string_view>, SourceRange>
+      config_names;
+  for (auto* p : unit->programs)
+    config_names.try_emplace({p->library, p->name}, p->range);
+  for (auto* i : unit->interfaces)
+    config_names.try_emplace({i->library, i->name}, i->range);
+  for (auto* cfg : unit->configs) {
+    if (!config_names.try_emplace({cfg->library, cfg->name}, cfg->range)
+             .second) {
+      diag.Error(cfg->range.start,
+                 std::format("duplicate definition of '{}'", cfg->name),
+                 Subclause("33.2"));
+    }
+  }
 }
 
 void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
@@ -388,8 +406,6 @@ void Elaborator::ValidateConfigHierarchicalRules() {
   }
 }
 
-namespace {
-
 bool IsLiteralKind(ExprKind k) {
   switch (k) {
     case ExprKind::kIntegerLiteral:
@@ -402,6 +418,8 @@ bool IsLiteralKind(ExprKind k) {
       return false;
   }
 }
+
+namespace {
 
 template <typename Visitor>
 bool WalkExprAnyChildren(const Expr* expr, Visitor&& v);
@@ -556,29 +574,32 @@ std::vector<std::string_view> HierReferenceNames(const Expr* e) {
   return names;
 }
 
+// Whether `item` is a generate construct one of whose blocks is named `name`.
+bool NamesGenerateBlock(const ModuleItem* item, std::string_view name) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateFor:
+      return item->name == name;
+    case ModuleItemKind::kGenerateIf:
+      for (const auto* arm = item; arm != nullptr; arm = arm->gen_else) {
+        if (arm->name == name) return true;
+      }
+      return false;
+    case ModuleItemKind::kGenerateCase:
+      return std::any_of(item->gen_case_items.begin(),
+                         item->gen_case_items.end(),
+                         [name](const auto& ci) { return ci.label == name; });
+    default:
+      return false;
+  }
+}
+
 // Whether `mod` holds, among its own items, a generate construct one of whose
 // blocks is named `name`.
 bool DeclaresGenerateBlock(const ModuleDecl* mod, std::string_view name) {
-  for (const auto* item : mod->items) {
-    switch (item->kind) {
-      case ModuleItemKind::kGenerateFor:
-        if (item->name == name) return true;
-        break;
-      case ModuleItemKind::kGenerateIf:
-        for (const auto* arm = item; arm != nullptr; arm = arm->gen_else) {
-          if (arm->name == name) return true;
-        }
-        break;
-      case ModuleItemKind::kGenerateCase:
-        for (const auto& ci : item->gen_case_items) {
-          if (ci.label == name) return true;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  return false;
+  return std::any_of(mod->items.begin(), mod->items.end(),
+                     [name](const ModuleItem* item) {
+                       return NamesGenerateBlock(item, name);
+                     });
 }
 
 // The module instantiated as `inst_name` among `mod`'s own items, or nullptr.
@@ -601,11 +622,10 @@ const ModuleDecl* InstantiatedModule(const ModuleDecl* mod,
 // last name; nullptr where one of them is a generate block, which is what
 // `through_generate` then reports, or names nothing that can be followed.
 const ModuleDecl* DescendScopes(const ModuleDecl* mod,
-                                const std::vector<std::string_view>& names,
-                                size_t first, size_t end,
+                                std::span<const std::string_view> names,
                                 const CompilationUnit* unit,
                                 bool& through_generate) {
-  for (size_t i = first; mod != nullptr && i < end; ++i) {
+  for (size_t i = 0; mod != nullptr && i + 1 < names.size(); ++i) {
     if (DeclaresGenerateBlock(mod, names[i])) {
       through_generate = true;
       return nullptr;
@@ -647,40 +667,49 @@ bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
     return nullptr;
   };
   bool through_generate = false;
+  std::span<const std::string_view> refs(names);
   if (const auto* top = top_module(names[0])) {
-    DescendScopes(top, names, 1, names.size() - 1, unit, through_generate);
+    DescendScopes(top, refs.subspan(1), unit, through_generate);
     return through_generate;
   }
   auto inst = SplitDots(rule->inst_path);
   const ModuleDecl* parent = top_module(inst.front());
   parent =
-      DescendScopes(parent, inst, 1, inst.size() - 1, unit, through_generate);
+      DescendScopes(parent, std::span<const std::string_view>(inst).subspan(1),
+                    unit, through_generate);
   if (parent == nullptr) return through_generate;
-  DescendScopes(parent, names, 0, names.size() - 1, unit, through_generate);
+  DescendScopes(parent, refs, unit, through_generate);
   return through_generate;
+}
+
+// Every parameter override one config's rules write, judged against the
+// config's own localparams and against the design the config selects.
+void ValidateConfigOverrides(const ConfigDecl* cfg, const CompilationUnit* unit,
+                             DiagEngine& diag) {
+  std::unordered_set<std::string_view> lp_names;
+  for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
+
+  for (const auto* rule : cfg->rules) {
+    for (const auto& [pname, expr] : rule->use_params) {
+      if (!expr) continue;
+      ValidateOneParamOverride(cfg, pname, expr, lp_names, diag);
+      if (OverrideReferenceCrossesGenerate(cfg, rule, expr, unit)) {
+        diag.Error(expr->range.start,
+                   std::format("config '{}' override of parameter '{}' uses "
+                               "a hierarchical reference that passes "
+                               "through a generate scope",
+                               cfg->name, pname),
+                   Subclause("33.4.3"));
+      }
+    }
+  }
 }
 
 }  // namespace
 
 void Elaborator::ValidateConfigParamOverrides() {
-  for (auto* cfg : unit_->configs) {
-    std::unordered_set<std::string_view> lp_names;
-    for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
-
-    for (auto* rule : cfg->rules) {
-      for (const auto& [pname, expr] : rule->use_params) {
-        if (!expr) continue;
-        ValidateOneParamOverride(cfg, pname, expr, lp_names, diag_);
-        if (OverrideReferenceCrossesGenerate(cfg, rule, expr, unit_)) {
-          diag_.Error(expr->range.start,
-                      std::format("config '{}' override of parameter '{}' uses "
-                                  "a hierarchical reference that passes "
-                                  "through a generate scope",
-                                  cfg->name, pname),
-                      Subclause("33.4.3"));
-        }
-      }
-    }
+  for (const auto* cfg : unit_->configs) {
+    ValidateConfigOverrides(cfg, unit_, diag_);
   }
 }
 

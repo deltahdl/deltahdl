@@ -229,8 +229,9 @@ TEST(ConfigCellClauseExample, UseExpansionNamingNoCellLeavesTheCellsUnbound) {
   ASSERT_NE(top, nullptr);
   // f1, the first of the two instances of m kAdderSource writes, on its second
   // line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'm'", 2,
-                            "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "library 'gateLib' holds no cell 'nosuch'", 2,
+                            "33.4.1.6"));
   std::vector<std::string> expected(4, "");
   EXPECT_EQ(LibrariesBindingM(top), expected);
 }
@@ -426,8 +427,9 @@ TEST(ConfigCellClauseExample, WithoutTheClauseThePrimitiveIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "w", "gateLib"));
   // kPrimitiveTop instantiates w on its fourth line.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), "unknown module 'w'", 4,
-                            "23.3.2"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
+                            "default library list (rtlLib) holds no cell 'w'",
+                            4, "33.4.1.5"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }

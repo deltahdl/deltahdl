@@ -96,7 +96,7 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
 static std::string_view SelectRootKey(const Expr* expr, SimContext& ctx) {
   const Expr* root = expr->base;
   while (root && root->kind == ExprKind::kSelect) root = root->base;
-  return ScopedOrBareTargetKey(root, ctx.GetArena());
+  return ArrayRootKey(root, ctx.GetArena());
 }
 
 static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
@@ -119,7 +119,7 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
                                   SimContext& ctx, Arena& arena,
                                   Logic4Vec& out) {
   if (!expr->base || expr->index_end) return false;
-  std::string_view key = ScopedOrBareTargetKey(expr->base, arena);
+  std::string_view key = ArrayRootKey(expr->base, arena);
   if (key.empty()) return false;
   auto* info = ctx.FindArrayInfo(key);
   if (!info) return false;
@@ -142,6 +142,10 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
     return true;
   }
   out = elem->value;
+  // As EvalIdentifier reads a variable: an element's signedness is its
+  // declaration's, never the value's that was last written into it, so
+  // `d[0] = 4'sd9` on `logic [3:0] d [2]` reads back 9.
+  out.is_signed = elem->is_signed;
   if (elem_is_string) out.is_string = true;
   return true;
 }
@@ -203,6 +207,7 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   auto* elem = ctx.FindVariable(compound);
   if (elem) {
     out = elem->value;
+    out.is_signed = elem->is_signed;
     return true;
   }
   // The full compound name is not a variable. If a prefix of the chain names

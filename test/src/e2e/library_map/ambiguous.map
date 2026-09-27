@@ -1,0 +1,2 @@
+library lib_a ambiguous.v;
+library lib_b ambiguous.v;

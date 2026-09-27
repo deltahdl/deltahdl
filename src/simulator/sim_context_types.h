@@ -21,6 +21,13 @@ struct Expr;
 struct ModuleItem;
 struct Process;
 
+// §21.3.7: the outcome SimContext records for the most recent file I/O
+// operation on a descriptor that failed, which $ferror reports.
+struct FileIoError {
+  int32_t code = 0;
+  std::string msg;
+};
+
 struct EnumMemberInfo {
   std::string_view name;
   uint64_t value = 0;
@@ -66,6 +73,10 @@ struct StructFieldInfo {
   // union, so a nested member is reachable by its dotted path. Null for
   // scalars.
   const StructTypeInfo* nested = nullptr;
+  // §21.2.1.6 (C7b): the member's type as written where it names one, the
+  // "scope::name" spelling for a package's -- how an enum member is known to
+  // print as the name of its value. Empty for a built-in type.
+  std::string_view type_name = {};
 };
 
 struct StructTypeInfo {

@@ -335,8 +335,10 @@ TEST(ConfigDefaultClauseExample, CellHeldOnlyByUnlistedLibrariesIsUnbound) {
   auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgTopLibraryOnly));
   ASSERT_NE(top, nullptr);
   // a1, the first of the two instances kTopFile writes, on its second line.
-  EXPECT_TRUE(ReportedError(d.diag.Diagnostics(), "unknown module 'adder'", 2,
-                            "23.3.2"));
+  EXPECT_TRUE(ReportedError(d.diag.Diagnostics(),
+                            "default library list (rtlLib) holds no cell "
+                            "'adder'",
+                            2, "33.4.1.5"));
   ASSERT_EQ(top->children.size(), 2u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
   EXPECT_EQ(top->children[1].resolved, nullptr);
@@ -510,8 +512,9 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAPrimitive) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "gateLib"));
   // kPrimTop instantiates w on its fourth line.
-  EXPECT_TRUE(
-      ReportedError(d.diag.Diagnostics(), "unknown module 'w'", 4, "23.3.2"));
+  EXPECT_TRUE(ReportedError(d.diag.Diagnostics(),
+                            "default library list (rtlLib) holds no cell 'w'",
+                            4, "33.4.1.5"));
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }

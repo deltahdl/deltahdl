@@ -435,6 +435,7 @@ class Parser {
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
+  void ParseSelectionExpansion(ConfigRule* rule, std::string_view selection);
   bool DotOpensNamedParamAssignment();
   void ParseUseClauseCell(ConfigRule* rule);
   void ParseNamedParamAssignment(ConfigRule* rule);

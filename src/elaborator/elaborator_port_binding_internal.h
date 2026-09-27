@@ -104,4 +104,9 @@ void CheckInterfacePortsConnected(const PortBindCtx& ctx,
                                   const std::vector<RtlirPort>& child_ports,
                                   const RtlirModuleInst& inst);
 
+// §23.3.3.1: an input net port the instance's module drives with a
+// continuous assignment, connected to a net of `parent`, is coerced to inout.
+// Defined in elaborator_port_binding_checks.cpp.
+void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent);
+
 }  // namespace delta

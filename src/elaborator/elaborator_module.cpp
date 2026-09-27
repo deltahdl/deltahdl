@@ -45,21 +45,22 @@ static uint32_t NamedSignalWidth(std::string_view name,
 // is as wide as its constant width operand, and a ranged select spans the
 // inclusive distance between its two constant bounds. The LRM example
 // `.P1(r[3:0])` connects to a 4-bit slice regardless of r's width.
-static uint32_t ExplicitPortSelectWidth(const Expr* expr) {
+static uint32_t ExplicitPortSelectWidth(const Expr* expr,
+                                        const ScopeMap& scope) {
   if (expr->index_end == nullptr) return 1;
   if (expr->is_part_select_plus || expr->is_part_select_minus) {
-    auto w = ConstEvalInt(expr->index_end);
+    auto w = ConstEvalInt(expr->index_end, scope);
     return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
   }
-  auto hi = ConstEvalInt(expr->index);
-  auto lo = ConstEvalInt(expr->index_end);
+  auto hi = ConstEvalInt(expr->index, scope);
+  auto lo = ConstEvalInt(expr->index_end, scope);
   if (!hi || !lo) return 0;
   int64_t span = (*hi >= *lo) ? (*hi - *lo + 1) : (*lo - *hi + 1);
   return static_cast<uint32_t>(span);
 }
 
-static uint32_t ExplicitPortExprWidth(const Expr* expr,
-                                      const RtlirModule* mod) {
+static uint32_t ExplicitPortExprWidth(const Expr* expr, const RtlirModule* mod,
+                                      const ScopeMap& scope) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
@@ -67,11 +68,11 @@ static uint32_t ExplicitPortExprWidth(const Expr* expr,
     case ExprKind::kConcatenation: {
       uint32_t total = 0;
       for (const auto* el : expr->elements)
-        total += ExplicitPortExprWidth(el, mod);
+        total += ExplicitPortExprWidth(el, mod, scope);
       return total;
     }
     case ExprKind::kSelect:
-      return ExplicitPortSelectWidth(expr);
+      return ExplicitPortSelectWidth(expr, scope);
     default:
       return 0;
   }
@@ -92,13 +93,23 @@ static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
 // §23.2.2.3: apply the self-determined type of each explicitly named port's
 // connection expression to the resolved port. The referenced declarations live
 // in the module body, so this runs after the items have been elaborated.
-static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod) {
+//
+// §23.2.2.2 (printed page 734): "ANSI style port declarations can be
+// explicitly named, allowing elements of arrays and structures, concatenations
+// of elements, and assignment pattern expressions of elements declared in a
+// module ... to be specified on the port list". The port stands for its
+// expression, so the expression is recorded on it for the connection to be
+// joined to (LowerPortBindings); without it `output .P1(r[3:0])` was storage
+// of its own that nothing inside the module reached.
+static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
+                                     const ScopeMap& scope) {
   for (const auto& src : decl->ports) {
     if (!src.is_explicit_named || !src.port_expr || src.name.empty()) continue;
-    uint32_t w = ExplicitPortExprWidth(src.port_expr, mod);
-    if (w == 0) continue;
+    uint32_t w = ExplicitPortExprWidth(src.port_expr, mod, scope);
     for (auto& rp : mod->ports) {
       if (rp.name != src.name) continue;
+      rp.port_expr = src.port_expr;
+      if (w == 0) break;
       rp.type_kind = DataTypeKind::kLogic;
       rp.width = w;
       rp.is_signed = ExplicitPortExprSigned(src.port_expr, mod);
@@ -561,7 +572,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
 
   ElaborateItems(decl, mod);
-  ResolveExplicitPortTypes(decl, mod);
+  ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));
   module_global_clocking_event_ = saved_global_clocking_event;
   if (own_gclk != nullptr) global_clocking_scopes_.pop_back();
   global_clocking_in_scope_ = saved_global_clocking_in_scope;

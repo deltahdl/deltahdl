@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -55,8 +56,13 @@ struct QueryArgInfo {
 // the width/kind of its packed element dimension. §20.7: a string is a nonarray
 // type equivalent to a simple bit vector (one packed dimension); a real type
 // contributes no packed dimension.
+//
+// §20.7 with §8.5: an unpacked array property of a class object, named bare in
+// one of its methods or through a handle, is an array too. Its dimension is
+// described into `class_array`, which the caller keeps for as long as it
+// reads the result.
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
-                                     Arena& arena) {
+                                     Arena& arena, ArrayInfo& class_array) {
   QueryArgInfo info;
   // §20.7 with §23.6: the array is named by an identifier, bare or a
   // hierarchical reference such as u.mem naming an instance's array.
@@ -71,6 +77,17 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
     info.assoc = ctx.FindAssocArray(name);
     info.queue = ctx.FindQueue(name);
     info.arr = ctx.FindArrayInfo(name);
+  }
+  ClassArrayRef ref;
+  if (arg0 && info.assoc == nullptr && info.queue == nullptr &&
+      info.arr == nullptr && ResolveClassArray(arg0, ctx, arena, ref)) {
+    class_array.lo = static_cast<uint32_t>(ref.lo);
+    class_array.size = ref.size;
+    class_array.elem_width = ref.prop->width;
+    class_array.is_descending = ref.prop->array_descending;
+    class_array.is_dynamic = ref.prop->is_dynamic;
+    class_array.is_4state = ref.prop->is_4state;
+    info.arr = &class_array;
   }
   info.dynamic_outer =
       info.queue != nullptr ||
@@ -237,7 +254,8 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   const Expr* arg0 = expr->args.empty() ? nullptr : expr->args[0];
 
   // Classify the first argument's outermost (slowest varying) dimension.
-  QueryArgInfo info = ClassifyQueryArg(arg0, ctx, arena);
+  ArrayInfo class_array;
+  QueryArgInfo info = ClassifyQueryArg(arg0, ctx, arena, class_array);
 
   uint32_t unpacked_dims = 0;
   uint32_t total_dims = CountTotalDims(info, unpacked_dims);

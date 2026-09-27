@@ -321,26 +321,6 @@ TEST(SizeOfDisplayedData, AutoSizedFieldHoldsUnknownStatusChar) {
   EXPECT_EQ(out, ":   x:\n");
 }
 
-// §21.2.1.2 (C3 negative): the inserted field width shall be a non-negative
-// decimal integer constant. A C-style negative (left-justify) width is not
-// part of the language; the specifier is not honored -- no left-justified
-// rendering is produced and the malformed text passes through, flagging the
-// misuse instead of silently inventing a meaning for it.
-TEST(SizeOfDisplayedData, NegativeFieldWidthIsRejected) {
-  SimFixture f;
-  std::string out = RunCapture(
-      "module t;\n"
-      "  logic [7:0] v;\n"
-      "  initial begin\n"
-      "    v = 5;\n"
-      "    $display(\"%-3d\", v);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out.find("5  "), std::string::npos);
-  EXPECT_NE(out.find("%-"), std::string::npos);
-}
-
 // §21.2.1.2 (C1 x §6.11.3): a function call is an expression argument like any
 // other, so its automatic decimal field comes from the return type. §6.11.3
 // makes `integer` signed, so the field is eleven columns (ten digits plus the

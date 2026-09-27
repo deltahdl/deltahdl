@@ -1,5 +1,6 @@
 #include "elaborator/elaborator.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -83,12 +84,31 @@ void CollectItemInstantiations(const ModuleItem* item,
 // unit->interfaces, unit->programs and unit->checkers. A design element that is
 // never instantiated contributes nothing to the elaborated design, so the
 // asymmetry is deliberate rather than an omission here.
+// §23.11 (printed page 771): "The bind_instantiation is effectively a complete
+// module, interface, program, or checker instantiation statement", so the
+// module a bind directive names appears in an instantiation and is no
+// top-level module (§23.3.1); run as a top as well, a module bound into
+// another ran once more with none of its ports connected.
+void CollectBoundNames(const std::vector<BindDirective*>& binds,
+                       std::unordered_set<std::string_view>& names) {
+  for (const auto* bd : binds) {
+    if (bd != nullptr && bd->instantiation != nullptr) {
+      names.insert(bd->instantiation->inst_module);
+    }
+  }
+}
+
 std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   std::unordered_set<std::string_view> instantiated;
-  for (const auto* mod : unit->modules)
+  for (const auto* mod : unit->modules) {
     CollectInstantiatedNames(mod->items, instantiated);
+    CollectBoundNames(mod->bind_directives, instantiated);
+  }
   for (const auto* prog : unit->programs)
     CollectInstantiatedNames(prog->items, instantiated);
+  for (const auto* iface : unit->interfaces)
+    CollectBoundNames(iface->bind_directives, instantiated);
+  CollectBoundNames(unit->bind_directives, instantiated);
 
   std::vector<ModuleDecl*> tops;
   for (auto* mod : unit->modules)
@@ -500,13 +520,30 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
 bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
                                      RtlirDesign* design) {
-  ParamList empty_params;
   for (auto* mod_decl : top_decls) {
     std::string saved_path = std::move(current_inst_path_);
     current_inst_path_.assign(mod_decl->name.data(), mod_decl->name.size());
-    auto* top = ElaborateModule(mod_decl, empty_params);
+    std::string saved_config_path =
+        std::exchange(config_inst_path_, current_inst_path_);
+    // §33.4.3 Example 3: `instance top use #(.WIDTH(32))` names the design's
+    // top-level cell alone, and its assignments are that cell's parameters,
+    // so they are applied to the top as a configuration's overrides are to any
+    // instance (§33.4.1.3 has an instance name start at the top-level module).
+    ParamList top_params;
+    std::vector<std::string_view> config_locked;
+    ModuleItem top_item;
+    top_item.inst_module = mod_decl->name;
+    ApplyConfigParamOverrides(&top_item, mod_decl, top_params, ScopeMap{},
+                              config_locked);
+    auto* top = ElaborateModule(mod_decl, top_params);
     current_inst_path_ = std::move(saved_path);
+    config_inst_path_ = std::move(saved_config_path);
     if (!top) return false;
+    for (auto& p : top->params) {
+      if (std::ranges::find(config_locked, p.name) != config_locked.end()) {
+        p.config_locked = true;
+      }
+    }
     design->top_modules.push_back(top);
   }
   // Every pass from here on runs outside any module. ApplyDefparamsRecursively
@@ -697,6 +734,27 @@ void Elaborator::SetMaxGenerateIterations(int64_t max_iterations) {
 
 // §33.4.3: record the parameter overrides each instance clause carries so they
 // can be applied as the matching instance is elaborated.
+// §33.4.3 (printed page 940): "A localparam declared in a configuration shall
+// be assigned a value and shall only be set to a literal value", so an override
+// naming one carries that literal itself, as wide as it was written -- a string
+// of any length rather than the 64 bits the folded localparam holds.
+static std::vector<std::pair<std::string_view, Expr*>>
+OverridesWithLocalparamLiterals(
+    const ConfigDecl* cfg,
+    std::vector<std::pair<std::string_view, Expr*>> params) {
+  for (auto& [pname, pexpr] : params) {
+    if (pexpr == nullptr || pexpr->kind != ExprKind::kIdentifier) continue;
+    for (const auto& [lname, lexpr] : cfg->local_params) {
+      if (lname == pexpr->text && lexpr != nullptr &&
+          IsLiteralKind(lexpr->kind)) {
+        pexpr = lexpr;
+        break;
+      }
+    }
+  }
+  return params;
+}
+
 void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
@@ -705,7 +763,7 @@ void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
     ov.inst_path.assign(rule->inst_path.data(), rule->inst_path.size());
     ov.reset_all = rule->use_param_reset_all;
     ov.loc = rule->loc;
-    ov.params = rule->use_params;
+    ov.params = OverridesWithLocalparamLiterals(cfg, rule->use_params);
     instance_param_overrides_.push_back(std::move(ov));
   }
 }
@@ -718,10 +776,35 @@ void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
 void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kCell) continue;
+    // §33.4.1.4 with Syntax 33-4's second and third use_clause forms: a cell
+    // clause's named parameter assignments apply to every instance of the
+    // cell, whether or not the clause also names the cell to bind.
+    if (RuleCarriesParamOverride(rule)) {
+      ConfigParamOverride ov;
+      ov.inst_path.assign(rule->cell_name.data(), rule->cell_name.size());
+      ov.reset_all = rule->use_param_reset_all;
+      ov.loc = rule->loc;
+      ov.params = OverridesWithLocalparamLiterals(cfg, rule->use_params);
+      cell_param_overrides_.push_back(std::move(ov));
+      if (rule->use_cell.empty()) continue;
+    }
     if (!rule->use_cell.empty()) {
+      std::string use_lib(rule->use_lib);
+      std::string use_cell(rule->use_cell);
+      // §33.4.2: a use clause naming a config binds what that config's design
+      // statement names, and §33.4.1.1 has a design cell written without a
+      // library taken from the library holding the config.
+      if (UseClauseNamesConfig(rule, cfg, unit_)) {
+        const ConfigDecl* inner =
+            FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
+        if (inner == nullptr || inner->design_cells.empty()) continue;
+        const ConfigDesignCell& design = inner->design_cells.front();
+        use_lib = design.library.empty() ? std::string(inner->library)
+                                         : std::string(design.library);
+        use_cell = std::string(design.cell);
+      }
       cell_clause_use_overrides_[std::string(rule->cell_name)] = {
-          std::string(rule->cell_lib), std::string(rule->use_lib),
-          std::string(rule->use_cell)};
+          std::string(rule->cell_lib), std::move(use_lib), std::move(use_cell)};
       continue;
     }
     cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
@@ -733,14 +816,48 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
 // specific instance to the exact library.cell named. A use clause that names a
 // config instead is expanded by CollectConfigDelegationOverrides and so is
 // skipped here; §33.2.1 settles which of the two a given name is.
+//
+// §33.4.2 (printed page 939): an instance bound to a configuration is "replaced
+// with the design hierarchy specified by the configuration", and "the rules
+// specified in the config shall determine the configuration of all other
+// subinstances". A binding clause of that configuration names its instances
+// from its own design cell down, so each is rewritten onto the instance the
+// outer clause delegated and recorded here as well.
 void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (UseClauseNamesConfig(rule, cfg, unit_)) continue;
     if (rule->use_cell.empty()) continue;
-    instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
-                                          std::string(rule->use_lib),
-                                          std::string(rule->use_cell));
+    if (!UseClauseNamesConfig(rule, cfg, unit_)) {
+      instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
+                                            std::string(rule->use_lib),
+                                            std::string(rule->use_cell));
+      continue;
+    }
+    const ConfigDecl* inner =
+        FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
+    if (inner == nullptr || inner->design_cells.empty()) continue;
+    std::string_view inner_top = inner->design_cells.front().cell;
+    for (auto* irule : inner->rules) {
+      if (irule->kind == ConfigRuleKind::kCell && !irule->use_cell.empty() &&
+          !UseClauseNamesConfig(irule, inner, unit_)) {
+        delegated_cell_use_overrides_.push_back(
+            {std::string(rule->inst_path),
+             std::string(irule->cell_name),
+             {std::string(irule->cell_lib), std::string(irule->use_lib),
+              std::string(irule->use_cell)}});
+        continue;
+      }
+      if (irule->kind != ConfigRuleKind::kInstance || irule->use_cell.empty() ||
+          UseClauseNamesConfig(irule, inner, unit_) ||
+          !InnerPathUnderTop(irule->inst_path, inner_top)) {
+        continue;
+      }
+      std::string path(rule->inst_path);
+      path.append(irule->inst_path.substr(inner_top.size()));
+      instance_bind_overrides_.emplace_back(std::move(path),
+                                            std::string(irule->use_lib),
+                                            std::string(irule->use_cell));
+    }
   }
 }
 

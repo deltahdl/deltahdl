@@ -92,6 +92,13 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
 // target names no dynamic array property or its value is no `new[]`.
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// §7.4.6: writes the element at declared index `index` of `ref` with `value`
+// coerced as a write to the property is; an index that addresses no element
+// writes nothing.
+void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
+                            const Logic4Vec& value, SimContext& ctx,
+                            Arena& arena);
+
 // §7.4.6: `lhs` as a single-index select of an array property, written with
 // `rhs_val` coerced as a write to the property is; false where its base names
 // no array property. An index that addresses no element writes nothing.

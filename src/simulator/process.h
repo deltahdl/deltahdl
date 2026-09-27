@@ -272,6 +272,9 @@ struct Process {
   // the block's for as long as the enable lasts, and any other enable leaves
   // them as they were.
   std::vector<std::vector<std::string>> caller_gen_prefixes;
+  // A copy of a calling process that carries its context to a display written
+  // later (SnapshotCallingProcess in deferred_caller.h); no thread of the run.
+  bool stand_in = false;
 
   ~Process() {
     if (coro) coro.destroy();

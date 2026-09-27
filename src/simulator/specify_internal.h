@@ -60,6 +60,11 @@ std::string SpecifyConditionText(const Expr* cond);
 // `interface_identifier . port_identifier` spelled with its dot (§30.4.2,
 // §31.2 Syntax 31-2, A.7.3). Defined in specify_register.cpp.
 std::string SpecifyTerminalName(const SpecifyTerminal& t);
+// The select `t` was written with, its bounds evaluated; an indexed
+// part-select, `a[i +: 2]`, is given as the part it covers. Defined in
+// specify_register.cpp.
+TerminalSelect SpecifyTerminalSelect(const SpecifyTerminal& t, SimContext& ctx,
+                                     Arena& arena);
 bool SpecifyConditionsMatch(std::string_view a, std::string_view b);
 
 }  // namespace delta

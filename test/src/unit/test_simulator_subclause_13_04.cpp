@@ -490,7 +490,7 @@ TEST(FunctionSim, GenerateBlockFunctionOfAParallelTop) {
       "  initial r = m.blk[1].scaled(10);\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design, {{"r", 30u}});
+  LowerRunAndCheck(f, design, {{"n.r", 30u}});
 }
 
 }  // namespace

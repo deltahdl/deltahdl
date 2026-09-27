@@ -117,7 +117,7 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
   // clause names its list outright, so the list it hands down is a list in
   // force wherever it reaches.
   const std::vector<std::string>* inherited =
-      InstanceLiblistForPath(current_inst_path_, instance_liblist_overrides_);
+      InstanceLiblistForPath(config_inst_path_, instance_liblist_overrides_);
   const std::vector<std::string>& order =
       inherited == nullptr ? library_order_ : *inherited;
   bool strict = inherited != nullptr || library_order_strict_;
@@ -145,13 +145,13 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
     // instantiation's own path, and the path is put back afterwards, so a
     // clause naming this very instance is the one the primitive is looked for
     // under. An instantiation with no instance name adds no level to reach.
-    std::string saved_inst_path = current_inst_path_;
+    std::string saved_inst_path = config_inst_path_;
     if (!item->inst_name.empty()) {
-      if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
-      current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
+      config_inst_path_ =
+          HierInstancePath(config_inst_path_, gen_block_path_, item->inst_name);
     }
     UdpDecl* udp = FindUdpByName(item->inst_module);
-    current_inst_path_ = std::move(saved_inst_path);
+    config_inst_path_ = std::move(saved_inst_path);
     if (udp == nullptr) continue;
 
     item->kind = ModuleItemKind::kUdpInst;
@@ -751,6 +751,8 @@ void Elaborator::InstantiateImplicitNestedModules(
     std::string saved_inst_path = current_inst_path_;
     if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
     current_inst_path_.append(name.data(), name.size());
+    std::string saved_config_path = std::exchange(
+        config_inst_path_, HierInstancePath(config_inst_path_, {}, name));
     // §23.9/§24.3: a nested module/program/interface resolves names declared in
     // this enclosing scope, so hand its visible names to ElaborateModule. The
     // instance is implied at the end of the items, but §6.10 counts a name as
@@ -760,6 +762,7 @@ void Elaborator::InstantiateImplicitNestedModules(
     nested_default_disable_iff_ = mod->default_disable_iff;
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
+    config_inst_path_ = std::move(saved_config_path);
     mod->children.push_back(inst);
   }
 }

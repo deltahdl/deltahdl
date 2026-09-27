@@ -586,7 +586,7 @@ std::string BytePortLeafInstantiated() {
 // unrecorded and GetVcdVarKind answered DataTypeKind::kImplicit for it.
 TEST_F(VcdTypeMappingSim, ChildInstancePortMapsPerTable) {
   auto content = RunVcd(BytePortLeafInstantiated());
-  auto pb = VarDecl(content, "u.pb");
+  auto pb = VarDecl(content, "pb");
   ASSERT_EQ(pb.size(), 6u) << content;
   EXPECT_EQ(pb[1], "reg");
   EXPECT_EQ(pb[2], "8");
@@ -611,7 +611,7 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstancePortsOfOneModuleDumpAlike) {
   auto top_content = RunVcd(kBytePortLeaf, "leaf");
   auto child_content = RunVcd(BytePortLeafInstantiated());
   auto top_pb = VarDecl(top_content, "pb");
-  auto child_pb = VarDecl(child_content, "u.pb");
+  auto child_pb = VarDecl(child_content, "pb");
   ASSERT_EQ(top_pb.size(), 6u) << top_content;
   ASSERT_EQ(child_pb.size(), 6u) << child_content;
 
@@ -673,7 +673,7 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyByteDumpsAlike) {
   auto top_content = RunVcd(kBodyVarLeaf, "leaf");
   auto child_content = RunVcd(BodyVarLeafInstantiated());
   auto top_b = VarDecl(top_content, "b");
-  auto child_b = VarDecl(child_content, "u.b");
+  auto child_b = VarDecl(child_content, "b");
   ASSERT_EQ(top_b.size(), 6u) << top_content;
   ASSERT_EQ(child_b.size(), 6u) << child_content;
 
@@ -696,7 +696,7 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyRealDumpsAlike) {
   auto top_content = RunVcd(kBodyVarLeaf, "leaf");
   auto child_content = RunVcd(BodyVarLeafInstantiated());
   auto top_r = VarDecl(top_content, "r");
-  auto child_r = VarDecl(child_content, "u.r");
+  auto child_r = VarDecl(child_content, "r");
   ASSERT_EQ(top_r.size(), 6u) << top_content;
   ASSERT_EQ(child_r.size(), 6u) << child_content;
 
@@ -721,7 +721,7 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyEventDumpsAlike) {
   auto top_content = RunVcd(kBodyVarLeaf, "leaf");
   auto child_content = RunVcd(BodyVarLeafInstantiated());
   auto top_ev = VarDecl(top_content, "ev");
-  auto child_ev = VarDecl(child_content, "u.ev");
+  auto child_ev = VarDecl(child_content, "ev");
   ASSERT_EQ(top_ev.size(), 6u) << top_content;
   ASSERT_EQ(child_ev.size(), 6u) << child_content;
 
@@ -746,10 +746,10 @@ TEST_F(VcdTypeMappingSim, ChildInstanceBodyStringIsNotDumped) {
   auto child_content = RunVcd(BodyVarLeafInstantiated());
   // Not vacuous: the byte declared beside the string in the same module body
   // is dumped, so the child's declarations reached the file.
-  auto child_b = VarDecl(child_content, "u.b");
+  auto child_b = VarDecl(child_content, "b");
   ASSERT_EQ(child_b.size(), 6u) << child_content;
 
-  EXPECT_FALSE(HasVar(child_content, "u.s")) << child_content;
+  EXPECT_FALSE(HasVar(child_content, "s")) << child_content;
 }
 
 // Dependency end-to-end (§21.7.2.3): the node information a mapped $var carries

@@ -442,6 +442,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
+  if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
   if (is_type) {
     // The type the instantiation gives the parameter, or the default, is
     // what the declaration's restriction judges and what the declarations

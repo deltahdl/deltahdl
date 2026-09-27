@@ -16,12 +16,45 @@ namespace delta {
 class SimContext;
 class Scheduler;
 
+// The bit-select or part-select a timing check terminal was written with,
+// `d[1]` or `d[3:2]` (A.7.3's `input_identifier [ [ constant_range_expression
+// ] ]`), in the declared indices of the port; `present` false for a whole
+// port. A bit-select has `left` equal to `right`.
+struct TerminalSelect {
+  bool present = false;
+  int64_t left = 0;
+  int64_t right = 0;
+  bool operator==(const TerminalSelect&) const = default;
+};
+
+// The delayed_reference or delayed_data a $setuphold or $recrem names
+// (§31.9.1): the signal's name in the declaring module and, where it was
+// written `name[index]`, the index; `name` empty where the check names none.
+struct DelayedSignalTarget {
+  std::string name;
+  bool indexed = false;
+  int64_t index = 0;
+};
+
 struct TimingCheckEntry {
   TimingCheckKind kind = TimingCheckKind::kSetup;
   std::string ref_signal;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_signal;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
+  // The selects the two terminals were written with. The event is a transition
+  // of the selected bits alone, so `d[1]` is not reached by a change of d[0].
+  TerminalSelect ref_select;
+  TerminalSelect data_select;
+  // The delayed copies of the two signals the check names, which
+  // DriveTimingCheckDelayedSignals (simulator/timing_check_delayed_signals.h)
+  // drives from them.
+  DelayedSignalTarget delayed_ref;
+  DelayedSignalTarget delayed_data;
+  // The declaration the entry was built from, null for one built otherwise.
+  // Each declared check is a check of its own (§31.2), so this, with the
+  // instance, is what identifies it when a rebuild files it again.
+  const TimingCheckDecl* decl = nullptr;
 
   // §31.5: the edge_descriptor list each of the check's two timing_check_events
   // was written with, empty for an event written with posedge, negedge or no
@@ -110,6 +143,12 @@ struct TimingCheckEntry {
   // deterministic and nondeterministic rules to the conditioning signal.
   const Expr* ref_condition_expr = nullptr;
   const Expr* data_condition_expr = nullptr;
+  // §31.3.3's and §31.3.6's timestamp_condition and timecheck_condition, null
+  // where the declaration left them out. §31.9.2 associates the first with the
+  // event that transitions first and the second with the one that transitions
+  // second, so which of the two signals each gates is settled per window.
+  const Expr* timestamp_condition_expr = nullptr;
+  const Expr* timecheck_condition_expr = nullptr;
 };
 
 // §31.4.1: the $skew check is event-based and stateful. Reference- and data-

@@ -378,7 +378,10 @@ class VcdWriter {
   // at one simulation time. The last of those runs after the first has already
   // opened the file, so a writer told to buffer builds the declaration
   // commands in memory instead of on disk and keeps a place in the version
-  // section for the commands still to come. Call before WriteHeader.
+  // section for the commands still to come. §21.7.1.2 has the same shape for
+  // $dumpvars, whose calls decide which objects are declared at all, so the
+  // held declarations are narrowed to the dumped objects as they are written
+  // out. Call before WriteHeader.
   void BufferDeclarations();
   // §21.7.4.1: add one dumpports_command to the version_text. Does nothing on
   // a writer that is not buffering, whose version section is already on disk
@@ -416,24 +419,45 @@ class VcdWriter {
   // limit comment exactly once when the threshold is first crossed.
   bool AtSizeLimit();
 
-  // Where a declaration command goes: the buffer while one is being held, the
-  // file otherwise.
-  std::ostream& Decl() {
+  // Where a command goes: the buffer while the declarations are being held,
+  // the file otherwise. A checkpoint written while they are held is held
+  // behind them, so it still follows the $enddefinitions it belongs after.
+  std::ostream& Out() {
     return buffer_decls_ ? static_cast<std::ostream&>(decl_buf_)
                          : static_cast<std::ostream&>(ofs_);
   }
-  // Put the held declaration commands on disk, the version_text's dumpports
-  // commands spliced into the place WriteHeader kept for them, and go back to
-  // writing straight through. Every entry point that writes something
-  // belonging after the declarations calls this first, so the held region
-  // never lands in the middle of the file. Does nothing when nothing is held.
+  // Put the held text on disk, the version_text's dumpports commands spliced
+  // into the place WriteHeader kept for them and the declarations narrowed to
+  // the objects the dump covers, and go back to writing straight through. The
+  // end-of-time-unit recording calls this first, as does every entry point
+  // that must see the file as it stands. Does nothing when nothing is held.
   void FlushDeclarations();
+  // §21.7.2.3: one $scope, $upscope or $var command in the held text, by its
+  // byte range, so a flush can leave out what the dump does not cover. A $var
+  // names the index of its object in signals_.
+  enum class HeldDeclKind : uint8_t { kScope, kUpscope, kVar };
+  struct HeldDecl {
+    size_t begin;
+    size_t end;
+    HeldDeclKind kind;
+    size_t signal;
+  };
+  // Remember the command just written from `begin` to the buffer's end, when
+  // the declarations are being held.
+  void HoldDecl(size_t begin, HeldDeclKind kind, size_t signal = 0);
+  // Which of held_decls_ stay: the $var of each object the dump covers, and
+  // each $scope section, with its $upscope, that is left holding one.
+  std::vector<bool> KeptHeldDecls() const;
+  // The held text with the $var of every object the dump does not cover left
+  // out, and every $scope section left with no $var in it.
+  std::string SelectedDeclarations(const std::string& text) const;
 
   std::ofstream ofs_;
   // §21.7.4.1: the declaration commands, held until every dumpports_command
   // that belongs in the version section is known. See BufferDeclarations.
   std::ostringstream decl_buf_;
   bool buffer_decls_ = false;
+  std::vector<HeldDecl> held_decls_;
   // Offset in decl_buf_ where a dumpports_command belongs: after the version
   // identifier, before the $version section's $end.
   size_t version_commands_at_ = 0;

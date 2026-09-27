@@ -23,8 +23,11 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
+#include "driver/cli_options.h"
 #include "fixture_simulator.h"
+#include "helpers_command_line.h"
 
 using namespace delta;
 
@@ -670,6 +673,34 @@ TEST(ValuePlusargsSim, DestinationWakesAnEventControlOnIt) {
       f, "hits");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// ---------------------------------------------------------------------------
+// The command line
+// ---------------------------------------------------------------------------
+
+// §21.6: the plusargs are the arguments "provided to the simulation" that "are
+// visually distinguished from other simulator arguments by their starting with
+// the plus (+) character", so +HELLO and +TEST=5 written after a source reach
+// the simulation, in the order written and without the plus sign, rather than
+// being refused as options the tool does not know.
+TEST(PlusargCommandLine, PlusArgumentsReachThePlusargs) {
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"t.sv", "+HELLO", "+TEST=5"}, opts));
+  EXPECT_EQ(opts.plus_args, (std::vector<std::string>{"HELLO", "TEST=5"}));
+  EXPECT_EQ(opts.source_files, (std::vector<std::string>{"t.sv"}));
+}
+
+// The tool's own + options are simulator arguments rather than plusargs: they
+// keep defining macros and naming include directories, and neither is among
+// the plusargs the two functions search.
+TEST(PlusargCommandLine, ToolPlusOptionsAreNotPlusargs) {
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"+define+W=8", "+incdir+inc", "+GO"}, opts));
+  EXPECT_EQ(opts.plus_args, (std::vector<std::string>{"GO"}));
+  ASSERT_EQ(opts.defines.size(), 1u);
+  EXPECT_EQ(opts.defines[0].first, "W");
+  EXPECT_EQ(opts.include_dirs, (std::vector<std::string>{"inc"}));
 }
 
 }  // namespace

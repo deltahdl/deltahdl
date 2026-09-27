@@ -263,4 +263,128 @@ TEST(RegisteredDesignTimingChecks,
             "1\n");
 }
 
+// A.7.3 lets a terminal carry a select, `input_identifier [ [
+// constant_range_expression ] ]`, and the event is then a transition of the
+// selected bits alone. `d[1]` fires when bit 1 changes and `d[3:2]` when bit 3
+// or 2 does, neither when bit 0 does. The select was dropped, so `d[1]` and
+// `d[3:2]` watched the whole port -- and, standing on the same signals, the
+// second replaced the first.
+TEST(RegisteredDesignTimingChecks, SelectTerminalsFollowTheirBitsAlone) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module dut(input clk, input [3:0] d);\n"
+                       "  reg n = 0, n2 = 0; integer cnt = 0, cnt2 = 0;\n"
+                       "  specify\n"
+                       "    $setup(d[1], posedge clk, 5, n);\n"
+                       "    $setup(d[3:2], posedge clk, 5, n2);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  always @(n2) cnt2 = cnt2 + 1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  reg clk = 0; reg [3:0] d = 0;\n"
+                       "  dut u(.clk(clk), .d(d));\n"
+                       "  initial begin\n"
+                       "    #10 d[0] = 1; #2 clk = 1;\n"
+                       "    #8 clk = 0;\n"
+                       "    #10 d[1] = 1; #2 clk = 1;\n"
+                       "    #8 clk = 0;\n"
+                       "    #10 d[3] = 1; #2 clk = 1;\n"
+                       "    #5 $display(\"%0d %0d\", u.cnt, u.cnt2);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+}
+
+// A bit-select reference terminal: `posedge clk[1]` is bit 1's rising edge,
+// not bit 0's. d[0] rises at 10 and clk[0] at 12, which is no event of the
+// check; d[0] falls at 27 and clk[1] rises at 29, a violation.
+TEST(RegisteredDesignTimingChecks, BitSelectReferenceFollowsItsBit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module dutv(input [1:0] clk, input d);\n"
+                       "  reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $setup(d, posedge clk[1], 5, n);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  reg [1:0] clk = 0, d = 0;\n"
+                       "  dutv uv(.clk(clk), .d(d[0]));\n"
+                       "  initial begin\n"
+                       "    #10 d = 2'b11;\n"
+                       "    #2 clk[0] = 1;\n"
+                       "    #6 clk[1] = 1;\n"
+                       "    #2 clk = 0; #5 d[0] = 0; #2 clk[1] = 1;\n"
+                       "    #5 $display(\"%0d\", uv.cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+// §31.2 (printed page 897): "Every timing check can include an optional
+// notifier that toggles whenever the timing check detects a violation", and
+// nothing in Clause 31 makes two checks on the same signals one. Three $setup
+// checks differing only in their notifier each toggle theirs; the checks were
+// merged into the last, whose notifier alone moved.
+TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsAreEachEvaluated) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(output reg clk = 0, output reg d = 0);\n"
+                       "  reg n1 = 0, n2 = 0, n3 = 0;\n"
+                       "  specify\n"
+                       "    $setup(d, posedge clk, 5, n1);\n"
+                       "    $setup(d, posedge clk, 5, n2);\n"
+                       "    $setup(d, posedge clk, 5, n3);\n"
+                       "  endspecify\n"
+                       "  initial begin\n"
+                       "    #10 d = 1; #2 clk = 1;\n"
+                       "    #5 $display(\"%b%b%b\", n1, n2, n3);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "111\n");
+}
+
+// Two $skew checks differing only in their limit keep their own: c2 rising 7
+// after c1 is past the limit 5 and within the limit 9.
+TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsKeepTheirLimits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(output reg c1 = 0, output reg c2 = 0);\n"
+                       "  reg n5 = 0, n9 = 0;\n"
+                       "  specify\n"
+                       "    $skew(posedge c1, posedge c2, 5, n5);\n"
+                       "    $skew(posedge c1, posedge c2, 9, n9);\n"
+                       "  endspecify\n"
+                       "  initial begin\n"
+                       "    #10 c1 = 1; #7 c2 = 1;\n"
+                       "    #1 $display(\"%b%b\", n5, n9);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "10\n");
+}
+
+// §31.5's edge[01] and edge[10] on one reference are two checks, the first
+// answering the rising clock at 12 and the second the falling one at 22.
+TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsKeepTheirEdges) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(output reg clk = 0, output reg d = 0);\n"
+                       "  reg n = 0, n2 = 0; integer cnt = 0, cnt2 = 0;\n"
+                       "  specify\n"
+                       "    $setup(d, edge[01] clk, 5, n);\n"
+                       "    $setup(d, edge[10] clk, 5, n2);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  always @(n2) cnt2 = cnt2 + 1;\n"
+                       "  initial begin\n"
+                       "    #10 d = 1; #2 clk = 1;\n"
+                       "    #8 d = 0; #2 clk = 0;\n"
+                       "    #5 $display(\"%0d %0d\", cnt, cnt2);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+}
+
 }  // namespace

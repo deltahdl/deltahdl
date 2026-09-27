@@ -702,7 +702,10 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
           caller, nullptr, resolved.substr(kThisPrefix.size()), ctx, arena);
     }
   }
-  auto* var = ctx.FindVariable(resolved);
+  // §23.3.1: a `$root`-headed name is read from the top of the design first.
+  std::string rooted = RootedReferenceKey(expr);
+  auto* var = rooted.empty() ? nullptr : ctx.FindVariable(rooted);
+  if (var == nullptr) var = ctx.FindVariable(resolved);
   if (var) {
     // §16.5.2: "In an assertion, the sampled value is the only valid value of a
     // variable during a clock tick", and §16.5.1 puts no condition on where the
@@ -713,7 +716,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     // property reads, so every other hierarchical read is the live read it was.
     const Logic4Vec* sampled =
         ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
-    return sampled != nullptr ? *sampled : var->value;
+    Logic4Vec val = sampled != nullptr ? *sampled : var->value;
+    // §11.8.1: the operand's signedness is its declaration's, whatever the
+    // value stored in it carried, as EvalIdentifier derives it for a simple
+    // name: `logic w` set to the signed literal 1 and read as `a.w` read -1.
+    val.is_signed = var->is_signed;
+    return val;
   }
 
   auto dot = MemberPathSplit(resolved, ctx);

@@ -313,6 +313,22 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
+// §31.9.4 (printed page 923): "the ability of simulators to handle negative
+// values in $setuphold and $recrem timing checks shall be enabled with an
+// invocation option", and the clause names "an invocation option turning off
+// all timing checks" beside it.
+bool TryParseTimingCheckFlag(std::string_view arg, CliOptions& opts) {
+  if (arg == "--negative-timing-checks") {
+    opts.negative_timing_checks = true;
+    return true;
+  }
+  if (arg == "--no-timing-checks") {
+    opts.no_timing_checks = true;
+    return true;
+  }
+  return false;
+}
+
 bool TryParseSynthFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--dump-aig") {
     opts.dump_aig = true;
@@ -380,6 +396,7 @@ bool TryParseDefineArg(std::string_view arg, int& i, int argc,
 bool TryParseSingleArg(std::string_view arg, int& i, int argc,
                        const char* const argv[], CliOptions& opts) {
   if (TryParseGeneralFlag(arg, opts)) return true;
+  if (TryParseTimingCheckFlag(arg, opts)) return true;
   if (TryParseSynthFlag(arg, opts)) return true;
   if (TryParseDefineArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
@@ -474,6 +491,12 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
     opts.include_dirs.emplace_back(arg.substr(8));
     return true;
   }
+  // §21.6: every other argument starting with + is a plusarg, handed to the
+  // simulation rather than read by the tool.
+  if (arg.starts_with("+")) {
+    opts.plus_args.emplace_back(arg.substr(1));
+    return true;
+  }
   return false;
 }
 
@@ -499,10 +522,14 @@ bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
       if (!TakeOptionsFile(i, argc, argv, opts, depth)) return false;
       continue;
     }
-    if (arg.starts_with("-") || arg.starts_with("+")) {
+    if (arg.starts_with("-")) {
       std::cerr << ArgOriginPrefix(opts.arg_origins, i)
                 << "unknown option: " << arg << "\n";
       return false;
+    }
+    if (arg.ends_with(".map")) {
+      opts.library_map_files.emplace_back(arg);
+      continue;
     }
     opts.source_files.emplace_back(arg);
   }

@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -565,6 +566,49 @@ TEST(SeparateCompilationBinding,
   ASSERT_EQ(target.modules.size(), 1u);
   EXPECT_EQ(target.modules[0]->name, "leaf");
   EXPECT_TRUE(target.cu_items.empty());
+}
+
+// ---------------------------------------------------------------------------
+// §33.8.1 on the bind: with no configuration in force, the library search
+// order an invocation gives names which library an instantiated cell is taken
+// from, and a bind is an invocation like any other. Two libraries each hold an
+// adder here, and the one bound is read off the child's library.
+// ---------------------------------------------------------------------------
+
+constexpr const char* kAdderUser =
+    "module user;\n"
+    "  adder a1();\n"
+    "endmodule\n";
+
+// The library `user`'s one child was bound from, after a bind under `order`.
+std::string BoundAdderLibrary(const std::vector<std::string>& order) {
+  ScratchDir tmp;
+  auto rtl = tmp.dir / "rtl.dpl";
+  auto gate = tmp.dir / "gate.dpl";
+  Precompile(kAdderUser, "rtlLib", rtl);
+  Precompile(kAdder, "rtlLib", rtl);
+  Precompile(kAdder, "gateLib", gate);
+
+  BindHarness h;
+  EXPECT_TRUE(h.binder.LoadLibrary(rtl));
+  EXPECT_TRUE(h.binder.LoadLibrary(gate));
+  h.binder.SetLibrarySearchOrder(order);
+  auto* design = h.binder.Bind({"user"});
+  EXPECT_FALSE(h.diag.HasErrors());
+  if (design == nullptr || design->top_modules.size() != 1 ||
+      design->top_modules[0]->children.size() != 1 ||
+      design->top_modules[0]->children[0].resolved == nullptr) {
+    return "";
+  }
+  return std::string(design->top_modules[0]->children[0].resolved->library);
+}
+
+TEST(SeparateCompilationBinding, SearchOrderNamingGateLibFirstBindsItsAdder) {
+  EXPECT_EQ(BoundAdderLibrary({"gateLib", "rtlLib"}), "gateLib");
+}
+
+TEST(SeparateCompilationBinding, SearchOrderNamingRtlLibFirstBindsItsAdder) {
+  EXPECT_EQ(BoundAdderLibrary({"rtlLib", "gateLib"}), "rtlLib");
 }
 
 }  // namespace

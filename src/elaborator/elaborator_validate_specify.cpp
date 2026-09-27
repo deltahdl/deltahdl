@@ -92,6 +92,7 @@ TerminalRole DestRole() {
 struct ModuleSignals {
   SignalSet local;
   SignalSet variable_ports;
+  SignalSet local_nets;  // the members of `local` declared as nets
 };
 
 struct SignalScope {
@@ -264,6 +265,9 @@ ModuleSignals BuildLocalSignals(const ModuleDecl* mod,
     }
     if (!port_map.contains(mi->name)) {
       signals.local.insert(mi->name);
+      if (mi->kind == ModuleItemKind::kNetDecl) {
+        signals.local_nets.insert(mi->name);
+      }
     } else if (mi->kind == ModuleItemKind::kVarDecl) {
       signals.variable_ports.insert(mi->name);
     }
@@ -310,6 +314,25 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
   }
 }
 
+// §31.6 (printed page 915): "The notifier is a variable, declared in the
+// module where timing check tasks are invoked", and Syntax 31-2 makes it a
+// variable_identifier, so a net of the module, or a port that is a net, is
+// refused as one.
+void CheckTimingCheckNotifier(const SpecifyItem* si, const SignalScope& scope,
+                              DiagEngine& diag) {
+  std::string_view n = si->timing_check.notifier;
+  if (n.empty()) return;
+  auto it = scope.port_map.find(n);
+  bool is_net = it != scope.port_map.end()
+                    ? !PortIsVariable(*it->second, scope.signals)
+                    : scope.signals.local_nets.contains(n);
+  if (!is_net) return;
+  diag.Error(
+      si->loc,
+      std::format("timing check notifier '{}' is a net, not a variable", n),
+      Subclause("31.6"));
+}
+
 // Validates all source and destination terminals of one path declaration.
 void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
                             const ModuleSignals& signals,
@@ -334,6 +357,7 @@ void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
     SignalScope scope{port_map, signals, iface_map};
     CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, scope, diag);
     CheckTimingTerminal(si->timing_check.data_terminal, si->loc, scope, diag);
+    CheckTimingCheckNotifier(si, scope, diag);
   }
 }
 

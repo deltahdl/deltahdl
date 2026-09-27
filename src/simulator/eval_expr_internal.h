@@ -71,7 +71,7 @@ std::string TagKeyOfName(std::string_view name, SimContext& ctx);
 
 // Strips a leading "$root.<top>." prefix from a hierarchical name, returning
 // the remainder; names without the prefix are returned unchanged. Defined in
-// eval_expr.cpp; also used by statement_assign.cpp.
+// eval_hierarchical_name.cpp; also used by statement_assign_lhs.cpp.
 std::string StripRootPrefix(const std::string& name);
 
 }  // namespace delta

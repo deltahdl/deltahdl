@@ -159,6 +159,10 @@ struct ClassTypeInfo {
     // fact about the object rather than the class.
     uint32_t array_size = 0;
     int64_t array_lo = 0;
+    // §7.4.2 with §20.7: whether that dimension is declared `[a:b]` with a
+    // above b, so its left bound is the higher index; `[N]` addresses 0 to
+    // N-1, ascending.
+    bool array_descending = false;
     // §7.5: whether the property's one unpacked dimension is the dynamic `[]`.
     // The object then holds the element count under the key
     // ClassArraySizeKey forms, set by `new[]` (§7.5.1) and by a randomize()

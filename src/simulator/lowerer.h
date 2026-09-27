@@ -80,6 +80,9 @@ class Lowerer {
 
  private:
   void LowerModule(const RtlirModule* mod);
+  // A top-level module after the first, lowered as an instance of its own
+  // name so its declarations are its own. Defined in lowerer_child.cpp.
+  void LowerParallelTop(const RtlirModule* mod);
   void LowerParams(const RtlirModule* mod);
   // §10.11: joins the nets each alias statement of `mod` lists, under the
   // names the instance inst_prefix_ names creates them by. Defined in
@@ -251,6 +254,10 @@ class Lowerer {
   // gathered, once every module has been lowered.
   void RegisterDesignTiming();
   void LowerChildModules(const RtlirModule* mod);
+  // One instance of LowerChildModules: its module's declarations, port
+  // connections, processes and instances, all under the instance's name
+  // joined to inst_prefix_.
+  void LowerChildInstance(const RtlirModuleInst& child);
   // §14.3: registers the module's clocking blocks with the run's
   // ClockingManager and creates the event variable §14.10 triggers under each
   // block's name. Defined in src/simulator/lowerer_clocking.cpp.
@@ -262,6 +269,9 @@ class Lowerer {
                                   const RtlirModule* resolved);
 
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
+  bool LowerArrayPortBinding(const RtlirModuleInst& inst,
+                             const RtlirPortBinding& binding,
+                             const std::string& inst_seg, bool from_program);
   bool TryAliasInterfacePort(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding);
 

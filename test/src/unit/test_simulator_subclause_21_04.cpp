@@ -831,4 +831,70 @@ TEST(ReadmemFileLoadSim, LoadedElementReleasesAWaitOnIt) {
   std::remove(path.c_str());
 }
 
+// §21.4 with §8.5: the memory_name is any unpacked array, and a class
+// object's array property is one -- named through a handle at module level,
+// or as a lowest-dimension slice of one, whose bounds narrow the load. A
+// module array named from inside a class method is loaded as it is anywhere.
+TEST(ReadmemFileLoadSim, ArrayPropertyThroughAHandleIsLoaded) {
+  SimFixture f;
+  std::string path = WriteData("class_prop", "aa bb\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Mem;\n"
+      "    logic [7:0] data[0:1];\n"
+      "  endclass\n"
+      "  logic [7:0] mm[0:1];\n"
+      "  class Ld;\n"
+      "    function void load; $readmemh(\"" +
+          path +
+          "\", mm); endfunction\n"
+          "  endclass\n"
+          "  Mem m = new;\n"
+          "  Mem n = new;\n"
+          "  Ld l = new;\n"
+          "  initial begin\n"
+          "    $readmemh(\"" +
+          path +
+          "\", m.data);\n"
+          "    $display(\"%h %h\", m.data[0], m.data[1]);\n"
+          "    l.load();\n"
+          "    $display(\"%h %h\", mm[0], mm[1]);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", n.data[1:1]);\n"
+          "    $display(\"%h %h\", n.data[0], n.data[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa bb\naa bb\nxx aa\n");
+  std::remove(path.c_str());
+}
+
+// §21.4 with §23.6: the memory_name may name an instance's array through a
+// hierarchical reference, one level down or two, and a slice of one narrows
+// the load as it does for a local array.
+TEST(ReadmemFileLoadSim, HierarchicallyNamedArrayIsLoaded) {
+  SimFixture f;
+  std::string path = WriteData("hier", "12 34\n");
+  std::string out = RunCapture(
+      "module leaf; logic [7:0] mem[0:1]; endmodule\n"
+      "module sub; leaf v(); logic [7:0] mem[0:1]; endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", u.mem);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", u.v.mem[1:1]);\n"
+          "    $display(\"%h %h %h %h\", u.mem[0], u.mem[1], u.v.mem[0],\n"
+          "             u.v.mem[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12 34 xx 12\n");
+  std::remove(path.c_str());
+}
+
 }  // namespace

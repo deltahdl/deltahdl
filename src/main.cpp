@@ -8,16 +8,21 @@
 #include <bits/pthreadtypes.h>
 #endif
 
+#include <algorithm>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -45,6 +50,7 @@
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
 #include "simulator/vcd_writer.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -73,8 +79,14 @@ void PrintHelp() {
             << "  -v <file>            Verilog library file\n"
             << "  -y <dir>             Verilog library directory\n"
             << "  -L <name>            Library search order (repeatable)\n"
+            << "  <file>.map           Library map file, read before the "
+               "sources (33.3.1);\n"
+            << "                       lib.map in the working directory "
+               "when none is named\n"
             << "  +define+<n>=<v>      Define macro\n"
             << "  +incdir+<path>       Include directory\n"
+            << "  +<plusarg>           Plusarg for $test$plusargs and "
+               "$value$plusargs (21.6)\n"
             << "  -Wall -Werror        Warning controls\n"
             << "  --version / --help   Info\n\n"
             << "Protected envelopes:\n"
@@ -95,6 +107,10 @@ void PrintHelp() {
                "(36.12.2.2):\n"
             << "                       1364v1995, 1364v2001, 1364v2005, "
                "1800v2005, 1800v2009\n"
+            << "  --negative-timing-checks\n"
+            << "                       Accept negative $setuphold/$recrem "
+               "limits (31.9.4)\n"
+            << "  --no-timing-checks   Turn every timing check off (31.9.4)\n"
             << "  -D <name>[=<value>]  Define preprocessor macro\n"
             << "  --lint-only          Parse and elaborate only\n"
             << "  --parse-only         Parse only\n"
@@ -154,6 +170,11 @@ struct PreprocResult {
 
   delta::TimeScale timescale;
   bool has_timescale = false;
+  // The line of `source` each command-line source file's text begins on, in
+  // command-line order. §33.3.1 maps a source file to a library, and a design
+  // element belongs to the file named on the command line whose text holds
+  // it, whichever file an `include put the element's own lines in.
+  std::vector<std::pair<uint32_t, std::string>> file_first_lines;
 };
 
 PreprocResult PreprocessSources(const delta::CliOptions& opts,
@@ -177,6 +198,9 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
       return result;
     }
     auto file_id = src_mgr.AddFile(path, content);
+    auto first_line = static_cast<uint32_t>(
+        std::count(result.source.begin(), result.source.end(), '\n') + 1);
+    result.file_first_lines.emplace_back(first_line, path);
     result.source += preproc.Preprocess(file_id);
   }
   // A `begin_keywords region may span source file boundaries (22.14), so the
@@ -278,11 +302,97 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->has_preproc_timescale = pp.has_timescale;
 }
 
-std::string ResolveTopModule(const delta::CliOptions& opts,
-                             delta::CompilationUnit* cu) {
+// §33.3.1 (printed pages 935-936): "When parsing a source description file
+// (or files), the parser shall first read the library mapping information from
+// a predefined file prior to reading any source files", and "all compliant
+// tools shall provide a mechanism to specify one or more library map files to
+// be used for a particular invocation of the tool. If multiple map files are
+// specified, then they shall be read in the order in which they are
+// specified." The predefined file is lib.map in the working directory, read
+// where the command line names no map file of its own. False where a map file
+// could not be read or parsed.
+bool LoadLibraryMaps(const delta::CliOptions& opts,
+                     delta::SourceManager& src_mgr,
+                     delta::LibraryMap& lib_map) {
+  lib_map.ResolvePositionsAgainst(src_mgr);
+  std::vector<std::string> map_files = opts.library_map_files;
+  std::error_code ec;
+  if (map_files.empty() && std::filesystem::is_regular_file("lib.map", ec)) {
+    map_files.emplace_back("lib.map");
+  }
+  for (const auto& map_file : map_files) {
+    std::vector<std::string> errors;
+    bool loaded = lib_map.LoadMapFile(map_file, &errors);
+    for (const auto& err : errors) std::cerr << "error: " << err << "\n";
+    if (!loaded || !errors.empty()) return false;
+  }
+  return true;
+}
+
+// The command-line source file whose text holds line `line` of the
+// preprocessed source.
+std::string_view SourceFileHoldingLine(const PreprocResult& pp, uint32_t line) {
+  std::string_view path;
+  for (const auto& [first_line, file] : pp.file_first_lines) {
+    if (first_line > line) break;
+    path = file;
+  }
+  return path;
+}
+
+// §33.3.1 (printed page 936): "Any file encountered by the compiler that does
+// not match any library's file_path_spec shall by default be compiled into a
+// library named work", and a file that does match compiles into the library
+// whose specification claims it, so every design element carries the library
+// of the command-line file it was written in. A file several libraries claim
+// equally belongs to none of them, which §33.3.1.1 makes an error.
+bool TagDesignElementLibraries(delta::CompilationUnit& cu,
+                               const PreprocResult& pp,
+                               const delta::LibraryMap& lib_map,
+                               delta::DiagEngine& diag) {
+  bool ok = true;
+  auto library_of = [&](delta::SourceLoc loc) -> std::string_view {
+    std::string_view file = SourceFileHoldingLine(pp, loc.line);
+    std::error_code ec;
+    auto path = std::filesystem::weakly_canonical(
+        std::filesystem::absolute(std::filesystem::path(file), ec), ec);
+    std::string canonical = path.string();
+    std::string_view library = lib_map.LibraryForFile(canonical);
+    if (!library.empty()) return library;
+    std::string claimants;
+    for (auto name : lib_map.LibrariesForFile(canonical)) {
+      if (!claimants.empty()) claimants += ", ";
+      claimants += name;
+    }
+    diag.Error(lib_map.FirstDeclarationClaiming(canonical),
+               "source description claimed by more than one library (" +
+                   claimants + "): " + std::string(file),
+               delta::Subclause("33.3.1.1"));
+    ok = false;
+    return library;
+  };
+  auto tag = [&](const auto& elements) {
+    for (auto* element : elements) {
+      element->library = library_of(element->range.start);
+    }
+  };
+  tag(cu.modules);
+  tag(cu.interfaces);
+  tag(cu.programs);
+  tag(cu.checkers);
+  tag(cu.udps);
+  tag(cu.packages);
+  tag(cu.configs);
+  return ok;
+}
+
+// The top-level instance a dump named on the command line is rooted at: the
+// one --top names, else the first the design roots.
+std::string DumpTopModule(const delta::CliOptions& opts,
+                          const delta::RtlirDesign* design) {
   if (!opts.top_module.empty()) return opts.top_module;
-  if (!cu->modules.empty()) return std::string(cu->modules.back()->name);
-  return "";
+  if (design->top_modules.empty()) return "";
+  return std::string(design->top_modules.front()->name);
 }
 
 // §33.8.1: installs the library search order this invocation is to use, which
@@ -305,6 +415,7 @@ bool InstallLibrarySearchOrder(const delta::CliOptions& opts,
 }
 
 const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
+                                          const delta::LibraryMap& lib_map,
                                           delta::CompilationUnit* cu,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
@@ -317,22 +428,30 @@ const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
   delta::Elaborator elaborator(arena, diag, cu);
   elaborator.SetMaxGenerateIterations(opts.max_generate_iterations);
 
-  delta::LibraryMap lib_map;
   if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) return nullptr;
   // §33.5.4: a configuration whose source description was named on the command
   // line settles the design, so the top-level cell named here is what a command
   // line that put no configuration in force is elaborated from.
-  auto top = ResolveTopModule(opts, cu);
-  const auto* design =
-      delta::ElaborateCommandLine(elaborator, *cu, top, opts.config, diag);
+  //
+  // §23.3.1 (printed page 740): "Top-level modules are modules that are
+  // included in the SystemVerilog source text, but do not appear in any module
+  // instantiation statement", so with no --top the design is rooted at every
+  // such module, which ElaborateCommandLine collects for an empty name. The
+  // last module in the source was taken for the top instead, and a design whose
+  // top came before the modules it instantiates -- the standard's own §23.5
+  // example, `module top` followed by `module m (.*)` and `module a (.*)` --
+  // elaborated one of those alone and ran nothing.
+  const auto* design = delta::ElaborateCommandLine(
+      elaborator, *cu, opts.top_module, opts.config, diag);
   if (diag.HasErrors() || design == nullptr) return nullptr;
   if (opts.dump_ir) DumpIr(design);
   return design;
 }
 
-int RunSynthesis(const delta::CliOptions& opts, delta::CompilationUnit* cu,
+int RunSynthesis(const delta::CliOptions& opts,
+                 const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
                  delta::DiagEngine& diag, delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, cu, diag, arena);
+  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
   if (!design || design->top_modules.empty()) return 1;
 
   delta::SynthLower synth(arena, diag);
@@ -366,20 +485,22 @@ int RunSynthesis(const delta::CliOptions& opts, delta::CompilationUnit* cu,
 // of comments alone is, has nothing to elaborate and nothing to report, and
 // passes. Until this the option returned 0 as soon as the source had parsed,
 // so a source only the elaborator could reject was reported clean.
-int RunLint(const delta::CliOptions& opts, delta::CompilationUnit* cu,
-            delta::DiagEngine& diag, delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, cu, diag, arena);
+int RunLint(const delta::CliOptions& opts, const delta::LibraryMap& lib_map,
+            delta::CompilationUnit* cu, delta::DiagEngine& diag,
+            delta::Arena& arena) {
+  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
   if (diag.HasErrors()) return 1;
   if (design == nullptr && !cu->DeclaresNothing()) return 1;
   std::cout << "lint pass: no errors\n";
   return 0;
 }
 
-int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
-                  delta::DiagEngine& diag, delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, cu, diag, arena);
-  if (!design) return 1;
-  auto top = ResolveTopModule(opts, cu);
+// Runs an elaborated design to its end: lowered into a simulation context,
+// scheduled, and its final blocks and coverage results reported.
+int SimulateDesign(const delta::CliOptions& opts,
+                   const delta::RtlirDesign* design, delta::DiagEngine& diag,
+                   delta::Arena& arena) {
+  auto top = DumpTopModule(opts, design);
 
   delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
@@ -389,6 +510,12 @@ int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
   // It is set before the design is lowered so that a delay evaluated during
   // lowering sees it.
   sim_ctx.SetDelayMode(opts.mintypmax);
+  // §21.6: the plusargs $test$plusargs and $value$plusargs search.
+  for (const auto& plus_arg : opts.plus_args) sim_ctx.AddPlusArg(plus_arg);
+  // §31.9.4: the two timing check invocation options are in force before the
+  // design's checks are registered at lowering, which builds each under them.
+  sim_ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(
+      {opts.negative_timing_checks, opts.no_timing_checks});
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
 
@@ -410,19 +537,24 @@ int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
   return diag.HasErrors() || sim_ctx.HasRuntimeErrors() ? 1 : 0;
 }
 
-// The arguments RunSimulation takes and the status it answers, carried across
-// the thread boundary below.
+int RunSimulation(const delta::CliOptions& opts,
+                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
+                  delta::DiagEngine& diag, delta::Arena& arena) {
+  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
+  if (!design) return 1;
+  return SimulateDesign(opts, design, diag, arena);
+}
+
+// The run to carry across the thread boundary below, and the status it
+// answers.
 struct SimulationJob {
-  const delta::CliOptions& opts;
-  delta::CompilationUnit* cu;
-  delta::DiagEngine& diag;
-  delta::Arena& arena;
+  const std::function<int()>& run;
   int status = 1;
 };
 
 void* RunSimulationJob(void* arg) {
   auto* job = static_cast<SimulationJob*>(arg);
-  job->status = RunSimulation(job->opts, job->cu, job->diag, job->arena);
+  job->status = job->run();
   return nullptr;
 }
 
@@ -435,20 +567,18 @@ void* RunSimulationJob(void* arg) {
 // thread of its own with a stack of 1 GiB, address space reserved and paged
 // in only as far as the run goes, the main thread waiting for its status; a
 // system that refuses the thread gets the run on the main thread as before.
-int RunSimulationOnDeepStack(const delta::CliOptions& opts,
-                             delta::CompilationUnit* cu,
-                             delta::DiagEngine& diag, delta::Arena& arena) {
-  SimulationJob job{opts, cu, diag, arena};
+int RunOnDeepStack(const std::function<int()>& run) {
+  SimulationJob job{run};
   constexpr std::size_t kStackBytes = std::size_t{1} << 30;
   pthread_attr_t attr;
   if (pthread_attr_init(&attr) != 0 ||
       pthread_attr_setstacksize(&attr, kStackBytes) != 0) {
-    return RunSimulation(opts, cu, diag, arena);
+    return run();
   }
   pthread_t thread{};
   int created = pthread_create(&thread, &attr, RunSimulationJob, &job);
   pthread_attr_destroy(&attr);
-  if (created != 0) return RunSimulation(opts, cu, diag, arena);
+  if (created != 0) return run();
   pthread_join(thread, nullptr);
   return job.status;
 }
@@ -493,9 +623,23 @@ int RunPrecompile(const delta::CliOptions& opts, delta::DiagEngine& diag) {
     std::cerr << "--precompile-into and --precompile-out are used together\n";
     return 1;
   }
+  // §33.3.1 (printed page 937): "In the case where multiple modules with the
+  // same name are mapped to the same library in a single invocation of the
+  // compiler, then a warning shall be issued." The last is the one the library
+  // keeps (PrecompiledLibrary::Load); a cell written by an earlier invocation
+  // is recompiled rather than duplicated, and draws none.
+  std::unordered_set<std::string> written;
   for (const auto& path : opts.source_files) {
     auto content = ReadFile(path);
     if (content.empty()) return 1;
+    for (const auto& name : delta::PrecompiledLibrary::CellNames(content)) {
+      if (written.insert(name).second) continue;
+      diag.Warning(delta::SourceLoc::None(),
+                   std::format("'{}' is compiled into library '{}' more than "
+                               "once in this invocation; the last one is kept",
+                               name, opts.precompile_library),
+                   delta::Subclause("33.3.1"));
+    }
     if (!delta::PrecompiledLibrary::Save(content, opts.precompile_library,
                                          opts.precompile_output)) {
       std::cerr << "could not precompile " << path << " into "
@@ -523,6 +667,16 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   for (const auto& path : opts.precompiled_libs) {
     if (!binder.LoadLibrary(path)) return 1;
   }
+  // §33.8.1: -L names the libraries an instantiated cell is searched in and
+  // their order, on this invocation as on one that reads source descriptions,
+  // and an argument that is no library name is refused here as it is there.
+  // A bind reads no library map, so the order is the -L names alone.
+  std::vector<std::string> errors;
+  auto order =
+      delta::LibraryMap().ResolveSearchOrder(opts.lib_search_order, &errors);
+  for (const auto& err : errors) std::cerr << "error: " << err << "\n";
+  if (!errors.empty()) return 1;
+  binder.SetLibrarySearchOrder(std::move(order));
 
   const delta::RtlirDesign* design = nullptr;
   if (!opts.config.empty()) {
@@ -535,7 +689,12 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   }
   if (design == nullptr || diag.HasErrors()) return 1;
   if (opts.dump_ir) DumpIr(design);
-  return 0;
+  // The bound design is the design of this invocation, so it is run as one
+  // elaborated from source descriptions is: --lint-only and --parse-only stop
+  // short of the run, and anything else simulates it.
+  if (opts.lint_only || opts.parse_only) return 0;
+  return RunOnDeepStack(
+      [&] { return SimulateDesign(opts, design, diag, arena); });
 }
 
 // The invocations that finish without elaborating a design out of the source
@@ -680,7 +839,8 @@ bool ForeignCodeIsWellFormed(const delta::CliOptions& opts,
 // test the preprocessor or the parser alone asks for; --lint-only elaborates
 // and stops; --synth synthesizes; and with none of them the design is
 // simulated.
-int RunParsedUnit(const delta::CliOptions& opts, delta::CompilationUnit* cu,
+int RunParsedUnit(const delta::CliOptions& opts,
+                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag) {
   if (opts.dump_ast) {
     DumpAst(cu);
@@ -692,12 +852,13 @@ int RunParsedUnit(const delta::CliOptions& opts, delta::CompilationUnit* cu,
 
   delta::Arena elab_arena;
   if (opts.lint_only) {
-    return RunLint(opts, cu, diag, elab_arena);
+    return RunLint(opts, lib_map, cu, diag, elab_arena);
   }
   if (opts.synth_mode) {
-    return RunSynthesis(opts, cu, diag, elab_arena);
+    return RunSynthesis(opts, lib_map, cu, diag, elab_arena);
   }
-  return RunSimulationOnDeepStack(opts, cu, diag, elab_arena);
+  return RunOnDeepStack(
+      [&] { return RunSimulation(opts, lib_map, cu, diag, elab_arena); });
 }
 
 int main(int argc, char* argv[]) {
@@ -727,7 +888,11 @@ int main(int argc, char* argv[]) {
     PrintVersion();
     return 0;
   }
-  if (opts.show_help || opts.source_files.empty()) {
+  // §33.5.4: a bind from precompiled libraries is given "the lib.cell
+  // specification for the top-level cell(s) and/or the config to be used" and
+  // no source description, so --load-lib stands in for a source file.
+  if (opts.show_help ||
+      (opts.source_files.empty() && opts.precompiled_libs.empty())) {
     PrintHelp();
     return opts.show_help ? 0 : 1;
   }
@@ -743,6 +908,9 @@ int main(int argc, char* argv[]) {
   int mode_status = 0;
   if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;
 
+  delta::LibraryMap lib_map;
+  if (!LoadLibraryMaps(opts, src_mgr, lib_map)) return 1;
+
   auto pp = PreprocessSources(opts, src_mgr, diag);
   if (pp.source.empty() || diag.HasErrors()) {
     return 1;
@@ -754,5 +922,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   ApplyPreprocMetadata(cu, pp);
-  return RunParsedUnit(opts, cu, diag);
+  if (!TagDesignElementLibraries(*cu, pp, lib_map, diag)) return 1;
+  return RunParsedUnit(opts, lib_map, cu, diag);
 }

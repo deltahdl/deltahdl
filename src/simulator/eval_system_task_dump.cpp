@@ -2,9 +2,11 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -16,9 +18,14 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/deferred_caller.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/file_monitor.h"
+#include "simulator/monitor_member_watch.h"
 #include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
@@ -88,7 +95,9 @@ static void ScheduleMonitorDisplay(SimContext& ctx, Arena& arena) {
     // of the output; the binding the %l/%L specifier reports belongs to that
     // instance and not to whichever process the value change happened to run
     // under.
-    ctx.SetDeferredBindingScope(std::string(ctx.MonitorBindingScope()));
+    Process* caller = ctx.MonitorCaller();
+    CallerStandIn stand_in(caller, ctx);
+    ctx.SetDeferredBindingScope(caller ? caller->inst_prefix : std::string());
     ExecDisplayWrite(monitor, ctx, arena);
     ctx.SetDeferredBindingScope(std::nullopt);
     ctx.Out() << "\n";
@@ -116,13 +125,12 @@ Logic4Vec EvalMonitor(const Expr* expr, SimContext& ctx, Arena& arena) {
   // A fresh $monitor call becomes the one active display list and supersedes
   // any earlier one.
   ctx.SetActiveMonitor(expr);
-  // §33.7: the list is redisplayed on every change of a watched value, each
-  // time from outside the process that installed it, so the instance this call
-  // was written in is recorded alongside the list for the %l/%L specifier to
-  // report the binding of.
-  std::string monitor_scope;
-  if (Process* proc = ctx.CurrentProcess()) monitor_scope = proc->inst_prefix;
-  ctx.SetMonitorBindingScope(std::move(monitor_scope));
+  // §21.2.3 with §33.7: the list is redisplayed on every change of a watched
+  // value, each time from outside the process that installed it, so the
+  // calling context -- the instance this call was written in, whose binding
+  // the %l/%L specifier reports, and a class method's object and locals -- is
+  // recorded alongside the list.
+  ctx.SetMonitorCaller(SnapshotCallingProcess(ctx));
   std::vector<std::string_view> names;
   for (auto* arg : expr->args) CollectMonitorSignals(arg, names);
   uint64_t generation = ctx.MonitorGeneration();
@@ -132,8 +140,116 @@ Logic4Vec EvalMonitor(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.SetMonitorLastValue(var, CloneLogic4Vec(var->value, arena));
     AddMonitorWatcher(var, ctx, arena, generation);
   }
+  // §21.2.3 with §8.5: a class property the list reads is watched on its
+  // object, or on its class for a static one (monitor_member_watch.h).
+  for (auto* arg : expr->args) {
+    WatchClassMembersRead(arg, ctx, [&ctx, &arena, generation]() {
+      if (generation != ctx.MonitorGeneration()) return true;
+      if (ctx.MonitorEnabled()) ScheduleMonitorDisplay(ctx, arena);
+      return false;
+    });
+  }
   // The initial values are displayed at the end of the current time step.
   if (ctx.MonitorEnabled()) ScheduleMonitorDisplay(ctx, arena);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// §21.3.2: queue a $fmonitor's write into the postponed region of this time
+// step, once however many of its arguments changed in it, as $monitor's
+// redisplay is. The list is read in the instance the call was written in,
+// the write happening outside any process.
+static void ScheduleFileMonitorWrite(FileMonitor* monitor, SimContext& ctx,
+                                     Arena& arena) {
+  if (monitor->write_pending || monitor->cancelled) return;
+  monitor->write_pending = true;
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [monitor, &ctx, &arena]() {
+    monitor->write_pending = false;
+    if (!monitor->cancelled) {
+      CallerStandIn stand_in(monitor->caller.get(), ctx);
+      ctx.SetDeferredBindingScope(monitor->scope);
+      WriteFileOutputTask(monitor->call, monitor->descriptor,
+                          monitor->task_name, ctx, arena);
+      ctx.SetDeferredBindingScope(std::nullopt);
+    }
+    // A strobe writes once; nothing refers to it after this.
+    if (monitor->one_shot) {
+      auto& all = ctx.FileMonitors();
+      std::erase_if(all, [monitor](const std::unique_ptr<FileMonitor>& m) {
+        return m.get() == monitor;
+      });
+    }
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
+                                   event);
+}
+
+// A watcher that schedules the monitor's write when the variable takes a new
+// value, and retires once an $fclose has cancelled the monitor.
+static void AddFileMonitorWatcher(Variable* var, FileMonitor* monitor,
+                                  SimContext& ctx, Arena& arena) {
+  var->AddWatcher([var, monitor, &ctx, &arena]() -> bool {
+    if (monitor->cancelled) return true;
+    auto last = monitor->last_values.find(var);
+    if (last != monitor->last_values.end() &&
+        SameBits(last->second, var->value))
+      return false;
+    monitor->last_values[var] = CloneLogic4Vec(var->value, arena);
+    ScheduleFileMonitorWrite(monitor, ctx, arena);
+    return false;
+  });
+}
+
+// Registers the file-output task `expr` on `descriptor`, called from the
+// running process, for its end-of-step write.
+static FileMonitor* AddFileMonitor(const Expr* expr, uint32_t descriptor,
+                                   std::string_view name, SimContext& ctx) {
+  auto owned = std::make_unique<FileMonitor>();
+  FileMonitor* monitor = owned.get();
+  monitor->call = expr;
+  monitor->task_name = std::string(name);
+  monitor->descriptor = descriptor;
+  monitor->caller = SnapshotCallingProcess(ctx);
+  if (monitor->caller != nullptr) monitor->scope = monitor->caller->inst_prefix;
+  ctx.FileMonitors().push_back(std::move(owned));
+  return monitor;
+}
+
+// §21.3.2 with §21.2.2 (printed page 664): $fstrobe works "just like"
+// $strobe, whose arguments are displayed "at the end of the current time
+// step" -- after every blocking assignment of the step has landed -- rather
+// than at the call, so a value the calling process changes after the call is
+// written as it ends up. §21.3.1: an $fclose of its descriptor before then
+// cancels it.
+Logic4Vec EvalFstrobe(const Expr* expr, uint32_t descriptor,
+                      std::string_view name, SimContext& ctx, Arena& arena) {
+  FileMonitor* strobe = AddFileMonitor(expr, descriptor, name, ctx);
+  strobe->one_shot = true;
+  ScheduleFileMonitorWrite(strobe, ctx, arena);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+Logic4Vec EvalFmonitor(const Expr* expr, uint32_t descriptor,
+                       std::string_view name, SimContext& ctx, Arena& arena) {
+  FileMonitor* monitor = AddFileMonitor(expr, descriptor, name, ctx);
+  // The first argument is the descriptor, not a member of the list.
+  std::vector<std::string_view> names;
+  for (size_t i = 1; i < expr->args.size(); ++i)
+    CollectMonitorSignals(expr->args[i], names);
+  for (auto var_name : names) {
+    Variable* var = ctx.FindVariable(var_name);
+    if (var == nullptr || monitor->last_values.count(var) != 0) continue;
+    monitor->last_values[var] = CloneLogic4Vec(var->value, arena);
+    AddFileMonitorWatcher(var, monitor, ctx, arena);
+  }
+  for (size_t i = 1; i < expr->args.size(); ++i) {
+    WatchClassMembersRead(expr->args[i], ctx, [monitor, &ctx, &arena]() {
+      if (monitor->cancelled) return true;
+      ScheduleFileMonitorWrite(monitor, ctx, arena);
+      return false;
+    });
+  }
+  ScheduleFileMonitorWrite(monitor, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -315,8 +431,7 @@ static std::string DumpportsControlFileArg(const Expr* expr, SimContext& ctx,
 // so rebuild it into the dotted downward path (e.g. c1.val) that matches the
 // key an instance's variable is registered under -- without this a
 // member-access argument would carry no text of its own and be dropped.
-// Flatten a hierarchical member access to its dotted path, outermost first.
-static std::string FlattenHierPath(const Expr* arg) {
+std::string FlattenHierPath(const Expr* arg) {
   std::vector<std::string_view> parts;
   const Expr* e = arg;
   while (e != nullptr && e->kind == ExprKind::kMemberAccess) {

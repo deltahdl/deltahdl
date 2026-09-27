@@ -409,12 +409,42 @@ std::string_view DeclaredNameTables::FindInstanceType(
                                        : std::string_view{};
 }
 
+void DeclaredNameTables::RegisterInstancePath(std::string_view prefix,
+                                              std::string path) {
+  instance_paths_[std::string(prefix)] = std::move(path);
+}
+
+std::string_view DeclaredNameTables::FindInstancePath(
+    std::string_view prefix) const {
+  auto it = instance_paths_.find(std::string(prefix));
+  return (it != instance_paths_.end()) ? std::string_view(it->second)
+                                       : std::string_view{};
+}
+
 void DeclaredNameTables::RegisterTopModule(std::string_view name) {
   top_module_names_.insert(std::string(name));
 }
 
 bool DeclaredNameTables::IsTopModule(std::string_view name) const {
   return top_module_names_.count(std::string(name)) != 0;
+}
+
+void DeclaredNameTables::RegisterParallelTop(std::string_view name) {
+  parallel_top_names_.insert(std::string(name));
+}
+
+bool DeclaredNameTables::IsParallelTop(std::string_view name) const {
+  return parallel_top_names_.contains(std::string(name));
+}
+
+std::string DeclaredNameTables::RootedStorageKey(std::string_view rest) const {
+  std::size_t dot = rest.find('.');
+  if (dot == std::string_view::npos) return std::string(rest);
+  std::string_view head = rest.substr(0, dot);
+  if (!IsParallelTop(head) && IsTopModule(head)) {
+    return std::string(rest.substr(dot + 1));
+  }
+  return std::string(rest);
 }
 
 uint64_t DeclaredNameTables::VirtualInterfaceHandle(std::string_view scope) {

@@ -152,6 +152,11 @@ struct BlockArrayLeaves {
   uint32_t elem_width;
   SimContext& ctx;
   Arena& arena;
+  // §6.11.3: each element is a variable of the declared type, so it carries
+  // the declaration's signedness and state-ness as a module's element does
+  // (CreateArrayElements in lowerer_var.cpp).
+  bool is_signed = false;
+  bool is_4state = true;
 };
 }  // namespace
 
@@ -183,7 +188,11 @@ static std::optional<BlockDimBounds> EvalBlockDim(const Expr* dim,
 static void CreateBlockArrayLeaves(const BlockArrayLeaves& b, size_t d,
                                    const std::string& prefix) {
   if (d == b.dims.size()) {
-    b.ctx.CreateVariable(*b.arena.Create<std::string>(prefix), b.elem_width);
+    Variable* leaf = b.ctx.CreateVariable(*b.arena.Create<std::string>(prefix),
+                                          b.elem_width);
+    leaf->is_signed = b.is_signed;
+    leaf->is_4state = b.is_4state;
+    if (!b.is_4state) leaf->value = MakeLogic4VecVal(b.arena, b.elem_width, 0);
     return;
   }
   int64_t low = b.dims[d].Low();
@@ -240,8 +249,11 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   // variable after it. The element variables below are created the same way a
   // few lines down in this file.
   ctx.RegisterArrayInScope(stmt->var_name, info);
-  CreateBlockArrayLeaves(BlockArrayLeaves{dims, elem_width, ctx, arena}, 0,
-                         std::string(stmt->var_name));
+  CreateBlockArrayLeaves(
+      BlockArrayLeaves{dims, elem_width, ctx, arena,
+                       DeclaredTypeIsSigned(stmt->var_decl_type, ctx),
+                       info.is_4state},
+      0, std::string(stmt->var_name));
 }
 
 // §7.10 (printed page 169): whether the declaration's first unpacked
@@ -499,11 +511,33 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
 // same flag there) and as a subroutine body local does (CreateFuncLocalVar),
 // so an `int` declared in a task is a signed operand, and a solver drawing
 // it (18.12) draws it over the signed range rather than the unsigned one.
+// §23.9 (printed page 761) with §9.3.1: a variable an unnamed block declares
+// in an instance below the top is that instance's, stored under its prefix as
+// the instance's own variables are, since a name read from inside an instance
+// never steps up to the top's bare one. Stored under the bare name, `int i;
+// i = 9;` in a submodule's initial read i as no variable at all. A
+// declaration executed again stands in the storage it made the first time,
+// given a fresh value as a new variable would be.
+static Variable* CreateBlockVariable(std::string_view name, uint32_t width,
+                                     SimContext& ctx) {
+  std::string prefix = ctx.ActiveInstancePrefix();
+  if (prefix.empty()) return ctx.CreateVariable(name, width);
+  std::string key = prefix + std::string(name);
+  if (Variable* existing = ctx.FindVariable(key)) {
+    *existing = Variable{};
+    existing->value = MakeLogic4Vec(ctx.GetArena(), width);
+    FillWithX(existing->value);
+    return existing;
+  }
+  return ctx.CreateVariable(*ctx.GetArena().Create<std::string>(std::move(key)),
+                            width);
+}
+
 static Variable* CreateVarInScope(std::string_view name, uint32_t width,
                                   bool is_signed, SimContext& ctx) {
   if (ctx.HasLocalScope())
     return ctx.CreateLocalVariable(name, width, is_signed);
-  Variable* var = ctx.CreateVariable(name, width);
+  Variable* var = CreateBlockVariable(name, width, ctx);
   var->is_signed = is_signed;
   var->value.is_signed = is_signed;
   return var;

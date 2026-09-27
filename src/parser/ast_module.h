@@ -783,6 +783,10 @@ struct ModuleDecl {
   SourceRange range;
   std::vector<Attribute> attrs;
   std::vector<PortDecl> ports;
+  // §23.2.2.1: the body port declarations of a non-ANSI module that name no
+  // port of its header but an object a port expression refers to, `input b, c;`
+  // under `.a({b, c})`, each held with the direction and type it declares.
+  std::vector<PortDecl> port_expr_objects;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::vector<DataType> param_types;

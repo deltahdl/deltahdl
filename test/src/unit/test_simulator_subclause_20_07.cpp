@@ -414,4 +414,35 @@ TEST(ArrayQuerySim, HierarchicallyNamedArrayIsQueried) {
   EXPECT_EQ(out, "4 2 5 5 8 3\n");
 }
 
+// §20.7 with §8.5: an unpacked array property of a class object is an array
+// the query functions examine -- through a handle, `logic [7:0] data[1:3]`
+// with 3 elements from left 1 to right 3 and an 8-bit second dimension, a
+// dynamic `int d[]` holding the count its new[] gave it, and, bare inside a
+// method, the descending `bit [3:0] dn[5:2]` from left 5 to right 2.
+TEST(ArrayQuerySim, ClassArrayPropertyIsQueried) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [7:0] data[1:3];\n"
+      "    bit [3:0] dn[5:2];\n"
+      "    int d[];\n"
+      "    function void show;\n"
+      "      $display(\"%0d %0d %0d\", $left(dn), $right(dn),\n"
+      "               $increment(dn));\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C m = new;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %0d %0d\", $size(m.data), $left(m.data),\n"
+      "             $right(m.data), $size(m.data, 2));\n"
+      "    m.d = new[5];\n"
+      "    $display(\"%0d %0d\", $size(m.d), $right(m.d));\n"
+      "    m.show();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 3 8\n5 4\n5 2 1\n");
+}
+
 }  // namespace

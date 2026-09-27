@@ -26,7 +26,14 @@ std::unordered_set<std::string_view> DelegatedConfigNames(
   std::unordered_set<std::string_view> names;
   for (const auto* cfg : unit.configs) {
     for (const auto* rule : cfg->rules) {
-      if (rule->kind != ConfigRuleKind::kInstance) continue;
+      // §33.4.2 hands an instance to a config through an instance clause, and
+      // §33.4.1.4 lets a cell clause carry the same use expansion for every
+      // instance of the cell; either makes the named config a delegated-to
+      // one rather than a second one in force.
+      if (rule->kind != ConfigRuleKind::kInstance &&
+          rule->kind != ConfigRuleKind::kCell) {
+        continue;
+      }
       if (!UseClauseNamesConfig(rule, cfg, &unit)) continue;
       names.insert(rule->use_cell);
     }

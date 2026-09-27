@@ -202,6 +202,7 @@ RtlirDesign* SeparateCompilationBinder::Bind(
   if (!AllCellsPrecompiled(top_names)) return nullptr;
 
   Elaborator elab(arena_, diag_, &unit_);
+  if (!library_order_.empty()) elab.SetLibraryDeclarationOrder(library_order_);
   return elab.Elaborate(top_names);
 }
 
@@ -234,6 +235,7 @@ RtlirDesign* SeparateCompilationBinder::BindConfig(
   if (!DesignCellsPrecompiled(cfg)) return nullptr;
 
   Elaborator elab(arena_, diag_, &unit_);
+  if (!library_order_.empty()) elab.SetLibraryDeclarationOrder(library_order_);
   return elab.Elaborate(cfg);
 }
 

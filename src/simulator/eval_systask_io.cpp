@@ -13,6 +13,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -103,15 +104,34 @@ static bool TryStoreIntoByteArray(std::string_view name,
   return true;
 }
 
-static void StoreStringResult(Variable* dst, std::string_view name,
-                              const std::string& output, SimContext& ctx,
-                              Arena& arena) {
+// §21.3.3 with §8.5: a destination no variable of the run's tables answers --
+// a class property named bare in a method or through a handle, an element or
+// a field -- takes the text as an assignment to it would: whole where it is a
+// string property, else fitted to the width it holds.
+static void AssignStringResult(const Expr* dest, const std::string& output,
+                               SimContext& ctx, Arena& arena) {
+  Logic4Vec packed = StringToLogic4Vec(arena, output);
+  if (NamesStringProperty(dest, ctx)) {
+    packed = StripStringZeros(packed, arena);
+    packed.is_string = true;
+  } else {
+    packed = ResizeToWidth(packed, EvalExpr(dest, ctx, arena).width, arena);
+  }
+  PerformBlockingAssign(dest, packed, ctx, arena);
+}
+
+static void StoreStringResult(const Expr* dest, Variable* dst,
+                              std::string_view name, const std::string& output,
+                              SimContext& ctx, Arena& arena) {
   // An unpacked byte array is recognised before the plain-variable case.
   // Lowering gives such an array a variable under its own name as well as one
   // per element, so testing the destination variable first would send every
   // character into that base variable, which no read of the array consults.
   if (TryStoreIntoByteArray(name, output, ctx, arena)) return;
-  if (dst == nullptr) return;
+  if (dst == nullptr) {
+    if (dest != nullptr) AssignStringResult(dest, output, ctx, arena);
+    return;
+  }
   Logic4Vec packed = StringToLogic4Vec(arena, output);
   if (ctx.IsStringVariable(name)) {
     dst->value = StripStringZeros(packed, arena);
@@ -145,7 +165,7 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
 
   std::vector<Expr*> rest(expr->args.begin() + 1, expr->args.end());
   std::string output = BuildStringTaskOutput(rest, default_radix, ctx, arena);
-  StoreStringResult(dst, dst_name, output, ctx, arena);
+  StoreStringResult(expr->args[0], dst, dst_name, output, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -162,14 +182,12 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
     dst = ctx.FindVariable(dst_name);
   }
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
-  std::vector<Logic4Vec> vals;
-  for (size_t i = 2; i < expr->args.size(); ++i) {
-    vals.push_back(EvalExpr(expr->args[i], ctx, arena));
-  }
-  WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size(), expr->range.start);
-  std::string out =
-      FormatDisplay(fmt, vals, {.ctx = &ctx, .loc = expr->range.start});
-  StoreStringResult(dst, dst_name, out, ctx, arena);
+  WarnIfArgCountMismatch(ctx, "$sformat", fmt, expr->args.size() - 2,
+                         expr->range.start);
+  // §21.3.3: the arguments fill the format as a display task's fill its
+  // template, %p and %v included.
+  std::string out = FormatDisplayArgs(expr, 1, fmt, ctx, arena);
+  StoreStringResult(expr->args[0], dst, dst_name, out, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -236,29 +254,16 @@ static std::vector<FILE*> ResolveOutputTargets(uint32_t descriptor,
   return ctx.GetMcdFiles(descriptor);
 }
 
-// §21.3.2: render the text one file-output task writes. The first argument is
-// the descriptor; a string literal directly after it is the format string and
-// every other argument is a value. With no format string the b/h/o radix is
-// derived from the task-name suffix.
+// §21.3.2: render the text one file-output task writes. The tasks "accept the
+// same type of arguments as the tasks upon which they are based" once the
+// descriptor is taken off the front, so the rest of the list is rendered as
+// $display renders its own: each string literal a template the arguments after
+// it fill, %p and %v included, each other expression under the radix the
+// task-name suffix picks (decimal without one), an omitted argument a space.
 static std::string RenderFileOutputText(const Expr* expr, SimContext& ctx,
                                         Arena& arena, char suffix) {
-  std::string fmt;
-  std::vector<Logic4Vec> arg_vals;
-  for (size_t i = 1; i < expr->args.size(); ++i) {
-    auto val = EvalExpr(expr->args[i], ctx, arena);
-    if (i == 1 && expr->args[i]->kind == ExprKind::kStringLiteral) {
-      fmt = ExtractFormatString(expr->args[i]);
-    } else {
-      arg_vals.push_back(val);
-    }
-  }
-  if (!fmt.empty())
-    return FormatDisplay(fmt, arg_vals,
-                         {.ctx = &ctx, .loc = expr->range.start});
-  if (suffix == '\0') return {};
-  char fmt_buf[3] = {'%', suffix, 0};
-  return FormatDisplay(fmt_buf, arg_vals,
-                       {.ctx = &ctx, .loc = expr->range.start});
+  return RenderDisplayArgList(expr, 1, suffix == '\0' ? 'd' : suffix, ctx,
+                              arena);
 }
 
 // Write the rendered text to one target stream. It is written by size, not as a
@@ -293,13 +298,10 @@ static void WriteFileOutputText(FILE* fp, const std::string& output,
   if (fp == stdout || fp == stderr || is_append) std::fflush(fp);
 }
 
-static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, std::string_view name) {
-  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  auto descriptor =
-      static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+void WriteFileOutputTask(const Expr* expr, uint32_t descriptor,
+                         std::string_view name, SimContext& ctx, Arena& arena) {
   auto targets = ResolveOutputTargets(descriptor, ctx);
-  if (targets.empty()) return MakeLogic4VecVal(arena, 1, 0);
+  if (targets.empty()) return;
 
   char suffix = FileOutputSuffix(name);
   bool is_display_family = name.rfind("$fdisplay", 0) == 0 ||
@@ -310,6 +312,23 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   for (FILE* fp : targets) {
     WriteFileOutputText(fp, output, is_display_family, ctx);
   }
+}
+
+static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, std::string_view name) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+  auto descriptor =
+      static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  // §21.3.2: $fmonitor sets up a monitor of its own, which writes the list at
+  // the end of this time step and whenever an argument changes after.
+  if (name.rfind("$fmonitor", 0) == 0) {
+    return EvalFmonitor(expr, descriptor, name, ctx, arena);
+  }
+  // §21.3.2: $fstrobe writes at the end of this time step.
+  if (name.rfind("$fstrobe", 0) == 0) {
+    return EvalFstrobe(expr, descriptor, name, ctx, arena);
+  }
+  WriteFileOutputTask(expr, descriptor, name, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

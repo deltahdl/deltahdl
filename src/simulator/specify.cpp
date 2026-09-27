@@ -611,6 +611,22 @@ void SpecifyManager::IncrementInterconnectDelay(
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
+  // §31.2 has "every timing check" carry its own limits and notifier, and
+  // nothing in Clause 31 merges two checks on the same signals, so an entry
+  // built from a declaration replaces only the one built from that same
+  // declaration in that same instance -- the rebuild
+  // RebuildTimingChecksForSpecparam files after an SDF specparam change.
+  if (check.decl != nullptr) {
+    for (auto& existing : timing_checks_) {
+      if (existing.decl == check.decl &&
+          existing.inst_prefix == check.inst_prefix) {
+        existing = std::move(check);
+        return;
+      }
+    }
+    timing_checks_.push_back(std::move(check));
+    return;
+  }
   for (auto& existing : timing_checks_) {
     // §31.2 puts a system timing check inside a specify block and §30.3 puts
     // that block inside a module declaration, so two instances of one cell
@@ -620,8 +636,10 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
     if (existing.inst_prefix == check.inst_prefix &&
         existing.kind == check.kind &&
         existing.ref_signal == check.ref_signal &&
+        existing.ref_select == check.ref_select &&
         existing.ref_edge == check.ref_edge &&
         existing.data_signal == check.data_signal &&
+        existing.data_select == check.data_select &&
         existing.data_edge == check.data_edge &&
         SpecifyConditionsMatch(existing.condition, check.condition)) {
       existing = std::move(check);

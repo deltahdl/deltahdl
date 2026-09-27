@@ -36,7 +36,10 @@ namespace {
 // the resolvers that own it, and a select on the way to the element paths.
 bool RootedAtCall(const Expr* side) {
   if (side == nullptr) return false;
-  if (side->kind == ExprKind::kCall) return true;
+  // A.8.4: a system function call is a primary a method is called on as a
+  // subroutine call is, `$sformatf("%s", s).len()`.
+  if (side->kind == ExprKind::kCall || side->kind == ExprKind::kSystemCall)
+    return true;
   return side->kind == ExprKind::kMemberAccess && !side->is_scope_resolution &&
          side->rhs != nullptr && side->rhs->kind == ExprKind::kIdentifier &&
          RootedAtCall(side->lhs);

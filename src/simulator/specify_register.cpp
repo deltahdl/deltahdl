@@ -20,23 +20,36 @@ namespace delta {
 // §32.4.1 (printed page 925): the select the specify path terminal `t` was
 // written with, spelled as PathDelay::src_select describes; empty for a whole
 // port. An indexed part-select, `a[i +: 2]`, is spelled as the part it covers.
+TerminalSelect SpecifyTerminalSelect(const SpecifyTerminal& t, SimContext& ctx,
+                                     Arena& arena) {
+  TerminalSelect sel;
+  if (t.range_kind == SpecifyRangeKind::kNone || t.range_left == nullptr)
+    return sel;
+  sel.present = true;
+  const int64_t kLeft = SelectBoundValue(EvalExpr(t.range_left, ctx, arena));
+  sel.left = kLeft;
+  sel.right = kLeft;
+  if (t.range_kind == SpecifyRangeKind::kBitSelect || t.range_right == nullptr)
+    return sel;
+  const int64_t kRight = SelectBoundValue(EvalExpr(t.range_right, ctx, arena));
+  sel.right = kRight;
+  if (t.range_kind == SpecifyRangeKind::kPlusIndexed) {
+    sel.left = kLeft + kRight - 1;
+    sel.right = kLeft;
+  } else if (t.range_kind == SpecifyRangeKind::kMinusIndexed) {
+    sel.right = kLeft - kRight + 1;
+  }
+  return sel;
+}
+
 static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
                                       Arena& arena) {
-  if (t.range_kind == SpecifyRangeKind::kNone || t.range_left == nullptr)
-    return {};
-  const int64_t kLeft = SelectBoundValue(EvalExpr(t.range_left, ctx, arena));
+  const TerminalSelect kSel = SpecifyTerminalSelect(t, ctx, arena);
+  if (!kSel.present) return {};
   if (t.range_kind == SpecifyRangeKind::kBitSelect || t.range_right == nullptr)
-    return "[" + std::to_string(kLeft) + "]";
-  const int64_t kRight = SelectBoundValue(EvalExpr(t.range_right, ctx, arena));
-  int64_t msb = kLeft;
-  int64_t lsb = kRight;
-  if (t.range_kind == SpecifyRangeKind::kPlusIndexed) {
-    msb = kLeft + kRight - 1;
-    lsb = kLeft;
-  } else if (t.range_kind == SpecifyRangeKind::kMinusIndexed) {
-    lsb = kLeft - kRight + 1;
-  }
-  return "[" + std::to_string(msb) + ":" + std::to_string(lsb) + "]";
+    return "[" + std::to_string(kSel.left) + "]";
+  return "[" + std::to_string(kSel.left) + ":" + std::to_string(kSel.right) +
+         "]";
 }
 
 // §30.4.2 (printed page 873): a path terminal is a port_identifier or

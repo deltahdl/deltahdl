@@ -16,6 +16,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_module_inst_internal.h"
@@ -239,127 +240,6 @@ DataType TypeParamOverrideToDataType(const Expr* expr,
   return dt;
 }
 
-static bool InstParamsArePositional(const ModuleItem* item) {
-  for (const auto& [n, e] : item->inst_params)
-    if (n.empty() && e) return true;
-  return false;
-}
-
-static const Expr* NamedTypeParamOverride(const ModuleItem* item,
-                                          std::string_view pname) {
-  for (const auto& [n, e] : item->inst_params)
-    if (n == pname) return e;
-  return nullptr;
-}
-
-// A positional override maps to the index of `pname` among the overridable
-// (non-localparam) parameters, mirroring ResolvePositionalInstParams.
-static const Expr* PositionalTypeParamOverride(const ModuleItem* item,
-                                               const ModuleDecl* child_decl,
-                                               std::string_view pname) {
-  size_t idx = 0;
-  for (const auto& [dname, dexpr] : child_decl->params) {
-    if (child_decl->localparam_port_names.count(dname) > 0) continue;
-    if (dname == pname)
-      return idx < item->inst_params.size() ? item->inst_params[idx].second
-                                            : nullptr;
-    ++idx;
-  }
-  return nullptr;
-}
-
-// Locate the instantiation override expression for the type parameter `pname`,
-// honoring both the named (.T(x)) and positional (#(x, ...)) forms (the two are
-// never mixed -- the parser rejects that).
-static const Expr* FindTypeParamOverrideExpr(const ModuleItem* item,
-                                             const ModuleDecl* child_decl,
-                                             std::string_view pname) {
-  if (InstParamsArePositional(item))
-    return PositionalTypeParamOverride(item, child_decl, pname);
-  return NamedTypeParamOverride(item, pname);
-}
-
-// A saved typedef-map entry, so a type-parameter substitution made for one
-// child elaboration can be undone afterwards (the map is shared across
-// modules).
-struct SavedTypedef {
-  std::string_view name;
-  bool existed = false;
-  DataType prev;
-};
-
-// §23.10.2/§6.20.3: the type the child's type parameter at index `i` takes for
-// this instantiation -- the instance parameter value assignment when one names
-// a type, otherwise the type the declaration defaulted to. Returns nothing,
-// having reported, when the assignment names no type, and when there is neither
-// an assignment nor a default (§6.20.1). Reporting an assignment that names no
-// type is what keeps it apart from an absent one: falling back to the default
-// there would elaborate the child against a type the source did not write, and
-// the mismatch would surface as a wrong width rather than as a report.
-static std::optional<DataType> ResolveChildTypeParam(
-    const ModuleItem* item, const ModuleDecl* child_decl, size_t i,
-    const CompilationUnit* unit, DiagEngine& diag) {
-  std::string_view pname = child_decl->params[i].first;
-  const Expr* ov = FindTypeParamOverrideExpr(item, child_decl, pname);
-  if (ov != nullptr) {
-    DataType resolved = TypeParamOverrideToDataType(ov, unit, diag, item->loc);
-    if (resolved.kind != DataTypeKind::kImplicit) return resolved;
-    diag.Error(item->loc,
-               std::format("parameter value assignment for type parameter '{}' "
-                           "of '{}' does not name a type",
-                           pname, child_decl->name),
-               Subclause("23.10.2"));
-    return std::nullopt;
-  }
-  if (i < child_decl->param_types.size() &&
-      child_decl->param_types[i].kind != DataTypeKind::kImplicit) {
-    return child_decl->param_types[i];
-  }
-  diag.Error(item->loc,
-             std::format("type parameter '{}' of '{}' has no default type "
-                         "and no override at instantiation",
-                         pname, child_decl->name),
-             Subclause("6.20.1"));
-  return std::nullopt;
-}
-
-// §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
-// type and publish it in `typedefs` so the child's dependent declarations
-// elaborate against the chosen type. A type parameter whose type
-// ResolveChildTypeParam could not settle publishes nothing, so the child's
-// declarations that depend on it are left unresolved rather than bound to a
-// type the instantiation did not ask for. Returns the prior entries so the
-// caller can restore the shared map after the child is elaborated.
-static std::vector<SavedTypedef> ApplyChildTypeParams(
-    const ModuleItem* item, const ModuleDecl* child_decl, TypedefMap& typedefs,
-    const CompilationUnit* unit, DiagEngine& diag) {
-  std::vector<SavedTypedef> saved;
-  for (size_t i = 0; i < child_decl->params.size(); ++i) {
-    std::string_view pname = child_decl->params[i].first;
-    if (child_decl->type_param_names.count(pname) == 0) continue;
-    auto resolved = ResolveChildTypeParam(item, child_decl, i, unit, diag);
-    if (!resolved) continue;
-    SavedTypedef s;
-    s.name = pname;
-    auto it = typedefs.find(pname);
-    s.existed = it != typedefs.end();
-    if (s.existed) s.prev = it->second;
-    saved.push_back(s);
-    typedefs[pname] = *resolved;
-  }
-  return saved;
-}
-
-static void RestoreChildTypeParams(TypedefMap& typedefs,
-                                   const std::vector<SavedTypedef>& saved) {
-  for (const auto& s : saved) {
-    if (s.existed)
-      typedefs[s.name] = s.prev;
-    else
-      typedefs.erase(s.name);
-  }
-}
-
 // §11.2.1 counts parameters among the operands a constant expression is made
 // of, so an instance-array bound may name one. `scope` carries the values
 // declared where the instantiation is written; without it a bound like [N:0]
@@ -547,6 +427,69 @@ ScopeMap BuildConfigOverrideScope(const ScopeMap& parent_scope,
   return scope;
 }
 
+// The dotted names a member-access chain is written with, outermost first, or
+// nothing where the chain is not a pure one.
+static std::vector<std::string_view> MemberAccessNames(const Expr* e) {
+  std::vector<std::string_view> names;
+  while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
+    if (e->rhs == nullptr) return {};
+    names.insert(names.begin(), e->rhs->text);
+    e = e->lhs;
+  }
+  if (e == nullptr || e->kind != ExprKind::kIdentifier) return {};
+  names.insert(names.begin(), e->text);
+  return names;
+}
+
+// §33.4.3 (printed page 940): "Parameters identifiers shall be resolved
+// starting in the parent scope of the instance", so a hierarchical reference
+// in a configuration's override that names the configured instance's parent,
+// `top.WIDTH` for `instance top.a1`, is that parent's parameter. It is folded
+// here, where the parent's values are known: a scalar parameter becomes its
+// value and a parameter array its name in the parent's scope, which an index
+// -- a literal or a config localparam -- then selects in. A reference naming
+// any other scope is left as it was written.
+static Expr* ResolveParentReference(Expr* e, std::string_view parent_path,
+                                    const ScopeMap& parent_scope,
+                                    Arena& arena) {
+  if (e == nullptr) return e;
+  if (e->kind == ExprKind::kSelect && e->base != nullptr &&
+      e->base->kind == ExprKind::kMemberAccess) {
+    Expr* base =
+        ResolveParentReference(e->base, parent_path, parent_scope, arena);
+    if (base == e->base) return e;
+    auto* copy = arena.Create<Expr>(*e);
+    copy->base = base;
+    return copy;
+  }
+  auto names = MemberAccessNames(e);
+  if (names.size() < 2) return e;
+  std::string scope_path;
+  for (size_t i = 0; i + 1 < names.size(); ++i) {
+    if (i > 0) scope_path += '.';
+    scope_path.append(names[i]);
+  }
+  bool names_parent =
+      parent_path == scope_path ||
+      (parent_path.size() > scope_path.size() &&
+       parent_path.ends_with(scope_path) &&
+       parent_path[parent_path.size() - scope_path.size() - 1] == '.');
+  if (!names_parent) return e;
+  std::string_view param = names.back();
+  if (auto it = parent_scope.find(param); it != parent_scope.end()) {
+    auto* value = arena.Create<Expr>();
+    value->kind = ExprKind::kIntegerLiteral;
+    value->int_val = static_cast<uint64_t>(it->second);
+    value->range = e->range;
+    return value;
+  }
+  auto* ident = arena.Create<Expr>();
+  ident->kind = ExprKind::kIdentifier;
+  ident->text = param;
+  ident->range = e->range;
+  return ident;
+}
+
 // Applies one configuration override's explicit per-parameter values onto
 // child_params, recording each touched parameter in `locked`. A present
 // expression sets a new value, a null one ("(.p())") leaves the parameter at
@@ -655,6 +598,30 @@ bool ConcatElementsUniform(const Expr* conn, uint32_t total,
   return true;
 }
 
+// §23.3.3.5 (printed page 748): an unpacked array connection is split across
+// an array of instances, "each element of the port connection shall be matched
+// to the port left index to left index, right index to right index", so the
+// instance `position` places from the right stands `total - 1 - position`
+// places from the left and takes the element that far from the array's left
+// bound. A variable's bounds are its declared ones; a net array is read as
+// written `[size]`, from 0. Empty where the name is no unpacked array, a
+// variable's or a net's.
+std::optional<int64_t> UnpackedElementForInstance(
+    const InstArrayDistribCtx& ctx, std::string_view name, uint32_t position,
+    uint32_t total) {
+  const auto kFromLeft = static_cast<int64_t>(total - 1 - position);
+  auto it = ctx.var_array_info.find(name);
+  if (it != ctx.var_array_info.end() && it->second.num_unpacked_dims > 0) {
+    if (it->second.declared_dims.empty()) return kFromLeft;
+    const auto& dim = it->second.declared_dims.front();
+    return dim.left <= dim.right ? dim.left + kFromLeft : dim.left - kFromLeft;
+  }
+  for (const auto& net : ctx.parent_mod->nets) {
+    if (net.name == name && net.num_unpacked_dims > 0) return kFromLeft;
+  }
+  return std::nullopt;
+}
+
 // §23.3.3.5: rewrite one port connection for the instance at array position
 // `position` (0 = least-significant / right index). An unpacked-array
 // connection maps element-by-position; a packed connection whose width is
@@ -668,9 +635,10 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
   if (!conn || port_width == 0 || total < 2) return conn;
 
   if (conn->kind == ExprKind::kIdentifier) {
-    auto it = ctx.var_array_info.find(conn->text);
-    if (it != ctx.var_array_info.end() && it->second.num_unpacked_dims > 0) {
-      return MakeElementSelectExpr(ctx.arena, conn, position);
+    if (auto index =
+            UnpackedElementForInstance(ctx, conn->text, position, total)) {
+      return MakeElementSelectExpr(ctx.arena, conn,
+                                   static_cast<uint32_t>(*index));
     }
     if (FindSignalWidth(conn->text, ctx.parent_mod) == port_width * total) {
       return MakePartSelectPlusExpr(
@@ -728,6 +696,14 @@ void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
       arr_left = ConstEvalInt(item->inst_range_left, scope);
     if (item->inst_range_right)
       arr_right = ConstEvalInt(item->inst_range_right, scope);
+    // §23.3.2 writes an instance's dimension as an unpacked_dimension, whose
+    // `[size]` form §7.4.2 makes `[0:size-1]`: `leaf arr[2]()` is arr[0] and
+    // arr[1]. Read as a range with no right bound it was one instance.
+    if (arr_left && item->inst_range_right == nullptr) {
+      arr_right = *arr_left - 1;
+      arr_left = 0;
+      if (*arr_right < 0) arr_left.reset();
+    }
   }
   if (arr_left && arr_right) {
     PushInstanceArray(ctx, mod, inst, *arr_left, *arr_right);
@@ -754,24 +730,39 @@ void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
 }
 
 void Elaborator::ApplyConfigParamOverrides(
-    const ModuleDecl* child_decl, Elaborator::ParamList& child_params,
-    const ScopeMap& parent_scope, std::vector<std::string_view>& locked) {
-  if (instance_param_overrides_.empty() || current_inst_path_.empty()) return;
+    const ModuleItem* item, const ModuleDecl* child_decl,
+    Elaborator::ParamList& child_params, const ScopeMap& parent_scope,
+    std::vector<std::string_view>& locked) {
+  if (config_inst_path_.empty()) return;
+  if (instance_param_overrides_.empty() && cell_param_overrides_.empty()) {
+    return;
+  }
 
   // Parameter identifiers resolve in the instance's parent scope, augmented
   // with the configuration's own localparams (§33.4.3).
   ScopeMap scope =
       BuildConfigOverrideScope(parent_scope, config_localparam_scope_);
-
-  for (const auto& ov : instance_param_overrides_) {
-    if (ov.inst_path != current_inst_path_) continue;
-
-    if (ov.reset_all) {
-      ResetAllConfigParams(child_decl, child_params, locked);
+  std::string_view parent_path = config_inst_path_;
+  parent_path = parent_path.substr(0, parent_path.rfind('.'));
+  auto apply = [&](const ConfigParamOverride& ov) {
+    if (ov.reset_all) ResetAllConfigParams(child_decl, child_params, locked);
+    auto params = ov.params;
+    for (auto& assignment : params) {
+      assignment.second = ResolveParentReference(assignment.second, parent_path,
+                                                 parent_scope, arena_);
     }
     ApplyConfigOverrideParams(
-        AssignableConfigParams(child_decl, ov.params, ov.loc, diag_),
-        child_params, scope, locked);
+        AssignableConfigParams(child_decl, params, ov.loc, diag_), child_params,
+        scope, locked);
+  };
+  // §33.4.1.4: a cell clause's overrides reach every instance of the cell; an
+  // instance clause, the more specific selection (§33.4.1.6), is applied after
+  // it and so decides a parameter both name.
+  for (const auto& ov : cell_param_overrides_) {
+    if (ov.inst_path == item->inst_module) apply(ov);
+  }
+  for (const auto& ov : instance_param_overrides_) {
+    if (ov.inst_path == config_inst_path_) apply(ov);
   }
 }
 
@@ -789,11 +780,10 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // new level of hierarchy", so the record of the instantiation has to carry
   // the scoped name as well as the redeclaration check does. Taking the raw
   // name for RtlirModuleInst::inst_name and for current_inst_path_ gave every
-  // iteration one name and one instance path, which is what
-  // Lowerer::LowerChildModules keys an instance's declarations on. ScopedName
-  // is asked for the name once and answers all three. The empty check guards
-  // it: ScopedName("") returns the generate prefix itself, which would name an
-  // unnamed instantiation after the block holding it.
+  // iteration one name and one instance path, which Lowerer::LowerChildModules
+  // keys an instance's declarations on. ScopedName is asked once and answers
+  // all three; ScopedName("") returns the generate prefix itself, which would
+  // name an unnamed instantiation after the block holding it.
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   if (!item->inst_name.empty() &&
@@ -815,6 +805,9 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::string saved_inst_path = current_inst_path_;
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
   current_inst_path_.append(scoped_inst_name.data(), scoped_inst_name.size());
+  std::string saved_config_path = std::exchange(
+      config_inst_path_,
+      HierInstancePath(config_inst_path_, gen_block_path_, item->inst_name));
 
   // §23.4: a name that resolves out of nested_module_decls_ names a module
   // declared inside this one, which sees this module's names.
@@ -822,9 +815,11 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
                         nested_module_decls_.end();
   auto* child_decl = FindModuleInScope(item->inst_module);
   if (!child_decl) {
-    ReportUnknownModule(item, diag_);
+    if (!ReportConfigRuleBindingNothing(unit_, item, diag_))
+      ReportUnknownModule(item, diag_);
     mod->children.push_back(inst);
     current_inst_path_ = std::move(saved_inst_path);
+    config_inst_path_ = std::move(saved_config_path);
     return;
   }
 
@@ -844,6 +839,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   }
 
   CheckInstancePorts(inst, item, mod);
+  CoerceDrivenInputPorts(inst, mod);
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   // §28.3.5: an instance-array range shall be given by two constant
   // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
@@ -858,6 +854,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_, parent_scope};
   AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);
   current_inst_path_ = std::move(saved_inst_path);
+  config_inst_path_ = std::move(saved_config_path);
 }
 
 void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
@@ -872,14 +869,15 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   // A configuration may override (or reset) this instance's parameters on top
   // of whatever the instantiation specified (§33.4.3).
   std::vector<std::string_view> config_locked;
-  ApplyConfigParamOverrides(child_decl, child_params, parent_scope,
+  ApplyConfigParamOverrides(item, child_decl, child_params, parent_scope,
                             config_locked);
 
   // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
   // shared typedef map so its dependent declarations resolve against the chosen
   // types, then restore the map once the child has been elaborated.
-  auto saved_type_params =
-      ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
+  auto saved_type_params = ApplyChildTypeParams(
+      TypeParamSourcesFor(item, instance_param_overrides_, config_inst_path_),
+      child_decl, typedefs_, unit_, diag_);
   // §16.15: the default disable iff extends to a nested declaration and not
   // into an instance of a module declared elsewhere. §23.4 makes this scope's
   // names visible inside such a declaration as well, whether the instance is

@@ -251,6 +251,20 @@ bool ClosesWindow(TimingCheckKind kind, StabilityEvent event) {
   return true;
 }
 
+// The timestamp_condition and timecheck_condition of §31.3.3 and §31.3.6 as
+// they stood at one transition; both hold where the declaration left them out.
+struct EventConditions {
+  bool timestamp = true;
+  bool timecheck = true;
+};
+
+EventConditions ConditionsNow(const TimingCheckEntry& check, SimContext& ctx) {
+  return {TimingCheckEventEnabled(check.timestamp_condition_expr,
+                                  check.inst_prefix, ctx),
+          TimingCheckEventEnabled(check.timecheck_condition_expr,
+                                  check.inst_prefix, ctx)};
+}
+
 // One §31.3 check between the two transitions it measures: which entry it is,
 // what its two signals are called, and when each of them last made the
 // transition the check was written with. Both signals are named under the
@@ -275,6 +289,13 @@ struct StabilityPair {
   uint64_t ref_ticks = 0;
   bool has_data = false;
   uint64_t data_ticks = 0;
+  // Whether the check's timestamp_condition and timecheck_condition held when
+  // each signal last made its transition. §31.9.2 leaves which of the two a
+  // transition answers to until the window is known -- the timestamp is the
+  // event that transitions first and the timecheck the one that transitions
+  // second -- so both are read at the event and kept.
+  EventConditions ref_conditions;
+  EventConditions data_conditions;
 
   // Whether an evaluation of this check is already scheduled for the slot
   // running now. ScheduleTimingCheckEvaluation
@@ -354,6 +375,25 @@ void ReportViolation(TimingCheckKind kind, StabilitySide side,
       "31.3.5", pair.armed.Entry().loc, ctx);
 }
 
+// §31.9.2 (printed page 922): "timestamp_condition is associated with the
+// delayed signal that transitions first, while timecheck_condition is
+// associated with the delayed signal that transitions second". A violation
+// before the reference edge has the data transition first and one after it the
+// reference transition first, so the side says which transition answers to
+// which condition; `$setuphold(clk, data, tsetup, thold, ntfr, , cond1)` is
+// then the clause's `$setup(data, clk &&& cond1, ...)` beside `$hold(clk, data
+// &&& cond1, ...)`. A condition that did not hold at its transition leaves that
+// transition no event of the check, and the window no violation.
+bool ConditionsAdmit(StabilitySide side, const StabilityPair& pair) {
+  const EventConditions& first = side == StabilitySide::kBefore
+                                     ? pair.data_conditions
+                                     : pair.ref_conditions;
+  const EventConditions& second = side == StabilitySide::kBefore
+                                      ? pair.ref_conditions
+                                      : pair.data_conditions;
+  return first.timestamp && second.timecheck;
+}
+
 // A §31.3 check whose timecheck event happened in the slot running now.
 // Reports a violation when the two signals' last transitions leave one inside
 // the window the other bounds.
@@ -372,6 +412,7 @@ void EvaluateStabilityPair(const StabilityPair& pair, SimContext& ctx) {
   StabilitySide side =
       ViolatedSide(*pair.armed.mgr, check, pair.ref_ticks, pair.data_ticks);
   if (side == StabilitySide::kNone) return;
+  if (!ConditionsAdmit(side, pair)) return;
   ReportViolation(check.kind, side, pair, ctx);
   ToggleNotifier(check, ctx);
 }
@@ -407,6 +448,7 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
       [pair, kRefCloses, &ctx]() {
         pair->has_ref = true;
         pair->ref_ticks = ctx.CurrentTime().ticks;
+        pair->ref_conditions = ConditionsNow(pair->armed.Entry(), ctx);
         if (!kRefCloses) return;
         ScheduleTimingCheckEvaluation(pair->pending, ctx, [pair, &ctx]() {
           EvaluateStabilityPair(*pair, ctx);
@@ -415,6 +457,7 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
       [pair, kDataCloses, &ctx]() {
         pair->has_data = true;
         pair->data_ticks = ctx.CurrentTime().ticks;
+        pair->data_conditions = ConditionsNow(pair->armed.Entry(), ctx);
         if (!kDataCloses) return;
         ScheduleTimingCheckEvaluation(pair->pending, ctx, [pair, &ctx]() {
           EvaluateStabilityPair(*pair, ctx);
