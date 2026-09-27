@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -507,6 +508,11 @@ class Preprocessor {
   // for the data's and the digest's keys come with the keys themselves
   // (§34.5.14.2, §34.5.20).
   bool reading_key_block_ = false;
+  // The data and digest key names a key block has carried a key for, each as
+  // its entity and name joined by a NUL. The reader holds those keys from then
+  // on, whatever list it was given (§34.5.14.2, §34.5.20).
+  std::unordered_set<std::string> names_carried_by_key_blocks_;
+  bool KeynameCarriedByKeyBlock(std::string_view owner, std::string_view name);
 
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
