@@ -743,8 +743,13 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
       cell.cell_type = std::string(val.text);
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "INSTANCE") {
-      auto val = NextSdfToken(s);
-      cell.instance = std::string(val.text);
+      // SDF writes a cell at the level the annotation runs at with its path
+      // left out, `(INSTANCE)`, which SdfCellPrefixInRegion reads as the region
+      // itself; read as a name, the closing parenthesis became the path and
+      // the cell's next construct was taken for the close.
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] != ')')
+        cell.instance = std::string(NextSdfToken(s).text);
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "DELAY") {
       ParseDelaySpec(s, cell, file);

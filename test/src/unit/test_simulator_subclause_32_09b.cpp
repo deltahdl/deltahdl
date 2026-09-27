@@ -435,6 +435,19 @@ TEST(SdfAnnotateTask, CellPathIsRelativeToTheModuleHoldingTheCall) {
   EXPECT_EQ(DelayIn(d, "b."), kDeclaredDelay);
 }
 
+// §32.9 (printed page 932): a cell whose INSTANCE leaves its path out names the
+// level the annotation runs at, here the operand a, so its entries reach a's
+// path and leave b's. The closing parenthesis was read as the path, and the
+// cell's DELAY section taken for the close.
+TEST(SdfAnnotateTask, CellWithNoInstancePathIsTheRegion) {
+  const std::string kSdf =
+      WriteTempFile("empty_instance.sdf", DelayFile(CellRecord("", "15")));
+  SdfDesign d;
+  ASSERT_TRUE(BuildAndRun(d, TwoCellDesign("\"" + kSdf + "\", a")));
+  EXPECT_EQ(DelayIn(d, "a."), 15u);
+  EXPECT_EQ(DelayIn(d, "b."), kDeclaredDelay);
+}
+
 // A design whose `mid` holds a cell `inner` and is instantiated twice, with
 // `call` placed in mid's initial block when `call_in_mid` is set and in top's
 // otherwise.
