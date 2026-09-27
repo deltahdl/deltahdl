@@ -275,9 +275,9 @@ namespace {
 // (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
 // check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $fullskew(posedge ref_sig, posedge data_sig, 29, 64);\n"
     "  endspecify\n"
@@ -288,9 +288,9 @@ constexpr const char* kDesignBeforeStimulus =
 // The design the two simultaneous cases run, up to the point their stimulus is
 // spliced in. It differs from kDesignBeforeStimulus in its two limits alone.
 constexpr const char* kSimultaneousDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $fullskew(posedge ref_sig, posedge data_sig, 58, 83);\n"
     "  endspecify\n"
@@ -304,9 +304,9 @@ constexpr const char* kSimultaneousDesignBeforeStimulus =
 // same module because §31.7 has the conditioning signal named by the declaring
 // module's own name.
 constexpr const char* kSuppressedRefDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  logic en;\n"
     "  specify\n"
     "    $fullskew(posedge ref_sig &&& en, posedge data_sig, 31, 47);\n"
@@ -321,9 +321,9 @@ constexpr const char* kSuppressedRefDesignBeforeStimulus =
 // limit2 and in nothing else: an empty notifier, an empty event_based_flag and
 // the flag itself.
 constexpr const char* kRemainActiveDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  logic en;\n"
     "  specify\n"
     "    $fullskew(posedge ref_sig &&& en, posedge data_sig, 31, 47, , , 1);\n"
@@ -347,9 +347,9 @@ constexpr const char* kSuppressedRefStimulus =
 // spliced in. Syntax 31-11 puts the event_based_flag after the notifier, so the
 // empty argument between limit2 and the 1 is the notifier §31.6 makes optional.
 constexpr const char* kEventBasedDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $fullskew(posedge ref_sig, posedge data_sig, 73, 96, , 1);\n"
     "  endspecify\n"

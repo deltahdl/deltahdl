@@ -224,9 +224,9 @@ namespace {
 // (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
 // check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $timeskew(posedge ref_sig, posedge data_sig, 52);\n"
     "  endspecify\n"
@@ -240,9 +240,9 @@ constexpr const char* kDesignBeforeStimulus =
 // and which is there to carry the run past the expiry a timer armed at the
 // reference event would fire at.
 constexpr const char* kSimultaneousDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  logic tail_sig;\n"
     "  specify\n"
     "    $timeskew(posedge ref_sig, posedge data_sig, 58);\n"
@@ -256,9 +256,9 @@ constexpr const char* kSimultaneousDesignBeforeStimulus =
 // the point the stimulus is spliced in. Its notifier position holds the empty
 // placeholder §31.4.2's example writes there, no notifier being declared.
 constexpr const char* kFlagDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $timeskew(posedge ref_sig, posedge data_sig, 66, , 15, 22);\n"
     "  endspecify\n"
@@ -273,9 +273,9 @@ constexpr const char* kFlagDesignBeforeStimulus =
 // sentence names, and `tail_sig` is there to carry the run past the expiry the
 // timer armed at the first reference edge holds.
 constexpr const char* kSuppressedRefDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  logic en;\n"
     "  logic tail_sig;\n"
     "  specify\n"
@@ -292,9 +292,9 @@ constexpr const char* kSuppressedRefDesignBeforeStimulus =
 // remain_active_flag alone, written 11 where that one writes 0, so nothing but
 // the flag can explain the two cases answering differently.
 constexpr const char* kRemainActiveDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  logic en;\n"
     "  logic tail_sig;\n"
     "  specify\n"
@@ -311,9 +311,9 @@ constexpr const char* kRemainActiveDesignBeforeStimulus =
 // "like the $skew check ... except that it becomes dormant after reporting the
 // first violation".
 constexpr const char* kEventBasedDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $timeskew(posedge ref_sig, posedge data_sig, 44, , 37);\n"
     "  endspecify\n"

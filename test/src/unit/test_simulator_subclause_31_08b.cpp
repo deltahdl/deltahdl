@@ -177,9 +177,9 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 // index the declaration gives that bit.
 std::string VectorReferenceDesign(const std::string& stimulus) {
   return std::string(
-             "module top;\n"
-             "  logic d;\n"
-             "  logic [5:4] clk;\n"
+             "module top(\n"
+             "    output logic d,\n"
+             "    output logic [5:4] clk);\n"
              "  specify\n"
              "    $setup(d, posedge clk, 73);\n"
              "  endspecify\n"
@@ -197,9 +197,9 @@ std::string VectorReferenceDesign(const std::string& stimulus) {
 // indices 4 through 7.
 std::string VectorDataDesign(const std::string& stimulus) {
   return std::string(
-             "module top;\n"
-             "  logic [7:4] d;\n"
-             "  logic clk;\n"
+             "module top(\n"
+             "    output logic [7:4] d,\n"
+             "    output logic clk);\n"
              "  specify\n"
              "    $setup(d, posedge clk, 79);\n"
              "  endspecify\n"
@@ -347,8 +347,8 @@ TEST(VectorSignalsInTimingChecksDriven,
      VectorWidthPulseOnUpperBitAloneIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic [3:2] clk;\n"
+      "module top(\n"
+      "    output logic [3:2] clk);\n"
       "  specify\n"
       "    $width(posedge clk, 89, 0);\n"
       "  endspecify\n"

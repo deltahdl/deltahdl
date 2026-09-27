@@ -142,4 +142,81 @@ TEST(TimingCheckLimitConstness, LocalparamLimitRejected) {
                             4, "31.2"));
 }
 
+// Syntax 31-2 makes each timing check event a specify_terminal_descriptor,
+// whose input_identifier and output_identifier (A.7.3) are a port of the
+// module or a member of one of its interface ports. A variable the module
+// declares for itself is neither, so a check naming one is refused.
+TEST(TimingCheckTerminals, LocalVariableDataEventRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module dut(input clk);\n"
+      "  reg d = 0; reg n = 0;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 5, n);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check terminal 'd' is not a port of the "
+                            "module",
+                            4, "31.2"));
+}
+
+// The same for a net the module declares, named as the reference event.
+TEST(TimingCheckTerminals, LocalNetReferenceEventRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module dut(input d);\n"
+      "  wire c;\n"
+      "  specify\n"
+      "    $hold(posedge c, d, 3);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check terminal 'c' is not a port of the "
+                            "module",
+                            4, "31.2"));
+}
+
+// An input, an inout and an output port are each a terminal: input_identifier
+// admits the first two and output_identifier the last two.
+TEST(TimingCheckTerminals, PortsOfEveryDirectionAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module dut(input d, inout clk, output q);\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 5);\n"
+      "    $hold(posedge clk, q, 2);\n"
+      "    $width(negedge q, 4);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// interface_identifier . port_identifier: a member of an interface port.
+TEST(TimingCheckTerminals, InterfacePortMemberAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface bus;\n"
+      "  logic d, clk;\n"
+      "endinterface\n"
+      "module dut(bus b);\n"
+      "  specify\n"
+      "    $setup(b.d, posedge b.clk, 5);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus i();\n"
+      "  dut u(.b(i));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

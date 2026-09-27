@@ -152,9 +152,9 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 TEST(EdgeControlSpecifierEvaluation, SetupEdge01IgnoresAZeroToXTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[01] clk, 23);\n"
       "  endspecify\n"
@@ -181,9 +181,9 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge01IgnoresAZeroToXTransition) {
 TEST(EdgeControlSpecifierEvaluation, SetupEdge01AnswersToAZeroToOneTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[01] clk, 23);\n"
       "  endspecify\n"
@@ -207,9 +207,9 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge01AnswersToAZeroToOneTransition) {
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToOneTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
       "  endspecify\n"
@@ -235,9 +235,9 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToOneTransition) {
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToXTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
       "  endspecify\n"
@@ -263,9 +263,9 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAZeroToXTransition) {
 TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAnXToOneTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[01, 0x, x1] clk, 31);\n"
       "  endspecify\n"
@@ -292,9 +292,9 @@ TEST(EdgeControlSpecifierEvaluation, PosedgeListAnswersToAnXToOneTransition) {
 TEST(EdgeControlSpecifierEvaluation, SetupEdge1xIgnoresAOneToZeroTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[1x] clk, 43);\n"
       "  endspecify\n"
@@ -317,9 +317,9 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge1xIgnoresAOneToZeroTransition) {
 TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, edge[z1] clk, 59);\n"
       "  endspecify\n"
@@ -345,8 +345,8 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
 TEST(EdgeControlSpecifierEvaluation, WidthEdge01ClosesOnAOneToZeroTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $width(edge[01] clk, 71, 0);\n"
       "  endspecify\n"
@@ -371,8 +371,8 @@ TEST(EdgeControlSpecifierEvaluation, WidthEdge01ClosesOnAOneToZeroTransition) {
 TEST(EdgeControlSpecifierEvaluation, WidthEdge01IgnoresAOneToXTransition) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $width(edge[01] clk, 71, 0);\n"
       "  endspecify\n"

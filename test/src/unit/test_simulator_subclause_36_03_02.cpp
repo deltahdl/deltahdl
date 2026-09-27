@@ -222,9 +222,9 @@ TEST_F(OverrideBuiltinSystf, ATimingCheckCannotBeOverridden) {
   // §31.3.1 orders $setup's arguments data_event, reference_event, limit, so
   // `d` is the data event and `clk` the reference.
   auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, posedge clk, 7);\n"
       "  endspecify\n"

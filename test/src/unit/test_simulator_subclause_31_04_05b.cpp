@@ -90,8 +90,8 @@ namespace {
 // (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
 // check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $period(posedge clk, 61);\n"
     "  endspecify\n"

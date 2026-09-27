@@ -274,9 +274,14 @@ ModuleSignals BuildLocalSignals(const ModuleDecl* mod,
 // A timing-check terminal may not name a ref port. §25.6: an interface signal
 // reached through a ref modport member is equally barred; other interface
 // signals are valid timing-check terminals regardless of modport direction.
+// Nor may it name a net or variable of the module that is no port: Syntax 31-2
+// (§31.2, printed page 896) makes it a specify_terminal_descriptor, whose
+// input_identifier and output_identifier (A.7.3) are port identifiers or an
+// interface port's member.
 void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
-                         const PortMap& port_map, const IfaceMap& iface_map,
-                         DiagEngine& diag) {
+                         const SignalScope& scope, DiagEngine& diag) {
+  const PortMap& port_map = scope.port_map;
+  const IfaceMap& iface_map = scope.iface_map;
   if (!t.interface_name.empty()) {
     IfaceTerminal ift = ResolveIfaceTerminal(t, port_map, iface_map);
     if (ift.is_ref) {
@@ -295,6 +300,13 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                            "terminal in a specify block",
                            t.name),
                Subclause("25.6"));
+  }
+  if (it == port_map.end() && scope.signals.local.contains(t.name)) {
+    diag.Error(loc,
+               std::format("timing check terminal '{}' is not a port of the "
+                           "module",
+                           t.name),
+               Subclause("31.2"));
   }
 }
 
@@ -319,10 +331,9 @@ void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
   if (si->kind == SpecifyItemKind::kPathDecl) {
     CheckPathDeclTerminals(si, port_map, signals, iface_map, diag);
   } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-    CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, port_map,
-                        iface_map, diag);
-    CheckTimingTerminal(si->timing_check.data_terminal, si->loc, port_map,
-                        iface_map, diag);
+    SignalScope scope{port_map, signals, iface_map};
+    CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, scope, diag);
+    CheckTimingTerminal(si->timing_check.data_terminal, si->loc, scope, diag);
   }
 }
 

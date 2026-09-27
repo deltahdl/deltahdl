@@ -132,9 +132,9 @@ namespace {
 // stands on out of this text. The declaration stands above the stimulus, so the
 // line it holds here is the line it holds in the whole source.
 constexpr const char* kDesignThroughTheCheck =
-    "module top;\n"
-    "  logic clr;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clr,\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $recrem(posedge clr, posedge clk, 24, 14);\n"
     "  endspecify\n"
@@ -146,9 +146,9 @@ constexpr const char* kDesignThroughTheCheck =
 // supplies. It differs from kDesignThroughTheCheck in its two limits alone, and
 // LineHolding reads the `$recrem` line off it the same way.
 constexpr const char* kSimultaneousDesignThroughTheCheck =
-    "module top;\n"
-    "  logic clr;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clr,\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $recrem(posedge clr, posedge clk, 45, 27);\n"
     "  endspecify\n"

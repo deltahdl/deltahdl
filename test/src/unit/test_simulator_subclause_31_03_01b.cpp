@@ -170,9 +170,9 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 TEST(DesignTimingCheckEvaluation, SetupViolationInARunIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, posedge clk, 23);\n"
       "  endspecify\n"
@@ -202,9 +202,9 @@ TEST(DesignTimingCheckEvaluation, SetupViolationInARunIsReported) {
 TEST(DesignTimingCheckEvaluation, SetupSatisfiedInARunReportsNothing) {
   SimFixture f;
   ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
+      DrivenToCompletion("module top(\n"
+                         "    output logic d,\n"
+                         "    output logic clk);\n"
                          "  specify\n"
                          "    $setup(d, posedge clk, 23);\n"
                          "  endspecify\n"
@@ -229,9 +229,9 @@ TEST(DesignTimingCheckEvaluation, SetupSatisfiedInARunReportsNothing) {
 TEST(DesignTimingCheckEvaluation, SetupViolationInARunTogglesTheNotifier) {
   SimFixture f;
   auto* notifier = RunAndFindVar(
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic setup_notifier;\n"
       "  specify\n"
       "    $setup(d, posedge clk, 19, setup_notifier);\n"
@@ -256,9 +256,9 @@ TEST(DesignTimingCheckEvaluation, SetupViolationInARunTogglesTheNotifier) {
 TEST(DesignTimingCheckEvaluation, HoldViolationInARunIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $hold(posedge clk, d, 17);\n"
       "  endspecify\n"
@@ -288,9 +288,9 @@ TEST(DesignTimingCheckEvaluation,
      HoldViolationInOneTimeStepWithTheClockAssignedFirst) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $hold(posedge clk, d, 13);\n"
       "  endspecify\n"
@@ -317,9 +317,9 @@ TEST(DesignTimingCheckEvaluation,
      HoldViolationInOneTimeStepWithTheDataAssignedFirst) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $hold(posedge clk, d, 13);\n"
       "  endspecify\n"
@@ -352,9 +352,9 @@ TEST(DesignTimingCheckEvaluation,
 TEST(DesignTimingCheckEvaluation, SetupInOneTimeStepReportsNothing) {
   SimFixture f;
   ASSERT_TRUE(
-      DrivenToCompletion("module top;\n"
-                         "  logic d;\n"
-                         "  logic clk;\n"
+      DrivenToCompletion("module top(\n"
+                         "    output logic d,\n"
+                         "    output logic clk);\n"
                          "  specify\n"
                          "    $setup(d, posedge clk, 29);\n"
                          "  endspecify\n"

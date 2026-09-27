@@ -142,9 +142,9 @@ constexpr std::string_view kSetupViolation = "$setup violation: data signal";
 std::string NotifierDesign(std::string_view initial_value, unsigned limit,
                            unsigned data_time, unsigned interval) {
   return std::string(
-             "module top;\n"
-             "  logic d;\n"
-             "  logic clk;\n"
+             "module top(\n"
+             "    output logic d,\n"
+             "    output logic clk);\n"
              "  logic setup_notifier;\n"
              "  specify\n"
              "    $setup(d, posedge clk, ") +

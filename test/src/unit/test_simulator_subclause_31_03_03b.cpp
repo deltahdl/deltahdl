@@ -92,9 +92,9 @@ namespace {
 // stands on out of this text. The declaration stands above the stimulus, so the
 // line it holds here is the line it holds in the whole source.
 constexpr const char* kDesignThroughTheCheck =
-    "module top;\n"
-    "  logic d;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic d,\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $setuphold(posedge clk, d, 21, 6);\n"
     "  endspecify\n"

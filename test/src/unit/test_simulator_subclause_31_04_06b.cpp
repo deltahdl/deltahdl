@@ -216,9 +216,9 @@ namespace {
 // LineHolding (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus
 // follows the check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ctl;\n"
-    "  logic d;\n"
+    "module top(\n"
+    "    output logic ctl,\n"
+    "    output logic d);\n"
     "  specify\n"
     "    $nochange(posedge ctl, d, 0, 0);\n"
     "  endspecify\n"
@@ -232,9 +232,9 @@ constexpr const char* kDesignBeforeStimulus =
 // two offsets alone, 27 as the start edge offset and -14 as the end edge
 // offset, and its $nochange stands on the same line.
 constexpr const char* kOffsetDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ctl;\n"
-    "  logic d;\n"
+    "module top(\n"
+    "    output logic ctl,\n"
+    "    output logic d);\n"
     "  specify\n"
     "    $nochange(posedge ctl, d, 27, -14);\n"
     "  endspecify\n"

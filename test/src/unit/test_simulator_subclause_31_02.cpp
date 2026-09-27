@@ -112,9 +112,9 @@ const TimingCheckEntry* RegisteredCheckIn(const SpecifyManager& mgr,
 TEST(RegisteredDesignTimingChecks, DeclaredSetupCheckReachesTheManager) {
   SimFixture f;
   const SpecifyManager* mgr = SpecifyStateAfterRun(
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  specify\n"
       "    $setup(d, posedge clk, 7);\n"
       "  endspecify\n"

@@ -130,8 +130,8 @@ namespace {
 // LineHolding (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus
 // follows the check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $width(posedge clk, 5, 0);\n"
     "  endspecify\n"
@@ -142,8 +142,8 @@ constexpr const char* kDesignBeforeStimulus =
 // §31.4.4 admits `$width ( negedge clr, lim, thresh, notif );`, so the
 // threshold is the third argument of the call and 8 is the value it declares.
 constexpr const char* kThresholdDesignBeforeStimulus =
-    "module top;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $width(posedge clk, 21, 8);\n"
     "  endspecify\n"
@@ -153,8 +153,8 @@ constexpr const char* kThresholdDesignBeforeStimulus =
 // The design whose $width declares no threshold, spliced the same way. §31.4.4
 // admits `$width ( negedge clr, lim );`, so the call ends after its limit.
 constexpr const char* kNoThresholdDesignBeforeStimulus =
-    "module top;\n"
-    "  logic clk;\n"
+    "module top(\n"
+    "    output logic clk);\n"
     "  specify\n"
     "    $width(posedge clk, 34);\n"
     "  endspecify\n"

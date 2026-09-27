@@ -27,15 +27,15 @@
 // Lowerer::RegisterDesignTiming (src/simulator/lowerer.cpp) registers under an
 // empty instance prefix, and ReportViolation
 // (src/simulator/timing_check_driver.cpp) spells both signal names under that
-// prefix. So the message names `d` and `clk` as they are written here.
+// prefix. So the message names `d` and `clk` as they are written here. They are
+// the module's output ports, since a timing check's terminals are ports of the
+// module that holds it (§31.2, Syntax 31-2).
 //
 // The design calls no $finish, so the run records no `$finish at time N` line:
 // EmitFinishDiagnostic (src/simulator/eval_system_func.cpp) is what prints
 // one. It calls no $display either, so standard output is empty and the
 // recorded output is the report alone.
-module timing_check_violation_location;
-  logic d;
-  logic clk;
+module timing_check_violation_location(output logic d, output logic clk);
 
   specify
 $setup(d, posedge clk, 10);

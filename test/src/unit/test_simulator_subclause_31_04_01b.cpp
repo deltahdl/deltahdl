@@ -138,9 +138,9 @@ namespace {
 // (lib/cpp/test_helpers/helpers_reported_error.h). The stimulus follows the
 // check, so a line of this text is that line of the whole source.
 constexpr const char* kDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $skew(posedge ref_sig, posedge data_sig, 46);\n"
     "  endspecify\n"
@@ -151,9 +151,9 @@ constexpr const char* kDesignBeforeStimulus =
 // The design the two simultaneous cases run, up to the point the stimulus is
 // spliced in. It differs from kDesignBeforeStimulus in its limit alone.
 constexpr const char* kSimultaneousDesignBeforeStimulus =
-    "module top;\n"
-    "  logic ref_sig;\n"
-    "  logic data_sig;\n"
+    "module top(\n"
+    "    output logic ref_sig,\n"
+    "    output logic data_sig);\n"
     "  specify\n"
     "    $skew(posedge ref_sig, posedge data_sig, 34);\n"
     "  endspecify\n"

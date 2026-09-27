@@ -134,9 +134,9 @@ bool DrivenToCompletion(const std::string& design, SimFixture& f) {
 TEST(ConditionedTimingCheckEvaluation, SetupWithFalseConditionReportsNothing) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $setup(d, posedge clk &&& en, 29);\n"
@@ -165,9 +165,9 @@ TEST(ConditionedTimingCheckEvaluation, SetupWithFalseConditionReportsNothing) {
 TEST(ConditionedTimingCheckEvaluation, SetupWithTrueConditionIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $setup(d, posedge clk &&& en, 29);\n"
@@ -195,9 +195,9 @@ TEST(ConditionedTimingCheckEvaluation, SetupWithTrueConditionIsReported) {
 TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $setup(d, posedge clk &&& en, 37);\n"
@@ -222,9 +222,9 @@ TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
 TEST(ConditionedTimingCheckEvaluation, EqualityConditionAtXIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $setup(d, posedge clk &&& (en == 1'b1), 41);\n"
@@ -253,9 +253,9 @@ TEST(ConditionedTimingCheckEvaluation, EqualityConditionAtXIsReported) {
 TEST(ConditionedTimingCheckEvaluation, NegatedConditionAtZeroIsReported) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $setup(d, posedge clk &&& ~en, 53);\n"
@@ -286,9 +286,9 @@ TEST(ConditionedTimingCheckEvaluation,
      HoldWithFalseDataConditionReportsNothing) {
   SimFixture f;
   const std::string kDesign =
-      "module top;\n"
-      "  logic d;\n"
-      "  logic clk;\n"
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
       "  logic en;\n"
       "  specify\n"
       "    $hold(posedge clk, d &&& en, 67);\n"
