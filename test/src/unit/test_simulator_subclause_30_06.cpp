@@ -94,4 +94,29 @@ TEST(MixedPathDistributedDelayRun, GatesLargerWinOverModulePath) {
             "t=30 q=0\nt=70 q=1\nt=110 q=0\n");
 }
 
+// §30.6 (printed page 885) with a continuous assignment's own delay the larger:
+// `assign #10` beside `(a => y) = 4` moves y 10 after a. y stayed x.
+TEST(MixedPathDistributedDelayRun, AssignmentDelayLargerWinsOverModulePath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mybuf(input a, output y);\n"
+                       "  assign #10 y = a;\n"
+                       "  specify\n"
+                       "    (a => y) = 4;\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic a; wire ty;\n"
+                       "  mybuf u(.a(a), .y(ty));\n"
+                       "  always @(ty) if ($time >= 12) $display(\"t=%0t "
+                       "y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 0;\n"
+                       "    #10 a = 1;\n"
+                       "    #10 a = 0;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=20 y=1\nt=30 y=0\n");
+}
+
 }  // namespace

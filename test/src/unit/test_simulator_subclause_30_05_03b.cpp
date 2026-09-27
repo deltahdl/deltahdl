@@ -253,4 +253,34 @@ TEST(ActivePathSelectionRun, EachTransitionTakesItsOwnSmallestDelay) {
             "t=40 q=1\nt=65 q=0\n");
 }
 
+// §30.5.3 (printed page 885): "if, the last time they transitioned, A and B did
+// so simultaneously, then the smallest of the two rise delays would be chosen",
+// so a and b rising in one time step raise y after min(6, 5) and falling in
+// one after min(9, 11). The second source's move, a step behind the first's
+// in the same time, was never counted, and y never rose at all.
+TEST(ActiveModulePathSelection,
+     SimultaneousInputsInOneStepTakeTheSmallerDelay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module myor(input a, input b, output y);\n"
+                       "  assign y = a | b;\n"
+                       "  specify\n"
+                       "    (a => y) = (6, 9);\n"
+                       "    (b => y) = (5, 11);\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic a, b; wire ty;\n"
+                       "  myor u(.a(a), .b(b), .y(ty));\n"
+                       "  always @(ty) if ($time >= 10) $display(\"t=%0t "
+                       "y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 0; b = 0;\n"
+                       "    #10 begin a = 1; b = 1; end\n"
+                       "    #10 begin a = 0; b = 0; end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=15 y=1\nt=29 y=0\n");
+}
+
 }  // namespace

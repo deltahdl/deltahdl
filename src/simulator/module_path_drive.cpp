@@ -172,14 +172,26 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
                                  bool* committed) {
   SimContext& ctx = drive.ctx;
   ModulePathTransitionDelay lead = ResolveTransitionDelay(drive, old_val, val);
-  SimTime target = ctx.CurrentTime() + SimTime{lead.ticks};
+  SimTime scheduled = ctx.CurrentTime();
+  SimTime target = scheduled + SimTime{lead.ticks};
 
   for (uint64_t remaining = TicksUntil(target.ticks, ctx); remaining > 0;
        remaining = TicksUntil(target.ticks, ctx)) {
     if (co_await InertialDelayAwaiter{ctx, remaining, drive.sources}) break;
 
     auto next = EvalExpr(drive.rhs, ctx, drive.arena, drive.width);
-    if (next.SameValueAs(val)) continue;
+    if (next.SameValueAs(val)) {
+      // §30.5.3 (printed page 885): a source moving in the very step the
+      // transition was scheduled in transitioned simultaneously with the one
+      // that scheduled it -- "if, the last time they transitioned, A and B did
+      // so simultaneously, then the smallest of the two rise delays would be
+      // chosen" -- so the delay is selected again among them.
+      if (ctx.CurrentTime().ticks == scheduled.ticks) {
+        lead = ResolveTransitionDelay(drive, old_val, val);
+        target = scheduled + SimTime{lead.ticks};
+      }
+      continue;
+    }
     if (!next.SameValueAs(old_val)) {
       // The driver wants a different value than the one pending, so the pending
       // transition is dropped and the new one takes its own delay.

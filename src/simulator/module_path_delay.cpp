@@ -170,6 +170,19 @@ uint8_t ModulePathTransitionSlot(const Logic4Vec& from, const Logic4Vec& to) {
   return kTransitionSlots[from_level][to_level];
 }
 
+std::vector<std::string> ModulePathSourcesOf(const SpecifyManager& mgr,
+                                             std::string_view output) {
+  std::vector<std::string> sources;
+  for (const PathDelay& pd : mgr.GetPathDelays()) {
+    if (!PathEndsAt(pd, output)) continue;
+    std::string name = pd.inst_prefix + pd.src_port;
+    if (std::find(sources.begin(), sources.end(), name) == sources.end()) {
+      sources.push_back(std::move(name));
+    }
+  }
+  return sources;
+}
+
 bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output) {
   for (const PathDelay& pd : mgr.GetPathDelays()) {
     if (PathEndsAt(pd, output)) return true;

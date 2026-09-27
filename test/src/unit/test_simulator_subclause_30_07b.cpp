@@ -168,4 +168,35 @@ TEST(ModulePathPulseFiltering, SamePulseIsRejectedByNarrowerLimit) {
   EXPECT_EQ(out, "at30=1\nat35=1\n");
 }
 
+// §30.7 (printed page 886): a rejected pulse leaves the output where it was,
+// and the transitions of the input after it still reach the output after the
+// path delay: under `(a => y) = 7` the 6-wide pulse at 10 is rejected, and a
+// falling at 30 and rising at 50 move y at 37 and 57. Once the pulse was
+// rejected y never moved again.
+TEST(ModulePathPulseFiltering, TransitionsAfterARejectedPulseStillPropagate) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module mybuf(input a, output y);\n"
+          "  assign y = a;\n"
+          "  specify\n"
+          "    (a => y) = 7;\n"
+          "  endspecify\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic a; wire ty;\n"
+          "  mybuf u(.a(a), .y(ty));\n"
+          "  always @(ty) if ($time > 0) $display(\"t=%0t y=%b\", $time, ty);\n"
+          "  initial begin\n"
+          "    a = 1;\n"
+          "    #10 a = 0;\n"
+          "    #6 a = 1;\n"
+          "    #14 a = 0;\n"
+          "    #20 a = 1;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "t=7 y=1\nt=37 y=0\nt=57 y=1\n");
+}
+
 }  // namespace

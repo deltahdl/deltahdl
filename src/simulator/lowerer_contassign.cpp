@@ -692,11 +692,18 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
   const bool kFirstAtPort = !w.params.module_path_port.empty() && drv.first;
   if (w.path_mgr != nullptr && !kFirstAtPort &&
       !Logic4VecEqual(driven, old_val)) {
-    ModulePathDrive drive{w.ctx,          w.arena,
-                          *w.path_mgr,    w.path_output,
-                          w.read_vars,    w.params.rhs,
-                          w.params.width, ticks,
-                          w.commit,       !w.params.module_path_port.empty()};
+    // At the port the wait also wakes on the paths' sources, whose moves in
+    // the scheduling step reselect the delay (RunModulePathTransition).
+    const bool kAtPort = !w.params.module_path_port.empty();
+    std::vector<std::string> path_sources;
+    std::vector<std::string_view> wake = w.read_vars;
+    if (kAtPort) {
+      path_sources = ModulePathSourcesOf(*w.path_mgr, w.path_output);
+      wake.insert(wake.end(), path_sources.begin(), path_sources.end());
+    }
+    ModulePathDrive drive{w.ctx,    w.arena,      *w.path_mgr,    w.path_output,
+                          wake,     w.params.rhs, w.params.width, ticks,
+                          w.commit, kAtPort};
     co_await RunModulePathTransition(drive, old_val, val, committed);
     co_return StmtResult::kDone;
   }

@@ -177,4 +177,33 @@ TEST(NegativePulseAtOutput, ListFormDeclarationsApplyToEachOutput) {
       "t=11 out=x\nt=16 out=1\nt=31 out_b=x\nt=37 out_b=1\n");
 }
 
+// §30.7.4.2 with `(a => y) = (5, 12)`: a going x at 10 schedules y's x at 15
+// behind the 0 that the time-0 value put on it for 12, a pulse 3 wide under the
+// reject limit 5, so it is rejected and y stays x; a falling at 20 then lands
+// at 32 and rising at 50 at 55. After the rejection y stayed x for the whole
+// run.
+TEST(NegativePulseAtOutput, TransitionsAfterARejectedStartupPulsePropagate) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mybuf(input a, output y);\n"
+                       "  assign y = a;\n"
+                       "  specify\n"
+                       "    (a => y) = (5, 12);\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic a; wire ty;\n"
+                       "  mybuf u(.a(a), .y(ty));\n"
+                       "  always @(ty) if ($time >= 8) $display(\"t=%0t "
+                       "y=%b\", $time, ty);\n"
+                       "  initial begin\n"
+                       "    a = 0;\n"
+                       "    #10 a = 1'bx;\n"
+                       "    #10 a = 0;\n"
+                       "    #30 a = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=32 y=0\nt=55 y=1\n");
+}
+
 }  // namespace

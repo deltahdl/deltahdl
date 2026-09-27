@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -140,6 +141,14 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
 // A design that declared no module path arms nothing, which leaves
 // last_change_ticks at 0 on every variable in it.
 void WatchModulePathSources(const SpecifyManager& mgr, SimContext& ctx);
+
+// The source terminals of every module path registered in `mgr` that ends at
+// `output`, each named as the design names it (the declaring instance's
+// prefix and the port), which is what a drive at the port wakes on besides
+// the port itself: a source moving in the step a transition was scheduled in
+// is one §30.5.3 counts as transitioning at the same time.
+std::vector<std::string> ModulePathSourcesOf(const SpecifyManager& mgr,
+                                             std::string_view output);
 
 // Waits out one pending transition of a module path output and applies §30.7's
 // pulse filtering to whatever the wait turns up.
