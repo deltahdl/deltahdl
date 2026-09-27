@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
 #include "common/types.h"
@@ -119,6 +120,19 @@ TEST(Preprocessor, Timescale_InvalidMagnitude5) {
   PreprocessWithPP("`timescale 5ns / 1ns\n", f, pp);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
                             "22.7"));
+}
+
+// A time unit is a magnitude followed by a unit name: one with the magnitude
+// alone, or with the name alone, is not one.
+TEST(Preprocessor, Timescale_UnitMissingItsNameOrItsMagnitude) {
+  for (const char* unit : {"1", "ns"}) {
+    PreprocFixture f;
+    Preprocessor pp(f.mgr, f.diag, {});
+    PreprocessWithPP(std::string("`timescale ") + unit + " / 1ps\n", f, pp);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit",
+                              1, "22.7"))
+        << unit;
+  }
 }
 
 TEST(Preprocessor, Timescale_InvalidMagnitude0) {
@@ -379,6 +393,32 @@ TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
       f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.HasTimescale());
+}
+
+// The `timescale in force at a header is recorded under the name the header
+// declares, whatever follows that name on the line: the end of the line with
+// the ports on the next, a tab before the ports, or the # of a parameter port
+// list. The first header puts a tab after the keyword's space, which is white
+// space before the name like any other.
+TEST(Preprocessor, Timescale_RecordedUnderTheHeadersName) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "module \ta;\nendmodule\n"
+      "module b\n(input x);\nendmodule\n"
+      "module c\t(input x);\nendmodule\n"
+      "module d#(parameter P = 1);\nendmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 4u);
+  const char* kNames[] = {"a", "b", "c", "d"};
+  for (size_t i = 0; i < list.size(); ++i) {
+    EXPECT_EQ(list[i].module, kNames[i]);
+    EXPECT_TRUE(list[i].has_timescale);
+    EXPECT_EQ(list[i].timescale.unit, TimeUnit::kUs);
+  }
 }
 
 }  // namespace

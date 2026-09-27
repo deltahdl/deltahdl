@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -109,6 +110,23 @@ TEST(CelldefinePreprocessing, TagsMacromoduleDeclaredInRegion) {
       f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(IsTaggedAsCell(pp, "mm"));
+}
+
+// A header with no name, which the parser goes on to reject, declares no
+// module the tag could be recorded under, whichever of the two keywords opens
+// it, so none is recorded.
+TEST(CelldefinePreprocessing, NamelessHeaderInRegionTagsNothing) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`celldefine\n"
+      "module ;\n"
+      "endmodule\n"
+      "macromodule (input x);\n"
+      "endmodule\n"
+      "`endcelldefine\n",
+      f, pp);
+  EXPECT_TRUE(pp.CellModuleNames().empty());
 }
 
 // The claim names no particular module header shape, so the parameter-port
@@ -472,6 +490,23 @@ TEST(CelldefinePreprocessing, LaterOfTwoDirectivesOnOneLineWins) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "first_cell"));
   EXPECT_TRUE(IsTaggedAsCell(pp, "second_cell"));
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
+}
+
+// What follows the directive on its line is read as source text when it opens
+// with a backtick that is neither a directive nor a defined macro, so the
+// usage of the undefined macro is reported as §22.5.1 has it, and the
+// directive before it still takes effect.
+TEST(CelldefinePreprocessing, UndefinedUsageAfterTheDirectiveIsReported) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`celldefine `NOPE\n"
+      "module cell;\n"
+      "endmodule\n",
+      f, pp);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undefined macro 'NOPE'", 1,
+                            "22.5.1"));
+  EXPECT_TRUE(IsTaggedAsCell(pp, "cell"));
 }
 
 // A source description is the whole compilation unit rather than one file, so

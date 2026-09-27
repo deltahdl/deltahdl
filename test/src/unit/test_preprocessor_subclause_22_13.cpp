@@ -70,6 +70,15 @@ TEST(FileAndLineMacroPreprocessing, LineDirective_AffectsFileMacro) {
   EXPECT_NE(result.find("\"overridden.sv\""), std::string::npos);
 }
 
+// The same `line, with `__FILE__ inside the line rather than at its head,
+// where the inline expander rather than the directive path answers it.
+TEST(FileAndLineMacroPreprocessing, LineDirective_AffectsFileMacroInLine) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("`line 1 \"overridden.sv\" 0\n$display(`__FILE__);\n", f);
+  EXPECT_NE(result.find("$display(\"overridden.sv\");"), std::string::npos);
+}
+
 TEST(FileAndLineMacroPreprocessing, Include_ChangesFileAndLine) {
   std::string tmp_dir = "/tmp/deltahdl_test_22_13";
   std::string inc_path = tmp_dir + "/inc.svh";

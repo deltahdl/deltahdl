@@ -81,6 +81,18 @@ TEST(Preprocessor, DefaultDecayTime_InvalidArgumentIsError) {
                             "E.2"));
 }
 
+// E2-C1 (syntax): a real_constant holds one decimal point, so an argument with
+// two is not one, though every other character in it is a digit.
+TEST(Preprocessor, DefaultDecayTime_TwoDecimalPointsIsError) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "`default_decay_time 1.2.3\n");
+  pp.Preprocess(fid);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `default_decay_time argument: '1.2.3'", 1,
+                            "E.2"));
+}
+
 // E2-C4 (baseline): with no directive present, no charge decay applies, i.e.
 // the default state is infinite.
 TEST(Preprocessor, DefaultDecayTime_DefaultStateIsInfinite) {

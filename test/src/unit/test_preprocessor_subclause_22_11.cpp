@@ -591,6 +591,74 @@ TEST(PragmaValue, UnterminatedString_Rejected) {
                             "22.11"));
 }
 
+// The exponent's sign is taken whichever sign it is and whichever case the
+// exponent letter is written in.
+TEST(PragmaValue, ExponentSignsInBothCases_Accepted) {
+  for (const char* value : {"1e+5", "1E-5", "2.5E+1"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`pragma my_pragma ratio = ") + value + "\n", f);
+    EXPECT_FALSE(f.diag.HasErrors()) << value;
+  }
+}
+
+// A sign after a digit that is not an exponent letter ends the number, and
+// nothing in the production admits the sign that follows it.
+TEST(PragmaValue, SignInsideANumber_Rejected) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma offset = 1-2\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
+}
+
+// A tick opens a number only where a base letter or a digit follows it: one
+// ending the directive, or followed by a parenthesis, opens nothing the
+// production admits.
+TEST(PragmaValue, TickOpeningNoNumber_Rejected) {
+  for (const char* value : {"'", "'(1)"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`pragma my_pragma v = ") + value + "\n", f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`pragma directive contains an illegal token", 1,
+                              "22.11"))
+        << value;
+  }
+}
+
+// A backslash ending the directive inside a string escapes nothing, and the
+// string is still unterminated.
+TEST(PragmaValue, StringEndingInABackslash_Rejected) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma note = \"abc\\\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
+}
+
+// A backslash with white space straight after it opens an escaped identifier
+// with no characters, which names nothing.
+TEST(PragmaValue, LoneBackslash_Rejected) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma v = \\ , w\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
+}
+
+// A slash opens a comment only with a second slash or an asterisk after it
+// (5.4); one ending the directive, or followed by anything else, is a
+// character the production does not admit.
+TEST(PragmaValue, SlashOpeningNoComment_Rejected) {
+  for (const char* tail : {"/", "/x"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`pragma my_pragma v = 1 ") + tail + "\n", f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`pragma directive contains an illegal token", 1,
+                              "22.11"))
+        << tail;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // An unrecognized pragma_name has no effect on the interpretation of the
 // SystemVerilog source text.

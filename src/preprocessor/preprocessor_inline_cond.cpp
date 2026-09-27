@@ -14,9 +14,9 @@ namespace delta {
 // in preprocessor.cpp and ExpandSubstitutedBody in preprocessor_inline.cpp run
 // these before ExpandInlineMacros.
 
+// Every caller hands text it has already seen open with a backtick.
 static bool MatchesDirective(std::string_view text, std::string_view dir) {
   if (text.size() < 1 + dir.size()) return false;
-  if (text[0] != '`') return false;
   if (text.substr(1, dir.size()) != dir) return false;
   if (text.size() > 1 + dir.size() && IsIdentChar(text[1 + dir.size()]))
     return false;
@@ -63,9 +63,12 @@ bool Preprocessor::HasInlineConditional(std::string_view line) const {
   return FindInlineConditional(line) != std::string_view::npos;
 }
 
+// The inline readers below run only on a conditional FindInlineConditional
+// found an `endif for, so the text after the directive name holds that
+// `endif's backtick, which is neither white space nor part of a name: a scan
+// over either stops at it before the text runs out.
 static size_t SkipWhitespace(const std::string& s, size_t pos) {
-  while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
-    ++pos;
+  while (std::isspace(static_cast<unsigned char>(s[pos]))) ++pos;
   return pos;
 }
 
@@ -84,10 +87,10 @@ static size_t ParseParenthesizedCondition(const std::string& result,
 
 static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
                                    bool& has_expr) {
-  has_expr = (cond_start < result.size() && result[cond_start] == '(');
+  has_expr = result[cond_start] == '(';
   if (has_expr) return ParseParenthesizedCondition(result, cond_start);
   size_t cond_end = cond_start;
-  while (cond_end < result.size() && IsIdentChar(result[cond_end])) ++cond_end;
+  while (IsIdentChar(result[cond_end])) ++cond_end;
   return cond_end;
 }
 

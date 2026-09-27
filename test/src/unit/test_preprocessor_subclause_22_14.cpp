@@ -697,6 +697,35 @@ TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClass) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// The same class with its name on the line after "interface class": the line
+// ends with the word class, and it is still a class rather than an interface.
+TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClassNamedOnTheNextLine) {
+  PreprocFixture f;
+  Preprocess(
+      "interface class\n"
+      "IC;\n"
+      "endclass\n"
+      "`begin_keywords \"1364-2001\"\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// An interface whose name only begins with the letters of class is an
+// interface, so the placement rule rejects a directive written inside it.
+TEST(KeywordVersionPreprocessing, ErrorInsideInterfaceNamedLikeClass) {
+  PreprocFixture f;
+  Preprocess(
+      "interface classy_if;\n"
+      "`begin_keywords \"1364-2001\"\n"
+      "`end_keywords\n"
+      "endinterface\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`begin_keywords illegal inside a design element",
+                            2, "22.14"));
+}
+
 // Whatever whitespace separates a design element's keyword from its name, the
 // header still opens the element, so the placement rule still rejects a
 // directive written inside it.

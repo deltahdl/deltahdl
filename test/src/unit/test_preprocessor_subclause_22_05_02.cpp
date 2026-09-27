@@ -89,6 +89,22 @@ TEST(UndefPreprocessing, UndefEscapedIdentifierMacro) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
+// The escaped name ends at the white space after it, so the text after that
+// is not part of the name: the macro is still removed, and the text is kept.
+TEST(UndefPreprocessing, UndefEscapedIdentifierFollowedByText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO 7\n"
+      "`undef \\M@CRO wire w;\n"
+      "`ifdef \\M@CRO\n"
+      "visible\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire w;"), std::string::npos);
+  EXPECT_EQ(result.find("visible"), std::string::npos);
+}
+
 // A text_macro_identifier names a macro regardless of whether `define gave it
 // a formal argument list, so the operand form here is a function-like macro.
 TEST(UndefPreprocessing, UndefFunctionLikeMacroName) {

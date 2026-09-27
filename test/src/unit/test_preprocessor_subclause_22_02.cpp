@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <utility>
 
 #include "common/types.h"
@@ -628,6 +629,32 @@ TEST(Preprocessor, DirectiveInTrailingLineCommentAfterCodeIgnored) {
   // directive (22.2), even though a language element precedes the comment on
   // the same line.
   EXPECT_FALSE(pp.InCelldefine());
+}
+
+// A line that opens with a slash but no comment opens with no directive, and
+// is kept as the continuation of the expression the line before began.
+TEST(Preprocessor, LineOpeningWithASlashThatStartsNoComment) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "assign x = a\n"
+      "  / b;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("  / b;"), std::string::npos);
+}
+
+// The `" of §22.5.1 is not the opening quote of a string literal, so the text
+// after it is not taken for string content, and the directive later on the
+// line is still found and takes effect.
+TEST(Preprocessor, DirectiveAfterABacktickQuoteOnTheLine) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "x `\" y `define AFTER_QUOTE 1\n"
+      "`ifdef AFTER_QUOTE\n"
+      "after_quote_defined\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("after_quote_defined"), std::string::npos);
 }
 
 TEST(Preprocessor, DirectiveDoesNotSpanOntoNextLine) {

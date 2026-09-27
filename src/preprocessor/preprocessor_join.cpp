@@ -17,7 +17,7 @@ static bool EndsWithBackslash(std::string_view line) {
 static bool HasOpenTripleQuote(std::string_view text) {
   int count = 0;
   for (size_t i = 0; i + 2 < text.size(); ++i) {
-    if (text[i] == '"' && text[i + 1] == '"' && text[i + 2] == '"') {
+    if (text.substr(i).starts_with("\"\"\"")) {
       if (i > 0 && text[i - 1] == '`') {
         i += 2;
         continue;
@@ -32,8 +32,7 @@ static bool HasOpenTripleQuote(std::string_view text) {
 static bool HasOpenBacktickTripleQuote(std::string_view text) {
   int count = 0;
   for (size_t i = 0; i + 3 < text.size(); ++i) {
-    if (text[i] == '`' && text[i + 1] == '"' && text[i + 2] == '"' &&
-        text[i + 3] == '"') {
+    if (text.substr(i).starts_with("`\"\"\"")) {
       ++count;
       i += 3;
     }

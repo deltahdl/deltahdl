@@ -517,6 +517,64 @@ TEST(Preprocessor, EscapedIdentifierAllDefaults) {
   EXPECT_NE(result.find("5 + 0"), std::string::npos);
 }
 
+// An escaped name runs to the next white space, and one that ends its line
+// has none after it: the end of the line closes the name instead.
+TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLine) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO 7\n"
+      "`\\M@CRO\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result, "\n7\n");
+}
+
+// §22.5.1 lets the macro text be blank, and an escaped name that ends the
+// directive's line has no white space after it to end it: the end of the line
+// does, and the macro is defined to be empty.
+TEST(Preprocessor, EscapedIdentifierMacroNameWithBlankText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO\n"
+      "a `\\M@CRO b\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("M@CRO"), std::string::npos);
+  EXPECT_NE(result.find("a "), std::string::npos);
+  EXPECT_NE(result.find(" b"), std::string::npos);
+}
+
+// The same usage after other text on its line, where the inline expander
+// rather than the directive path reads the name.
+TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLineAfterText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO 7\n"
+      "x = `\\M@CRO\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result, "\nx = 7\n");
+}
+
+// A grave accent with no name after it is neither a directive nor a macro
+// usage, so the preprocessor leaves it in place for the lexer to report as the
+// character §5.2 gives no token.
+TEST(Preprocessor, GraveAccentWithNoNameIsLeftInPlace) {
+  PreprocFixture f;
+  auto result = Preprocess("a\n`\nb\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result, "a\n`\nb\n");
+}
+
+// The same grave accent ending a line after other text, where the inline
+// expander finds no name at all after it.
+TEST(Preprocessor, GraveAccentEndingALineAfterTextIsLeftInPlace) {
+  PreprocFixture f;
+  auto result = Preprocess("a `\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result, "a `\n");
+}
+
 TEST(Preprocessor, TripleQuotedStringInMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(

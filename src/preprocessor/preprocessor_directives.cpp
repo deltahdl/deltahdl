@@ -256,7 +256,8 @@ void Preprocessor::TakeLineFileOverrideId() {
 std::string Preprocessor::ResolveInclude(std::string_view filename,
                                          const std::string& src_dir,
                                          bool quoted) {
-  if (!filename.empty() && filename[0] == '/') {
+  // HandleInclude, the one caller, has already refused an empty name.
+  if (filename[0] == '/') {
     std::string path{filename};
     std::ifstream ifs(path);
     if (ifs.good()) return path;
@@ -340,10 +341,11 @@ void Preprocessor::ReportUnterminatedKeywordRegions() {
   keyword_version_stack_.clear();
 }
 
-static bool ValidateDecayTimeChars(std::string_view arg, bool has_dot) {
+// Digits, with at most one decimal point among them.
+static bool ValidateDecayTimeChars(std::string_view arg) {
   bool saw_dot = false;
   for (char c : arg) {
-    if (c == '.' && has_dot && !saw_dot) {
+    if (c == '.' && !saw_dot) {
       saw_dot = true;
     } else if (!std::isdigit(static_cast<unsigned char>(c))) {
       return false;
@@ -388,7 +390,7 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     return;
   }
   bool has_dot = arg.find('.') != std::string_view::npos;
-  if (!ValidateDecayTimeChars(arg, has_dot)) {
+  if (!ValidateDecayTimeChars(arg)) {
     diag_.Error(
         loc, "invalid `default_decay_time argument: '" + std::string(arg) + "'",
         Subclause("E.2"));

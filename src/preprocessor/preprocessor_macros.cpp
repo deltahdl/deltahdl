@@ -104,8 +104,7 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   resolved.reserve(macro.params.size());
   for (size_t i = 0; i < macro.params.size(); ++i) {
     std::string_view arg = (i < args.size()) ? args[i] : std::string_view{};
-    if (arg.empty() && i < macro.param_defaults.size() &&
-        macro.param_defaults[i] != "\x01") {
+    if (arg.empty() && macro.param_defaults[i] != "\x01") {
       resolved.emplace_back(macro.param_defaults[i]);
     } else {
       // §22.5.1: an actual argument is macro-expanded before being substituted
@@ -262,12 +261,12 @@ size_t Preprocessor::FindMacroParamListClose(std::string_view text) {
 }
 
 // The actual argument list opening at the first '(' of `text`, parentheses
-// included, or empty when the list is not closed within `text`. §22.5.1 lists
-// the matched pairs a right parenthesis is protected inside, so the ')' that
-// closes the list is the first one standing at top level of every pair.
+// included, or empty when the list is not closed within `text`. Every caller
+// has checked that the '(' is there. §22.5.1 lists the matched pairs a right
+// parenthesis is protected inside, so the ')' that closes the list is the
+// first one standing at top level of every pair.
 std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   auto open = text.find('(');
-  if (open == std::string_view::npos) return {};
   DelimiterTracker tracker;
   size_t i = open;
   while (i < text.size()) {
@@ -306,7 +305,7 @@ static void SubstituteToken(std::string_view token,
                             const std::vector<std::string>& params,
                             const std::vector<std::string_view>& args,
                             std::string& result) {
-  for (size_t p = 0; p < params.size() && p < args.size(); ++p) {
+  for (size_t p = 0; p < params.size(); ++p) {
     if (token == params[p]) {
       result.append(args[p]);
       return;
@@ -320,27 +319,27 @@ static void SubstituteToken(std::string_view token,
 // characters consumed, or 0 if no macro-quote begins at body[i].
 static size_t AppendMacroQuote(std::string_view body, size_t i,
                                std::string& result) {
-  if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
-      body[i + 2] == '`' && body[i + 3] == '"') {
+  std::string_view at = body.substr(i);
+  if (at.starts_with("`\\`\"")) {
     result += "\\\"";
     return 4;
   }
-  if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '"') {
+  if (at.starts_with("`\"")) {
     result += '"';
     return 2;
   }
-  if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
-    return 2;
-  }
+  if (at.starts_with("``")) return 2;
   return 0;
 }
 
 // §22.5.1: macro and argument substitution shall not occur within string
 // literals. Copies one literal character (honoring escapes) at body[i] into
 // result, clearing in_string at the closing quote. Returns chars consumed.
+// HandleDefine refuses a body whose string is left open, so a backslash inside
+// one always has the character it escapes after it.
 static size_t CopyStringChar(std::string_view body, size_t i, bool& in_string,
                              std::string& result) {
-  if (body[i] == '\\' && i + 1 < body.size()) {
+  if (body[i] == '\\') {
     result += body[i];
     result += body[i + 1];
     return 2;

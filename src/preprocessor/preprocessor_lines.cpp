@@ -173,7 +173,9 @@ static bool StartsPragmaNumber(std::string_view s, size_t i) {
 
 // A pragma_value number may carry a size and a base, a decimal point, or an
 // exponent, so consume the characters those spellings use. The sign of an
-// exponent is part of the number; a sign anywhere else is not.
+// exponent is part of the number; a sign anywhere else is not. A number opens
+// with a digit or a tick, so a sign is never its first character and always
+// has one before it.
 static size_t ScanPragmaNumber(std::string_view s, size_t i) {
   while (i < s.size()) {
     char c = s[i];
@@ -181,8 +183,7 @@ static size_t ScanPragmaNumber(std::string_view s, size_t i) {
       ++i;
       continue;
     }
-    if ((c == '+' || c == '-') && i > 0 &&
-        (s[i - 1] == 'e' || s[i - 1] == 'E')) {
+    if ((c == '+' || c == '-') && (s[i - 1] == 'e' || s[i - 1] == 'E')) {
       ++i;
       continue;
     }
@@ -367,10 +368,10 @@ static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
 // The directive text that the tokens from `first` up to `last` were scanned
 // out of, as one run. Every token is a view into the same directive text, so
 // the run from where the first one starts to where the last one ends is the
-// text those tokens were written as, spacing and punctuation included.
+// text those tokens were written as, spacing and punctuation included. The one
+// caller hands a nonempty run of tokens it has just parsed.
 static std::string_view SpannedText(const PragmaTokens& toks, size_t first,
                                     size_t last) {
-  if (first >= last || last > toks.size()) return {};
   const char* start = toks[first].text.data();
   std::string_view final_token = toks[last - 1].text;
   size_t size =
@@ -523,10 +524,10 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
 // §22.11.1: the default values a reset restores are the values the tool defines
 // before any SystemVerilog text has been processed. For the protect pragma
 // those are the defaults its keyword table gives, which is what a keyword scope
-// holding nothing reports.
+// holding nothing reports. Protect is the one name RecognizedPragmaNames holds
+// (src/preprocessor/standard_pragmas.cpp), so a recognized name is protect.
 void Preprocessor::ResetPragma(std::string_view pragma_name) {
   if (!IsRecognizedPragmaName(pragma_name)) return;
-  if (pragma_name != kProtectPragmaName) return;
   protect_keywords_.Reset();
   // §22.11.1 restores the state of the pragma_keywords as well as their values,
   // and the keyword scope holds only what a directive wrote against a name. Two
@@ -667,9 +668,10 @@ static bool StartsWithUndefineAllDirective(std::string_view line) {
 // §5.6 opens a simple_identifier with a letter or an underscore and an
 // escaped_identifier with a backslash. Syntax 22-4 admits only an identifier
 // after the keyword, so an operand starting with anything else — a digit, a
-// dollar sign, punctuation — is not a text_macro_identifier at all.
+// dollar sign, punctuation — is not a text_macro_identifier at all. The caller
+// has already refused an empty operand, whose name FindUndefNameEnd finds
+// empty.
 static bool StartsTextMacroIdentifier(std::string_view text) {
-  if (text.empty()) return false;
   return std::isalpha(static_cast<unsigned char>(text[0])) != 0 ||
          text[0] == '_' || text[0] == '\\';
 }

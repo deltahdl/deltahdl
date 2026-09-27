@@ -26,8 +26,7 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
     return false;
   }
   for (size_t i = args.size(); i < def.params.size(); ++i) {
-    bool has_default =
-        i < def.param_defaults.size() && def.param_defaults[i] != "\x01";
+    bool has_default = def.param_defaults[i] != "\x01";
     if (!has_default) {
       diag_.Error(loc,
                   "too few arguments for macro '" + std::string(name) + "'",
@@ -439,7 +438,7 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
     // whether we are inside a string literal before searching for the next
     // backtick.
     in_string = false;
-    for (size_t i = 0; i < copied && i < line.size(); ++i) {
+    for (size_t i = 0; i < copied; ++i) {
       if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
         in_string = !in_string;
       }
@@ -482,8 +481,9 @@ static std::string_view ExtractModuleName(std::string_view trimmed,
   auto rest = trimmed.substr(keyword.size());
 
   if (rest.starts_with("automatic ")) rest = rest.substr(10);
-  while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
-    rest.remove_prefix(1);
+  // Every caller hands a trimmed line, whose last character is not white
+  // space, so the skip stops before the text runs out.
+  while (rest[0] == ' ' || rest[0] == '\t') rest.remove_prefix(1);
   size_t end = 0;
   while (end < rest.size() && rest[end] != ' ' && rest[end] != '\t' &&
          rest[end] != '(' && rest[end] != ';' && rest[end] != '#')
@@ -680,11 +680,10 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
     return;
   }
 
+  // An escaped name runs to the white space that ends it (5.6.1), and that one
+  // character belongs to the name rather than to what follows it (22.5.1).
   auto after_name = rest.substr(name_end);
-  if (escaped && !after_name.empty() &&
-      std::isspace(static_cast<unsigned char>(after_name[0]))) {
-    after_name.remove_prefix(1);
-  }
+  if (escaped && !after_name.empty()) after_name.remove_prefix(1);
 
   if (!after_name.empty() && after_name[0] == '(') {
     auto close = FindMacroParamListClose(after_name);
@@ -764,11 +763,12 @@ void Preprocessor::HandleEndif() {
   }
 }
 
+// The one caller, HandleInclude, has already refused a name that opens with
+// neither a double quote nor an angle bracket.
 static void StripIncludeQuotes(std::string_view& fn,
                                std::string_view& after_close) {
   after_close = {};
   if (fn.size() < 2) return;
-  if (fn.front() != '"' && fn.front() != '<') return;
   char close = (fn.front() == '"') ? '"' : '>';
   auto end = fn.find(close, 1);
   if (end != std::string_view::npos) {
@@ -806,12 +806,8 @@ void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
                 Subclause::None());
     return;
   }
+  // ResolveInclude answers only a path it has just opened.
   std::ifstream ifs(resolved);
-  if (!ifs) {
-    diag_.Error(loc, "cannot open include file '" + resolved + "'",
-                Subclause::None());
-    return;
-  }
   std::ostringstream ss;
   ss << ifs.rdbuf();
   auto content = ss.str();
@@ -845,7 +841,7 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
     return;
   }
 
-  if (angle_bracket && !fn.empty() && fn[0] == '/') {
+  if (angle_bracket && fn[0] == '/') {
     diag_.Error(loc, "absolute path not allowed with angle-bracket `include",
                 Subclause("22.4"));
     return;

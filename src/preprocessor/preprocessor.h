@@ -132,9 +132,10 @@ class Preprocessor {
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
 
-  // Records that one output line was written on line `line` of `file_id`. It
-  // does nothing while recording_origins_ is false, which is how text run for
-  // its definitions alone and appended to no output stays out of the table.
+  // Records that one output line was written on line `line` of `file_id`. Its
+  // one caller, NoteOutputLines, reaches it only while recording_origins_ is
+  // true, which is how text run for its definitions alone and appended to no
+  // output stays out of the table.
   void NoteOutputLine(uint32_t file_id, uint32_t line);
   // Where `output` and the table stand now, taken before a source line is
   // written so NoteOutputLines can count what it wrote.

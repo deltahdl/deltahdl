@@ -42,8 +42,9 @@ namespace delta {
 // file, which ProcessSource passes, and the value of a define supplied to
 // PreprocConfig, which the constructor below passes. They report differently
 // because only one of them has a line to report against.
-template <typename Report>
-static std::string BlankKeywordMarkers(std::string_view text, Report report) {
+static std::string BlankKeywordMarkers(
+    std::string_view text,
+    const std::function<void(uint32_t, uint32_t)>& report) {
   std::string out(text);
   uint32_t line = 1;
   uint32_t column = 1;
@@ -121,7 +122,6 @@ std::string Preprocessor::Preprocess(uint32_t file_id) {
 }
 
 void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
-  if (!recording_origins_) return;
   // §22.12's `line directive sets the line number and file name of the lines
   // after it, so an origin for one of those names what the directive said
   // rather than where the text stands. The arithmetic is the one
@@ -516,9 +516,9 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
   in_block_comment_ = false;
   auto remainder = line.substr(close + 2);
   if (!Trim(remainder).empty()) {
-    bool handled =
-        ProcessDirective(remainder, file_id, line_num, depth, output);
-    if (!handled && IsActive()) {
+    // The line is active, and a remainder ProcessDirective declines changed
+    // nothing, so it is still active text.
+    if (!ProcessDirective(remainder, file_id, line_num, depth, output)) {
       ExpandAndAppendLine(remainder, file_id, line_num, output);
     }
   }
@@ -537,9 +537,10 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
     auto remainder = line.substr(close + 2);
     if (!Trim(remainder).empty()) {
       // Text after the comment close may be a directive (e.g. `endif) that
-      // must still act on the conditional stack while the block is skipped.
-      if (!ProcessDirective(remainder, file_id, line_num, depth, output) &&
-          !IsActive()) {
+      // must still act on the conditional stack while the block is skipped. A
+      // remainder ProcessDirective declines changed nothing, so it is still
+      // skipped text, read only for the comments it opens.
+      if (!ProcessDirective(remainder, file_id, line_num, depth, output)) {
         StripComments(remainder, in_block_comment_, in_triple_string_);
       }
     }
@@ -580,7 +581,7 @@ static void EmitActiveLine(std::string_view view, const ActiveLineEmit& emit,
       emit.expand_and_emit(view.substr(0, split.split_pos));
       emit.emit_directive_or_text(view.substr(split.split_pos));
       return;
-    case ActiveLineSplit::Kind::kPlainText:
+    default:  // ActiveLineSplit::Kind::kPlainText, the one kind left
       emit.expand_and_emit(view);
       return;
   }

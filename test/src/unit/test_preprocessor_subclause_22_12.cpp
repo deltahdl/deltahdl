@@ -96,6 +96,15 @@ TEST(Preprocessor, Line_MissingLevel) {
                             "22.12"));
 }
 
+// The level is a number, so a word in its place is no level at all.
+TEST(Preprocessor, Line_LevelThatIsNoNumber) {
+  PreprocFixture f;
+  Preprocess("`line 1 \"somefile\" x\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`line directive requires a level (0, 1, or 2)", 1,
+                            "22.12"));
+}
+
 TEST(Preprocessor, Line_MissingAll) {
   PreprocFixture f;
   Preprocess("`line\n", f);

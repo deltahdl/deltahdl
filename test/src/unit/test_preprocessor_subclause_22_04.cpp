@@ -67,6 +67,29 @@ TEST(Preprocessor, Include_AngleBracket_SearchesIncludeDirs) {
   EXPECT_NE(result.find("parameter P = 1;"), std::string::npos);
 }
 
+// The user-specified locations are searched in turn, so a file the first does
+// not hold is still found in the one after it.
+TEST(Preprocessor, Include_AngleBracket_SearchesPastAnIncludeDirWithoutIt) {
+  IncludeTestDir tmp;
+  auto first = tmp.dir / "first";
+  auto second = tmp.dir / "second";
+  fs::create_directories(first);
+  fs::create_directories(second);
+  tmp.WriteFile("second/std_defs.svh", "parameter Q = 2;\n");
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(first.string());
+  cfg.include_dirs.push_back(second.string());
+  auto fid =
+      f.mgr.AddFile("<test>", "`include <std_defs.svh>\nmodule m; endmodule\n");
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("parameter Q = 2;"), std::string::npos);
+}
+
 TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   IncludeTestDir tmp;
 
@@ -278,6 +301,21 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
                             "only whitespace or a comment may follow `include "
                             "filename",
                             1, "22.4"));
+}
+
+// Two more shapes of text that is not a comment: a single character, too
+// short to open one, and a slash followed by neither the slash nor the
+// asterisk that would make it the start of a comment (5.4).
+TEST(Preprocessor, Include_ShortOrSlashTextAfterFilename_Error) {
+  for (const char* trailing : {";", "/x"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`include \"/dev/null\" ") + trailing + "\n", f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "only whitespace or a comment may follow "
+                              "`include filename",
+                              1, "22.4"))
+        << trailing;
+  }
 }
 
 TEST(Preprocessor, Include_MacroExpansionInFilename) {

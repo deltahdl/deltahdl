@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
+#include <string>
+
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -336,4 +341,174 @@ TEST(Preprocessor, MacroTextOpeningWithAnotherUsageExpandsEveryLineOfIt) {
   EXPECT_NE(result.find("task get(output int t); endtask"), std::string::npos);
   EXPECT_NE(result.find("task peek(output int t); endtask"), std::string::npos);
   EXPECT_EQ(result.find('`'), std::string::npos);
+}
+
+// §22.5.1 lets a default contain a comma inside a matched pair of parentheses,
+// where it separates the default's own arguments rather than two formal
+// arguments. The macro therefore has two formal arguments, and the first,
+// left empty, takes the whole of its default.
+TEST(Preprocessor, CommaInsideAParenthesizedDefaultSeparatesNoArguments) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a = f(1, 2), b = 0) a + b\n"
+      "x = `M(, 3);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("x = f(1, 2) + 3;"), std::string::npos) << result;
+}
+
+// §22.5.1: argument substitution does not occur within a string literal, and
+// §5.9's escaped quotation mark inside one closes nothing, so a formal
+// argument's name after it is still inside the string and left as written.
+TEST(Preprocessor, AnEscapedQuoteInsideAMacroTextStringClosesNothing) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(x) \"say \\\"x\\\" to x\" x\n"
+      "`M(1)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"say \\\"x\\\" to x\" 1"), std::string::npos)
+      << result;
+}
+
+// A directory holding one include file, `name` with `text`, removed when the
+// case is over.
+class OneIncludeFile {
+ public:
+  OneIncludeFile(const char* dir, const char* name, const char* text)
+      : dir_(std::filesystem::temp_directory_path() / dir) {
+    std::filesystem::create_directories(dir_);
+    std::ofstream(dir_ / name) << text;
+  }
+  ~OneIncludeFile() { std::filesystem::remove_all(dir_); }
+  OneIncludeFile(const OneIncludeFile&) = delete;
+  OneIncludeFile& operator=(const OneIncludeFile&) = delete;
+  PreprocConfig Config() const {
+    PreprocConfig cfg;
+    cfg.include_dirs.push_back(dir_.string());
+    return cfg;
+  }
+
+ private:
+  std::filesystem::path dir_;
+};
+
+// §22.5.1 makes a macro recursive where it expands directly or indirectly to
+// text holding a usage of itself. INC's text is an `include, and the file it
+// brings in uses INC at the head of a line, so INC reaches its own usage
+// through the file; that usage is read by the directive path while INC is
+// still being expanded.
+TEST(Preprocessor, AUsageInAFileTheMacroIncludesIsRecursive) {
+  OneIncludeFile inc("dhl_22_05_01b_self_inc", "self.svh", "`INC\n");
+  PreprocFixture f;
+  Preprocess(
+      "`define INC `include \"self.svh\"\n"
+      "`INC\n",
+      f, inc.Config());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive expansion of macro 'INC'", 1, "22.5.1"));
+}
+
+// §22.5.1 has a directive in a macro's text take effect where the macro is
+// used, and the text INC substitutes is an `include with no file name. The
+// rest of the usage's line supplies it, so the two together are the one
+// directive §22.4 reads.
+TEST(Preprocessor, TheRestOfTheLineCompletesADirectiveTheMacroOpened) {
+  OneIncludeFile inc("dhl_22_05_01b_rest", "body.svh", "included_text\n");
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define INC `include\n"
+      "`INC \"body.svh\"\n",
+      f, inc.Config());
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("included_text"), std::string::npos);
+}
+
+// The rest of the line opens with a backtick of its own, so it is read after
+// the `include as a line of its own. It names no directive and no macro, so
+// it is the usage of an undefined macro §22.5.1 makes an error, and the
+// `include before it still takes effect.
+TEST(Preprocessor, AnUndefinedUsageAfterAnIncludeTheMacroOpenedIsReported) {
+  OneIncludeFile inc("dhl_22_05_01b_undef", "body.svh", "included_text\n");
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define INC `include \"body.svh\"\n"
+      "`INC `NOPE\n",
+      f, inc.Config());
+  EXPECT_NE(result.find("included_text"), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undefined macro 'NOPE'", 2,
+                            "22.5.1"));
+}
+
+// A grave accent opens the `" and `\`" of §22.5.1 only with those characters
+// after it, so macro text ending in one, or holding `\ followed by anything
+// else, opens no string literal and is not reported as an unterminated one.
+TEST(Preprocessor, GraveAccentOpeningNoMacroQuoteOpensNoString) {
+  for (const char* text : {"a`", "`\\xyz", "`\\`xy"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`define M ") + text + "\n", f);
+    EXPECT_FALSE(f.diag.HasErrors()) << text;
+  }
+}
+
+// Inside a triple-quoted string a pair of quotes that a third does not follow
+// closes nothing, and an escaped quote inside an ordinary string closes
+// nothing either; both macros are complete and substitute their text whole.
+TEST(Preprocessor, QuotesThatCloseNoStringInMacroText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define TRIPLE \"\"\"ab\"\"c\"\"\"\n"
+      "`define ESCAPED \"a\\\"b\"\n"
+      "x `TRIPLE `ESCAPED y\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("x \"\"\"ab\"\"c\"\"\" \"a\\\"b\" y"),
+            std::string::npos);
+}
+
+// §22.5.1 keeps a comment out of the substituted text, and a quote inside a
+// block comment is comment text, so it opens no string that would carry the
+// macro text past the comment's close.
+TEST(Preprocessor, QuoteInsideABlockCommentInMacroTextOpensNoString) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M a /* \" */ b\n"
+      "x `M y\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("x a"), std::string::npos);
+  EXPECT_NE(result.find("b y"), std::string::npos);
+}
+
+// A backslash asks for the macro text to go on over the next line, and the
+// end of the source ends it all the same: on the source's last line, or on a
+// last line the backslash carried the text onto. The macros stay defined for
+// the next source the same run reads.
+TEST(Preprocessor, BackslashContinuationRunningToTheEndOfTheSource) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(f.mgr.AddFile("first.sv", "`define ENDS a \\"));
+  pp.Preprocess(f.mgr.AddFile("second.sv", "`define CARRIED c \\\nd"));
+  auto result =
+      pp.Preprocess(f.mgr.AddFile("third.sv", "x `ENDS `CARRIED y\n"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("x a"), std::string::npos);
+  EXPECT_NE(result.find('c'), std::string::npos);
+  EXPECT_NE(result.find("d y"), std::string::npos);
+}
+
+// An argument list still open at the end of a line goes on over a line that
+// holds only another macro's usage, which is an argument rather than a
+// directive the join has to leave standing.
+TEST(Preprocessor, ArgumentsContinueOverALineHoldingOnlyAUsage) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define PAIR(a, b) a b\n"
+      "`define ONE 1\n"
+      "int x = `PAIR(1,\n"
+      "`ONE\n"
+      ");\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1 1;"), std::string::npos);
 }
