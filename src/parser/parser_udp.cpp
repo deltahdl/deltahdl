@@ -415,11 +415,29 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag,
   }
 }
 
+// §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
+// combinational row "defines the output for a particular combination of the
+// input values", its inputs a level_input_list, while a sequential row adds "at
+// most one input transition" -- so an edge indicator, `(01)` or r, f, p, n or
+// *, stands in a row written as a sequential entry alone.
+static bool UdpRowHasEdge(const UdpTableRow& row) {
+  for (char c : row.inputs) {
+    if (UdpInputIsEdge(c)) return true;
+  }
+  return false;
+}
+
 static void ValidateUdpTableRow(DiagEngine& diag, bool row_is_sequential,
                                 const UdpTableRow& row, SourceLoc row_loc) {
   if (UdpRowContainsZ(row)) {
     diag.Error(row_loc, "UDP table row shall not contain z",
                Subclause("29.3.5"));
+  }
+  if (!row_is_sequential && UdpRowHasEdge(row)) {
+    diag.Error(row_loc,
+               "a combinational UDP entry's inputs are level symbols; an edge "
+               "indicator belongs to a sequential entry",
+               Subclause("29.3.4"));
   }
   ValidateUdpRowInputTransitions(diag, row, row_loc);
   ValidateUdpRowStateAndOutput(diag, row_is_sequential, row, row_loc);

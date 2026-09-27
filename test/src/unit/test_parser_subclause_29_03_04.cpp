@@ -478,4 +478,43 @@ TEST(UdpStateTable, RowWidthIsNotReportedUnderAHeaderWithNoInputs) {
   EXPECT_EQ(width_reports, 0);
 }
 
+// §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
+// combinational_entry is a level_input_list and one output symbol, a row that
+// "defines the output for a particular combination of the input values", and
+// only a sequential entry adds "at most one input transition". A row with one
+// field after its colon therefore holds no `(01)`, and one was taken without a
+// report and the primitive run as if edge-sensitive.
+TEST(UdpStateTable, EdgeIndicatorInCombinationalRowRejected) {
+  auto r = Parse(
+      "primitive p (y, a, b);\n"
+      "  output y;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    (01) 1 : 1 ;\n"
+      "    0 ? : 0 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an edge indicator belongs to a sequential "
+                            "entry",
+                            5, "29.3.4"));
+}
+
+// The same for an edge_symbol: `r` is Table 29-1's (01).
+TEST(UdpStateTable, EdgeSymbolInCombinationalRowRejected) {
+  auto r = Parse(
+      "primitive p (y, a, b);\n"
+      "  output y;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 ? : 0 ;\n"
+      "    1 r : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an edge indicator belongs to a sequential "
+                            "entry",
+                            6, "29.3.4"));
+}
+
 }  // namespace
