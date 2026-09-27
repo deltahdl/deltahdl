@@ -427,4 +427,26 @@ TEST(PrimaryParsing, ErrorCastMissingCloseParen) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "6.24.1"));
 }
 
+// A.8.4 (printed page 1211): `primary` has no class_new alternative, and
+// A.6.2 (printed page 1198) admits class_new only as the right-hand side of a
+// blocking assignment, so `new(7)` written as a subroutine argument is no
+// expression. It was accepted, and the run pushed a null handle.
+TEST(PrimaryParsing, ErrorClassNewAsSubroutineArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial q.push_back(new(7));\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'new' is not an expression", 2, "A.8.4"));
+}
+
+// A.8.4 as above, for a dynamic_array_new, which A.6.2 likewise admits only
+// on the right-hand side of a blocking assignment, passed to a function.
+TEST(PrimaryParsing, ErrorDynamicArrayNewAsFunctionArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = f(1, new[3]);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'new' is not an expression", 2, "A.8.4"));
+}
+
 }  // namespace

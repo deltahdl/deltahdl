@@ -68,6 +68,17 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
 // list is ordered and then named, or named from its first element, and either
 // may be empty. Each argument lands in call->args, and a named one records its
 // name in call->arg_names as well.
+// A.8.4 (printed page 1211): `primary` has no class_new or dynamic_array_new
+// alternative, and A.6.2 (printed page 1198) admits each only as the
+// right-hand side of a blocking assignment, so neither is an expression and
+// neither can be an argument. ParsePrimaryExpr reads `new` wherever an
+// expression starts, for the assignment forms it stands in, so an argument is
+// told apart here: `q.push_back(new(7))` was accepted and pushed a null handle.
+static bool IsNewExpr(const Expr* arg) {
+  return arg != nullptr && arg->kind == ExprKind::kCall && arg->text == "new" &&
+         arg->callee.empty();
+}
+
 void Parser::ParseListOfArguments(Expr* call) {
   Expect(TokenKind::kLParen, Subclause("13.5"));
   if (!Check(TokenKind::kRParen)) {
@@ -78,6 +89,14 @@ void Parser::ParseListOfArguments(Expr* call) {
     }
   }
   Expect(TokenKind::kRParen, Subclause("13.5"));
+  for (const Expr* arg : call->args) {
+    if (IsNewExpr(arg)) {
+      diag_.Error(arg->range.start,
+                  "'new' is not an expression and cannot be a subroutine "
+                  "argument",
+                  Subclause("A.8.4"));
+    }
+  }
 }
 
 void Parser::ParseNamedArg(Expr* call) {
