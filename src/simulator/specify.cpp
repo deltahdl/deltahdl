@@ -533,8 +533,14 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
 
 namespace {
 
-void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
-  for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+// §32.7: an INCREMENT adds each amount, a negative one lowering the delay, and
+// §30.5.1 puts a delay that comes out below zero at zero.
+void AddPathDelayValues(PathDelay& existing,
+                        const SdfPathDelayIncrement& deltas) {
+  for (int i = 0; i < 12; ++i) {
+    existing.delays[i] =
+        ClampPathDelay(static_cast<int64_t>(existing.delays[i]) + deltas[i]);
+  }
 }
 
 // Adds `delta` to every existing path delay between the same ports of the same
@@ -545,14 +551,15 @@ void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
 // and SpecifyManager::IncrementSdfPathDelay is the sole caller and knows which
 // instance the SDF entry named.
 bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
-                                       const PathDelay& delta) {
+                                       const PathDelay& delta,
+                                       const SdfPathDelayIncrement& deltas) {
   bool matched = false;
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
         existing.inst_prefix == delta.inst_prefix &&
         SdfEntryNamesPath(existing, delta)) {
-      AddPathDelayValues(existing, delta);
+      AddPathDelayValues(existing, deltas);
       matched = true;
     }
   }
@@ -562,7 +569,8 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
 // Adds `delta` to the first existing path delay matching ports, instance prefix
 // and condition/ifnone. Returns true if a matching entry was found.
 bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
-                                   const PathDelay& delta) {
+                                   const PathDelay& delta,
+                                   const SdfPathDelayIncrement& deltas) {
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
@@ -570,7 +578,7 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
         SpecifyConditionsMatch(existing.condition, delta.condition) &&
         existing.is_ifnone == delta.is_ifnone &&
         SdfEntryNamesPath(existing, delta)) {
-      AddPathDelayValues(existing, delta);
+      AddPathDelayValues(existing, deltas);
       return true;
     }
   }
@@ -579,20 +587,21 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
 
 }  // namespace
 
-bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
+bool SpecifyManager::IncrementSdfPathDelay(
+    const PathDelay& delta, const SdfPathDelayIncrement& deltas) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   if (kSdfIsNonconditional) {
     // §32.9: the entry reaches the paths of the instance its cell named, which
     // AnnotateSdfIopathEntry (simulator/sdf_annotate_entry.cpp) stamped onto
     // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
-    if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
+    if (!IncrementNonconditionalPathDelays(path_delays_, delta, deltas)) {
       path_delays_.push_back(SdfEntryAsWritten(delta));
     }
     return true;
   }
   // §32.4.1, as above: with no declared path carrying that condition there is
   // nothing to add to.
-  return IncrementConditionalPathDelay(path_delays_, delta);
+  return IncrementConditionalPathDelay(path_delays_, delta, deltas);
 }
 
 namespace {

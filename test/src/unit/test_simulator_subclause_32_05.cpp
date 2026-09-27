@@ -393,6 +393,28 @@ TEST(SdfMultipleAnnotations, IncrementSectionModifiesTheEarlierAnnotation) {
   EXPECT_EQ(pd->delays[1], 66u);
 }
 
+// §32.5 (printed page 929) with §32.7 (printed pages 930-931, whose example
+// increments by (-4) and (-5)): an INCREMENT adds the value the file wrote,
+// sign included, so -2 after an ABSOLUTE 35 and 61 leaves 33 and 59, and one
+// below what stands brings the delay to 0 rather than past it. The sign was
+// dropped and the entry added 2.
+TEST(SdfMultipleAnnotations, NegativeIncrementLowersTheEarlierAnnotation) {
+  Design d;
+  ASSERT_TRUE(d.Build(kLiteralPathSrc));
+
+  d.Annotate(
+      SdfCellText("(DELAY (ABSOLUTE (IOPATH A Z (35) (61))))"
+                  " (DELAY (INCREMENT (IOPATH A Z (-2) (-2))))"));
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 33u);
+  EXPECT_EQ(pd->delays[1], 59u);
+
+  d.Annotate(SdfCellText("(DELAY (INCREMENT (IOPATH A Z (-40) (-2))))"));
+  EXPECT_EQ(pd->delays[0], 0u);
+  EXPECT_EQ(pd->delays[1], 57u);
+}
+
 // The overwriting half, and the negative form of the test above: an ABSOLUTE
 // section written after an INCREMENT section discards what the INCREMENT
 // accumulated instead of adding to it.

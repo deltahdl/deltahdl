@@ -132,7 +132,8 @@ class SpecifyManager {
   // §32.4.1: the incremental form of the same rule -- the entry's values add to
   // what the path already carries instead of replacing it, and a conditional
   // entry is restricted to declared paths in exactly the same way.
-  bool IncrementSdfPathDelay(const PathDelay& delta);
+  bool IncrementSdfPathDelay(const PathDelay& target,
+                             const SdfPathDelayIncrement& deltas);
 
   void AddTimingCheck(TimingCheckEntry check);
 

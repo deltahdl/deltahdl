@@ -115,28 +115,42 @@ static uint64_t RoundToTicks(double scaled) {
   return static_cast<uint64_t>(std::floor(scaled + 0.5));
 }
 
+// §32.7 (printed pages 930-931): each member keeps the sign of the value it is
+// scaled from, since a negative INCREMENT value lowers what it is added to and
+// the magnitudes above are scaled apart from their signs. Scaled from
+// magnitudes alone, every value of a $sdf_annotate call's file came out
+// positive and a negative INCREMENT raised the delay it was meant to lower.
 SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
                               const SdfScaleFactors& factors) {
   double src_min = 0.0;
   double src_typ = 0.0;
   double src_max = 0.0;
+  SdfDelayValue out;
   switch (type) {
     case SdfScaleType::kFromMtm:
       src_min = static_cast<double>(value.min_val);
       src_typ = static_cast<double>(value.typ_val);
       src_max = static_cast<double>(value.max_val);
+      out.min_negative = value.min_negative;
+      out.typ_negative = value.typ_negative;
+      out.max_negative = value.max_negative;
       break;
     case SdfScaleType::kFromMinimum:
       src_min = src_typ = src_max = static_cast<double>(value.min_val);
+      out.min_negative = out.typ_negative = out.max_negative =
+          value.min_negative;
       break;
     case SdfScaleType::kFromTypical:
       src_min = src_typ = src_max = static_cast<double>(value.typ_val);
+      out.min_negative = out.typ_negative = out.max_negative =
+          value.typ_negative;
       break;
     case SdfScaleType::kFromMaximum:
       src_min = src_typ = src_max = static_cast<double>(value.max_val);
+      out.min_negative = out.typ_negative = out.max_negative =
+          value.max_negative;
       break;
   }
-  SdfDelayValue out;
   out.min_val = RoundToTicks(src_min * factors.min_factor);
   out.typ_val = RoundToTicks(src_typ * factors.typ_factor);
   out.max_val = RoundToTicks(src_max * factors.max_factor);

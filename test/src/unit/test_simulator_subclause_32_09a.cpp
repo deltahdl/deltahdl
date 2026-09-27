@@ -149,4 +149,27 @@ TEST(SdfScaling, ZeroFactorClampsScaledValueToZero) {
   EXPECT_EQ(out.max_val, 0u);
 }
 
+// §32.7 (printed pages 930-931): scaling keeps each member's sign, so a
+// negative INCREMENT value in a $sdf_annotate call's file, which is scaled
+// before it is annotated, still lowers what it is added to; a scale type taking
+// one member for all three takes that member's sign for all three. Scaled from
+// the magnitudes alone, every value came out positive.
+TEST(SdfScaling, ScalingKeepsEachMembersSign) {
+  SdfDelayValue v;
+  v.min_val = 1;
+  v.typ_val = 2;
+  v.max_val = 3;
+  v.typ_negative = true;
+  SdfScaleFactors f;
+  auto mtm = ApplySdfScaling(v, SdfScaleType::kFromMtm, f);
+  EXPECT_FALSE(mtm.min_negative);
+  EXPECT_TRUE(mtm.typ_negative);
+  EXPECT_FALSE(mtm.max_negative);
+  EXPECT_EQ(mtm.typ_val, 2u);
+  auto typ = ApplySdfScaling(v, SdfScaleType::kFromTypical, f);
+  EXPECT_TRUE(typ.min_negative);
+  EXPECT_TRUE(typ.typ_negative);
+  EXPECT_TRUE(typ.max_negative);
+}
+
 }  // namespace

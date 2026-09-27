@@ -83,8 +83,11 @@ static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
   return SelectMtmMagnitude(dv, mtm);
 }
 
-static void ExpandSdfDelaysTwo(std::vector<uint64_t>& out, uint64_t v1,
-                               uint64_t v2) {
+// §32.8 Table 32-4's spreading of one, two, three, six or twelve listed values
+// over the twelve transitions, for a value of type T: the delay an entry
+// states, or, for an INCREMENT, the signed amount it adds (§32.7).
+template <typename T>
+static void ExpandSdfDelaysTwo(std::vector<T>& out, T v1, T v2) {
   out[0] = v1;
   out[1] = v2;
   out[2] = v1;
@@ -99,8 +102,8 @@ static void ExpandSdfDelaysTwo(std::vector<uint64_t>& out, uint64_t v1,
   out[11] = std::min(v1, v2);
 }
 
-static void ExpandSdfDelaysThree(std::vector<uint64_t>& out, uint64_t v1,
-                                 uint64_t v2, uint64_t v3) {
+template <typename T>
+static void ExpandSdfDelaysThree(std::vector<T>& out, T v1, T v2, T v3) {
   out[0] = v1;
   out[1] = v2;
   out[2] = v3;
@@ -121,19 +124,21 @@ namespace {
 // form (IEEE 1800 SDF annotation): 0->1, 1->0, 0->Z, Z->1, 1->Z, Z->0. They
 // together describe one domain object - a single delay specification - so they
 // travel as one struct rather than six loose scalars.
+template <typename T>
 struct SdfSixDelays {
-  uint64_t v1;
-  uint64_t v2;
-  uint64_t v3;
-  uint64_t v4;
-  uint64_t v5;
-  uint64_t v6;
+  T v1;
+  T v2;
+  T v3;
+  T v4;
+  T v5;
+  T v6;
 };
 
 }  // namespace
 
-static void ExpandSdfDelaysSixDirect(std::vector<uint64_t>& out,
-                                     const SdfSixDelays& d) {
+template <typename T>
+static void ExpandSdfDelaysSixDirect(std::vector<T>& out,
+                                     const SdfSixDelays<T>& d) {
   out[0] = d.v1;
   out[1] = d.v2;
   out[2] = d.v3;
@@ -142,8 +147,9 @@ static void ExpandSdfDelaysSixDirect(std::vector<uint64_t>& out,
   out[5] = d.v6;
 }
 
-static void ExpandSdfDelaysSixDerived(std::vector<uint64_t>& out,
-                                      const SdfSixDelays& d) {
+template <typename T>
+static void ExpandSdfDelaysSixDerived(std::vector<T>& out,
+                                      const SdfSixDelays<T>& d) {
   out[6] = std::min(d.v1, d.v3);
   out[7] = std::max(d.v1, d.v4);
   out[8] = std::min(d.v2, d.v5);
@@ -152,54 +158,64 @@ static void ExpandSdfDelaysSixDerived(std::vector<uint64_t>& out,
   out[11] = std::min(d.v4, d.v6);
 }
 
-static void ExpandSdfDelaysSix(std::vector<uint64_t>& out,
-                               const SdfSixDelays& d) {
+template <typename T>
+static void ExpandSdfDelaysSix(std::vector<T>& out, const SdfSixDelays<T>& d) {
   ExpandSdfDelaysSixDirect(out, d);
   ExpandSdfDelaysSixDerived(out, d);
 }
 
-std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
-                                      SdfMtm mtm) {
-  std::vector<uint64_t> out(12, 0);
+// The twelve transition values `vals` spreads to, each listed value read by
+// `select`, which decides what a value written negative becomes.
+template <typename T>
+static std::vector<T> ExpandSdfDelaysBy(const std::vector<SdfDelayValue>& vals,
+                                        SdfMtm mtm,
+                                        T (*select)(const SdfDelayValue&,
+                                                    SdfMtm)) {
+  std::vector<T> out(12, 0);
   if (vals.empty()) return out;
 
   const std::size_t kN = vals.size();
-  const uint64_t kV1 = SelectMtm(vals[0], mtm);
+  const T kV1 = select(vals[0], mtm);
 
-  if (kN != 1 && kN != 2 && kN != 3 && kN != 6 && kN != 12) {
+  if (kN != 2 && kN != 3 && kN != 6 && kN != 12) {
     std::fill(out.begin(), out.end(), kV1);
     return out;
   }
 
-  if (kN == 1) {
-    std::fill(out.begin(), out.end(), kV1);
-    return out;
-  }
-
-  const uint64_t kV2 = SelectMtm(vals[1], mtm);
+  const T kV2 = select(vals[1], mtm);
   if (kN == 2) {
     ExpandSdfDelaysTwo(out, kV1, kV2);
     return out;
   }
 
-  const uint64_t kV3 = SelectMtm(vals[2], mtm);
+  const T kV3 = select(vals[2], mtm);
   if (kN == 3) {
     ExpandSdfDelaysThree(out, kV1, kV2, kV3);
     return out;
   }
 
-  const uint64_t kV4 = SelectMtm(vals[3], mtm);
-  const uint64_t kV5 = SelectMtm(vals[4], mtm);
-  const uint64_t kV6 = SelectMtm(vals[5], mtm);
   if (kN == 6) {
-    ExpandSdfDelaysSix(out, SdfSixDelays{kV1, kV2, kV3, kV4, kV5, kV6});
+    ExpandSdfDelaysSix(
+        out, SdfSixDelays<T>{kV1, kV2, kV3, select(vals[3], mtm),
+                             select(vals[4], mtm), select(vals[5], mtm)});
     return out;
   }
 
-  for (std::size_t i = 0; i < 12; ++i) {
-    out[i] = SelectMtm(vals[i], mtm);
-  }
+  for (std::size_t i = 0; i < 12; ++i) out[i] = select(vals[i], mtm);
   return out;
+}
+
+std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
+                                      SdfMtm mtm) {
+  return ExpandSdfDelaysBy<uint64_t>(vals, mtm, SelectMtm);
+}
+
+// §32.7 (printed pages 930-931): an INCREMENT entry's twelve transition
+// amounts, each with the sign the file wrote, since a negative value in
+// INCREMENT mode lowers what it is added to.
+static std::vector<int64_t> ExpandSignedSdfDelays(
+    const std::vector<SdfDelayValue>& vals, SdfMtm mtm) {
+  return ExpandSdfDelaysBy<int64_t>(vals, mtm, SelectSignedMtm);
 }
 
 std::array<uint64_t, 4> ReduceSdfDelaysToThree(
@@ -412,12 +428,20 @@ void FillSdfIopathDelays(PathDelay& pd, const SdfIopath& io, SdfMtm mtm) {
   for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
 }
 
+// §32.7: the twelve amounts an INCREMENT IOPATH adds, signed.
+SdfPathDelayIncrement SdfIopathIncrementOf(const SdfIopath& io, SdfMtm mtm) {
+  const auto kExpanded = ExpandSignedSdfDelays(SdfIopathDelayValues(io), mtm);
+  SdfPathDelayIncrement deltas{};
+  for (int i = 0; i < 12; ++i) deltas[i] = kExpanded[i];
+  return deltas;
+}
+
 // Handles the non-extended (legacy) iopath form: increment in place, or apply
 // the global pulse limits and add. Returns once the entry is committed.
 void AnnotateSdfIopathSimple(PathDelay& pd, const SdfIopath& io,
-                             SpecifyManager& mgr) {
+                             SpecifyManager& mgr, SdfMtm mtm) {
   if (io.is_increment) {
-    mgr.IncrementSdfPathDelay(pd);
+    mgr.IncrementSdfPathDelay(pd, SdfIopathIncrementOf(io, mtm));
     return;
   }
   ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
@@ -505,7 +529,7 @@ SdfIopathPulseIncrement SdfIopathPulseIncrementOf(const SdfIopath& io,
 void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
                                         const SdfIopath& io,
                                         SpecifyManager& mgr, SdfMtm mtm) {
-  mgr.IncrementSdfPathDelay(pd);
+  mgr.IncrementSdfPathDelay(pd, SdfIopathIncrementOf(io, mtm));
   const SdfIopathPulseIncrement kIncrement = SdfIopathPulseIncrementOf(io, mtm);
   mgr.IncrementSdfPulseLimit(pd.src_port, pd.dst_port, kIncrement.reject,
                              kIncrement.error, pd.inst_prefix);
@@ -547,7 +571,7 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
 
   FillSdfIopathDelays(pd, io, mtm);
   if (!io.extended_form) {
-    AnnotateSdfIopathSimple(pd, io, mgr);
+    AnnotateSdfIopathSimple(pd, io, mgr, mtm);
     return;
   }
   if (io.is_increment) {

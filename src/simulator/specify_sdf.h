@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -202,5 +203,10 @@ struct PathDelayPulseRetention {
   bool reject = false;
   bool error = false;
 };
+
+// §32.7 (printed pages 930-931): what an INCREMENT entry adds to a module path,
+// one amount per transition of §32.8 Table 32-4. Signed, since a negative value
+// in INCREMENT mode lowers the delay it is added to.
+using SdfPathDelayIncrement = std::array<int64_t, 12>;
 
 }  // namespace delta
