@@ -797,4 +797,73 @@ TEST(SdfTimingCheckMapping, UnmatchedSignalNamesReachNothing) {
   EXPECT_EQ(CheckWith(mgr, TimingCheckKind::kHold, "")->limit, 51u);
 }
 
+// ---------------------------------------------------------------------------
+// An IOPATH source written with an edge names the edge-sensitive path.
+// ---------------------------------------------------------------------------
+
+// Two edge-sensitive paths from one clock, one per edge, each to its own
+// output, so an entry naming an edge can be checked against the path with the
+// other edge.
+const char* const kEdgeDesign =
+    "module t(input clk, input d, output q, output r);\n"
+    "  specify\n"
+    "    (posedge clk => (q +: d)) = 2;\n"
+    "    (negedge clk => (r +: d)) = 3;\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+const PathDelay* PathFrom(const SpecifyManager& mgr, std::string_view dst,
+                          SpecifyEdge edge) {
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "clk" && pd.dst_port == dst && pd.edge == edge)
+      return &pd;
+  }
+  return nullptr;
+}
+
+// §32.4.1 (printed page 925): an IOPATH whose source carries an edge,
+// `(IOPATH (posedge clk) q (7) (13))`, is read as the port clk with that edge,
+// and annotates the path between those ports, which keeps the edge its
+// declaration gave it. The parenthesized source was left unread, so the entry
+// was reported as the constructs "(" and "13" and annotated nothing.
+TEST(SdfDelayMapping, IopathWithAnEdgedSourceReachesThePathWithThatEdge) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kEdgeDesign, f, mgr));
+
+  SdfFile file;
+  ASSERT_TRUE(ParseSdf(DelaySdf("(IOPATH (posedge clk) q (7) (13))"), file));
+  EXPECT_TRUE(file.unannotatable.empty());
+  ASSERT_EQ(file.cells.size(), 1u);
+  ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
+  EXPECT_EQ(file.cells[0].iopaths[0].src_port, "clk");
+  EXPECT_EQ(file.cells[0].iopaths[0].src_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(file.cells[0].iopaths[0].dst_port, "q");
+
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  const PathDelay* q = PathFrom(mgr, "q", SpecifyEdge::kPosedge);
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->delays[0], 7u);
+  EXPECT_EQ(q->delays[1], 13u);
+}
+
+// §32.4.1: the edge is part of what the entry names, so `(posedge clk)` does
+// not reach the path declared on the other edge, while an entry naming no edge
+// reaches the path whatever edge it was declared with, and the path keeps its
+// edge rather than taking the entry's none.
+TEST(SdfDelayMapping, IopathEdgeMustMatchThePathsEdge) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kEdgeDesign, f, mgr));
+
+  AnnotateFileOnto(DelaySdf("(IOPATH (posedge clk) r (9)) (IOPATH clk q (11))"),
+                   mgr);
+  const PathDelay* r = PathFrom(mgr, "r", SpecifyEdge::kNegedge);
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->delays[0], 3u);
+  const PathDelay* q = PathFrom(mgr, "q", SpecifyEdge::kPosedge);
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->delays[0], 11u);
+}
+
 }  // namespace

@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "parser/ast_specify.h"
 #include "simulator/sdf_parser_internal.h"
 
 namespace delta {
@@ -330,9 +331,32 @@ static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
   if (io.values.size() > 2) io.turnoff = io.values[2];
 }
 
+// §32.4.1: an IOPATH's source port, which may be written with an edge,
+// `(posedge clk)`; the port's name, with the edge recorded on `io`. posedge
+// and negedge are the edges a module path declares (§30.4.2); any other edge
+// the SDF file writes leaves the source's edge unknown. Read as a bare port, a
+// parenthesized source read as no name, and the rest of the entry was
+// reported token by token as constructs that could not be annotated.
+static std::string ParseIopathSource(std::string_view& s, SdfIopath& io) {
+  SkipWhitespace(s);
+  if (s.empty() || s[0] != '(') return ParseSdfPort(s);
+  Expect(s, SdfTokKind::kLParen);
+  auto edge_tok = NextSdfToken(s);
+  if (edge_tok.text == "posedge") {
+    io.src_edge = SpecifyEdge::kPosedge;
+  } else if (edge_tok.text == "negedge") {
+    io.src_edge = SpecifyEdge::kNegedge;
+  } else {
+    io.src_edge_known = false;
+  }
+  std::string port = ParseSdfPort(s);
+  Expect(s, SdfTokKind::kRParen);
+  return port;
+}
+
 static SdfIopath ParseIopath(std::string_view& s, SdfFile& file) {
   SdfIopath io;
-  io.src_port = ParseSdfPort(s);
+  io.src_port = ParseIopathSource(s, io);
   io.dst_port = ParseSdfPort(s);
 
   SkipOptionalIopathRetain(s, file);
@@ -430,8 +454,13 @@ static void RecordCellEntry(SdfCell& cell, SdfCellEntryKind kind,
 }
 
 // Appends an already-parsed iopath to the cell and records its delay-entry
-// order slot.
-static void AddIopathToCell(SdfCell& cell, const SdfIopath& io) {
+// order slot; one whose source edge names no edge a module path declares is
+// reported instead.
+static void AddIopathToCell(SdfCell& cell, SdfFile& file, const SdfIopath& io) {
+  if (!io.src_edge_known) {
+    file.unannotatable.emplace_back("IOPATH");
+    return;
+  }
   cell.iopaths.push_back(io);
   RecordCellEntry(cell, SdfCellEntryKind::kIopath, cell.iopaths.size() - 1);
 }
@@ -467,7 +496,7 @@ static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
       auto io = ParseIopath(s, file);
       io.is_increment = increment;
       io.condition = std::move(cond);
-      AddIopathToCell(cell, io);
+      AddIopathToCell(cell, file, io);
       Expect(s, SdfTokKind::kRParen);
       return;
     }
@@ -492,7 +521,7 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
       auto io = ParseIopath(s, file);
       io.is_increment = increment;
       io.is_ifnone = true;
-      AddIopathToCell(cell, io);
+      AddIopathToCell(cell, file, io);
       Expect(s, SdfTokKind::kRParen);
       return;
     }
@@ -537,7 +566,7 @@ static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
                                   SdfFile& file, bool increment) {
   auto io = ParseIopath(s, file);
   io.is_increment = increment;
-  AddIopathToCell(cell, io);
+  AddIopathToCell(cell, file, io);
 }
 
 // Dispatches a single already-opened delay-section entry (the leading '(' and

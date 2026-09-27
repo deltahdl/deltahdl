@@ -350,11 +350,6 @@ void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
 // apart only by PathDelay::inst_prefix. `match_inst_prefix` asks for that
 // comparison: SpecifyManager::AddPathDelay sets it, so registering a second
 // instance adds a path rather than overwriting the first instance's.
-// SpecifyManager::AnnotateSdfPathDelay sets it too: SdfCellInstancePrefix
-// (simulator/sdf_annotate.cpp) turns an SDF cell's instance path, below the
-// §32.9 module_instance operand CellInScope filtered on, into the prefix
-// stamped on the PathDelay, so one entry no longer reaches both in-scope
-// instances of one cell.
 bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delay,
                                     PathDelayPulseRetention retain,
@@ -369,6 +364,49 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
       ReplacePathDelayPreservingPulse(existing, delay, retain);
       existing.condition = std::move(saved_cond);
       existing.is_ifnone = saved_ifnone;
+      matched = true;
+    }
+  }
+  return matched;
+}
+
+// §32.4.1 (printed page 925): whether the SDF entry `entry` names the declared
+// path `existing` by its edge. An entry whose source was written with an edge,
+// `(IOPATH (posedge clk) q ...)`, names the path declared with that edge; one
+// written with none names the path whatever edge it was declared with.
+bool SdfEdgeNamesPath(const PathDelay& existing, const PathDelay& entry) {
+  return entry.edge == SpecifyEdge::kNone || existing.edge == entry.edge;
+}
+
+// §32.4.1: an SDF entry carries delays and pulse limits and nothing of the
+// path's shape, so the path it lands on keeps what its declaration gave it --
+// its kind, its edge and its condition, as text and as the expression §30.5.3
+// selects on. Replaced whole, an edge-sensitive path took the entry's edge,
+// none, and a conditional one lost the expression.
+void ReplaceWithSdfDelays(PathDelay& existing, PathDelay entry,
+                          PathDelayPulseRetention retain) {
+  entry.path_kind = existing.path_kind;
+  entry.edge = existing.edge;
+  entry.condition = existing.condition;
+  entry.condition_expr = existing.condition_expr;
+  entry.is_ifnone = existing.is_ifnone;
+  ReplacePathDelayPreservingPulse(existing, std::move(entry), retain);
+}
+
+// §32.4.1 with §32.9: a nonconditional entry lands on every path of the
+// instance its cell named (PathDelay::inst_prefix, which SdfCellInstancePrefix
+// in simulator/sdf_annotate.cpp stamped on it) between those two ports that it
+// names by edge. Returns true if at least one path matched.
+bool AnnotateNonconditionalSdfPaths(std::vector<PathDelay>& path_delays,
+                                    const PathDelay& entry,
+                                    PathDelayPulseRetention retain) {
+  bool matched = false;
+  for (auto& existing : path_delays) {
+    if (existing.src_port == entry.src_port &&
+        existing.dst_port == entry.dst_port &&
+        existing.inst_prefix == entry.inst_prefix &&
+        SdfEdgeNamesPath(existing, entry)) {
+      ReplaceWithSdfDelays(existing, entry, retain);
       matched = true;
     }
   }
@@ -420,10 +458,8 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
     // ports. Its rule names no restriction to paths already declared, so an
     // entry matching none is still kept, which is how §32.3 chose to hold on to
     // delay data that finds no home.
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay, retain,
-                                        /*match_inst_prefix=*/true)) {
+    if (!AnnotateNonconditionalSdfPaths(path_delays_, delay, retain))
       path_delays_.push_back(std::move(delay));
-    }
     return true;
   }
   // §32.4.1: a conditional entry may land *only* on a path between those same
@@ -438,8 +474,9 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
         existing.dst_port == delay.dst_port &&
         existing.inst_prefix == delay.inst_prefix &&
         SpecifyConditionsMatch(existing.condition, delay.condition) &&
-        existing.is_ifnone == delay.is_ifnone) {
-      ReplacePathDelayPreservingPulse(existing, std::move(delay), retain);
+        existing.is_ifnone == delay.is_ifnone &&
+        SdfEdgeNamesPath(existing, delay)) {
+      ReplaceWithSdfDelays(existing, std::move(delay), retain);
       return true;
     }
   }
@@ -465,7 +502,8 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
   for (auto& existing : path_delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port &&
-        existing.inst_prefix == delta.inst_prefix) {
+        existing.inst_prefix == delta.inst_prefix &&
+        SdfEdgeNamesPath(existing, delta)) {
       AddPathDelayValues(existing, delta);
       matched = true;
     }
@@ -482,7 +520,8 @@ bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
         existing.dst_port == delta.dst_port &&
         existing.inst_prefix == delta.inst_prefix &&
         SpecifyConditionsMatch(existing.condition, delta.condition) &&
-        existing.is_ifnone == delta.is_ifnone) {
+        existing.is_ifnone == delta.is_ifnone &&
+        SdfEdgeNamesPath(existing, delta)) {
       AddPathDelayValues(existing, delta);
       return true;
     }

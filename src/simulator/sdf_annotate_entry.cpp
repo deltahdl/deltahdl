@@ -524,6 +524,7 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
   pd.src_port = io.src_port;
   pd.dst_port = io.dst_port;
   pd.inst_prefix = inst_prefix;
+  pd.edge = io.src_edge;
 
   pd.condition = io.condition;
   pd.is_ifnone = io.is_ifnone;

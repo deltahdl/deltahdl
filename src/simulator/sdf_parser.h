@@ -33,6 +33,13 @@ struct SdfDelayValue {
 
 struct SdfIopath {
   std::string src_port;
+  // §32.4.1: the edge the source port was written with, `(posedge clk)`, which
+  // names the edge-sensitive path with that edge; kNone where it carries none.
+  SpecifyEdge src_edge = SpecifyEdge::kNone;
+  // False where the source was written with an SDF edge no module path
+  // declares -- 01, 10 or a transition to or from z -- so the entry names no
+  // path and is reported rather than annotated.
+  bool src_edge_known = true;
   std::string dst_port;
   SdfDelayValue rise;
   SdfDelayValue fall;
