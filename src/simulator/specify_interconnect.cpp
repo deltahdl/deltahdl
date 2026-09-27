@@ -604,7 +604,22 @@ const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
   // coexist: a PORT written afterwards discards the source-specific entries on
   // its load, so preferring the named source is also preferring the later
   // annotation.
+  //
+  // §32.4.4 (printed pages 928-929): the run asks by the signal a port
+  // connection names, `w` in `.din(w)`, where an entry names the port driving
+  // it, `u1/dout`, so where the asked name is such a signal rather than a port
+  // an entry whose source sits on its net is the delay from that source, taken
+  // where no entry names the asked name itself. A port asked by its own name
+  // reads only its own entries, so on a net with two sources one source's
+  // delay does not answer for the other. Compared by name alone, an
+  // INTERCONNECT from an instance's output port was never found and its load
+  // waited on nothing.
   const InterconnectDelay* all_sources = nullptr;
+  const InterconnectDelay* same_net = nullptr;
+  const std::string kSourceNet =
+      FindInterconnectTerminal(topology_, source) == nullptr
+          ? InterconnectNetIdOf(source)
+          : std::string();
   for (const auto& delay : interconnect_delays_) {
     if (!InterconnectNameEq(delay.dst_port, load)) continue;
     // A delay recorded with no source is the delay from all sources, so it is
@@ -613,11 +628,27 @@ const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
       if (all_sources == nullptr) all_sources = &delay;
       continue;
     }
-    for (const auto& covered : delay.covered_sources) {
-      if (InterconnectNameEq(covered, source)) return &delay;
-    }
+    const SourceMatch kMatch = CoveredSourceMatch(delay, source, kSourceNet);
+    if (kMatch == SourceMatch::kNamed) return &delay;
+    if (kMatch == SourceMatch::kSameNet && same_net == nullptr)
+      same_net = &delay;
   }
-  return all_sources;
+  return same_net != nullptr ? same_net : all_sources;
+}
+
+// How the sources `delay` covers answer for the asked `source`, which sits on
+// the net `source_net` (empty where it sits on none the topology knows): one
+// of them is that very name, one sits on that net, or neither.
+SpecifyManager::SourceMatch SpecifyManager::CoveredSourceMatch(
+    const InterconnectDelay& delay, std::string_view source,
+    const std::string& source_net) const {
+  SourceMatch match = SourceMatch::kNone;
+  for (const auto& covered : delay.covered_sources) {
+    if (InterconnectNameEq(covered, source)) return SourceMatch::kNamed;
+    if (!source_net.empty() && InterconnectNetIdOf(covered) == source_net)
+      match = SourceMatch::kSameNet;
+  }
+  return match;
 }
 
 // The net a name sits on, whether it names a terminal or the net itself. Empty

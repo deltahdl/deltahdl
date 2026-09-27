@@ -282,12 +282,20 @@ class SpecifyManager {
   bool DelayLoadCoversReference(const InterconnectDelay& delay,
                                 const std::string& net_id,
                                 std::string_view name) const;
+  // §32.4.4: how an annotated delay's covered sources answer for a source a run
+  // asks about -- by its very name, by sitting on its net, or not at all
+  // (FindInterconnectDelay).
+  enum class SourceMatch : uint8_t { kNone, kSameNet, kNamed };
+  SourceMatch CoveredSourceMatch(const InterconnectDelay& delay,
+                                 std::string_view source,
+                                 const std::string& source_net) const;
 
  public:
   // §32.4.4: the annotated delay from `source` to `load`, or null when nothing
   // is annotated between them. A delay recorded as being from all sources
   // answers for any source, and a down-hierarchy annotation answers for every
-  // source at or above the one the entry named.
+  // source at or above the one the entry named; `source` may name the net a
+  // port connection reads, which a delay from a port on that net answers for.
   const InterconnectDelay* FindInterconnectDelay(std::string_view source,
                                                  std::string_view load) const;
 

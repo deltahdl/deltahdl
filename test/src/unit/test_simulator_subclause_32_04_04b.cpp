@@ -145,4 +145,49 @@ TEST(InterconnectDelaySim, TheRunBindsTheDesignsInterconnectTopology) {
   EXPECT_TRUE(found);
 }
 
+// Two instances in a chain: u1's output drives the net w, and w drives u2's
+// input, so an INTERCONNECT from u1/dout to u2/din names an instance's output
+// port as its source. Sampled as InterconnectDesign samples.
+std::string ChainDesign(const std::string& sdf_path) {
+  return "module leaf(input logic [7:0] din, output logic [7:0] dout);\n"
+         "  assign dout = din;\n"
+         "endmodule\n"
+         "module top;\n"
+         "  logic [7:0] src = 8'h00;\n"
+         "  wire [7:0] w;\n"
+         "  logic [7:0] out;\n"
+         "  logic [7:0] early = 8'hEE;\n"
+         "  logic [7:0] late = 8'hEE;\n"
+         "  leaf u1(.din(src), .dout(w));\n"
+         "  leaf u2(.din(w), .dout(out));\n"
+         "  initial begin\n"
+         "    #1 $sdf_annotate(\"" +
+         sdf_path +
+         "\");\n"
+         "    #4 src = 8'hA5;\n"
+         "    #2 early = out;\n"
+         "    #10 late = out;\n"
+         "    #5 $finish;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §32.4.4 (printed pages 928-929): an INTERCONNECT names a source port and a
+// load port and puts its delay between them, so with u1's output port as the
+// source u2's input holds its old value until 10 after w moves. The entry was
+// stored against the port u1/dout while the run asked for the delay from the
+// net u2's connection names, w, and found none: u2 took the new value at once.
+TEST(InterconnectDelaySim, AnInstanceOutputPortIsASourceTheLoadWaitsOn) {
+  const std::string kSdf = WriteSdfFile(
+      "chain.sdf", DelayFile("(INTERCONNECT u1/dout u2/din (10))"));
+  SimFixture early_run;
+  auto* early = RunAndFindVar(ChainDesign(kSdf), early_run, "early");
+  ASSERT_NE(early, nullptr);
+  EXPECT_EQ(early->value.ToUint64(), kOldValue);
+  SimFixture late_run;
+  auto* late = RunAndFindVar(ChainDesign(kSdf), late_run, "late");
+  ASSERT_NE(late, nullptr);
+  EXPECT_EQ(late->value.ToUint64(), kNewValue);
+}
+
 }  // namespace
