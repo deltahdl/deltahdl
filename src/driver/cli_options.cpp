@@ -452,7 +452,7 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
     std::istringstream words_of_line(line);
     std::string word;
     while (words_of_line >> word) {
-      if (!word.empty() && word[0] == '#') break;
+      if (word.starts_with('#')) break;
       words.push_back(std::move(word));
       origins.lines.push_back(line_no);
     }
