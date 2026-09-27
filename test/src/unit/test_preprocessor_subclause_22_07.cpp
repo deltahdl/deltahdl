@@ -413,9 +413,9 @@ TEST(Preprocessor, Timescale_RecordedUnderTheHeadersName) {
   EXPECT_FALSE(f.diag.HasErrors());
   const auto& list = pp.ModuleDirectivesList();
   ASSERT_EQ(list.size(), 4u);
-  const char* kNames[] = {"a", "b", "c", "d"};
+  const char* names[] = {"a", "b", "c", "d"};
   for (size_t i = 0; i < list.size(); ++i) {
-    EXPECT_EQ(list[i].module, kNames[i]);
+    EXPECT_EQ(list[i].module, names[i]);
     EXPECT_TRUE(list[i].has_timescale);
     EXPECT_EQ(list[i].timescale.unit, TimeUnit::kUs);
   }
