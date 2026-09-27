@@ -268,8 +268,10 @@ TEST(SpecifyPathDelayFromSource, NegativeTypicalMemberClampsToZero) {
   for (int i = 0; i < 6; ++i) EXPECT_EQ(pd.delays[i], 0u) << "slot " << i;
 }
 
-// A buffer whose one path takes its delay from `delay`, driven 1 at 10 and 0 at
-// 20 under `timescale 1ns / 1ps, printing each change of its output after 0.
+// A buffer whose one path takes its delay from `delay`, driven 0 at 0, 1 at 10
+// and 0 at 20 under `timescale 1ns / 1ps, printing each change of its output
+// after 0. The output's first change, from x to 0, crosses the path as the
+// later ones do, so it too lands one path delay after its source's.
 std::string BufferWithPathDelay(const std::string& specparam,
                                 const std::string& delay) {
   return "`timescale 1ns / 1ps\n"
@@ -306,7 +308,7 @@ TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(
                 BufferWithPathDelay("    specparam tr = 2.5;\n", "tr"), f),
-            "t=12.5 y=1\nt=22.5 y=0\n");
+            "t=2.5 y=0\nt=12.5 y=1\nt=22.5 y=0\n");
 }
 
 // The same for a literal: an integer path delay of 3 is 3 ns, and a real 2.5
@@ -314,10 +316,10 @@ TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
 TEST(SpecifyPathDelayFromSource, LiteralPathDelaysCountTheModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(BufferWithPathDelay("", "3"), f),
-            "t=13 y=1\nt=23 y=0\n");
+            "t=3 y=0\nt=13 y=1\nt=23 y=0\n");
   SimFixture g;
   EXPECT_EQ(PreprocessAndCapture(BufferWithPathDelay("", "2.5"), g),
-            "t=12.5 y=1\nt=22.5 y=0\n");
+            "t=2.5 y=0\nt=12.5 y=1\nt=22.5 y=0\n");
 }
 
 // §22.7: the unit is the declaring module's, not the top's, so a path of 2 in

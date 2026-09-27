@@ -91,7 +91,7 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
 
   // The parser accepts only the one/two/three/six/twelve delay lists of
   // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.
-  const TimeScale& kScale = ActiveInstanceTimeScale(ctx);
+  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   std::size_t count = decl.delays.size();
   if (count > 12) count = 12;
   pd.delay_count = static_cast<uint8_t>(count == 0 ? 1 : count);
@@ -100,7 +100,7 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
     // §30.5.1: a single value is the typical delay; a colon-separated
     // min:typ:max triple selects one member. EvalExpr resolves a
     // constant_mintypmax_expression against the context's delay mode.
-    pd.delays[i] = PathDelayTicks(EvalExpr(decl.delays[i], ctx, arena), kScale,
+    pd.delays[i] = PathDelayTicks(EvalExpr(decl.delays[i], ctx, arena), scale,
                                   ctx.GlobalPrecision());
   }
 
