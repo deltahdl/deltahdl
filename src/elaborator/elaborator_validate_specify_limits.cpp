@@ -290,8 +290,41 @@ static std::string ConditionOpMessage(const Expr* e) {
 // identifier operand must be a permitted signal: an input or inout port (or a
 // bit-/part-select of one), a locally defined net or variable, or a compile-
 // time constant (specparam or literal). An output port is not among the
-// permitted operands. Unknown identifiers (module parameters, hierarchical
-// names) are left alone so the check only flags what it can prove illegal.
+// permitted operands. Unknown identifiers (module parameters) are left alone
+// so the check only flags what it can prove illegal.
+// The name a dotted operand is written with, `top.b` for `top.b`.
+static std::string DottedName(const Expr* e) {
+  if (e == nullptr) return {};
+  if (e->kind == ExprKind::kIdentifier) return std::string(e->text);
+  if (e->kind != ExprKind::kMemberAccess) return {};
+  return DottedName(e->lhs) + "." + DottedName(e->rhs);
+}
+
+// §30.4.4.1 (printed page 876): a condition's operands are "Scalar or vector
+// module input ports or inout ports", "Locally defined variables or nets" and
+// "Compile-time constants" and their selects, so a hierarchical name reaching
+// into another scope, `if (top.b)`, is none of them. A dotted name starting at
+// one of the module's own ports is the member of an interface port, and one
+// written with `::` names a package's constant, and neither is refused here.
+static void CheckConditionMemberOperand(const Expr* e, SourceLoc loc,
+                                        const PortMap& port_map,
+                                        DiagEngine& diag) {
+  if (e->is_scope_resolution) return;
+  const Expr* head = e;
+  while (head->kind == ExprKind::kMemberAccess && head->lhs != nullptr) {
+    head = head->lhs;
+  }
+  if (head->kind == ExprKind::kIdentifier &&
+      port_map.find(head->text) != port_map.end()) {
+    return;
+  }
+  diag.Error(loc,
+             std::format("state-dependent path condition operand '{}' may "
+                         "not be a hierarchical name reaching another scope",
+                         DottedName(e)),
+             Subclause("30.4.4.1"));
+}
+
 void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
                         DiagEngine& diag) {
   if (!e) return;
@@ -307,6 +340,9 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
       }
       return;
     }
+    case ExprKind::kMemberAccess:
+      CheckConditionMemberOperand(e, loc, port_map, diag);
+      return;
     case ExprKind::kUnary:
     case ExprKind::kPostfixUnary:
       if (!IsAllowedConditionOp(e->op)) {

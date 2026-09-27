@@ -483,4 +483,50 @@ TEST(OperatorElaboration, OutputOperandOnEdgeSensitivePathIsRejected) {
                             "30.4.4.1"));
 }
 
+// §30.4.4.1 (printed page 876): a condition's operands are input or inout
+// ports, "Locally defined variables or nets" and "Compile-time constants", and
+// their selects, so a hierarchical name reaching into the instantiating
+// module, `if (top.b)`, is none of them. The operator check ran and the operand
+// passed unexamined, so the design elaborated and ran.
+TEST(OperatorElaboration, HierarchicalNameOperandIsRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module mybuf(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n"
+      "    if (top.b) (a => y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a, b; wire ty;\n"
+      "  mybuf u(.a(a), .y(ty));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operand 'top.b' may not be a hierarchical name "
+                            "reaching another scope",
+                            4, "30.4.4.1"));
+}
+
+// A dotted name starting at the module's own interface port is the member of a
+// port, and §30.4.2 names such a signal as a path terminal besides, so it is
+// not refused as a hierarchical name.
+TEST(OperatorElaboration, InterfacePortMemberOperandElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc;\n"
+      "  logic a, en;\n"
+      "endinterface\n"
+      "module mybuf(ifc p, output y);\n"
+      "  assign y = p.a;\n"
+      "  specify\n"
+      "    if (p.en) (p.a => y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
