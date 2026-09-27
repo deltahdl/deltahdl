@@ -115,4 +115,68 @@ TEST(SpecifyPathSim, SelectDriverOfANonPathNetTakesNoPathDelay) {
   EXPECT_EQ(out, "y=0 z=1\n");
 }
 
+// §30.4.2 (printed page 873): a path's input terminal may be
+// `interface_identifier . port_identifier`, a signal of the module's interface
+// port, so `(p.a => y) = 5` delays by 5 each transition of `y` that a change of
+// `p.a` produces -- the connected instance's `a` rising at 10 and falling at
+// 20. The path had kept the port name alone, starting at an `a` nothing in the
+// module reads, and every transition landed undelayed.
+TEST(SpecifyPathSim, InterfacePortSignalIsAPathSource) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "endinterface\n"
+      "module mybuf(ifc p, output y);\n"
+      "  assign y = p.a;\n"
+      "  specify\n"
+      "    (p.a => y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  wire ty;\n"
+      "  mybuf u(.p(i), .y(ty));\n"
+      "  always @(ty) if ($time >= 8) $display(\"t=%0t y=%b\", $time, ty);\n"
+      "  initial begin\n"
+      "    i.a = 0;\n"
+      "    #10 i.a = 1;\n"
+      "    #10 i.a = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=15 y=1\n"
+            "t=25 y=0\n");
+}
+
+// §25.3 with §10.3.2: the continuous assignment `assign y = p.a` reads through
+// the interface port, so without the path `y` follows the connected
+// instance's `a` at the moment it changes.
+TEST(SpecifyPathSim, AssignReadingAnInterfacePortFollowsIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "endinterface\n"
+      "module mybuf(ifc p, output y);\n"
+      "  assign y = p.a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  wire ty;\n"
+      "  mybuf u(.p(i), .y(ty));\n"
+      "  always @(ty) if ($time >= 8) $display(\"t=%0t y=%b\", $time, ty);\n"
+      "  initial begin\n"
+      "    i.a = 0;\n"
+      "    #10 i.a = 1;\n"
+      "    #10 i.a = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=10 y=1\n"
+            "t=20 y=0\n");
+}
+
 }  // namespace

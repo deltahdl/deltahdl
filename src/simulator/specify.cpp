@@ -88,15 +88,27 @@ static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
   return "[" + std::to_string(msb) + ":" + std::to_string(lsb) + "]";
 }
 
+// §30.4.2 (printed page 873): a path terminal is a port_identifier or
+// `interface_identifier . port_identifier`, and the second names the signal of
+// the module's interface port by both names, as the module's own text reads it
+// (`p.a`). Kept as the port name alone, a path from `p.a` started at an `a`
+// nothing in the module reads, so no transition was ever timed through it.
+static std::string TerminalName(const SpecifyTerminal& t) {
+  if (t.interface_name.empty()) return std::string(t.name);
+  std::string name(t.interface_name);
+  name.append(".").append(t.name);
+  return name;
+}
+
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena) {
   PathDelay pd;
   if (!decl.src_ports.empty()) {
-    pd.src_port = std::string(decl.src_ports.front().name);
+    pd.src_port = TerminalName(decl.src_ports.front());
     pd.src_select = TerminalSelectText(decl.src_ports.front(), ctx, arena);
   }
   if (!decl.dst_ports.empty()) {
-    pd.dst_port = std::string(decl.dst_ports.front().name);
+    pd.dst_port = TerminalName(decl.dst_ports.front());
     pd.dst_select = TerminalSelectText(decl.dst_ports.front(), ctx, arena);
   }
   pd.path_kind = decl.path_kind;
