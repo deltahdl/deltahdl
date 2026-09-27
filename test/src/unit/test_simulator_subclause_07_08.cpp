@@ -449,4 +449,45 @@ TEST(AssocArraySimulation, AssocPropertyOfHandlesConstructedInAMethod) {
             5u);
 }
 
+// §7.4.4 (printed page 155) with §6.18: an array's unpacked dimensions may be
+// defined in stages with typedef, so `ie_t x;` under `typedef bit ie_t[int];`
+// declares an associative array indexed by int (§7.8), as `bit x[int]` does.
+// The dimensions of an associative typedef were the one form the elaborator
+// did not carry to a declaration through the name, so the module variable was
+// a single bit and `x[5] = 1` was reported as a bit-select of a scalar.
+TEST(AssocArraySimulation, ModuleVariableThroughAnAssocTypedefIsAnAssocArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef bit ie_t[int];\n"
+      "module t;\n"
+      "  ie_t x;\n"
+      "  initial begin\n"
+      "    x[5] = 1;\n"
+      "    x[9] = 1;\n"
+      "    $display(\"num=%0d\", x.num());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "num=2\n");
+}
+
+// §7.4.4 as above, for a local of a module's procedure, which the elaborator
+// rewrites through the same record of the typedef's dimensions.
+TEST(AssocArraySimulation, ProceduralLocalThroughAnAssocTypedefIsAnAssocArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef bit ie_t[int];\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    ie_t y;\n"
+      "    y[2] = 1;\n"
+      "    y[7] = 1;\n"
+      "    y[11] = 1;\n"
+      "    $display(\"num=%0d\", y.num());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "num=3\n");
+}
+
 }  // namespace

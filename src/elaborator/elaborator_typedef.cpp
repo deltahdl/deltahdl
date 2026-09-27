@@ -369,14 +369,13 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   // §6.18: the dimensions belong to the type the name stands for, so a name
   // written with any of them stands for an aggregate rather than for one
   // element. Recording that is what lets the elaborated type-width table
-  // decline to answer for it; the map below keeps only the dimensions of the
-  // forms it was written for, and an associative typedef reaches neither.
+  // decline to answer for it.
   if (!item->unpacked_dims.empty()) {
     aggregate_typedef_names_.insert(item->name);
   }
   bool first_dim_assoc = IsAssocFirstDimTypedef(item, typedefs_, class_names_,
                                                 assoc_typedef_names_);
-  if (!item->unpacked_dims.empty() && !first_dim_assoc) {
+  if (!item->unpacked_dims.empty()) {
     // §6.18: a typedef "gives a user-defined name to an existing data type",
     // and the clause has unpacked array types among those -- it notes that a
     // user-defined name is needed for a type parameter value "when unpacked
@@ -389,9 +388,17 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     // altogether: a variable declared through the typedef came out as the bare
     // element type rather than a queue or a dynamic array. The width is still
     // recorded only when it exists, since that is what it means.
+    //
+    // §7.4.4 (printed page 155) and §7.8: an associative dimension is one of
+    // them, so `ie_t x;` under `typedef bit ie_t[int];` is an associative
+    // array indexed by int, as `bit x[int]` is. Left out of the record, it
+    // declared a single bit, and `x[5] = 1` was reported as a bit-select of a
+    // scalar.
     td_array_dims_[item->name] = item->unpacked_dims;
-    if (auto width = ComputeFixedUnpackedWidth(item, typedefs_)) {
-      fixed_unpacked_typedef_widths_[item->name] = *width;
+    if (!first_dim_assoc) {
+      if (auto width = ComputeFixedUnpackedWidth(item, typedefs_)) {
+        fixed_unpacked_typedef_widths_[item->name] = *width;
+      }
     }
   }
   ScopeMap scope = BuildParamScope(mod);
