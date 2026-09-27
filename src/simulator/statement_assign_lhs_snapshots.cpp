@@ -1,5 +1,3 @@
-#include <string>
-
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_function_args_scoped.h"
