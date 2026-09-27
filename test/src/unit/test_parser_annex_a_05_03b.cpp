@@ -133,13 +133,13 @@ TEST(UdpBodyGrammar, LevelSymbol_AllValues) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
       "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
+      "    0 : x;\n"
+      "    1 : x;\n"
       "    x : x;\n"
       "    X : x;\n"
-      "    ? : 0;\n"
-      "    b : 0;\n"
-      "    B : 0;\n"
+      "    ? : x;\n"
+      "    b : x;\n"
+      "    B : x;\n"
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
@@ -190,15 +190,15 @@ TEST(UdpBodyGrammar, EdgeSymbol_AllValues) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
       "  table\n"
-      "    r : ? : 1;\n"
-      "    R : ? : 1;\n"
-      "    f : ? : 0;\n"
-      "    F : ? : 0;\n"
-      "    p : ? : 1;\n"
-      "    P : ? : 1;\n"
-      "    n : ? : 0;\n"
-      "    N : ? : 0;\n"
-      "    * : ? : x;\n"
+      "    r : ? : -;\n"
+      "    R : ? : -;\n"
+      "    f : ? : -;\n"
+      "    F : ? : -;\n"
+      "    p : ? : -;\n"
+      "    P : ? : -;\n"
+      "    n : ? : -;\n"
+      "    N : ? : -;\n"
+      "    * : ? : -;\n"
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);

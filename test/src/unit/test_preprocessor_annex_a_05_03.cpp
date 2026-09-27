@@ -84,13 +84,13 @@ TEST(UdpBodyPreprocessor, AllLevelSymbolsThroughPreprocessor) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("primitive p(output y, input a);\n"
                               "  table\n"
-                              "    0 : 0;\n"
-                              "    1 : 1;\n"
+                              "    0 : x;\n"
+                              "    1 : x;\n"
                               "    x : x;\n"
                               "    X : x;\n"
-                              "    ? : 0;\n"
-                              "    b : 0;\n"
-                              "    B : 0;\n"
+                              "    ? : x;\n"
+                              "    b : x;\n"
+                              "    B : x;\n"
                               "  endtable\n"
                               "endprimitive\n"));
 }

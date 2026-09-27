@@ -178,12 +178,11 @@ TEST(UdpStateTable, DuplicateInputsWithDifferentOutputsRejected) {
       "    0 1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // Parser::ValidateUdpTable compares whole rows once the table is complete,
-  // so the report stands at the primitive's own line rather than at a row.
+  // Parser::ValidateUdpTable reports at the later of the two rows.
   EXPECT_TRUE(ReportedError(r.diags,
-                            "UDP table rows with identical inputs shall not "
-                            "specify different outputs",
-                            1, "29.3.4"));
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            4, "29.3.4"));
 }
 
 TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
@@ -195,9 +194,123 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "UDP table rows with identical inputs shall not "
-                            "specify different outputs",
-                            1, "29.3.4"));
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            4, "29.3.4"));
+}
+
+TEST(UdpStateTable, OverlappingRowsWithDifferentOutputsRejected) {
+  // "It shall be illegal to have the same combination of inputs, including
+  // edges, specify different output values": the `?` row covers a = b = 1,
+  // which the row above it gives 1.
+  auto r = Parse(
+      "primitive p (y, a, b);\n"
+      "  output y;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    1 1 : 1 ;\n"
+      "    1 ? : 0 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            6, "29.3.4"));
+}
+
+TEST(UdpStateTable, OverlappingRowsWithTheSameOutputAccepted) {
+  auto r = Parse(
+      "primitive p(output y, input a, input b);\n"
+      "  table\n"
+      "    1 1 : 1;\n"
+      "    1 ? : 1;\n"
+      "    0 b : 0;\n"
+      "    0 ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(UdpStateTable, OverlappingEdgeRowsWithDifferentOutputsRejected) {
+  // p covers (0x), the transition the second row names.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    p 0 : 0 : 1;\n"
+      "    (0x) ? : 0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            4, "29.3.4"));
+}
+
+TEST(UdpStateTable, NoChangeOutputConflictsWithAnotherStateRejected) {
+  // "-" is the current state, so under a current state of 0 the first row
+  // gives 0 where the second gives 1.
+  auto r = Parse(
+      "primitive seq(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    ? f : ? : -;\n"
+      "    1 (10) : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            4, "29.3.4"));
+}
+
+TEST(UdpStateTable, NoChangeOutputMatchingTheStateAccepted) {
+  auto r = Parse(
+      "primitive seq(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    ? f : ? : -;\n"
+      "    1 (10) : 1 : 1;\n"
+      "    ? * : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(UdpStateTable, LevelRowBesideEdgeRowWithAnotherOutputAccepted) {
+  // A level row and an edge row are not the same combination "including
+  // edges"; §29.9 settles which of the two applies.
+  auto r = Parse(
+      "primitive latch(output reg q, input d, input en);\n"
+      "  table\n"
+      "    1 1 : ? : 1;\n"
+      "    (01) 1 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(UdpStateTable, JkEdgeFlipFlopOfSubclause29_9Accepted) {
+  // §29.9's jk_edge_ff mixes level rows over the preset and clear with edge
+  // rows over the clock, j and k, none of them in conflict.
+  auto r = Parse(
+      "primitive jk_edge_ff (q, clock, j, k, preset, clear);\n"
+      "  output q; reg q;\n"
+      "  input clock, j, k, preset, clear;\n"
+      "  table\n"
+      "    ? ?? 01 : ? : 1 ;\n"
+      "    ? ?? *1 : 1 : 1 ;\n"
+      "    ? ?? 10 : ? : 0 ;\n"
+      "    ? ?? 1* : 0 : 0 ;\n"
+      "    r 00 00 : 0 : 1 ;\n"
+      "    r 00 11 : ? : - ;\n"
+      "    r 01 11 : ? : 0 ;\n"
+      "    r 10 11 : ? : 1 ;\n"
+      "    r 11 11 : 0 : 1 ;\n"
+      "    r 11 11 : 1 : 0 ;\n"
+      "    f ?? ?? : ? : - ;\n"
+      "    b *? ?? : ? : - ;\n"
+      "    b ?* ?? : ? : - ;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(UdpStateTable, RowWithTwoInputTransitionsRejected) {
@@ -294,9 +407,9 @@ TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "UDP table rows with identical inputs shall not "
-                            "specify different outputs",
-                            1, "29.3.4"));
+                            "UDP table rows covering the same combination of "
+                            "inputs shall not specify different outputs",
+                            4, "29.3.4"));
 }
 
 TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {

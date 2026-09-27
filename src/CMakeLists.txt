@@ -442,6 +442,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/expr_parser_literals.cpp
     parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
+    parser/udp_row_overlap.cpp
     simulator/constraint_solver_dist.cpp
     simulator/constraint_solver_eval.cpp
     simulator/constraint_solver_propagate.cpp

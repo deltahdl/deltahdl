@@ -138,6 +138,8 @@ struct SpecifyItem {
 
 struct UdpTableRow {
   std::vector<char> inputs;
+  // Where the row starts, which a report about the row stands at.
+  SourceLoc loc;
 
   std::vector<std::pair<char, char>> paren_edges;
   char current_state = 0;

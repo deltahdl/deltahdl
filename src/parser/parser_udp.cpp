@@ -14,6 +14,7 @@
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"
 #include "parser/udp_ansi_port_entry.h"
+#include "parser/udp_row_overlap.h"
 
 namespace delta {
 
@@ -114,19 +115,18 @@ void Parser::ValidateUdpHeader(UdpDecl* udp) {
   }
 }
 
+// §29.3.4 (printed page 863): "It shall be illegal to have the same
+// combination of inputs, including edges, specify different output values."
+// Reported once per table, at the later row of the first pair found.
 void Parser::ValidateUdpTable(UdpDecl* udp) {
-  for (size_t i = 0; i < udp->table.size(); ++i) {
-    for (size_t j = i + 1; j < udp->table.size(); ++j) {
-      const auto& a = udp->table[i];
-      const auto& b = udp->table[j];
-      if (a.inputs == b.inputs && a.paren_edges == b.paren_edges &&
-          a.current_state == b.current_state && a.output != b.output) {
-        diag_.Error(udp->range.start,
-                    "UDP table rows with identical inputs shall not specify "
-                    "different outputs",
-                    Subclause("29.3.4"));
-        return;
-      }
+  for (size_t j = 1; j < udp->table.size(); ++j) {
+    for (size_t i = 0; i < j; ++i) {
+      if (!UdpRowsConflict(udp->table[i], udp->table[j])) continue;
+      diag_.Error(udp->table[j].loc,
+                  "UDP table rows covering the same combination of inputs "
+                  "shall not specify different outputs",
+                  Subclause("29.3.4"));
+      return;
     }
   }
 }
@@ -534,6 +534,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
                               bool& row_width_reported) {
   UdpTableRow row;
   SourceLoc row_loc = CurrentLoc();
+  row.loc = row_loc;
   while (!Check(TokenKind::kColon) && !AtEnd()) {
     if (Check(TokenKind::kLParen)) {
       Consume();
