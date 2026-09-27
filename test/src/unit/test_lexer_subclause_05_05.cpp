@@ -373,4 +373,37 @@ TEST(LexicalConventionLexing, ConditionalOperatorTwoOperatorChars) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
+// An operator whose first character may begin a longer one still lexes as
+// itself when that character ends the text.
+TEST(LexicalConventionLexing, OperatorEndingTheTextIsItself) {
+  auto tokens = Lex("a ~");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
+}
+
+// Each of these characters begins a longer operator only with the right two
+// characters after it: `+/-`, `+%-`, `|->`, `#-#`, `#=#` and `<->`. With the
+// first of them but not the second, the character is an operator of its own
+// and so is the one after it.
+TEST(LexicalConventionLexing, PrefixOfALongerOperatorWithoutItsEndStandsAlone) {
+  const struct {
+    const char* src;
+    TokenKind first;
+    TokenKind second;
+  } kCases[] = {{"+/b", TokenKind::kPlus, TokenKind::kSlash},
+                {"+%b", TokenKind::kPlus, TokenKind::kPercent},
+                {"|-b", TokenKind::kPipe, TokenKind::kMinus},
+                {"#-b", TokenKind::kHash, TokenKind::kMinus},
+                {"#=b", TokenKind::kHash, TokenKind::kEq},
+                {"<-b", TokenKind::kLt, TokenKind::kMinus}};
+  for (const auto& c : kCases) {
+    auto tokens = Lex(c.src);
+    ASSERT_EQ(tokens.size(), 4u) << c.src;
+    EXPECT_EQ(tokens[0].kind, c.first) << c.src;
+    EXPECT_EQ(tokens[1].kind, c.second) << c.src;
+    EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier) << c.src;
+  }
+}
+
 }  // namespace

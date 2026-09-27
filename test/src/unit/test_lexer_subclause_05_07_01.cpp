@@ -345,4 +345,25 @@ TEST(IntegerLiteralLexing, SizelessLiteralSpansTheDigitsAfterTheWhitespace) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
+// §5.7.1 allows white space between the size and the apostrophe, and a tab is
+// white space as a blank is; between the apostrophe and the base format it is
+// forbidden, tab or blank.
+TEST(IntegerLiteralLexing, TabBeforeTheApostropheIsAllowedAndAfterItIsNot) {
+  auto tokens = Lex("8\t'h1");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "8\t'h1");
+  EXPECT_TRUE(LexDiagnostics("8\t'h1").empty());
+
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8'\th1"),
+                            "white space shall not separate", 1, "5.7.1"));
+}
+
+// An apostrophe that ends the text opens no literal, cast or pattern, and is
+// reported as a character no token begins with.
+TEST(IntegerLiteralLexing, ApostropheEndingTheTextIsAnUnexpectedCharacter) {
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics("x = '"), "unexpected character", 1, "5.2"));
+}
+
 }  // namespace

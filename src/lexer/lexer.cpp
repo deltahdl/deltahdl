@@ -134,22 +134,16 @@ size_t FindConcatCloseBrace(const std::vector<std::string_view>& words) {
 
 // Reconstruct the `{...}` region as one contiguous view of the source, so the
 // internal spaces and commas are preserved regardless of how the comment body
-// split into words, and return the text between the braces. Returns true and
-// fills `inside` on success.
-bool ExtractBracedInside(const std::vector<std::string_view>& words,
-                         size_t close, std::string_view& inside) {
+// split into words, and return the text between the braces. words[2] opens
+// with the `{` and words[close] holds the `}`, which the caller has found.
+std::string_view ExtractBracedInside(const std::vector<std::string_view>& words,
+                                     size_t close) {
   const char* region_begin = words[2].data();
   const char* region_end = words[close].data() + words[close].size();
   std::string_view region(region_begin,
                           static_cast<size_t>(region_end - region_begin));
-  size_t open_brace = region.find('{');
   size_t close_brace = region.rfind('}');
-  if (open_brace == std::string_view::npos ||
-      close_brace == std::string_view::npos || close_brace <= open_brace) {
-    return false;
-  }
-  inside = region.substr(open_brace + 1, close_brace - open_brace - 1);
-  return true;
+  return region.substr(1, close_brace - 1);
 }
 
 // Split a concatenation body on commas and collect every member. Each member
@@ -159,7 +153,7 @@ bool ExtractBracedInside(const std::vector<std::string_view>& words,
 bool ParseConcatMembers(std::string_view inside,
                         std::vector<std::string_view>& names) {
   size_t i = 0;
-  while (i <= inside.size()) {
+  while (true) {
     size_t comma = inside.find(',', i);
     std::string_view piece = comma == std::string_view::npos
                                  ? inside.substr(i)
@@ -186,19 +180,6 @@ bool ParseConcatMembers(std::string_view inside,
   return !names.empty();
 }
 
-// Returns true if a pragma carrying this exact source location was already
-// recorded, so the lexer does not double-record a comment it backtracks over.
-template <typename PragmaVec>
-bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
-  for (const auto& existing : recorded) {
-    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
-        existing.loc.column == loc.column) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // Whether c is a digit an escape of the kind may take: a hex_digit other than
 // an x_digit or z_digit for `\xdd`, one of 0 to 7 for `\ddd`.
 bool IsEscapeDigit(char c, bool hex) {
@@ -212,19 +193,13 @@ Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag,
              TextOrigin origin)
     : source_(source), file_id_(file_id), diag_(diag), origin_(origin) {}
 
-char Lexer::Current() const {
-  if (AtEnd()) {
-    return '\0';
-  }
-  return source_[pos_];
+char Lexer::CharAt(uint32_t p) const {
+  return p < source_.size() ? source_[p] : '\0';
 }
 
-char Lexer::PeekChar() const {
-  if (pos_ + 1 >= source_.size()) {
-    return '\0';
-  }
-  return source_[pos_ + 1];
-}
+char Lexer::Current() const { return CharAt(pos_); }
+
+char Lexer::PeekChar() const { return CharAt(pos_ + 1); }
 
 void Lexer::Advance() {
   if (AtEnd()) {
@@ -248,9 +223,8 @@ uint32_t Lexer::SkipLineComment() {
     Advance();
   }
   uint32_t body_end = pos_;
-  if (!AtEnd() && Current() == '\n') {
-    Advance();
-  }
+  // The newline that ended the comment, unless the text ended first.
+  Advance();
   return body_end;
 }
 
@@ -320,6 +294,16 @@ bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
 }
 
 void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
+  // The parser rewinds the lexer through SavePos and RestorePos, which hands a
+  // comment it has read before to this function again. The lexer reads the
+  // text in order otherwise, so every comment before the furthest one read has
+  // been seen, and one comment is one pragma recorded or one report made.
+  auto offset = static_cast<uint32_t>(body.data() - source_.data());
+  if (offset < first_unseen_comment_) {
+    return;
+  }
+  first_unseen_comment_ = offset + 1;
+
   // Split the comment body into whitespace-delimited words.
   std::vector<std::string_view> words = SplitPragmaWords(body);
 
@@ -333,7 +317,7 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
   // simple signal named by §40.4.1; dispatch to the matching recognizer.
   if (words.size() >= 3 && words[1] == "state_vector" &&
       !IsSimplePragmaIdentifier(words[2])) {
-    if (!words[2].empty() && words[2].front() == '{') {
+    if (words[2].front() == '{') {
       // §40.4.3: a concatenation of signals can hold the current state. The
       // pragma supplies an FSM name and an enumeration name:
       //   `tool state_vector {sig , sig, ...} FSM_name enum enum_name`.
@@ -350,11 +334,6 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
 
   FsmStatePragma pragma;
   if (!BuildSimpleFsmStatePragma(words, loc, pragma)) {
-    return;
-  }
-
-  // Avoid re-recording the same comment if the lexer backtracks over it.
-  if (PragmaAlreadyRecorded(fsm_state_pragmas_, loc)) {
     return;
   }
   fsm_state_pragmas_.push_back(pragma);
@@ -382,11 +361,6 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
   pragma.fsm_name = words[3];
   pragma.enum_name = words[5];
   pragma.loc = loc;
-
-  // Avoid re-recording the same comment if the lexer backtracks over it.
-  if (PragmaAlreadyRecorded(fsm_part_select_pragmas_, loc)) {
-    return;
-  }
   fsm_part_select_pragmas_.push_back(pragma);
 }
 
@@ -407,12 +381,6 @@ void Lexer::ReportConcatSelectProhibition(std::string_view inside,
   if (inside.find('[') == std::string_view::npos) {
     return;
   }
-  // A comment the parser backtracks over reaches the recognizer again, and one
-  // comment breaking one rule is one report.
-  if (PragmaAlreadyRecorded(fsm_concat_select_reports_, loc)) {
-    return;
-  }
-  fsm_concat_select_reports_.push_back({loc});
   diag_.Warning(loc,
                 "bit-select or part-select cannot be used in an FSM "
                 "state_vector concatenation",
@@ -427,9 +395,6 @@ void Lexer::TryRecognizeFsmConcatPragma(
   // The braced list may be split across several whitespace-delimited words, so
   // find the word carrying the closing brace and rejoin the brace region from
   // the contiguous source span the words point into.
-  if (words.size() < 3 || words[2].empty() || words[2].front() != '{') {
-    return;
-  }
   size_t close = FindConcatCloseBrace(words);
   if (close == words.size()) {
     return;  // no closing brace for the concatenation
@@ -444,10 +409,7 @@ void Lexer::TryRecognizeFsmConcatPragma(
     return;
   }
 
-  std::string_view inside;
-  if (!ExtractBracedInside(words, close, inside)) {
-    return;
-  }
+  std::string_view inside = ExtractBracedInside(words, close);
 
   FsmConcatPragma pragma;
   if (!ParseConcatMembers(inside, pragma.signal_names)) {
@@ -458,11 +420,6 @@ void Lexer::TryRecognizeFsmConcatPragma(
   pragma.fsm_name = words[close + 1];
   pragma.enum_name = words[close + 3];
   pragma.loc = loc;
-
-  // Avoid re-recording the same comment if the lexer backtracks over it.
-  if (PragmaAlreadyRecorded(fsm_concat_pragmas_, loc)) {
-    return;
-  }
   fsm_concat_pragmas_.push_back(pragma);
 }
 
@@ -515,21 +472,20 @@ void Lexer::SkipWhitespaceAndComments() {
 // discard it.
 bool Lexer::SkipSpacesAndTabs() {
   uint32_t before = pos_;
-  while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
+  while (Current() == ' ' || Current() == '\t') {
     Advance();
   }
   return pos_ != before;
 }
 
+// Preprocessor::HandleBeginKeywords and HandleEndKeywords write the marker and
+// the version byte together, so the byte after a marker is its version. The
+// newline ending the directive's line is white space, which the caller's loop
+// steps over as it does any other.
 void Lexer::ConsumeKeywordMarker() {
   Advance();
-  if (!AtEnd()) {
-    keyword_version_ = static_cast<KeywordVersion>(Current());
-    Advance();
-  }
-  if (!AtEnd() && Current() == '\n') {
-    Advance();
-  }
+  keyword_version_ = static_cast<KeywordVersion>(Current());
+  Advance();
 }
 
 Token Lexer::MakeToken(TokenKind kind, SourceLoc loc) const {
@@ -621,8 +577,8 @@ Token Lexer::NextFilePathSpec() {
 Token Lexer::LexIdentifier() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
-  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
-                      Current() == '_' || Current() == '$')) {
+  while (std::isalnum(static_cast<unsigned char>(Current())) ||
+         Current() == '_' || Current() == '$') {
     Advance();
   }
   std::string_view text = source_.substr(start, pos_ - start);
@@ -641,8 +597,7 @@ Token Lexer::LexStringLiteral() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
 
-  bool triple = PeekChar() == '"' && pos_ + 2 < source_.size() &&
-                source_[pos_ + 2] == '"';
+  bool triple = PeekChar() == '"' && CharAt(pos_ + 2) == '"';
   if (triple) {
     Advance();
     Advance();
@@ -672,22 +627,20 @@ Token Lexer::LexStringLiteral() {
 // report is placed there, on the escape's own line.
 void Lexer::CheckEscapeDigits() {
   uint32_t p = pos_ + 1;
-  if (p >= source_.size()) return;
-  const bool kHex = source_[p] == 'x';
+  const bool kHex = CharAt(p) == 'x';
   if (kHex) {
     ++p;
-  } else if (!IsEscapeDigit(source_[p], false)) {
+  } else if (!IsEscapeDigit(CharAt(p), false)) {
     return;
   }
   const uint32_t kMax = kHex ? 2 : 3;
   uint32_t taken = 0;
-  while (taken < kMax && p < source_.size() &&
-         IsEscapeDigit(source_[p], kHex)) {
+  while (taken < kMax && IsEscapeDigit(CharAt(p), kHex)) {
     ++p;
     ++taken;
   }
-  if (taken == kMax || p >= source_.size()) return;
-  const char kNext = source_[p];
+  if (taken == kMax) return;
+  const char kNext = CharAt(p);
   if (kNext != 'x' && kNext != 'X' && kNext != 'z' && kNext != 'Z' &&
       kNext != '?')
     return;
@@ -717,8 +670,7 @@ bool Lexer::LexQuotedBody() {
 
 bool Lexer::LexTripleQuotedBody() {
   while (!AtEnd()) {
-    if (Current() == '"' && PeekChar() == '"' && pos_ + 2 < source_.size() &&
-        source_[pos_ + 2] == '"') {
+    if (Current() == '"' && PeekChar() == '"' && CharAt(pos_ + 2) == '"') {
       Advance();
       Advance();
       Advance();

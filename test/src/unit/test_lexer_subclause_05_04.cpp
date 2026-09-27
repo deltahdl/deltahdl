@@ -310,4 +310,14 @@ TEST(LexicalConventionLexing, LineCommentEndedByCrlf) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
+// A one-line comment ends at the end of the text as well as at a newline, and
+// the text ending inside one is no error.
+TEST(LexicalConventionLexing, OneLineCommentMayEndTheText) {
+  auto result = LexWithDiag("a // no newline follows");
+  ASSERT_EQ(result.tokens.size(), 2u);
+  EXPECT_EQ(result.tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(result.tokens[1].kind, TokenKind::kEof);
+  EXPECT_FALSE(result.has_errors);
+}
+
 }  // namespace

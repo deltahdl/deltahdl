@@ -187,4 +187,18 @@ TEST(FsmConcatPragmaLexing, NothingIsReportedWhereNoSelectWasWritten) {
   EXPECT_TRUE(diag.Diagnostics().empty());
 }
 
+// The braces are followed by exactly the FSM name, `enum` and the enumeration
+// name, and both names are identifiers. A comment missing the enumeration
+// name, writing another word for `enum`, or naming either with a word that is
+// not an identifier is not recorded.
+TEST(FsmConcatPragmaLexing, MissingOrMalformedNamesAreNotRecognized) {
+  for (const char* tail : {"my_fsm enum", "my_fsm with state_e",
+                           "9fsm enum state_e", "my_fsm enum 9e"}) {
+    EXPECT_TRUE(CollectConcatPragmas(
+                    std::string("/* tool state_vector {a, b} ") + tail + " */")
+                    .empty())
+        << tail;
+  }
+}
+
 }  // namespace

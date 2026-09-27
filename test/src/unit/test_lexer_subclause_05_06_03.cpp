@@ -141,4 +141,23 @@ TEST(SystemNameLexing, LengthIsClause36sToBoundAndItBoundsNone) {
   EXPECT_EQ(tokens[0].text.size(), 2001u);
 }
 
+// Only a name spelled as a system_tf_identifier is refused escaped. An escaped
+// identifier beginning with $ and holding a character no such name may hold,
+// here a plus sign, is an ordinary escaped identifier.
+TEST(SystemNameLexing, EscapedNameThatNoSystemNameSpellsIsAccepted) {
+  EXPECT_TRUE(LexDiagnostics("\\$a+b ").empty());
+  auto tokens = Lex("\\$a+b ");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "$a+b");
+}
+
+// A system_tf_identifier may hold underscores and dollar signs after its
+// first $, and one spelled with both is as much a system name, and as
+// forbidden escaped, as one spelled with letters alone.
+TEST(SystemNameLexing, EscapedSystemNameWithUnderscoreAndDollarIsRejected) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\\$my$task_1 "),
+                            "shall not be escaped", 1, "5.6.3"));
+}
+
 }  // namespace

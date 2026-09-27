@@ -112,4 +112,22 @@ TEST(LexicalConventionLexing, MultipleStrings) {
   EXPECT_EQ(tokens[1].text, "\"def\"");
 }
 
+// A backslash that ends the text leaves a string literal unterminated, quoted
+// or triple-quoted alike: it escapes nothing, and no closing quote follows.
+TEST(LexicalConventionLexing, BackslashEndingTheTextLeavesTheStringOpen) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"abc\\"),
+                            "unterminated string literal", 1, "5.9"));
+  EXPECT_TRUE(ReportedError(LexDiagnostics("\"\"\"abc\\"),
+                            "unterminated triple-quoted string", 1, "5.9"));
+}
+
+// Two double quotes inside a triple-quoted string are two of its characters;
+// only three together close it.
+TEST(LexicalConventionLexing, TwoQuotesInsideATripleQuotedString) {
+  auto tokens = Lex(R"("""a""b""")");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[0].text, R"("""a""b""")");
+}
+
 }  // namespace

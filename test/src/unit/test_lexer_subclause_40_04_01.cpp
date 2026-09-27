@@ -169,4 +169,61 @@ TEST(FsmStatePragmaLexing, NamesMayNotOpenWithADigitOrDollarSign) {
       CollectFsmPragmas("/* tool state_vector cur_state enum $e */").empty());
 }
 
+// §40.4.1's pragma opens with the tool keyword and names what follows it. A
+// comment holding the keyword alone names nothing, and one whose words after
+// the signal are not `enum` and an enumeration name is not the form either:
+// neither is recorded.
+TEST(FsmStatePragmaLexing,
+     KeywordAloneOrTrailingWordsOtherThanEnumAreNotAPragma) {
+  EXPECT_TRUE(CollectFsmPragmas("/* tool */").empty());
+  EXPECT_TRUE(
+      CollectFsmPragmas("/* tool state_vector cur_state with state_e */")
+          .empty());
+}
+
+// The names a pragma carries are §5.6 simple identifiers, which may begin with
+// an underscore and hold a dollar sign anywhere but first, and may not begin
+// with a digit: an enumeration named `9e` makes the comment no pragma.
+TEST(FsmStatePragmaLexing, NamesAreSimpleIdentifiers) {
+  auto pragmas = CollectFsmPragmas("/* tool state_vector _cur$state */");
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].signal, "_cur$state");
+  EXPECT_TRUE(CollectFsmPragmas("/* tool enum 9e */").empty());
+}
+
+// Two pragmas on one line are two comments, and each is recorded.
+TEST(FsmStatePragmaLexing, TwoPragmasOnOneLineAreBothRecorded) {
+  auto pragmas =
+      CollectFsmPragmas("/* tool enum first_e */ /* tool enum second_e */");
+  ASSERT_EQ(pragmas.size(), 2u);
+  EXPECT_EQ(pragmas[0].enum_name, "first_e");
+  EXPECT_EQ(pragmas[1].enum_name, "second_e");
+}
+
+// The parser rewinds the lexer through SavePos and RestorePos to look ahead,
+// which hands the lexer a comment it has already read. Each comment is one
+// pragma however often it is read: here every form of §40.4.1 through §40.4.3,
+// and the §40.4.3 prohibition report, is read twice and recorded once.
+TEST(FsmStatePragmaLexing, CommentReadAgainAfterARewindIsRecordedOnce) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid =
+      mgr.AddFile("<test>",
+                  "/* tool state_vector cur_state */\n"
+                  "// tool state_vector cur[3:0] part_fsm enum part_e\n"
+                  "/* tool state_vector {a, b} cat_fsm enum cat_e */\n"
+                  "/* tool state_vector {a[1:0], b} sel_fsm enum sel_e */\n"
+                  "x\n");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto start = lexer.SavePos();
+  lexer.LexAll();
+  lexer.RestorePos(start);
+  lexer.LexAll();
+
+  EXPECT_EQ(lexer.FsmStatePragmas().size(), 1u);
+  EXPECT_EQ(lexer.FsmPartSelectPragmas().size(), 1u);
+  EXPECT_EQ(lexer.FsmConcatPragmas().size(), 1u);
+  EXPECT_EQ(diag.WarningCount(), 1u);
+}
+
 }  // namespace

@@ -98,6 +98,11 @@ class Lexer {
   void RestorePos(const SavedPos& saved);
 
  private:
+  // The character at `p`, and '\0' at or past the end of the text. Every look
+  // at the text goes through this, so a comparison with any other character
+  // is false at the end without a separate test for it; a caller that has to
+  // tell the end from a NUL byte the text holds asks AtEnd.
+  char CharAt(uint32_t p) const;
   char Current() const;
   char PeekChar() const;
   void Advance();
@@ -184,13 +189,10 @@ class Lexer {
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
   std::vector<FsmConcatPragma> fsm_concat_pragmas_;
-  // §40.4.3 prohibitions already reported, so a comment the parser backtracks
-  // over is reported once. Only the location matters, which is what the
-  // recorded-pragma check reads of any of these lists.
-  struct ConcatSelectReport {
-    SourceLoc loc;
-  };
-  std::vector<ConcatSelectReport> fsm_concat_select_reports_;
+  // The offset one past the start of the furthest comment body handed to
+  // TryRecognizeFsmStatePragma, so a comment read again after RestorePos is
+  // recognized once.
+  uint32_t first_unseen_comment_ = 0;
 };
 
 }  // namespace delta

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <map>
 #include <string_view>
 
 #include "lexer/token.h"
@@ -16,13 +17,15 @@ namespace {
 // source. A kind with no spelling of its own makes every report of it read the
 // same as a report of any other kind, which is what a reader loses.
 
-// Every kind answers something, swept over the enum from its first enumerator
-// to kLastTokenKind rather than over a list of kinds written out here. A list
-// would be a second inventory of TokenKind: a kind added to the enum after it
-// would answer nothing with no case going red. "token" is the answer the 261
-// unspelled kinds shared, and "unnamed token kind" is what the default arm of
-// TokenKindName answers, so a kind giving either is a kind nothing spells.
-TEST(TokenKindName, EveryKindHasASpelling) {
+// Every kind answers something, and no two kinds answer the same, swept over
+// the enum from its first enumerator to kLastTokenKind rather than over a list
+// of kinds written out here. A list would be a second inventory of TokenKind: a
+// kind added to the enum after it would answer nothing with no case going red.
+// "token" is the answer the 261 unspelled kinds shared. TokenKindName's last
+// arm is a default, which answers the spelling of kPlusPercentMinus, so a kind
+// no arm names answers what another kind answers, and the sweep says which.
+TEST(TokenKindName, EveryKindHasASpellingOfItsOwn) {
+  std::map<std::string_view, unsigned> first_kind_named;
   for (auto raw = static_cast<unsigned>(TokenKind::kEof);
        raw <= static_cast<unsigned>(TokenKind::kLastTokenKind); ++raw) {
     auto kind = static_cast<TokenKind>(static_cast<uint16_t>(raw));
@@ -30,8 +33,9 @@ TEST(TokenKindName, EveryKindHasASpelling) {
     EXPECT_FALSE(name.empty()) << "TokenKind " << raw << " answers nothing";
     EXPECT_NE(name, std::string_view("token"))
         << "TokenKind " << raw << " answers the name every kind would answer";
-    EXPECT_NE(name, std::string_view("unnamed token kind"))
-        << "TokenKind " << raw << " reaches the default arm of TokenKindName";
+    auto [it, fresh] = first_kind_named.emplace(name, raw);
+    EXPECT_TRUE(fresh) << "TokenKind " << raw << " answers " << name
+                       << ", as TokenKind " << it->second << " does";
   }
 }
 

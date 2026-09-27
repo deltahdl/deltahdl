@@ -164,4 +164,34 @@ TEST(FsmPartSelectPragmaLexing, BoundsTooLargeForAnIndexAreNotRecognized) {
   EXPECT_EQ(held[0].lsb, 0);
 }
 
+// §40.4.2's state operand is `signal_name[n:n]`. A word that is not a simple
+// identifier and does not open a concatenation is read against that shape, and
+// each way of missing it leaves the comment unrecorded: no bracket, a bracket
+// with no name before it, no closing bracket, a name that is not an
+// identifier, and a bound left out on either side of the colon.
+TEST(FsmPartSelectPragmaLexing, OperandNotShapedAsAPartSelectIsNotRecognized) {
+  for (const char* operand : {"cur.state", "[3:0]", "cur_state[3:0",
+                              "9cur[3:0]", "cur_state[:0]", "cur_state[3:]"}) {
+    EXPECT_TRUE(CollectPartSelectPragmas(std::string("/* tool state_vector ") +
+                                         operand + " my_fsm enum state_e */")
+                    .empty())
+        << operand;
+  }
+}
+
+// The form is exactly six words, and its FSM and enumeration names are
+// identifiers: one with the FSM name left out, and one naming either with a
+// word that is not an identifier, is not recorded.
+TEST(FsmPartSelectPragmaLexing, MissingOrMalformedNamesAreNotRecognized) {
+  EXPECT_TRUE(
+      CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] enum e */")
+          .empty());
+  EXPECT_TRUE(CollectPartSelectPragmas(
+                  "/* tool state_vector cur_state[3:0] 9fsm enum state_e */")
+                  .empty());
+  EXPECT_TRUE(CollectPartSelectPragmas(
+                  "/* tool state_vector cur_state[3:0] my_fsm enum 9e */")
+                  .empty());
+}
+
 }  // namespace

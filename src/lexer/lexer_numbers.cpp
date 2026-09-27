@@ -37,25 +37,25 @@ namespace delta {
 // forms '0, '1, 'x and 'z.
 bool Lexer::ApostropheStartsBaseSpecifier(uint32_t apostrophe_pos) const {
   auto skip_spaces_and_tabs = [this](uint32_t p) {
-    while (p < source_.size() && (source_[p] == ' ' || source_[p] == '\t')) {
+    while (CharAt(p) == ' ' || CharAt(p) == '\t') {
       ++p;
     }
     return p;
   };
   uint32_t look = skip_spaces_and_tabs(apostrophe_pos + 1);
-  if (look < source_.size() && (source_[look] == 's' || source_[look] == 'S')) {
+  if (CharAt(look) == 's' || CharAt(look) == 'S') {
     look = skip_spaces_and_tabs(look + 1);
   }
-  char base = (look < source_.size()) ? source_[look] : '\0';
+  char base = CharAt(look);
   return base == 'd' || base == 'D' || base == 'b' || base == 'B' ||
          base == 'o' || base == 'O' || base == 'h' || base == 'H';
 }
 
+// LexApostrophe calls this, through LexNumber, only for an apostrophe followed
+// by 0, 1, x, X, z or Z, so there are two characters to step over.
 Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
   Advance();
-  if (!AtEnd()) {
-    Advance();
-  }
+  Advance();
   Token tok;
   tok.kind = TokenKind::kUnbasedUnsizedLiteral;
   tok.loc = loc;
@@ -87,7 +87,7 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
 // collected nothing, given a lexer positioned at the character that stopped the
 // run. `loc` is the start of the literal, which is where both reports stand.
 void Lexer::ReportMissingValueToken(SourceLoc loc) {
-  if (!AtEnd() && (Current() == '+' || Current() == '-')) {
+  if ((Current() == '+' || Current() == '-')) {
     // §5.7.1: "A plus or minus operator between the base format and the number
     // is an illegal syntax", which Example 3 writes as `8 'd -6`. The sign is
     // no part of the value token, so a literal written with one arrives here
@@ -116,17 +116,14 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
         break;
       case 'o':
       case 'O':
-        valid = (c >= '0' && c <= '7');
+        valid = c <= '7';
         break;
       case 'd':
       case 'D':
-        valid = (c >= '0' && c <= '9');
+        valid = c <= '9';
         break;
-      case 'h':
-      case 'H':
+      default:  // 'h' or 'H', the one base left
         valid = std::isxdigit(static_cast<unsigned char>(c));
-        break;
-      default:
         break;
     }
     if (!valid) {
@@ -146,7 +143,7 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   // spans it, and report the sentence once even when both places carry white
   // space.
   bool space_before_sign = SkipSpacesAndTabs();
-  if (!AtEnd() && (Current() == 's' || Current() == 'S')) {
+  if ((Current() == 's' || Current() == 'S')) {
     Advance();
   }
   bool space_before_base = SkipSpacesAndTabs();
@@ -156,11 +153,10 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
                 "format character",
                 Subclause("5.7.1"));
   }
-  char base_letter = '\0';
-  if (!AtEnd()) {
-    base_letter = Current();
-    Advance();
-  }
+  // Both callers asked ApostropheStartsBaseSpecifier first, so a base letter
+  // stands here.
+  char base_letter = Current();
+  Advance();
 
   // §5.7.1: "The unsigned number token shall immediately follow the base
   // format, optionally preceded by white space." This white space is legal, so
@@ -175,8 +171,8 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   // no base accepts would hand that function a span it can never reject for a
   // hexadecimal literal, and would leave `4'hG` reported as a literal carrying
   // no value at all.
-  while (!AtEnd() && (std::isalnum(static_cast<unsigned char>(Current())) ||
-                      Current() == '_' || Current() == '?')) {
+  while ((std::isalnum(static_cast<unsigned char>(Current())) ||
+          Current() == '_' || Current() == '?')) {
     Advance();
   }
   if (pos_ == before_digits) {
@@ -196,33 +192,32 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
 }
 
 void Lexer::LexFractionalPart() {
-  if (AtEnd() || Current() != '.') return;
-  if (!std::isdigit(static_cast<unsigned char>(PeekChar()))) return;
+  // LexNumber has already taken a point that no digit follows, as in `9.`, so
+  // a point here has a digit after it.
+  if (Current() != '.') return;
   Advance();
-  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
-                      Current() == '_')) {
+  while ((std::isdigit(static_cast<unsigned char>(Current())) ||
+          Current() == '_')) {
     Advance();
   }
 }
 
 void Lexer::LexExponentPart() {
-  if (AtEnd()) return;
   if (Current() != 'e' && Current() != 'E') return;
 
   uint32_t look = pos_ + 1;
-  if (look < source_.size() && (source_[look] == '+' || source_[look] == '-')) {
+  if (CharAt(look) == '+' || CharAt(look) == '-') {
     ++look;
   }
-  if (look >= source_.size() ||
-      !std::isdigit(static_cast<unsigned char>(source_[look]))) {
+  if (!std::isdigit(static_cast<unsigned char>(CharAt(look)))) {
     return;
   }
   Advance();
-  if (!AtEnd() && (Current() == '+' || Current() == '-')) {
+  if ((Current() == '+' || Current() == '-')) {
     Advance();
   }
-  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
-                      Current() == '_')) {
+  while ((std::isdigit(static_cast<unsigned char>(Current())) ||
+          Current() == '_')) {
     Advance();
   }
 }
@@ -241,8 +236,8 @@ void Lexer::LexExponentPart() {
 // has no digit.
 Token Lexer::LexRealMissingDigit(SourceLoc loc, uint32_t start,
                                  const char* side) {
-  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
-                      Current() == '_')) {
+  while ((std::isdigit(static_cast<unsigned char>(Current())) ||
+          Current() == '_')) {
     Advance();
   }
   LexExponentPart();
@@ -258,32 +253,24 @@ Token Lexer::LexRealMissingDigit(SourceLoc loc, uint32_t start,
 }
 
 bool Lexer::IsWordBoundary(uint32_t p) const {
-  return p >= source_.size() ||
-         (!std::isalnum(source_[p]) && source_[p] != '_');
+  char c = CharAt(p);
+  return !std::isalnum(static_cast<unsigned char>(c)) && c != '_';
 }
 
 bool Lexer::TryLexTimeSuffix() {
-  if (AtEnd()) return false;
-  uint32_t save = pos_;
-
-  if (pos_ + 1 < source_.size()) {
-    char c0 = source_[pos_];
-    char c1 = source_[pos_ + 1];
-    bool is_two_char =
-        (c0 == 'm' || c0 == 'u' || c0 == 'n' || c0 == 'p' || c0 == 'f') &&
-        c1 == 's';
-    if (is_two_char && IsWordBoundary(pos_ + 2)) {
-      Advance();
-      Advance();
-      return true;
-    }
-  }
-
-  if (source_[pos_] == 's' && IsWordBoundary(pos_ + 1)) {
+  char c0 = Current();
+  bool is_two_char =
+      (c0 == 'm' || c0 == 'u' || c0 == 'n' || c0 == 'p' || c0 == 'f') &&
+      PeekChar() == 's';
+  if (is_two_char && IsWordBoundary(pos_ + 2)) {
+    Advance();
     Advance();
     return true;
   }
-  pos_ = save;
+  if (c0 == 's' && IsWordBoundary(pos_ + 1)) {
+    Advance();
+    return true;
+  }
   return false;
 }
 
@@ -295,8 +282,8 @@ Token Lexer::LexNumber() {
     return LexUnbasedUnsized(loc, start);
   }
 
-  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
-                      Current() == '_')) {
+  while ((std::isdigit(static_cast<unsigned char>(Current())) ||
+          Current() == '_')) {
     Advance();
   }
 
@@ -311,7 +298,7 @@ Token Lexer::LexNumber() {
   uint32_t column_before_ws = column_;
   SkipSpacesAndTabs();
 
-  if (!AtEnd() && Current() == '\'' && ApostropheStartsBaseSpecifier(pos_)) {
+  if (Current() == '\'' && ApostropheStartsBaseSpecifier(pos_)) {
     return LexBasedNumber(loc, start);
   }
   pos_ = before_ws;
@@ -321,7 +308,7 @@ Token Lexer::LexNumber() {
   // of a real literal missing the digit §5.7.2 wants after it: no legal token
   // puts a point against a digit run, since a member access or a hierarchical
   // name is written against an identifier and never against a number.
-  if (!AtEnd() && Current() == '.' &&
+  if (Current() == '.' &&
       !std::isdigit(static_cast<unsigned char>(PeekChar()))) {
     Advance();
     return LexRealMissingDigit(loc, start, "after");

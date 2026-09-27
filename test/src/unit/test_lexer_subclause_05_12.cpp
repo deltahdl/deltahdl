@@ -41,4 +41,15 @@ TEST(LexicalConventionLexing, AttrFollowedByMultiply) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kStar);
 }
 
+// Inside an attribute a star that no right parenthesis follows is the
+// multiplication operator of the attribute's constant expression, and only
+// the star before `)` ends the attribute.
+TEST(LexicalConventionLexing, StarInsideAnAttributeIsMultiplication) {
+  auto tokens = Lex("(* w = 2*3 *)");
+  ASSERT_EQ(tokens.size(), 8u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kStar);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kAttrEnd);
+}
+
 }  // namespace

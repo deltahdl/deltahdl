@@ -95,4 +95,15 @@ TEST(TimeLiteralLexing, UnlistedSuffixIsNotTimeLiteral) {
   EXPECT_EQ(tokens[1].text, "cs");
 }
 
+// A time unit is a whole word: one an underscore continues is an identifier,
+// and the number before it an integer.
+TEST(TimeLiteralLexing, UnitContinuedByAnUnderscoreIsNotTimeLiteral) {
+  auto tokens = Lex("10ns_x");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "10");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "ns_x");
+}
+
 }  // namespace

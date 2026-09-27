@@ -99,4 +99,22 @@ TEST(RealLiteralLexing, DigitsOnBothSidesOfThePointDrawNoClause572Report) {
   EXPECT_TRUE(LexDiagnostics("29E-2 ").empty());
 }
 
+// Underscores may stand among the digits of an exponent, and among those
+// after a point with no digit before it, and the literal is read whole either
+// way: `1e1_0` is one real literal, and `.1_2` one literal reported for its
+// missing digit rather than a literal and an identifier.
+TEST(RealLiteralLexing, UnderscoresAmongExponentAndFractionDigits) {
+  auto exponent = Lex("1e1_0");
+  ASSERT_EQ(exponent.size(), 2u);
+  EXPECT_EQ(exponent[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(exponent[0].text, "1e1_0");
+
+  auto no_leading_digit = Lex(".1_2");
+  ASSERT_EQ(no_leading_digit.size(), 2u);
+  EXPECT_EQ(no_leading_digit[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(no_leading_digit[0].text, ".1_2");
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics(".1_2"), "no digit before", 1, "5.7.2"));
+}
+
 }  // namespace
