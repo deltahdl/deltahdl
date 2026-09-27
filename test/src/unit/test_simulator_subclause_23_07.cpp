@@ -188,4 +188,57 @@ TEST(DottedNameSimulation,
   EXPECT_EQ(v->value.ToUint64(), 0x5Au);
 }
 
+// §23.7 (printed pages 757-758): a dotted name whose first component resolves
+// to a subroutine is a hierarchical name into it, so `f.x` is the static
+// variable x of the function f -- here one imported from a package, the
+// standard's own example's `f.x = 3` making `p::f()` return 3. The write went
+// nowhere: the static local existed only once a call had declared it, and
+// nothing looked a dotted name up among a function's locals.
+TEST(DottedNameResolution, DottedNameWritesAnImportedFunctionsStaticLocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  function int f();\n"
+                       "    static int x = 0;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  initial begin\n"
+                       "    f.x = 3;\n"
+                       "    #1 $display(\"%0d %0d\", p::f(), f());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 3\n");
+}
+
+// A read reaches the variable the calls keep: after two calls that count x
+// up, `p::f.x` and the module's own `g.y` read what the calls left there.
+TEST(DottedNameResolution, DottedNameReadsTheStaticLocalTheCallsKeep) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  function int f();\n"
+                       "    static int x = 0;\n"
+                       "    x = x + 1;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  function int g();\n"
+                       "    static int y = 10;\n"
+                       "    y = y + 5;\n"
+                       "    return y;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d %0d %0d\", p::f(), f(), p::f.x);\n"
+                       "    g.y = 1;\n"
+                       "    $display(\"%0d %0d\", g(), g.y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 2 2\n6 6\n");
+}
+
 }  // namespace

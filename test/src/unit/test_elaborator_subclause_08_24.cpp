@@ -419,4 +419,58 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
                             "8.24"));
 }
 
+// §8.24 (printed page 202) and §23.2.4 (printed page 739): a class among a
+// module's items has its out-of-block bodies among the same items, and `this`
+// in the body of a non-static method names the object, so §8.11's rule for a
+// subroutine outside a class does not reach it.
+TEST(OutOfBlockDeclElaboration, ThisInModuleOutOfBlockMethodIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  class C;\n"
+             "    int x;\n"
+             "    extern function void set(int v);\n"
+             "  endclass\n"
+             "  function void C::set(int v);\n"
+             "    this.x = v;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
+// §8.10 (printed pages 186-187): "Access ... to the special this handle within
+// the body of a static method is illegal", and an out-of-block body is that
+// method's body wherever it stands. Neither scope reported it.
+TEST(OutOfBlockDeclElaboration, ThisInModuleStaticOutOfBlockMethodIsError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  class C;\n"
+      "    int x;\n"
+      "    extern static function void f();\n"
+      "  endclass\n"
+      "  function void C::f();\n"
+      "    this.x = 1;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not be used in a static method", 6, "8.10"));
+}
+
+TEST(OutOfBlockDeclElaboration, ThisInUnitStaticOutOfBlockMethodIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  extern static function void f();\n"
+      "endclass\n"
+      "function void C::f();\n"
+      "  this.x = 1;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not be used in a static method", 5, "8.10"));
+}
+
 }  // namespace

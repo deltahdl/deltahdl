@@ -782,4 +782,22 @@ TEST(SysTask, ScopeAndPercentSpecsTakeNoArgument) {
   EXPECT_EQ(out, "t%  7\n");
 }
 
+// §21.2.1.1 (printed page 658): Table 21-2's specifiers "are used with real
+// numbers", so an integral operand is shown by its value as a real, signed
+// where the operand is and with its x and z bits as zero (§6.12.1). Read as
+// a double's bit pattern, every integral operand printed 0.000000.
+TEST(SysTask, RealSpecifierShowsAnIntegralOperandsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter P = 5;\n"
+                       "  int si = -3;\n"
+                       "  logic [3:0] u = 4'hF;\n"
+                       "  logic [3:0] xz = 4'b1x0z;\n"
+                       "  initial $display(\"%f %f %f %f %e %g\",\n"
+                       "                   P, si, u, xz, -3, 2);\n"
+                       "endmodule\n",
+                       f),
+            "5.000000 -3.000000 15.000000 8.000000 -3.000000e+00 2\n");
+}
+
 }  // namespace

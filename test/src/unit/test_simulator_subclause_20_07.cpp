@@ -396,4 +396,22 @@ TEST(ArrayQuerySim, OutOfRangeDimensionIsUnknown) {
                            "result"));
 }
 
+// §20.7 with §23.6: the array a query function examines may be an
+// instance's array named through a hierarchical reference, whose unpacked
+// dimension comes first and whose packed element dimension second, as for a
+// local one; so may an instance's queue.
+TEST(ArrayQuerySim, HierarchicallyNamedArrayIsQueried) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub; logic [7:0] mem[2:5]; int q[$] = '{1, 2, 3}; endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d %0d\", $size(u.mem),\n"
+      "                   $left(u.mem), $right(u.mem), $high(u.mem),\n"
+      "                   $size(u.mem, 2), $size(u.q));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 2 5 5 8 3\n");
+}
+
 }  // namespace

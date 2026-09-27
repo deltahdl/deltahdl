@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -57,5 +58,12 @@ bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types);
 std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s);
 std::unordered_set<std::string_view> CollectMethodLocalNames(
     const ModuleItem* method);
+
+// Defined in elaborator_validate_static_methods.cpp: §8.10's ban on `this` and
+// `super` in a static method, over the out-of-block body `item` of a method
+// `cls` declares extern (§8.24). Reports nothing where `cls` is null or
+// declares the method non-static.
+void CheckStaticOutOfBlockBodyThis(const ModuleItem* item, const ClassDecl* cls,
+                                   DiagEngine& diag);
 
 }  // namespace delta

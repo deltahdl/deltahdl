@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -238,6 +240,46 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "automatic task variable traced by system task", 4,
                             "13.3.2"));
+}
+
+// §13.3.2: the radix forms of $monitor trace as it does, and so does $fmonitor
+// in each of its forms (§21.3.2), so an automatic task variable is refused in
+// each list. Only $monitor itself was refused.
+TEST(TaskBodyElaboration, AutoTaskLocalInMonitorFormsError) {
+  for (const char* task :
+       {"$monitorh(x)", "$fmonitor(1, x)", "$fmonitorb(1, \"%b\", x)"}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("module m;\n"
+                             "  task automatic t();\n"
+                             "    int x;\n"
+                             "    ") +
+                     task +
+                     ";\n"
+                     "  endtask\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "automatic task variable traced by system task",
+                              4, "13.3.2"))
+        << task;
+  }
+}
+
+// §13.3.2: $strobe displays its list once, at the end of the step it is called
+// in, and traces nothing, so an automatic task variable may be in it.
+TEST(TaskBodyElaboration, AutoTaskLocalInStrobeAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    int x;\n"
+      "    $strobe(\"%d\", x);\n"
+      "    $fstrobe(1, \"%d\", x);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §13.3.2: an automatic task variable shall not be traced with $dumpvars.

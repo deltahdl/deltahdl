@@ -135,4 +135,31 @@ TEST(DefparamSimulation, ADefparamNamingAnotherParameterKeepsEveryCharacter) {
   EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
 }
 
+// §23.10 (printed page 764), the clause's own example: "the defparam of f1.A
+// with the value 3.1415 is performed by converting the floating-point number
+// 3.1415 into a fixed-point number 3", and "the defparam of f1.B with the
+// value 3.1415 replaces B's current value of 3'h2 with the floating-point
+// number 3.1415". Folded as an integer, each right-hand side was reported as
+// not constant and both read 0.0.
+TEST(DefparamSimulation, RealRightHandSideTakesTheParametersTypeOrItsOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m1;\n"
+                       "  real r1, r2;\n"
+                       "  parameter [2:0] A = 3'h2;\n"
+                       "  parameter B = 3'h2;\n"
+                       "  initial begin\n"
+                       "    r1 = A; r2 = B;\n"
+                       "    $display(\"r1 is %f r2 is %f\", r1, r2);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module m2;\n"
+                       "  defparam f1.A = 3.1415;\n"
+                       "  defparam f1.B = 3.1415;\n"
+                       "  m1 f1();\n"
+                       "endmodule\n",
+                       f),
+            "r1 is 3.000000 r2 is 3.141500\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

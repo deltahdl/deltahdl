@@ -772,6 +772,8 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateTimingCheckFlags(mod, diag);
   // Each check's own subclause states the limits it takes, so each pass names
   // the subclause of the check it walks.
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kSetup,
+                                      "$setup", Subclause("31.3.1"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kHold,
                                       "$hold", Subclause("31.3.2"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kRemoval,

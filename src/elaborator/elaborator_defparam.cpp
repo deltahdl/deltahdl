@@ -498,6 +498,14 @@ static std::optional<int64_t> EvalDefparamOverride(
     rec.applied.insert(rec.key);
     return std::nullopt;
   }
+  // §23.10 (printed page 764): a real right-hand side, the clause's own
+  // `defparam f1.A = 3.1415`, is converted to the parameter's type
+  // (ApplyOverrideRealness), rounded for an integral one as §6.12.1 converts a
+  // real; folded as an integer it had no value and was reported as not
+  // constant.
+  if (auto real = RealOverrideValue(ovr.val_expr, ovr.scope)) {
+    return ConvertOverrideValue(RoundRealToInteger(*real), *ovr.param);
+  }
   auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
     // §23.10.1 states that the expression on the right-hand side of a defparam
@@ -595,6 +603,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->resolved_value = *value;
     param->is_resolved = true;
     param->from_override = true;
+    ApplyOverrideRealness(*param, RealOverrideValue(val_expr, scope));
     param->override_expr = DefparamOverrideExpr(val_expr);
     // §23.10.1 (printed pages 764-765): the right-hand side stands in the
     // scope of the defparam statement, which is registered here and not

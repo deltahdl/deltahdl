@@ -67,11 +67,41 @@ bool SimContext::IsUndumpableVcdName(std::string_view name) const {
          assoc_arrays_.find(name) != assoc_arrays_.end();
 }
 
+// §21.7.2.3: the definitions section opens one `$scope module` per module
+// instance, and an object's $var declares it by its own name within the scope
+// holding it. The model keys an instance's variables on their hierarchical
+// name, `u.deep`, so the scopes between the one open and the one `name` stands
+// in are closed and opened here, and the name within that scope is returned.
+static std::string_view EnterVcdInstanceScope(
+    VcdWriter& vcd, std::vector<std::string_view>& open,
+    std::string_view name) {
+  std::vector<std::string_view> path;
+  size_t start = 0;
+  for (size_t dot = name.find('.'); dot != std::string_view::npos;
+       dot = name.find('.', start)) {
+    path.push_back(name.substr(start, dot - start));
+    start = dot + 1;
+  }
+  size_t common = 0;
+  while (common < open.size() && common < path.size() &&
+         open[common] == path[common]) {
+    ++common;
+  }
+  for (; open.size() > common; open.pop_back()) vcd.EndScope();
+  for (; open.size() < path.size(); open.push_back(path[open.size()])) {
+    vcd.BeginScope(path[open.size()]);
+  }
+  return name.substr(start);
+}
+
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
   std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
                                                            variables_.end());
+  // Sorted by name, the variables of one instance stand together, since each
+  // of their names starts with the instance's path and a dot.
   std::sort(vars.begin(), vars.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::vector<std::string_view> open_scopes;
   for (const auto& [name, var] : vars) {
     if (IsUndumpableVcdName(name)) continue;
     // §21.7.5: Table 21-11 gives string no row and the subclause defines no
@@ -84,18 +114,20 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // because a string port reaches SetVcdVarKind but not
     // RegisterStringVariable.
     if (vcd_.GetVcdVarKind(name) == DataTypeKind::kString) continue;
+    std::string_view ref_name = EnterVcdInstanceScope(vcd, open_scopes, name);
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
     // as a named fork-join block whose members are the dumped objects. A packed
     // structure is excluded here because the table collapses it to a single reg
     // vector, which the ordinary registration below already produces.
     if (const StructTypeInfo* sinfo = GetVariableStructType(name);
         sinfo != nullptr && !sinfo->is_packed && !sinfo->fields.empty()) {
-      RegisterVcdStructScope(vcd, name, {var, VcdDataTypeForDeclKind}, sinfo,
-                             0);
+      RegisterVcdStructScope(vcd, ref_name, {var, VcdDataTypeForDeclKind},
+                             sinfo, 0);
       continue;
     }
     VcdSignalSpec spec;
     spec.name = name;
+    spec.ref_name = ref_name;
     spec.width = var->value.width;
     spec.var = var;
     // §21.7.2.1: value changes for a real variable are real numbers, so its
@@ -139,6 +171,7 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     }
     vcd.RegisterSignal(spec);
   }
+  for (; !open_scopes.empty(); open_scopes.pop_back()) vcd.EndScope();
 }
 
 // §21.7.1 lists two steps for creating a 4-state VCD file: insert the VCD

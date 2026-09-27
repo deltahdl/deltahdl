@@ -332,4 +332,46 @@ TEST(ReadingALineAtATime, FgetsDestinationWakesAnEventControlOnIt) {
   std::remove(tmp.c_str());
 }
 
+// §21.3.4.2 with §13.3 and §8.5: the destination is any string or integral
+// variable -- a task's string output formal, a string property through a
+// handle or bare inside one of its methods, and a packed property, which fills
+// at its whole bytes as a module variable does.
+TEST(ReadingALineAtATime, FgetsIntoFormalsAndClassProperties) {
+  SimFixture f;
+  std::string tmp = "/tmp/deltahdl_213402_props.txt";
+  SeedFile(tmp, "hello\nagain\nthird\nfourth\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Rd;\n"
+      "    string line;\n"
+      "    logic [23:0] w;\n"
+      "    function void get(integer fd); void'($fgets(line, fd)); "
+      "endfunction\n"
+      "  endclass\n"
+      "  Rd r = new;\n"
+      "  task automatic readline(integer fd, output string o);\n"
+      "    void'($fgets(o, fd));\n"
+      "  endtask\n"
+      "  integer fd;\n"
+      "  string got;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    readline(fd, got);\n"
+          "    $write(\"%s\", got);\n"
+          "    void'($fgets(r.line, fd));\n"
+          "    $write(\"%s\", r.line);\n"
+          "    r.get(fd);\n"
+          "    $write(\"%s\", r.line);\n"
+          "    void'($fgets(r.w, fd));\n"
+          "    $display(\"%s\", r.w);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hello\nagain\nthird\nfou\n");
+  std::remove(tmp.c_str());
+}
+
 }  // namespace

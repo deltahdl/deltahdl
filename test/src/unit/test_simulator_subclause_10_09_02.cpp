@@ -401,4 +401,27 @@ TEST(StructPatternSimulation, NestedKeyedPatternIsPlacedByTheMembersLayout) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
+// §10.9.2 with §7.8 and §21.2.1.6 (printed page 663, the %p example's own
+// declaration): a keyed assignment pattern initializes an associative array
+// element by element, the keys being index values and each value an
+// assignment pattern of the element type. It was matched against the element
+// struct instead, and every key was reported as no member of it.
+TEST(StructPatternSimulation,
+     KeyedPatternInitializesAssociativeArrayOfStructs) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef enum {ON, OFF} switch_e;\n"
+      "  typedef struct {switch_e sw; string s;} pair_t;\n"
+      "  typedef struct {int a; int b;} ab_t;\n"
+      "  pair_t va[int] = '{10:'{OFF, \"switch10\"}, 20:'{ON, \"switch20\"}};\n"
+      "  ab_t vb[int] = '{1:'{5, 6}, 2:'{7, 8}};\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d\", va.num(), vb.num(),\n"
+      "                   vb[1].a, vb[2].b, va.exists(20));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "2 2 5 8 1\n");
+}
+
 }  // namespace

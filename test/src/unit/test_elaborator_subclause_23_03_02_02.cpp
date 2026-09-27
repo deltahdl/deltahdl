@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -231,6 +232,52 @@ TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
       f, "top");
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "not found on module", 5,
                               "23.3.2.2"));
+}
+
+// §23.3.2.2 (printed page 744): "Multiple module instance port connections
+// are not allowed", and the clause's example connecting an input, an output
+// and an inout port twice each is "illegal". Each port named twice is
+// reported, once; both connections were applied without a word.
+TEST(NamedPortConnectionElaboration, PortConnectedTwiceIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module A(input i, output o, inout e);\n"
+      "  assign o = i;\n"
+      "endmodule\n"
+      "module test;\n"
+      "  wire a, b, c, d, e, f;\n"
+      "  A ia(.i(a), .i(b), .o(c), .o(d), .e(e), .e(f), .i(a));\n"
+      "endmodule\n",
+      f, "test");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'i' of module 'A'", 6,
+                            "23.3.2.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'o' of module 'A'", 6,
+                            "23.3.2.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'e' of module 'A'", 6,
+                            "23.3.2.2"));
+  size_t repeats = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("connected more than once") != std::string::npos) {
+      ++repeats;
+    }
+  }
+  EXPECT_EQ(repeats, 3u);
+}
+
+// Each port connected once, however the connections are ordered, raises no
+// such report.
+TEST(NamedPortConnectionElaboration, EachPortConnectedOnceIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module A(input i, output o, inout e);\n"
+      "  assign o = i;\n"
+      "endmodule\n"
+      "module test;\n"
+      "  wire a, c, e;\n"
+      "  A ia(.e(e), .o(c), .i(a));\n"
+      "endmodule\n",
+      f, "test");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

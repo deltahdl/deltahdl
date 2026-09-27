@@ -83,4 +83,14 @@ void ExecFunctionBodyInCallee(const ModuleItem* func,
                               std::string_view inst_prefix, Variable* ret_var,
                               SimContext& ctx, Arena& arena);
 
+// §23.7 (printed pages 757-758): a dotted name whose first component names a
+// function, `f.x` or `p::f.x`, is the static variable `x` of that function.
+// `member` is the member access, its left side the function as a call would
+// name it (FindSubroutineTarget) and its right the variable. Answers the
+// variable the function's calls read, creating it in the function's static
+// frame from its declaration where no call has yet, or null where the left
+// side names no function or the function declares no static `x`.
+Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
+                              Arena& arena);
+
 }  // namespace delta

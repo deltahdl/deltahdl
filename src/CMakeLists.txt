@@ -104,6 +104,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_items.cpp
     elaborator/elaborator_items_checker_rules.cpp
     elaborator/elaborator_items_udp.cpp
+    elaborator/elaborator_delayed_signals.cpp
     elaborator/elaborator_items_scope.cpp
     elaborator/elaborator_items_assertions.cpp
     elaborator/elaborator_items_formals.cpp

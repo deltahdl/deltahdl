@@ -4,6 +4,7 @@
 // src/elaborator/elaborator_module.cpp, which holds the module's frame, at its
 // size limit.
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -98,6 +99,7 @@ bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
+  pd.decl_is_real = IsRealType(dtype.kind);
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
   pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
@@ -109,6 +111,7 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
                            const TypedefMap& typedefs, const ScopeMap& scope) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
+  pd.decl_is_real = IsRealType(dtype.kind);
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
   pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
@@ -189,6 +192,37 @@ void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
                             const DataType* dtype, Arena& arena) {
   if (!dtype || dtype->kind != DataTypeKind::kString) return;
   RecordStringParamChars(pd, init, arena);
+}
+
+std::optional<double> RealOverrideValue(const Expr* expr,
+                                        const ScopeMap& scope) {
+  if (expr == nullptr || !HasRealOperand(expr)) return std::nullopt;
+  return ConstEvalReal(expr, scope);
+}
+
+// §6.12.1 (printed page 110): "Real numbers shall be converted to integers by
+// rounding the real number to the nearest integer, rather than by truncating
+// it", a half rounded away from zero.
+int64_t RoundRealToInteger(double value) { return std::llround(value); }
+
+// §23.10 (printed page 764): for "A value parameter with a type
+// specification ... An override value shall be converted to the type of the
+// parameter", so one declared real takes the value as a real and an integral
+// one the real rounded (resolved_value, already written); and of one declared
+// with neither, "when its value is redefined, the parameter type and range
+// take on the type and range of the new value", a real override making it
+// real and an integral one leaving it integral.
+void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real) {
+  bool untyped = !pd.has_decl_range && !pd.has_decl_type;
+  if (real && (pd.decl_is_real || untyped)) {
+    pd.resolved_real = *real;
+    pd.is_real_value = true;
+  } else if (pd.decl_is_real) {
+    pd.resolved_real = static_cast<double>(pd.resolved_value);
+    pd.is_real_value = true;
+  } else {
+    pd.is_real_value = false;
+  }
 }
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
@@ -352,6 +386,10 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   pd.resolved_value = ConvertOverrideValue(ovr->value, pd);
   pd.is_resolved = true;
   pd.from_override = true;
+  ApplyOverrideRealness(pd, ovr->real);
+  // A real value is not refolded at the declared width: the real a real
+  // parameter holds is resolved_real, and an integral one's rounding is done.
+  if (ovr->real) return true;
   // §6.20.2 has the declared range survive the override, and the folded int64
   // holds 64 bits of it, so the expression is kept for the simulator to
   // evaluate at the declared width. ResetAllConfigParams (§33.4.3's `#()`)
@@ -573,6 +611,12 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
                              Elaborator::ParamList& child_params) {
   if (IsBodyTypeParam(child_decl, pname)) {
     child_params.push_back({pname, 0, pexpr});
+    return;
+  }
+  if (auto real = RealOverrideValue(pexpr, parent_scope)) {
+    Elaborator::ParamOverride ovr{pname, RoundRealToInteger(*real), pexpr};
+    ovr.real = real;
+    child_params.push_back(ovr);
     return;
   }
   auto val = ConstEvalInt(pexpr, parent_scope);

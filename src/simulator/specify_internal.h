@@ -56,6 +56,10 @@ void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
 void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
                                      PathDelayPulseRetention retain);
 std::string SpecifyConditionText(const Expr* cond);
+// The name a specify terminal reads in its module: the port identifier, or
+// `interface_identifier . port_identifier` spelled with its dot (§30.4.2,
+// §31.2 Syntax 31-2, A.7.3). Defined in specify_register.cpp.
+std::string SpecifyTerminalName(const SpecifyTerminal& t);
 bool SpecifyConditionsMatch(std::string_view a, std::string_view b);
 
 }  // namespace delta

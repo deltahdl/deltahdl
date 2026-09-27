@@ -67,12 +67,20 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   // most-significant partial byte (a width that is not a multiple of eight)
   // does not count toward the size. A string destination resizes to the line,
   // so it never fills: only a newline or end-of-file ends its read.
+  const Expr* dest = expr->args[0];
   Variable* var = nullptr;
-  if (expr->args[0]->kind == ExprKind::kIdentifier)
-    var = ctx.FindVariable(expr->args[0]->text);
-  bool string_dest =
-      var != nullptr && ctx.IsStringVariable(expr->args[0]->text);
+  if (dest->kind == ExprKind::kIdentifier) var = ctx.FindVariable(dest->text);
+  bool string_dest = var != nullptr && ctx.IsStringVariable(dest->text);
   uint32_t capacity = var ? var->value.width / 8 : 0;
+  // §21.3.4.2 with §8.5: any other variable -- a class property through a
+  // handle or bare in a method, an element or a field -- is sized from the
+  // value it holds, and the line is stored as an assignment to it would be.
+  bool assign_dest = var == nullptr;
+  if (assign_dest) {
+    Logic4Vec held = EvalExpr(dest, ctx, arena);
+    string_dest = held.is_string || NamesStringProperty(dest, ctx);
+    capacity = held.width / 8;
+  }
   if (!string_dest && capacity == 0) return MakeLogic4VecVal(arena, 32, 0);
 
   std::string line = ReadFgetsLine(fp, string_dest, capacity);
@@ -81,18 +89,21 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   // zero; otherwise the count of characters read is returned.
   if (line.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
-  if (string_dest) {
-    var->value =
-        ScanStringToVec(arena, line, static_cast<uint32_t>(line.size()) * 8);
-  } else if (var) {
-    var->value = ScanStringToVec(arena, line, var->value.width);
+  uint32_t width = string_dest ? static_cast<uint32_t>(line.size()) * 8
+                               : (var ? var->value.width : capacity * 8);
+  Logic4Vec value = ScanStringToVec(arena, line, width);
+  value.is_string = string_dest;
+  if (assign_dest) {
+    PerformBlockingAssign(dest, value, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
   }
+  var->value = value;
   // §9.4.2: "A non-edge implicit event shall be detected on any change in the
   // value of the expression", and the clause names no writer whose change is
   // exempt. A system task that writes one of its arguments has written a user
   // variable, and Variable::NotifyWatchers is the only route by which a
   // process parked on it resumes.
-  if (var) var->NotifyWatchers();
+  var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
 }
 

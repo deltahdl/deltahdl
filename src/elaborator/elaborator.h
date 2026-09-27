@@ -61,6 +61,7 @@ class Elaborator : public ElaboratorClassRules {
     std::string_view name;
     int64_t value = 0;
     const Expr* value_expr = nullptr;
+    std::optional<double> real{};  // §23.10: a real override, value rounded
   };
 
   using ParamList = std::vector<ParamOverride>;

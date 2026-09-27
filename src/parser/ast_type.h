@@ -84,6 +84,10 @@ struct StructMember {
   // full parsed type, retained so member widths can be computed by recursing
   // into nested members / enum base. Null for scalar and named-type members.
   const DataType* nested_type = nullptr;
+  // §7.2.1 with §6.18: the bit width of a member declared through a typedef
+  // that names no aggregate -- an enum with its base, `typedef logic [5:0]
+  // w_t` -- as the elaborator resolved it; 0 where it resolved none.
+  uint32_t resolved_width = 0;
 };
 
 struct DataType {

@@ -716,4 +716,76 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesPositiveCheck) {
   EXPECT_FALSE(all_off.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
+// §31.9.4 (printed page 923): without the option that enables negative timing
+// checks "the delayed reference and data signals become copies of the original
+// reference and data signals". dclk and dd, named by the check and declared
+// nowhere else, follow clk and d: `@(posedge dclk)` fires when clk rises at 20
+// and dd reads the 1 d took at 10. They were never created -- dd was an
+// unresolved identifier or read 0, and dclk's edge never came.
+TEST(DelayedSignalCopies, UndeclaredDelayedSignalsCopyTheirOriginals) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top(\n"
+                 "    output reg clk = 0,\n"
+                 "    output reg d = 0);\n"
+                 "  reg n = 0; integer t = 0;\n"
+                 "  specify\n"
+                 "    $setuphold(posedge clk, d, 5, 5, n, , , dclk, dd);\n"
+                 "  endspecify\n"
+                 "  always @(posedge dclk) t = $time;\n"
+                 "  initial begin\n"
+                 "    #10 d = 1;\n"
+                 "    #10 clk = 1;\n"
+                 "    #1 $display(\"%0d %0d\", t, dd);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "20 1\n");
+}
+
+// A delayed copy of a vector is as wide as the vector, and a delayed signal
+// the module declares itself is driven the same way.
+TEST(DelayedSignalCopies, VectorAndDeclaredDelayedSignalsCopyWhole) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top(\n"
+                 "    output reg clk = 0,\n"
+                 "    output reg [3:0] d = 0);\n"
+                 "  reg n = 0; wire dclk;\n"
+                 "  specify\n"
+                 "    $setuphold(posedge clk, d, 5, 5, n, , , dclk, dd);\n"
+                 "  endspecify\n"
+                 "  initial begin\n"
+                 "    #10 d = 4'b1010; clk = 1;\n"
+                 "    #1 $display(\"%b %b\", dd, dclk);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1010 1\n");
+}
+
+// §31.9.1 Example 3: "If a given signal has a delayed signal in some timing
+// checks but not in others, the delayed signal shall be used in both cases",
+// one delayed signal per original, so del_CLK named by one of two checks on
+// CLK is created once and follows CLK.
+TEST(DelayedSignalCopies, DelayedSignalNamedByOneOfTwoChecksIsShared) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg CLK = 0,\n"
+                       "    output reg DATA1 = 0,\n"
+                       "    output reg DATA2 = 0);\n"
+                       "  specify\n"
+                       "    $setuphold(posedge CLK, DATA1, 10, 20,,,, "
+                       "del_CLK, del_DATA1);\n"
+                       "    $setuphold(posedge CLK, DATA2, 15, 18);\n"
+                       "  endspecify\n"
+                       "  initial begin\n"
+                       "    #50 DATA1 = 1; #50 CLK = 1;\n"
+                       "    #1 $display(\"%b %b\", del_CLK, del_DATA1);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+}
+
 }  // namespace

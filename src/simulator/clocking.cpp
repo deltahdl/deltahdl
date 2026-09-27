@@ -11,6 +11,7 @@
 
 #include "common/types.h"
 #include "parser/ast_stmt.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -51,6 +52,30 @@ Logic4Vec MakeClockvarNetDriverInit(Arena& arena, uint32_t width) {
 std::string ClockingSignalName(std::string_view inst_prefix,
                                std::string_view signal_name) {
   return std::string(inst_prefix) + std::string(signal_name);
+}
+
+// The path a clockvar's signal is spelled by: its `= expression` where the
+// declaration gives one, its own name otherwise.
+static std::string_view ClockvarPath(const ClockingSignal& sig) {
+  return sig.target_path.empty() ? sig.signal_name : sig.target_path;
+}
+
+// The variable `path` names from the instance a clocking block was declared
+// in. A bare name is that instance's own signal, found under its prefix
+// (§23.9). §14.3 (printed page 354) with §23.6: a clocking event, and a
+// clockvar's `= expression`, may name the signal hierarchically,
+// `@(posedge top.clk)` and `output d = top.d`, which reaches nothing joined to
+// the prefix, so it is resolved as a reference written in that instance is,
+// SimContext::FindVariable walking the path from there, `$root` and a top
+// module's name at its head included.
+static Variable* FindInBlockInstance(std::string_view inst_prefix,
+                                     std::string_view path, SimContext& ctx) {
+  if (auto* var = ctx.FindVariable(ClockingSignalName(inst_prefix, path))) {
+    return var;
+  }
+  if (path.find('.') == std::string_view::npos) return nullptr;
+  InstancePrefixOverride in_block(ctx.InstancePrefixOverride(), inst_prefix);
+  return ctx.FindVariable(path);
 }
 
 void ClockingManager::Register(ClockingBlock block) {
@@ -128,8 +153,8 @@ static void SampleBlockInputs(ClockingManager* mgr, const ClockWatch& watch,
     if (only_zero_skew && !sig.is_explicit_zero_skew) continue;
     if (!only_zero_skew && sig.is_explicit_zero_skew) continue;
     const std::string kVarName =
-        ClockingSignalName(watch.inst_prefix, sig.signal_name);
-    auto* var = ctx.FindVariable(kVarName);
+        ClockingSignalName(watch.inst_prefix, ClockvarPath(sig));
+    auto* var = FindInBlockInstance(watch.inst_prefix, ClockvarPath(sig), ctx);
     if (!var) continue;
     // §14.4: an input skew of 1step "indicates that the signal is to be
     // sampled at the end of the previous time step ... the value sampled is
@@ -204,8 +229,10 @@ void ClockingManager::RecordStepValues(SimContext& ctx) {
       // §23.9: what is recorded is the instance's own variable, so two
       // instances of one module keep two records rather than overwriting each
       // other's under the bare name the module declared.
-      std::string name = ClockingSignalName(block.inst_prefix, sig.signal_name);
-      auto* var = ctx.FindVariable(name);
+      std::string name =
+          ClockingSignalName(block.inst_prefix, ClockvarPath(sig));
+      auto* var =
+          FindInBlockInstance(block.inst_prefix, ClockvarPath(sig), ctx);
       if (var == nullptr) continue;
       prev_step_values_[std::move(name)] = var->value.ToUint64();
     }
@@ -221,8 +248,8 @@ std::optional<uint64_t> ClockingManager::PrevStepValue(
 
 void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
   for (const auto& block : blocks_) {
-    auto* clk_var = ctx.FindVariable(
-        ClockingSignalName(block.inst_prefix, block.clock_signal));
+    auto* clk_var =
+        FindInBlockInstance(block.inst_prefix, block.clock_signal, ctx);
     if (!clk_var) continue;
     // §14.10: the block's event is the transition of its clocking expression,
     // so the record starts at what the clock stands at now -- a clock already
@@ -269,14 +296,27 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
   bool event_now = DidBlockEventOccurAt(block_name, now);
   auto drive_time = SynchronousDriveEffectiveTime(now, event_now, now, skew);
   // §23.9: the signal a clockvar drives is the one the block's own instance
-  // declared, so the drive is placed on that instance's variable.
-  auto sig_name = ClockingSignalName(block->inst_prefix, signal_name);
+  // declared, or the one its `= expression` names from there, so the drive is
+  // placed on that variable.
+  const ClockingSignal* sig = FindSignal(*block, signal_name);
+  auto* var = FindInBlockInstance(
+      block->inst_prefix, sig != nullptr ? ClockvarPath(*sig) : signal_name,
+      ctx);
+  if (var == nullptr) return;
   auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&ctx, sig_name, value]() {
-    auto* var = ctx.FindVariable(sig_name);
-    if (!var) return;
-    var->value.words[0].aval = value;
+  ev->callback = [var, value]() {
+    // §14.16 (printed page 368): the drive assigns the signal in the Re-NBA
+    // region, and a change of a variable is the §9.4.2 event that a process
+    // waiting on it, `always @(d)`, is woken by. Written without the notice,
+    // the value landed and the process slept on. What lands is the signal's
+    // width of the value, as an assignment truncates its right-hand side to
+    // the target (§10.7), so no bit above the signal marks a change.
+    uint64_t fitted = value & WordMaskWithinWidth(var->value.width, 0);
+    bool changed =
+        var->value.words[0].aval != fitted || var->value.words[0].bval != 0;
+    var->value.words[0].aval = fitted;
     var->value.words[0].bval = 0;
+    if (changed) var->NotifyWatchers();
   };
 
   // §14.16: the new value is scheduled in the Re-NBA region regardless of
@@ -345,8 +385,7 @@ Variable* ClockingManager::ResolveClockingMember(std::string_view block_name,
   if (!block) return nullptr;
   const auto* sig = FindSignal(*block, signal_name);
   if (!sig) return nullptr;
-  return ctx.FindVariable(
-      ClockingSignalName(block->inst_prefix, sig->signal_name));
+  return FindInBlockInstance(block->inst_prefix, ClockvarPath(*sig), ctx);
 }
 
 }  // namespace delta

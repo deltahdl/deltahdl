@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "parser/ast_specify.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -270,11 +271,18 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
 // open.
 //
 // §31.4.6 puts the end of the window at "(trailing reference edge time) +
-// end_edge_offset", so a data transition inside an open window cannot be
-// answered when it happens -- a negative end_edge_offset shortens the region
-// and can leave the transition outside it. Such a transition is held in
-// `pending` and answered at the trailing edge, which is the first moment both
-// end points are known.
+// end_edge_offset", so a data transition inside an open window can only be
+// answered once that end is known to lie past it. With a positive
+// end_edge_offset it does from the start -- the trailing edge is still to come,
+// at the transition's time or later -- and the transition is answered when it
+// happens. With a zero offset the trailing edge may yet come in the same time
+// step, which would leave the transition on the excluded end point, so it is
+// held in `pending` and answered at the Inactive region of its time step if the
+// window is still open then. A negative end_edge_offset shortens the region and
+// can leave the transition outside it, so it is held and answered at the
+// trailing edge, the first moment both end points are known. "A violation
+// results if the data event occurs anytime within the time window", so each
+// transition is its own violation and toggles the notifier at its own time.
 struct NochangeWindow {
   ArmedCheck armed;
   std::string ref_signal;
@@ -307,23 +315,28 @@ bool NochangeWindowViolated(const TimingCheckEntry& check,
   return begin < data && data < end;
 }
 
-// A data transition of a §31.4.6 check at `data_ticks`, both reference edges of
-// the window being known. Reports the violation when the transition fell inside
-// the window.
-void EvaluateNochangeData(const NochangeWindow& window, uint64_t data_ticks,
-                          SimContext& ctx) {
+// Reports a data transition of a §31.4.6 check that fell inside its window,
+// and toggles the notifier (§31.6).
+void ReportNochangeViolation(const NochangeWindow& window, SimContext& ctx) {
   if (AllTimingChecksOff(window.armed)) return;
   const TimingCheckEntry& check = window.armed.Entry();
-  if (!NochangeWindowViolated(check, window.leading_ticks,
-                              window.trailing_ticks, data_ticks)) {
-    return;
-  }
   ReportTimingViolation(
       std::format("$nochange violation: data signal {} transitioned inside "
                   "the window bounded by reference signal {}",
                   window.data_signal, window.ref_signal),
       "31.4.6", check.loc, ctx);
   ToggleNotifier(check, ctx);
+}
+
+// A data transition of a §31.4.6 check at `data_ticks`, both reference edges of
+// the window being known. Reports the violation when the transition fell inside
+// the window.
+void EvaluateNochangeData(const NochangeWindow& window, uint64_t data_ticks,
+                          SimContext& ctx) {
+  if (NochangeWindowViolated(window.armed.Entry(), window.leading_ticks,
+                             window.trailing_ticks, data_ticks)) {
+    ReportNochangeViolation(window, ctx);
+  }
 }
 
 // The trailing reference edge of a §31.4.6 check has arrived at
@@ -368,6 +381,51 @@ void DropTransitionsBefore(NochangeWindow& window, uint64_t reference_ticks) {
   window.pending = std::move(kept);
 }
 
+// Answers the transitions held at `now` in a window still open at the Inactive
+// region of their time step: its trailing reference edge has not come in the
+// Active region they were made in, so the end of a window with a zero
+// end_edge_offset lies past them.
+void SettleOpenNochangeWindow(NochangeWindow& window, uint64_t now,
+                              SimContext& ctx) {
+  if (!window.has_leading || window.has_trailing) return;
+  std::vector<uint64_t> kept;
+  std::vector<uint64_t> settled;
+  for (uint64_t data_ticks : window.pending) {
+    (data_ticks == now ? settled : kept).push_back(data_ticks);
+  }
+  window.pending = std::move(kept);
+  for (std::size_t i = 0; i < settled.size(); ++i) {
+    ReportNochangeViolation(window, ctx);
+  }
+}
+
+// A data transition inside a §31.4.6 window whose leading reference edge has
+// come and whose trailing edge has not. Answers it now where the window's end
+// is already known to lie past it, or has it answered at the Inactive region
+// of this time step where the end offset is zero, and answers whether it was
+// taken care of. A transition at or before the window's beginning, or under a
+// negative end_edge_offset, is left for RecordNochangeData to hold.
+bool AnswerInOpenWindow(const std::shared_ptr<NochangeWindow>& shared,
+                        uint64_t data_ticks, SimContext& ctx) {
+  NochangeWindow& window = *shared;
+  const TimingCheckEntry& check = window.armed.Entry();
+  const int64_t kBegin =
+      static_cast<int64_t>(window.leading_ticks) - check.start_edge_offset;
+  if (static_cast<int64_t>(data_ticks) <= kBegin) return false;
+  if (check.end_edge_offset > 0) {
+    ReportNochangeViolation(window, ctx);
+    return true;
+  }
+  if (check.end_edge_offset < 0) return false;
+  window.pending.push_back(data_ticks);
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [shared, data_ticks, &ctx]() {
+    SettleOpenNochangeWindow(*shared, data_ticks, ctx);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kInactive, event);
+  return true;
+}
+
 // A data transition of a §31.4.6 check at `data_ticks`.
 //
 // It is measured against the window standing closed, if one is, because
@@ -384,10 +442,15 @@ void DropTransitionsBefore(NochangeWindow& window, uint64_t reference_ticks) {
 // the interval a positive offset adds one no violation could be reported in.
 // One transition standing inside two windows violates both, which is why the
 // hold is not conditional on the immediate measurement having found nothing.
-void RecordNochangeData(NochangeWindow& window, uint64_t data_ticks,
-                        SimContext& ctx) {
+void RecordNochangeData(const std::shared_ptr<NochangeWindow>& shared,
+                        uint64_t data_ticks, SimContext& ctx) {
+  NochangeWindow& window = *shared;
   if (window.has_leading && window.has_trailing) {
     EvaluateNochangeData(window, data_ticks, ctx);
+  }
+  if (window.has_leading && !window.has_trailing &&
+      AnswerInOpenWindow(shared, data_ticks, ctx)) {
+    return;
   }
   // Nothing held is dropped while a window stands open, every transition in it
   // being one that window's trailing reference edge has still to measure. The
@@ -454,7 +517,7 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
                         nullptr});
   WatchConditionedEdge(data_var, std::move(data_edge), data_event, ctx,
                        {[window, &ctx]() {
-                          RecordNochangeData(*window, ctx.CurrentTime().ticks,
+                          RecordNochangeData(window, ctx.CurrentTime().ticks,
                                              ctx);
                         },
                         nullptr});

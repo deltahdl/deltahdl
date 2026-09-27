@@ -1,10 +1,12 @@
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -56,10 +58,19 @@ struct QueryArgInfo {
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
                                      Arena& arena) {
   QueryArgInfo info;
+  // §20.7 with §23.6: the array is named by an identifier, bare or a
+  // hierarchical reference such as u.mem naming an instance's array.
+  std::string name;
   if (arg0 && arg0->kind == ExprKind::kIdentifier) {
-    info.assoc = ctx.FindAssocArray(arg0->text);
-    info.queue = ctx.FindQueue(arg0->text);
-    info.arr = ctx.FindArrayInfo(arg0->text);
+    name = std::string(arg0->text);
+  } else if (arg0 && arg0->kind == ExprKind::kMemberAccess &&
+             !arg0->is_scope_resolution) {
+    name = FlattenHierPath(arg0);
+  }
+  if (!name.empty()) {
+    info.assoc = ctx.FindAssocArray(name);
+    info.queue = ctx.FindQueue(name);
+    info.arr = ctx.FindArrayInfo(name);
   }
   info.dynamic_outer =
       info.queue != nullptr ||

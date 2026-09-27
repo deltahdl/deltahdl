@@ -63,7 +63,13 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena) {
   for (auto& m : dt.struct_members) {
     const DataType* src = NestedAggregateSource(m, typedefs);
-    if (!src) continue;
+    if (!src) {
+      // A named member that is no aggregate keeps no nested type, and the
+      // run-time layout sizes it by this width rather than by its kind alone.
+      if (const DataType* named = MemberNamedType(m, typedefs))
+        m.resolved_width = EvalTypeWidth(*named, typedefs);
+      continue;
+    }
     auto* copy = arena.Create<DataType>(*src);
     ResolveNestedAggregateTypes(*copy, typedefs, arena);
     m.nested_type = copy;

@@ -20,6 +20,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
@@ -718,6 +719,13 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
   auto base_name = std::string_view(resolved).substr(0, dot);
+  // §23.7: a name whose head is no variable may be `f.x`, the static local
+  // of the function f.
+  if (ctx.FindVariable(base_name) == nullptr) {
+    if (Variable* local = FunctionStaticLocal(expr, ctx, arena)) {
+      return local->value;
+    }
+  }
   auto field_name = std::string_view(resolved).substr(dot + 1);
   return ResolveMemberByType(base_name, field_name, ctx, arena,
                              expr->range.start);

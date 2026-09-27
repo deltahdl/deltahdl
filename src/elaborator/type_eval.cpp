@@ -79,6 +79,8 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
   // from its full type, which already folds in its own packed dimensions and
   // (for aggregates) the widths of its nested members.
   if (m.nested_type) return EvalTypeWidth(*m.nested_type);
+  // A member declared through a typedef the elaborator resolved.
+  if (m.resolved_width > 0) return m.resolved_width;
 
   if (m.packed_dim_left && m.packed_dim_right) {
     uint32_t w = PackedDimProduct(m);

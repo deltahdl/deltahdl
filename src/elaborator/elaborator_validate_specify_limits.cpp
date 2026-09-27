@@ -196,6 +196,7 @@ static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
 //   $timeskew  §31.4.2, Table 31-8     $hold      §31.3.2, Table 31-2
 //   $fullskew  §31.4.3, Table 31-9     $removal   §31.3.4, Table 31-4
 //   $width     §31.4.4, Table 31-10    $recovery  §31.3.5, Table 31-5
+//   $setup     §31.3.1, Table 31-1
 //
 // $fullskew carries limit1 (the maximum delay by which the data event may
 // trail the reference event) and limit2 (the maximum delay by which the

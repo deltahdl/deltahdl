@@ -83,8 +83,8 @@ EffectiveDelayedSignals ResolveDelayedSignalsUnderOptions(
   const bool kActive = NegativeTimingCheckOptionActive(
       options.negative_timing_checks, options.all_timing_checks_off);
 
-  const std::string kRefOriginal(decl.ref_terminal.name);
-  const std::string kDataOriginal(decl.data_terminal.name);
+  const std::string kRefOriginal = SpecifyTerminalName(decl.ref_terminal);
+  const std::string kDataOriginal = SpecifyTerminalName(decl.data_terminal);
 
   EffectiveDelayedSignals out;
   out.are_copies_of_originals = !kActive;
@@ -153,9 +153,13 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
     const TimingCheckInvocationOptions& options) {
   TimingCheckEntry entry;
   entry.kind = decl.check_kind;
-  entry.ref_signal = std::string(decl.ref_terminal.name);
+  // A terminal written through an interface port, `b.d`, is named by both
+  // names, as the module's text reads it: A.7.3's input_identifier admits
+  // `interface_identifier . port_identifier`, and the signal is the member of
+  // the interface instance the port is bound to.
+  entry.ref_signal = SpecifyTerminalName(decl.ref_terminal);
   entry.ref_edge = decl.ref_edge;
-  entry.data_signal = std::string(decl.data_terminal.name);
+  entry.data_signal = SpecifyTerminalName(decl.data_terminal);
   entry.data_edge = decl.data_edge;
   entry.notifier = std::string(decl.notifier);
   entry.loc = decl.loc;

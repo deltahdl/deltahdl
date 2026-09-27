@@ -260,4 +260,90 @@ TEST(SyncDriveSim, TwoInstancesOfOneCellDriveTheirOwnSignals) {
   EXPECT_EQ(untouched->value.ToUint64(), 0x11u);
 }
 
+// §14.16 (printed page 368) with §9.4.2: the Re-NBA update a drive makes is a
+// change of the signal, which wakes `always @(q)` and `@(q)`.
+TEST(SyncDriveSim, DriveUpdateWakesEventControlsOnTheSignal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic clk = 0;\n"
+                 "  logic [7:0] q = 1;\n"
+                 "  clocking cb @(posedge clk);\n"
+                 "    output q;\n"
+                 "  endclocking\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  always @(q) $display(\"always@q t=%0t q=%0d\", $time, q);\n"
+                 "  initial begin\n"
+                 "    @(q); $display(\"initial@q t=%0t q=%0d\", $time, q);\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    @(posedge clk);\n"
+                 "    cb.q <= 9;\n"
+                 "    #20 $finish;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "always@q t=5 q=9\ninitial@q t=5 q=9\n$finish at time 25\n");
+}
+
+// The update reaches what the signal drives: a submodule's input port and a
+// continuous assignment.
+TEST(SyncDriveSim, DriveUpdatePropagatesThroughPortAndAssign) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module dut(input logic clk, input logic [7:0] in);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] din = 0;\n"
+                       "  wire [7:0] w = din;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    output din;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  dut u_dut(clk, din);\n"
+                       "  initial begin\n"
+                       "    @(cb); cb.din <= 55;\n"
+                       "    #2 $display(\"top t=%0t din=%0d u_dut.in=%0d "
+                       "w=%0d\", $time, din, u_dut.in, w);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "top t=7 din=55 u_dut.in=55 w=55\n$finish at time 7\n");
+}
+
+// A program's drive of its output port lands in the Re-NBA region of the step,
+// and the design reads it at the next edge. The program waits past that edge,
+// as §24.3 ends the run once every program initial has.
+TEST(SyncDriveSim, ProgramDriveReachesTheDesignAtTheNextEdge) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program tb(input logic clk, output logic [7:0] din);\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    output din;\n"
+                       "  endclocking\n"
+                       "  initial begin\n"
+                       "    din = 0;\n"
+                       "    @(cb);\n"
+                       "    cb.din <= 55;\n"
+                       "    repeat (3) @(cb);\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module dut(input logic clk, input logic [7:0] in);\n"
+                       "  always @(posedge clk) if (in == 55) begin\n"
+                       "    $display(\"dut t=%0t in=%0d\", $time, in);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] din;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  tb u_tb(clk, din);\n"
+                       "  dut u_dut(clk, din);\n"
+                       "  initial #40 $finish;\n"
+                       "endmodule\n",
+                       f),
+            "dut t=15 in=55\n$finish at time 15\n");
+}
+
 }  // namespace

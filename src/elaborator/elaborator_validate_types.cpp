@@ -456,9 +456,22 @@ static bool IsPackageEnumMemberRef(const Expr* e, const CompilationUnit* unit) {
 // an assignment, a module-item declaration's initializer, a procedural
 // declaration's initializer -- asks this one question, so that the three
 // cannot answer it differently.
+//
+// §10.9.1 with §7.4: a variable declared as an unpacked array of the enum takes
+// an assignment pattern whose every item is one of those, `'{ON, OFF, ON}`,
+// a keyed or default item included, and a nested pattern for a further
+// dimension; each item initializes an element, an enum variable of its own.
 static bool IsBareEnumAssignable(const Expr* e, const CompilationUnit* unit) {
-  return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast ||
-               IsPackageEnumMemberRef(e, unit) || IsEnumTypedMethodResult(e));
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kAssignmentPattern) {
+    if (e->elements.empty()) return false;
+    for (const Expr* item : e->elements) {
+      if (!IsBareEnumAssignable(item, unit)) return false;
+    }
+    return true;
+  }
+  return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast ||
+         IsPackageEnumMemberRef(e, unit) || IsEnumTypedMethodResult(e);
 }
 
 // What EnumValueSubclause reads to find an enum among a value's operands: the

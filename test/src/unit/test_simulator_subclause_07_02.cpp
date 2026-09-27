@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -119,6 +120,29 @@ TEST(StructMemberAccess, MemberAccessBasic) {
 
   auto result = EvalExpr(acc, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 99u);
+}
+
+// §7.2 with §6.18: a member declared through a typedef holds the typedef's
+// type -- `ab_e e` of `typedef enum logic [1:0] {A=1, B=2} ab_e` two bits,
+// `six_t w` of `typedef logic [5:0] six_t` six -- in an unpacked struct and a
+// packed one alike, as $bits of the struct already counted them. The run-time
+// layout gave each one bit, so B and 6'h2a read back as 0.
+TEST(StructType, MembersDeclaredThroughTypedefsHoldTheirWidth) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef enum logic [1:0] {A=1, B=2} ab_e;\n"
+      "  typedef logic [5:0] six_t;\n"
+      "  typedef struct {ab_e e; six_t w; int n;} s_t;\n"
+      "  typedef struct packed {ab_e e; six_t w;} ps_t;\n"
+      "  s_t s = '{B, 6'h2a, 3};\n"
+      "  ps_t ps = '{B, 6'h2a};\n"
+      "  initial $display(\"%0d %h %0d %0d %h %h %p\", s.e, s.w, s.n, ps.e, "
+      "ps.w,\n"
+      "                   ps, s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2a 3 2 2a aa '{e:B, w:42, n:3}\n");
 }
 
 }  // namespace

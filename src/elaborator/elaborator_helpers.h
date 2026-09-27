@@ -224,6 +224,16 @@ void RecordParamDeclRange(RtlirParamDecl& pd, const DataType& dtype,
                           const ScopeMap& scope);
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
+// §23.10 with §6.20.2: the real an override's expression folds to where the
+// expression is real (HasRealOperand), else empty; the same real rounded as
+// §6.12.1 converts a real to an integer; and the realness the override leaves
+// the parameter with -- real for a parameter declared real or untyped under
+// a real override, real for one declared real under an integral one, and
+// integral otherwise. Defined in elaborator_module_params.cpp.
+std::optional<double> RealOverrideValue(const Expr* expr,
+                                        const ScopeMap& scope);
+int64_t RoundRealToInteger(double value);
+void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real);
 
 bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
 

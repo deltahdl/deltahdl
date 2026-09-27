@@ -9,6 +9,8 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
@@ -316,6 +318,73 @@ void ExecFunctionBodyInCallee(const ModuleItem* func,
                               SimContext& ctx, Arena& arena) {
   InstancePrefixOverride in_callee(ctx.InstancePrefixOverride(), inst_prefix);
   ExecFunctionBody(func, ret_var, ctx, arena);
+}
+
+}  // namespace delta
+
+namespace delta {
+namespace {
+
+// The declaration of the static local `name` among `stmts`, searched through
+// the blocks and branches of the body.
+const Stmt* FindStaticLocalDecl(const std::vector<Stmt*>& stmts,
+                                std::string_view name);
+
+const Stmt* FindStaticLocalDeclIn(const Stmt* s, std::string_view name) {
+  if (s == nullptr) return nullptr;
+  if (s->kind == StmtKind::kVarDecl) {
+    return s->var_is_static && s->var_name == name ? s : nullptr;
+  }
+  if (const Stmt* found = FindStaticLocalDecl(s->stmts, name)) return found;
+  if (const Stmt* found = FindStaticLocalDeclIn(s->body, name)) return found;
+  if (const Stmt* found = FindStaticLocalDeclIn(s->then_branch, name)) {
+    return found;
+  }
+  return FindStaticLocalDeclIn(s->else_branch, name);
+}
+
+const Stmt* FindStaticLocalDecl(const std::vector<Stmt*>& stmts,
+                                std::string_view name) {
+  for (const Stmt* s : stmts) {
+    if (const Stmt* found = FindStaticLocalDeclIn(s, name)) return found;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
+                              Arena& arena) {
+  if (member == nullptr || member->kind != ExprKind::kMemberAccess ||
+      member->lhs == nullptr || member->rhs == nullptr ||
+      member->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  // The function part is looked up as a call naming it is: a bare name, a
+  // path, or a package scope, whose callee a call keeps on its left side.
+  Expr call;
+  call.kind = ExprKind::kCall;
+  call.lhs = member->lhs;
+  SubroutineTarget target = FindSubroutineTarget(&call, ctx, arena);
+  if (target.func == nullptr ||
+      target.func->kind != ModuleItemKind::kFunctionDecl) {
+    return nullptr;
+  }
+  std::string_view var = member->rhs->text;
+  const Stmt* decl = FindStaticLocalDecl(target.func->func_body_stmts, var);
+  if (decl == nullptr) return nullptr;
+  // §13.4.2: the static frame is keyed by the instance the function runs in,
+  // which the call's target names.
+  EnterCalleeInstance(ctx, target);
+  Variable* found = ctx.FindStaticFuncVar(target.func->name, var);
+  if (found == nullptr) {
+    ctx.PushStaticScope(target.func->name);
+    ExecFuncVarDecl(decl, target.func->name, ctx, arena);
+    ctx.PopStaticScope(target.func->name);
+    found = ctx.FindStaticFuncVar(target.func->name, var);
+  }
+  LeaveCalleeInstance(ctx);
+  return found;
 }
 
 }  // namespace delta

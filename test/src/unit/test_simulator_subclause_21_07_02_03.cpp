@@ -566,5 +566,37 @@ TEST_F(VcdTimescaleFromSource, TimescaleNamesNsWhenThatIsTheDesignsPrecision) {
   EXPECT_EQ(CountToken(Tokens(timescale), "1ns"), 1u) << timescale;
 }
 
+// §21.7.2.3: the definitions nest one $scope module per module instance, and a
+// $var declares an object by its own name within the scope holding it. A
+// variable of the instance u of t is declared as `deep` inside `$scope module
+// u`, itself inside `$scope module t`, and one level further down the same.
+TEST_F(VcdKeywordCommandsE2E, SubInstanceVariablesAreDeclaredInTheirOwnScope) {
+  auto content = RunVcd(
+      "module leaf; logic [3:0] x = 1; endmodule\n"
+      "module sub; logic [7:0] deep = 3; leaf l(); endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "  logic [7:0] shallow = 1;\n"
+      "endmodule\n");
+  auto lines = AllLines(content);
+  EXPECT_FALSE(FindVarLine(lines, "deep").empty()) << content;
+  EXPECT_FALSE(FindVarLine(lines, "x").empty()) << content;
+  EXPECT_TRUE(FindVarLine(lines, "u.deep").empty()) << content;
+  EXPECT_TRUE(FindVarLine(lines, "u.l.x").empty()) << content;
+  size_t t_scope = content.find("$scope module t $end");
+  size_t u_scope = content.find("$scope module u $end");
+  size_t l_scope = content.find("$scope module l $end");
+  ASSERT_NE(u_scope, std::string::npos) << content;
+  ASSERT_NE(l_scope, std::string::npos) << content;
+  EXPECT_LT(t_scope, u_scope);
+  EXPECT_LT(u_scope, content.find(" deep $end"));
+  EXPECT_LT(content.find(" deep $end"), l_scope);
+  EXPECT_LT(l_scope, content.find(" x $end"));
+  // Each of the three scopes is closed by its own $upscope before the
+  // definitions end.
+  EXPECT_EQ(CountLine(lines, "$upscope $end"), 3u) << content;
+  EXPECT_LT(content.rfind("$upscope $end"), content.find("$enddefinitions"));
+}
+
 }  // namespace
 }  // namespace delta

@@ -161,7 +161,19 @@ ConfigRule* Parser::ParseConfigRule() {
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     rule->kind = ConfigRuleKind::kDefault;
-    ParseLiblistClause(rule);
+    // §33.4.1.2 (printed page 938): "The use expansion clause (see 33.4.1.6)
+    // cannot be used with a default selection clause." The rule is reported
+    // under that subclause, once, and the use clause is still read to its end
+    // so the rules after it parse as rules.
+    if (Check(TokenKind::kKwUse)) {
+      diag_.Error(CurrentLoc(),
+                  "a use expansion clause cannot be used with a default "
+                  "selection clause",
+                  Subclause("33.4.1.2"));
+      ParseUseClause(rule);
+    } else {
+      ParseLiblistClause(rule);
+    }
   } else if (Check(TokenKind::kKwInstance)) {
     Consume();
     rule->kind = ConfigRuleKind::kInstance;

@@ -44,7 +44,7 @@ static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
 // the module's interface port by both names, as the module's own text reads it
 // (`p.a`). Kept as the port name alone, a path from `p.a` started at an `a`
 // nothing in the module reads, so no transition was ever timed through it.
-static std::string TerminalName(const SpecifyTerminal& t) {
+std::string SpecifyTerminalName(const SpecifyTerminal& t) {
   if (t.interface_name.empty()) return std::string(t.name);
   std::string name(t.interface_name);
   name.append(".").append(t.name);
@@ -74,14 +74,14 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  std::size_t dst_index) {
   PathDelay pd;
   if (src_index < decl.src_ports.size()) {
-    pd.src_port = TerminalName(decl.src_ports[src_index]);
+    pd.src_port = SpecifyTerminalName(decl.src_ports[src_index]);
     pd.src_select = TerminalSelectText(decl.src_ports[src_index], ctx, arena);
-    pd.decl_src_port = TerminalName(decl.src_ports.front());
+    pd.decl_src_port = SpecifyTerminalName(decl.src_ports.front());
   }
   if (dst_index < decl.dst_ports.size()) {
-    pd.dst_port = TerminalName(decl.dst_ports[dst_index]);
+    pd.dst_port = SpecifyTerminalName(decl.dst_ports[dst_index]);
     pd.dst_select = TerminalSelectText(decl.dst_ports[dst_index], ctx, arena);
-    pd.decl_dst_port = TerminalName(decl.dst_ports.front());
+    pd.decl_dst_port = SpecifyTerminalName(decl.dst_ports.front());
   }
   pd.path_kind = decl.path_kind;
   pd.edge = decl.edge;

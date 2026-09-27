@@ -62,4 +62,79 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   EXPECT_EQ(bidir->value.ToUint64(), 0x11u);
 }
 
+// §14.5 (printed page 357): "Any signal in a clocking block can be associated
+// with an arbitrary hierarchical expression", so `input st = u.state` samples
+// `u.state`, where it sampled a signal of the clockvar's own name, which there
+// is none of.
+TEST(ClockingHierExprSim, ClockvarBoundToAnotherNameSamplesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  logic [3:0] state = 2;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic clk = 0;\n"
+                       "  sub u();\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    input st = u.state;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin\n"
+                       "    #7 u.state = 6;\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    @(cb); @(cb);\n"
+                       "    $display(\"t=%0t st=%0d\", $time, cb.st);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=15 st=6\n$finish at time 15\n");
+}
+
+// The same from a program, the expression headed by the top module's name.
+TEST(ClockingHierExprSim, ProgramClockvarSamplesACrossModuleSignal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module cpu;\n"
+                       "  logic [3:0] state = 6;\n"
+                       "endmodule\n"
+                       "program test(input logic clk);\n"
+                       "  clocking cd1 @(posedge clk);\n"
+                       "    input state = top.cpu1.state;\n"
+                       "  endclocking\n"
+                       "  initial begin\n"
+                       "    @(cd1);\n"
+                       "    $display(\"t=%0t state=%0d\", $time, cd1.state);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  cpu cpu1();\n"
+                       "  test main(clk);\n"
+                       "endmodule\n",
+                       f),
+            "t=5 state=6\n$finish at time 5\n");
+}
+
+// §14.5 with §14.16: an output clockvar bound to `top.d` drives `top.d`, and a
+// process of the module waiting on it wakes.
+TEST(ClockingHierExprSim, OutputClockvarDrivesTheSignalItsExpressionNames) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  logic clk = 0; logic [3:0] d;\n"
+          "  always #5 clk = ~clk;\n"
+          "  always @(d) $display(\"mod d=%0d at %0t\", d, $time);\n"
+          "  p pi();\n"
+          "endmodule\n"
+          "program p;\n"
+          "  clocking cb @(posedge top.clk); output d = top.d; endclocking\n"
+          "  initial begin @(cb); cb.d <= 4'd5; @(cb); #1; end\n"
+          "endprogram\n",
+          f),
+      "mod d=5 at 5\n");
+}
+
 }  // namespace

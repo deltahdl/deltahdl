@@ -96,8 +96,30 @@ std::string FormatValueAsString(const Logic4Vec& val) {
   return result;
 }
 
+// §21.2.1.1 (printed page 658): Table 21-2's specifiers "are used with real
+// numbers", so an integral operand is read for its value, converted as §6.12.1
+// (printed 110) converts an expression assigned to a real -- "Individual bits
+// that are x or z ... shall be treated as zero" -- and signed where the
+// operand is. Read as a real's bit pattern, `$display("%f", 5)` printed
+// 0.000000.
+static double OperandAsReal(const Logic4Vec& val) {
+  if (val.is_real) return RealVecToDouble(val);
+  if (val.nwords == 0 || val.width == 0) return 0.0;
+  uint64_t bits = val.words[0].aval & ~val.words[0].bval;
+  if (val.width < 64) {
+    uint64_t mask = (uint64_t{1} << val.width) - 1;
+    bits &= mask;
+    if (val.is_signed && ((bits >> (val.width - 1)) & 1U) != 0U) {
+      return static_cast<double>(static_cast<int64_t>(bits | ~mask));
+    }
+  } else if (val.is_signed) {
+    return static_cast<double>(static_cast<int64_t>(bits));
+  }
+  return static_cast<double>(bits);
+}
+
 static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
-  double d = RealVecToDouble(val);
+  double d = OperandAsReal(val);
   char buf[128];
   if (spec == 'e') {
     std::snprintf(buf, sizeof(buf), "%e", d);
@@ -128,7 +150,7 @@ struct FormatFieldSpec {
 // rendering.
 static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
                                        const FormatFieldSpec& field) {
-  double d = RealVecToDouble(val);
+  double d = OperandAsReal(val);
   int w = field.has_width ? static_cast<int>(field.width) : 0;
   int p = field.has_precision ? static_cast<int>(field.precision) : 6;
   char buf[256];

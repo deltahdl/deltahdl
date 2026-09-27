@@ -377,4 +377,66 @@ TEST(ClassSim, UnresolvedMethodReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
+// §23.2.4 (printed page 739) admits a class among a module's items, and §8.24
+// (printed page 202) has its out-of-block declarations "declared in the same
+// scope as the class declaration", so the bodies follow the class among the
+// module's items and `this` in them names the object. The elaborator took
+// each for a subroutine of the module and refused its `this` under §8.11.
+TEST(ClassSim, OutOfBlockBodiesAmongModuleItemsAreTheClassMethods) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  class Rect;\n"
+                       "    int w, h;\n"
+                       "    static int count = 0;\n"
+                       "    extern function new(int w, int h);\n"
+                       "    extern function int area();\n"
+                       "  endclass\n"
+                       "  int seen;\n"
+                       "  function Rect::new(int w, int h);\n"
+                       "    this.w = w; this.h = h; count++;\n"
+                       "  endfunction\n"
+                       "  function int Rect::area();\n"
+                       "    return w * h;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    Rect a = new(4, 6), b = new(1, 1);\n"
+                       "    seen = Rect::count;\n"
+                       "    $display(\"area %0d count %0d static %0d\",\n"
+                       "             a.area(), seen, b.count);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "area 24 count 2 static 2\n");
+}
+
+// A void method whose body writes a property through `this`, called after the
+// constructor has set it, beside the constructor and a function reading it.
+TEST(ClassSim, OutOfBlockVoidMethodAmongModuleItemsWritesThroughThis) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  class Rect;\n"
+                       "    int w, h;\n"
+                       "    extern function new(int w, int h);\n"
+                       "    extern function int area();\n"
+                       "    extern function void setw(int w);\n"
+                       "  endclass\n"
+                       "  function Rect::new(int w, int h);\n"
+                       "    this.w = w; this.h = h;\n"
+                       "  endfunction\n"
+                       "  function int Rect::area();\n"
+                       "    return w * h;\n"
+                       "  endfunction\n"
+                       "  function void Rect::setw(int w);\n"
+                       "    this.w = w;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    Rect a = new(4, 6);\n"
+                       "    a.setw(5);\n"
+                       "    $display(\"area %0d\", a.area());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "area 30\n");
+}
+
 }  // namespace

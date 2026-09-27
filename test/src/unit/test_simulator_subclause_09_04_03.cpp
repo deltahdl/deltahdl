@@ -792,4 +792,42 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 330u);
 }
 
+// §9.4.3 (printed page 236) with §23.6 (printed page 753) and §24.3.1
+// (printed page 777): a wait whose condition reads a design variable by
+// hierarchical name is re-evaluated each time that variable changes, from a
+// program and from a submodule alike, and resumes at the change that makes it
+// true.
+TEST(LevelSensitiveEventSimulation, WaitOnHierarchicalNameResumesWhenTrue) {
+  SimFixture fp;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  int v = 0;\n"
+                 "  initial begin #3 v = 1; #4 v = 3; end\n"
+                 "  p pi();\n"
+                 "endmodule\n"
+                 "program p;\n"
+                 "  initial begin\n"
+                 "    wait (top.v == 3);\n"
+                 "    $display(\"prog woke v=%0d at %0t\", top.v, $time);\n"
+                 "  end\n"
+                 "endprogram\n",
+                 fp),
+      "prog woke v=3 at 7\n");
+  SimFixture fm;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  int v;\n"
+                 "  initial begin #3 v = 1; #4 v = 3; end\n"
+                 "  sub s();\n"
+                 "endmodule\n"
+                 "module sub;\n"
+                 "  initial begin\n"
+                 "    wait (top.v == 3);\n"
+                 "    $display(\"sub woke v=%0d at %0t\", top.v, $time);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 fm),
+      "sub woke v=3 at 7\n");
+}
+
 }  // namespace

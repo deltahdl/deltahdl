@@ -481,4 +481,82 @@ TEST(DrivenTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$nochange violation: data signal"), nullptr);
 }
 
+// §31.4.6: "A violation results if the data event occurs anytime within the
+// time window", so each data transition inside one window is its own
+// violation and toggles the notifier (§31.6) at its own time. Two changes of d
+// while clk is high toggle it twice, at 13 and 16, before the trailing edge
+// at 20; answering both there toggled it twice in one time step, which an
+// `always @(n)` saw once.
+TEST(DrivenTimingCheckEvaluation, NochangeTogglesTheNotifierAtEachDataEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $nochange(posedge clk, d, 0, 0, n);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 clk = 1;\n"
+                       "    #3 d = 1; #1 $display(\"%0d\", cnt);\n"
+                       "    #2 d = 0; #1 $display(\"%0d\", cnt);\n"
+                       "    #3 clk = 0;\n"
+                       "    #5 d = 1; #1 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n2\n2\n");
+}
+
+// With end_edge_offset 0 the window ends at the trailing edge and the end is
+// excluded, so a data change in the same time step as the trailing edge is no
+// violation even where it is made before that edge.
+TEST(DrivenTimingCheckEvaluation,
+     NochangeDataChangeBeforeTheTrailingEdgeOfItsTimeStepIsNoViolation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $nochange(posedge clk, d, 0, 0, n);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 clk = 1;\n"
+                       "    #10 d = 1; clk = 0;\n"
+                       "    #1 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
+  EXPECT_EQ(FindDiag(f, "$nochange violation: data signal"), nullptr);
+}
+
+// A positive end_edge_offset puts the window's end past the trailing edge
+// still to come, so a change inside the high level toggles the notifier when
+// it happens, and one within the offset after the trailing edge does too.
+TEST(DrivenTimingCheckEvaluation,
+     NochangePositiveEndOffsetTogglesAtTheDataEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top(\n"
+                       "    output reg clk = 0,\n"
+                       "    output reg d = 0);\n"
+                       "  reg n = 0; integer cnt = 0;\n"
+                       "  specify\n"
+                       "    $nochange(posedge clk, d, 0, 3, n);\n"
+                       "  endspecify\n"
+                       "  always @(n) cnt = cnt + 1;\n"
+                       "  initial begin\n"
+                       "    #10 clk = 1; #2 d = 1;\n"
+                       "    #1 $display(\"%0d\", cnt);\n"
+                       "    #2 clk = 0; #2 d = 0;\n"
+                       "    #1 $display(\"%0d\", cnt);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n2\n");
+}
+
 }  // namespace

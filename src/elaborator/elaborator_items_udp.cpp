@@ -859,6 +859,9 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     }
     ElaborateItem(item, mod);
   }
+  for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
+    ElaborateItem(item, mod);
+  }
 
   // §6.18: a class method's or a module subroutine's formal may name a
   // typedef the module forward-declares above it and defines below it, so

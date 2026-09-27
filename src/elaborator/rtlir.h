@@ -552,6 +552,10 @@ struct RtlirParamDecl {
   // parameter's value and resolved_value is not meaningful.
   double resolved_real = 0.0;
   bool is_real_value = false;
+  // §6.20.2: the parameter was declared with a real type (real, realtime or
+  // shortreal), so every value it takes is real, an integral override's
+  // included.
+  bool decl_is_real = false;
   // §6.16: a parameter declared with a string type takes a value of arbitrary
   // length. §6.16 rules that "strings can be of arbitrary length and no
   // truncation occurs", and resolved_value is 64 bits, so a value of more than

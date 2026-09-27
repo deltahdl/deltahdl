@@ -205,4 +205,11 @@ bool SpecparamIsReal(const DataType& type, const Expr* init);
 void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                                bool parent_is_checker, DiagEngine& diag);
 
+// §31.9.1 and §31.9.4: the net each delayed_reference and delayed_data of a
+// $setuphold or $recrem names, where the module declares none of the name, and
+// the continuous assignment copying the original signal into it. Defined in
+// elaborator_delayed_signals.cpp.
+std::vector<ModuleItem*> TimingCheckDelayedSignalItems(const ModuleDecl* decl,
+                                                       Arena& arena);
+
 }  // namespace delta

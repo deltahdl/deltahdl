@@ -15,10 +15,12 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -434,6 +436,13 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   bool is_func_or_task = item->kind == ModuleItemKind::kFunctionDecl ||
                          item->kind == ModuleItemKind::kTaskDecl;
   if (!is_func_or_task || item->func_body_stmts.empty()) return;
+  // §8.24 (printed page 202): an out-of-block body, `function Rect::new(...)`,
+  // is the method its class declared `extern`, and §23.2.4 (printed page 739)
+  // admits the class and the body among a module's items as well as at
+  // compilation-unit scope. `this` in it names the object, so it is checked
+  // as the class's method (a static one by CheckStaticOutOfBlockBodyThis), not
+  // as a subroutine of the module.
+  if (!item->method_class.empty()) return;
   for (const auto* s : item->func_body_stmts) {
     if (StmtRefsThisOrSuper(s)) {
       diag_.Error(item->loc,
@@ -445,9 +454,53 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   }
 }
 
+// §8.24 (printed page 202): the body `function C::f(...)` defines the method
+// `C` declares `extern`, and §8.10 (printed pages 186-187) holds over it as
+// over a body written in the class: "Access ... to the special this handle
+// within the body of a static method is illegal".
+void CheckStaticOutOfBlockBodyThis(const ModuleItem* item, const ClassDecl* cls,
+                                   DiagEngine& diag) {
+  if (cls == nullptr) return;
+  bool is_static = false;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr &&
+        m->method->is_extern && m->method->name == item->name) {
+      is_static = m->is_static;
+    }
+  }
+  if (!is_static) return;
+  for (const auto* s : item->func_body_stmts) {
+    if (StmtRefsThisOrSuper(s)) {
+      diag.Error(item->loc,
+                 "'this' and 'super' shall not be used in a static method",
+                 Subclause("8.10"));
+      return;
+    }
+  }
+}
+
+// The class `name` names from among `items`, which is where §23.2.4 (printed
+// page 739) puts a class a module declares, else the one the compilation unit
+// answers for it.
+static const ClassDecl* ClassSeenAmong(std::string_view name,
+                                       const std::vector<ModuleItem*>& items,
+                                       const CompilationUnit* unit) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+        item->class_decl->name == name) {
+      return item->class_decl;
+    }
+  }
+  return FindClassDecl(name, unit);
+}
+
 void ElaboratorClassRules::ValidateThisUsage(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateThisInItem(item);
+    if (!item->method_class.empty()) {
+      CheckStaticOutOfBlockBodyThis(
+          item, ClassSeenAmong(item->method_class, decl->items, unit_), diag_);
+    }
   }
 }
 

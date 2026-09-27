@@ -258,6 +258,72 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
                             4, "33.4.3"));
 }
 
+// "Hierarchical references cannot include scopes of generate or array of
+// instances." Whether a scope is a generate block is a fact about the design,
+// so `top.g.GW` is refused because top declares a generate block named g.
+TEST(ConfigParamOverride, HierRefThroughGenerateScopeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    parameter GW = 20;\n"
+      "  end\n"
+      "  adder a1();\n"
+      "endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(top.g.GW));\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' uses a "
+                            "hierarchical reference that passes through a "
+                            "generate scope",
+                            10, "33.4.3"));
+}
+
+// A reference not rooted at the design's top is resolved from the parent scope
+// of the configured instance, so `g.GW` reaches top's generate block g too.
+TEST(ConfigParamOverride, RelativeHierRefThroughGenerateScopeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g\n"
+      "    localparam GW = 20;\n"
+      "  end\n"
+      "  adder a1();\n"
+      "endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(g.GW));\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "passes through a generate scope", 10, "33.4.3"));
+}
+
+// The same reference through a module instance names no generate scope.
+TEST(ConfigParamOverride, HierRefThroughModuleInstanceNotAGenerateScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf #(parameter LW = 5); endmodule\n"
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top;\n"
+      "  leaf g();\n"
+      "  adder a1();\n"
+      "endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(top.g.LW));\n"
+      "endconfig\n",
+      f, "top");
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_EQ(d.message.find("generate scope"), std::string::npos) << d.message;
+  }
+}
+
 TEST(ConfigParamOverride, UserFunctionCallRejected) {
   ElabFixture f;
   ElaborateSrc(

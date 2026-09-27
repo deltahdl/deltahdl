@@ -298,10 +298,31 @@ static void CollapseInterconnectNetTypes(
                                    interconnect_names);
 }
 
+// §23.3.2.2 (printed page 744): "Multiple module instance port connections
+// are not allowed", the clause's `A ia (.i (a), .i (b), ...)` connecting
+// input, output and inout ports twice each being "illegal". Both connections
+// were applied, the input reading the two drivers' x. Each port named twice
+// is reported once.
+static void ReportRepeatedPortConnections(const ModuleItem* item,
+                                          DiagEngine& diag) {
+  std::unordered_set<std::string_view> seen;
+  std::unordered_set<std::string_view> reported;
+  for (const auto& [name, conn] : item->inst_ports) {
+    if (name.empty() || seen.insert(name).second) continue;
+    if (!reported.insert(name).second) continue;
+    diag.Error(item->loc,
+               std::format("port '{}' of module '{}' is connected more than "
+                           "once",
+                           name, item->inst_module),
+               Subclause("23.3.2.2"));
+  }
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod,
                            const ModuleDecl* child_decl) {
   if (!inst.resolved) return;
+  ReportRepeatedPortConnections(item, diag_);
   const auto& child_ports = inst.resolved->ports;
 
   const PortBindScope kScope{

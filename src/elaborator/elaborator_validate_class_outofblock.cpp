@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -257,6 +258,7 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
   linked.insert(key);
   ValidateOutOfBlockSignature(
       proto, item, {item->method_class, "::", Subclause("8.24")}, diag);
+  CheckStaticOutOfBlockBodyThis(item, cls, diag);
 }
 
 void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {

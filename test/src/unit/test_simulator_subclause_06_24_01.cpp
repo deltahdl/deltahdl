@@ -270,4 +270,23 @@ TEST(CastOperatorSim, CastDestinationWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §6.24.1 (printed page 139): a cast returns what a variable of the casting
+// type holds once the expression is assigned to it, so `shortreal'(2)` is
+// the single-precision 2.0 and a signed operand keeps its sign. The integer
+// was turned into a double's pattern cut to 32 bits, which reads back as 0.
+TEST(CastOperatorSim, IntegerCastToShortrealIsItsValueInSinglePrecision) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  shortreal s;\n"
+                       "  byte c = -5;\n"
+                       "  initial begin\n"
+                       "    s = shortreal'(2);\n"
+                       "    $display(\"%f %f %f %f\", s, shortreal'(-3),\n"
+                       "             shortreal'(c), real'(c));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2.000000 -3.000000 -5.000000 -5.000000\n");
+}
+
 }  // namespace

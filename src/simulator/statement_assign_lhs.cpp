@@ -8,6 +8,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -155,7 +156,9 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
     std::string name;
     BuildLhsName(lhs, name);
     auto resolved = StripRootPrefix(name);
-    return ctx.FindVariable(resolved);
+    if (Variable* var = ctx.FindVariable(resolved)) return var;
+    // §23.7: `f.x = 3` writes the static local of the function f.
+    return FunctionStaticLocal(lhs, ctx, ctx.GetArena());
   }
   if (lhs->kind == ExprKind::kSelect && lhs->base) {
     return ResolveLhsVariable(lhs->base, ctx);

@@ -209,4 +209,21 @@ TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   EXPECT_EQ(unsigned_res.ToUint64(), in.ToUint64());
 }
 
+// §20.5: $itor and $bitstoreal return reals, which arithmetic and a real
+// format specifier tell from integers by the value's mark: `$itor(5) + 1` is
+// the real 6.0, and $bitstoreal of 1.5's pattern prints 1.5.
+TEST(SysTask, ItorAndBitstorealResultsAreReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real r;\n"
+                       "  initial begin\n"
+                       "    r = $itor(5) + 1;\n"
+                       "    $display(\"%f %f %f\", $itor(5), r,\n"
+                       "             $bitstoreal(64'h3ff8000000000000));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5.000000 6.000000 1.500000\n");
+}
+
 }  // namespace

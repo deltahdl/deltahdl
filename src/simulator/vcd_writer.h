@@ -217,6 +217,10 @@ struct VcdSignalSpec {
   // state characters come from. kNone for a dumped object no port declaration
   // covers, which reads the unknown-direction list.
   Direction direction{};
+  // §21.7.2.3: the reference written in the object's $var declaration, its
+  // own name within the $scope it is declared in. Empty where that is `name`
+  // itself; `name` stays the hierarchical name $dumpvars selects on.
+  std::string_view ref_name = {};
 };
 
 // The §21.7.2.2 value character of one bit of a dumped object: 0, 1, x or z,

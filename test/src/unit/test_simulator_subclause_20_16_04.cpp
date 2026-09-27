@@ -275,4 +275,34 @@ TEST(PlaPersonalityFormat, PlaneFormatMatchesLrmExample) {
   EXPECT_EQ(c101->value.ToUint64(), 0b1101u);  // 101 -> 1101
 }
 
+// §20.16.4 Example 2 (printed page 652) as the clause writes it: the
+// asynchronous AND plane, its inputs driven over time and each result shown by
+// `$displayb(a, " -> ", b)`, whose three arguments print in order, the
+// vectors in binary and the literal as its text (§21.2.1). The `b` after the
+// literal was dropped, so every line read `111 -> ` and the like.
+TEST(PlaPersonalityFormat, AsyncPlaneExampleDisplaysEachResult) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module pla;\n"
+                       "  logic [1:3] a, mem[1:4];\n"
+                       "  logic [1:4] b;\n"
+                       "  initial begin\n"
+                       "    $async$and$plane(mem, a[1:3], b[1:4]);\n"
+                       "    mem[1] = 3'b10?;\n"
+                       "    mem[2] = 3'b??1;\n"
+                       "    mem[3] = 3'b0?0;\n"
+                       "    mem[4] = 3'b???;\n"
+                       "    #10 a = 3'b111;\n"
+                       "    #10 $displayb(a, \" -> \", b);\n"
+                       "    #10 a = 3'b000;\n"
+                       "    #10 $displayb(a, \" -> \", b);\n"
+                       "    #10 a = 3'bxxx;\n"
+                       "    #10 $displayb(a, \" -> \", b);\n"
+                       "    #10 a = 3'b101;\n"
+                       "    #10 $displayb(a, \" -> \", b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "111 -> 0101\n000 -> 0011\nxxx -> xxx1\n101 -> 1101\n");
+}
+
 }  // namespace

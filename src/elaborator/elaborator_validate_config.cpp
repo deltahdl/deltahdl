@@ -538,6 +538,130 @@ void ValidateOneParamOverride(
 
 }  // namespace
 
+namespace {
+
+// The names a pure hierarchical reference is written with, outermost first,
+// or nothing where it selects anywhere along the way (the array-of-instances
+// report covers that shape).
+std::vector<std::string_view> HierReferenceNames(const Expr* e) {
+  std::vector<std::string_view> names;
+  while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
+    if (e->rhs == nullptr) return {};
+    names.push_back(e->rhs->text);
+    e = e->lhs;
+  }
+  if (e == nullptr || e->kind != ExprKind::kIdentifier) return {};
+  names.push_back(e->text);
+  std::reverse(names.begin(), names.end());
+  return names;
+}
+
+// Whether `mod` holds, among its own items, a generate construct one of whose
+// blocks is named `name`.
+bool DeclaresGenerateBlock(const ModuleDecl* mod, std::string_view name) {
+  for (const auto* item : mod->items) {
+    switch (item->kind) {
+      case ModuleItemKind::kGenerateFor:
+        if (item->name == name) return true;
+        break;
+      case ModuleItemKind::kGenerateIf:
+        for (const auto* arm = item; arm != nullptr; arm = arm->gen_else) {
+          if (arm->name == name) return true;
+        }
+        break;
+      case ModuleItemKind::kGenerateCase:
+        for (const auto& ci : item->gen_case_items) {
+          if (ci.label == name) return true;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+// The module instantiated as `inst_name` among `mod`'s own items, or nullptr.
+const ModuleDecl* InstantiatedModule(const ModuleDecl* mod,
+                                     std::string_view inst_name,
+                                     const CompilationUnit* unit) {
+  for (const auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kModuleInst ||
+        item->inst_name != inst_name) {
+      continue;
+    }
+    for (const auto* cand : unit->modules) {
+      if (cand->name == item->inst_module) return cand;
+    }
+  }
+  return nullptr;
+}
+
+// The module the scopes `names` descend into from `mod`, stopping short of the
+// last name; nullptr where one of them is a generate block, which is what
+// `through_generate` then reports, or names nothing that can be followed.
+const ModuleDecl* DescendScopes(const ModuleDecl* mod,
+                                const std::vector<std::string_view>& names,
+                                size_t first, size_t end,
+                                const CompilationUnit* unit,
+                                bool& through_generate) {
+  for (size_t i = first; mod != nullptr && i < end; ++i) {
+    if (DeclaresGenerateBlock(mod, names[i])) {
+      through_generate = true;
+      return nullptr;
+    }
+    mod = InstantiatedModule(mod, names[i], unit);
+  }
+  return mod;
+}
+
+std::vector<std::string_view> SplitDots(std::string_view path) {
+  std::vector<std::string_view> parts;
+  size_t start = 0;
+  while (start <= path.size()) {
+    size_t dot = path.find('.', start);
+    if (dot == std::string_view::npos) dot = path.size();
+    parts.push_back(path.substr(start, dot - start));
+    start = dot + 1;
+  }
+  return parts;
+}
+
+// §33.4.3 (printed page 940): "Hierarchical references cannot include scopes
+// of generate or array of instances." A reference is resolved "starting in the
+// parent scope of the instance", or from the design's top-level cell where it
+// is written from there, and whether a scope it passes through is a generate
+// block is a fact about the design rather than about the text.
+bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
+                                      const ConfigRule* rule, const Expr* expr,
+                                      const CompilationUnit* unit) {
+  auto names = HierReferenceNames(expr);
+  if (names.size() < 2) return false;
+  auto top_module = [&](std::string_view cell) -> const ModuleDecl* {
+    for (const auto& dc : cfg->design_cells) {
+      if (dc.cell != cell) continue;
+      for (const auto* mod : unit->modules) {
+        if (mod->name == cell) return mod;
+      }
+    }
+    return nullptr;
+  };
+  bool through_generate = false;
+  if (const auto* top = top_module(names[0])) {
+    DescendScopes(top, names, 1, names.size() - 1, unit, through_generate);
+    return through_generate;
+  }
+  auto inst = SplitDots(rule->inst_path);
+  const ModuleDecl* parent = top_module(inst.front());
+  parent =
+      DescendScopes(parent, inst, 1, inst.size() - 1, unit, through_generate);
+  if (parent == nullptr) return through_generate;
+  DescendScopes(parent, names, 0, names.size() - 1, unit, through_generate);
+  return through_generate;
+}
+
+}  // namespace
+
 void Elaborator::ValidateConfigParamOverrides() {
   for (auto* cfg : unit_->configs) {
     std::unordered_set<std::string_view> lp_names;
@@ -547,6 +671,14 @@ void Elaborator::ValidateConfigParamOverrides() {
       for (const auto& [pname, expr] : rule->use_params) {
         if (!expr) continue;
         ValidateOneParamOverride(cfg, pname, expr, lp_names, diag_);
+        if (OverrideReferenceCrossesGenerate(cfg, rule, expr, unit_)) {
+          diag_.Error(expr->range.start,
+                      std::format("config '{}' override of parameter '{}' uses "
+                                  "a hierarchical reference that passes "
+                                  "through a generate scope",
+                                  cfg->name, pname),
+                      Subclause("33.4.3"));
+        }
       }
     }
   }

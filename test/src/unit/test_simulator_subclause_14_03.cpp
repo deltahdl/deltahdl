@@ -198,4 +198,78 @@ TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
   EXPECT_EQ(found->clock_edge, Edge::kEdge);
 }
 
+// §14.3 (printed page 354) with §23.6: a clocking event may name its clock by a
+// hierarchical name, `@(posedge top.clk)`, and the block then fires at that
+// signal's edges as at a local one's. Dropped, the program's `@(cb)` waited for
+// ever on a free-running clock.
+TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromAProgram) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  logic clk = 0; logic [3:0] d;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  p pi(d);\n"
+                 "endmodule\n"
+                 "program p(output logic [3:0] d);\n"
+                 "  clocking cb @(posedge top.clk); output d; endclocking\n"
+                 "  initial begin @(cb); cb.d <= 4'd5; @(cb); $display(\"prog "
+                 "at %0t\", $time); end\n"
+                 "endprogram\n",
+                 f),
+      "prog at 15\n");
+}
+
+// The same clocking event in a submodule's block.
+TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromASubmodule) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  logic clk = 0; logic [3:0] d;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  sub si(d);\n"
+                 "endmodule\n"
+                 "module sub(output logic [3:0] d);\n"
+                 "  clocking cb @(posedge top.clk); output d; endclocking\n"
+                 "  initial begin @(cb); cb.d <= 4'd5; @(cb); $display(\"sub "
+                 "at %0t\", $time); $finish; end\n"
+                 "endmodule\n",
+                 f),
+      "sub at 15\n$finish at time 15\n");
+}
+
+// §14.9 (printed page 359) with §25.5: a program's block clocked by a signal of
+// its interface port, `@(posedge a.clk)` with `bus_A.test a`, fires at that
+// edge, samples `data = a.data` and drives `write = a.write` through the port.
+TEST(ClockingBlockSim, ClockReachedThroughAnInterfacePortFires) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface bus_A(input clk);\n"
+                 "  logic [15:0] data;\n"
+                 "  logic write;\n"
+                 "  modport test(input data, output write, input clk);\n"
+                 "endinterface\n"
+                 "program test(bus_A.test a);\n"
+                 "  clocking cd1 @(posedge a.clk);\n"
+                 "    input data = a.data;\n"
+                 "    output write = a.write;\n"
+                 "  endclocking\n"
+                 "  initial begin\n"
+                 "    @(cd1);\n"
+                 "    $display(\"t=%0t data=%0d\", $time, cd1.data);\n"
+                 "    cd1.write <= 1;\n"
+                 "    #1 $display(\"t=%0t write=%0d\", $time, a.write);\n"
+                 "    $finish;\n"
+                 "  end\n"
+                 "endprogram\n"
+                 "module top;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  bus_A a(clk);\n"
+                 "  initial begin a.data = 33; a.write = 0; #60 $finish; end\n"
+                 "  test main(a);\n"
+                 "endmodule\n",
+                 f),
+      "t=5 data=33\nt=6 write=1\n$finish at time 6\n");
+}
+
 }  // namespace

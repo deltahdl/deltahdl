@@ -93,4 +93,44 @@ TEST(StringParamOverride,
             "John Smith\n");
 }
 
+// §23.10 (printed page 764): "An override value shall be converted to the
+// type of the parameter", so `.R(3.25)` on `parameter real R` makes R 3.25;
+// and a parameter with neither type nor range takes "the type and range of
+// the new value", so `.Q(2.5)` makes Q the real 2.5, 64 bits. A real
+// override was folded as an integer, had no value and was dropped: R kept
+// 1.5 and Q read 0.0. The instance with no real override keeps Q integral.
+TEST(NamedParamAssignment, RealOverrideTakesTheParametersTypeOrGivesItsOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter Q = 5, parameter real R = 1.5,\n"
+                       "           parameter S = \"abc\")();\n"
+                       "  initial #1 $display(\"Q %f R %f S %s bitsQ %0d\",\n"
+                       "                      Q, R, S, $bits(Q));\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  m #(.Q(2.5), .R(3.25), .S(\"xyz\")) u();\n"
+                       "  m #(7) v();\n"
+                       "endmodule\n",
+                       f),
+            "Q 2.500000 R 3.250000 S xyz bitsQ 64\n"
+            "Q 7.000000 R 1.500000 S abc bitsQ 32\n");
+}
+
+// The same beside ranged parameters, which keep their range: 20 into
+// [3:0] P is 4, and a signed [3:0] S reads 15 as -1. An integral override
+// of a parameter declared real is a real, `.R(3)` reading 3.0.
+TEST(NamedParamAssignment, RealOverrideBesideRangedAndIntegralOverrides) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter [3:0] P = 0, parameter Q = 5,\n"
+                       "           parameter signed [3:0] S = 0,\n"
+                       "           parameter real R = 1.5)();\n"
+                       "  initial #1 $display(\"p %0d q %f s %0d r %f\",\n"
+                       "                      P, Q, S, R);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  m #(.P(20), .Q(2.5), .S(15), .R(3)) u();\n"
+                       "endmodule\n",
+                       f),
+            "p 4 q 2.500000 s -1 r 3.000000\n");
+}
+
 }  // namespace

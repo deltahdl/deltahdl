@@ -1,4 +1,5 @@
 #include <format>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -433,15 +434,23 @@ static void CheckTaskBodyNbaForAutoVar(
   CheckNbaEventControlForAutoVar(s, auto_vars, rule, diag);
 }
 
-// An automatic task variable shall not be traced by continuous monitoring
-// system tasks such as $monitor and $dumpvars, whose tracing outlives the
-// invocation.
+// §13.3.2 (printed page 339): an automatic task variable shall not be "traced
+// with system tasks such as $monitor and $dumpvars", whose tracing outlives the
+// invocation. $monitor's radix forms trace as it does, and so does $fmonitor
+// in each of its forms, which §21.3.2 makes work "just like" $monitor.
+static bool IsTracingSystemTask(std::string_view name) {
+  if (name == "$dumpvars") return true;
+  name.remove_prefix(name.starts_with("$f") ? 2 : 1);
+  return name == "monitor" || name == "monitorb" || name == "monitoro" ||
+         name == "monitorh";
+}
+
 static void CheckTaskBodyMonitorTrace(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     const AutoVarRule& rule, DiagEngine& diag) {
   if (s->kind != StmtKind::kExprStmt || !s->expr ||
       s->expr->kind != ExprKind::kSystemCall ||
-      (s->expr->callee != "$monitor" && s->expr->callee != "$dumpvars"))
+      !IsTracingSystemTask(s->expr->callee))
     return;
   for (auto* a : s->expr->args) {
     if (ExprRefsAutoVar(a, auto_vars)) {

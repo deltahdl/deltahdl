@@ -309,4 +309,59 @@ TEST(IoDisplayWriteSim, WritehOmitsNewline) {
   EXPECT_EQ(out, "hi");
 }
 
+// §21.2.1 with §21.2.1.1 (printed pages 654-656): every argument prints in
+// order. A literal holding no specifier is text and the expression after it
+// prints in the task's default radix; an expression beyond the template's
+// specifiers prints on its own in that radix; an empty argument is a space.
+// §21.2.1.2 (printed page 659) sizes each such value by the largest value its
+// type holds, so the 4-bit v takes two columns in decimal and each 32-bit
+// literal eleven. The value after a specifier-free literal and every value
+// past the template's last specifier were dropped.
+TEST(IoDisplayWriteSim, ArgumentsBeyondATemplatesSpecifiersPrintInOrder) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] w = 8'd77;\n"
+                       "  logic [3:0] v = 5;\n"
+                       "  string s = \"hello\", n = \"nm\";\n"
+                       "  initial begin\n"
+                       "    $display(\":\", w);\n"
+                       "    $displayb(\":\", w);\n"
+                       "    $displayo(\":\", w);\n"
+                       "    $displayh(\":\", w);\n"
+                       "    $display(s, \" \", w);\n"
+                       "    $display(\":\", v);\n"
+                       "    $display(v, \":\");\n"
+                       "    $display(\"%s\", n, , \"x\");\n"
+                       "    $display(\"v=%0d\", 1, 2, 3);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            ": 77\n:01001101\n:115\n:4d\nhello  77\n: 5\n 5:\nnm x\n"
+            "v=1          2          3\n");
+}
+
+// §21.2.1.1 with §21.2.1.2: a string literal after a template is the value of
+// the template's pending %s, padded on the left to the field width and never
+// truncated, as a string variable is -- in $display, $swrite and $sformat
+// alike. The literal was printed after the template as a template of its own,
+// `::a`.
+TEST(IoDisplayWriteSim, StringLiteralIsThePendingPercentSValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s = \"xy\", o;\n"
+                       "  initial begin\n"
+                       "    $display(\":%3s:\", \"a\");\n"
+                       "    $display(\":%3s:\", \"abcdef\");\n"
+                       "    $display(\":%0s:\", \"a\");\n"
+                       "    $display(\":%5s:\", s);\n"
+                       "    $swrite(o, \":%3s:\", \"a\");\n"
+                       "    $display(o);\n"
+                       "    $sformat(o, \":%3s:\", \"a\");\n"
+                       "    $display(o);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            ":  a:\n:abcdef:\n:a:\n:   xy:\n:  a:\n:  a:\n");
+}
+
 }  // namespace

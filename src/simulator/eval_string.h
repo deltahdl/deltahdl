@@ -23,6 +23,12 @@ Logic4Vec StripStringZeros(const Logic4Vec& packed, Arena& arena);
 void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
                      Arena& arena);
 
+// §6.16 with §8.5: whether `e` names a class property declared with the
+// string type -- bare or through `this` inside a method of the class, as a
+// static `C::name`, or through a handle -- rather than a variable of the run's
+// tables, which the caller asks about first.
+bool NamesStringProperty(const Expr* e, SimContext& ctx);
+
 // §6.16 (printed page 113): the indexed character assignment `s[i] = c` on a
 // string that is a class property rather than a variable of the run's tables
 // -- `h.p[0] = "x"` through a handle, `p[0] = "x"` bare or through `this`

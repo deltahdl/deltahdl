@@ -623,6 +623,11 @@ static bool TryEvalStringMethodOnReceiver(const Expr* expr, SimContext& ctx,
   return DispatchMutatingMethod(method, args, out);
 }
 
+bool NamesStringProperty(const Expr* e, SimContext& ctx) {
+  FieldTarget target;
+  return ResolveStringPropertyTarget(e, ctx, target);
+}
+
 bool TryWriteStringPropertyChar(const Expr* lhs, const Logic4Vec& rhs_val,
                                 SimContext& ctx, Arena& arena) {
   if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr ||

@@ -1,5 +1,6 @@
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -11,6 +12,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -82,6 +84,15 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
   // which is how ClockingBlock keeps it; ClockingBlock::inst_prefix is what
   // joins it to the instance's own variable.
   sig.signal_name = decl.name;
+  // §14.3: `output d = top.d` drives and samples the signal the expression
+  // names rather than a signal of the clockvar's own name.
+  if (decl.hier_expr != nullptr) {
+    std::string path;
+    BuildLhsName(decl.hier_expr, path);
+    if (!path.empty()) {
+      sig.target_path = *scope.arena.Create<std::string>(std::move(path));
+    }
+  }
   sig.direction = ClockingDirOf(decl.direction);
   const Expr* skew = SkewExprOf(decl, item, sig.direction);
   sig.skew = ClockingSkewOf(skew, scope);
@@ -100,14 +111,21 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
 // and §14.10 makes the event a block triggers "the event associated with the
 // clocking block name", so an anonymous block has no name for a clockvar or an
 // `@(cb)` to spell and there is nothing to register it under. A clocking event
-// that is not a plain identifier names no variable the clock watcher could
-// attach to, which is the other way a declaration arrives with nothing here to
-// use.
+// that is neither a name nor a hierarchical name names no variable the clock
+// watcher could attach to, which is the other way a declaration arrives with
+// nothing here to use.
+//
+// §14.3 (printed page 354) with §23.6: the event may name its clock by a
+// hierarchical name, `@(posedge top.clk)`, which is kept as it is spelled and
+// resolved from the block's instance when the watcher attaches
+// (ClockingManager::Attach). Dropped here, the block never fired and a process
+// waiting in `@(cb)` waited for ever.
 std::optional<ClockingBlock> BuildClockingBlock(
     const ModuleItem* item, const ClockingLowerScope& scope) {
   if (item->name.empty() || item->clocking_event.empty()) return std::nullopt;
   const Expr* clock = item->clocking_event[0].signal;
-  if (clock == nullptr || clock->kind != ExprKind::kIdentifier) {
+  if (clock == nullptr || (clock->kind != ExprKind::kIdentifier &&
+                           clock->kind != ExprKind::kMemberAccess)) {
     return std::nullopt;
   }
   ClockingBlock block;
@@ -119,7 +137,13 @@ std::optional<ClockingBlock> BuildClockingBlock(
   block.name = *scope.arena.Create<std::string>(scope.inst_prefix +
                                                 std::string(item->name));
   block.inst_prefix = *scope.arena.Create<std::string>(scope.inst_prefix);
-  block.clock_signal = clock->text;
+  if (clock->kind == ExprKind::kIdentifier && clock->scope_prefix.empty()) {
+    block.clock_signal = clock->text;
+  } else {
+    std::string path;
+    BuildLhsName(clock, path);
+    block.clock_signal = *scope.arena.Create<std::string>(std::move(path));
+  }
   block.clock_edge = item->clocking_event[0].edge;
   block.default_input_skew =
       ClockingSkewOf(item->default_input_skew_delay, scope);

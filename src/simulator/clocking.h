@@ -52,6 +52,10 @@ enum class ClockingDir : uint8_t {
 
 struct ClockingSignal {
   std::string_view signal_name;
+  // §14.3's clocking_decl_assign: the signal an `= expression` names in place
+  // of the module signal of the clockvar's own name, `output d = top.d`, as
+  // the path it spells, hierarchical or not; empty where there is none.
+  std::string_view target_path;
   ClockingDir direction = ClockingDir::kInput;
   SimTime skew{0};
   bool is_explicit_zero_skew = false;

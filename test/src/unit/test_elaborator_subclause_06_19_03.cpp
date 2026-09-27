@@ -725,4 +725,40 @@ TEST(Elaboration, ScopedPackageParameterAssignedToEnumIsReported) {
                             "6.19.3"));
 }
 
+// §6.19.3 with §10.9.1: an unpacked array of the enum takes an assignment
+// pattern whose every item is a value of the enumeration -- positional, a
+// default item, and a nested pattern for a second dimension -- in a declaration
+// and in an assignment, each item initializing an element. It was reported as
+// an integer assigned without a cast.
+TEST(Elaboration, EnumArrayTakesAPatternOfEnumValues_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {ON, OFF} sw_e;\n"
+      "  sw_e ea[3] = '{ON, OFF, ON};\n"
+      "  sw_e ek[3] = '{default: OFF};\n"
+      "  sw_e ed[2][2] = '{'{ON, OFF}, '{OFF, OFF}};\n"
+      "  sw_e eb[2];\n"
+      "  initial eb = '{OFF, ON};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The items are still screened: a pattern of integers initializing an array
+// of the enum assigns each element an integer without a cast.
+TEST(Elaboration, EnumArrayPatternOfIntegers_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {ON, OFF} sw_e;\n"
+      "  sw_e ea[2] = '{0, 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 3,
+                            "6.19.3"));
+}
+
 }  // namespace

@@ -168,12 +168,20 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
     result.is_signed = true;
     return result;
   }
-  auto d = static_cast<double>(inner.ToUint64());
-  uint64_t bits = 0;
-  std::memcpy(&bits, &d, sizeof(double));
-  auto result = MakeLogic4VecVal(arena, target_width, bits);
-  result.is_real = true;
-  return result;
+  // §6.24.1 (printed page 139): the value a variable of the casting type
+  // holds once the operand is assigned to it, the integer's value as a real,
+  // signed where the operand is. A shortreal is single precision in 32 bits
+  // (MakeRealVec), which a double's pattern cut to 32 bits read back as 0.
+  uint64_t raw = inner.ToUint64();
+  double d = static_cast<double>(raw);
+  if (inner.is_signed && inner.width > 0 && inner.width < 64 &&
+      ((raw >> (inner.width - 1)) & 1U) != 0U) {
+    d = static_cast<double>(
+        static_cast<int64_t>(raw | ~((uint64_t{1} << inner.width) - 1)));
+  } else if (inner.is_signed && inner.width == 64) {
+    d = static_cast<double>(static_cast<int64_t>(raw));
+  }
+  return MakeRealVec(arena, d, target_width);
 }
 
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {

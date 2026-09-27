@@ -679,7 +679,11 @@ static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto d = static_cast<double>(static_cast<int64_t>(val.ToUint64()));
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
-  return MakeLogic4VecVal(arena, 64, bits);
+  // §20.5: $itor returns a real, which a reader tells from an integer by
+  // the mark rather than by the bits.
+  Logic4Vec out = MakeLogic4VecVal(arena, 64, bits);
+  out.is_real = true;
+  return out;
 }
 
 static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -693,7 +697,10 @@ static Logic4Vec EvalBitstoreal(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  return MakeLogic4VecVal(arena, 64, val.ToUint64());
+  // §20.5: $bitstoreal returns the real the bits spell.
+  Logic4Vec out = MakeLogic4VecVal(arena, 64, val.ToUint64());
+  out.is_real = true;
+  return out;
 }
 
 static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,

@@ -349,7 +349,9 @@ void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
-  WriteSignalVarDecl(Decl(), sig, spec.name, spec.width, port_nodes_);
+  WriteSignalVarDecl(Decl(), sig,
+                     spec.ref_name.empty() ? spec.name : spec.ref_name,
+                     spec.width, port_nodes_);
 }
 
 void VcdWriter::WriteComment(std::string_view text) {
