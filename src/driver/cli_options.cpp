@@ -14,6 +14,7 @@
 #include "common/types.h"
 #include "preprocessor/protect_cli.h"
 #include "simulator/foreign_code.h"
+#include "simulator/sv_vpi_user.h"
 
 namespace delta {
 
@@ -202,6 +203,54 @@ bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
   return true;
 }
 
+// §36.12.2.2 (printed page 997): the vpiCompatibilityMode value the mode
+// `name` stands for, spelled as the Annex L symbols spell it, and 0 for a name
+// Annex M's sv_vpi_user.h (printed page 1331) gives no value -- 1800v2012,
+// 1800v2017 and 1800v2023 among them, which the listing defines none for.
+int VpiCompatModeNamed(std::string_view name) {
+  static constexpr std::pair<std::string_view, int> kModes[] = {
+      {"1364v1995", vpiMode1364v1995},
+      {"1364v2001", vpiMode1364v2001},
+      {"1364v2005", vpiMode1364v2005},
+      {"1800v2005", vpiMode1800v2005},
+      {"1800v2009", vpiMode1800v2009}};
+  for (const auto& [spelling, mode] : kModes) {
+    if (spelling == name) return mode;
+  }
+  return 0;
+}
+
+// §36.12.2.2: "A means to set the default VPI compatibility mode shall be made
+// available by the simulation provider", and "only one such default mode shall
+// be selectable for a given simulation run". This is that means. A name that is
+// no mode, and a second switch naming a mode other than the first's, are
+// consumed and refused as TryParseMinTypMaxArg refuses a bad value; the same
+// mode named again selects nothing new and is accepted, as
+// VpiContext::SetDefaultCompatibilityMode accepts it.
+bool TryParseVpiCompatModeArg(std::string_view arg, int& i, int argc,
+                              const char* const argv[], CliOptions& opts) {
+  if (arg != "--vpi-compat-mode") return false;
+  if (i + 1 >= argc) {
+    ReportMissingValue("--vpi-compat-mode", i, opts);
+    return true;
+  }
+  std::string_view value = argv[++i];
+  int mode = VpiCompatModeNamed(value);
+  if (mode == 0) {
+    std::cerr << "--vpi-compat-mode expects 1364v1995, 1364v2001, 1364v2005, "
+                 "1800v2005 or 1800v2009: "
+              << value << "\n";
+    opts.rejected_argument = true;
+  } else if (opts.vpi_compat_mode != 0 && opts.vpi_compat_mode != mode) {
+    std::cerr << "--vpi-compat-mode selects one default mode for the run; "
+              << value << " follows another\n";
+    opts.rejected_argument = true;
+  } else {
+    opts.vpi_compat_mode = mode;
+  }
+  return true;
+}
+
 bool TryParseSimArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
   ArgCursor cur{i, argc, argv, opts};
@@ -211,7 +260,8 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
   if (TakeValue(arg, "--timescale", cur, opts.timescale)) return true;
   if (TakeValue(arg, "--fst", cur, opts.fst_file)) return true;
   if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
-  return TryParseMinTypMaxArg(arg, i, argc, argv, opts);
+  if (TryParseMinTypMaxArg(arg, i, argc, argv, opts)) return true;
+  return TryParseVpiCompatModeArg(arg, i, argc, argv, opts);
 }
 
 bool TryParseSynthArg(std::string_view arg, int& i, int argc,

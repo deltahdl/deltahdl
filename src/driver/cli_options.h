@@ -91,6 +91,12 @@ struct CliOptions {
   // --mintypmax. Not delay_mode above, which is the synthesizer's
   // delay-oriented optimization.
   delta::DelayMode mintypmax = delta::DelayMode::kTyp;
+  // §36.12.2.2's default VPI compatibility mode for the run, selected by
+  // --vpi-compat-mode: one of the vpiCompatibilityMode values Annex M's
+  // sv_vpi_user.h defines, vpiMode1364v1995 through vpiMode1800v2009, and 0
+  // while none was selected, every application then observing this standard's
+  // behavior.
+  int vpi_compat_mode = 0;
   // Whether an option was recognized and its argument refused. It is separate
   // from the unrecognized option ParseArgs reports, because an option that
   // names its own complaint has already printed the one a reader needs.

@@ -90,6 +90,11 @@ void PrintHelp() {
             << "  --max-time <time>    Maximum simulation time\n"
             << "  --seed <n>           Random seed\n"
             << "  --timescale <t/p>    Override default timescale\n"
+            << "  --vpi-compat-mode <mode>\n"
+            << "                       Default VPI compatibility mode "
+               "(36.12.2.2):\n"
+            << "                       1364v1995, 1364v2001, 1364v2005, "
+               "1800v2005, 1800v2009\n"
             << "  -D <name>[=<value>]  Define preprocessor macro\n"
             << "  --lint-only          Parse and elaborate only\n"
             << "  --parse-only         Parse only\n"
@@ -705,6 +710,13 @@ int main(int argc, char* argv[]) {
   if (!delta::ParseArgs(argc, argv, opts)) {
     return 1;
   }
+  // §36.12.2.2: the default VPI compatibility mode --vpi-compat-mode selects
+  // governs every application not bound to a mode at compile time, so it is
+  // set once, before the design is compiled or run and any callback an
+  // application registered above is called.
+  if (opts.vpi_compat_mode != 0)
+    delta::GetGlobalVpiContext().SetDefaultCompatibilityMode(
+        opts.vpi_compat_mode);
   if (opts.show_version) {
     PrintVersion();
     return 0;

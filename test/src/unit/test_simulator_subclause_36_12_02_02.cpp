@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "driver/cli_options.h"
+#include "helpers_command_line.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -163,6 +168,60 @@ TEST_F(VpiDefaultCompatibilityMode, An1800DefaultLeavesTheBehaviorAsItIs) {
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &reg);
   EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §36.12.2.2 (printed page 997): the means the simulation provider makes
+// available is the driver's --vpi-compat-mode, which names one of the modes
+// Annex M's sv_vpi_user.h (printed page 1331) gives vpiCompatibilityMode a
+// value for, and is absent from a command line that selects none. Nothing on
+// the command line could select one, so no run had a default mode.
+TEST(VpiDefaultCompatibilityModeSwitch, TheDriverTakesEachAnnexMMode) {
+  const std::pair<std::string, int> kModes[] = {
+      {"1364v1995", vpiMode1364v1995},
+      {"1364v2001", vpiMode1364v2001},
+      {"1364v2005", vpiMode1364v2005},
+      {"1800v2005", vpiMode1800v2005},
+      {"1800v2009", vpiMode1800v2009}};
+  for (const auto& [name, mode] : kModes) {
+    CliOptions opts;
+    EXPECT_TRUE(ParseCommandLine({"--vpi-compat-mode", name, "top.sv"}, opts))
+        << name;
+    EXPECT_EQ(opts.vpi_compat_mode, mode) << name;
+  }
+  CliOptions none;
+  EXPECT_TRUE(ParseCommandLine({"top.sv"}, none));
+  EXPECT_EQ(none.vpi_compat_mode, 0);
+}
+
+// §36.12.2.2: a name that is no mode vpiCompatibilityMode has a value for --
+// 1800v2012 among them, which Annex M defines none for -- is refused, as is a
+// switch with no name after it.
+TEST(VpiDefaultCompatibilityModeSwitch, ANameWithNoModeValueIsRefused) {
+  CliOptions opts;
+  EXPECT_FALSE(
+      ParseCommandLine({"--vpi-compat-mode", "1800v2012", "top.sv"}, opts));
+  EXPECT_TRUE(opts.rejected_argument);
+  EXPECT_EQ(opts.vpi_compat_mode, 0);
+  CliOptions bare;
+  EXPECT_FALSE(ParseCommandLine({"top.sv", "--vpi-compat-mode"}, bare));
+  EXPECT_TRUE(bare.rejected_argument);
+}
+
+// §36.12.2.2: only one default mode is selectable for a given run, so a second
+// switch naming a different mode is refused and the first stands, while one
+// naming the same mode again selects nothing new and is accepted.
+TEST(VpiDefaultCompatibilityModeSwitch, OnlyOneDefaultModeIsSelectable) {
+  CliOptions twice;
+  EXPECT_FALSE(ParseCommandLine({"--vpi-compat-mode", "1364v1995",
+                                 "--vpi-compat-mode", "1800v2009", "top.sv"},
+                                twice));
+  EXPECT_TRUE(twice.rejected_argument);
+  EXPECT_EQ(twice.vpi_compat_mode, vpiMode1364v1995);
+  CliOptions same;
+  EXPECT_TRUE(ParseCommandLine({"--vpi-compat-mode", "1364v2005",
+                                "--vpi-compat-mode", "1364v2005", "top.sv"},
+                               same));
+  EXPECT_EQ(same.vpi_compat_mode, vpiMode1364v2005);
 }
 
 }  // namespace
