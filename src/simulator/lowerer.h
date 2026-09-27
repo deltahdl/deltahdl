@@ -282,6 +282,11 @@ class Lowerer {
   std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
+  // The instance output ports whose connection carries their module path
+  // delays (RtlirContAssign::module_path_port), so that an assignment inside
+  // the instance driving one of them does not carry them a second time.
+  // LowerPortBindings fills it before the instance's own body is lowered.
+  std::unordered_set<std::string> path_delayed_ports_;
   // The bare class names LowerUnimportedPackageClasses found no scope had
   // bound, each with the package class the pass bound it to, which
   // RebindStrayPackageClassNames binds again once the modules are lowered.

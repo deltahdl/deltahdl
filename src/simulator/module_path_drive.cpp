@@ -59,7 +59,16 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
     const ModulePathDrive& drive, const Logic4Vec& from, const Logic4Vec& to) {
   ModulePathDelay mp = SelectModulePathDelay(drive, from, to);
   if (!mp.found) return {drive.distributed_ticks, 0, 0};
-  return {SelectEffectivePathDelay(mp.delay, drive.distributed_ticks),
+  // §30.6 (printed page 885): at the port the delay the instance's own logic
+  // took is already spent, so the path delay runs from its source's transition
+  // and only what is left of it is waited out -- none where the logic took
+  // longer, "the larger of the two delays" being the logic's then.
+  uint64_t delay = mp.delay;
+  if (drive.at_port) {
+    const uint64_t kSpent = drive.ctx.CurrentTime().ticks - mp.source_ticks;
+    delay = delay > kSpent ? delay - kSpent : 0;
+  }
+  return {SelectEffectivePathDelay(delay, drive.distributed_ticks),
           mp.reject_limit, mp.error_limit};
 }
 

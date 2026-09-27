@@ -56,6 +56,9 @@ struct ModulePathDelay {
   uint64_t delay = 0;
   uint64_t reject_limit = 0;
   uint64_t error_limit = 0;
+  // When the selected path's source last transitioned, which a drive at the
+  // port (ModulePathDrive::at_port) measures the delay from.
+  uint64_t source_ticks = 0;
 };
 
 // Whether any module path registered in `mgr` names `output` as its
@@ -89,6 +92,12 @@ struct ModulePathDrive {
   uint32_t width;
   uint64_t distributed_ticks;
   std::function<void(const Logic4Vec&)> commit;
+  // §30.4.1 with §30.6: the drive is an output port's connection, which
+  // carries the port's delays whatever drove it inside the instance. Every
+  // path into the port is then a candidate, its condition is read in the
+  // declaring instance, and its delay runs from its source's transition, part
+  // of it already spent in the instance's own logic.
+  bool at_port = false;
 };
 
 // The module path delay governing `drive.output` transitioning from `from` to

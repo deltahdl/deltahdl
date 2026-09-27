@@ -378,6 +378,12 @@ struct RtlirContAssign {
   // -- still reaches the load.
   std::string interconnect_load;
   std::string interconnect_source;
+  // §30.4.1 with §30.6: when this assignment is the connection of an
+  // instance's output port, the port as the design names it ("u.y"). A module
+  // path the instance declares onto the port is carried here, on the way out,
+  // whatever drives the port inside the instance -- a continuous assignment, a
+  // procedure, a gate or a nested instance. Empty for every other assignment.
+  std::string module_path_port;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
   GenBlockPrefixes gen_block_prefixes;

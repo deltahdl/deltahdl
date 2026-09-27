@@ -144,6 +144,13 @@ struct ContAssignParams {
   // The driver slot PresetDelayedDriver gave this assignment on its net when it
   // was lowered, or -1 where it gave none.
   int64_t preset_driver = -1;
+
+  // §30.4.1 with §30.6: RtlirContAssign::module_path_port, the output port
+  // whose module path delays this connection carries; and, for an assignment
+  // inside the instance, whether the connection of the port it drives carries
+  // them instead, so it does not delay the port a second time.
+  std::string module_path_port;
+  bool path_delayed_at_connection = false;
 };
 
 // Identifies the driver slot that a continuous assignment writes to. Per IEEE
@@ -679,10 +686,17 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
                                  ContAssignTransitionWidth(drv, w.params.width))
                            : 0;
 
-  if (w.path_mgr != nullptr && !Logic4VecEqual(driven, old_val)) {
-    ModulePathDrive drive{w.ctx,          w.arena,     *w.path_mgr,
-                          w.path_output,  w.read_vars, w.params.rhs,
-                          w.params.width, ticks,       w.commit};
+  // An output port's connection places the port's first value on the net
+  // above as it finds it, the net holding nothing yet for a module path to
+  // delay a transition from; the port's transitions after that are delayed.
+  const bool kFirstAtPort = !w.params.module_path_port.empty() && drv.first;
+  if (w.path_mgr != nullptr && !kFirstAtPort &&
+      !Logic4VecEqual(driven, old_val)) {
+    ModulePathDrive drive{w.ctx,          w.arena,
+                          *w.path_mgr,    w.path_output,
+                          w.read_vars,    w.params.rhs,
+                          w.params.width, ticks,
+                          w.commit,       !w.params.module_path_port.empty()};
     co_await RunModulePathTransition(drive, old_val, val, committed);
     co_return StmtResult::kDone;
   }
@@ -782,10 +796,15 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   // which is what PathDelay::inst_prefix and PathDelay::dst_port together
   // spell. Built once outside the loop because ModulePathDrive::output is a
   // view of it.
+  // An output port's connection names the port it carries the delays of
+  // instead, and an assignment inside the instance whose port's connection
+  // carries them names nothing.
   std::string_view target_name = ContAssignTargetName(params.lhs);
-  std::string path_output = target_name.empty()
-                                ? std::string()
-                                : params.inst_prefix + std::string(target_name);
+  std::string path_output = params.module_path_port;
+  if (path_output.empty() && !target_name.empty() &&
+      !params.path_delayed_at_connection) {
+    path_output = params.inst_prefix + std::string(target_name);
+  }
 
   std::function<void(const Logic4Vec&)> commit = [&](const Logic4Vec& v) {
     CommitContAssignValue(params, drv, v, ctx, arena);
@@ -882,6 +901,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.interconnect_load = ca.interconnect_load;
   cap.interconnect_source = ca.interconnect_source;
   cap.preset_driver = PresetDelayedDriver(cap, ctx_, arena_);
+  cap.module_path_port = ca.module_path_port;
+  cap.path_delayed_at_connection = path_delayed_ports_.contains(
+      inst_prefix_ + std::string(ContAssignTargetName(ca.lhs)));
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);

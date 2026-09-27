@@ -194,6 +194,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     ca.lhs = binding.connection;
     ca.rhs = local_id;
     ca.width = binding.width;
+    ca.module_path_port =
+        inst_prefix_ + inst_seg + std::string(binding.port_name);
+    path_delayed_ports_.insert(ca.module_path_port);
     LowerContAssign(ca, from_program);
   }
 }

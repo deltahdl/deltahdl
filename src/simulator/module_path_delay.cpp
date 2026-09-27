@@ -21,6 +21,7 @@
 #include "common/types.h"
 #include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -224,6 +225,10 @@ static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
 static bool ConditionalPathIsActive(const PathDelay& pd,
                                     const ModulePathDrive& drive) {
   if (pd.condition_expr == nullptr) return true;
+  // The condition names the declaring instance's signals by their bare names,
+  // and a drive at the port runs in the instance above.
+  InstancePrefixOverride scope(drive.ctx.InstancePrefixOverride(),
+                               pd.inst_prefix);
   Logic4Vec value = EvalExpr(pd.condition_expr, drive.ctx, drive.arena);
   if (value.nwords == 0) return false;
   return StateDependentPathConditionEnables(value.words[0]);
@@ -300,7 +305,7 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
   std::vector<PathCandidate> candidates;
   for (const PathDelay& pd : drive.mgr.GetPathDelays()) {
     if (!PathEndsAt(pd, drive.output)) continue;
-    if (!PathStartsAtOneOf(pd, drive.sources)) continue;
+    if (!drive.at_port && !PathStartsAtOneOf(pd, drive.sources)) continue;
     // An ifnone candidate is settled below, after every condition has an
     // answer to be settled against.
     bool active = (pd.is_ifnone || ConditionalPathIsActive(pd, drive)) &&
@@ -311,11 +316,16 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
   SettleIfnoneCandidates(candidates);
   const PathDelay* selected = SelectActivePath(candidates, slot);
   if (selected == nullptr) return ModulePathDelay{};
+  uint64_t source_ticks = 0;
+  for (const PathCandidate& candidate : candidates) {
+    if (candidate.path == selected)
+      source_ticks = candidate.last_transition_time;
+  }
   // §30.7 measures a pulse against the limits of the delay that formed its
   // edge, so all three are read off the one path the selection settled on.
   return ModulePathDelay{true, selected->delays[slot],
                          selected->reject_limit[slot],
-                         selected->error_limit[slot]};
+                         selected->error_limit[slot], source_ticks};
 }
 
 // Records on `var` the time its value last changed, for as long as the run
