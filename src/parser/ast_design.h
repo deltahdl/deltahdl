@@ -213,6 +213,16 @@ inline void MarkCellModules(CompilationUnit* cu,
   }
 }
 
+// The directives the preprocessor recorded at the header of the design element
+// named `name`, or null when it recorded none there.
+inline const ModuleDirectives* DirectivesAtHeader(
+    std::string_view name, const std::vector<ModuleDirectives>& directives) {
+  for (const auto& d : directives) {
+    if (name == d.module) return &d;
+  }
+  return nullptr;
+}
+
 // Annex E: puts on each module declaration the default decay time, charge
 // strength and delay mode the preprocessor recorded in force at its header,
 // so a module takes the directives that preceded it in the source rather than
@@ -222,27 +232,23 @@ inline void MarkCellModules(CompilationUnit* cu,
 inline void ApplyModuleDirectives(
     CompilationUnit* cu, const std::vector<ModuleDirectives>& directives) {
   for (auto* mod : cu->modules) {
-    for (const auto& d : directives) {
-      if (mod->name != d.module) continue;
-      mod->has_module_directives = true;
-      mod->default_decay_time = d.decay_ticks;
-      mod->default_decay_time_infinite = d.decay_infinite;
-      mod->default_trireg_strength = d.strength;
-      mod->has_default_trireg_strength = d.has_strength;
-      mod->delay_mode = d.delay_mode;
-      break;
-    }
+    const ModuleDirectives* d = DirectivesAtHeader(mod->name, directives);
+    if (d == nullptr) continue;
+    mod->has_module_directives = true;
+    mod->default_decay_time = d->decay_ticks;
+    mod->default_decay_time_infinite = d->decay_infinite;
+    mod->default_trireg_strength = d->strength;
+    mod->has_default_trireg_strength = d->has_strength;
+    mod->delay_mode = d->delay_mode;
   }
   // §22.7: the `timescale in force at a module's, interface's or program's
   // header is the one it takes.
   for (const auto* list : {&cu->modules, &cu->interfaces, &cu->programs}) {
     for (auto* mod : *list) {
-      for (const auto& d : directives) {
-        if (mod->name != d.module) continue;
-        mod->has_directive_timescale = d.has_timescale;
-        mod->directive_timescale = d.timescale;
-        break;
-      }
+      const ModuleDirectives* d = DirectivesAtHeader(mod->name, directives);
+      if (d == nullptr) continue;
+      mod->has_directive_timescale = d->has_timescale;
+      mod->directive_timescale = d->timescale;
     }
   }
 }

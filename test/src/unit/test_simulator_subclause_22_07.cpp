@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 
 TEST(TimescaleSimulation, TimescaleModuleSimulatesCorrectly) {

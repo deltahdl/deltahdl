@@ -1,16 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <iostream>
-#include <sstream>
-#include <streambuf>
 #include <string>
 
-#include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_scheduler.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -22,27 +16,6 @@ static std::string ElemChar(SimFixture& f, const std::string& name) {
   if (!v) return "";
   auto val = static_cast<char>(v->value.ToUint64() & 0xFF);
   return std::string(1, val);
-}
-
-// The run's output for `src` taken through the preprocessor first, for a case
-// whose literal reaches the simulator through a macro body or argument.
-static std::string PreprocessAndCapture(const std::string& src) {
-  SimFixture f;
-  auto fid = f.mgr.AddFile("<test>", src);
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto preprocessed = pp.Preprocess(fid);
-  auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag,
-              TextOrigin::kPreprocessorOutput);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(TopNameOf(cu));
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
 }
 
 TEST(LexicalConventionSim, SingleCharValue) {
@@ -300,22 +273,26 @@ TEST(LexicalConventionSim, TripleQuotedLiteralAfterAnotherPrintsItsText) {
 // §22.5.1 with §5.9: a triple-quoted literal as a macro's whole body reaches
 // `$display` as the same literal and prints its text.
 TEST(LexicalConventionSim, TripleQuotedMacroBodyPrintsItsText) {
+  SimFixture f;
   auto out = PreprocessAndCapture(
       "`define MSG \"\"\"say \"hi\" now\"\"\"\n"
       "module t;\n"
       "  initial $display(`MSG);\n"
-      "endmodule\n");
+      "endmodule\n",
+      f);
   EXPECT_EQ(out, "say \"hi\" now\n");
 }
 
 // §22.5.1 with §5.9: a triple-quoted literal as a macro's actual argument is
 // substituted whole, its inner `"` included, and prints its text.
 TEST(LexicalConventionSim, TripleQuotedMacroArgumentPrintsItsText) {
+  SimFixture f;
   auto out = PreprocessAndCapture(
       "`define SHOW(s) $display(s)\n"
       "module t;\n"
       "  initial `SHOW(\"\"\"arg \"x\" here\"\"\");\n"
-      "endmodule\n");
+      "endmodule\n",
+      f);
   EXPECT_EQ(out, "arg \"x\" here\n");
 }
 
