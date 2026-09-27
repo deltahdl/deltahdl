@@ -15,13 +15,17 @@ namespace {
 // One state a bit can stand in: a value at a strength level, or high
 // impedance at level 0. The value is 0 or 1, or x where two opposite values
 // meet at one level (§28.12.2's "two signals of equal strength and opposite
-// value"), which stands on both sides of the scale at that level.
+// value"), which stands on both sides of the scale at that level. An x a
+// driver drives at one level on both sides is `exact`: §28.12.2's "signals
+// with a value x ... have strength levels consisting of subdivisions of both
+// the strength1 and the strength0 parts of the scale", and its level is known.
 struct BitState {
   uint8_t val = 3;
   uint8_t lvl = 0;
+  bool exact = false;
 
   bool operator==(const BitState& other) const {
-    return val == other.val && lvl == other.lvl;
+    return val == other.val && lvl == other.lvl && exact == other.exact;
   }
 };
 
@@ -49,6 +53,7 @@ std::vector<BitState> DriverStates(uint8_t val, DriverStrength ds) {
   if (val == 0) return {s0 != 0 ? BitState{0, s0} : kHighZ};
   if (val == 1) return {s1 != 0 ? BitState{1, s1} : kHighZ};
   if (val == 3) return {kHighZ};
+  if (s0 != 0 && s0 == s1) return {BitState{2, s0, true}};
   std::vector<BitState> states;
   if (s0 != 0) states.push_back({0, s0});
   if (s1 != 0) states.push_back({1, s1});
@@ -75,7 +80,7 @@ BitState Combine(BitState a, BitState b, NetType type) {
   if (a.lvl == 0) return b;
   if (b.lvl == 0) return a;
   if (a.lvl != b.lvl) return a.lvl > b.lvl ? a : b;
-  if (a.val == b.val) return a;
+  if (a.val == b.val) return {a.val, a.lvl, a.exact && b.exact};
   if (type == NetType::kWand || type == NetType::kTriand) {
     return {WiredAndValue(a.val, b.val), a.lvl};
   }
@@ -147,7 +152,8 @@ bool AnyDriverUnknownAt(const std::vector<Logic4Vec>& drivers, uint32_t bit) {
 // The range runs over every level a reachable state stands at, and where the
 // states reach both sides of the scale, or reach high impedance, it runs down
 // through high impedance as §28.12.2 draws such a range (Figure 28-5, Figure
-// 28-10).
+// 28-10) -- save where the one state reachable is an x a driver drives at one
+// level, whose both sides stand at that level alone.
 uint8_t ResolveBitOverDriverStates(const std::vector<Logic4Vec>& drivers,
                                    const std::vector<DriverStrength>& strengths,
                                    NetType type, uint32_t bit,
@@ -155,7 +161,9 @@ uint8_t ResolveBitOverDriverStates(const std::vector<Logic4Vec>& drivers,
   SideLevels side0;
   SideLevels side1;
   bool reaches_z = false;
-  for (BitState s : ReachableStates(drivers, strengths, type, bit)) {
+  std::vector<BitState> reach = ReachableStates(drivers, strengths, type, bit);
+  const bool kOneExactX = reach.size() == 1 && reach[0].exact;
+  for (BitState s : reach) {
     if (s.lvl == 0) {
       reaches_z = true;
       continue;
@@ -165,10 +173,10 @@ uint8_t ResolveBitOverDriverStates(const std::vector<Logic4Vec>& drivers,
   }
   out = NetStrength{};
   if (side0.hi == 0 && side1.hi == 0) return 3;
-  bool both = side0.hi != 0 && side1.hi != 0;
+  bool both = side0.hi != 0 && side1.hi != 0 && !kOneExactX;
   side0.WriteTo(out.s0_hi, out.s0_lo, both || reaches_z);
   side1.WriteTo(out.s1_hi, out.s1_lo, both || reaches_z);
-  if (both || reaches_z) return 2;
+  if (both || reaches_z || kOneExactX) return 2;
   return side0.hi != 0 ? 0 : 1;
 }
 
