@@ -374,4 +374,321 @@ TEST(ArrayArgPassing, FixedFormalSizeMismatchNames7_7) {
                             "array size mismatch: formal expects", 7, "7.7"));
 }
 
+// §7.7 accepts a fixed-size actual of the formal's size whatever its range,
+// and §7.6 pairs the elements left to right: `b[5:2]` passed to `arr[4:1]`
+// puts b[3], the third from the left, at arr[2].
+TEST(ArrayArgPassing, FixedActualOfOtherRangePairsLeftToRight) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int b[5:2] = '{10, 20, 30, 40};\n"
+      "  int result;\n"
+      "  function automatic int third(int arr[4:1]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial result = third(b);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
+
+// A formal written with a range takes a dynamic array of the size the range
+// spans, the leftmost index getting element 0.
+TEST(ArrayArgPassing, DynamicArrayToRangedFixedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = '{10, 20, 30, 40};\n"
+      "  int result;\n"
+      "  function automatic int third(int arr[4:1]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial result = third(d);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 30u);
+}
+
+TEST(ArrayArgPassing, QueueToRangedFixedFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  function automatic int third(int arr[4:1]);\n"
+      "    return arr[2];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q = {5, 6, 7, 8};\n"
+      "    result = third(q);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
+// §13.5 copies an output formal to its actual on return, and §7.7 passes an
+// array by the rules of array assignment, so a dynamic array formal sized in
+// the body gives the actual its size and elements.
+TEST(ArrayArgPassing, OutputDynamicArrayFormalCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[];\n"
+      "  int result;\n"
+      "  function automatic void mk(output int arr[]);\n"
+      "    arr = new[3];\n"
+      "    arr[2] = 7;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    mk(d);\n"
+      "    result = d.size() * 100 + d[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 307u);
+}
+
+// §13.3 copies nothing into an output formal, so the queue starts empty
+// whatever the actual held, and the actual ends holding what the task left.
+TEST(ArrayArgPassing, OutputQueueFormalOfTaskCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  task automatic mkq(output int o[$]);\n"
+      "    o.push_back(8);\n"
+      "    o.push_back(9);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    q = {1, 2, 3};\n"
+      "    mkq(q);\n"
+      "    result = q.size() * 100 + q[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 209u);
+}
+
+TEST(ArrayArgPassing, OutputAssociativeFormalCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int m[string];\n"
+      "  int result;\n"
+      "  function automatic void mm(output int a[string]);\n"
+      "    a[\"x\"] = 4;\n"
+      "    a[\"y\"] = 5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    m[\"z\"] = 1;\n"
+      "    mm(m);\n"
+      "    result = m.num() * 100 + m[\"y\"] * 10 + m.exists(\"z\");\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 250u);
+}
+
+TEST(ArrayArgPassing, InoutQueueFormalCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  function automatic void grow(inout int io[$]);\n"
+      "    io.push_back(io[0] + io[1]);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q = {3, 4};\n"
+      "    grow(q);\n"
+      "    result = q.size() * 100 + q[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 307u);
+}
+
+// An output fixed-size formal bound to a dynamic array copies its elements
+// back into it, left to right.
+TEST(ArrayArgPassing, OutputFixedFormalToDynamicArrayCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[];\n"
+      "  int result;\n"
+      "  function automatic void mf(output int f[2:1]);\n"
+      "    f[2] = 6;\n"
+      "    f[1] = 5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    d = new[2];\n"
+      "    mf(d);\n"
+      "    result = d[0] * 10 + d[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 65u);
+}
+
+// The copy-out pairs the elements left to right as the copy-in does: the
+// formal's leftmost `o[4]` goes to the actual's leftmost `b[5]`.
+TEST(ArrayArgPassing, OutputFixedFormalOfOtherRangeCopiesBackLeftToRight) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int b[5:2];\n"
+      "  int result;\n"
+      "  function automatic void fill(output int o[4:1]);\n"
+      "    o[4] = 1; o[3] = 2; o[2] = 3; o[1] = 4;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    fill(b);\n"
+      "    result = b[5] * 1000 + b[4] * 100 + b[3] * 10 + b[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1234u);
+}
+
+TEST(ArrayArgPassing, ClassMethodOutputDynamicFormalCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    function void mk(output int d[]);\n"
+      "      d = new[3];\n"
+      "      d[1] = 8;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int d[];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.mk(d);\n"
+      "    result = d.size() * 100 + d[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 308u);
+}
+
+// §8.5 with §7.7: an array property reached through a handle is an array
+// actual like any other and is copied into the formal.
+TEST(ArrayArgPassing, AssociativePropertyThroughHandleToFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int m[string];\n"
+      "    function void fill(); m[\"a\"] = 1; m[\"b\"] = 2; endfunction\n"
+      "  endclass\n"
+      "  function automatic int cnt(int a[string]);\n"
+      "    return a.num();\n"
+      "  endfunction\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    result = cnt(h.m);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 2u);
+}
+
+TEST(ArrayArgPassing, QueuePropertyThroughHandleToFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int q[$];\n"
+      "    function void fill(); q.push_back(4); q.push_back(5); endfunction\n"
+      "  endclass\n"
+      "  function automatic int sum(int a[]);\n"
+      "    int s = 0;\n"
+      "    foreach (a[i]) s += a[i];\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    result = sum(h.q);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 9u);
+}
+
+// A fixed-size array property holds its elements on the object, and is
+// copied into the formal left to right as a declared array is.
+TEST(ArrayArgPassing, FixedPropertyThroughHandleToFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int r[4:1];\n"
+      "    function void fill(); r[4] = 1; r[3] = 2; r[2] = 3; r[1] = 4; "
+      "endfunction\n"
+      "  endclass\n"
+      "  function automatic int third(int a[1:4]);\n"
+      "    return a[3];\n"
+      "  endfunction\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    result = third(h.r);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 3u);
+}
+
+// An output dynamic array formal resizes a dynamic array property it is
+// copied back into, as §7.6's assignment to a dynamic array does.
+TEST(ArrayArgPassing, OutputDynamicFormalToDynamicPropertyCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int d[];\n"
+      "  endclass\n"
+      "  function automatic void mk(output int a[]);\n"
+      "    a = new[2];\n"
+      "    a[1] = 5;\n"
+      "  endfunction\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    mk(h.d);\n"
+      "    result = h.d.size() * 100 + h.d[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 205u);
+}
+
+// §8.11: in a method, a bare name no declaration answers to is the running
+// object's property, so `fill3(f)` passes the object's array and takes the
+// output back into it.
+TEST(ArrayArgPassing, BarePropertyActualInMethodCopiesBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int f[3];\n"
+      "    function void go(); fill3(f); endfunction\n"
+      "    function int total(); return sum3(f); endfunction\n"
+      "  endclass\n"
+      "  function automatic void fill3(output int a[3]);\n"
+      "    a[0] = 9; a[1] = 8; a[2] = 7;\n"
+      "  endfunction\n"
+      "  function automatic int sum3(int a[3]);\n"
+      "    return a[0] * 100 + a[1] * 10 + a[2];\n"
+      "  endfunction\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.go();\n"
+      "    result = h.total();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 987u);
+}
+
 }  // namespace

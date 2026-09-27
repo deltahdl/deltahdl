@@ -7,10 +7,7 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_loc.h"
 #include "common/types.h"
-#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -24,7 +21,6 @@
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/lowerer_register.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -428,157 +424,6 @@ static ActualValue ResolveArgValue(const FunctionArg& param, const Expr* expr,
                        ? EvalDefaultInDeclScope(param.default_value, ctx, arena)
                        : MakeLogic4Vec(arena, 32);
   return resolved;
-}
-
-// §13.5.1: "This argument passing mechanism works by copying each argument into
-// the subroutine area ... If the arguments are changed within the subroutine,
-// the changes are not visible outside the subroutine", and §13.5.2 draws the
-// contrast this and the three binds below erased -- "Arguments passed by
-// reference are not copied into the subroutine area". A map assignment
-// copy-constructs every entry, and a Logic4Vec copy carries its words pointer
-// rather than the words (src/common/types.h), so the formal's entries were the
-// actual's: an in-place write to either -- DepositBitField writes through the
-// words it finds -- was a write to both. Each entry takes its own words.
-static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
-                            SimContext& ctx, Arena& arena) {
-  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
-  auto* src = ctx.FindAssocArray(IdentifierLookupKey(call_arg));
-  if (!src) return false;
-  auto* dst =
-      ctx.CreateAssocArray(param_name, src->elem_width, src->is_string_key);
-  for (const auto& [key, val] : src->int_data)
-    dst->int_data[key] = OwnRhsWords(val, arena);
-  for (const auto& [key, val] : src->str_data)
-    dst->str_data[key] = OwnRhsWords(val, arena);
-  dst->has_default = src->has_default;
-  dst->default_value = OwnRhsWords(src->default_value, arena);
-  dst->index_width = src->index_width;
-  dst->is_wildcard = src->is_wildcard;
-  dst->is_4state = src->is_4state;
-  dst->index_class = src->index_class;
-  return true;
-}
-
-// Binds a dynamic-array/queue actual to a fixed-size formal: the sizes must
-// match, after which the formal is materialized as per-element variables.
-// `loc` is where the actual was written, which the size-mismatch report names;
-// the formal carries no position of its own.
-static bool BindQueueToFixedFormal(QueueObject* src_q,
-                                   const FunctionArg& formal, SimContext& ctx,
-                                   Arena& arena, SourceLoc loc) {
-  // A fixed-size formal accepts a dynamic array or queue only when the
-  // sizes are equal; this can only be verified at the time of the call.
-  auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
-  if (src_q->elements.size() != formal_size) {
-    ctx.GetDiag().Error(
-        loc,
-        "array size mismatch: formal expects " + std::to_string(formal_size) +
-            " elements, actual has " + std::to_string(src_q->elements.size()),
-        Subclause("7.7"));
-    return true;
-  }
-  ArrayInfo finfo;
-  finfo.size = static_cast<uint32_t>(formal_size);
-  finfo.elem_width = src_q->elem_width;
-  finfo.is_4state = src_q->is_4state;
-  // §13.4: a formal has the lifetime of the call, so its shape goes away when
-  // the call returns, as the per-element formals created just below already do.
-  ctx.RegisterArrayInScope(formal.name, finfo);
-  for (uint32_t j = 0; j < finfo.size; ++j) {
-    auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
-    auto* dst_var = ctx.CreateLocalVariable(
-        *arena.Create<std::string>(std::move(dst)), src_q->elements[j].width);
-    // §13.5.1, as in TryBindAssocArg above: the element is copied into the
-    // subroutine area, words and all.
-    dst_var->value = OwnRhsWords(src_q->elements[j], arena);
-  }
-  return true;
-}
-
-// Dynamic arrays and queues hold their elements in a QueueObject rather than
-// as per-element variables, so a by-value bind copies through that object. The
-// formal becomes a fresh, independent copy of the actual -- which the vector
-// assignment alone did not make it: it copy-constructs every Logic4Vec, and
-// that carries the words pointer rather than the words, so §13.5.1's copy
-// reached the QueueObject and the vector inside it and stopped at every element
-// they held.
-static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
-                            SimContext& ctx, Arena& arena, SourceLoc loc) {
-  if (formal.unpacked_dims.empty()) return false;
-  // §7.10 writes a queue formal's dimension as `[$]` or `[$:N]`, which the
-  // parser records as an expression rather than as the null a dynamic array's
-  // `[]` leaves. Reading any non-null dimension as §7.4.2's fixed size sent a
-  // queue formal to the fixed-size bind, which evaluated the `$` as a size,
-  // reported a mismatch and bound nothing -- so the callee's `q[0]` found no
-  // formal at all and reached the actual it was called with.
-  const Expr* dim = formal.unpacked_dims[0];
-  if (dim != nullptr && !IsQueueDim(dim)) {
-    return BindQueueToFixedFormal(src_q, formal, ctx, arena, loc);
-  }
-  // An unsized formal keeps the dynamic-array/queue representation, so the
-  // callee reads the copy through the same queue-backed select path.
-  auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width, src_q->max_size,
-                                src_q->is_4state);
-  dst_q->elements.reserve(src_q->elements.size());
-  for (const auto& elem : src_q->elements)
-    dst_q->elements.push_back(OwnRhsWords(elem, arena));
-  dst_q->AssignFreshIds();
-  return true;
-}
-
-// Binds a fixed-size unpacked-array actual by copying each element variable
-// into a fresh per-element formal variable.
-//
-// §13.3 (printed page 337) has an output formal copy its value out at the end
-// and nothing in at the beginning, so an output formal's element starts at
-// the default a scalar output formal starts at in BindValueArg rather than at
-// the caller's element; an input or inout element is the caller's copied in.
-//
-// §7.4 (printed page 153) puts the packed dimensions before the name and the
-// unpacked ones after it, so mytask4's `output [3:0][7:0] y[1:0]` (§13.3,
-// printed 337) is two elements of a packed two-dimensional type, and §7.4.1
-// makes one index of such an element select a subfield of it, `y[1][3]` the
-// eight bits of element 3. The element's variable is created here with no
-// record of that layout, so the body's `y[1][3] = 8'hAB` wrote bit 3 of it.
-// The formal's declared packed dimensions are recorded as a declaration's are
-// (RecordPackedRange), which is what SelectStorageBits reads the index by.
-static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
-                              const ArrayInfo& info, SimContext& ctx,
-                              Arena& arena) {
-  // §13.4, as above: the shape lives as long as the call does.
-  ctx.RegisterArrayInScope(formal.name, info);
-  for (uint32_t j = 0; j < info.size; ++j) {
-    uint32_t idx = info.lo + j;
-    auto src = IdentifierLookupKey(call_arg) + "[" + std::to_string(idx) + "]";
-    auto dst = std::string(formal.name) + "[" + std::to_string(idx) + "]";
-    auto* src_var = ctx.FindVariable(src);
-    auto val =
-        src_var ? src_var->value : MakeLogic4VecVal(arena, info.elem_width, 0);
-    if (formal.direction == Direction::kOutput)
-      val = MakeLogic4VecVal(arena, val.width, 0);
-    auto* dst_var = ctx.CreateLocalVariable(
-        *arena.Create<std::string>(std::move(dst)), val.width);
-    // §13.5.1 again: `val` is the caller's element variable's own Logic4Vec
-    // where the element exists, so the store takes the words rather than the
-    // pointer to them.
-    dst_var->value = OwnRhsWords(val, arena);
-    RecordPackedRange(&formal.data_type, dst_var, ctx, arena);
-  }
-}
-
-static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
-                            SimContext& ctx, Arena& arena) {
-  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
-  if (TryBindAssocArg(call_arg, formal.name, ctx, arena)) return true;
-
-  if (auto* src_q = ctx.FindQueue(IdentifierLookupKey(call_arg)))
-    return TryBindQueueArg(src_q, formal, ctx, arena, call_arg->range.start);
-
-  auto* info = ctx.FindArrayInfo(IdentifierLookupKey(call_arg));
-  if (!info) return false;
-
-  BindFixedArrayArg(call_arg, formal, *info, ctx, arena);
-  return true;
 }
 
 // §13.5.2 (printed page 349) lists an element of an unpacked array among what

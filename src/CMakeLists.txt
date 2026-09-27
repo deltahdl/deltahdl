@@ -469,6 +469,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_locator.cpp
     simulator/eval_array_queue.cpp
     simulator/eval_function_args.cpp
+    simulator/eval_function_args_array.cpp
     simulator/eval_function_args_scoped.cpp
     simulator/eval_function_args_sync.cpp
     simulator/eval_function_args_tagged.cpp

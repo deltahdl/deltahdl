@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -9,6 +10,8 @@
 
 namespace delta {
 
+struct ArrayInfo;
+struct ClassArrayRef;
 struct ClassObject;
 struct ClassTypeInfo;
 struct Expr;
@@ -17,7 +20,8 @@ struct ModuleItem;
 class Arena;
 
 // The helpers the argument binding of eval_function_args.cpp shares with the
-// binds split out beside it (eval_function_args_sync.cpp).
+// binds split out beside it (eval_function_args_array.cpp and
+// eval_function_args_sync.cpp).
 
 // Whether the object on top of the `this` stack is the callee's own, pushed
 // for the call being bound rather than the caller's; BindFunctionArgs
@@ -124,6 +128,26 @@ class CalleeScopeAside {
   bool this_set_aside_ = false;
   bool class_set_aside_ = false;
 };
+
+// The position `k`, counted from the left, of the one-dimensional array
+// `info` as an address: `[4:1]` puts position 0 at 4, `[1:4]` at 1. §7.6
+// (printed page 160) pairs two arrays' elements left to right, which is how
+// §7.7 (printed 162) passes an array of another range. Defined in
+// eval_function_args_array.cpp.
+uint32_t ElementIndexAt(const ArrayInfo& info, uint32_t k);
+
+// §7.4.2 with §7.5: the shape of the fixed or dynamic array property `ref`
+// addresses, a dynamic one counting from 0 up. Defined in
+// eval_function_args_array.cpp.
+ArrayInfo ClassArrayShape(const ClassArrayRef& ref);
+
+// §7.7 (printed page 162): binds `formal` by value to the array the actual
+// `call_arg` names -- an associative array, a dynamic array or queue, or a
+// fixed-size array, declared or a property reached through a handle -- as a
+// copy of it in the callee's scope. False, binding nothing, where the actual
+// names no array. Defined in eval_function_args_array.cpp.
+bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
+                     SimContext& ctx, Arena& arena);
 
 // §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
 // value is passed as its handle, so the actual of a `mailbox m` or
