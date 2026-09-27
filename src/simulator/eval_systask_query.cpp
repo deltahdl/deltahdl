@@ -52,6 +52,35 @@ struct QueryArgInfo {
   bool is_string = false;
 };
 
+// §20.7 with §23.6: the array is named by an identifier, bare or a
+// hierarchical reference such as u.mem naming an instance's array; the empty
+// name for any other argument.
+static std::string QueryArgName(const Expr* arg0) {
+  if (arg0 == nullptr) return {};
+  if (arg0->kind == ExprKind::kIdentifier) return std::string(arg0->text);
+  if (arg0->kind == ExprKind::kMemberAccess && !arg0->is_scope_resolution) {
+    return FlattenHierPath(arg0);
+  }
+  return {};
+}
+
+// §20.7 with §8.5: describes into `class_array` the dimension of the unpacked
+// array class property `arg0` names, answering whether it names one.
+static bool DescribeClassArray(const Expr* arg0, SimContext& ctx, Arena& arena,
+                               ArrayInfo& class_array) {
+  ClassArrayRef ref;
+  if (arg0 == nullptr || !ResolveClassArray(arg0, ctx, arena, ref)) {
+    return false;
+  }
+  class_array.lo = static_cast<uint32_t>(ref.lo);
+  class_array.size = ref.size;
+  class_array.elem_width = ref.prop->width;
+  class_array.is_descending = ref.prop->array_descending;
+  class_array.is_dynamic = ref.prop->is_dynamic;
+  class_array.is_4state = ref.prop->is_4state;
+  return true;
+}
+
 // Resolve the first argument to an unpacked container (if any) and determine
 // the width/kind of its packed element dimension. §20.7: a string is a nonarray
 // type equivalent to a simple bit vector (one packed dimension); a real type
@@ -64,29 +93,14 @@ struct QueryArgInfo {
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
                                      Arena& arena, ArrayInfo& class_array) {
   QueryArgInfo info;
-  // §20.7 with §23.6: the array is named by an identifier, bare or a
-  // hierarchical reference such as u.mem naming an instance's array.
-  std::string name;
-  if (arg0 && arg0->kind == ExprKind::kIdentifier) {
-    name = std::string(arg0->text);
-  } else if (arg0 && arg0->kind == ExprKind::kMemberAccess &&
-             !arg0->is_scope_resolution) {
-    name = FlattenHierPath(arg0);
-  }
-  if (!name.empty()) {
+  if (std::string name = QueryArgName(arg0); !name.empty()) {
     info.assoc = ctx.FindAssocArray(name);
     info.queue = ctx.FindQueue(name);
     info.arr = ctx.FindArrayInfo(name);
   }
-  ClassArrayRef ref;
-  if (arg0 && info.assoc == nullptr && info.queue == nullptr &&
-      info.arr == nullptr && ResolveClassArray(arg0, ctx, arena, ref)) {
-    class_array.lo = static_cast<uint32_t>(ref.lo);
-    class_array.size = ref.size;
-    class_array.elem_width = ref.prop->width;
-    class_array.is_descending = ref.prop->array_descending;
-    class_array.is_dynamic = ref.prop->is_dynamic;
-    class_array.is_4state = ref.prop->is_4state;
+  bool found =
+      info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
+  if (!found && DescribeClassArray(arg0, ctx, arena, class_array)) {
     info.arr = &class_array;
   }
   info.dynamic_outer =

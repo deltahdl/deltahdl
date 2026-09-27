@@ -37,11 +37,11 @@ struct ClassScope;
 // anything, and none of them reads an RtlirModule. Most of the definitions
 // were already gathered in the src/elaborator/elaborator_validate_class*.cpp
 // files and in src/elaborator/elaborator_validate_static_methods.cpp.
-// RunPreElaborationClassValidations stands in src/elaborator/elaborator.cpp
-// and the two §6.18 forward-typedef checks in
-// src/elaborator/elaborator_scope_rules_enclosing.cpp, each left in the file
-// it was written in, since the file a definition stands in does not decide
-// which class declares it.
+// RunPreElaborationClassValidations stands in
+// src/elaborator/elaborator_validate_class_run.cpp and the two §6.18
+// forward-typedef checks in
+// src/elaborator/elaborator_scope_rules_enclosing.cpp, since the file a
+// definition stands in does not decide which class declares it.
 //
 // This derives from ElaboratorOperationRules in
 // src/elaborator/elaborator_validate_operations.h, and Elaborator in

@@ -405,6 +405,16 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
   scope.ctx.AliasNet(local, target);
 }
 
+// The port side of `binding`, qualified with the instance's segment: its port
+// expression where the header wrote one, else the port's own name.
+static Expr* LocalPortExpr(const RtlirPortBinding& binding,
+                           const std::string& inst_seg, Arena& arena) {
+  if (binding.port_expr != nullptr) {
+    return QualifiedPortExpr(binding.port_expr, inst_seg, arena);
+  }
+  return MakeLocalPortId(inst_seg + std::string(binding.port_name), arena);
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -419,11 +429,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     if (!IsConnectablePortBinding(binding)) continue;
     if (LowerArrayPortBinding(inst, binding, inst_seg, from_program)) continue;
 
-    Expr* local_id =
-        binding.port_expr != nullptr
-            ? QualifiedPortExpr(binding.port_expr, inst_seg, arena_)
-            : MakeLocalPortId(inst_seg + std::string(binding.port_name),
-                              arena_);
+    Expr* local_id = LocalPortExpr(binding, inst_seg, arena_);
 
     // An inout or ref port shares its connection's storage
     // (JoinInoutPortBinding).

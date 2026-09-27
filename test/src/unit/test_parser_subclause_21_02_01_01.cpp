@@ -35,31 +35,37 @@ TEST(FormatSpecifications, UndefinedSpecifierIsAnErrorInEveryFormatTask) {
         "$strobeh(\"%j\", 1)", "$monitor(\"%k\", v)", "$fdisplay(1, \"%n\", 1)",
         "$swrite(s, \"%r\", 1)", "$sformat(s, \"%w\", 1)",
         "s = $sformatf(\"%a\", 1)", "$error(\"%i\", 1)",
-        "$fatal(1, \"%-3d\", 1)"}) {
+        "$fatal(1, \"%-3y\", 1)"}) {
     auto r = Parse(std::string("module t;\n"
                                "  string s; int v;\n"
                                "  initial ") +
                    call +
                    ";\n"
                    "endmodule\n");
-    EXPECT_TRUE(r.has_errors) << call;
-    EXPECT_NE(FindDiag(r, "undefined format specifier"), nullptr) << call;
+    EXPECT_TRUE(
+        ReportedError(r.diags, "undefined format specifier", 3, "21.2.1.1"))
+        << call;
   }
 }
 
-// §21.2.1.2 (printed page 658) with §21.2.1.1: the field width a specifier
-// may carry "shall be a non-negative decimal integer constant", and only the
-// real specifiers take C's flags, so a left-justified `%-3d` is an undefined
-// specifier. It passed through to the output at run time.
-TEST(FormatSpecifications, NegativeFieldWidthIsAnUndefinedSpecifier) {
+// §21.2.1.2 (printed page 659): the field width between the % and an integer
+// specifier's letter "shall be a non-negative decimal integer constant", and
+// only Table 21-2's real specifiers take C's flags (printed page 658), so the
+// `-` of `%-3d` is no width. Its letter is Table 21-1's, so §21.2.1.1's error
+// for an undefined specifier does not reach it, and the malformed width is
+// warned about.
+TEST(FormatSpecifications, FlaggedIntegerSpecifierIsWarnedAbout) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] v;\n"
       "  initial $display(\"%-3d\", v);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "undefined format specifier '%-3d' in a string literal argument",
-      3, "21.2.1.1"));
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedWarning(r.diags,
+                              "field width of '%-3d' in a string literal "
+                              "argument of $display is not a non-negative "
+                              "decimal integer constant",
+                              3, "21.2.1.2"));
 }
 
 // §21.2.1.1 with Table 21-1 and Table 21-2: each defined specifier in either

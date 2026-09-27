@@ -589,6 +589,26 @@ static bool IsRealSpec(char spec) {
   return spec == 'e' || spec == 'f' || spec == 'g';
 }
 
+// Records into `flags` the C flag `c` is, answering whether it is one.
+static bool RecordCFlag(char c, FormatFieldSpec& flags) {
+  switch (c) {
+    case '-':
+      flags.left_justify = true;
+      return true;
+    case '+':
+      flags.plus_sign = true;
+      return true;
+    case ' ':
+      flags.space_sign = true;
+      return true;
+    case '#':
+      flags.alternate = true;
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
 // formatting capabilities available in the C language", its flags among them.
 // From fmt[start], the character after the '%', record the run of `-`, `+`,
@@ -599,20 +619,7 @@ static void ParseRealFlags(const std::string& fmt, size_t& start,
                            FormatFieldSpec& field) {
   size_t j = start;
   FormatFieldSpec flags;
-  for (; j < fmt.size(); ++j) {
-    char c = fmt[j];
-    if (c == '-') {
-      flags.left_justify = true;
-    } else if (c == '+') {
-      flags.plus_sign = true;
-    } else if (c == ' ') {
-      flags.space_sign = true;
-    } else if (c == '#') {
-      flags.alternate = true;
-    } else {
-      break;
-    }
-  }
+  while (j < fmt.size() && RecordCFlag(fmt[j], flags)) ++j;
   if (j == start) return;
   size_t k = j;
   while (k < fmt.size() && ((fmt[k] >= '0' && fmt[k] <= '9') || fmt[k] == '.'))

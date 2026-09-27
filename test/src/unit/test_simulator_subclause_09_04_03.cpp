@@ -815,16 +815,16 @@ TEST(LevelSensitiveEventSimulation, WaitOnHierarchicalNameResumesWhenTrue) {
       "prog woke v=3 at 7\n");
   SimFixture fm;
   EXPECT_EQ(
-      RunCapture("module top;\n"
-                 "  int v;\n"
-                 "  initial begin #3 v = 1; #4 v = 3; end\n"
-                 "  sub s();\n"
-                 "endmodule\n"
-                 "module sub;\n"
+      RunCapture("module sub;\n"
                  "  initial begin\n"
                  "    wait (top.v == 3);\n"
                  "    $display(\"sub woke v=%0d at %0t\", top.v, $time);\n"
                  "  end\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  int v;\n"
+                 "  initial begin #3 v = 1; #4 v = 3; end\n"
+                 "  sub s();\n"
                  "endmodule\n",
                  fm),
       "sub woke v=3 at 7\n");

@@ -155,23 +155,81 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   }
 }
 
-// Every config_rule_statement pairs a selection clause with an expansion
-// clause: an inst_clause or a cell_clause is legal only when followed by a
-// liblist_clause or a use_clause. A bare 'instance <path>;' or 'cell <name>;'
-// matches no grammar alternative.
-void Parser::ParseSelectionExpansion(ConfigRule* rule,
-                                     std::string_view selection) {
-  if (Check(TokenKind::kKwLiblist)) {
-    ParseLiblistClause(rule);
-  } else if (Check(TokenKind::kKwUse)) {
-    ParseUseClause(rule);
-  } else {
-    diag_.Error(CurrentLoc(),
-                std::format("{} selection requires a 'liblist' or 'use' clause",
-                            selection),
-                Subclause("33.4.1"));
+// The pieces of config parsing that ParseConfigRule and ParseConfigDecl hand
+// off, kept out of Parser's declaration.
+struct ParserConfigHelpers {
+  // Every config_rule_statement pairs a selection clause with an expansion
+  // clause: an inst_clause or a cell_clause is legal only when followed by a
+  // liblist_clause or a use_clause. A bare 'instance <path>;' or 'cell
+  // <name>;' matches no grammar alternative.
+  static void SelectionExpansion(Parser& p, ConfigRule* rule,
+                                 std::string_view selection) {
+    if (p.Check(TokenKind::kKwLiblist)) {
+      p.ParseLiblistClause(rule);
+    } else if (p.Check(TokenKind::kKwUse)) {
+      p.ParseUseClause(rule);
+    } else {
+      p.diag_.Error(
+          p.CurrentLoc(),
+          std::format("{} selection requires a 'liblist' or 'use' clause",
+                      selection),
+          Subclause("33.4.1"));
+    }
   }
-}
+
+  // Syntax 33-4 (printed page 938) opens a config_declaration with
+  // `{ local_parameter_declaration ; }`, and A.2.1.1 gives that declaration a
+  // data_type_or_implicit and a list_of_param_assignments, so `localparam int
+  // S = 24, T = 8;` is as much a config's as `localparam S = 24;`. They are
+  // read as any localparam declaration is, and each value assignment is kept.
+  static void LocalParams(Parser& p, ConfigDecl* decl) {
+    // Check(kKwLocalparam) is already false at EOF (the current token is
+    // kEof), so an explicit !AtEnd() guard would be redundant here.
+    while (p.Check(TokenKind::kKwLocalparam)) {
+      std::vector<ModuleItem*> items;
+      p.ParseParamDecl(items);
+      for (auto* item : items) {
+        if (item->kind != ModuleItemKind::kParamDecl) continue;
+        decl->local_params.emplace_back(item->name, item->init_expr);
+      }
+    }
+  }
+
+  // Reports and discards a duplicate 'design' statement, skipping tokens up
+  // to (and including) its terminating semicolon.
+  static void SkipDuplicateDesign(Parser& p, const ConfigDecl* decl) {
+    p.diag_.Error(
+        p.CurrentLoc(),
+        std::format("duplicate 'design' statement in config '{}'", decl->name),
+        Subclause("33.4.1.1"));
+    p.Consume();
+    while (!p.Check(TokenKind::kSemicolon) &&
+           !p.Check(TokenKind::kKwEndconfig) && !p.AtEnd()) {
+      p.Consume();
+    }
+    // Match consumes the terminating ';' iff present, equivalent to the
+    // guarded 'if (Check(kSemicolon)) Consume()' but without a nested branch.
+    p.Match(TokenKind::kSemicolon);
+  }
+
+  // The config_rule_statements up to 'endconfig', a duplicate 'design'
+  // statement among them reported and skipped.
+  static void Rules(Parser& p, ConfigDecl* decl) {
+    while (!p.Check(TokenKind::kKwEndconfig) && !p.AtEnd()) {
+      if (p.Check(TokenKind::kKwDesign)) {
+        SkipDuplicateDesign(p, decl);
+        continue;
+      }
+      auto before = p.lexer_.SavePos().pos;
+      decl->rules.push_back(p.ParseConfigRule());
+      // A token that starts no config_rule (e.g. the 'use' of an illegal
+      // 'default use ...', already diagnosed) leaves the cursor unmoved. Stop
+      // so the Expect(kKwEndconfig) after the rules reports it instead of
+      // spinning.
+      if (p.lexer_.SavePos().pos == before) break;
+    }
+  }
+};
 
 ConfigRule* Parser::ParseConfigRule() {
   auto* rule = arena_.Create<ConfigRule>();
@@ -199,7 +257,7 @@ ConfigRule* Parser::ParseConfigRule() {
     Consume();
     rule->kind = ConfigRuleKind::kInstance;
     rule->inst_path = ParseDottedPath();
-    ParseSelectionExpansion(rule, "instance");
+    ParserConfigHelpers::SelectionExpansion(*this, rule, "instance");
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
     rule->kind = ConfigRuleKind::kCell;
@@ -210,7 +268,7 @@ ConfigRule* Parser::ParseConfigRule() {
     } else {
       rule->cell_name = first;
     }
-    ParseSelectionExpansion(rule, "cell");
+    ParserConfigHelpers::SelectionExpansion(*this, rule, "cell");
   }
   Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
   return rule;
@@ -223,42 +281,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
   decl->name = Expect(TokenKind::kIdentifier, Subclause("33.4.1")).text;
   Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
 
-  // Syntax 33-4 (printed page 938) opens a config_declaration with
-  // `{ local_parameter_declaration ; }`, and A.2.1.1 gives that declaration a
-  // data_type_or_implicit and a list_of_param_assignments, so `localparam int
-  // S = 24, T = 8;` is as much a config's as `localparam S = 24;`. They are
-  // read as any localparam declaration is, and each value assignment is kept.
-  auto parse_local_params = [this, decl]() {
-    // Check(kKwLocalparam) is already false at EOF (the current token is kEof),
-    // so an explicit !AtEnd() guard would be redundant here.
-    while (Check(TokenKind::kKwLocalparam)) {
-      std::vector<ModuleItem*> items;
-      ParseParamDecl(items);
-      for (auto* item : items) {
-        if (item->kind != ModuleItemKind::kParamDecl) continue;
-        decl->local_params.emplace_back(item->name, item->init_expr);
-      }
-    }
-  };
-
-  // Reports and discards a duplicate 'design' statement, skipping tokens up to
-  // (and including) its terminating semicolon.
-  auto skip_duplicate_design = [this, decl]() {
-    diag_.Error(
-        CurrentLoc(),
-        std::format("duplicate 'design' statement in config '{}'", decl->name),
-        Subclause("33.4.1.1"));
-    Consume();
-    while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
-           !AtEnd()) {
-      Consume();
-    }
-    // Match consumes the terminating ';' iff present, equivalent to the
-    // guarded 'if (Check(kSemicolon)) Consume()' but without a nested branch.
-    Match(TokenKind::kSemicolon);
-  };
-
-  parse_local_params();
+  ParserConfigHelpers::LocalParams(*this, decl);
 
   bool has_design = false;
   if (Check(TokenKind::kKwDesign)) {
@@ -269,18 +292,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
                 Subclause("33.4.1.1"));
   }
 
-  while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
-    if (Check(TokenKind::kKwDesign)) {
-      skip_duplicate_design();
-      continue;
-    }
-    auto before = lexer_.SavePos().pos;
-    decl->rules.push_back(ParseConfigRule());
-    // A token that starts no config_rule (e.g. the 'use' of an illegal
-    // 'default use ...', already diagnosed) leaves the cursor unmoved. Stop so
-    // the Expect(kKwEndconfig) below reports it instead of spinning.
-    if (lexer_.SavePos().pos == before) break;
-  }
+  ParserConfigHelpers::Rules(*this, decl);
 
   if (!has_design) {
     diag_.Error(

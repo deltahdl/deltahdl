@@ -70,12 +70,9 @@ struct ParserPortHelpers {
       port.unpacked_dims = dims;
     }
     // §23.5: with a `.*` module header the port names come from the module's
-    // extern declaration, which is not visible until elaboration, so there is
-    // no header port to annotate yet. Materialize the port from this non-ANSI
-    // body declaration; elaboration keeps these body-declared ports instead of
-    // the (name-only) extern ports. Guarded by has_wildcard_ports so the normal
-    // non-ANSI path (where every body declaration must match a header port) is
-    // unaffected.
+    // extern declaration, which is not visible until elaboration, so the port
+    // is materialized from this body declaration; elaboration keeps these
+    // body-declared ports instead of the (name-only) extern ports.
     if (found) return;
     PortDecl np;
     np.name = name;
@@ -931,6 +928,9 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   }
 
   auto dtype = ParseDataType();
+  // §23.2.2.3 (printed page 735): an inout declared with no port kind is a net
+  // of the default net type, and mh4 there makes an inout `var` an error.
+  if (dir == Direction::kInout) dtype.is_net = true;
 
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();

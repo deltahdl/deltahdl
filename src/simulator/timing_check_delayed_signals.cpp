@@ -23,13 +23,16 @@
 #include "simulator/timing_check_delayed_signals.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_specify.h"
 #include "simulator/net.h"

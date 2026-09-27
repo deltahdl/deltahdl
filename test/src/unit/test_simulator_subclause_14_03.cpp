@@ -223,15 +223,15 @@ TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromAProgram) {
 TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromASubmodule) {
   SimFixture f;
   EXPECT_EQ(
-      RunCapture("module top;\n"
-                 "  logic clk = 0; logic [3:0] d;\n"
-                 "  always #5 clk = ~clk;\n"
-                 "  sub si(d);\n"
-                 "endmodule\n"
-                 "module sub(output logic [3:0] d);\n"
+      RunCapture("module sub(output logic [3:0] d);\n"
                  "  clocking cb @(posedge top.clk); output d; endclocking\n"
                  "  initial begin @(cb); cb.d <= 4'd5; @(cb); $display(\"sub "
                  "at %0t\", $time); $finish; end\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  logic clk = 0; logic [3:0] d;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  sub si(d);\n"
                  "endmodule\n",
                  f),
       "sub at 15\n$finish at time 15\n");

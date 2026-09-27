@@ -16,13 +16,13 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/time_resolve.h"
 
@@ -458,66 +458,6 @@ void Elaborator::RunPreElaborationValidations() {
   ResolveExternModules();
 }
 
-void ElaboratorClassRules::RunPreElaborationClassValidations() {
-  ValidateFinalClassExtension();
-
-  ValidateWeakReferenceMembers();
-
-  ValidateRestrictedScopePrefixInClasses();
-
-  ValidateChainingConstructors();
-
-  ValidateSuperRules();
-
-  ValidateEmbeddedCovergroupAssign();
-
-  ValidateDerivedCovergroupBase();
-
-  ValidateConstClassProperties();
-
-  ValidateVirtualMethodOverrides();
-
-  ValidateAbstractClassRules();
-
-  ValidateOutOfBlockDeclarations();
-
-  ValidateNestedClassEnclosingAccess();
-
-  ValidateInterfaceClassRules();
-
-  // Clause 18: the class constraint rules are checked as one unit, against the
-  // compilation unit and its typedef table.
-  ClassConstraintValidator constraints(unit_, typedefs_, diag_);
-
-  constraints.ValidateRandomVariableTypes();
-
-  constraints.ValidateConstraintBlockNames();
-
-  constraints.ValidateForeachConstraintDims();
-
-  constraints.ValidateDistConstraints();
-
-  constraints.ValidateUniqueConstraints();
-
-  constraints.ValidateSolveBeforeConstraints();
-
-  constraints.ValidateSoftConstraintVariables();
-
-  constraints.ValidateConstraintFunctionArgs();
-
-  constraints.ValidateBuiltinRandomizationMethods();
-
-  constraints.ValidateExternalConstraints();
-
-  // 18.5.1: once the external blocks are validated, complete each prototype by
-  // attaching its external block's relations so randomization applies them.
-  constraints.CompleteExternalConstraints();
-
-  constraints.ValidateConstraintInheritance();
-
-  ValidateForwardClassTypedefs();
-}
-
 bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
                                      RtlirDesign* design) {
   for (auto* mod_decl : top_decls) {
@@ -755,16 +695,43 @@ OverridesWithLocalparamLiterals(
   return params;
 }
 
+// Fills the override `ov` with the parameter overrides `rule` of `cfg`
+// carries, for the instances `path` names.
+static void FillRuleParamOverride(auto& ov, const ConfigDecl* cfg,
+                                  const ConfigRule* rule,
+                                  std::string_view path) {
+  ov.inst_path.assign(path.data(), path.size());
+  ov.reset_all = rule->use_param_reset_all;
+  ov.loc = rule->loc;
+  ov.params = OverridesWithLocalparamLiterals(cfg, rule->use_params);
+}
+
+// §33.4.2: the library and cell a cell clause's use expansion binds; for a
+// use clause naming a config, what that config's design statement names, a
+// design cell written without a library taken from the library holding the
+// config (§33.4.1.1). False where that config holds no design cell.
+static bool CellUseTarget(const ConfigRule* rule, const ConfigDecl* cfg,
+                          const CompilationUnit* unit, std::string& use_lib,
+                          std::string& use_cell) {
+  use_lib = std::string(rule->use_lib);
+  use_cell = std::string(rule->use_cell);
+  if (!UseClauseNamesConfig(rule, cfg, unit)) return true;
+  const ConfigDecl* inner =
+      FindDelegatedConfig(unit->configs, cfg, rule->use_cell);
+  if (inner == nullptr || inner->design_cells.empty()) return false;
+  const ConfigDesignCell& design = inner->design_cells.front();
+  use_lib = design.library.empty() ? std::string(inner->library)
+                                   : std::string(design.library);
+  use_cell = std::string(design.cell);
+  return true;
+}
+
 void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
     if (!RuleCarriesParamOverride(rule)) continue;
-    ConfigParamOverride ov;
-    ov.inst_path.assign(rule->inst_path.data(), rule->inst_path.size());
-    ov.reset_all = rule->use_param_reset_all;
-    ov.loc = rule->loc;
-    ov.params = OverridesWithLocalparamLiterals(cfg, rule->use_params);
-    instance_param_overrides_.push_back(std::move(ov));
+    FillRuleParamOverride(instance_param_overrides_.emplace_back(), cfg, rule,
+                          rule->inst_path);
   }
 }
 
@@ -780,29 +747,14 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
     // clause's named parameter assignments apply to every instance of the
     // cell, whether or not the clause also names the cell to bind.
     if (RuleCarriesParamOverride(rule)) {
-      ConfigParamOverride ov;
-      ov.inst_path.assign(rule->cell_name.data(), rule->cell_name.size());
-      ov.reset_all = rule->use_param_reset_all;
-      ov.loc = rule->loc;
-      ov.params = OverridesWithLocalparamLiterals(cfg, rule->use_params);
-      cell_param_overrides_.push_back(std::move(ov));
+      FillRuleParamOverride(cell_param_overrides_.emplace_back(), cfg, rule,
+                            rule->cell_name);
       if (rule->use_cell.empty()) continue;
     }
     if (!rule->use_cell.empty()) {
-      std::string use_lib(rule->use_lib);
-      std::string use_cell(rule->use_cell);
-      // §33.4.2: a use clause naming a config binds what that config's design
-      // statement names, and §33.4.1.1 has a design cell written without a
-      // library taken from the library holding the config.
-      if (UseClauseNamesConfig(rule, cfg, unit_)) {
-        const ConfigDecl* inner =
-            FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
-        if (inner == nullptr || inner->design_cells.empty()) continue;
-        const ConfigDesignCell& design = inner->design_cells.front();
-        use_lib = design.library.empty() ? std::string(inner->library)
-                                         : std::string(design.library);
-        use_cell = std::string(design.cell);
-      }
+      std::string use_lib;
+      std::string use_cell;
+      if (!CellUseTarget(rule, cfg, unit_, use_lib, use_cell)) continue;
       cell_clause_use_overrides_[std::string(rule->cell_name)] = {
           std::string(rule->cell_lib), std::move(use_lib), std::move(use_cell)};
       continue;
@@ -810,6 +762,27 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
     cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
         LiblistToStrings(rule->liblist);
   }
+}
+
+// What a binding clause of a config an instance clause delegates to carries
+// onto the delegated instance: a cell clause's use of a cell, an instance
+// clause's use of a cell for an instance under the config's design cell, or
+// nothing.
+enum class DelegatedBinding : uint8_t { kNone, kCellUse, kInstanceBind };
+
+static DelegatedBinding DelegatedBindingOf(const ConfigRule* irule,
+                                           const ConfigDecl* inner,
+                                           const CompilationUnit* unit,
+                                           std::string_view inner_top) {
+  if (irule->use_cell.empty() || UseClauseNamesConfig(irule, inner, unit)) {
+    return DelegatedBinding::kNone;
+  }
+  if (irule->kind == ConfigRuleKind::kCell) return DelegatedBinding::kCellUse;
+  if (irule->kind == ConfigRuleKind::kInstance &&
+      InnerPathUnderTop(irule->inst_path, inner_top)) {
+    return DelegatedBinding::kInstanceBind;
+  }
+  return DelegatedBinding::kNone;
 }
 
 // §33.4.1.6: an instance clause whose use expansion names a cell binds that
@@ -825,8 +798,9 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
 // outer clause delegated and recorded here as well.
 void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->use_cell.empty()) continue;
+    if (rule->kind != ConfigRuleKind::kInstance || rule->use_cell.empty()) {
+      continue;
+    }
     if (!UseClauseNamesConfig(rule, cfg, unit_)) {
       instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
                                             std::string(rule->use_lib),
@@ -838,25 +812,23 @@ void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
     if (inner == nullptr || inner->design_cells.empty()) continue;
     std::string_view inner_top = inner->design_cells.front().cell;
     for (auto* irule : inner->rules) {
-      if (irule->kind == ConfigRuleKind::kCell && !irule->use_cell.empty() &&
-          !UseClauseNamesConfig(irule, inner, unit_)) {
-        delegated_cell_use_overrides_.push_back(
-            {std::string(rule->inst_path),
-             std::string(irule->cell_name),
-             {std::string(irule->cell_lib), std::string(irule->use_lib),
-              std::string(irule->use_cell)}});
-        continue;
+      switch (DelegatedBindingOf(irule, inner, unit_, inner_top)) {
+        case DelegatedBinding::kCellUse:
+          delegated_cell_use_overrides_.push_back(
+              {std::string(rule->inst_path),
+               std::string(irule->cell_name),
+               {std::string(irule->cell_lib), std::string(irule->use_lib),
+                std::string(irule->use_cell)}});
+          break;
+        case DelegatedBinding::kInstanceBind:
+          instance_bind_overrides_.emplace_back(
+              std::string(rule->inst_path) +
+                  std::string(irule->inst_path.substr(inner_top.size())),
+              std::string(irule->use_lib), std::string(irule->use_cell));
+          break;
+        case DelegatedBinding::kNone:
+          break;
       }
-      if (irule->kind != ConfigRuleKind::kInstance || irule->use_cell.empty() ||
-          UseClauseNamesConfig(irule, inner, unit_) ||
-          !InnerPathUnderTop(irule->inst_path, inner_top)) {
-        continue;
-      }
-      std::string path(rule->inst_path);
-      path.append(irule->inst_path.substr(inner_top.size()));
-      instance_bind_overrides_.emplace_back(std::move(path),
-                                            std::string(irule->use_lib),
-                                            std::string(irule->use_cell));
     }
   }
 }

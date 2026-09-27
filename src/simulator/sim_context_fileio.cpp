@@ -324,6 +324,15 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
   return 0;
 }
 
+// Whether an operation writing through `writer` is on what an $fclose of
+// `closed` closes: the same file descriptor, or for a multichannel descriptor
+// a multichannel descriptor selecting any channel `closed` selects past the
+// standard output's.
+static bool WritesThroughClosed(uint32_t writer, uint32_t closed) {
+  if ((closed & SimContext::kFdMsb) != 0) return writer == closed;
+  return (writer & SimContext::kFdMsb) == 0 && (writer & closed & ~1U) != 0;
+}
+
 void SimContext::CloseFile(uint32_t descriptor) {
   EnsureStdioDescriptors();
   // §21.3.1 (printed page 666): "Active $fmonitor and/or $fstrobe operations
@@ -333,10 +342,9 @@ void SimContext::CloseFile(uint32_t descriptor) {
   // channel it closes, which a later $fopen may hand to another file.
   bool is_fd = (descriptor & kFdMsb) != 0;
   for (auto& monitor : file_monitors_) {
-    bool on_closed = is_fd ? monitor->descriptor == descriptor
-                           : ((monitor->descriptor & kFdMsb) == 0 &&
-                              (monitor->descriptor & descriptor & ~1u) != 0);
-    if (on_closed) monitor->cancelled = true;
+    if (WritesThroughClosed(monitor->descriptor, descriptor)) {
+      monitor->cancelled = true;
+    }
   }
   if (is_fd) {
     // STDIN/STDOUT/STDERR are not closable per §21.3.1.

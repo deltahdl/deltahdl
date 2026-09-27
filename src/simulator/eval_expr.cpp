@@ -659,70 +659,80 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
   return TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out);
 }
 
+// §7.8.7: `b[2].x` reads a member of an associative array element, and §8.4
+// `q[1].v` or `a[1].v` a property of the object an element of a queue or of
+// an array property (§7.4.2) refers to; the name EvalMemberAccess builds
+// reaches none. §8.6: nor `n.self().v`, a property of the object a method call
+// returned. §8.9 with §8.4: nor `C::m_inst.k` or a static method's bare
+// `m_inst.k`, a property of the object a static property holds a handle to.
+static bool TryObjectMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  return TryEvalAssocMemberField(expr, ctx, arena, out) ||
+         TryEvalElementObjectMember(expr, ctx, arena, out) ||
+         TryEvalCallResultMember(expr, ctx, arena, out) ||
+         TryPackageClassStaticMember(expr, ctx, arena, out) ||
+         TryStaticHandleMember(expr, ctx, arena, out);
+}
+
+// §18.7.1: a name qualified by local:: — the local::x used to steer an inline
+// randomize()...with constraint from the calling scope — bypasses the
+// randomized object's class scope and resolves in the scope containing the
+// method call, which is exactly the scope this expression is evaluated in.
+// `local` is a reserved keyword and cannot name any declaration, so a leading
+// "local." segment can only be that qualifier: it is dropped from `resolved`,
+// so local::x denotes the same declaration an unqualified x written in this
+// scope would. local::this binds to the scope containing the call, whose
+// `this` the constraint evaluation keeps aside while the randomized object
+// stands in scope as `this`; true with `out` read through it.
+static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  constexpr std::string_view kLocalScopePrefix = "local.";
+  if (!std::string_view(resolved).starts_with(kLocalScopePrefix)) return false;
+  resolved = resolved.substr(kLocalScopePrefix.size());
+  constexpr std::string_view kThisPrefix = "this.";
+  ClassObject* caller = ctx.ConstraintCallerThis();
+  if (caller == nullptr ||
+      !std::string_view(resolved).starts_with(kThisPrefix)) {
+    return false;
+  }
+  out = ResolveClassFieldChain(caller, nullptr,
+                               resolved.substr(kThisPrefix.size()), ctx, arena);
+  return true;
+}
+
+// §16.5.2: "In an assertion, the sampled value is the only valid value of a
+// variable during a clock tick", and §16.5.1 puts no condition on where the
+// variable is declared, so a variable a property reaches across an instance
+// boundary reads the value sampled for this time slot exactly as one the
+// module declares itself. The store answers nothing outside a clocked
+// concurrent assertion's property and nothing for a variable no such property
+// reads, so every other hierarchical read is the live read it was.
+static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
+  const Logic4Vec* sampled =
+      ctx.AssertionSamples().ReadWithinProperty(&var, ctx.CurrentTime());
+  Logic4Vec val = sampled != nullptr ? *sampled : var.value;
+  // §11.8.1: the operand's signedness is its declaration's, whatever the value
+  // stored in it carried, as EvalIdentifier derives it for a simple name:
+  // `logic w` set to the signed literal 1 and read as `a.w` read -1.
+  val.is_signed = var.is_signed;
+  return val;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
   if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 
-  // §7.8.7: `b[2].x` reads a member of an associative array element, and §8.4
-  // `q[1].v` or `a[1].v` a property of the object an element of a queue or of
-  // an array property (§7.4.2) refers to; the name built below reaches none.
-  // §8.6: nor `n.self().v`, a property of the object a method call returned.
-  // §8.9 with §8.4: nor `C::m_inst.k` or a static method's bare `m_inst.k`,
-  // a property of the object a static property holds a handle to.
-  if (TryEvalAssocMemberField(expr, ctx, arena, out) ||
-      TryEvalElementObjectMember(expr, ctx, arena, out) ||
-      TryEvalCallResultMember(expr, ctx, arena, out) ||
-      TryPackageClassStaticMember(expr, ctx, arena, out) ||
-      TryStaticHandleMember(expr, ctx, arena, out))
-    return out;
+  if (TryObjectMemberRead(expr, ctx, arena, out)) return out;
 
   auto resolved = HierarchicalReferenceName(expr);
-  // §18.7.1: a name qualified by local:: — the local::x used to steer an inline
-  // randomize()...with constraint from the calling scope — bypasses the
-  // randomized object's class scope and resolves in the scope containing the
-  // method call, which is exactly the scope this expression is evaluated in.
-  // `local` is a reserved keyword and cannot name any declaration, so a leading
-  // "local." segment can only be that qualifier: drop it and resolve the
-  // remaining name here, so local::x denotes the same declaration an
-  // unqualified x written in this scope would.
-  constexpr std::string_view kLocalScopePrefix = "local.";
-  if (std::string_view(resolved).substr(0, kLocalScopePrefix.size()) ==
-      kLocalScopePrefix) {
-    resolved = resolved.substr(kLocalScopePrefix.size());
-    // §18.7.1: local::this binds to the scope containing the call, whose
-    // `this` the constraint evaluation keeps aside while the randomized
-    // object stands in scope as `this`.
-    constexpr std::string_view kThisPrefix = "this.";
-    ClassObject* caller = ctx.ConstraintCallerThis();
-    if (caller != nullptr && std::string_view(resolved).substr(
-                                 0, kThisPrefix.size()) == kThisPrefix) {
-      return ResolveClassFieldChain(
-          caller, nullptr, resolved.substr(kThisPrefix.size()), ctx, arena);
-    }
-  }
+  if (TryLocalScopeQualifier(resolved, ctx, arena, out)) return out;
   // §23.3.1: a `$root`-headed name is read from the top of the design first.
   std::string rooted = RootedReferenceKey(expr);
   auto* var = rooted.empty() ? nullptr : ctx.FindVariable(rooted);
   if (var == nullptr) var = ctx.FindVariable(resolved);
-  if (var) {
-    // §16.5.2: "In an assertion, the sampled value is the only valid value of a
-    // variable during a clock tick", and §16.5.1 puts no condition on where the
-    // variable is declared, so a variable a property reaches across an instance
-    // boundary reads the value sampled for this time slot exactly as one the
-    // module declares itself. The store answers nothing outside a clocked
-    // concurrent assertion's property and nothing for a variable no such
-    // property reads, so every other hierarchical read is the live read it was.
-    const Logic4Vec* sampled =
-        ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
-    Logic4Vec val = sampled != nullptr ? *sampled : var->value;
-    // §11.8.1: the operand's signedness is its declaration's, whatever the
-    // value stored in it carried, as EvalIdentifier derives it for a simple
-    // name: `logic w` set to the signed literal 1 and read as `a.w` read -1.
-    val.is_signed = var->is_signed;
-    return val;
-  }
+  if (var) return ReadReferencedVariable(*var, ctx);
 
   auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);

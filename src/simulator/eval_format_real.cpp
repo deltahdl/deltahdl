@@ -65,6 +65,24 @@ static std::string RealDigits(double d, char spec, int precision, bool alt) {
   return buf;
 }
 
+// Table 21-2's "%e or %E" and the rest: the uppercase form writes C's
+// uppercase exponent letter, INF and NAN, the digits being the same. C's `+`
+// signs a non-negative value and its space puts a blank where the sign would
+// be.
+static void CaseAndSignDigits(std::string& text, const FormatFieldSpec& field) {
+  if (field.uppercase) {
+    for (char& c : text) {
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+  }
+  if (text.empty() || text.front() == '-') return;
+  if (field.plus_sign) {
+    text.insert(0, 1, '+');
+  } else if (field.space_sign) {
+    text.insert(0, 1, ' ');
+  }
+}
+
 // §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
 // formatting capabilities available in the C language" -- "%10.3g" is a
 // minimum field width of 10 with 3 fractional digits, and C's flags apply as
@@ -78,20 +96,7 @@ std::string FormatRealFormatted(const Logic4Vec& val, char spec,
   double d = OperandAsReal(val);
   int precision = field.has_precision ? static_cast<int>(field.precision) : 6;
   std::string text = RealDigits(d, spec, precision, field.alternate);
-  // Table 21-2's "%e or %E" and the rest: the uppercase form writes C's
-  // uppercase exponent letter, INF and NAN, the digits being the same.
-  if (field.uppercase) {
-    for (char& c : text) {
-      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-  }
-  if (!text.empty() && text.front() != '-') {
-    if (field.plus_sign) {
-      text.insert(0, 1, '+');
-    } else if (field.space_sign) {
-      text.insert(0, 1, ' ');
-    }
-  }
+  CaseAndSignDigits(text, field);
   size_t width = field.has_width ? field.width : 0;
   if (text.size() >= width) return text;
   size_t pad = width - text.size();

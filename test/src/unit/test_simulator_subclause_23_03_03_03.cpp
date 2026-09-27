@@ -186,7 +186,7 @@ TEST(PortConnectionRulesForNetsSimulation,
 // width, and an output net port started at 0 or x, which its connection copied
 // up before the port's own driver ran.
 TEST(PortConnectionRulesForNetsSimulation, NetDrivenToTheZItHoldsDoesNotWake) {
-  const char* kDrivers[] = {
+  const char* const kDrivers[] = {
       "program p(inout wire [7:0] data);\n"
       "  logic [7:0] drv = 8'bz;\n"
       "  assign data = drv;\n"

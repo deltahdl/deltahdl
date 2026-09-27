@@ -255,14 +255,13 @@ TEST(DefaultArgumentSim, DefaultBoundInDeclaringTopFromParallelTop) {
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(
-      f, design,
-      {{"n.r1", 1u},
-       {"n.r2", 2u},
-       {"n.r3", 6u},
-       {"n.r4", 12u},
-       {"a", 6u},
-       {"w", 12u}});
+  LowerRunAndCheck(f, design,
+                   {{"n.r1", 1u},
+                    {"n.r2", 2u},
+                    {"n.r3", 6u},
+                    {"n.r4", 12u},
+                    {"a", 6u},
+                    {"w", 12u}});
 }
 
 // §23.6: a write through the same path lands in m: n's `m.a = 7` is what m's

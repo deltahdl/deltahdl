@@ -258,6 +258,10 @@ class Lowerer {
   // connections, processes and instances, all under the instance's name
   // joined to inst_prefix_.
   void LowerChildInstance(const RtlirModuleInst& child);
+  // The part of LowerChildInstance that follows the port connections: the
+  // instance's aliases, processes, assignments, primitives, clocking blocks
+  // and instances, under the prefix inst_prefix_ holds.
+  void LowerChildBody(const RtlirModule* mod);
   // §14.3: registers the module's clocking blocks with the run's
   // ClockingManager and creates the event variable §14.10 triggers under each
   // block's name. Defined in src/simulator/lowerer_clocking.cpp.

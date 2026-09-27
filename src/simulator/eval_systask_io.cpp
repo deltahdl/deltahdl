@@ -120,9 +120,16 @@ static void AssignStringResult(const Expr* dest, const std::string& output,
   PerformBlockingAssign(dest, packed, ctx, arena);
 }
 
-static void StoreStringResult(const Expr* dest, Variable* dst,
-                              std::string_view name, const std::string& output,
+// Writes a string task's text into its output variable `dest`: one named by an
+// identifier is found in the run's tables, any other form is assigned to.
+static void StoreStringResult(const Expr* dest, const std::string& output,
                               SimContext& ctx, Arena& arena) {
+  Variable* dst = nullptr;
+  std::string_view name;
+  if (dest != nullptr && dest->kind == ExprKind::kIdentifier) {
+    name = dest->text;
+    dst = ctx.FindVariable(name);
+  }
   // An unpacked byte array is recognised before the plain-variable case.
   // Lowering gives such an array a variable under its own name as well as one
   // per element, so testing the destination variable first would send every
@@ -148,12 +155,6 @@ static void StoreStringResult(const Expr* dest, Variable* dst,
 static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::string_view name) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  Variable* dst = nullptr;
-  std::string_view dst_name;
-  if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
-    dst_name = expr->args[0]->text;
-    dst = ctx.FindVariable(dst_name);
-  }
 
   // The suffix character ('\0' / b / h / o) becomes the default radix letter
   // for bare expression arguments. Without a suffix, decimal is the default.
@@ -165,7 +166,7 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
 
   std::vector<Expr*> rest(expr->args.begin() + 1, expr->args.end());
   std::string output = BuildStringTaskOutput(rest, default_radix, ctx, arena);
-  StoreStringResult(expr->args[0], dst, dst_name, output, ctx, arena);
+  StoreStringResult(expr->args[0], output, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -175,19 +176,13 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
 static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
-  Variable* dst = nullptr;
-  std::string_view dst_name;
-  if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
-    dst_name = expr->args[0]->text;
-    dst = ctx.FindVariable(dst_name);
-  }
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   WarnIfArgCountMismatch(ctx, "$sformat", fmt, expr->args.size() - 2,
                          expr->range.start);
   // §21.3.3: the arguments fill the format as a display task's fill its
   // template, %p and %v included.
   std::string out = FormatDisplayArgs(expr, 1, fmt, ctx, arena);
-  StoreStringResult(expr->args[0], dst, dst_name, out, ctx, arena);
+  StoreStringResult(expr->args[0], out, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

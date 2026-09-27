@@ -394,6 +394,21 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
   if (p.from_override) ReconvertOverrideValue(p, kRefoldOverride);
 }
 
+// The values in scope where an instantiation stands, `outer`, with the
+// instantiating module's own parameters, `own`, as they now are over them.
+static ScopeMap ScopeOverlaidWith(ScopeMap outer, const ScopeMap& own) {
+  for (const auto& [name, value] : own) outer[name] = value;
+  return outer;
+}
+
+// Whether `p` is a value parameter the instantiation in `parent` assigned and
+// no defparam has set since, so a change in `parent` folds it again.
+static bool RefoldsFromInstantiation(const RtlirParamDecl& p,
+                                     const RtlirModule* parent) {
+  return !p.is_type_param && p.override_expr != nullptr &&
+         p.override_module == parent && p.defparam_value_expr == nullptr;
+}
+
 // §23.10.2 (printed page 766): a parameter whose value depends on the one a
 // defparam redefined takes its new value too. Each such value expression is
 // written in `mod`, so `mod` is registered while it folds: the module
@@ -426,14 +441,10 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
     if (cm == nullptr || cm == mod) continue;
     bool changed = false;
     for (auto& p : cm->params) {
-      if (p.is_type_param || p.override_expr == nullptr ||
-          p.override_module != mod || p.defparam_value_expr != nullptr) {
-        continue;
-      }
-      ScopeMap scope = p.override_scope;
-      for (const auto& [name, value] : mod_scope) scope[name] = value;
+      if (!RefoldsFromInstantiation(p, mod)) continue;
       int64_t before = p.resolved_value;
-      RefoldOverride(p, p.override_expr, scope);
+      RefoldOverride(p, p.override_expr,
+                     ScopeOverlaidWith(p.override_scope, mod_scope));
       changed = changed || p.resolved_value != before;
     }
     if (changed) RecomputeDependentParams(cm);

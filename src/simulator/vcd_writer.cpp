@@ -433,7 +433,7 @@ bool VcdWriter::AtSizeLimit() {
   std::streampos pos = ofs_.tellp();
   if (pos == std::streampos(-1)) return false;
   // Text still held is on its way to the file and counts toward its size.
-  uint64_t size = static_cast<uint64_t>(pos);
+  auto size = static_cast<uint64_t>(pos);
   if (buffer_decls_) size += static_cast<uint64_t>(decl_buf_.tellp());
   if (size < size_limit_) return false;
   // The file has reached the requested byte count: note it in the dump via a

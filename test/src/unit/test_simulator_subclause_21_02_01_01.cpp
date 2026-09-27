@@ -58,10 +58,7 @@ TEST(SysTask, FormatOctal) {
 TEST(SysTask, RealFormatExponential) {
   std::vector<Logic4Vec> vals;
   Arena arena;
-  double dval = 1.5;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  vals.push_back(MakeLogic4VecVal(arena, 64, bits));
+  vals.push_back(MakeRealVec(arena, 1.5, 64));
   auto out = FormatDisplay("%e", vals);
   EXPECT_NE(out.find("1.5"), std::string::npos);
 }
@@ -69,10 +66,7 @@ TEST(SysTask, RealFormatExponential) {
 TEST(SysTask, RealFormatDecimal) {
   std::vector<Logic4Vec> vals;
   Arena arena;
-  double dval = 2.5;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  vals.push_back(MakeLogic4VecVal(arena, 64, bits));
+  vals.push_back(MakeRealVec(arena, 2.5, 64));
   auto out = FormatDisplay("%f", vals);
   EXPECT_NE(out.find("2.5"), std::string::npos);
 }
@@ -152,23 +146,19 @@ TEST(FormatArg, BinaryUppercaseMatchesLowercase) {
   EXPECT_EQ(FormatArg(val, 'B'), FormatArg(val, 'b'));
 }
 
-// Table 21-2: "%e or %E" -- exponential form for reals, case insensitive.
-TEST(FormatArg, RealExponentialUppercaseMatchesLowercase) {
+// Table 21-2: "%e or %E" -- exponential form for reals; the uppercase form
+// writes the same digits with C's uppercase exponent letter.
+TEST(FormatArg, RealExponentialUppercaseWritesAnUppercaseExponentLetter) {
   Arena arena;
-  double dval = 7.25;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  auto val = MakeLogic4VecVal(arena, 64, bits);
-  EXPECT_EQ(FormatArg(val, 'E'), FormatArg(val, 'e'));
+  auto val = MakeRealVec(arena, 7.25, 64);
+  EXPECT_EQ(FormatArg(val, 'e'), "7.250000e+00");
+  EXPECT_EQ(FormatArg(val, 'E'), "7.250000E+00");
 }
 
 // Table 21-2: "%f or %F" -- decimal form for reals, case insensitive.
 TEST(FormatArg, RealDecimalUppercaseMatchesLowercase) {
   Arena arena;
-  double dval = 3.5;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  auto val = MakeLogic4VecVal(arena, 64, bits);
+  auto val = MakeRealVec(arena, 3.5, 64);
   EXPECT_EQ(FormatArg(val, 'F'), FormatArg(val, 'f'));
 }
 
@@ -176,10 +166,7 @@ TEST(FormatArg, RealDecimalUppercaseMatchesLowercase) {
 // insensitive.
 TEST(FormatArg, RealGeneralUppercaseMatchesLowercase) {
   Arena arena;
-  double dval = 12.5;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  auto val = MakeLogic4VecVal(arena, 64, bits);
+  auto val = MakeRealVec(arena, 12.5, 64);
   EXPECT_EQ(FormatArg(val, 'G'), FormatArg(val, 'g'));
 }
 
@@ -200,10 +187,7 @@ TEST(SysTask, FormatCharacterInString) {
 TEST(SysTask, RealFormatGeneral) {
   std::vector<Logic4Vec> vals;
   Arena arena;
-  double dval = 4.25;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  vals.push_back(MakeLogic4VecVal(arena, 64, bits));
+  vals.push_back(MakeRealVec(arena, 4.25, 64));
   auto out = FormatDisplay("%g", vals);
   EXPECT_NE(out.find("4.25"), std::string::npos);
 }
@@ -451,10 +435,7 @@ TEST(SysTask, UnformattedTwoValueZeroesXZFromSource) {
 TEST(SysTask, RealFormatWidthAndPrecisionG) {
   std::vector<Logic4Vec> vals;
   Arena arena;
-  double dval = 3.14159;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  vals.push_back(MakeLogic4VecVal(arena, 64, bits));
+  vals.push_back(MakeRealVec(arena, 3.14159, 64));
   auto out = FormatDisplay("%10.3g", vals);
   ASSERT_EQ(out.size(), 10u);
   EXPECT_EQ(out.substr(6), "3.14");
@@ -467,10 +448,7 @@ TEST(SysTask, RealFormatWidthAndPrecisionG) {
 TEST(SysTask, RealFormatPrecisionOnlyF) {
   std::vector<Logic4Vec> vals;
   Arena arena;
-  double dval = 3.14159;
-  uint64_t bits = 0;
-  std::memcpy(&bits, &dval, sizeof(double));
-  vals.push_back(MakeLogic4VecVal(arena, 64, bits));
+  vals.push_back(MakeRealVec(arena, 3.14159, 64));
   auto out = FormatDisplay("%.3f", vals);
   EXPECT_EQ(out, "3.142");
 }

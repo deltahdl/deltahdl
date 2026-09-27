@@ -190,6 +190,34 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
   }
 }
 
+void Lowerer::LowerChildBody(const RtlirModule* mod) {
+  // §10.11: the instance's alias statements join the nets LowerChildInstance
+  // created, ahead of the processes and continuous assignments that drive and
+  // read them, as LowerModule orders the top's.
+  LowerAliases(mod);
+  uint32_t child_block_id = mod->is_program ? next_program_block_id_++ : 0;
+  LowerProcesses(mod->processes, mod->is_program, child_block_id);
+  for (const auto& ca : mod->assigns) {
+    LowerContAssign(ca, mod->is_program);
+  }
+  for (const auto& sw : mod->bidir_switches) {
+    LowerBidirSwitch(sw, mod->is_program);
+  }
+  // §29.8: a primitive instance written in this child drives its output
+  // terminal wherever the child sits, so it is lowered under the child's
+  // prefix beside the child's continuous assignments.
+  for (const auto& udp_inst : mod->udp_insts) {
+    LowerUdpInst(udp_inst, mod->is_program);
+  }
+  // §14.3: a clocking block belongs to the instance that declares it, so this
+  // instance's blocks are registered under this instance's prefix, beside its
+  // processes. Lowerer::AttachDesignClocking arms them all once the whole
+  // design is lowered.
+  LowerClockingBlocks(mod);
+
+  LowerChildModules(mod);
+}
+
 void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   auto saved_prefix = inst_prefix_;
   auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
@@ -271,33 +299,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   inst_prefix_ = child_prefix;
   ctx_.SetLoweringInstancePrefix(inst_prefix_);
 
-  // §10.11: the instance's alias statements join the nets created above,
-  // ahead of the processes and continuous assignments that drive and read
-  // them, as LowerModule orders the top's.
-  LowerAliases(child.resolved);
-  uint32_t child_block_id =
-      child.resolved->is_program ? next_program_block_id_++ : 0;
-  LowerProcesses(child.resolved->processes, child.resolved->is_program,
-                 child_block_id);
-  for (const auto& ca : child.resolved->assigns) {
-    LowerContAssign(ca, child.resolved->is_program);
-  }
-  for (const auto& sw : child.resolved->bidir_switches) {
-    LowerBidirSwitch(sw, child.resolved->is_program);
-  }
-  // §29.8: a primitive instance written in this child drives its output
-  // terminal wherever the child sits, so it is lowered under the child's
-  // prefix beside the child's continuous assignments.
-  for (const auto& udp_inst : child.resolved->udp_insts) {
-    LowerUdpInst(udp_inst, child.resolved->is_program);
-  }
-  // §14.3: a clocking block belongs to the instance that declares it, so this
-  // instance's blocks are registered under this instance's prefix, beside its
-  // processes. Lowerer::AttachDesignClocking arms them all once the whole
-  // design is lowered.
-  LowerClockingBlocks(child.resolved);
-
-  LowerChildModules(child.resolved);
+  LowerChildBody(child.resolved);
 
   inst_prefix_ = saved_prefix;
   ctx_.SetLoweringInstancePrefix(inst_prefix_);

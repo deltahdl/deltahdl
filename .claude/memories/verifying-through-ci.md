@@ -17,6 +17,7 @@ Never run locally a tool that CI also runs; push and read the run instead.
 - "It is not a build or a test" — `clang-tidy` and the file-size cap are CI jobs like any other. A red run's `gh run view --log-failed` gives the same file/line/check list, for free, and one push verifies every file at once.
 - "It reproduces the gate in 1.3 seconds" — the seconds are not the cost. The tokens spent reading its output are.
 - "Local caught a regression, so it was worth it" — CI would have surfaced the same diff for nothing.
+- "Build every target once the fixes are in, to see the push compiles" — that is the build job's check, and a compile error comes back in its log for nothing.
 
 Building locally to investigate is allowed. A Debug build of `deltahdl` in the scratchpad, run over small repro sources or an instrumented copy of a library such as UVM, is how to find where a run-time defect lives and to check that a fix changes the repro's output. What is still not done locally is the gate list above: the unit test binaries, `clang-tidy`, the size caps, pytest and the rest are still verified by pushing and reading the run.
 

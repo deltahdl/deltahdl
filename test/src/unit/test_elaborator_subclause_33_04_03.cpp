@@ -14,10 +14,8 @@
 
 namespace {
 
-// Config-elaborates `src` through its first configuration and returns the cell
-// bound to the first child instance of the design's top module, so that
-// configuration-applied parameter values can be inspected (§33.4.3).
-RtlirModule* ConfigElabFirstChild(ElabFixture& f, const std::string& src) {
+// Config-elaborates `src` through its first configuration.
+RtlirDesign* ConfigElab(ElabFixture& f, const std::string& src) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -25,6 +23,14 @@ RtlirModule* ConfigElabFirstChild(ElabFixture& f, const std::string& src) {
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// Config-elaborates `src` through its first configuration and returns the cell
+// bound to the first child instance of the design's top module, so that
+// configuration-applied parameter values can be inspected (§33.4.3).
+RtlirModule* ConfigElabFirstChild(ElabFixture& f, const std::string& src) {
+  auto* design = ConfigElab(f, src);
   if (!design || design->top_modules.empty()) return nullptr;
   auto* top = design->top_modules[0];
   if (top->children.empty()) return nullptr;
@@ -189,13 +195,7 @@ TEST(ConfigParamOverride, HierarchicalParameterArrayIndexedByALocalparam) {
 // Config-elaborates `src` through its first configuration and returns the
 // design's one top-level module.
 RtlirModule* ConfigElabTop(ElabFixture& f, const std::string& src) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->configs[0]);
-  f.has_errors = f.diag.HasErrors();
+  auto* design = ConfigElab(f, src);
   if (!design || design->top_modules.size() != 1) return nullptr;
   return design->top_modules[0];
 }

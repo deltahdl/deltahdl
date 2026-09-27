@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -634,10 +633,13 @@ int RunPrecompile(const delta::CliOptions& opts, delta::DiagEngine& diag) {
     if (content.empty()) return 1;
     for (const auto& name : delta::PrecompiledLibrary::CellNames(content)) {
       if (written.insert(name).second) continue;
+      // Joined rather than std::format'ed: main shall throw nothing, and
+      // std::format is declared to throw format_error.
       diag.Warning(delta::SourceLoc::None(),
-                   std::format("'{}' is compiled into library '{}' more than "
-                               "once in this invocation; the last one is kept",
-                               name, opts.precompile_library),
+                   "'" + name + "' is compiled into library '" +
+                       opts.precompile_library +
+                       "' more than once in this invocation; the last one is "
+                       "kept",
                    delta::Subclause("33.3.1"));
     }
     if (!delta::PrecompiledLibrary::Save(content, opts.precompile_library,
@@ -861,6 +863,26 @@ int RunParsedUnit(const delta::CliOptions& opts,
       [&] { return RunSimulation(opts, lib_map, cu, diag, elab_arena); });
 }
 
+// --version and --help are answered with no design read, and so is an
+// invocation that names nothing to read, whose help ends in a failing status.
+// §33.5.4: a bind from precompiled libraries is given "the lib.cell
+// specification for the top-level cell(s) and/or the config to be used" and no
+// source description, so --load-lib stands in for a source file.
+bool AnsweredWithoutADesign(const delta::CliOptions& opts, int& status) {
+  if (opts.show_version) {
+    PrintVersion();
+    status = 0;
+    return true;
+  }
+  if (opts.show_help ||
+      (opts.source_files.empty() && opts.precompiled_libs.empty())) {
+    PrintHelp();
+    status = opts.show_help ? 0 : 1;
+    return true;
+  }
+  return false;
+}
+
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
@@ -884,18 +906,8 @@ int main(int argc, char* argv[]) {
   if (opts.vpi_compat_mode != 0)
     delta::GetGlobalVpiContext().SetDefaultCompatibilityMode(
         opts.vpi_compat_mode);
-  if (opts.show_version) {
-    PrintVersion();
-    return 0;
-  }
-  // §33.5.4: a bind from precompiled libraries is given "the lib.cell
-  // specification for the top-level cell(s) and/or the config to be used" and
-  // no source description, so --load-lib stands in for a source file.
-  if (opts.show_help ||
-      (opts.source_files.empty() && opts.precompiled_libs.empty())) {
-    PrintHelp();
-    return opts.show_help ? 0 : 1;
-  }
+  int answered_status = 0;
+  if (AnsweredWithoutADesign(opts, answered_status)) return answered_status;
 
   delta::SourceManager src_mgr;
   delta::DiagEngine diag(src_mgr);

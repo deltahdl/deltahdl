@@ -87,7 +87,7 @@ TEST(ProgramConstructSim,
   f.scheduler.Run();
   EXPECT_TRUE(f.ctx.StopRequested());
   auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("p.b");
+  auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 1u);

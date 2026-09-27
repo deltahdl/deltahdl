@@ -14,6 +14,7 @@
 #include "simulator/specify_internal.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
+#include "simulator/specify_timing_check.h"
 
 namespace delta {
 

@@ -132,11 +132,11 @@ int64_t EvalTimingCheckLimit(Expr* limit, SimContext& ctx, Arena& arena) {
 int64_t EvalTimingCheckTime(Expr* limit, SimContext& ctx, Arena& arena) {
   if (limit == nullptr) return 0;
   Logic4Vec value = EvalExpr(limit, ctx, arena);
-  const TimeScale& kScale = ActiveInstanceTimeScale(ctx);
+  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   if (value.is_real) {
     const double kReal = RealVecToDouble(value);
     const auto kTicks = static_cast<int64_t>(RealDelayToTicks(
-        kReal < 0 ? -kReal : kReal, kScale, ctx.GlobalPrecision()));
+        kReal < 0 ? -kReal : kReal, scale, ctx.GlobalPrecision()));
     return kReal < 0 ? -kTicks : kTicks;
   }
   const uint32_t kWidth = value.width == 0 ? 64u : value.width;
@@ -145,7 +145,7 @@ int64_t EvalTimingCheckTime(Expr* limit, SimContext& ctx, Arena& arena) {
                                   ? 0ULL - static_cast<uint64_t>(kSigned)
                                   : static_cast<uint64_t>(kSigned);
   const auto kTicks = static_cast<int64_t>(
-      DelayToTicks(kMagnitude, kScale, ctx.GlobalPrecision()));
+      DelayToTicks(kMagnitude, scale, ctx.GlobalPrecision()));
   return kSigned < 0 ? -kTicks : kTicks;
 }
 

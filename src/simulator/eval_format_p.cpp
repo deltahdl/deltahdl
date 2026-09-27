@@ -11,6 +11,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"

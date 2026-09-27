@@ -32,6 +32,21 @@ TEST(NonAnsiStylePortDeclarations, ExplicitPortsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.2.2.3 (printed page 735): an inout declared in the body with no port kind
+// is a net of the default net type, not a variable §23.3.3.2 would refuse.
+TEST(NonAnsiStylePortDeclarations, BodyInoutWithNoKindIsANet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(i);\n"
+      "  inout i;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  EXPECT_FALSE(design->top_modules[0]->ports[0].is_var);
+}
+
 TEST(NonAnsiStylePortDeclarations, TwoImplicitPortsSameNetElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -746,6 +746,32 @@ static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
                   w, false};
 }
 
+// The first parameter named `name` of the module a ParamRangeRegistryGuard
+// installed, or nullptr.
+static const RtlirParamDecl* RegisteredParam(std::string_view name) {
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return nullptr;
+  for (const auto& p : mod->params) {
+    if (p.name == name) return &p;
+  }
+  return nullptr;
+}
+
+// How far into an unpacked dimension `dim`, `[lo:hi]` or `[size]`, the element
+// `index` selects lies from the dimension's left bound, where both fold.
+static std::optional<int64_t> ElementOffset(const Expr* dim, const Expr* index,
+                                            const ScopeMap& scope) {
+  if (dim == nullptr) return std::nullopt;
+  auto idx = ConstEvalFull(index, scope);
+  bool ranged = dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon;
+  auto left = ConstEvalFull(ranged ? dim->lhs : nullptr, scope);
+  auto right = ConstEvalFull(ranged ? dim->rhs : dim, scope);
+  if (!idx || !right || (ranged && !left)) return std::nullopt;
+  int64_t lo = ranged ? left->value : 0;
+  int64_t hi = ranged ? right->value : right->value - 1;
+  return lo <= hi ? idx->value - lo : lo - idx->value;
+}
+
 // A.2.1.1 gives a param_assignment unpacked dimensions, so a parameter may be
 // an array, and a select of one element of it -- `PARR[2]` of `parameter int
 // PARR[3] = '{10, 20, 30}` -- is a constant expression (§11.2.1) whose value
@@ -757,33 +783,22 @@ static std::optional<ConstVal> ParamArrayElement(const Expr* expr,
       expr->base->kind != ExprKind::kIdentifier) {
     return std::nullopt;
   }
-  const RtlirModule* mod = RegisteredModule();
-  if (mod == nullptr) return std::nullopt;
-  for (const auto& p : mod->params) {
-    if (p.name != expr->base->text) continue;
-    if (p.unpacked_dims == nullptr || p.unpacked_dims->size() != 1) break;
-    const Expr* value = p.override_expr ? p.override_expr : p.default_value;
-    const Expr* dim = p.unpacked_dims->front();
-    if (value == nullptr || dim == nullptr ||
-        value->kind != ExprKind::kAssignmentPattern ||
-        !value->pattern_keys.empty()) {
-      break;
-    }
-    auto idx = ConstEvalFull(expr->index, scope);
-    bool ranged =
-        dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon;
-    auto left = ConstEvalFull(ranged ? dim->lhs : nullptr, scope);
-    auto right = ConstEvalFull(ranged ? dim->rhs : dim, scope);
-    if (!idx || !right || (ranged && !left)) break;
-    int64_t lo = ranged ? left->value : 0;
-    int64_t hi = ranged ? right->value : right->value - 1;
-    int64_t offset = lo <= hi ? idx->value - lo : lo - idx->value;
-    if (offset < 0 || offset >= static_cast<int64_t>(value->elements.size())) {
-      break;
-    }
-    return ConstEvalFull(value->elements[static_cast<size_t>(offset)], scope);
+  const RtlirParamDecl* p = RegisteredParam(expr->base->text);
+  if (p == nullptr || p->unpacked_dims == nullptr ||
+      p->unpacked_dims->size() != 1) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  const Expr* value = p->override_expr ? p->override_expr : p->default_value;
+  if (value == nullptr || value->kind != ExprKind::kAssignmentPattern ||
+      !value->pattern_keys.empty()) {
+    return std::nullopt;
+  }
+  auto offset = ElementOffset(p->unpacked_dims->front(), expr->index, scope);
+  if (!offset || *offset < 0 ||
+      *offset >= static_cast<int64_t>(value->elements.size())) {
+    return std::nullopt;
+  }
+  return ConstEvalFull(value->elements[static_cast<size_t>(*offset)], scope);
 }
 
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,

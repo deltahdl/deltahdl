@@ -206,6 +206,20 @@ static void WriteMemContainer(const WritememEval& eval,
   if (auto* target = ctx.FindVariable(mem_name)) emit(target->value);
 }
 
+// §21.5: the memory is named by an identifier, bare or hierarchical (§23.6);
+// false for any other form of `mem`.
+static bool MemoryName(const Expr* mem, std::string& name) {
+  if (mem->kind == ExprKind::kIdentifier) {
+    name = std::string(mem->text);
+    return true;
+  }
+  if (mem->kind == ExprKind::kMemberAccess && !mem->is_scope_resolution) {
+    name = FlattenHierPath(mem);
+    return true;
+  }
+  return false;
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
@@ -217,15 +231,10 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   ClassArrayRef class_array;
   bool is_class_array =
       ResolveClassArray(expr->args[1], ctx, arena, class_array);
-  // §21.5: the memory is named by an identifier, bare or hierarchical (§23.6).
-  const Expr* mem = expr->args[1];
-  bool is_hier = mem->kind == ExprKind::kMemberAccess &&
-                 !mem->is_scope_resolution && !is_class_array;
-  if (!is_class_array && !is_hier && mem->kind != ExprKind::kIdentifier) {
+  std::string mem_name;
+  if (!is_class_array && !MemoryName(expr->args[1], mem_name)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  std::string mem_name =
-      is_hier ? FlattenHierPath(mem) : std::string(mem->text);
 
   // §21.5.3: an associative array is a legal $writemem argument only when its
   // index type is integral (see §21.4.1) — a string-keyed array has no numeric

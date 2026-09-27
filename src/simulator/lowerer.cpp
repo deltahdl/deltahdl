@@ -816,9 +816,8 @@ void Lowerer::RegisterDesignTiming() {
 // Annex D.11: the interactive scope consulted by the optional $scope system
 // task starts at the first top-level module, and a later $scope call retargets
 // it to one of the scopes registered here, each by its complete hierarchical
-// name.
-static void RegisterInteractiveScopes(const RtlirDesign* design,
-                                      SimContext& ctx) {
+// name. Each scope's timescale is registered beside it.
+static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   if (!design->top_modules.empty()) {
     ctx.SetInteractiveScope(design->top_modules.front()->name);
   }
@@ -831,6 +830,23 @@ static void RegisterInteractiveScopes(const RtlirDesign* design,
     ctx.RegisterScopeVariables(
         vars.scope,
         ScopeVariableSet{std::move(vars.prefix), std::move(vars.names)});
+  }
+  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
+  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
+  // timescale come from the design; the top module is the initial current
+  // scope reported when those functions take no argument.
+  ctx.SetGlobalPrecision(design->global_time_precision);
+  ctx.SetCompUnitTimeScale(design->cu_timescale);
+  if (!design->top_modules.empty()) {
+    const RtlirModule* top = design->top_modules.front();
+    ctx.SetCurrentTimeScale(top->timescale);
+    ctx.SetCurrentScopeName(top->name);
+  }
+  for (auto* top : design->top_modules) {
+    // A later top is keyed under its name, as an instance (LowerParallelTop).
+    std::string below_top =
+        top == design->top_modules.front() ? "" : std::string(top->name);
+    RegisterScopeTimescales(top, ctx, std::string(top->name), below_top);
   }
 }
 
@@ -854,24 +870,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
-  RegisterInteractiveScopes(design, ctx_);
-  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
-  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
-  // timescale come from the design; the top module is the initial current
-  // scope reported when those functions take no argument.
-  ctx_.SetGlobalPrecision(design->global_time_precision);
-  ctx_.SetCompUnitTimeScale(design->cu_timescale);
-  if (!design->top_modules.empty()) {
-    const RtlirModule* top = design->top_modules.front();
-    ctx_.SetCurrentTimeScale(top->timescale);
-    ctx_.SetCurrentScopeName(top->name);
-  }
-  for (auto* top : design->top_modules) {
-    // A later top is keyed under its name, as an instance (LowerParallelTop).
-    std::string below_top =
-        top == design->top_modules.front() ? "" : std::string(top->name);
-    RegisterScopeTimescales(top, ctx_, std::string(top->name), below_top);
-  }
+  RegisterDesignScopes(design, ctx_);
   LowerDesignData();
 
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region

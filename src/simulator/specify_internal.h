@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "simulator/specify_path_delay.h"

@@ -781,6 +781,34 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
       });
 }
 
+// Marks a top after the first, keyed under its own name as an instance is,
+// as a top module, answering the tops so marked.
+static std::unordered_set<const RtlirModule*> MarkKeyedTops(
+    const RtlirDesign* design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects) {
+  std::unordered_set<const RtlirModule*> keyed_tops;
+  for (auto* top : design->top_modules) {
+    if (top == nullptr || top == design->top_modules.front()) continue;
+    auto named = objects.find(top->name);
+    if (named == objects.end() || named->second == nullptr) continue;
+    named->second->top_module = true;
+    keyed_tops.insert(top);
+  }
+  return keyed_tops;
+}
+
+// The objects entered so far that no instance encloses and that are no top.
+static std::vector<VpiObject*> UnenclosedObjects(
+    const std::unordered_map<std::string_view, VpiObject*>& objects) {
+  std::vector<VpiObject*> contents;
+  for (const auto& [name, object] : objects) {
+    if (object != nullptr && object->parent == nullptr && !object->top_module) {
+      contents.push_back(object);
+    }
+  }
+  return contents;
+}
+
 void VpiContext::AttachTopModules(const RtlirDesign* design) {
   // §37.5 detail 1: "Top-level modules shall be accessed using vpi_iterate()
   // with a NULL reference object", which is where a PLI application walking a
@@ -797,27 +825,15 @@ void VpiContext::AttachTopModules(const RtlirDesign* design) {
   // (Lowerer::LowerParallelTop), so the object its contents were entered under
   // is already its module object; it is marked a top, and is none of the first
   // top's contents.
-  std::unordered_set<const RtlirModule*> keyed_tops;
-  for (auto* top : design->top_modules) {
-    if (top == nullptr || top == design->top_modules.front()) continue;
-    auto named = object_map_.find(top->name);
-    if (named == object_map_.end() || named->second == nullptr) continue;
-    named->second->top_module = true;
-    keyed_tops.insert(top);
-  }
+  std::unordered_set<const RtlirModule*> keyed_tops =
+      MarkKeyedTops(design, object_map_);
   for (auto* top : design->top_modules) {
     if (top == nullptr || keyed_tops.contains(top)) continue;
     // The objects already entered under bare names are the top's contents, so
     // they become its children and it becomes their enclosing instance. They
     // stay keyed under those names, which is what the simulator keys their
     // storage on and what vpi_handle_by_name() has always answered to.
-    std::vector<VpiObject*> contents;
-    for (auto& [name, object] : object_map_) {
-      if (object != nullptr && object->parent == nullptr &&
-          !object->top_module) {
-        contents.push_back(object);
-      }
-    }
+    std::vector<VpiObject*> contents = UnenclosedObjects(object_map_);
 
     name_pool_.emplace_back(top->name);
     auto* obj = AllocObject();

@@ -78,6 +78,7 @@ class Parser {
   friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
   friend struct ParserClassOverrideHelpers;
+  friend struct ParserConfigHelpers;
   // Expect reports through the diagnostic engine and is reached from nowhere
   // but this class, so the only way to ask what it reports is from inside it.
   // Defined in test/src/unit/test_non_lrm_parser_expect.cpp.
@@ -435,7 +436,6 @@ class Parser {
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
-  void ParseSelectionExpansion(ConfigRule* rule, std::string_view selection);
   bool DotOpensNamedParamAssignment();
   void ParseUseClauseCell(ConfigRule* rule);
   void ParseNamedParamAssignment(ConfigRule* rule);

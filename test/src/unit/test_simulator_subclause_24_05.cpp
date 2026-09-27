@@ -114,18 +114,18 @@ TEST(BlockingTasksCycleEventMode,
      ModuleTaskEnabledByHierarchicalNameFromSubmoduleRunsItsBody) {
   SimFixture f;
   EXPECT_EQ(
-      RunCapture("module top;\n"
+      RunCapture("module sub;\n"
+                 "  initial begin\n"
+                 "    #1 $display(\"sub f=%0d at %0t\", top.scale(7), $time);\n"
+                 "    top.T;\n"
+                 "  end\n"
+                 "endmodule\n"
+                 "module top;\n"
                  "  int k = 5, a = 1, b = 2;\n"
                  "  function int scale(int x); return x * k; endfunction\n"
                  "  task T; a = b; $display(\"T a=%0d at %0t\", a, $time); "
                  "endtask\n"
                  "  sub s();\n"
-                 "endmodule\n"
-                 "module sub;\n"
-                 "  initial begin\n"
-                 "    #1 $display(\"sub f=%0d at %0t\", top.scale(7), $time);\n"
-                 "    top.T;\n"
-                 "  end\n"
                  "endmodule\n",
                  f),
       "sub f=35 at 1\nT a=2 at 1\n");
