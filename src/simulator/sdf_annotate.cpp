@@ -13,7 +13,6 @@
 // expansion each of them reads. They are declared below rather than in
 // simulator/sdf_parser.h because AnnotateSdfCellEntry is their only caller.
 
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
