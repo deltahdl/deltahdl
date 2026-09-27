@@ -4,7 +4,6 @@
 
 #include "fixture_synthesizer.h"
 #include "helpers_reported_error.h"
-#include "helpers_synth_assign.h"
 #include "helpers_synth_input_sweep.h"
 #include "synthesizer/synth_lower.h"
 
