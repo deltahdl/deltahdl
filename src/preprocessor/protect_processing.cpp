@@ -459,8 +459,8 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
   // key for its key blocks has that data key carried in the blocks, rather
   // than a key made for it; one naming no held data key has one made.
   how.key_blocks = ProtectKeyBlocksFor(
-      requests, region.body, keys,
-      EnvelopeBlockEncoding(region.written_inside.encoding), how.digest, named);
+      requests, ProtectKeyBlockRegion{region.body, named}, keys,
+      EnvelopeBlockEncoding(region.written_inside.encoding), how.digest);
   if (how.key_blocks.data_key.empty() && !named.empty()) {
     how.key_blocks = ProtectKeyBlocks{};
     UnderNamedKey(how, in_effect, named, keys);

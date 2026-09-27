@@ -290,8 +290,16 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       const ProtectEncoding& encoding,
                                       std::string_view method);
 
+// The region a set of key blocks is made for: its cleartext, and the key a
+// region naming one the tool holds has its data under, empty where it named
+// none.
+struct ProtectKeyBlockRegion {
+  std::string_view cleartext;
+  std::string_view data_key;
+};
+
 // The key blocks `requests` asks for, over the region whose cleartext is
-// `cleartext`, using the keys the tool was given.
+// `region.cleartext`, using the keys the tool was given.
 //
 // A request whose designation reaches none of those keys is passed over: there
 // is nothing to encrypt its block under, and a block written under no key would
@@ -305,15 +313,14 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 // block on the next expression rather than having to decide which of several
 // digests belongs to it.
 //
-// `data_key` is the key the region's data are under where the region named
-// one the tool holds, which the blocks then carry (§34.5.25.2: the key a
+// `region.data_key` is the key the region's data are under where the region
+// named one the tool holds, which the blocks then carry (§34.5.25.2: the key a
 // key_keyname names "shall be used for encrypting the data encryption keys");
 // where it is empty the region's key is made here.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
-                                     std::string_view cleartext,
+                                     const ProtectKeyBlockRegion& region,
                                      const ProtectKeyList& keys,
                                      const ProtectEncoding& encoding,
-                                     const ProtectDigestBlockPolicy& digest,
-                                     std::string_view data_key);
+                                     const ProtectDigestBlockPolicy& digest);
 
 }  // namespace delta

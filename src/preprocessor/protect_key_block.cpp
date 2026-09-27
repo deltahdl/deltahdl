@@ -231,20 +231,19 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 // the block an author has to look at to find what changed is the first one that
 // stopped matching.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
-                                     std::string_view cleartext,
+                                     const ProtectKeyBlockRegion& region,
                                      const ProtectKeyList& keys,
                                      const ProtectEncoding& encoding,
-                                     const ProtectDigestBlockPolicy& digest,
-                                     std::string_view data_key) {
+                                     const ProtectDigestBlockPolicy& digest) {
   ProtectKeyBlocks blocks;
   const ProtectDataDecryption* first = nullptr;
   for (const ProtectKeyBlockRequest& request : requests.Requests()) {
     std::string_view key = KeyOfRequest(request, keys);
     if (key.empty()) continue;
     if (blocks.data_key.empty()) {
-      blocks.data_key = data_key.empty()
-                            ? ProtectGeneratedDataKey(cleartext, key)
-                            : std::string(data_key);
+      blocks.data_key = region.data_key.empty()
+                            ? ProtectGeneratedDataKey(region.cleartext, key)
+                            : std::string(region.data_key);
       blocks.digest_key = ProtectGeneratedDigestKey(blocks.data_key);
     }
     if (first == nullptr) {
