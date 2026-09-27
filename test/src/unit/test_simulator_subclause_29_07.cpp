@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -180,6 +181,75 @@ TEST(UdpInitialStatement, InitialValueServesAsCurrentState) {
   UdpEvalState state_low(*low.cu->udps[0]);
   EXPECT_EQ(state_low.GetOutput(), '0');
   EXPECT_EQ(state_low.Evaluate({'0'}), '0');
+}
+
+// §29.7 Example 2 with Figure 29-1 (printed pages 867-868): the standard's own
+// `dff`, its `dff1` UDP given `initial q = 1'b1` and its clk and d left
+// undriven. §29.3.5 (printed page 863) has "The z values passed to UDP inputs
+// ... treated the same as x values", so the undriven inputs make no
+// transition, the 1 stands on qi from time 0, and it reaches q through `buf #3`
+// at 3 and qb through `not #5` at 5. The z was taken for a transition from
+// the x the inputs were assumed to start at, no row matched it, and qi went x.
+TEST(UdpInitialStatementRun, Figure29_1InitialValueReachesTheGates) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive dff1 (q, clk, d);\n"
+                       "  input clk, d;\n"
+                       "  output q; reg q;\n"
+                       "  initial q = 1'b1;\n"
+                       "  table\n"
+                       "    r 0 : ? : 0 ;\n"
+                       "    r 1 : ? : 1 ;\n"
+                       "    f ? : ? : - ;\n"
+                       "    ? * : ? : - ;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module dff (q, qb, clk, d);\n"
+                       "  input clk, d;\n"
+                       "  output q, qb;\n"
+                       "  dff1 g1(qi, clk, d);\n"
+                       "  buf #3 g2(q, qi);\n"
+                       "  not #5 g3(qb, qi);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire clk, d; wire q, qb;\n"
+                       "  dff u(q, qb, clk, d);\n"
+                       "  initial begin\n"
+                       "    #0 $display(\"qi=%b\", u.qi);\n"
+                       "    #1 $display(\"q=%b qb=%b\", q, qb);\n"
+                       "    #3 $display(\"q=%b qb=%b\", q, qb);\n"
+                       "    #2 $display(\"q=%b qb=%b\", q, qb);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "qi=1\nq=x qb=x\nq=1 qb=x\nq=1 qb=0\n");
+}
+
+// Undriven wire inputs, at z, keep the initial 1 as never-assigned reg inputs,
+// at x, do.
+TEST(UdpInitialStatementRun, ZInputsKeepTheInitialValueAsXInputsDo) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive dff1 (q, clk, d);\n"
+                       "  input clk, d;\n"
+                       "  output q; reg q;\n"
+                       "  initial q = 1'b1;\n"
+                       "  table\n"
+                       "    r 0 : ? : 0 ;\n"
+                       "    r 1 : ? : 1 ;\n"
+                       "    f ? : ? : - ;\n"
+                       "    ? * : ? : - ;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module top;\n"
+                       "  wire clk, d; wire qi; reg rclk, rd; wire qr;\n"
+                       "  dff1 g1(qi, clk, d);\n"
+                       "  dff1 g2(qr, rclk, rd);\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"wire-z inputs qi=%b  reg-x inputs "
+                       "qr=%b\", qi, qr);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "wire-z inputs qi=1  reg-x inputs qr=1\n");
 }
 
 }  // namespace

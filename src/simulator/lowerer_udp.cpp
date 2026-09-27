@@ -116,13 +116,17 @@ static char UdpInitialOutput(const UdpDecl& decl, SimContext& ctx,
 // the state table is taken directly from the port list in the UDP definition
 // header", and §29.8 rules that "The terminal connection order is as specified
 // in the UDP definition", so position i of this vector is position i of every
-// row.
+// row. §29.3.5 (printed page 863): "The z values passed to UDP inputs shall be
+// treated the same as x values", so a z is read as the x it is taken for, and
+// an input moving between the two makes no transition: an undriven net left at
+// z from the start leaves a sequential primitive's initial state standing.
 static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
                                        SimContext& ctx, Arena& arena) {
   std::vector<char> inputs;
   inputs.reserve(inst.inputs.size());
   for (const Expr* terminal : inst.inputs) {
-    inputs.push_back(UdpInputChar(terminal, ctx, arena));
+    const char kBit = UdpInputChar(terminal, ctx, arena);
+    inputs.push_back(kBit == 'z' ? 'x' : kBit);
   }
   return inputs;
 }
