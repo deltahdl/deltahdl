@@ -1,6 +1,9 @@
 #include <cstddef>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_data.h"
@@ -96,6 +99,18 @@ static bool SelectsQueueElement(
   return it != arrays.end() && it->second.elements_are_queues;
 }
 
+// Whether the innermost declaration of `name` among `decls` -- a block's, the
+// walk's record of them -- is of an unpacked array; empty where no block the
+// walk is inside declares it.
+static std::optional<bool> BlockDeclIsArray(
+    const std::vector<std::pair<std::string_view, bool>>& decls,
+    std::string_view name) {
+  for (auto it = decls.rbegin(); it != decls.rend(); ++it) {
+    if (it->first == name) return it->second;
+  }
+  return std::nullopt;
+}
+
 // The elaborator classified a `{...}` right-hand side by its target and knew a
 // bare name alone, so `h.q = {4, 5}` and `C::s = {5, 15, 25}` on a queue
 // property were reported as vector concatenations of unsized constants where
@@ -116,9 +131,8 @@ bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
     const Expr* lhs) const {
   if (lhs == nullptr) return false;
   if (lhs->kind == ExprKind::kIdentifier) {
-    for (auto it = block_decls_.rbegin(); it != block_decls_.rend(); ++it) {
-      if (it->first == lhs->text) return it->second;
-    }
+    if (auto is_array = BlockDeclIsArray(block_decls_, lhs->text))
+      return *is_array;
     return var_array_info_.count(lhs->text) > 0;
   }
   if (lhs->kind == ExprKind::kSelect)
