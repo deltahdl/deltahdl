@@ -39,6 +39,16 @@ DataType TypeSpelledBy(const Expr* elem);
 void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
                                SimContext& ctx, Arena& arena);
 
+// §8.25 (printed pages 203-204) with §8.9 (printed page 186): a static
+// property's initializer is evaluated once for the specialization `cls` it
+// belongs to, on no object and in no method, so the type each type parameter
+// of the class stands for there -- the actual `cls` binds it to, else the
+// default the class declares, which is all the default specialization has --
+// is bound in the innermost scope, the one the caller pushed for the
+// initializers, under the parameter's name. A parameter the class gives no
+// default and `cls` no actual binds nothing.
+void BindStaticInitTypeActuals(const ClassTypeInfo* cls, SimContext& ctx);
+
 // §8.25 with §20.6.2: the number of bits of the type the type parameter `name`
 // of the running class stands for, where no object is running -- the type
 // the innermost scope binds it to (BindClassScopeTypeActuals), else the

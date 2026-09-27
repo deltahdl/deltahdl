@@ -101,6 +101,21 @@ void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
   }
 }
 
+void BindStaticInitTypeActuals(const ClassTypeInfo* cls, SimContext& ctx) {
+  if (cls == nullptr || cls->decl == nullptr) return;
+  const ClassDecl* decl = cls->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->type_param_names.count(pname) == 0) continue;
+    const DataType* actual = cls->param_actuals != nullptr
+                                 ? ActualForParam(*cls->param_actuals, i, pname)
+                                 : nullptr;
+    if (actual == nullptr || actual->kind == DataTypeKind::kImplicit)
+      actual = TypeParamActual(nullptr, decl, pname);
+    if (actual != nullptr) ctx.BindScopeTypeActual(pname, actual);
+  }
+}
+
 uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx) {
   if (const DataType* bound = ctx.FindScopeTypeActual(name))
     return DeclaredTypeWidth(*bound, ctx);

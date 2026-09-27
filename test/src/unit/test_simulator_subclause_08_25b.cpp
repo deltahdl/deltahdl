@@ -738,4 +738,25 @@ TEST(ClassSim, TypeParameterPropertyTakesTheActualsWidth) {
   EXPECT_EQ(out, "44 44 44 300 8\n");
 }
 
+// §8.25 (printed pages 203-204) with §20.6.2 (printed page 629): a static
+// property's initializer is evaluated for the specialization the property
+// belongs to, and there the class's type parameter names the type that
+// specialization binds it to, so `$bits(T)` is 8 under `C#(byte)` and 32 under
+// the default and `C#(int)`. The byte actual discriminates from the default's
+// int, and the default specialization from the 1 the parameter read as a value
+// gave.
+TEST(ClassSim, StaticInitializerSizesItsSpecializationsTypeParameter) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = int);\n"
+      "  static int w = $bits(T);\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial $display(\"%0d %0d %0d\", C#()::w, C#(int)::w, "
+      "C#(byte)::w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32 8\n");
+}
+
 }  // namespace

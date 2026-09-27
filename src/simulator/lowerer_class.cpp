@@ -18,6 +18,7 @@
 #include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -178,13 +179,20 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
 // first set back to the default CreateStaticProperties gives it. Kept as
 // copied, `S #(byte)::n` made after `S s = new;` had run read the count the
 // default specialization's constructor had made.
+//
+// A type parameter is no value, so the frame binds it as the type the
+// specialization's actual names (BindStaticInitTypeActuals) rather than as a
+// local. With no type bound, `static int w = $bits(T)` held 32 under
+// `C #(byte)`.
 void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
                                         Arena& arena) {
   if (spec == nullptr || spec->decl == nullptr) return;
   CreateStaticProperties(spec, arena);
   if (!spec->package.empty()) ctx.PushScope(spec->package);
   ctx.PushScope();
+  BindStaticInitTypeActuals(spec, ctx);
   for (const auto& [pname, pexpr] : spec->decl->params) {
+    if (spec->decl->type_param_names.count(pname) != 0) continue;
     auto entry = spec->static_properties.find(std::string(pname));
     if (entry == spec->static_properties.end()) continue;
     auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
@@ -650,12 +658,19 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
 // once in a frame of the scope declaring the class -- its package, the
 // compilation unit's "$unit", or none for a module's -- the scope
 // RecordClassPackage recorded on the class. A same-named class of another
-// scope bound under the bare name since is not `cls` and is left alone.
+// scope bound under the bare name since is not `cls` and is left alone. The
+// class's own copy is the default specialization's (§8.25.1, printed page
+// 205), so a frame of its own binds each type parameter to the default the
+// class declares, which `static int w = $bits(T)` sizes; with nothing bound
+// it held 1 under `class C #(type T = int)`.
 void Lowerer::InitClassStaticProperties(const ClassDecl* cls) {
   ClassTypeInfo* info = ctx_.FindClassType(cls->name);
   if (info == nullptr || info->decl != cls) return;
   if (!info->package.empty()) ctx_.PushScope(info->package);
+  ctx_.PushScope();
+  BindStaticInitTypeActuals(info, ctx_);
   InitStaticProperties(info, ctx_, arena_);
+  ctx_.PopScope();
   if (!info->package.empty()) ctx_.PopScope();
 }
 
