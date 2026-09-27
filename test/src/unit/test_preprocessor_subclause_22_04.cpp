@@ -125,6 +125,56 @@ TEST(Preprocessor, Include_RelativeToSourceDir) {
   EXPECT_NE(result.find("wire h;"), std::string::npos);
 }
 
+// Runs the enclosing scope with the working directory at `dir`, and puts the
+// one it replaced back when the scope ends.
+struct WorkingDirectoryAt {
+  fs::path previous;
+
+  explicit WorkingDirectoryAt(const fs::path& dir)
+      : previous(fs::current_path()) {
+    fs::current_path(dir);
+  }
+
+  ~WorkingDirectoryAt() { fs::current_path(previous); }
+};
+
+// §22.4 (printed page 705): "When the filename is enclosed in double quotes
+// ("filename"), for a relative path the compiler's current working directory,
+// and optionally user-specified locations are searched." A source file named
+// without a directory, as `deltahdl 46.sv` names it from the directory holding
+// it, has no directory of its own to search, and its quoted include is found
+// in the working directory.
+TEST(Preprocessor, Include_DoubleQuote_SearchesWorkingDirectory) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("46-inc.svh", "`define FROM_INC 10\n");
+  WorkingDirectoryAt cwd(tmp.dir);
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile("46.sv", "`include \"46-inc.svh\"\n`FROM_INC\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("10"), std::string::npos);
+}
+
+// §22.4: a filename in angle brackets is looked for in "an
+// implementation-dependent location containing files defined by the language
+// standard" alone, so the working directory is not searched for it.
+TEST(Preprocessor, Include_AngleBracket_DoesNotSearchWorkingDirectory) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("local.svh", "wire local_wire;\n");
+  WorkingDirectoryAt cwd(tmp.dir);
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile("top.sv", "`include <local.svh>\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot find include file 'local.svh'", 1, ""));
+}
+
 TEST(Preprocessor, Include_IncludeDirs_SearchOrder) {
   IncludeTestDir tmp;
   fs::create_directories(tmp.dir / "dir_a");

@@ -251,7 +251,7 @@ class Preprocessor {
   bool ValidateMacroArgCount(const MacroDef& def, std::string_view args_text,
                              SourceLoc loc, std::string_view name);
   std::string ResolveInclude(std::string_view filename,
-                             const std::string& src_dir);
+                             const std::string& src_dir, bool quoted);
   void DefinePredefined(std::string name, std::string body);
   void TrackDesignElement(std::string_view trimmed);
   void ExpandAndAppendLine(std::string_view line, uint32_t file_id,

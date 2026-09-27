@@ -796,7 +796,7 @@ void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
       src_dir = std::string(src_path.substr(0, slash));
     }
   }
-  auto resolved = ResolveInclude(fn, src_dir);
+  auto resolved = ResolveInclude(fn, src_dir, !angle_bracket);
   if (resolved.empty()) {
     diag_.Error(loc, "cannot find include file '" + std::string(fn) + "'",
                 Subclause::None());
