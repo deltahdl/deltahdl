@@ -81,6 +81,22 @@ TEST(ConcatenationSynthesis, AnOperandOfUnknownWidthIsReported) {
                        "concatenation operand has no width", "11.4.12");
 }
 
+// The test fails on a lowering that places a shift inside a concatenation at
+// the size and type of the assignment around it. §11.6.1 Table 11-21 marks the
+// operands of a concatenation self-determined, and §11.8.1 rules the sign and
+// size of such an operand its own, so `a >>> 1` is a signed four-bit shift and
+// §11.4.10 fills its vacated top position with the sign bit of `a`. Under the
+// unsigned eight-bit target it would be zero-filled instead, which disagrees at
+// the eight values of `a` with bit 3 set.
+TEST(ConcatenationSynthesis, AShiftOperandKeepsItsOwnSizeAndType) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [7:0] y", "input signed [3:0] a",
+                        "{a >>> 1, 4'b0}"),
+      1, [](uint64_t a, uint64_t) -> uint64_t {
+        return ((a >> 1) | (a & 0x8u)) << 4;
+      });
+}
+
 // The case below fails on a run that answers a netlist and reports nothing for
 // an assignment whose target the synthesizer builds nothing for.
 // `SynthLower::LowerContAssign` and `SynthLower::LowerAssignStmt` in

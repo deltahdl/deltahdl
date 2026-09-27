@@ -44,6 +44,12 @@ std::optional<uint32_t> SynthLower::ExprWidth(const Expr* expr) {
       return ElementsWidth(expr);
     case ExprKind::kReplicate:
       return ReplicateWidth(expr);
+    case ExprKind::kBinary:
+      // §11.6.1 Table 11-21 gives a shift the length of its left operand, which
+      // InferExprWidth answers as 0 when that operand is a name, for the reason
+      // the identifier case above gives.
+      if (IsShiftOp(expr->op)) return ExprWidth(expr->lhs);
+      [[fallthrough]];
     default: {
       uint32_t width = InferExprWidth(expr, NoTypedefs());
       if (width == 0) return std::nullopt;
@@ -114,7 +120,20 @@ uint32_t SynthLower::LowerElementsBit(const Expr* expr, AigGraph& aig,
   uint32_t offset = 0;
   for (auto it = expr->elements.rbegin(); it != expr->elements.rend(); ++it) {
     uint32_t width = ExprWidth(*it).value_or(0);
-    if (bit < offset + width) return LowerExprBit(*it, aig, bit - offset);
+    if (bit < offset + width) {
+      // §11.6.1 Table 11-21 marks the operands of a concatenation
+      // self-determined, and §11.8.1 rules that the sign and size of such an
+      // operand are its own. They are set for the operand in place of what an
+      // assignment around the concatenation propagated, and handed back after.
+      uint32_t saved_width = propagated_width_;
+      bool saved_signed = propagated_signed_;
+      propagated_width_ = width;
+      propagated_signed_ = IsSignedExpr(*it);
+      uint32_t lit = LowerExprBit(*it, aig, bit - offset);
+      propagated_width_ = saved_width;
+      propagated_signed_ = saved_signed;
+      return lit;
+    }
     offset += width;
   }
   // A bit at or above the width of the whole concatenation carries nothing the

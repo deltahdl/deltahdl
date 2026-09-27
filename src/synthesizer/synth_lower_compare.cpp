@@ -286,7 +286,22 @@ uint32_t SynthLower::LowerCompareBit(const Expr* expr, AigGraph& aig,
   // and every bit of the target above it is zero. SynthLower::LowerBinaryBit
   // already has that shape for the §11.4.7 logical operators.
   if (bit > 0) return AigGraph::kConstFalse;
+  // §11.6.1 Table 11-21 sizes both operands of a relational or equality
+  // operator to the larger of their two lengths, and §11.8.2 propagates that
+  // size and the operands' type down to their context-determined operands in
+  // place of whatever the one-bit result stands in. The two are set for the
+  // operands and handed back afterwards, since the comparison may itself be an
+  // operand of an assignment that set them. An operand SynthLower::ExprWidth
+  // cannot answer for contributes nothing, which leaves a shift standing there
+  // at least as wide as its own left operand.
+  uint32_t saved_width = propagated_width_;
+  bool saved_signed = propagated_signed_;
+  propagated_width_ = std::max(ExprWidth(expr->lhs).value_or(0),
+                               ExprWidth(expr->rhs).value_or(0));
+  propagated_signed_ = IsSignedExpr(expr->lhs) && IsSignedExpr(expr->rhs);
   uint32_t match = LowerCompareMatch(expr, aig);
+  propagated_width_ = saved_width;
+  propagated_signed_ = saved_signed;
   if (ComparesNegated(expr->op)) return aig.AddNot(match);
   return match;
 }
