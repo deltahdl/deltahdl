@@ -116,6 +116,24 @@ static void WithCalleeScopeOff(SimContext& ctx, Read read) {
   ctx.SwapScopeStack(std::move(stack));
 }
 
+// An actual that is no declared fixed-size array -- a queue, or a property
+// reached through a handle or by its bare name in a method, which holds its
+// elements on the object -- takes them back by position (AssignAggregate).
+// Otherwise `actual_info` receives the declared array's shape, read with the
+// callee's scope off.
+static bool TakesElementsByPosition(const Expr* actual, SimContext& ctx,
+                                    const ArrayInfo*& actual_info) {
+  actual_info = nullptr;
+  if (actual->kind == ExprKind::kMemberAccess) return true;
+  bool by_position = false;
+  WithCalleeScopeOff(ctx, [&] {
+    actual_info = ctx.FindArrayInfo(actual->text);
+    by_position =
+        actual_info == nullptr || ctx.FindQueue(actual->text) != nullptr;
+  });
+  return by_position;
+}
+
 // §13.3 (printed page 337) writes mytask4's `output [3:0][7:0] y[1:0]`, a
 // formal with an unpacked dimension, and §13.5 (printed page 348) has the
 // return pass the values of the output and inout formals to the variables of
@@ -146,33 +164,28 @@ static void CollectElementWritebacks(const FunctionArg& formal,
   const ArrayInfo* info = ctx.FindArrayInfo(formal.name);
   if (info == nullptr) return;
   const ArrayInfo* actual_info = nullptr;
-  // An actual that is no declared fixed-size array -- a queue, or a property
-  // reached through a handle or by its bare name in a method, which holds its
-  // elements on the object -- takes them back by position (AssignAggregate).
-  bool actual_is_queue = actual->kind == ExprKind::kMemberAccess;
-  WithCalleeScopeOff(ctx, [&] {
-    if (actual_is_queue) return;
-    actual_info = ctx.FindArrayInfo(actual->text);
-    actual_is_queue =
-        actual_info == nullptr || ctx.FindQueue(actual->text) != nullptr;
-  });
-  AggregateWriteback to_queue{.actual = actual};
+  bool by_position = TakesElementsByPosition(actual, ctx, actual_info);
+  // The actual's own bounds, where it declares as many elements as the
+  // formal; otherwise the formal's, as the copy-out has always named them.
+  const ArrayInfo& target =
+      (actual_info != nullptr && actual_info->size == info->size) ? *actual_info
+                                                                  : *info;
+  AggregateWriteback to_queue;
+  to_queue.actual = actual;
   for (uint32_t k = 0; k < info->size; ++k) {
     std::string suffix = "[" + std::to_string(ElementIndexAt(*info, k)) + "]";
     auto* elem = ctx.FindLocalVariable(std::string(formal.name) + suffix);
     if (elem == nullptr) continue;
     Logic4Vec value = OwnRhsWords(elem->value, arena);
-    if (actual_is_queue) {
+    if (by_position) {
       to_queue.elements.push_back(value);
       continue;
     }
-    uint32_t idx = (actual_info != nullptr && actual_info->size == info->size)
-                       ? ElementIndexAt(*actual_info, k)
-                       : ElementIndexAt(*info, k);
-    out.elements.push_back(
-        {std::string(actual->text) + "[" + std::to_string(idx) + "]", value});
+    out.elements.push_back({std::string(actual->text) + "[" +
+                                std::to_string(ElementIndexAt(target, k)) + "]",
+                            value});
   }
-  if (actual_is_queue) out.aggregates.push_back(std::move(to_queue));
+  if (by_position) out.aggregates.push_back(std::move(to_queue));
 }
 
 // §7.7 (printed page 162) makes the rules of array argument passing by value
@@ -188,7 +201,8 @@ static bool CollectAggregateWriteback(const FunctionArg& formal,
                                       const Expr* actual, SimContext& ctx,
                                       std::vector<AggregateWriteback>& out) {
   if (formal.unpacked_dims.empty() || actual == nullptr) return false;
-  AggregateWriteback write{.actual = actual};
+  AggregateWriteback write;
+  write.actual = actual;
   std::vector<Scope> stack = ctx.SwapScopeStack({});
   if (!stack.empty()) {
     const Scope& callee = stack.back();
