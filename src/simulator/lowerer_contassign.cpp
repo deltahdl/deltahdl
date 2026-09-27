@@ -15,7 +15,6 @@
 // ScheduleProcess, which src/simulator/lowerer.h declares because §9.2's
 // procedures and §10.3's assignments are started the same way.
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -30,6 +29,7 @@
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
+#include "simulator/contassign_delay.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
@@ -74,13 +74,6 @@ static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
   return true;
 }
 
-static bool IsAllHighZ(const Logic4Vec& v) {
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    if (v.words[i].aval != 0 || v.words[i].bval == 0) return false;
-  }
-  return v.nwords > 0;
-}
-
 static Logic4Vec ApplyHighzStrengthsToValue(const Logic4Vec& val,
                                             DriverStrength ds, Arena& arena) {
   bool s0_is_z = (ds.s0 == Strength::kHighz);
@@ -106,14 +99,6 @@ static Logic4Vec ApplyHighzStrengthsToValue(const Logic4Vec& val,
   }
   return out;
 }
-
-struct ContAssignDelays {
-  uint64_t rise = 0;
-  uint64_t fall = 0;
-  uint64_t decay = 0;
-  bool has_fall = false;
-  bool has_decay = false;
-};
 
 struct ContAssignDelayExprs {
   const Expr* rise = nullptr;
@@ -154,6 +139,10 @@ struct ContAssignParams {
   // value the gate would transmit.
   const Expr* three_state_ctrl = nullptr;
   const Expr* three_state_pass = nullptr;
+
+  // The driver slot PresetDelayedDriver gave this assignment on its net when it
+  // was lowered, or -1 where it gave none.
+  int64_t preset_driver = -1;
 };
 
 // Identifies the driver slot that a continuous assignment writes to. Per IEEE
@@ -199,77 +188,6 @@ struct ContAssignDrivenValue {
   const Logic4Vec& value;
   DriverStrength strength;
 };
-
-static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
-                                            const Logic4Vec& new_val,
-                                            const ContAssignDelays& d) {
-  bool new_has_x = HasUnknownBits(new_val);
-  if (new_has_x) {
-    uint64_t m = std::min(d.rise, d.fall);
-    if (d.has_decay) m = std::min(m, d.decay);
-    return m;
-  }
-  if (HasUnknownBits(old_val) || IsAllHighZ(old_val)) {
-    // Old value is x or z, new value is a known 0 or 1. The destination
-    // logic level selects the slot: 0 routes through the fall delay and 1
-    // through the rise delay, matching the x/z-source rows of Table 28-9.
-    return new_val.ToUint64() == 0 ? d.fall : d.rise;
-  }
-  uint64_t nv = new_val.ToUint64();
-  uint64_t ov = old_val.ToUint64();
-  if (nv > ov) return d.rise;
-  if (nv < ov) return d.fall;
-  return d.rise;
-}
-
-// §10.3.3 decides which of the three delays governs, and for a vector net it
-// decides it once for the assignment rather than once per bit: "If the
-// left-hand side references a vector net, then up to three delays can be
-// applied. The following rules determine which delay controls the assignment:
-// If the right-hand side makes a transition from nonzero to zero, then the
-// falling delay shall be used. If the right-hand side makes a transition to z,
-// then the turn-off delay shall be used. For all other cases, the rising delay
-// shall be used." Each rule reads the right-hand side whole, so a vector whose
-// bits move in opposite directions is neither a transition to zero nor one to
-// z, and the rising delay carries every bit of it: the whole vector settles at
-// one time, not each bit at its own.
-//
-// The clause's later sentence restricts the same thing again for one of the two
-// forms -- "if the assignment is to a vector net, then the rising and falling
-// delays shall not be applied to the individual bits if the assignment is
-// included in the declaration" -- and grants nothing to the other. A net delay
-// reaches here as the driver's own delay, ApplyNetDeclDelaysToDrivers
-// (src/elaborator/elaborator_net_delay.cpp) having added it to whatever the
-// driver wrote, and it is selected by these same rules. So both forms settle a
-// vector whole, which is what #3372 asked to be decided and recorded.
-//
-// A scalar left-hand side is the other half of the clause: "If the left-hand
-// references a scalar net, then the delay shall be treated in the same way as
-// for gate delays", which is Table 28-9 and is what
-// SelectScalarContAssignDelay above reads.
-static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
-                                      const Logic4Vec& new_val,
-                                      const ContAssignDelays& d,
-                                      uint32_t width) {
-  if (!d.has_fall) return d.rise;
-
-  bool new_is_z = IsAllHighZ(new_val);
-  if (new_is_z) {
-    if (d.has_decay) return d.decay;
-    return std::min(d.rise, d.fall);
-  }
-
-  if (width <= 1) {
-    return SelectScalarContAssignDelay(old_val, new_val, d);
-  }
-
-  if (!HasUnknownBits(new_val) && new_val.ToUint64() == 0 &&
-      !HasUnknownBits(old_val) && !IsAllHighZ(old_val) &&
-      old_val.ToUint64() != 0) {
-    return d.fall;
-  }
-  return d.rise;
-}
 
 static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
                                               SimContext& ctx, Arena& arena) {
@@ -846,6 +764,10 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   DropUnwatchableNames(ctx, read_vars);
 
   ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
+  if (params.preset_driver >= 0 && drv.net != nullptr) {
+    drv.driver_idx = static_cast<size_t>(params.preset_driver);
+    drv.first = false;
+  }
 
   // The name a module path declared in this instance gives this assignment's
   // target: the net the driver resolves against, under the instance prefix,
@@ -900,6 +822,28 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     co_await AnyChangeAwaiter{ctx, read_vars};
   }
 }
+// §6.6 (printed page 91): a net's value "shall be determined by the values of
+// its drivers", and it is high impedance only where "no driver is connected".
+// A delayed assignment's driver is connected from the start but has computed
+// no value until its first transition lands after the delay (§28.16, printed
+// page 856; §10.3.3), so until then it drives x, at its drive strength, on the
+// bits it drives. It is given that slot here, before time 0, so the net holds
+// x there from the start rather than z and no change to x is seen at time 0.
+// Answers the slot, or -1 where the assignment has no delay or drives no net.
+static int64_t PresetDelayedDriver(const ContAssignParams& p, SimContext& ctx,
+                                   Arena& arena) {
+  if (p.delays.rise == nullptr) return -1;
+  ContAssignDriver drv = MakeContAssignDriver(p.lhs, ctx);
+  if (drv.net == nullptr || drv.net->resolved == nullptr) return -1;
+  RefreshContAssignDriverBits(drv, p.lhs, ctx, arena);
+  auto slot = static_cast<int64_t>(drv.net->drivers.size());
+  drv.net->drivers.push_back(ContAssignDriverValue(
+      drv, MakeAllX(arena, drv.net->resolved->value.width), arena));
+  drv.net->driver_strengths.push_back(p.ds);
+  drv.net->Resolve(arena, nullptr);
+  return slot;
+}
+
 void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;
@@ -929,6 +873,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.inst_prefix = inst_prefix_;
   cap.interconnect_load = ca.interconnect_load;
   cap.interconnect_source = ca.interconnect_source;
+  cap.preset_driver = PresetDelayedDriver(cap, ctx_, arena_);
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);

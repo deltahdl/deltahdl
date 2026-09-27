@@ -758,4 +758,89 @@ TEST(GateNetDelays, InputPortKeepsFollowingAfterItCancelsAPendingTransition) {
             "t=45 u.b=0 w=0\n");
 }
 
+// §6.6 (printed page 91): a net's value "shall be determined by the values of
+// its drivers", and it is z only "if no driver is connected". A delayed gate is
+// connected from the start and has computed nothing until its first transition
+// lands (§28.16, printed page 856), so its net reads x, at the gate's strong
+// strength, until the delay elapses.
+TEST(GateNetDelays, DelayedGateOutputIsUnknownUntilItsFirstTransition) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire y;\n"
+      "  logic a = 1, b = 1;\n"
+      "  and #4 g (y, a, b);\n"
+      "  initial begin\n"
+      "    #2 $display(\"t=%0t y=%b v=%v\", $time, y, y);\n"
+      "    #2 $display(\"t=%0t y=%b v=%v\", $time, y, y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=2 y=x v=StX\n"
+            "t=4 y=1 v=St1\n");
+}
+
+// §28.3 (printed page 829): the instances of one declaration "shall have the
+// same drive strength and delay specification", and each of them drives its
+// own net x until that delay has passed.
+TEST(GateNetDelays, GatesOfOneDeclarationEachDriveXUntilTheSharedDelay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire y1, y2;\n"
+      "  logic a = 1, b = 0;\n"
+      "  or (strong1, weak0) #4 g1 (y1, a, b), g2 (y2, b, b);\n"
+      "  initial begin\n"
+      "    #3 $display(\"t=%0t y1=%b y2=%b\", $time, y1, y2);\n"
+      "    #2 $display(\"t=%0t y1=%b y2=%b\", $time, y1, y2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=3 y1=x y2=x\n"
+            "t=5 y1=1 y2=0\n");
+}
+
+// §6.6 with §10.3.2: a delayed assignment to a select of a net drives x on the
+// bits it selects until its delay has passed, and the bits it does not select
+// stay undriven, z.
+TEST(GateNetDelays, DelayedSelectDriverIsUnknownOnItsBitsUntilItsDelay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [3:0] w;\n"
+      "  assign #5 w[2:1] = 2'b10;\n"
+      "  initial begin\n"
+      "    #1 $display(\"t=%0t w=%b\", $time, w);\n"
+      "    #5 $display(\"t=%0t w=%b\", $time, w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=1 w=zxxz\n"
+            "t=6 w=z10z\n");
+}
+
+// §28.16's Table 28-9 has the third of three delays govern a transition to z,
+// and §28.6 has a disabled bufif1 output z, so a bufif1 disabled from the start
+// drives x until its turn-off delay of 6 passes and only then leaves its net
+// undriven.
+TEST(GateNetDelays, DisabledThreeStateGateTurnsOffAfterItsTurnOffDelay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire v;\n"
+      "  bufif1 #(4, 4, 6) g (v, 1'b1, 1'b0);\n"
+      "  initial begin\n"
+      "    #5 $display(\"t=%0t v=%b %v\", $time, v, v);\n"
+      "    #2 $display(\"t=%0t v=%b %v\", $time, v, v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "t=5 v=x StX\n"
+            "t=7 v=z HiZ\n");
+}
+
 }  // namespace
