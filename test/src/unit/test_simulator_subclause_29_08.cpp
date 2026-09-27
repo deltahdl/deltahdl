@@ -417,4 +417,42 @@ TEST(UdpInstanceDelayRun, ParameterDelayedSequentialUdpInsideAStageUpdates) {
       "1 1\n0 1\n0 0\n");
 }
 
+// §29.6's `r 1 1 1 ? : ? : 1` row gives q = 1 on a rising clock with data 1,
+// whatever the notifier input holds, `?` matching its x. An unnamed sequential
+// instance inside a child module, its output on the module's output port,
+// captured x instead where the same instance at the top captured 1.
+TEST(UdpInstanceRun, UnnamedSequentialUdpInsideAChildModuleCaptures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive posdff_udp(q, clock, data, preset, clear, "
+                       "notifier);\n"
+                       "  output q; reg q;\n"
+                       "  input clock, data, preset, clear, notifier;\n"
+                       "  table\n"
+                       "    r 0 1 1 ? : ? : 0 ;\n"
+                       "    r 1 1 1 ? : ? : 1 ;\n"
+                       "    n ? ? ? ? : ? : - ;\n"
+                       "    ? * ? ? ? : ? : - ;\n"
+                       "    ? ? ? ? * : ? : x ;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module dff(q, clock, data);\n"
+                       "  output q; input clock, data;\n"
+                       "  reg notifier;\n"
+                       "  posdff_udp(q, clock, data, 1'b1, 1'b1, notifier);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  reg clock = 0, data = 0;\n"
+                       "  wire q;\n"
+                       "  dff u(.q(q), .clock(clock), .data(data));\n"
+                       "  initial begin\n"
+                       "    #20 data = 1; #20 clock = 1;\n"
+                       "    #1 $display(\"%b %b\", u.notifier, q);\n"
+                       "    #9 clock = 0; #10 data = 0; #10 clock = 1;\n"
+                       "    #1 $display(\"%b %b\", u.notifier, q);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "x 1\nx 0\n");
+}
+
 }  // namespace

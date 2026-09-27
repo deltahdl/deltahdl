@@ -265,4 +265,74 @@ TEST(NotifierUpdateDriven, SatisfiedWindowLeavesTheDrivenNotifierAtZero) {
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }
 
+// §31.6 Example 2 (printed pages 916-917) whole, a model that "uses a
+// notifier to set the D flip-flop output to x when a timing violation occurs in
+// an edge-sensitive UDP". The rising clock at 40 with data 1 is legal, so q
+// rises 6 later, tPLHc's typical value, and qbar falls 8 later, tPHLc's. Data
+// falling at 62 is 8 units before the clock rises at 70, inside tSU = 10, so
+// the $setup toggles the notifier, the UDP's `? ? ? ? *` row drives its output
+// to x, and the x reaches qbar at 76 and q at 78 through the clock's paths.
+TEST(NotifierUpdateDriven, SubclauseExample2FlipFlopGoesToXOnASetupViolation) {
+  SimFixture f;
+  const std::string kDesign =
+      "primitive posdff_udp(q, clock, data, preset, clear, notifier);\n"
+      "  output q; reg q;\n"
+      "  input clock, data, preset, clear, notifier;\n"
+      "  table\n"
+      "    r 0 1 1 ? : ? : 0 ;\n"
+      "    r 1 1 1 ? : ? : 1 ;\n"
+      "    p 1 ? 1 ? : 1 : 1 ;\n"
+      "    p 0 1 ? ? : 0 : 0 ;\n"
+      "    n ? ? ? ? : ? : - ;\n"
+      "    ? * ? ? ? : ? : - ;\n"
+      "    ? ? 0 1 ? : ? : 1 ;\n"
+      "    ? ? * 1 ? : 1 : 1 ;\n"
+      "    ? ? 1 0 ? : ? : 0 ;\n"
+      "    ? ? 1 * ? : 0 : 0 ;\n"
+      "    ? ? ? ? * : ? : x ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module dff(q, qbar, clock, data, preset, clear);\n"
+      "  output q, qbar;\n"
+      "  input clock, data, preset, clear;\n"
+      "  reg notifier;\n"
+      "  and (enable, preset, clear);\n"
+      "  not (qbar, ffout);\n"
+      "  buf (q, ffout);\n"
+      "  posdff_udp (ffout, clock, data, preset, clear, notifier);\n"
+      "  specify\n"
+      "    specparam tSU = 10, tHD = 1, tPW = 25, tWPC = 10, tREC = 5;\n"
+      "    specparam tPLHc = 4:6:9 , tPHLc = 5:8:11;\n"
+      "    specparam tPLHpc = 3:5:6 , tPHLpc = 4:7:9;\n"
+      "    (clock *> q,qbar) = (tPLHc, tPHLc);\n"
+      "    (preset,clear *> q,qbar) = (tPLHpc, tPHLpc);\n"
+      "    $setup(data, posedge clock &&& enable, tSU, notifier);\n"
+      "    $hold(posedge clock, data &&& enable, tHD, notifier);\n"
+      "    $period(posedge clock, tPW, notifier);\n"
+      "    $width(negedge preset, tWPC, 0, notifier);\n"
+      "    $width(negedge clear, tWPC, 0, notifier);\n"
+      "    $recovery(posedge preset, posedge clock, tREC, notifier);\n"
+      "    $recovery(posedge clear, posedge clock, tREC, notifier);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top;\n"
+      "  reg clock = 0, data = 0, preset = 1, clear = 1;\n"
+      "  wire q, qbar;\n"
+      "  dff u(q, qbar, clock, data, preset, clear);\n"
+      "  initial $monitor(\"%0t %b %b %b\", $time, q, qbar, u.notifier);\n"
+      "  initial begin\n"
+      "    #20 data = 1; #20 clock = 1;\n"
+      "    #10 clock = 0;\n"
+      "    #12 data = 0; #8 clock = 1;\n"
+      "    #20 $finish;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunCapture(kDesign, f),
+            "0 x x x\n46 1 x x\n48 1 0 x\n76 1 x 1\n78 x x 1\n"
+            "$finish at time 90\n");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), kSetupViolation,
+                              LineHolding(kDesign, "$setup(data, posedge"),
+                              "31.3.1"));
+}
+
 }  // namespace
