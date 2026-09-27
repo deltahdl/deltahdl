@@ -380,6 +380,12 @@ static void DecayKnownBitsToX(Logic4Vec& val) {
   }
 }
 
+static void RecordTriregChargeStrengths(Net& net);
+
+// §28.16.2.1 (printed page 858): when the charge decay time elapses the net
+// "makes a transition from 1 or 0 to x", and the strength §21.2.1.4 reports for
+// it is that of the charge it now stores, an x at the charge's size. The value
+// alone was turned to x, and `%v` went on reporting the decayed 1 as `La1`.
 static void ScheduleDecay(Net& net, Scheduler* sched) {
   uint64_t gen = ++net.decay_generation;
   auto* event = sched->GetEventPool().Acquire();
@@ -388,6 +394,7 @@ static void ScheduleDecay(Net& net, Scheduler* sched) {
   event->callback = [&net, gen]() {
     if (net.decay_generation != gen) return;
     DecayKnownBitsToX(net.resolved->value);
+    RecordTriregChargeStrengths(net);
     net.resolved->NotifyWatchers();
   };
   auto time = sched->CurrentTime();
@@ -502,14 +509,21 @@ static NetStrength TriregBitCharge(const Logic4Vec& value, uint32_t bit,
 // net reports. Reading bit 0 and letting it stand for the rest said of a
 // `trireg [63:0]` holding 64'd1 that it was charged high and not low, when
 // sixty-three of its bits were charged low (#3465).
-static void ResolveTriregCharge(Net& net, Scheduler* sched) {
+// The strength of each bit of a trireg holding charge, and of the net, as the
+// value it stores and its charge strength give them (TriregBitCharge).
+static void RecordTriregChargeStrengths(Net& net) {
   net.resolved_strength = NetStrength{};
+  net.bit_strengths.clear();
   for (uint32_t b = 0; b < net.resolved->value.width; ++b) {
     NetStrength bit_charge =
         TriregBitCharge(net.resolved->value, b, net.charge_strength);
     net.bit_strengths.push_back(bit_charge);
     WidenNetStrengthOverBit(net.resolved_strength, bit_charge);
   }
+}
+
+static void ResolveTriregCharge(Net& net, Scheduler* sched) {
+  RecordTriregChargeStrengths(net);
   // §28.16.2.1: the decay process ends when "the delay specified by charge
   // decay time elapses, and the trireg net makes a transition from 1 or 0 to
   // x", so a charge decay time of zero schedules that transition at the current
