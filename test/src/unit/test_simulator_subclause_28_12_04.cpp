@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "model_strength.h"
@@ -351,6 +353,33 @@ TEST(WiredLogicPipeline, WorGateOutputDriversOrToOne) {
   auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);  // 1 OR 0 == 1
+}
+
+// §28.12.4 (printed page 853): "If the value of the upper signal changes so
+// that both signals in Figure 28-24 possess a value 1, then the results of both
+// types of logic have a value 1." The two drivers of a top-level wand here are
+// the output ports of two instances of a module holding one buf (§23.2.2), and
+// the second driver's input changes from 0 to 1 after time 0, so the net reads
+// 0 and then the AND of two 1s.
+TEST(WiredLogicPipeline, WandThroughTwoInstancesOutputPortsReResolves) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module d1 (output w, input a);\n"
+      "  buf g (w, a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wand w;\n"
+      "  logic a = 1, b = 0;\n"
+      "  d1 x (w, a);\n"
+      "  d1 y (w, b);\n"
+      "  initial begin\n"
+      "    #1 $display(\"w=%b\", w);\n"
+      "    b = 1;\n"
+      "    #1 $display(\"w=%b\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "w=0\nw=1\n");
 }
 
 // Claim D (Figure 28-25): when ambiguous-strength signals combine in wired
