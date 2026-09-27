@@ -240,6 +240,13 @@ TEST(ProtectViewportSyntax, AnObjectWrittenBareIsReported) {
                                              std::string(kAccess) + "\"")));
 }
 
+// A name written with nothing against it carries no string at all, so it names
+// no object any more than leaving it out does.
+TEST(ProtectViewportSyntax, AnObjectStandingAloneIsReported) {
+  EXPECT_TRUE(NotTheSpelling(
+      ViewportWriting("object , access = \"" + std::string(kAccess) + "\"")));
+}
+
 // The same of the other name, written as the remaining spelling of a
 // pragma_value: a number is not a string either. Two names and two spellings
 // are varied across these two cases, a reading that looked for quotation marks

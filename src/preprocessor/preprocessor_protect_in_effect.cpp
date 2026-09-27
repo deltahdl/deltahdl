@@ -10,9 +10,9 @@
 //
 // §34.5.10, §34.5.12, §34.5.16, §34.5.18 and §34.5.20 pair the entity that
 // provided a key with the name, the public key or the carried key that picks
-// one of that entity's keys out. §34.5.17, §34.5.21 and §34.5.24 name the
-// algorithm a digest block, a digest and a key block are made with. §34.5.9
-// names the coding scheme every encoded value of an envelope is written under.
+// one of that entity's keys out. §34.5.21 names the algorithm a digest is made
+// with, and §34.5.9 the coding scheme every encoded value of an envelope is
+// written under.
 // Each of these selects among the values in effect and reports nothing.
 
 #include <string>
@@ -21,9 +21,7 @@
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
-#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
-#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 
 namespace delta {
@@ -140,24 +138,6 @@ std::string_view Preprocessor::DigestBlockKeyInEffect() const {
 // it, so what a block's digest belongs to is whatever was in effect beside it.
 std::string Preprocessor::DigestMethodInEffect() const {
   return ProtectDigestMethodInEffect(protect_keywords_).value;
-}
-
-// The identifier is read where the reading stands rather than where the keys
-// were supplied, because a text may name one cipher for one region and another
-// for the next: §34.5.17 has the value name what a digest block is opened with,
-// so the block a value governs is whichever one stands after it. Where the text
-// named none, what stands here is the cipher its data are under, that being the
-// default the subclause settles rather than one this implementation chose.
-std::string Preprocessor::DigestKeyMethodInEffect() const {
-  return ProtectDigestKeyMethodInEffect(protect_keywords_).value;
-}
-
-// The identifier is read where the reading stands rather than where the keys
-// were supplied, because a text may name one algorithm for one region and
-// another for the next: §34.5.24 has the value name what a key block is opened
-// with, so the block a value governs is whichever one stands after it.
-std::string Preprocessor::KeyMethodInEffect() const {
-  return ProtectKeyMethodInEffect(protect_keywords_).value;
 }
 
 ProtectEncoding Preprocessor::ProtectEncodingInEffect() const {

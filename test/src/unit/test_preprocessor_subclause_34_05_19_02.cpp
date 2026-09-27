@@ -382,6 +382,17 @@ TEST(ProtectDigestPublicKeyDefault, ADesignationForTheDigestIsWhatStands) {
   EXPECT_EQ(run.Designated().value, kPublicKey);
 }
 
+// A line beneath the digest's keyword carrying nothing designates no key, so
+// the data's designation fills the place as it does where the digest wrote
+// none.
+TEST(ProtectDigestPublicKeyDefault, AnEmptyLineDesignatesNone) {
+  std::string described = DataPublicKeyDesignation(kDataPublicKey);
+  described += DigestPublicKeyDesignation("", PlainEncoding());
+  ReadUnderKeys run(ForeignEnvelope(described), ProtectKeyList());
+  EXPECT_EQ(run.Designated().value, kDataPublicKey);
+  EXPECT_TRUE(run.Designated().defaulted);
+}
+
 // A text that designated no public key anywhere has nothing for the default to
 // fill the place from, so none stands for its digest at all. That is what makes
 // the cases above about the data's designation rather than about any value at
@@ -413,6 +424,17 @@ TEST(ProtectDigestPublicKeyEncryptionOutput, TheDesignationIsWrittenOut) {
 // never named, and a reader would then look for a private key answering to it.
 TEST(ProtectDigestPublicKeyEncryptionOutput, ARegionDesignatingNoneGetsNone) {
   std::string envelope = WrittenOutOf(Region(NamesProvider(kProvider)));
+  EXPECT_EQ(envelope.find(kSealedDesign), std::string::npos) << envelope;
+  EXPECT_EQ(envelope.find("digest_public_key"), std::string::npos) << envelope;
+}
+
+// A region whose line beneath the keyword is not something the scheme in effect
+// writes designated no public key for its digest, so none is written out for
+// it either. The characters here hold a space, which the tool's own scheme
+// never writes.
+TEST(ProtectDigestPublicKeyEncryptionOutput, AnUnreadableLineDesignatesNone) {
+  std::string envelope =
+      WrittenOutOf(Region("`pragma protect digest_public_key\nnot a block\n"));
   EXPECT_EQ(envelope.find(kSealedDesign), std::string::npos) << envelope;
   EXPECT_EQ(envelope.find("digest_public_key"), std::string::npos) << envelope;
 }

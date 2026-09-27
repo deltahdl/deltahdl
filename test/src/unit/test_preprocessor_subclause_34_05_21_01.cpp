@@ -163,6 +163,15 @@ TEST(ProtectDigestMethodSyntax, TheKeywordStandingAloneStatesNoAlgorithm) {
   EXPECT_EQ(in_effect.value, kDefaultDigestMethod);
 }
 
+// A string with nothing inside its quotation marks names no algorithm, so it
+// states none any more than leaving the keyword out did, and the default fills
+// the place.
+TEST(ProtectDigestMethodSyntax, AnEmptyStringStatesNoAlgorithm) {
+  ProtectKeywordValue in_effect = MethodAfter(StatesMethod("\"\""));
+  EXPECT_TRUE(in_effect.defaulted);
+  EXPECT_EQ(in_effect.value, kDefaultDigestMethod);
+}
+
 // The '=' written after the keyword with nothing following it. §34.5.21.1 has a
 // string standing there, and an '=' with no value after it is no
 // pragma_expression in any spelling, so §22.11 reports it.

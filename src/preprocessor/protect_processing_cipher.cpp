@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "preprocessor/protect_des.h"
-#include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_processing.h"
@@ -42,15 +42,6 @@ std::string FingerprintPrefix(uint32_t fingerprint) {
   return prefix;
 }
 
-uint32_t ReadFingerprintPrefix(std::string_view bytes) {
-  uint32_t fingerprint = 0;
-  for (size_t n = 0; n < kFingerprintBytes; ++n) {
-    auto byte = static_cast<uint8_t>(bytes[n]);
-    fingerprint = (fingerprint << 8) | byte;
-  }
-  return fingerprint;
-}
-
 // One run of the value the key is combined with, of the length `wanted`.
 //
 // Every byte of it depends on every character of the key. A run taken from the
@@ -75,14 +66,12 @@ std::string KeyStream(std::string_view key, size_t wanted) {
     for (size_t n = 4; n > 0; --n) {
       input.push_back(static_cast<char>((counter >> ((n - 1) * 8)) & 0xFFU));
     }
-    std::string digest;
-    // The identifier is this file's own choice rather than the one a text
+    // The algorithm is this file's own choice rather than the one a text
     // named. §34.5.21's identifier says what the digests written into an
     // envelope are computed with, which is a thing a reader is told; this is
     // the cipher's internal step and no envelope states it, so it is fixed
     // here and both halves reach it through the same call.
-    if (!ProtectMessageDigest(input, kSha1DigestMethod, &digest)) return stream;
-    stream.append(digest);
+    stream.append(Sha1Digest(input));
   }
   stream.resize(wanted);
   return stream;
@@ -93,12 +82,6 @@ std::string KeyStream(std::string_view key, size_t wanted) {
 // region.
 std::string CombineWithKey(std::string_view bytes, std::string_view key) {
   std::string stream = KeyStream(key, bytes.size());
-  // A key the digest could not be taken of leaves a run shorter than the bytes
-  // it is to be combined with, and combining what there is would leave the rest
-  // of a region in the clear. There is no such key today -- kSha1DigestMethod
-  // is one this implementation provides -- and the check is here so that a
-  // change to the digests available cannot quietly stop encrypting.
-  if (stream.size() != bytes.size()) return "";
   std::string combined;
   combined.reserve(bytes.size());
   for (size_t n = 0; n < bytes.size(); ++n) {
@@ -119,9 +102,7 @@ std::string CombineWithKey(std::string_view bytes, std::string_view key) {
 // FIPS 46-3 leaves the low bit of each key byte to parity and never reads it,
 // so the derivation says nothing about those bits and the cipher ignores them.
 std::string DesKeyOf(std::string_view key) {
-  std::string derived = KeyStream(key, kDesKeyBytes);
-  if (derived.size() != kDesKeyBytes) return "";
-  return derived;
+  return KeyStream(key, kDesKeyBytes);
 }
 
 // §34.5.11.2 recommends the IV be randomly generated for each use of the
@@ -137,9 +118,7 @@ std::string FreshInitializationVector(std::string_view key,
   for (size_t n = 8; n > 0; --n) {
     seed.push_back(static_cast<char>((counter >> ((n - 1) * 8)) & 0xFFU));
   }
-  std::string run = KeyStream(seed, kDesBlockBytes);
-  if (run.size() != kDesBlockBytes) return "";
-  return run;
+  return KeyStream(seed, kDesBlockBytes);
 }
 
 // Whether `method` names §34.5.11.2's required cipher. Every other identifier
@@ -156,19 +135,9 @@ std::string EncryptedRegionBytes(std::string_view cleartext,
                                  std::string_view method) {
   std::string blob = FingerprintPrefix(FingerprintOf(cleartext));
   blob.append(cleartext);
-  if (!UsesDesCbc(method)) {
-    std::string combined = CombineWithKey(blob, key);
-    // CombineWithKey leaves nothing where it could not produce a run as long as
-    // the bytes, and an empty block written out would be a region whose text
-    // went nowhere rather than a region that was sealed.
-    if (combined.size() != blob.size()) return "";
-    return combined;
-  }
-  std::string des_key = DesKeyOf(key);
+  if (!UsesDesCbc(method)) return CombineWithKey(blob, key);
   std::string iv = FreshInitializationVector(key, blob);
-  if (des_key.empty() || iv.empty()) return "";
-  std::string ciphertext = DesCbcEncrypt(blob, des_key, iv);
-  if (ciphertext.empty()) return "";
+  std::string ciphertext = DesCbcEncrypt(blob, DesKeyOf(key), iv);
   // §34.5.15.2: "the IV cipher-block shall be prepended to the encrypted data
   // before encoding is performed", so it travels ahead of the ciphertext rather
   // than beside it in the envelope's description.
@@ -182,15 +151,13 @@ bool RecoverRegionBytes(std::string_view block, std::string_view key,
                         std::string_view method, std::string* recovered) {
   if (!UsesDesCbc(method)) {
     recovered->assign(CombineWithKey(block, key));
-    return recovered->size() == block.size();
+    return true;
   }
   // §34.5.15.2: "the first cipher-block of the decoded data_block shall be
   // removed for use as the IV. The remainder of the data_block shall be
   // internally decrypted."
   if (block.size() <= kDesBlockBytes) return false;
-  std::string des_key = DesKeyOf(key);
-  if (des_key.empty()) return false;
-  return DesCbcDecrypt(block.substr(kDesBlockBytes), des_key,
+  return DesCbcDecrypt(block.substr(kDesBlockBytes), DesKeyOf(key),
                        block.substr(0, kDesBlockBytes), recovered);
 }
 
@@ -220,7 +187,6 @@ std::string EncryptProtectedRegion(std::string_view cleartext,
                                    size_t line_length) {
   if (key.empty()) return "";
   std::string recorded = EncryptedRegionBytes(cleartext, key, method);
-  if (recorded.empty()) return "";
   ProtectEncoding encoding;
   encoding.enctype = std::string(enctype);
   encoding.line_length = line_length;
@@ -233,9 +199,12 @@ bool DecryptProtectedBlock(std::string_view block, std::string_view key,
   if (block.size() < kFingerprintBytes) return false;
   std::string recovered;
   if (!RecoverRegionBytes(block, key, method, &recovered)) return false;
-  if (recovered.size() < kFingerprintBytes) return false;
-  std::string_view text = std::string_view(recovered).substr(kFingerprintBytes);
-  if (FingerprintOf(text) != ReadFingerprintPrefix(recovered)) return false;
+  // A des-cbc block whose padding leaves fewer bytes than a fingerprint takes
+  // records no fingerprint, and a prefix that short matches none.
+  std::string_view whole(recovered);
+  std::string_view prefix = whole.substr(0, kFingerprintBytes);
+  std::string_view text = whole.substr(prefix.size());
+  if (prefix != FingerprintPrefix(FingerprintOf(text))) return false;
   cleartext->assign(text);
   return true;
 }

@@ -53,6 +53,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -232,6 +233,34 @@ TEST(ProtectKeyBlockEncryptionInput,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(), "data decryption expressions change value",
       LineHolding(src, kSecondProviderKeyName), "34.5.27"));
+}
+
+// The other data decryption expressions held to agreeing, each changed on its
+// own between the two designations: the cipher §34.5.11 names, the entity
+// §34.5.10 names, and the public key §34.5.13 designates on the line beneath
+// its keyword. Any one of them changing gives the second block another account
+// of the data, so each is reported at the designation that stopped agreeing.
+TEST(ProtectKeyBlockEncryptionInput, EachOtherDataExpressionIsHeldToAgreeing) {
+  const std::pair<std::string, std::string> kChanges[] = {
+      {Writes("data_method", "des-cbc"),
+       Writes("data_method", "x-deltahdl-stream")},
+      {Writes("data_keyowner", "acme"), Writes("data_keyowner", "globex")},
+      {"`pragma protect data_public_key\nYWNtZQ\n",
+       "`pragma protect data_public_key\nZ2xvYmV4\n"}};
+  for (const auto& [first, second] : kChanges) {
+    std::string described = first;
+    described.append(
+        Designation(kFirstProvider, kFirstProviderKeyName, "design-2026"));
+    described.append(second);
+    described.append(
+        Designation(kSecondProvider, kSecondProviderKeyName, "design-2026"));
+    std::string src = Region(described);
+    KeyedEncryptionRun run(src);
+    EXPECT_TRUE(ReportedError(
+        run.diag.Diagnostics(), "data decryption expressions change value",
+        LineHolding(src, kSecondProviderKeyName), "34.5.27"))
+        << first;
+  }
 }
 
 // The blocks are still written. What the condition costs is the report, so a

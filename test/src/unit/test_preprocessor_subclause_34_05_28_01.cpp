@@ -366,6 +366,37 @@ TEST(ProtectDecryptLicenseSyntax, AMatchWrittenAsAStringStatesNoNumber) {
   EXPECT_FALSE(license.has_match);
 }
 
+// A name written with nothing against it carries no value at all, so a
+// required name standing alone names nothing and the licence is not stated,
+// and match standing alone states no number.
+TEST(ProtectDecryptLicenseSyntax, ANameStandingAloneCarriesNothing) {
+  EXPECT_FALSE(
+      ParseProtectLicense("(library, entry=\"checkout\", feature=\"decrypt\")")
+          .stated);
+  ProtectLicense license = ParseProtectLicense(LicenseList(", match"));
+  ASSERT_TRUE(license.stated);
+  EXPECT_FALSE(license.has_match);
+}
+
+// Digits are the whole of a <number>, so a value with a letter among them, or
+// an '=' with nothing after it, states none.
+TEST(ProtectDecryptLicenseSyntax, AMatchThatIsNotAllDigitsStatesNoNumber) {
+  EXPECT_FALSE(ParseProtectLicense(LicenseList(", match=7x")).has_match);
+  EXPECT_FALSE(ParseProtectLicense(LicenseList(", match=")).has_match);
+}
+
+// The number is compared against what the entry function returns, so a number
+// too large to be held states none rather than one the reading wrapped. The
+// largest number that is held is still read, which is what places the limit.
+TEST(ProtectDecryptLicenseSyntax, AMatchTooLargeToHoldStatesNoNumber) {
+  EXPECT_FALSE(ParseProtectLicense(LicenseList(", match=18446744073709551616"))
+                   .has_match);
+  ProtectLicense largest =
+      ParseProtectLicense(LicenseList(", match=18446744073709551615"));
+  ASSERT_TRUE(largest.has_match);
+  EXPECT_EQ(largest.match, 18446744073709551615ULL);
+}
+
 // The same list met as a directive rather than handed to the reading, so that
 // what the preprocessor does with it is what is observed. §34.5.28.1 is what
 // the report cites, the spelling being what the list failed.

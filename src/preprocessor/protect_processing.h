@@ -67,7 +67,7 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext,
 // Encrypts one region of cleartext under `key` and returns the text that
 // records it, written in the coding scheme `enctype` names. An empty key
 // encrypts nothing and returns an empty block, and so does a scheme this
-// implementation does not provide and a key no keyed run can be derived from.
+// implementation does not provide.
 //
 // The scheme defaults to this implementation's own, which is what a region
 // encrypted by a text that stated no encoding is written in.

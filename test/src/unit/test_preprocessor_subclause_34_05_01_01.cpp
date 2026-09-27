@@ -372,4 +372,32 @@ TEST(ProtectBeginSyntax, TheWordInsideAParenthesizedValueDelimitsNothing) {
   EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
+// A simple identifier may hold a '$' and may open with an '_', so each of
+// these is one longer name the encrypting half reads whole rather than the word
+// with characters beside it -- and the pragma_name written with a letter after
+// it is another pragma_name. None of the three opens a region.
+TEST(ProtectBeginSyntax, LongerNamesAroundTheWordDelimitNothingWhenEncrypting) {
+  for (const char* opening :
+       {"`pragma protect begin$now\n", "`pragma protect _begin\n",
+        "`pragma protectx begin\n"}) {
+    std::string src = opening;
+    src.append("  initial result = 42;\n`pragma protect end\n");
+    EXPECT_EQ(EncryptedByTheAuthor(src), src) << opening;
+  }
+}
+
+// A directive naming the protect pragma and no expression at all is still one
+// the encrypting half reads as that pragma's, and it names nothing that opens
+// or closes a region, so the region around it is sealed as usual. Written as
+// the last line of a text ending without a line terminator it is carried
+// across as it stands.
+TEST(ProtectBeginSyntax, TheBarePragmaNameInsideARegionChangesNothing) {
+  std::string written = EncryptedByTheAuthor(
+      "`pragma protect begin\n`pragma protect\n  initial result = 42;\n"
+      "`pragma protect end\n`pragma protect");
+  EXPECT_FALSE(Holds(written, "initial result = 42;")) << written;
+  EXPECT_TRUE(Holds(written, "data_block")) << written;
+  EXPECT_TRUE(written.ends_with("\n`pragma protect")) << written;
+}
+
 }  // namespace

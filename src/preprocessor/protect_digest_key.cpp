@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -140,12 +141,9 @@ std::string ProtectDigestDecryptionContent(
 // depends on the data's key and reveals it no more than a digest reveals the
 // text it was computed from.
 std::string ProtectGeneratedDigestKey(std::string_view data_key) {
-  if (data_key.empty()) return {};
   std::string material(kDigestKeyDerivationMarker);
   material.append(data_key);
-  std::string key;
-  if (!ProtectMessageDigest(material, kDefaultDigestMethod, &key)) return {};
-  return key;
+  return Sha1Digest(material);
 }
 
 }  // namespace delta

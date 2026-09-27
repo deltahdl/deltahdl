@@ -255,6 +255,21 @@ TEST(ProtectKeyPublicKeyDescription, TheDesignationHeadsTheBlockItWasUsedFor) {
   EXPECT_TRUE(Holds(envelope, "`pragma protect key_public_key")) << envelope;
 }
 
+// §34.4 makes the scope of an expression lexical, so a designation written
+// ahead of the region, with the entity it belongs to, is the one in effect
+// where the region closes, and it is used for the region's block just as one
+// written inside would be.
+TEST(ProtectKeyPublicKeyDescription, ADesignationAheadOfTheRegionIsUsedToo) {
+  std::string src = Writes("key_keyowner", kEntity);
+  src.append(DesignatesByPublicKey(kPublicKey));
+  src.append("`pragma protect begin\n");
+  src.append(Writes("data_keyname", kDataKeyName)).append(kSealedDesign);
+  src.append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(src, {}, HeldUnderThePublicKey());
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  EXPECT_TRUE(Holds(envelope, "`pragma protect key_block")) << envelope;
+}
+
 // §34.5.26 makes the name and the public key alternatives, so a block carries
 // whichever designation the region reached its key by and not both. A region
 // reaching its key by name is written a block headed by the name, with no

@@ -48,12 +48,11 @@
 // than to the keyword: a region that named such an identifier without writing a
 // digest_block expression asked for nothing and is refused nothing.
 //
-// Only one half of that report is reachable here. Table 34-4 marks sha1 and md5
-// required and md2 and ripemd-160 optional, and ProtectDigestIsAvailable in
-// src/preprocessor/protect_digest.cpp answers yes for exactly the two the table
-// requires, so every identifier that draws the report is one the table does not
-// require. The report's "requires of every implementation" half would need a
-// required identifier this tool had no algorithm for, and there is none.
+// The report says the identifier is one the table does not require. Table 34-4
+// marks sha1 and md5 required and md2 and ripemd-160 optional, and
+// ProtectDigestIsAvailable in src/preprocessor/protect_digest.cpp answers yes
+// for exactly the two the table requires, so every identifier that draws the
+// report is one the table does not require.
 //
 // A second thing the identifier decides is what a region spelling it in a
 // spelling §34.5.21.1 does not define gets. §34.5.21.1 spells the expression
@@ -668,6 +667,26 @@ TEST(ProtectDigestMethodDecryptionInput, TheDigestAgreesUnderTheDefaultToo) {
   ReadUnderKeys run(ThroughEndProtected(SignedEnvelope("")), TheBlockKey());
   EXPECT_TRUE(run.Identifier().defaulted);
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
+}
+
+// An identifier Table 34-4 tabulates and this implementation does not provide,
+// stated in an envelope ahead of its digest block. The digest the block carries
+// opens under the key, and no digest of the data can be generated to compare it
+// with, so the comparison is one this reader cannot make rather than one that
+// found the data altered.
+TEST(ProtectDigestMethodDecryptionInput, AnUnprovidedOneRegeneratesNoDigest) {
+  std::string envelope = UnsignedEnvelope("");
+  size_t block = envelope.find("`pragma protect digest_block",
+                               envelope.find("`pragma protect data_block\n"));
+  ASSERT_NE(block, std::string::npos);
+  envelope.insert(block, Writes(kIdentifierKeyword, "md2"));
+  PreprocConfig config;
+  config.protect_key = std::string(kExchangeKey);
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  Preprocessor pp(mgr, diag, config);
+  pp.Preprocess(mgr.AddFile("<test>", envelope));
+  EXPECT_EQ(pp.LastDigestBlockCheck(), ProtectDigestCheck::kUnreadable);
 }
 
 }  // namespace

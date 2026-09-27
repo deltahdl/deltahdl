@@ -45,12 +45,10 @@ namespace {
 // those where the text named a third would hand the author a file claiming an
 // algorithm nobody used.
 //
-// The report says which half of Table 34-3 the identifier came from. One the
-// table marks required is "standard in every implementation", so a text naming
-// it assumed nothing and this tool would be what falls short; des-cbc is the
-// only identifier the table marks so, and it is provided, so what reaches that
-// half of the message is an optional cipher spelled as the table spells it.
-// Any other names a cipher a text assumed its reader knew.
+// The report says the identifier is not one Table 34-3 requires of every
+// implementation. des-cbc is the only identifier the table marks required, and
+// it is provided, so what reaches the report is an optional cipher spelled as
+// the table spells it or a cipher a text assumed its reader knew.
 //
 // A region naming nothing is not refused anything, and neither is one naming
 // either identifier this tool encrypts under.
@@ -65,11 +63,9 @@ void ReportUnprovidedDataMethod(const RegionKeyReader& in_effect,
       "protect pragma data_method asks for an encryption algorithm this "
       "implementation does not provide: ");
   message.append(stated);
-  message.append(IsRequiredProtectEncryptionAlgorithm(stated)
-                     ? ", which IEEE 1800-2023 Table 34-3 requires of every "
-                       "implementation"
-                     : ", which IEEE 1800-2023 Table 34-3 does not require of "
-                       "every implementation");
+  message.append(
+      ", which IEEE 1800-2023 Table 34-3 does not require of every "
+      "implementation");
   diag->Error(LineOf(file_id, in_effect.data_method_line), message,
               Subclause("34.5.11.2"));
 }
@@ -311,11 +307,9 @@ void ReportUnprovidedKeyMethod(const RegionKeyReader& in_effect,
       "protect pragma key_method asks for an encryption algorithm this "
       "implementation does not provide: ");
   message.append(stated);
-  message.append(IsRequiredProtectEncryptionAlgorithm(stated)
-                     ? ", which IEEE 1800-2023 Table 34-3 requires of every "
-                       "implementation"
-                     : ", which IEEE 1800-2023 Table 34-3 does not require of "
-                       "every implementation");
+  message.append(
+      ", which IEEE 1800-2023 Table 34-3 does not require of every "
+      "implementation");
   diag->Error(LineOf(file_id, in_effect.key_method_line), message,
               Subclause("34.5.24.2"));
 }

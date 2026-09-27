@@ -96,6 +96,17 @@ TEST(ProtectDigestKeyMethodDescription, TheDataCipherFillsThePlaceLeftEmpty) {
   EXPECT_EQ(method.value, "des-cbc");
 }
 
+// A string with nothing inside its quotation marks names no algorithm, so the
+// place is as empty as if the keyword had not been written, and the data's
+// cipher fills it.
+TEST(ProtectDigestKeyMethodDescription, AnEmptyStringLeavesThePlaceEmpty) {
+  std::string src = StatesDataMethod("des-cbc");
+  src += StatesDigestKeyMethod("");
+  ProtectKeywordValue method = InEffectAfter(src);
+  EXPECT_TRUE(method.defaulted);
+  EXPECT_EQ(method.value, "des-cbc");
+}
+
 // The algorithm stated for the digest's key is not displaced by the one stated
 // for the data, the default filling a place left empty rather than overriding
 // what stands there. Without this the case above would hold of a reading that

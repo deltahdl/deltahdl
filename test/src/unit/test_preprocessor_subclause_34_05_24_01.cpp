@@ -199,6 +199,14 @@ TEST(ProtectKeyMethodSyntax, TheKeywordStandingAloneStatesNoAlgorithm) {
   EXPECT_TRUE(method.value.empty());
 }
 
+// A string with nothing inside its quotation marks names no algorithm, so it
+// states none any more than leaving the keyword out did.
+TEST(ProtectKeyMethodSyntax, AnEmptyStringStatesNoAlgorithm) {
+  ProtectKeywordValue method = MethodAfter(StatesMethod("\"\""));
+  EXPECT_TRUE(method.defaulted);
+  EXPECT_TRUE(method.value.empty());
+}
+
 // The '=' written after the keyword with nothing following it. §34.5.24.1 has a
 // string standing there, and an '=' with no value after it is no
 // pragma_expression in any spelling, so §22.11 reports it.

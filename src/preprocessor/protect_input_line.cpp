@@ -83,10 +83,10 @@ std::string TransformedDelimiterLine(std::string_view line,
   transformed.append(replacement);
   transformed.append(
       ExpressionsAfterDelimiter(line.substr(at + delimiter.keyword.size())));
-  // The last line of a source text need not be terminated, and a trimmed
-  // comment takes the terminator with it. What follows this line either way is
-  // a directive of its own.
-  if (transformed.back() != '\n') transformed.push_back('\n');
+  // The trimming takes the line's terminator with it, and the last line of a
+  // source text need not have had one. What follows this line either way is a
+  // directive of its own.
+  transformed.push_back('\n');
   return transformed;
 }
 

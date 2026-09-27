@@ -130,6 +130,17 @@ TEST(ProtectDataBlockSyntax, TheKeywordAloneTakesTheLineBeneathItAsTheBlock) {
   EXPECT_EQ(read.find("data_block"), std::string::npos) << read;
 }
 
+// The same name with a pragma_value written against it is the expression in a
+// spelling §34.5.15.1 does not define, so it announces no block, and the line
+// beneath it stays text of the design rather than being taken as one.
+TEST(ProtectDataBlockSyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
+  PreprocFixture f;
+  std::string described = "`pragma protect data_block=\"a-value-of-its-own\"\n";
+  described.append(kUnopenableBlock).append("\n");
+  std::string read = Preprocess(ForeignEnvelope(described), f);
+  EXPECT_NE(read.find(kUnopenableBlock), std::string::npos) << read;
+}
+
 // The keyword written as one expression of §22.11's comma-separated list, with
 // a second expression after it. The keyword ends at the comma, so the
 // expression past it takes effect and the keyword still speaks for the line

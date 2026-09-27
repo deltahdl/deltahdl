@@ -630,10 +630,8 @@ void Preprocessor::FinishGatheredProtectBlock(int depth, std::string& output) {
     case ProtectBlockKind::kData:
       ReadProtectDataBlock(block, loc, depth, output);
       return;
-    case ProtectBlockKind::kDigest:
+    default:  // ProtectBlockKind::kDigest, the one kind left
       ReadProtectDigestBlock(block, loc);
-      return;
-    default:
       return;
   }
 }

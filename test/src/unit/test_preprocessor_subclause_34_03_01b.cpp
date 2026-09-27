@@ -163,6 +163,26 @@ TEST(ProtectCliParsing, NamedKeyWithAnEmptyOwnerIsRefused) {
   EXPECT_TRUE(parse.opts.rejected_argument);
 }
 
+// The same of the other two parts: a value whose name, or whose key, is empty
+// between separators that are both there is refused as well.
+TEST(ProtectCliParsing, NamedKeyWithAnEmptyNameOrKeyIsRefused) {
+  for (const char* value : {"acme:=acme-key", "acme:rsa-2048="}) {
+    auto parse = ParsedArg({"--protect-named-key", value});
+    EXPECT_TRUE(parse.recognized) << value;
+    EXPECT_TRUE(parse.opts.rejected_argument) << value;
+    EXPECT_FALSE(parse.opts.keys.KnowsOwner("acme")) << value;
+  }
+}
+
+// §34.5.10 gives an empty key no meaning, so an exchange key written as an
+// empty argument is refused rather than stored as a key of nothing.
+TEST(ProtectCliParsing, AnEmptyExchangeKeyIsRefused) {
+  auto parse = ParsedArg({"--protect-key", ""});
+  EXPECT_TRUE(parse.recognized);
+  EXPECT_TRUE(parse.opts.rejected_argument);
+  EXPECT_TRUE(parse.opts.exchange_key.empty());
+}
+
 // A named key needs all three of owner, name and key, since §34.5.10 selects on
 // the first two. A value missing the separator names no owner, so it is refused
 // rather than stored under an empty one.

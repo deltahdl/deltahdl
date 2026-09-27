@@ -153,6 +153,17 @@ TEST(ProtectDataKeynameDescription, ANameInTheEntitysListIsNotReported) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §34.5.12.1 writes the keyword with a string against it, so the keyword
+// standing alone names no key at all -- not one outside the entity's list --
+// and nothing is reported.
+TEST(ProtectDataKeynameDescription, TheKeywordStandingAloneNamesNoKey) {
+  std::string src = "`pragma protect data_keyowner=\"";
+  src.append(kOwner).append("\"\n`pragma protect data_keyname\n");
+  PreprocFixture f;
+  Preprocess(src, f, HoldingBothLists());
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 // §34.5.12.2: the same name under the entity that does hold a key by it. The
 // two entities and the two names are the same four values as the case that was
 // reported, differently paired, so the entity is shown to decide which list the

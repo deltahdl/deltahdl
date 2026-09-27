@@ -318,6 +318,17 @@ TEST(ProtectEndEncryptionOutput, TheClosingExpressionIsReplaced) {
   EXPECT_FALSE(Holds(written, kClosingDirective));
 }
 
+// The expression written on the last line of a text that ends without a line
+// terminator still closes the region, and the word standing in its place ends
+// its line so that whatever is appended after the text begins a line of its
+// own.
+TEST(ProtectEndEncryptionOutput, AnUnterminatedLastLineIsReplacedToo) {
+  std::string written =
+      Encrypted(RegionClosedWith(kSealedDesign, "`pragma protect end"));
+  EXPECT_FALSE(Holds(written, kSealedStatement));
+  EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n"));
+}
+
 // It is the expression that is replaced rather than the directive carrying it.
 // The expressions written beside it described the region and go on describing
 // the envelope standing in its place, so the one thing changed on that line is

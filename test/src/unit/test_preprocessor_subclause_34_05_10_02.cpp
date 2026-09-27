@@ -207,6 +207,17 @@ TEST(ProtectDataKeyownerDescription, DistinctValuesUnderOneEntityAreLeftAlone) {
   EXPECT_FALSE(run.Reported(kTwoNamesOneValue));
 }
 
+// A name written as a string holding nothing, and a public key whose line
+// carries nothing, designate no key between them, so they are not one value
+// designating two keys and nothing is reported.
+TEST(ProtectDataKeyownerDescription, TwoEmptyDesignationsRepeatNothing) {
+  std::string described = NamesKeyOwner(kOwner);
+  described += NamesKeyName("");
+  described += DesignatesPublicKey("");
+  Read run(ForeignEnvelope(described));
+  EXPECT_FALSE(run.Reported(kTwoNamesOneValue));
+}
+
 // §34.5.10.2: the data_keyowner is unchanged in the output file. §22.5.1 admits
 // a bare identifier as a pragma_value, so an entity named with one is named
 // with those characters; writing it back as a string would change the value the

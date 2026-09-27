@@ -260,6 +260,7 @@ TEST(ProtectEncodingTable, TheRequiredIdentifiersAreProvidedAndSoAreTheRest) {
   EXPECT_TRUE(IsRequiredProtectEncodingAlgorithm(kBase64Enctype));
   EXPECT_FALSE(IsRequiredProtectEncodingAlgorithm(kQuotedPrintableEnctype));
   EXPECT_FALSE(IsRequiredProtectEncodingAlgorithm(kRawEnctype));
+  EXPECT_FALSE(IsRequiredProtectEncodingAlgorithm(kUnprovidedEnctype));
   EXPECT_TRUE(ProtectEncodingIsAvailable(kQuotedPrintableEnctype));
   EXPECT_TRUE(ProtectEncodingIsAvailable(kRawEnctype));
 }
@@ -353,6 +354,19 @@ TEST(ProtectEncodingTable, AnIdentifierNothingProvidesReadsNoDesignation) {
       kUnprovidedEnctype, kDesignationInBase64, kDesignatedKey);
   EXPECT_TRUE(Holds(untouched, kEncodingSealedDesign));
   EXPECT_FALSE(Holds(untouched, kKeyBlockLine));
+}
+
+// The same identifier asked to write and to read directly. It stands for no
+// writing, so there is nothing to produce and nothing a text can be the
+// writing of.
+TEST(ProtectEncodingTable, AnIdentifierNothingProvidesWritesAndReadsNothing) {
+  ProtectEncoding unprovided;
+  unprovided.enctype = std::string(kUnprovidedEnctype);
+  EXPECT_EQ(EncodeProtectBlock(kDesignatedKey, unprovided), "");
+  std::string bytes = "untouched";
+  EXPECT_FALSE(
+      DecodeProtectBlock(kDesignationInBase64, kUnprovidedEnctype, &bytes));
+  EXPECT_EQ(bytes, "untouched");
 }
 
 // ---------------------------------------------------------------------------
@@ -630,6 +644,27 @@ TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheWriting) {
   std::string recovered;
   EXPECT_TRUE(DecodeProtectBlock(written, kBase64Enctype, &recovered));
   EXPECT_EQ(recovered, kEncodingSealedDesign);
+}
+
+// A length the whole writing fits inside breaks nothing, so the text is the
+// one line the scheme wrote.
+TEST(ProtectEncodingEncryptionOutput, ALengthTheWritingFitsInBreaksNothing) {
+  ProtectEncoding stated =
+      ParseProtectEncoding("(enctype=\"base64\", line_length=1000)");
+  ASSERT_EQ(stated.line_length, 1000U);
+  std::string written = EncodeProtectBlock(kEncodingSealedDesign, stated);
+  EXPECT_FALSE(Holds(written, "\n"));
+  EXPECT_FALSE(written.empty());
+}
+
+// A break written as a carriage return and a line feed, as a text written on
+// another system carries it, belongs to the writing as a bare line feed does,
+// so neither character is read as part of the value.
+TEST(ProtectEncodingDecryptionInput, ACarriageReturnInABreakIsNotData) {
+  std::string bytes;
+  ASSERT_TRUE(
+      DecodeProtectBlock("YWNtZSBw\r\ndWJsaWM=", kBase64Enctype, &bytes));
+  EXPECT_EQ(bytes, kDesignatedKey);
 }
 
 // The negative of the length: the one row of the table with nothing for it to

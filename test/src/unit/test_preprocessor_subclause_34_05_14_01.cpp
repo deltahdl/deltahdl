@@ -101,4 +101,20 @@ TEST(ProtectDataDecryptKeySyntax, ALongerNameOpeningWithItIsADifferentName) {
                   .defaulted);
 }
 
+// The same name with a pragma_value written against it is the expression in a
+// spelling §34.5.14.1 does not define, so even inside an envelope it announces
+// nothing about the line beneath it, and that line stays text of the design.
+TEST(ProtectDataDecryptKeySyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  Preprocessor pp(mgr, diag, PreprocConfig{});
+  std::string read = pp.Preprocess(
+      mgr.AddFile("<test>",
+                  "`pragma protect begin_protected\n"
+                  "`pragma protect data_decrypt_key=\"stated-here\"\n"
+                  "wire beneath_w;\n"
+                  "`pragma protect end_protected\n"));
+  EXPECT_NE(read.find("wire beneath_w;"), std::string::npos) << read;
+}
+
 }  // namespace

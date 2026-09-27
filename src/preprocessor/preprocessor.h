@@ -593,22 +593,6 @@ class Preprocessor {
   // the preprocessor as the reading passes.
   std::string DigestMethodInEffect() const;
 
-  // The identifier naming the cipher the message digests of whatever the
-  // reading has reached are encrypted under, which §34.5.17 has the
-  // digest_key_method pragma expression specify. On the writing side it names
-  // the cipher a region's digests are put under; on the reading side it names
-  // the cipher a digest block is opened with, which is why a text is read for
-  // it as well as written with it.
-  //
-  // A text that has stated none is read under the cipher its data are under,
-  // which is the default §34.5.17 settles rather than one of this
-  // implementation's choosing.
-  //
-  // Like the values it is built from, it belongs to the position the reading
-  // has reached rather than to any one directive, which is why it is read off
-  // the preprocessor as the reading passes.
-  std::string DigestKeyMethodInEffect() const;
-
   // The key §34.5.20 has open the digests of whatever the reading has reached:
   // the one a key block carried for them, and the key the region's data are
   // under where no key block carried one, that being the default the subclause
@@ -642,36 +626,6 @@ class Preprocessor {
   ProtectDigestCheck LastDigestBlockCheck() const {
     return last_digest_block_check_;
   }
-
-  // The identifier naming the algorithm the keys of whatever the reading has
-  // reached are encrypted under, which §34.5.24 has the key_method pragma
-  // expression specify. On the writing side it names the algorithm a region's
-  // keys are put under; on the reading side it names the algorithm the block
-  // holding those keys is opened with, which is why a text is read for it as
-  // well as written with it.
-  //
-  // Empty where no directive has named one, this subclause settling no default
-  // and §34.4 filling an unwritten keyword from a default that is not there to
-  // fill it.
-  //
-  // What a reading does with the answer is nothing, and a key block under a
-  // cipher this implementation does not provide is passed over rather than
-  // reported. §34.5.27.2 makes several key blocks alternative ways into one
-  // envelope, so a block written for some other reader is not an error here:
-  // it fails to open, and Preprocessor::ReadProtectKeyBlock
-  // (preprocessor/preprocessor_protect_values.cpp) spends its lines and says
-  // nothing, which is where a block whose key the reader does not hold is left
-  // as well.
-  //
-  // Where an author is told instead is the encrypting half.
-  // ReportUnprovidedKeyMethod (preprocessor/protect_processing.cpp) refuses a
-  // region naming a cipher this tool cannot encrypt its keys under, so every
-  // envelope this tool writes states the cipher its blocks are really under.
-  //
-  // Like the value it is built from, it belongs to the position the reading has
-  // reached rather than to any one directive, which is why it is read off the
-  // preprocessor as the reading passes.
-  std::string KeyMethodInEffect() const;
 
   // The coding scheme, line length and byte count the encoding pragma
   // expression in effect states, which §34.5.9 has every encoded value of a

@@ -223,9 +223,8 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   // describes anything and none is stated.
   //
   // It is written as the string §34.5.24.1 spells the expression with rather
-  // than through ProtectKeyMethodDirective, which writes a value as the source
-  // spelled it and is for carrying an author's pragma_value back out unchanged.
-  // The value here is this file's own identifier rather than anything a source
+  // than as a source spelled it, which is for carrying an author's
+  // pragma_value back out unchanged. The value here is this file's own identifier rather than anything a source
   // wrote, and written bare it would be no pragma_value at all: §22.5.1 admits
   // a simple identifier, and x-deltahdl-stream holds a character that ends one,
   // so every envelope would carry a line Preprocessor::HandlePragma reports as

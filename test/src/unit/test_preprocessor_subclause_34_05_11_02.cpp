@@ -79,6 +79,7 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_des.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -210,6 +211,15 @@ TEST(ProtectDataMethodDescription, ABlockNamingAnUnknownIdentifierIsReported) {
 TEST(ProtectDataMethodDescription, ABlockNamingTheCipherWeProvideIsRead) {
   ReadBack run(OurEnvelope());
   EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_TRUE(run.Recovered()) << run.text;
+}
+
+// A string holding nothing names no algorithm, so the block is read as one
+// naming none is -- under the cipher it was produced with -- rather than
+// refused as naming one this tool lacks.
+TEST(ProtectDataMethodDescription, AnEmptyIdentifierNamesNoAlgorithm) {
+  ReadBack run(EnvelopeNaming(""));
+  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
   EXPECT_TRUE(run.Recovered()) << run.text;
 }
 
@@ -625,6 +635,83 @@ TEST(ProtectDataMethodCipher, ADifferentKeyDoesNotGiveTheTextBack) {
   bool opened =
       DesCbcDecrypt(ciphered, BytesOfHex("133457799BBCDFF5"), kIv, &recovered);
   EXPECT_FALSE(opened && recovered == kText);
+}
+
+// FIPS 46-3 defines the cipher over a 64-bit block and a 64-bit key, so a block
+// or a key of another length is enciphered to nothing rather than to something
+// the algorithm never defined.
+TEST(ProtectDataMethodCipher, ABlockOrKeyOfAnotherLengthGivesNothing) {
+  const std::string kKey = BytesOfHex("133457799BBCDFF1");
+  const std::string kBlock = BytesOfHex("0123456789ABCDEF");
+  EXPECT_EQ(DesEncryptBlock(kBlock.substr(1), kKey), "");
+  EXPECT_EQ(DesEncryptBlock(kBlock, kKey.substr(1)), "");
+  EXPECT_EQ(DesDecryptBlock(kBlock, kKey.substr(1)), "");
+}
+
+// The same of the chained mode's key and IV, whichever way it runs.
+TEST(ProtectDataMethodCipher, AKeyOrIvOfAnotherLengthChainsNothing) {
+  const std::string kKey = BytesOfHex("133457799BBCDFF1");
+  const std::string kIv = BytesOfHex("0011223344556677");
+  const std::string kText = "abcdefgh";
+  EXPECT_EQ(DesCbcEncrypt(kText, kKey.substr(1), kIv), "");
+  EXPECT_EQ(DesCbcEncrypt(kText, kKey, kIv.substr(1)), "");
+  std::string ciphered = DesCbcEncrypt(kText, kKey, kIv);
+  std::string recovered;
+  EXPECT_FALSE(DesCbcDecrypt(ciphered, kKey.substr(1), kIv, &recovered));
+  EXPECT_FALSE(DesCbcDecrypt(ciphered, kKey, kIv.substr(1), &recovered));
+}
+
+// The chained mode writes whole blocks and always at least one, so a
+// ciphertext of no blocks or of part of one is not something it wrote.
+TEST(ProtectDataMethodCipher, CiphertextThatIsNotWholeBlocksIsRefused) {
+  const std::string kKey = BytesOfHex("133457799BBCDFF1");
+  const std::string kIv = BytesOfHex("0011223344556677");
+  std::string ciphered = DesCbcEncrypt("abcdefgh", kKey, kIv);
+  std::string recovered;
+  EXPECT_FALSE(DesCbcDecrypt("", kKey, kIv, &recovered));
+  EXPECT_FALSE(DesCbcDecrypt(ciphered.substr(0, kDesBlockBytes + 1), kKey, kIv,
+                             &recovered));
+}
+
+// A block enciphered by hand, with an IV of zeros so that the one block the
+// chained mode deciphers is the block itself. Each ends in a count that is not
+// the padding RFC 5652 writes -- none, more than a block, or two with the byte
+// before it not a two -- and the last ends in the padding it does write.
+TEST(ProtectDataMethodCipher, PaddingThisNeverWritesIsRefused) {
+  const std::string kKey = BytesOfHex("133457799BBCDFF1");
+  const std::string kZeroIv(kDesBlockBytes, '\0');
+  std::string recovered;
+  for (std::string_view block :
+       {std::string_view("abcdefg\0", 8), std::string_view("abcdefg\x09"),
+        std::string_view("abcdefg\x02")}) {
+    EXPECT_FALSE(
+        DesCbcDecrypt(DesEncryptBlock(block, kKey), kKey, kZeroIv, &recovered))
+        << HexOfBytes(block);
+  }
+  ASSERT_TRUE(DesCbcDecrypt(DesEncryptBlock("abcdef\x02\x02", kKey), kKey,
+                            kZeroIv, &recovered));
+  EXPECT_EQ(recovered, "abcdef");
+}
+
+// §34.5.15.2 has the first cipher-block of a des-cbc block removed for the IV,
+// so a block no longer than that one cipher-block carries no data to decrypt.
+TEST(ProtectDataMethodCipher, ABlockNoLongerThanItsIvRecordsNoRegion) {
+  std::string block = EncryptProtectedRegion(kSealedDesign, kRegionKey,
+                                             kRawEnctype, kDesCbcMethod);
+  ASSERT_GT(block.size(), kDesBlockBytes);
+  std::string recovered;
+  EXPECT_TRUE(
+      DecryptProtectedBlock(block, kRegionKey, &recovered, kDesCbcMethod));
+  EXPECT_FALSE(DecryptProtectedBlock(block.substr(0, kDesBlockBytes),
+                                     kRegionKey, &recovered, kDesCbcMethod));
+}
+
+// An empty key encrypts nothing, whichever cipher is named.
+TEST(ProtectDataMethodCipher, AnEmptyKeyEncryptsNothing) {
+  EXPECT_EQ(EncryptProtectedRegion(kSealedDesign, ""), "");
+  EXPECT_EQ(
+      EncryptProtectedRegion(kSealedDesign, "", kRawEnctype, kDesCbcMethod),
+      "");
 }
 
 }  // namespace

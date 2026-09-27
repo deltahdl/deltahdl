@@ -129,4 +129,18 @@ TEST(ProtectDataPublicKeySyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
   EXPECT_TRUE(run.ValueOf("data_public_key").defaulted);
 }
 
+// The same name with a pragma_value written against it is the expression in a
+// spelling §34.5.13.1 does not define, so even inside an envelope it announces
+// nothing about the line beneath it, and that line stays text of the design.
+TEST(ProtectDataPublicKeySyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
+  PreprocFixture f;
+  std::string read = Preprocess(
+      "`pragma protect begin_protected\n"
+      "`pragma protect data_public_key=\"stated-here\"\n"
+      "wire beneath_w;\n"
+      "`pragma protect end_protected\n",
+      f);
+  EXPECT_NE(read.find("wire beneath_w;"), std::string::npos) << read;
+}
+
 }  // namespace

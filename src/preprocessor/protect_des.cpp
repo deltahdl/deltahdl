@@ -208,7 +208,6 @@ std::string DesCbcEncrypt(std::string_view cleartext, std::string_view key,
     std::string_view block(padded);
     block = block.substr(at, kDesBlockBytes);
     chain = DesEncryptBlock(CombineBlocks(block, chain), key);
-    if (chain.size() != kDesBlockBytes) return "";
     ciphertext.append(chain);
   }
   return ciphertext;
@@ -225,13 +224,13 @@ bool DesCbcDecrypt(std::string_view ciphertext, std::string_view key,
   padded.reserve(ciphertext.size());
   for (size_t at = 0; at < ciphertext.size(); at += kDesBlockBytes) {
     std::string_view block = ciphertext.substr(at, kDesBlockBytes);
-    std::string deciphered = DesDecryptBlock(block, key);
-    if (deciphered.size() != kDesBlockBytes) return false;
-    padded.append(CombineBlocks(deciphered, chain));
+    padded.append(CombineBlocks(DesDecryptBlock(block, key), chain));
     chain.assign(block);
   }
   auto pad = static_cast<size_t>(static_cast<uint8_t>(padded.back()));
-  if (pad == 0 || pad > kDesBlockBytes || pad > padded.size()) return false;
+  // The ciphertext is at least one whole block, so a count no larger than a
+  // block is never larger than what it counts.
+  if (pad == 0 || pad > kDesBlockBytes) return false;
   for (size_t n = 0; n < pad; ++n) {
     auto byte = static_cast<size_t>(
         static_cast<uint8_t>(padded[padded.size() - 1 - n]));

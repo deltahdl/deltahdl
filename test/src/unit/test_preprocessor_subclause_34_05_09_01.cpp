@@ -696,6 +696,82 @@ TEST(ProtectEncodingSyntax, ABareWordAmongTheSubkeywordsQualifiesNothing) {
       WhereTheEncodedBlockStands(src), "34.5.9.2"));
 }
 
+// ---------------------------------------------------------------------------
+// The list as the encrypting half reads it off a region's own line.
+// ---------------------------------------------------------------------------
+
+// The encoding expression the envelope produced from a region holding `list`
+// states first, which is the scheme and length that region's blocks were
+// written under, as the encrypting half writes it back out.
+std::string StatedForARegionWriting(std::string_view list) {
+  std::string envelope = EnvelopeAround(StatesEncoding(list));
+  size_t at = envelope.find("`pragma protect encoding=");
+  EXPECT_NE(at, std::string::npos) << envelope;
+  size_t ends = envelope.find('\n', at);
+  return envelope.substr(at, ends - at);
+}
+
+// The expression the encrypting half writes where the region's list named no
+// scheme it takes, which is its own scheme and no length.
+constexpr std::string_view kStatesNothingTaken =
+    "`pragma protect encoding=(enctype=\"x-deltahdl-block\")";
+
+// Whitespace standing between the last character of an expression and the
+// comma or parenthesis after it separates the two rather than belonging to
+// either, so the scheme and the length are both still read.
+TEST(ProtectEncodingSyntax, ARegionsListIsReadPastThePaddingAfterEachValue) {
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\" , line_length=8 )"),
+            "`pragma protect encoding=(enctype=\"base64\", line_length=8)");
+}
+
+// An expression whose own value is a parenthesized list, standing among the
+// subkeywords. Its comma is inside its parentheses rather than between two
+// expressions of this list, so the length after it is still read as one.
+TEST(ProtectEncodingSyntax, ACommaInsideANestedListSeparatesNothing) {
+  EXPECT_EQ(StatedForARegionWriting(
+                "(enctype=\"base64\", x_acme=(1,2), line_length=8)"),
+            "`pragma protect encoding=(enctype=\"base64\", line_length=8)");
+}
+
+// A quotation mark behind a backslash is part of the string rather than its
+// end, so the comma and the length written after it inside the scheme's name
+// are the name's, and the length that counts is the one after the string.
+TEST(ProtectEncodingSyntax, AnEscapedQuoteInsideTheSchemeNameEndsNothing) {
+  std::string stated = StatedForARegionWriting(
+      "(enctype=\"x-acme\\\",line_length=9\", line_length=8)");
+  EXPECT_TRUE(Carries(stated, "line_length=8")) << stated;
+  EXPECT_FALSE(Carries(stated, "line_length=9")) << stated;
+}
+
+// §34.5.9.1 writes the length as a number, so a word holding a letter, no
+// value at all, or a number with a stray parenthesis after it carries no
+// length, and the scheme beside it is still taken.
+TEST(ProtectEncodingSyntax, ALengthSpelledOtherThanInDigitsIsNoLength) {
+  constexpr std::string_view kSchemeAlone =
+      "`pragma protect encoding=(enctype=\"base64\")";
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=x8)"),
+            kSchemeAlone);
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=)"),
+            kSchemeAlone);
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=8))"),
+            kSchemeAlone);
+}
+
+// The spellings of the list that name no scheme, each of which leaves the
+// length written beside it qualifying nothing: a bare word where the string
+// belongs, a string opened and never closed -- once ending on a backslash --
+// and a list opened and never closed.
+TEST(ProtectEncodingSyntax, ARegionsListNamingNoSchemeIsNotTaken) {
+  EXPECT_EQ(StatedForARegionWriting("(enctype=b, line_length=8)"),
+            kStatesNothingTaken);
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64, line_length=8)"),
+            kStatesNothingTaken);
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\\"),
+            kStatesNothingTaken);
+  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=8"),
+            kStatesNothingTaken);
+}
+
 // The keyword written as an escaped identifier. A pragma_keyword is the simple
 // form of an identifier, so the escaped spelling names no keyword at all: it
 // stands where the grammar admits a value instead, which leaves the '=' after

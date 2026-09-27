@@ -5,7 +5,7 @@
 #include <string_view>
 #include <utility>
 
-#include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
@@ -118,9 +118,7 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
                                     std::string_view under) {
   std::string material(under);
   material.append(cleartext);
-  std::string key;
-  if (!ProtectMessageDigest(material, kDefaultDigestMethod, &key)) return {};
-  return key;
+  return Sha1Digest(material);
 }
 
 // The entity comes first and the name of the key follows the cipher, which is

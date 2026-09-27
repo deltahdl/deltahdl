@@ -290,6 +290,14 @@ TEST(ProtectDigestBlockEncryptionOutput, ARegionAskingForNoneGetsNoneAtAll) {
             (std::vector<std::string>{"key", "key", "data"}));
 }
 
+// A digest sealed under no key would be one anyone could open and rewrite, so
+// where no key was reached the writer produces no block at all rather than one
+// vouching for nothing.
+TEST(ProtectDigestBlockEncryptionOutput, NoKeyReachedWritesNoDigest) {
+  EXPECT_EQ(DigestBlockUnder(kEncodingSealedDesign, ""), "");
+  EXPECT_NE(DigestBlockUnder(kEncodingSealedDesign, kEncodingExchangeKey), "");
+}
+
 // -- What the block carries -------------------------------------------------
 
 // §34.5.22.2: the digest is encoded under the current encoding pragma
@@ -365,6 +373,33 @@ TEST(ProtectDigestBlockDecryptionInput, ADigestOfOtherTextIsReported) {
                             "digest block disagrees with the block it follows",
                             LineHolding(src, LineAfter(src, kDigestBlockLine)),
                             "34.5.22"));
+}
+
+// A digest line that is not something the scheme in effect writes carries no
+// digest, which the reading reports as it does any value written in another
+// scheme, and no comparison is made against the block it follows.
+TEST(ProtectDigestBlockDecryptionInput, ADigestNotInTheSchemeChecksNothing) {
+  std::string src =
+      EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
+                       std::string(kDigestBlockLine) + "not a block\n");
+  ReadEnvelope run(src);
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kNotChecked);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma value is not written in the encoding in effect",
+      LineHolding(src, "not a block"), "34.5.9.2"));
+}
+
+// The keyword followed at once by another directive announces a block no line
+// carries. The directive is read as itself rather than as characters of a
+// digest, so nothing is reported and nothing is compared.
+TEST(ProtectDigestBlockDecryptionInput, ADirectiveAfterTheKeywordIsNoDigest) {
+  ReadEnvelope run(EnvelopeCarrying(DataBlockHolding(kEncodingSealedDesign) +
+                                    std::string(kDigestBlockLine) +
+                                    "`pragma protect author=\"after\"\n"));
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kNotChecked);
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
 // §34.5.22.2 has the digest of a block written in the digest block immediately

@@ -14,10 +14,9 @@ namespace {
 // Whether `text` is written as a string. §22.5.1 spells a pragma_value four
 // ways and only one of them is a string, so a value carrying no quotation
 // marks around it is one of the other three however much it reads like the
-// name a producer meant.
-bool WrittenAsString(std::string_view text) {
-  return text.size() >= 2 && text.front() == '"' && text.back() == '"';
-}
+// name a producer meant. The §22.11 grammar that carried the value here closes
+// every string it opens, so the opening mark is the one to look for.
+bool WrittenAsString(std::string_view text) { return text.starts_with('"'); }
 
 // Takes the string written against one of the five names into `into`, and
 // reports whether the expression was that name written that way.
@@ -58,8 +57,9 @@ ProtectLicense ParseProtectLicense(std::string_view value) {
   // The expressions of the list are what TopLevelKeywords walks, so the
   // parentheses announcing the list come off before the walk rather than
   // reaching it as characters of the first expression.
-  std::string_view inside = value.substr(1);
-  if (!inside.empty() && inside.back() == ')') inside.remove_suffix(1);
+  // The §22.11 grammar that carried the list here closes it, so the last
+  // character is the parenthesis matching the first.
+  std::string_view inside = value.substr(1, value.size() - 2);
   ProtectLicense license;
   bool named_library = false;
   bool named_entry = false;

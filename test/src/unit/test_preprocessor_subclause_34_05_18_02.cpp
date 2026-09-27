@@ -300,6 +300,15 @@ TEST(ProtectDigestKeynameDefault, TheKeywordWithNothingAgainstItSpecifiesNone) {
   EXPECT_EQ(run.NameInEffect().value, kDataName);
 }
 
+// The keyword written with a string holding nothing names no key either, so the
+// data's name fills the place as it does where the keyword was left out.
+TEST(ProtectDigestKeynameDefault, AnEmptyStringSpecifiesNone) {
+  ReadingOf run(Written("data_keyname", kDataName) +
+                Written("digest_keyname", ""));
+  EXPECT_EQ(run.NameInEffect().value, kDataName);
+  EXPECT_TRUE(run.NameInEffect().defaulted);
+}
+
 // A text that named no key anywhere has nothing for the default to fill the
 // place from, so no name stands for its digest at all. That is a different
 // state from a name that reaches none of the keys held, and it is what makes

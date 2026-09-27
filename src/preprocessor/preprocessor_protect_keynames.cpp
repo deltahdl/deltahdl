@@ -160,7 +160,6 @@ void Preprocessor::CheckDataKeyDesignationValue(std::string_view keyword,
                                                 std::string_view value,
                                                 SourceLoc loc) {
   if (value.empty()) return;
-  if (!IsProtectKeyDesignationKeyword(keyword)) return;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
   if (!protect_key_designations_.Record(owner.value, keyword, value)) {
     diag_.Error(loc,
@@ -211,7 +210,6 @@ void Preprocessor::CheckDigestDesignationValue(std::string_view keyword,
                                                std::string_view value,
                                                SourceLoc loc) {
   if (value.empty()) return;
-  if (!IsProtectDigestDesignationKeyword(keyword)) return;
   ProtectKeywordValue owner = protect_keywords_.DigestKeyownerInEffect();
   if (!protect_digest_designations_.Record(owner.value, keyword, value)) {
     diag_.Error(loc,

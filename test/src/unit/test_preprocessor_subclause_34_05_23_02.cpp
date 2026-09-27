@@ -204,6 +204,15 @@ TEST(ProtectKeyKeyownerDescription, OneValueAgainstBothDesignationsIsReported) {
                             "34.5.23"));
 }
 
+// A name written as a string holding nothing, and a public key whose line
+// carries nothing, designate no key between them, so they are not one value
+// designating a key twice and nothing is reported.
+TEST(ProtectKeyKeyownerDescription, TwoEmptyDesignationsRepeatNothing) {
+  Read run(ForeignEnvelope(NamesEntity(kEntity) + Writes("key_keyname", "") +
+                           DesignatesPublicKey("")));
+  EXPECT_FALSE(run.diag.HasErrors());
+}
+
 // The constraint is about the entity the values are unique for and not about
 // the characters. One value written under two entities designates a key of each
 // and repeats nothing, so nothing is reported.
