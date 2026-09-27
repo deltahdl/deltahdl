@@ -2,6 +2,24 @@
 concurrency:
   cancel-in-progress: true
   group: deltahdl-${{ github.ref_name }}
+# SHARD_SLICE is the awk program every sharded job selects its slice with:
+# given n, the matrix width, and s, the shard, it prints the input lines whose
+# hash is s modulo n. A line's shard therefore depends on that line alone.
+# Selecting by position, (NR-1) % n, moved every line after an inserted one to
+# the next shard, and a target registered anywhere but last in
+# test/CMakeLists.txt, which 7 of the 200 commits before this one did, sent
+# most of every slice to a shard whose ccache or ctcache had never held it.
+# The price is evenness: of the 3,237 unit-test targets, eighteen shards get
+# 156 to 196 by hash where position gave 179 or 180. The hash is a polynomial
+# over the printable ASCII a target name or path is made of, kept below 2^53 so
+# every awk computes it exactly, and s is added to 0 so a shard spelled '07'
+# compares as the number 7.
+env:
+  SHARD_SLICE: >-
+    BEGIN { for (c = 32; c < 127; c++) ord[sprintf("%c", c)] = c }
+    { h = 0; for (i = 1; i <= length($0); i++)
+    h = (h * 31 + ord[substr($0, i, 1)]) % 1000003;
+    if (h % n == s + 0) print }
 jobs:
   assert-coverage:
     # The four tiers whose counters this job merges are named here one by one.
@@ -1158,7 +1176,7 @@ jobs:
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     name: build-asan-ubsan-shard-${{ matrix.shard }}
     needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-latest
@@ -1183,14 +1201,21 @@ jobs:
             ccache-build-asan-ubsan-
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
+      # report a lifetime average. Zero them so the figure describes this run,
+      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
           sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
           tag: ${{ needs.cache-googletest.outputs.tag }}
+      # -gline-tables-only rather than Debug's -g: a sanitizer report needs a
+      # file and line for each frame and nothing else DWARF holds, and the rest
+      # of it is what made build-coverage-lib's objects six to eight times the
+      # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
           cmake -B build \
@@ -1199,23 +1224,27 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS_DEBUG=-gline-tables-only \
+            -DCMAKE_C_FLAGS_DEBUG=-gline-tables-only \
             -DDELTAHDL_SANITIZERS=ON
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
+            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. A cap that binds only when something
-      # misses is not a cap, and the cache quota is shared across every job in
-      # the repository, so evict explicitly and let the entry this job saves
-      # honour its configured size whether or not anything missed. Cleanup leaves
-      # the hit and miss counters alone, so the report below still describes this
-      # build while the size it prints is the size that actually gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
+      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
+      # to compile, and this step bounds the cache instead: it evicts every
+      # entry older than the time Reset ccache statistics wrote, leaving
+      # exactly the entries this build stored or read, as the step of the same
+      # name in unit-test-coverage does and for the reasons the comment above
+      # that job gives. A 200M cap applied during the build is what this
+      # replaces, and it was the one unit-test-coverage measured costing up to
+      # 31 misses a shard on a commit that changed one test source.
+      - name: Evict what the build did not use
+        run: |
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -1238,8 +1267,9 @@ jobs:
     # were compiled once per shard a run and stored once per shard in the cache.
     # Compile them once here and hand the shards the object tree.
     #
-    # The cache is not capped while the build runs and is trimmed after it,
-    # as the coverage shards do it. Under the 200M this job carried as its
+    # The cache is not capped while the build runs and is pared after it to
+    # what the build used, as the coverage shards do it. Under the 200M this
+    # job carried as its
     # CCACHE_MAXSIZE, sized when the library was 284 objects at a quarter of a
     # megabyte apiece, run 35657769589 restored the entry saved at 561cc0211,
     # a commit no C++ file had changed since, and still reported 161 misses
@@ -1248,9 +1278,9 @@ jobs:
     # during the build and compiled that third again, 188 of the build step's
     # 201 seconds. Level 10 is the compression the shards measured as costing
     # nothing over ccache's own level and leaving a slice fifteen percent
-    # smaller; the 517 Debug objects of the library compress to 298 MiB at
-    # ccache's own level and 237 MiB at level 10 before instrumentation, and
-    # the trim below is what caps the cache.
+    # smaller; the 517 Debug objects of the library compressed to 298 MiB at
+    # ccache's own level and 237 MiB at level 10 before instrumentation, when
+    # they still carried the debug information the Build step now leaves out.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1311,8 +1341,12 @@ jobs:
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
       # report a lifetime average. Zero them so the figure describes this run.
+      # The time written beside them is where Evict what the build did not use
+      # draws its line, as it is in unit-test-coverage.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
@@ -1326,6 +1360,20 @@ jobs:
       # with nothing compiling or linking, and --parallel had no two goals in
       # flight at once to overlap. Ninja scans the graph once and runs the whole
       # set four wide.
+      #
+      # The flags this configure chooses are also the ones every shard compiles
+      # with, and they carry no debug information. Debug's -g made DWARF about
+      # seven eighths of every object ccache stores: compiled with the coverage
+      # flags and compressed at level 10, test_simulator_subclause_31_06b.cpp
+      # was 1,830 KiB with -g and 230 KiB with -g0,
+      # test_elaborator_subclause_06_14.cpp 842 and 139, and
+      # test_synthesizer_subclause_09_04.cpp 499 and 82, and the compile took
+      # a fifth less time without it. Nothing here reads DWARF: llvm-cov reports
+      # from the coverage mapping -fcoverage-mapping writes, and a failing unit
+      # test names its file and line through googletest's own macros. With -g a
+      # shard's slice outgrew the cap that held it, so run 36323338286, whose
+      # commit changed two test files, missed 66 to 85 of every shard's 182
+      # compilations and spent three to four minutes compiling them again.
       - name: Build
         run: |
           cmake -B build -G Ninja \
@@ -1334,6 +1382,8 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS_DEBUG=-g0 \
+            -DCMAKE_C_FLAGS_DEBUG=-g0 \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel 4 --target deltahdl
       # Read after the compile because that is where the disk this job asks for
@@ -1344,41 +1394,28 @@ jobs:
       # itself costs.
       - name: Report free space after the build
         run: df -h /
-      # The size the build left, which is what the cap below has to cover: the
-      # whole library at level 10 plus the earlier versions of whatever changed
-      # since the restored entry was saved. The du after the trim reports the
-      # cap, so the difference between the two is what the trim evicted, and
-      # what it evicts is what the next run misses.
+      # The size the build left: the whole library plus the earlier versions of
+      # whatever changed since the restored entry was saved. The du after the
+      # eviction below is the library alone, so the difference between the two
+      # is what the eviction removed.
       - name: Report the ccache size the build left
         run: du -sk "$CCACHE_DIR"
-      # This step is the only thing that caps the cache, the build above having
-      # run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no limit.
-      # Evicting here rather than during the build spares the build the objects
-      # it would otherwise drop before compiling them. Leaving it to ccache
-      # would also cap nothing on the runs that matter most: ccache evicts only
-      # on the path that stores a new object, so a job that got a hit for every
-      # compilation never applies the cap at all and saves the lot back over
-      # it. The cache quota is shared across the whole repository, so evict
-      # explicitly here. Cleanup leaves the hit and miss counters alone, so the
-      # report below still describes this build while the size it prints is the
-      # size that gets saved.
-      #
-      # 300M holds the library: run 35661247203, the first under no cap, left
-      # 216,044 KiB with the tree's versions of that commit alone, and run
-      # 35667385416, whose commit changed one .cpp, reported 506 hits of 519
-      # with the restored entry at 298,752 KiB. The entry carries the earlier
-      # versions of whatever changed since, up to the cap, so the size the
-      # build leaves reads as the cap from here on and the hit count above
-      # is what says whether the cap still holds the tree: a run on an
-      # unchanged tree missing more than a handful is the sign to raise it.
-      #
-      # export rather than an env: block on the step, because the job sets
-      # CCACHE_MAXSIZE and a value written into the environment by a step does
-      # not override the job's.
-      - name: Trim ccache to its size limit
+      # This step is the only thing that bounds the cache, the build above
+      # having run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no
+      # limit. It evicts every entry older than the time Reset ccache
+      # statistics wrote, leaving exactly the entries this build stored or
+      # read, as the step of the same name in unit-test-coverage does and for
+      # the reasons the comment above that job gives. It replaces a fixed 300M
+      # cap, sized from run 35661247203's 216,044 KiB for the library when its
+      # objects carried debug information, which a library that kept growing
+      # would have outgrown as the unit-test slices outgrew theirs. A step that
+      # fails ends the job before this one, so a partial build is never
+      # evicted down to what it reached.
+      - name: Evict what the build did not use
         run: |
-          export CCACHE_MAXSIZE=300M
-          ccache --cleanup
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration. du reports the size
       # because ccache -s rounds it to a tenth of a GiB and prints no
@@ -1433,7 +1470,7 @@ jobs:
   build-macos-26-arm64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     needs: [assert-coverage, cache-googletest]
     runs-on: macos-26
     steps:
@@ -1453,9 +1490,12 @@ jobs:
             ccache-build-macos-arm64-
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
+      # report a lifetime average. Zero them so the figure describes this run,
+      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
@@ -1470,17 +1510,19 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. A cap that binds only when something
-      # misses is not a cap, and the cache quota is shared across every job in
-      # the repository, so evict explicitly and let the entry this job saves
-      # honour its configured size whether or not anything missed. Cleanup leaves
-      # the hit and miss counters alone, so the report below still describes this
-      # build while the size it prints is the size that actually gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
+      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
+      # to compile, and this step bounds the cache instead: it evicts every
+      # entry older than the time Reset ccache statistics wrote, leaving
+      # exactly the entries this build stored or read, as the step of the same
+      # name in unit-test-coverage does and for the reasons the comment above
+      # that job gives. A 200M cap applied during the build is what this
+      # replaces, and it was the one unit-test-coverage measured costing up to
+      # 31 misses a shard on a commit that changed one test source.
+      - name: Evict what the build did not use
+        run: |
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -1496,7 +1538,7 @@ jobs:
   build-tsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     name: build-tsan-shard-${{ matrix.shard }}
     needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-latest
@@ -1521,14 +1563,21 @@ jobs:
             ccache-build-tsan-
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
+      # report a lifetime average. Zero them so the figure describes this run,
+      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
           sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
           tag: ${{ needs.cache-googletest.outputs.tag }}
+      # -gline-tables-only rather than Debug's -g: a sanitizer report needs a
+      # file and line for each frame and nothing else DWARF holds, and the rest
+      # of it is what made build-coverage-lib's objects six to eight times the
+      # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
           cmake -B build \
@@ -1537,23 +1586,27 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS_DEBUG=-gline-tables-only \
+            -DCMAKE_C_FLAGS_DEBUG=-gline-tables-only \
             -DDELTAHDL_TSAN=ON
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
+            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. A cap that binds only when something
-      # misses is not a cap, and the cache quota is shared across every job in
-      # the repository, so evict explicitly and let the entry this job saves
-      # honour its configured size whether or not anything missed. Cleanup leaves
-      # the hit and miss counters alone, so the report below still describes this
-      # build while the size it prints is the size that actually gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
+      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
+      # to compile, and this step bounds the cache instead: it evicts every
+      # entry older than the time Reset ccache statistics wrote, leaving
+      # exactly the entries this build stored or read, as the step of the same
+      # name in unit-test-coverage does and for the reasons the comment above
+      # that job gives. A 200M cap applied during the build is what this
+      # replaces, and it was the one unit-test-coverage measured costing up to
+      # 31 misses a shard on a commit that changed one test source.
+      - name: Evict what the build did not use
+        run: |
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -1573,7 +1626,7 @@ jobs:
   build-ubuntu-24-04-x86-64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-24.04
@@ -1598,9 +1651,12 @@ jobs:
             ccache-build-clang-release-
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
+      # report a lifetime average. Zero them so the figure describes this run,
+      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
@@ -1617,19 +1673,21 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk -v n=4 -v s=${{ matrix.shard }} "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. A cap that binds only when something
-      # misses is not a cap, and the cache quota is shared across every job in
-      # the repository, so evict explicitly and let the entry this job saves
-      # honour its configured size whether or not anything missed. Cleanup leaves
-      # the hit and miss counters alone, so the report below still describes this
-      # build while the size it prints is the size that actually gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
+      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
+      # to compile, and this step bounds the cache instead: it evicts every
+      # entry older than the time Reset ccache statistics wrote, leaving
+      # exactly the entries this build stored or read, as the step of the same
+      # name in unit-test-coverage does and for the reasons the comment above
+      # that job gives. A 200M cap applied during the build is what this
+      # replaces, and it was the one unit-test-coverage measured costing up to
+      # 31 misses a shard on a commit that changed one test source.
+      - name: Evict what the build did not use
+        run: |
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -1649,7 +1707,7 @@ jobs:
   build-ubuntu-24-04-x86-64-gcc:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: [assert-coverage, cache-googletest]
     runs-on: ubuntu-24.04
@@ -1674,9 +1732,12 @@ jobs:
             ccache-build-gcc-release-
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
+      # report a lifetime average. Zero them so the figure describes this run,
+      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       - name: Fetch googletest
         uses: ./.github/actions/fetch-googletest
         with:
@@ -1693,19 +1754,21 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
+            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. A cap that binds only when something
-      # misses is not a cap, and the cache quota is shared across every job in
-      # the repository, so evict explicitly and let the entry this job saves
-      # honour its configured size whether or not anything missed. Cleanup leaves
-      # the hit and miss counters alone, so the report below still describes this
-      # build while the size it prints is the size that actually gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
+      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
+      # to compile, and this step bounds the cache instead: it evicts every
+      # entry older than the time Reset ccache statistics wrote, leaving
+      # exactly the entries this build stored or read, as the step of the same
+      # name in unit-test-coverage does and for the reasons the comment above
+      # that job gives. A 200M cap applied during the build is what this
+      # replaces, and it was the one unit-test-coverage measured costing up to
+      # 31 misses a shard on a commit that changed one test source.
+      - name: Evict what the build did not use
+        run: |
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -2024,7 +2087,8 @@ jobs:
           regex=$(jq -r '.[].file' build/compile_commands.json \
             | grep '/test/src/unit/.*\.cpp$' \
             | sort \
-            | awk "NR % ${{ strategy.job-total }} == ${{ matrix.shard }}" \
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE" \
             | sed 's/\./\\./g' \
             | sed 's/$/$/' \
             | paste -sd'|')
@@ -2422,13 +2486,12 @@ jobs:
     # gets 10 GB of cache for all jobs together, and GitHub reclaims an overage
     # by evicting whatever was least recently used, so a generation left behind
     # does not cost the job that made it: it costs some other job its entire
-    # cache. Every ccache job here caps at 200M bar the coverage shards, which
-    # compute a cap from the slice each of them holds, so one generation of all
-    # of them is about 5.6 GB, most of it that matrix. Its share does not move
-    # when the matrix widens, the cap falling as the slice does. A new entry is
-    # written before this job removes the superseded one, so the figure that has
-    # to fit under 10 GB is two generations of it, and adding a cached job means
-    # budgeting twice its CCACHE_MAXSIZE times its matrix width.
+    # cache. Every ccache job here saves what its build used and nothing else,
+    # so a generation costs what one run of every cached job compiles. A new
+    # entry is written before this job removes
+    # the superseded one, so the figure that has to fit under 10 GB is two
+    # generations, and adding a cached job means budgeting twice what one
+    # build of it stores.
     # What is kept is the newest entry per cache identity, not the entry for
     # this commit. Not every identity has an entry for this commit: actions/cache
     # declares post-if: "success()" on its save step, so every job here that
@@ -2669,74 +2732,53 @@ jobs:
     # A shard compiles and runs its slice of the unit tests, caching the
     # instrumented objects it makes and nothing else, src/ arriving prebuilt.
     #
-    # The trim step below computes the cap on that cache rather than stating it,
-    # because the cap is a property of the slice and not of this matrix. The
-    # cache holds one object per target the shard built, so a matrix N wide
-    # needs a cap of ceil(2777/N) objects and nothing more, and widening the
-    # matrix has to lower the cap or it budgets for objects that do not exist.
-    # The step multiplies the targets it selects by 1,377 kB and adds 15%, which
-    # is 220M for a 139-target slice and 245M for a 155-target one. Run
-    # 31071176358 is where 1,377 comes from. It rewrote every shard's cache at
-    # the compression level below and measured 200,304 to 208,516 KiB for slices
-    # of 154 and 155 targets, so the widest shard's object costs 1,345 KiB,
-    # which is 1,377 kB in the decimal units ccache reads a cap in.
+    # The cache a shard saves is what its build used and nothing else: after
+    # the build, every entry it neither stored nor read is evicted, which
+    # ccache can tell because reading an entry rewrites its modification time:
+    # ccache 4.9.1, the version apt installs here, does so in LocalStorage::get
+    # "to save file from LRU cleanup". Nothing is estimated, so nothing goes
+    # stale. An object whose source has changed leaves on the first run that
+    # stops reading it, and a slice that grows keeps all of itself.
     #
-    # The 15% is provisional, and the du on Report the ccache size the build
-    # left below is the reading that settles it. A cache holds more than the
-    # slice: an object whose source has since changed stays until something
-    # evicts it, and the trim is the only thing that ever does. 15% is a guess
-    # at how much a shard accumulates between the run that last wrote its cache
-    # from scratch and today, and the reading before the trim measures it. The
-    # reading after the trim cannot, because after the trim the size is the cap.
+    # That step used to apply a cap computed from the slice, 1,377 kB a target
+    # plus 15%, 1,377 being what run 31071176358 measured an object at. The
+    # objects outgrew it: by run 36323338286 shard 01's build left 369,840 KiB
+    # against the 285M its 180 targets were allowed, and on a commit that
+    # changed two test files every shard missed 66 to 85 of its 182
+    # compilations, each run evicting what the next one needed. A cap stated in
+    # kilobytes an object is wrong from the day the objects grow, and only the
+    # misses ever said so.
     #
-    # Fitting a cap to a freshly written cache is the defect this replaces. Run
-    # 31071176358 left every shard at 200,304 to 208,516 KiB under a stated
-    # 240M, cleaning nothing and missing nothing. Ten commits later, in run
-    # 31139246359, every one of the eighteen shards read 235,640 to 236,564 KiB
-    # against the 234,375 KiB that 240M allows, cleaned 5 to 14 entries and
-    # missed 6 to 23 of its 156 or 157 compilations. That run built 81e82eaef,
-    # which changed two workflow files and no C++, so every one of those misses
-    # was an entry the previous run's trim had evicted.
+    # What a cap guarded was the repository's 10 GB cache quota, which every job
+    # shares, and the objects no longer strain it. Compiled without debug
+    # information (see build-coverage-lib), a unit-test object stores at 80 to
+    # 230 KiB where it stored at 500 to 1,830, so a slice is tens of megabytes.
+    # Two generations of the matrix exist between a save and prune-ccache, and
+    # both fit several times over.
     #
-    # Raising the cap instead of fitting it spends the repository's cache quota.
-    # The repository-wide figure does not follow the matrix width at all: every
-    # object is compiled by exactly one shard, so a generation costs 2,777
-    # objects however many shards divide them, and that is the figure a cap has
-    # to hold still. All jobs together get 10 GB, and a new entry is written
-    # before prune-ccache removes the superseded one, so two generations have to
-    # fit. Twenty shards at 220M came to 4.4 GB a generation and eighteen at
-    # 240M to 4.32 GB, and on 2026-08-07 those eighteen entries
-    # measured 222.7 to 224.7 MiB apiece and 3.93 GiB together, against 4.55 GiB
-    # for every cache entry the repository held. GitHub reclaims an overage by
-    # evicting whatever was least recently used, which is never this matrix --
-    # it is the small entries belonging to everything else, and they were duly
-    # evicted down to nothing back when this matrix ran under a 200M cap.
-    #
-    # Whatever the cap is, it has to be off while the build runs, or the build
-    # evicts objects it has not compiled yet and then compiles them. ccache
+    # CCACHE_MAXSIZE stays 0 while the build runs, because a cap there has the
+    # build evict objects it has not compiled yet and then compile them. ccache
     # cannot store without first getting under the cap, and what it gives up is
     # whatever nothing has read recently, which partway through a build is
     # whatever is still queued. Commit 3370b9bbc changed one test source, which
     # one shard owns, so one miss was all the whole matrix could honestly take;
     # in run 31064569103 six sampled shards took 9, 18, 20, 22, 22 and 31, each
     # of them restoring an entry ccache reported at 99.06% to 99.94% of the cap.
-    # Lifting the cap off the build and leaving it to the trim step took that to
+    # Lifting the cap off the build and evicting in a step after it took that to
     # 2 to 12 on an unchanged tree, and the median Build step from 36 seconds to
     # 28.
     #
     # CCACHE_COMPRESSLEVEL is zstd 10 rather than the level ccache picks for
-    # itself, because at ccache's own level a slice does not fit under a cap of
-    # this size at all. Run 31069471362 recompressed each shard's cache at four
-    # levels and measured it after each, on the eighteen-shard slices of 154 and
-    # 155 targets. ccache's own level leaves a slice at 236,004 to 245,956 KiB,
-    # over the 234,375 KiB a 240M cap allowed those slices. Level 3 leaves
-    # 224,340 to 233,520, which was 855 KiB of room on the widest shard and gone
-    # by the next commit. Level 6 leaves 205,816 to 214,248 and level 10 leaves
-    # 200,304 to 208,516. Level 19 leaves 174,696 to 181,848 and costs 167 to
-    # 262 seconds to write a whole slice, against 7.8 to 10.5 for level 10 and
-    # 5.3 to 10.6 for level 6. Ten is therefore the level that buys the room: it
-    # costs what the levels below it cost, and the level above it costs twenty
-    # times as much for room nothing needs.
+    # itself. It was chosen when a slice had to fit under a cap, and it stays
+    # because it spends the least quota for no extra time. Run 31069471362
+    # recompressed each shard's cache at four levels and measured it after
+    # each, on the eighteen-shard slices of 154 and 155 targets. ccache's own
+    # level leaves a slice at 236,004 to 245,956 KiB, level 3 at 224,340 to
+    # 233,520, level 6 at 205,816 to 214,248 and level 10 at 200,304 to
+    # 208,516. Level 19 leaves 174,696 to 181,848 and costs 167 to 262 seconds
+    # to write a whole slice, against 7.8 to 10.5 for level 10 and 5.3 to 10.6
+    # for level 6. Ten costs what the levels below it cost, and the level above
+    # it costs twenty times as much.
     #
     # The shards start once every clang-tidy-test shard has finished, whatever
     # it concluded: clang-tidy-test is in `needs` for the ordering alone, and
@@ -2859,96 +2901,78 @@ jobs:
       # ccache keeps its counters inside the cache directory, so the restore
       # above brings back every earlier run's totals and `ccache -s` would
       # report a lifetime average. Zero them so the figure describes this run.
+      #
+      # The time written beside them is where the eviction below draws its line:
+      # every entry this build stores or reads is stamped later than it, and
+      # every entry the restore brought back that the build never touched keeps
+      # the older time it was saved with, because tar restores modification
+      # times.
       - name: Reset ccache statistics
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          date +%s > "$RUNNER_TEMP/ccache-epoch"
       # The compiler, its launcher and the coverage flags all come from the
       # CMake cache inside the downloaded tree, so this shard configures
       # nothing: it compiles its slice of the unit tests and links each one
-      # against the library build-coverage-lib already archived.
+      # against the library build-coverage-lib already archived. The slice is
+      # the one SHARD_SLICE, at the top of this file, assigns the shard.
       - name: Build
         run: |
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % ${{ strategy.job-total }} == ${{ matrix.shard }}")
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
       # Read here because this is the fullest the disk gets: the objects are on
       # it and so are the executables linked from them. Slim build output below
       # deletes the objects, and both readings after it are therefore taken with
-      # the objects already gone. An instrumented unit-test object compresses to
-      # about 1,345 KiB in ccache and a slice is 138 or 139 of them, so this
-      # reading is taken with upwards of 190 MB of objects the ones below no
-      # longer see.
+      # the objects already gone.
       - name: Report free space after the build
         run: df -h /
-      # The size the build left, which is the size the cap has to cover. The du
-      # in Report ccache statistics below runs after the trim, so it reports the
-      # cap however much the build had; this one reports the demand. The
-      # difference between the two is what the trim evicted, and what the trim
-      # evicts is what the next run misses. Both run on the same condition as
-      # the trim, so a shard that died before restoring runs neither on a
-      # directory that is not there.
+      # The size the build left. The du in Report ccache statistics below runs
+      # after the eviction, so the difference between the two is what it
+      # evicted: the entries of sources that have since changed, and on a
+      # shard that restored another shard's entry, that shard's slice. Both
+      # run on the same condition as the save, so a shard that died before
+      # restoring runs neither on a directory that is not there.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report the ccache size the build left
         run: du -sk "$CCACHE_DIR"
-      # This step is the only thing that caps the cache, the build above having
-      # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
-      # spelling no limit at all, so the cap belongs on it. Evicting here rather
-      # than during the build spares the build the objects it would otherwise
-      # drop before compiling them, which took the miss count on an unchanged
-      # tree from 5-to-27 a shard down to 2-to-12.
+      # This step is the only thing that bounds the cache, the build above
+      # having run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no
+      # limit. It evicts every entry older than the time Reset ccache
+      # statistics wrote, which leaves exactly the entries this build stored or
+      # read, and so the whole slice however large its objects grow. The
+      # comment above the job says why that replaced a cap in megabytes.
+      # --evict-older-than wants its age with a unit, d or s. The five
+      # seconds of margin keep an entry the build touched within a second of
+      # the stamp, ccache reading its own clock a moment after this step reads
+      # the shell's.
       #
-      # The cap is computed from the slice this shard owns, on the arithmetic
-      # the comment above the job sets out, so that changing the width of the
-      # matrix or adding unit tests changes it without anybody recomputing it.
-      # The slice is selected again here rather than carried over from Build,
-      # because it has to be known on the runs where Build failed: the save
-      # below runs on those too, and what it saves has to be within the cap
-      # either way. The selection reads test/CMakeLists.txt and the shard
-      # number, and neither depends on the build having worked.
-      #
-      # export rather than an env: block on the step, because the job sets
-      # CCACHE_MAXSIZE and a value written into the environment by a step does
-      # not override the job's.
-      #
-      # Leaving it to ccache would cap nothing on the runs that matter most.
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies the cap at all: it restores
-      # whatever the last run saved, adds nothing, and saves the lot back, over
-      # the cap and unremarked. This matrix is where that was caught -- a shard
-      # whose slice was a clean 139 of 139 hits reported "Cache size (GB): 0.4 /
-      # 0.2 (199.9%)" and saved all 396 MB of it under a 200M cap, once per shard
-      # in the one run. Cleanup leaves the hit and miss counters alone, so the
-      # report below still describes this build while the size it prints is the
-      # size that gets saved.
-      #
-      # Run whether or not the build succeeded, because the save below runs on
-      # that footing too and what it saves has to be within the cap either way.
-      # The condition asks whether the restore ran rather than asking always(),
-      # so a shard that died before it -- on the LLVM or ccache it installs, on
-      # the build tree it unpacks -- reports that one failure rather than three.
-      # cache-primary-key is the key the restore attempted, so it is set on a
-      # complete miss as much as on a hit.
-      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
-        name: Trim ccache to its size limit
+      # It runs only when the build succeeded. A build that stopped partway
+      # never read the entries of the targets it did not reach, and evicting
+      # them would have the next run compile them again. The save below still
+      # runs, so a red shard saves what it restored plus what it compiled, and
+      # the next green run evicts the difference. The condition also asks
+      # whether the restore ran, so a shard that died before it -- on the LLVM
+      # or ccache it installs, on the build tree it unpacks -- reports that one
+      # failure rather than three. cache-primary-key is the key the restore
+      # attempted, so it is set on a complete miss as much as on a hit.
+      - if: ${{ success() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Evict what the build did not use
         run: |
-          targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
-            test/CMakeLists.txt \
-            | awk "(NR-1) % ${{ strategy.job-total }} == ${{ matrix.shard }}" \
-            | wc -l)
-          export CCACHE_MAXSIZE=$(( targets * 1377 * 115 / 100000 ))M
-          echo "Trimming to ${CCACHE_MAXSIZE} for ${targets} targets"
-          ccache --cleanup
+          age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
+          echo "Evicting entries unused for the last ${age} seconds"
+          ccache --evict-older-than "${age}s"
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       #
       # du reports the size because ccache -s rounds it to a tenth of a GiB and
-      # prints no percentage here, this step running under the job's
-      # CCACHE_MAXSIZE of 0 rather than the cap the trim above applies. This
-      # reading is the size that gets saved, and the one before the trim is the
-      # size the build wanted; #2990 went a long way on an estimate of neither,
-      # because actions/cache reports the archive it restored, which is measured
-      # before the build adds to it, and reading that as the size of the
-      # directory put the cache under a cap it was over.
+      # prints no percentage under a CCACHE_MAXSIZE of 0. This reading is the
+      # size that gets saved, and the one before the eviction is the size the
+      # build left; #2990 went a long way on an estimate of neither, because
+      # actions/cache reports the archive it restored, which is measured
+      # before the build adds to it.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report ccache statistics
         run: |
