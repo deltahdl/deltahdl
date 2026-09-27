@@ -252,4 +252,36 @@ TEST(UdpInitialStatementRun, ZInputsKeepTheInitialValueAsXInputsDo) {
             "wire-z inputs qi=1  reg-x inputs qr=1\n");
 }
 
+// §29.7 (printed pages 866-867), the srff example: under `initial q = 1'b1`
+// "The output q has an initial value of 1 at the start of the simulation", so
+// a module's initial block reading the net at time 0, before any input moves
+// and before any delta passes, reads 1. It read z, the value reaching the net
+// only once the instance's own process had run.
+TEST(UdpInitialStatementRun, InitialValueIsOnTheNetAtTimeZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive srff (q, s, r);\n"
+                       "  output q; reg q;\n"
+                       "  input s, r;\n"
+                       "  initial q = 1'b1;\n"
+                       "  table\n"
+                       "    1 0 : ? : 1 ;\n"
+                       "    f 0 : 1 : - ;\n"
+                       "    0 r : ? : 0 ;\n"
+                       "    0 f : 0 : - ;\n"
+                       "    1 1 : ? : 0 ;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module top;\n"
+                       "  reg s, r; wire q;\n"
+                       "  srff u(q, s, r);\n"
+                       "  initial begin\n"
+                       "    $display(\"t0 %b\", q);\n"
+                       "    #0 $display(\"t0+ %b\", q);\n"
+                       "    #1 $display(\"t1 %b\", q);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t0 1\nt0+ 1\nt1 1\n");
+}
+
 }  // namespace

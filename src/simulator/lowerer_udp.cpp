@@ -273,7 +273,8 @@ static char UdpPassOutput(UdpEvalState& state, bool is_sequential,
 // Scheduler::Run(), which is the lifetime the Expr pointers of a lowered
 // process already rely on.
 static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
-                                         SimContext& ctx, Arena& arena) {
+                                         UdpOutputDriver* drv, SimContext& ctx,
+                                         Arena& arena) {
   if (inst->decl == nullptr || inst->output == nullptr) co_return;
 
   // The change-watchers and SimContext key by std::string_view, so the strings
@@ -291,10 +292,6 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // per evaluation would match every row against the initial value §29.7 gives
   // rather than against the state the previous evaluation left.
   UdpEvalState state(*inst->decl, UdpInitialOutput(*inst->decl, ctx, arena));
-  // The driver lives in the arena rather than in this coroutine frame because a
-  // delayed commit is a scheduler event that runs after this coroutine has
-  // moved on to its next evaluation.
-  auto* drv = arena.Create<UdpOutputDriver>(MakeUdpOutputDriver(*inst, ctx));
 
   // §29.7: "When simulation starts, this value is the current state in the
   // state table", and "a delay specification on an instantiated UDP does not
@@ -304,7 +301,8 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // combinational primitive has no such value, since §29.3.2 rules that
   // "Combinational UDPs cannot contain a reg declaration" and §29.3.3's initial
   // statement assigns to that reg.
-  if (inst->decl->is_sequential) {
+  // LowerUdpInst has already driven it where the terminal is a whole net.
+  if (inst->decl->is_sequential && drv->first) {
     CommitUdpOutput(inst->output, drv, state.GetOutput(), ctx, arena);
   }
 
@@ -345,7 +343,22 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   p->gen_prefixes.assign(inst.gen_block_prefixes.begin(),
                          inst.gen_block_prefixes.end());
   InstallGenBlockConsts(inst.gen_block_consts, p);
-  p->coro = MakeUdpInstCoroutine(&inst, ctx_, arena_).Release();
+  // The driver lives in the arena rather than in the coroutine frame because a
+  // delayed commit is a scheduler event that runs after the coroutine has moved
+  // on to its next evaluation.
+  UdpOutputDriver* drv = nullptr;
+  if (inst.decl != nullptr && inst.output != nullptr) {
+    drv = arena_.Create<UdpOutputDriver>(MakeUdpOutputDriver(inst, ctx_));
+    // §29.7 (printed page 867): under `initial q = 1'b1` "The output q has an
+    // initial value of 1 at the start of the simulation", so a sequential
+    // primitive driving a whole net drives it before time 0, and a procedure
+    // reading the net at time 0 sees it whichever process runs first.
+    if (inst.decl->is_sequential && drv->net != nullptr) {
+      CommitUdpOutput(inst.output, drv,
+                      UdpInitialOutput(*inst.decl, ctx_, arena_), ctx_, arena_);
+    }
+  }
+  p->coro = MakeUdpInstCoroutine(&inst, drv, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);
 }
