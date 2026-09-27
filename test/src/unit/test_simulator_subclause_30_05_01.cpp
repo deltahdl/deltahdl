@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_path_decl.h"
+#include "helpers_preprocess_and_get.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -264,6 +266,82 @@ TEST(SpecifyPathDelayFromSource, NegativeTypicalMemberClampsToZero) {
   ASSERT_NE(decl, nullptr);
   PathDelay pd = BuildPathDelayFromDecl(*decl, f.ctx, f.arena);
   for (int i = 0; i < 6; ++i) EXPECT_EQ(pd.delays[i], 0u) << "slot " << i;
+}
+
+// A buffer whose one path takes its delay from `delay`, driven 1 at 10 and 0 at
+// 20 under `timescale 1ns / 1ps, printing each change of its output after 0.
+std::string BufferWithPathDelay(const std::string& specparam,
+                                const std::string& delay) {
+  return "`timescale 1ns / 1ps\n"
+         "module mybuf(input a, output y);\n"
+         "  assign y = a;\n"
+         "  specify\n" +
+         specparam + "    (a => y) = " + delay +
+         ";\n"
+         "  endspecify\n"
+         "endmodule\n"
+         "module t;\n"
+         "  logic a;\n"
+         "  wire y;\n"
+         "  mybuf u(.a(a), .y(y));\n"
+         "  always @(y) if ($realtime > 0) $display(\"t=%g y=%b\", $realtime,"
+         " y);\n"
+         "  initial begin\n"
+         "    a = 0;\n"
+         "    #10 a = 1;\n"
+         "    #10 a = 0;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §30.5 with §22.7 (printed page 716): "The time unit is the unit of
+// measurement for time values such as the simulation time and delay values",
+// so a path delay is a count of the declaring module's unit, and a real one
+// keeps what its fraction the module's precision holds (§3.14.1). A specparam
+// holding 2.5 -- a real, as §6.20.5 (printed page 129) gives a specparam with
+// no range its value's range -- delays each transition by 2.5 ns under
+// `timescale 1ns / 1ps. The delay was read as 3 ticks of the 1 ps precision:
+// the specparam stored the rounded integer and the path took it unscaled.
+TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture(
+                BufferWithPathDelay("    specparam tr = 2.5;\n", "tr"), f),
+            "t=12.5 y=1\nt=22.5 y=0\n");
+}
+
+// The same for a literal: an integer path delay of 3 is 3 ns, and a real 2.5
+// written in the path itself is 2.5 ns.
+TEST(SpecifyPathDelayFromSource, LiteralPathDelaysCountTheModuleUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture(BufferWithPathDelay("", "3"), f),
+            "t=13 y=1\nt=23 y=0\n");
+  SimFixture g;
+  EXPECT_EQ(PreprocessAndCapture(BufferWithPathDelay("", "2.5"), g),
+            "t=12.5 y=1\nt=22.5 y=0\n");
+}
+
+// §22.7: the unit is the declaring module's, not the top's, so a path of 2 in
+// a module under `timescale 1us / 1ns delays by 2000 of a 1 ns top's units.
+TEST(SpecifyPathDelayFromSource, PathDelayCountsItsOwnModulesUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"
+                                 "module slow_cell(input a, output y);\n"
+                                 "  assign y = a;\n"
+                                 "  specify\n"
+                                 "    (a => y) = 2;\n"
+                                 "  endspecify\n"
+                                 "endmodule\n"
+                                 "`timescale 1ns / 1ns\n"
+                                 "module t;\n"
+                                 "  logic a;\n"
+                                 "  wire y;\n"
+                                 "  slow_cell c(a, y);\n"
+                                 "  always @(y) if ($time > 0)\n"
+                                 "    $display(\"y=%b %0d\", y, $time);\n"
+                                 "  initial #10 a = 1;\n"
+                                 "endmodule\n",
+                                 f),
+            "y=1 2010\n");
 }
 
 }  // namespace

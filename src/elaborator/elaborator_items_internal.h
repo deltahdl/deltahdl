@@ -188,6 +188,13 @@ void RegisterSpecifyBlockSpecparams(
 uint32_t SpecparamWidth(const DataType& type, const Expr* init,
                         const TypedefMap& typedefs);
 
+// §6.20.5 (printed pages 129-130): whether a specify parameter holds a real.
+// One with no range specification takes its final value's, so a value written
+// with a real operand -- the clause's own `specparam dhold = 1.0;` -- makes it
+// a real, as §6.20.2 makes such a parameter one; a range makes it a vector
+// whatever its value. Defined in elaborator_items.cpp.
+bool SpecparamIsReal(const DataType& type, const Expr* init);
+
 // §17.5/§17.7: the rules that govern what a checker body may contain -- no
 // nets, no general `always`, no blocking assignment in an always_ff, only
 // event-controlled timing in an initial procedure, and no design element other

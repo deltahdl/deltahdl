@@ -1,15 +1,114 @@
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_internal.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
 
 namespace delta {
+
+// §32.4.1 (printed page 925): the select the specify path terminal `t` was
+// written with, spelled as PathDelay::src_select describes; empty for a whole
+// port. An indexed part-select, `a[i +: 2]`, is spelled as the part it covers.
+static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
+                                      Arena& arena) {
+  if (t.range_kind == SpecifyRangeKind::kNone || t.range_left == nullptr)
+    return {};
+  const int64_t kLeft = SelectBoundValue(EvalExpr(t.range_left, ctx, arena));
+  if (t.range_kind == SpecifyRangeKind::kBitSelect || t.range_right == nullptr)
+    return "[" + std::to_string(kLeft) + "]";
+  const int64_t kRight = SelectBoundValue(EvalExpr(t.range_right, ctx, arena));
+  int64_t msb = kLeft;
+  int64_t lsb = kRight;
+  if (t.range_kind == SpecifyRangeKind::kPlusIndexed) {
+    msb = kLeft + kRight - 1;
+    lsb = kLeft;
+  } else if (t.range_kind == SpecifyRangeKind::kMinusIndexed) {
+    lsb = kLeft - kRight + 1;
+  }
+  return "[" + std::to_string(msb) + ":" + std::to_string(lsb) + "]";
+}
+
+// §30.4.2 (printed page 873): a path terminal is a port_identifier or
+// `interface_identifier . port_identifier`, and the second names the signal of
+// the module's interface port by both names, as the module's own text reads it
+// (`p.a`). Kept as the port name alone, a path from `p.a` started at an `a`
+// nothing in the module reads, so no transition was ever timed through it.
+static std::string TerminalName(const SpecifyTerminal& t) {
+  if (t.interface_name.empty()) return std::string(t.name);
+  std::string name(t.interface_name);
+  name.append(".").append(t.name);
+  return name;
+}
+
+// §22.7 (printed page 716): "The time unit is the unit of measurement for time
+// values such as the simulation time and delay values", so a path delay is a
+// count of the declaring module's time unit, and a real one, `specparam tr =
+// 2.5`, keeps what of its fraction the module's precision holds (§3.14.1). The
+// path's slots are counted in ticks of the design's global precision, which
+// §32.4.1's SDF values are scaled into as well.
+static uint64_t PathDelayTicks(const Logic4Vec& value, const TimeScale& scale,
+                               TimeUnit precision) {
+  if (value.is_real) {
+    const double kDelay = RealVecToDouble(value);
+    // §30.5.1: a delay expression that evaluates negative is treated as zero.
+    return kDelay <= 0.0 ? 0u : RealDelayToTicks(kDelay, scale, precision);
+  }
+  const uint32_t kWidth = value.width == 0 ? 64u : value.width;
+  const int64_t kSigned = SignExtend(value.ToUint64(), kWidth);
+  return DelayToTicks(ClampPathDelay(kSigned), scale, precision);
+}
+
+PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
+                                 Arena& arena) {
+  PathDelay pd;
+  if (!decl.src_ports.empty()) {
+    pd.src_port = TerminalName(decl.src_ports.front());
+    pd.src_select = TerminalSelectText(decl.src_ports.front(), ctx, arena);
+  }
+  if (!decl.dst_ports.empty()) {
+    pd.dst_port = TerminalName(decl.dst_ports.front());
+    pd.dst_select = TerminalSelectText(decl.dst_ports.front(), ctx, arena);
+  }
+  pd.path_kind = decl.path_kind;
+  pd.edge = decl.edge;
+  pd.is_ifnone = decl.is_ifnone;
+  pd.condition = SpecifyConditionText(decl.condition);
+  // §30.4.4: SelectModulePathDelay in simulator/module_path_delay.cpp evaluates
+  // this condition for §30.5.3's activity test, which the text above cannot
+  // answer, being rendered for §32.4.1's SDF COND matching.
+  pd.condition_expr = decl.condition;
+
+  // The parser accepts only the one/two/three/six/twelve delay lists of
+  // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.
+  const TimeScale& kScale = ActiveInstanceTimeScale(ctx);
+  std::size_t count = decl.delays.size();
+  if (count > 12) count = 12;
+  pd.delay_count = static_cast<uint8_t>(count == 0 ? 1 : count);
+
+  for (std::size_t i = 0; i < count; ++i) {
+    // §30.5.1: a single value is the typical delay; a colon-separated
+    // min:typ:max triple selects one member. EvalExpr resolves a
+    // constant_mintypmax_expression against the context's delay mode.
+    pd.delays[i] = PathDelayTicks(EvalExpr(decl.delays[i], ctx, arena), kScale,
+                                  ctx.GlobalPrecision());
+  }
+
+  // §30.5.1 / Table 30-2: distribute the listed delays over the twelve
+  // transition slots according to how many were specified.
+  ExpandTransitionDelays(pd);
+  return pd;
+}
 
 // Calls `visit` on every specify item of kind `kind` that `blocks` declares, in
 // declaration order, skipping a null block or item. The six registration passes

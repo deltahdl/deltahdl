@@ -40,6 +40,8 @@ void RegisterSpecifyBlockSpecparams(
     type.packed_dim_left = sp->param_packed_left;
     type.packed_dim_right = sp->param_packed_right;
     var.width = SpecparamWidth(type, sp->param_value, typedefs);
+    var.is_real = SpecparamIsReal(type, sp->param_value);
+    if (var.is_real) var.width = 64;
     var.init_expr = sp->param_value;
     mod->variables.push_back(var);
   }

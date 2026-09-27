@@ -87,7 +87,9 @@ class Scheduler;
 // `ctx`; a single value is the typical delay and a min:typ:max triple selects a
 // member per the context's delay mode. A delay that evaluates to a negative
 // value is treated as zero, and the resulting one/two/three/six/twelve values
-// are distributed across all twelve transition slots per Table 30-2.
+// are distributed across all twelve transition slots per Table 30-2. Each is a
+// count of the declaring module's time unit and lands in the design's ticks
+// (§22.7). Defined in specify_register.cpp.
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena);
 

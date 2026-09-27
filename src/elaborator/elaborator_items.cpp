@@ -16,6 +16,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -47,6 +48,13 @@ uint32_t SpecparamWidth(const DataType& type, const Expr* init,
   return 32;
 }
 
+bool SpecparamIsReal(const DataType& type, const Expr* init) {
+  if (type.packed_dim_left != nullptr && type.packed_dim_right != nullptr) {
+    return false;
+  }
+  return HasRealOperand(init);
+}
+
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
@@ -54,6 +62,8 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   // any other declaration, so its object reports where.
   var.loc = item->loc;
   var.width = SpecparamWidth(item->data_type, item->init_expr, typedefs_);
+  var.is_real = SpecparamIsReal(item->data_type, item->init_expr);
+  if (var.is_real) var.width = 64;
   var.init_expr = item->init_expr;
   mod->variables.push_back(var);
   // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits

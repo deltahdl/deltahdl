@@ -4,8 +4,8 @@
 // its port names and by this string, so the only job here is to write a
 // condition in the same spelling an SDF file writes one in. Nothing evaluates
 // what is rendered: §30.5.3's activity test reads PathDelay::condition_expr
-// instead, which BuildPathDelayFromDecl in simulator/specify.cpp sets from the
-// same declaration.
+// instead, which BuildPathDelayFromDecl in simulator/specify_register.cpp sets
+// from the same declaration.
 //
 // SpecifyConditionOperator gives the spelling of each operator Table 30-1
 // admits, and SpecifyConditionText walks the expression; the helpers between
