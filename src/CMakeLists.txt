@@ -259,6 +259,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_systask.cpp
     simulator/eval_systask_cast.cpp
     simulator/eval_expr.cpp
+    simulator/eval_hierarchical_name.cpp
     simulator/eval_expr_assign_ops.cpp
     simulator/eval_expr_cast.cpp
     simulator/eval_member_path.cpp

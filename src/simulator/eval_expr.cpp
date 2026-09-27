@@ -106,40 +106,6 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-static void BuildMemberName(const Expr* expr, std::string& out) {
-  if (expr->kind == ExprKind::kIdentifier) {
-    if (!expr->scope_prefix.empty()) {
-      out += expr->scope_prefix;
-      out += ".";
-    }
-    out += expr->text;
-    return;
-  }
-  if (expr->kind == ExprKind::kMemberAccess) {
-    BuildMemberName(expr->lhs, out);
-    out += ".";
-    BuildMemberName(expr->rhs, out);
-  }
-}
-
-std::string StripRootPrefix(const std::string& name) {
-  constexpr std::string_view kPrefix = "$root.";
-  if (name.size() > kPrefix.size() &&
-      std::string_view(name).substr(0, kPrefix.size()) == kPrefix) {
-    auto rest = std::string_view(name).substr(kPrefix.size());
-    auto dot = rest.find('.');
-    if (dot != std::string_view::npos) return std::string(rest.substr(dot + 1));
-    return std::string(rest);
-  }
-  return name;
-}
-
-std::string HierarchicalReferenceName(const Expr* expr) {
-  std::string name;
-  BuildMemberName(expr, name);
-  return StripRootPrefix(name);
-}
-
 // §7.3.1: a packed union with any 4-state member has 4-state storage, so a
 // 2-state member aliases bits that may hold x/z. Reading such a member performs
 // an implicit 4-state-to-2-state conversion (x/z become 0). For 2-state storage
