@@ -88,9 +88,12 @@ void Preprocessor::ReadProtectKeyBlock(std::string_view text, SourceLoc loc,
   // Recording them would name lines the output does not have and would displace
   // every line written after this one.
   bool was_recording = recording_origins_;
+  bool was_reading_block = reading_key_block_;
   recording_origins_ = false;
+  reading_key_block_ = true;
   ProcessSource(content, loc.file_id, depth + 1);
   recording_origins_ = was_recording;
+  reading_key_block_ = was_reading_block;
   // §34.5.22 owes this block a digest of its own, written immediately after it,
   // so what the block recovered to is held for the digest that follows. The key
   // that digest is under is read only now, because the block just read is what

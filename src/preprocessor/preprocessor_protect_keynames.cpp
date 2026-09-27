@@ -31,9 +31,18 @@ namespace delta {
 // A tool holding no keys for that entity holds no list of them either, and a
 // name cannot be found missing from a list that was never supplied. There is
 // nothing to report about the name then, and it stands.
+//
+// Nor is a name read out of a key block. §34.5.14.2 (printed page 959) has the
+// decrypting tool "decrypt the key_block to find the data_decrypt_key and
+// data_method that in turn can be used to decrypt the data_block", so the key
+// comes out of the block beside the name, and a reader holding only the key
+// the block is under -- the one reader the block is written for -- holds no
+// list the name could be missing from. Checked there, the name stopped that
+// reader at the block written to let it in.
 void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
                                     SourceLoc loc) {
   if (expr.keyword != kDataKeynameKeyword || !expr.has_value) return;
+  if (reading_key_block_) return;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
   if (!ProtectKeynameReachesNoKey(config_.protect_keys, owner.value,
                                   ProtectPragmaValueBody(expr.value))) {
@@ -67,6 +76,9 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
 void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
                                       SourceLoc loc) {
   if (expr.keyword != kDigestKeynameKeyword || !expr.has_value) return;
+  // §34.5.20: a key block carries the digest's key beside its name, as it
+  // carries the data's (CheckDataKeyname above).
+  if (reading_key_block_) return;
   ProtectKeywordValue owner = protect_keywords_.DigestKeyownerInEffect();
   if (!ProtectKeynameReachesNoKey(config_.protect_keys, owner.value,
                                   ProtectPragmaValueBody(expr.value))) {

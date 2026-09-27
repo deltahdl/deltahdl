@@ -503,6 +503,10 @@ class Preprocessor {
   // an entry recorded for it would name a line the output does not have and
   // would displace every line after it.
   bool recording_origins_ = false;
+  // Whether the text being read is what a key block recovered to, whose names
+  // for the data's and the digest's keys come with the keys themselves
+  // (§34.5.14.2, §34.5.20).
+  bool reading_key_block_ = false;
 
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }

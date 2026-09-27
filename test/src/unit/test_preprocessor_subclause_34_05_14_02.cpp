@@ -156,4 +156,33 @@ TEST(ProtectDataDecryptKeyDescription, WithoutTheBlocksKeyTheDataStaysShut) {
       << read;
 }
 
+// §34.5.14.2 (printed page 959): "the decrypting tool shall decrypt the
+// key_block to find the data_decrypt_key and data_method that in turn can be
+// used to decrypt the data_block". A region naming its data's key under the
+// same entity its key block is under writes that name into the block beside
+// the key, and a reader holding only the block's key -- a list for that entity
+// without the data's name in it -- takes the key from the block rather than
+// being told the name is not in its list: §34.5.12.2 makes that an error of
+// the encryption input, and the reader was stopped at the block written to let
+// it in.
+TEST(ProtectDataDecryptKeyDescription,
+     TheNameInsideTheBlockNeedsNoKeyOfItsOwn) {
+  std::string region = "`pragma protect begin\n";
+  region.append(Writes("data_keyowner", kProvider));
+  region.append(Writes("data_keyname", kDataKeyName));
+  region.append(Writes("key_keyowner", kProvider));
+  region.append(Writes("key_keyname", kBlockKeyName));
+  region.append(kSealedDesign);
+  region.append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, {}, TheBlockKey());
+  ASSERT_NE(envelope.find("`pragma protect key_block"), std::string::npos)
+      << envelope;
+  PreprocFixture f;
+  PreprocConfig config;
+  config.protect_keys = TheBlockKey();
+  std::string read = Preprocess(envelope, f, config);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
+}
+
 }  // namespace
