@@ -86,6 +86,37 @@ uint32_t SynthLower::LowerReductionBit(const Expr* expr, AigGraph& aig,
   return rule.invert ? aig.AddNot(result) : result;
 }
 
+uint32_t SynthLower::LowerTruthValue(const Expr* expr, AigGraph& aig,
+                                     Subclause subclause) {
+  // A value is true where any of its bits is one, so the OR is taken across
+  // every bit of the operand, as SynthLower::LowerReductionBit folds `|`.
+  // Stopping short of the operand's width reads a value such as 2 as false,
+  // and reading past it takes in bits an operand such as a sum does not have.
+  std::optional<uint32_t> width = ExprWidth(expr);
+  if (!width) {
+    ReportExprUnlowered(expr,
+                        "operand has no width in the synthesizer, so whether "
+                        "it is true has no lowering",
+                        subclause);
+    return AigGraph::kConstFalse;
+  }
+  // §11.6.1 Table 11-21 marks the operands of the logical operators and the
+  // condition of `i ? j : k` self-determined, and §11.8.1 rules that the sign
+  // and size of such an operand are its own. They are set for the operand in
+  // place of what an assignment around it propagated, and handed back after.
+  uint32_t saved_width = propagated_width_;
+  bool saved_signed = propagated_signed_;
+  propagated_width_ = *width;
+  propagated_signed_ = IsSignedExpr(expr);
+  uint32_t any = AigGraph::kConstFalse;
+  for (uint32_t b = 0; b < *width; ++b) {
+    any = aig.AddOr(any, LowerExprBit(expr, aig, b));
+  }
+  propagated_width_ = saved_width;
+  propagated_signed_ = saved_signed;
+  return any;
+}
+
 uint32_t SynthLower::LowerNegateBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
   // Table 11-6 of §11.4.3 gives `-m` as "Unary minus m", and §11.4.3.1 rules
@@ -109,9 +140,10 @@ uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
     return aig.AddNot(LowerExprBit(expr->lhs, aig, bit));
   }
   if (expr->op == TokenKind::kBang) {
-    // §11.4.7 states the result of the logical negation as `1'b0` or `1'b1`.
+    // §11.4.7 states the result of the logical negation as `1'b0` or `1'b1`,
+    // and makes it `1'b0` for a nonzero operand and `1'b1` for a zero one.
     if (bit > 0) return AigGraph::kConstFalse;
-    return aig.AddNot(LowerExprBit(expr->lhs, aig, 0));
+    return aig.AddNot(LowerTruthValue(expr->lhs, aig, Subclause("11.4.7")));
   }
   if (expr->op == TokenKind::kPlus) {
     // Table 11-6 of §11.4.3: "Unary plus m (same as m)".

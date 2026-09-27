@@ -35,6 +35,20 @@ bool IsCompareOp(TokenKind op);
 // result a caller asks for is built from a different bit of the left operand.
 bool IsShiftOp(TokenKind op);
 
+// True for the unary operators §11.8.1 rules unsigned whatever their operand
+// is. The subclause names the six §11.4.9 reduction operators itself:
+// "Comparison and reduction operator results are unsigned, regardless of the
+// operands". §11.4.7 states the result of the logical negation `!` as `1'b0` or
+// `1'b1`, and §11.8.1 rules a based number unsigned. §11.6.1 Table 11-21 makes
+// each of them one bit long.
+bool IsUnsignedResultUnaryOp(TokenKind op);
+
+// True for the four §11.4.7 logical operators. §11.4.7 states the result of
+// each as `1'b1`, `1'b0` or `1'bx`, and §11.8.1 rules a based number unsigned,
+// so the type of neither operand reaches the result. §11.6.1 Table 11-21 makes
+// each of them one bit long.
+bool IsLogicalOp(TokenKind op);
+
 // One stage of a ripple-carry chain: answer `a XOR b XOR carry` and leave the
 // majority of the three in `carry`. §11.4.3 addition and subtraction, the
 // §11.4.2 increment and decrement operators and the §11.4.4 relational
@@ -231,6 +245,18 @@ class SynthLower {
   // single-bit result, so bit 0 carries the fold across the operand's bits and
   // every bit above it is zero.
   uint32_t LowerReductionBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // Whether `expr` is true, as one literal. §11.4.7, §11.4.11 and §12.4 each
+  // take a value as true where it is nonzero, so this is the OR of every bit of
+  // `expr` across its self-determined width. An operand SynthLower::ExprWidth
+  // cannot answer for is reported under `subclause` and answered false.
+  uint32_t LowerTruthValue(const Expr* expr, AigGraph& aig,
+                           Subclause subclause);
+
+  // §11.4.7: lower one bit of `&&`, `||`, `->` or `<->`. Each yields one bit
+  // over the truth values of its two operands, so bit 0 carries the result and
+  // every bit above it is zero.
+  uint32_t LowerLogicalBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
   // §11.4.3: lower one bit of the unary minus, which §11.4.3.1 makes the
   // two's complement of the operand. Bit `bit` of it depends on every operand

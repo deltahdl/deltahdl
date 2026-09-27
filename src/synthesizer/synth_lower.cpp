@@ -293,12 +293,7 @@ bool SynthLower::IsSignedSignal(std::string_view name) {
   return it != signal_signed_.end() && it->second;
 }
 
-// True for the operators §11.8.1 rules unsigned whatever their operands are.
-// The subclause names the six §11.4.9 reduction operators itself: "Comparison
-// and reduction operator results are unsigned, regardless of the operands".
-// §11.4.7 states the result of the logical negation `!` as `1'b0` or `1'b1`,
-// and §11.8.1 rules a based number unsigned.
-static bool IsUnsignedResultUnaryOp(TokenKind op) {
+bool IsUnsignedResultUnaryOp(TokenKind op) {
   switch (op) {
     case TokenKind::kAmp:
     case TokenKind::kTildeAmp:
@@ -314,10 +309,7 @@ static bool IsUnsignedResultUnaryOp(TokenKind op) {
   }
 }
 
-// True for the four §11.4.7 logical operators. §11.4.7 states the result of
-// each as `1'b1`, `1'b0` or `1'bx`, and §11.8.1 rules a based number unsigned,
-// so the type of neither operand reaches the result.
-static bool IsLogicalOp(TokenKind op) {
+bool IsLogicalOp(TokenKind op) {
   switch (op) {
     case TokenKind::kAmpAmp:
     case TokenKind::kPipePipe:
@@ -457,6 +449,26 @@ bool SynthLower::ReportArithIfUnlowered(const Expr* expr) {
   return true;
 }
 
+uint32_t SynthLower::LowerLogicalBit(const Expr* expr, AigGraph& aig,
+                                     uint32_t bit) {
+  // §11.4.7 yields `1'b1` or `1'b0` over the truth values of the two operands,
+  // and its Example 1 reads `alpha && beta` over the whole of `alpha` and
+  // `beta`. `a -> b` is `!a || b` and `a <-> b` is `(a -> b) && (b -> a)`.
+  if (bit > 0) return AigGraph::kConstFalse;
+  uint32_t l = LowerTruthValue(expr->lhs, aig, Subclause("11.4.7"));
+  uint32_t r = LowerTruthValue(expr->rhs, aig, Subclause("11.4.7"));
+  switch (expr->op) {
+    case TokenKind::kAmpAmp:
+      return aig.AddAnd(l, r);
+    case TokenKind::kPipePipe:
+      return aig.AddOr(l, r);
+    case TokenKind::kArrow:
+      return aig.AddOr(aig.AddNot(l), r);
+    default:
+      return aig.AddNot(aig.AddXor(l, r));
+  }
+}
+
 uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
   if (expr->op == TokenKind::kPlus || expr->op == TokenKind::kMinus) {
@@ -464,6 +476,7 @@ uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
   }
   if (IsCompareOp(expr->op)) return LowerCompareBit(expr, aig, bit);
   if (IsShiftOp(expr->op)) return LowerShiftBit(expr, aig, bit);
+  if (IsLogicalOp(expr->op)) return LowerLogicalBit(expr, aig, bit);
   if (ReportArithIfUnlowered(expr)) return AigGraph::kConstFalse;
   uint32_t l = LowerExprBit(expr->lhs, aig, bit);
   uint32_t r = LowerExprBit(expr->rhs, aig, bit);
@@ -480,18 +493,6 @@ uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
       return aig.AddNot(aig.AddOr(l, r));
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
-      return aig.AddNot(aig.AddXor(l, r));
-    case TokenKind::kAmpAmp:
-      if (bit > 0) return AigGraph::kConstFalse;
-      return aig.AddAnd(l, r);
-    case TokenKind::kPipePipe:
-      if (bit > 0) return AigGraph::kConstFalse;
-      return aig.AddOr(l, r);
-    case TokenKind::kArrow:
-      if (bit > 0) return AigGraph::kConstFalse;
-      return aig.AddOr(aig.AddNot(l), r);
-    case TokenKind::kLtDashGt:
-      if (bit > 0) return AigGraph::kConstFalse;
       return aig.AddNot(aig.AddXor(l, r));
     default:
       return AigGraph::kConstFalse;
@@ -523,7 +524,10 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
     case ExprKind::kReplicate:
       return LowerReplicateBit(expr, aig, bit);
     case ExprKind::kTernary: {
-      uint32_t sel = LowerExprBit(expr->condition, aig, 0);
+      // §11.4.11 returns the first expression where the condition is true,
+      // which is where it is nonzero.
+      uint32_t sel =
+          LowerTruthValue(expr->condition, aig, Subclause("11.4.11"));
       uint32_t t = LowerExprBit(expr->true_expr, aig, bit);
       uint32_t f = LowerExprBit(expr->false_expr, aig, bit);
       return aig.AddMux(sel, t, f);

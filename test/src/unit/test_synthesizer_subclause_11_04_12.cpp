@@ -76,9 +76,50 @@ TEST(ConcatenationSynthesis, NestedConcatenationJoinsAsOneVector) {
 // §11.4.12 rules that "the size of each operand in the concatenation is needed
 // to calculate the complete size of the concatenation", so an operand whose
 // width the synthesizer cannot compute is one it cannot place.
+// `SynthLower::ExprWidth` reads no function's declaration, so a call is such an
+// operand.
 TEST(ConcatenationSynthesis, AnOperandOfUnknownWidthIsReported) {
-  ExpectAssignReported("input [2:0] a, input [1:0] b", "{a + b, a}",
-                       "concatenation operand has no width", "11.4.12");
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(input [3:0] a, output logic [7:0] y);\n"
+                   "  function logic [3:0] g(input logic [3:0] v); return v; "
+                   "endfunction\n"
+                   "  assign y = {g(a), a};\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concatenation operand has no width", 3,
+                            "11.4.12"));
+}
+
+// The test fails on a fix that sizes an operator from whichever operand it can
+// answer for. Table 11-21 makes `a + b` as long as the longer of its operands,
+// so neither operand's length alone says how long it is, and an operand of
+// unknown width on either side leaves the sum one the concatenation cannot
+// place.
+TEST(ConcatenationSynthesis, AnOperatorOverAnOperandOfUnknownWidthIsReported) {
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(input [3:0] a, output logic [7:0] y, "
+                   "output logic [7:0] z);\n"
+                   "  function logic [3:0] g(input logic [3:0] v); return v; "
+                   "endfunction\n"
+                   "  assign y = {g(a) + a, a};\n"
+                   "  assign z = {a + g(a), a};\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concatenation operand has no width", 3,
+                            "11.4.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concatenation operand has no width", 4,
+                            "11.4.12"));
 }
 
 // The test fails on a lowering that places a shift inside a concatenation at
@@ -95,6 +136,106 @@ TEST(ConcatenationSynthesis, AShiftOperandKeepsItsOwnSizeAndType) {
       1, [](uint64_t a, uint64_t) -> uint64_t {
         return ((a >> 1) | (a & 0x8u)) << 4;
       });
+}
+
+// The test fails on a lowering that sizes an operator expression from its
+// literals alone and counts a name as no bits. §11.6.1 Table 11-21 makes `a |
+// 4'b0000` as long as the longer of its operands, the eight bits of `a`, so
+// every bit of `a` reaches `y` above the literal `1'b0`. Sized from the
+// literal, the operand is four bits long and the netlist disagrees at every `a`
+// from 16 up.
+TEST(ConcatenationSynthesis, AnOperatorOperandIsAsLongAsItsLongerOperand) {
+  ExpectInputSweep(
+      "module m(input [7:0] a, output logic [8:0] y);\n"
+      "  assign y = {a | 4'b0000, 1'b0};\n"
+      "endmodule\n",
+      256, [](uint64_t a) -> uint64_t { return a << 1; });
+}
+
+// The test fails on a lowering that finds no width in an operator expression
+// over names alone, which refuses the concatenation below as having an operand
+// it cannot place. Table 11-21 makes `a + b` three bits long, the longer of `a`
+// and `b`, so the sum drops its carry and stands above the three bits of `a`.
+// A lowering keeping the carry places `a` one bit too high.
+TEST(ConcatenationSynthesis, ASumOfTwoNamesIsAsLongAsTheLongerName) {
+  ExpectInputSweep(
+      "module m(input [2:0] a, input [1:0] b, output logic [6:0] y);\n"
+      "  assign y = {a + b, a};\n"
+      "endmodule\n",
+      32, [](uint64_t v) -> uint64_t {
+        uint64_t a = v & 0x7u;
+        uint64_t b = (v >> 3) & 0x3u;
+        return (((a + b) & 0x7u) << 3) | a;
+      });
+}
+
+// The test fails on a lowering that sizes a unary operator other than a
+// reduction or `!` as anything but its operand. Table 11-21 makes `~a` as long
+// as `a`, four bits, so all four complemented bits stand above the `1'b0`.
+TEST(ConcatenationSynthesis, AComplementIsAsLongAsItsOperand) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [4:0] y", "input [3:0] a", "{~a, 1'b0}"),
+      1, [](uint64_t a, uint64_t) -> uint64_t { return (~a & 0xFu) << 1; });
+}
+
+// The test fails on a lowering that sizes `!a` as its operand, which the case
+// above passes. Table 11-21 makes `!` one bit long whatever its operand, so the
+// result stands directly above the four bits of `a`.
+TEST(ConcatenationSynthesis, ALogicalNegationIsOneBitLong) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [4:0] y", "input [3:0] a", "{!a, a}"), 1,
+      [](uint64_t a, uint64_t) -> uint64_t {
+        return ((a == 0 ? 1u : 0u) << 4) | a;
+      });
+}
+
+// The test fails on a lowering that sizes a comparison as the longer of its
+// operands. Table 11-21 makes the relational and equality operators one bit
+// long, so `a == b` stands directly above the four bits of `a`.
+TEST(ConcatenationSynthesis, AComparisonIsOneBitLong) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [4:0] y", "input [3:0] a, input [3:0] b",
+                        "{a == b, a}"),
+      16, [](uint64_t a, uint64_t b) -> uint64_t {
+        return ((a == b ? 1u : 0u) << 4) | a;
+      });
+}
+
+// The test fails on a lowering that sizes a logical operator as the longer of
+// its operands, which the case above passes. Table 11-21 makes `&&` one bit
+// long as well, so `a && b` stands directly above the four bits of `a`.
+TEST(ConcatenationSynthesis, ALogicalAndIsOneBitLong) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [4:0] y", "input [3:0] a, input [3:0] b",
+                        "{a && b, a}"),
+      16, [](uint64_t a, uint64_t b) -> uint64_t {
+        return ((a != 0 && b != 0 ? 1u : 0u) << 4) | a;
+      });
+}
+
+// The test fails on a lowering that sizes `i ? j : k` from its literal arm
+// alone. Table 11-21 makes the conditional operator as long as the longer of
+// its two arms, the eight bits of `a`, so every bit of `a` reaches `y` above
+// the `1'b0` where `s` is set.
+TEST(ConcatenationSynthesis, AConditionalIsAsLongAsItsLongerArm) {
+  ExpectInputSweep(
+      "module m(input [7:0] a, input s, output logic [8:0] y);\n"
+      "  assign y = {s ? a : 4'b0000, 1'b0};\n"
+      "endmodule\n",
+      512, [](uint64_t v) -> uint64_t {
+        uint64_t a = v & 0xFFu;
+        return (v >> 8) != 0 ? a << 1 : 0;
+      });
+}
+
+// The test fails on a lowering that finds no width in `a ** 2` and refuses the
+// concatenation for its operand, rather than for the operator it has no
+// lowering for. Table 11-21 makes `**` as long as its left operand, so the
+// concatenation has a width and the report names what is missing.
+TEST(ConcatenationSynthesis, APowerOperandIsReportedForItsOperator) {
+  ExpectAssignReported("input [3:0] a", "{a ** 2, 1'b0}",
+                       "'a ** b', a to the power of b, has no lowering",
+                       "11.4.3");
 }
 
 // The case below fails on a run that answers a netlist and reports nothing for
