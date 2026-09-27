@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -25,12 +24,10 @@ struct ArgOrigins {
 // The "<file>:<line>: " a report about the word at `i` opens with, or nothing
 // where the word came from the command line -- which is the case that must go
 // on saying what it always said, the command line being in front of the reader
-// already. The form is the one the rest of the tool uses for a position.
+// already. The form is the one the rest of the tool uses for a position. `i`
+// indexes the argv the origins were read into, which has one line per word.
 inline std::string ArgOriginPrefix(const ArgOrigins* origins, int i) {
-  if (origins == nullptr || i < 0 ||
-      static_cast<size_t>(i) >= origins->lines.size()) {
-    return "";
-  }
+  if (origins == nullptr) return "";
   return origins->path + ":" + std::to_string(origins->lines[i]) + ": ";
 }
 

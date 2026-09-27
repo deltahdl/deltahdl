@@ -62,7 +62,8 @@ bool Logic4Vec::IsTruthy() const {
 }
 
 bool Logic4Vec::SameValueAs(const Logic4Vec& other) const {
-  if (width != other.width || nwords != other.nwords) return false;
+  // The word count follows from the width, so equal widths hold equal words.
+  if (width != other.width) return false;
   for (uint32_t i = 0; i < nwords; ++i) {
     if (words[i].aval != other.words[i].aval ||
         words[i].bval != other.words[i].bval) {
@@ -91,14 +92,10 @@ std::string Logic4Vec::ToString() const {
     uint64_t mask = uint64_t(1) << bit_idx;
     bool a = (words[word_idx].aval & mask) != 0;
     bool b = (words[word_idx].bval & mask) != 0;
-    if (!b && !a) {
-      result += '0';
-    } else if (!b && a) {
-      result += '1';
-    } else if (b && a) {
-      result += 'x';
+    if (!b) {
+      result += a ? '1' : '0';
     } else {
-      result += 'z';
+      result += a ? 'x' : 'z';
     }
   }
   return result;
@@ -190,13 +187,6 @@ void DepositBitField(Logic4Vec& dst, uint32_t start_bit, const Logic4Vec& src,
   }
 }
 
-uint64_t Logic2Vec::ToUint64() const {
-  if (nwords == 0) {
-    return 0;
-  }
-  return words[0];
-}
-
 Strength ReduceNonresistive(Strength input) {
   return input == Strength::kSupply ? Strength::kStrong : input;
 }
@@ -214,10 +204,10 @@ Strength ReduceResistive(Strength input) {
     case Strength::kMedium:
     case Strength::kSmall:
       return Strength::kSmall;
-    case Strength::kHighz:
-      return Strength::kHighz;
+    default:
+      // Strength::kHighz, the one strength left, which no reduction changes.
+      return input;
   }
-  return input;
 }
 
 bool IsDrivingStrength(Strength input) {
@@ -319,6 +309,7 @@ bool IsPliRegion(Region r) {
     case Region::kPreReNBA:
     case Region::kPostReNBA:
     case Region::kPrePostponed:
+    case Region::kPostponed:
       return true;
     default:
       return false;
@@ -346,10 +337,10 @@ std::string_view TimeUnitStr(TimeUnit unit) {
       return "ns";
     case TimeUnit::kPs:
       return "ps";
-    case TimeUnit::kFs:
-      break;
+    default:
+      // TimeUnit::kFs, the one unit left.
+      return "fs";
   }
-  return "fs";
 }
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {

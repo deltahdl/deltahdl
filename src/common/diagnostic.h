@@ -25,14 +25,6 @@ class Subclause {
   // the run rather than a breach of the standard.
   static constexpr Subclause None() { return Subclause(std::string_view()); }
 
-  // Nobody has yet read this site against the standard. No site carries this
-  // any more: #2975 through #2987 and #2966 read every one of them, and the
-  // assert-no-unread-subclause job in .github/workflows/deltahdl.yml fails on
-  // a use of it anywhere under src/. It is kept as the word a reviewer greps
-  // for, and a new report says None() where it enforces no rule of the
-  // standard rather than saying this.
-  static constexpr Subclause Unread() { return Subclause(std::string_view()); }
-
   constexpr std::string_view Text() const { return text_; }
 
  private:
@@ -75,8 +67,8 @@ class DiagEngine {
   // The subclause is required and there is no form that omits it, so a report
   // cannot say nothing about which rule it enforces by saying nothing. A
   // report that enforces no rule of the standard says so with
-  // Subclause::None(), which is the only answer left for a report that names
-  // no subclause: Subclause::Unread() is rejected by CI.
+  // Subclause::None(), which is the only answer for a report that names no
+  // subclause.
   void Warning(SourceLoc loc, std::string msg, Subclause subclause);
   void Error(SourceLoc loc, std::string msg, Subclause subclause);
 
@@ -108,9 +100,7 @@ class DiagEngine {
   // errors. Calls nest; diagnostics resume once the outermost suppression is
   // released.
   void PushSuppress() { ++suppress_depth_; }
-  void PopSuppress() {
-    if (suppress_depth_ > 0) --suppress_depth_;
-  }
+  void PopSuppress() { --suppress_depth_; }
   // The errors suppressed so far, which a trial parse compares before and
   // after to learn whether the text it read was well formed, the report
   // itself being discarded.

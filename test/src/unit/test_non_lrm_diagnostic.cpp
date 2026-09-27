@@ -161,6 +161,40 @@ TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
             "cannot read source description: absent.v");
 }
 
+TEST(Diagnostics, SuppressedWarningIsNotCountedAsASuppressedError) {
+  // A trial parse learns whether the text it read was well formed by comparing
+  // the suppressed errors before and after, so a warning it provoked has to
+  // leave that count alone or well-formed text would read as malformed. The
+  // suppressed error reported after it is what shows the count was being kept.
+  EngineFixture f;
+  f.diag.PushSuppress();
+  f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
+                 Subclause::None());
+  EXPECT_EQ(f.diag.SuppressedErrorCount(), 0u);
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
+  f.diag.PopSuppress();
+
+  EXPECT_EQ(f.diag.SuppressedErrorCount(), 1u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(Diagnostics, ReportWithoutAColumnQuotesItsLineWithoutACaret) {
+  // A column counts from 1, so a location whose column is 0 names a line and
+  // no position on it. The report still quotes the line, and draws no caret
+  // under a character the location does not name.
+  EngineFixture f;
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
+  f.diag.Error(f.Loc(2, 0), "two libraries claim this description",
+               Subclause::None());
+  std::cerr.rdbuf(old_buf);
+
+  EXPECT_NE(captured.str().find("  endmodule\n"), std::string::npos);
+  EXPECT_EQ(captured.str().find('^'), std::string::npos);
+}
+
 // A subclause of IEEE 1800-2023 is what the engine reports a rule from, and the
 // cases below cover the record keeping it. The subclause a report names is
 // separate from the sentence it reads out, so a caller can ask which rule was
@@ -194,10 +228,7 @@ TEST(Diagnostics, ReportStatingNoRuleOfTheStandardCarriesAnEmptySubclause) {
   // Subclause::None(), and it has to read back as naming none rather than as
   // naming whatever the last report named. The subclause-bearing error reported
   // first is what makes that able to fail: an engine holding the subclause
-  // across reports would hand it to the second one. Subclause::Unread() is
-  // covered by
-  // the same case, since the two are one value at run time and differ only in
-  // the word the source uses.
+  // across reports would hand it to the second one.
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
                Subclause("11.4.14"));

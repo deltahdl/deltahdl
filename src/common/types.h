@@ -135,14 +135,6 @@ Logic4Vec ExtractBitField(class Arena& arena, const Logic4Vec& src,
 void DepositBitField(Logic4Vec& dst, uint32_t start_bit, const Logic4Vec& src,
                      uint32_t width);
 
-struct Logic2Vec {
-  uint32_t width = 0;
-  uint32_t nwords = 0;
-  uint64_t* words = nullptr;
-
-  uint64_t ToUint64() const;
-};
-
 enum class Strength : uint8_t {
   kHighz = 0,
   kSmall = 1,

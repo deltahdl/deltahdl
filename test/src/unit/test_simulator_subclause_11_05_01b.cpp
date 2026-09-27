@@ -82,6 +82,22 @@ TEST(DeclaredRangeSelect, PartSelectWriteLandsAtTheLowEndOfTheRange) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// A part-select wholly below a range that does not reach zero addresses no bit
+// of it, and §11.5.1 has a write there affect nothing. Indices 3 to 0 are the
+// low bits of a vector declared [7:0], so code reading the indices as bit
+// offsets would write the low nibble of `v` instead.
+TEST(DeclaredRangeSelect, PartSelectWhollyBelowTheRangeWritesNothing) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [15:8] v;\n"
+      "  initial begin v = 8'hA5; v[3:0] = 4'hF; end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+}
+
 // An ascending range, the direction the clause's `logic [0:31] b_vect` example
 // uses: its first index addresses the most significant bit, so index 0 of a
 // [0:7] vector reads the top bit of 8'b1000_0000.
@@ -253,6 +269,28 @@ TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesInTheDeclaredRange) {
       f, "out");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x6u);
+}
+
+// The same slicing over a connection declared with an ascending range, whose
+// least significant bit is its right-hand index: the rightmost instance takes
+// src[4] and the leftmost src[1], so 4'b0011 comes out as 4'b0011. Counting
+// the instances up from src[4] as a descending range would run them off the
+// top of the declaration.
+TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesAnAscendingRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input a, output y);\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire [1:4] src;\n"
+      "  wire [3:0] out;\n"
+      "  assign src = 4'b0011;\n"
+      "  leaf u [3:0] (.a(src), .y(out));\n"
+      "endmodule\n",
+      f, "out");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x3u);
 }
 
 // A module port carries a packed dimension the same way a variable or a net

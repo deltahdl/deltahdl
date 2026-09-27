@@ -102,6 +102,27 @@ TEST(DesignBuildingBlockSimulation, DelayHeldToOwnElementPrecision) {
                    2.8);
 }
 
+// The same rule where the element's precision is a whole unit coarser than
+// the design's: t rounds to 1 ns while the child's 1 ps makes the global tick
+// a picosecond. A 100 ps precision is held as a picosecond count of 100, so
+// the case above rounds in the global unit; this one has to scale t's step up
+// to it, and 1.3 ns rounds to 1 ns rather than staying 1.3 ns.
+TEST(DesignBuildingBlockSimulation, DelayHeldToACoarserUnitOfPrecision) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("module sub;\n"
+                                 "  timeunit 1ns / 1ps;\n"
+                                 "endmodule\n"
+                                 "module t;\n"
+                                 "  timeunit 1ns / 1ns;\n"
+                                 "  sub s();\n"
+                                 "  real x;\n"
+                                 "  initial begin\n"
+                                 "    #1.3 x = $realtime;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x"),
+                   1.0);
+}
+
 // The rounding rule reaches the intra-assignment delay of a blocking
 // assignment too (§10.4.1): x = #2.75 1 completes at the rounded time 3, so a
 // following read of $time sees 3.

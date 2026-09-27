@@ -567,6 +567,29 @@ TEST_F(VcdTimescaleFromSource, TimescaleNamesNsWhenThatIsTheDesignsPrecision) {
   EXPECT_EQ(CountToken(Tokens(timescale), "1ns"), 1u) << timescale;
 }
 
+// §21.7.2.3 with Syntax 21-20's time_unit: s, ms, us, ns, ps and fs are each
+// named as written. The cases above name ps and ns; these name the other four,
+// so a writer that spelt one unit as another's name is caught whichever it is.
+TEST_F(VcdTimescaleFromSource, TimescaleNamesSWhenThatIsTheDesignsPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1s", "1s"), "$timescale");
+  EXPECT_EQ(CountToken(Tokens(timescale), "1s"), 1u) << timescale;
+}
+
+TEST_F(VcdTimescaleFromSource, TimescaleNamesMsWhenThatIsTheDesignsPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1ms", "1ms"), "$timescale");
+  EXPECT_EQ(CountToken(Tokens(timescale), "1ms"), 1u) << timescale;
+}
+
+TEST_F(VcdTimescaleFromSource, TimescaleNamesUsWhenThatIsTheDesignsPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1us", "1us"), "$timescale");
+  EXPECT_EQ(CountToken(Tokens(timescale), "1us"), 1u) << timescale;
+}
+
+TEST_F(VcdTimescaleFromSource, TimescaleNamesFsWhenThatIsTheDesignsPrecision) {
+  auto timescale = Section(DumpAfterOneUnit("1fs", "1fs"), "$timescale");
+  EXPECT_EQ(CountToken(Tokens(timescale), "1fs"), 1u) << timescale;
+}
+
 // §21.7.2.3: the definitions nest one $scope module per module instance, and a
 // $var declares an object by its own name within the scope holding it. A
 // variable of the instance u of t is declared as `deep` inside `$scope module

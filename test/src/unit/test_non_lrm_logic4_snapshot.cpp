@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "common/arena.h"
 #include "common/types.h"
 
@@ -86,6 +88,32 @@ TEST(Logic4Snapshot, CaptureCopiesEveryWordOfAMultiWordValue) {
 TEST(Logic4Snapshot, ADefaultSnapshotReadsAsAnEmptyValue) {
   Logic4Snapshot snap;
   EXPECT_EQ(snap.Get().nwords, 0u);
+}
+
+// Assigning a snapshot to itself keeps what it holds. The assignment reaches
+// the snapshot through a second name, as it would through two references to
+// one object; a move that emptied its own words before reading them would
+// leave the snapshot empty.
+TEST(Logic4Snapshot, CopyAssignedToItselfKeepsItsValue) {
+  Arena arena;
+  auto value = MakeLogic4VecVal(arena, 8, 0x10);
+  Logic4Snapshot snap;
+  snap.Capture(value);
+  Logic4Snapshot& same = snap;
+  snap = same;
+  ASSERT_EQ(snap.Get().nwords, 1u);
+  EXPECT_EQ(snap.Get().words[0].aval, 0x10u);
+}
+
+TEST(Logic4Snapshot, MoveAssignedToItselfKeepsItsValue) {
+  Arena arena;
+  auto value = MakeLogic4VecVal(arena, 8, 0x10);
+  Logic4Snapshot snap;
+  snap.Capture(value);
+  Logic4Snapshot& same = snap;
+  snap = std::move(same);
+  ASSERT_EQ(snap.Get().nwords, 1u);
+  EXPECT_EQ(snap.Get().words[0].aval, 0x10u);
 }
 
 }  // namespace

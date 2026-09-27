@@ -10,13 +10,7 @@
 namespace delta {
 
 static const char* SeverityLabel(DiagSeverity sev) {
-  switch (sev) {
-    case DiagSeverity::kWarning:
-      return "warning";
-    case DiagSeverity::kError:
-      return "error";
-  }
-  return "unknown";
+  return sev == DiagSeverity::kWarning ? "warning" : "error";
 }
 
 void DiagEngine::Warning(SourceLoc loc, std::string msg, Subclause subclause) {
@@ -39,7 +33,7 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
   }
   if (sev == DiagSeverity::kError) {
     ++error_count_;
-  } else if (sev == DiagSeverity::kWarning) {
+  } else {
     ++warning_count_;
   }
 
