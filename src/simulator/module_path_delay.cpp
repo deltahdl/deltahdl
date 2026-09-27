@@ -19,6 +19,7 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -114,9 +115,33 @@ bool SelectBounds(std::string_view select, int64_t& left, int64_t& right) {
   return parse(lhs, left) && parse(rhs, right);
 }
 
+// The level of bit `bit` of `word`: 0, 1, or 2 for x and z alike, which is
+// all §9.4.2's Table 9-2 tells apart.
+uint8_t BitLevel(const Logic4Word& word, unsigned bit) {
+  if (((word.bval >> bit) & 1U) != 0U) return 2;
+  return static_cast<uint8_t>((word.aval >> bit) & 1U);
+}
+
+// §9.4.2 Table 9-2: the edge a bit moving from level `from` to level `to` is,
+// posedge (Variable::kEdgeRise) for every change that leaves 0 or arrives at 1
+// and negedge (kEdgeFall) for every other change, which leaves 1 or arrives at
+// 0; none for no change.
+uint8_t EdgeBetween(uint8_t from, uint8_t to) {
+  if (from == to) return 0;
+  if (from == 0 || to == 1) return Variable::kEdgeRise;
+  return Variable::kEdgeFall;
+}
+
+// The edge the change from `seen` to `var`'s value is at the least significant
+// bit, storage offset 0.
+uint8_t LsbEdge(const std::vector<Logic4Word>& seen, const Variable& var) {
+  if (var.value.nwords == 0 || seen.empty()) return 0;
+  return EdgeBetween(BitLevel(seen[0], 0), BitLevel(var.value.words[0], 0));
+}
+
 // Records `now` as the change time of each bit of `var` that differs from
 // `seen`, the value the watcher last recorded, a bit being one that differs
-// in either its value or its unknown plane.
+// in either its value or its unknown plane, and the edge the change was.
 void RecordChangedBits(Variable& var, const std::vector<Logic4Word>& seen,
                        uint64_t now) {
   const size_t kWords = std::min<size_t>(var.value.nwords, seen.size());
@@ -124,10 +149,13 @@ void RecordChangedBits(Variable& var, const std::vector<Logic4Word>& seen,
     uint64_t diff = (var.value.words[i].aval ^ seen[i].aval) |
                     (var.value.words[i].bval ^ seen[i].bval);
     while (diff != 0) {
-      const size_t kOffset =
-          i * 64 + static_cast<size_t>(std::countr_zero(diff));
-      if (kOffset < var.bit_change_ticks.size())
+      const auto kBit = static_cast<unsigned>(std::countr_zero(diff));
+      const size_t kOffset = i * 64 + kBit;
+      if (kOffset < var.bit_change_ticks.size()) {
         var.bit_change_ticks[kOffset] = now;
+        var.bit_change_edges[kOffset] = EdgeBetween(
+            BitLevel(seen[i], kBit), BitLevel(var.value.words[i], kBit));
+      }
       diff &= diff - 1;
     }
   }
@@ -236,6 +264,35 @@ static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
   }
 }
 
+// §30.4.3 (printed page 874): an edge-sensitive path models delays "which
+// only occur when a specified edge occurs at the source signal", detected on
+// the LSB of a vector source, so it is active only where the source's latest
+// change was its edge -- the posedge of a `posedge` path, the negedge of a
+// `negedge` one, either of an `edge` one. A path from a select of the source
+// reads the edge of the select's least significant bit. A path written with no
+// edge "shall be considered active on any transition at the input terminal".
+static bool EdgeSensitivePathIsActive(const PathDelay& pd, SimContext& ctx) {
+  if (pd.edge == SpecifyEdge::kNone) return true;
+  const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);
+  if (var == nullptr) return true;
+  uint8_t edge = var->last_change_edge;
+  int64_t left = 0;
+  int64_t right = 0;
+  if (!var->bit_change_edges.empty() &&
+      SelectBounds(pd.src_select, left, right)) {
+    const PackedRange kRange = var->DeclaredRange();
+    const int64_t kLsb =
+        kRange.OffsetOf(left) < kRange.OffsetOf(right) ? left : right;
+    const auto kOffset = static_cast<size_t>(kRange.OffsetOf(kLsb));
+    edge = kOffset < var->bit_change_edges.size()
+               ? var->bit_change_edges[kOffset]
+               : 0;
+  }
+  if (pd.edge == SpecifyEdge::kPosedge) return edge == Variable::kEdgeRise;
+  if (pd.edge == SpecifyEdge::kNegedge) return edge == Variable::kEdgeFall;
+  return edge != 0;
+}
+
 ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
                                       const Logic4Vec& from,
                                       const Logic4Vec& to) {
@@ -246,7 +303,8 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
     if (!PathStartsAtOneOf(pd, drive.sources)) continue;
     // An ifnone candidate is settled below, after every condition has an
     // answer to be settled against.
-    bool active = pd.is_ifnone || ConditionalPathIsActive(pd, drive);
+    bool active = (pd.is_ifnone || ConditionalPathIsActive(pd, drive)) &&
+                  EdgeSensitivePathIsActive(pd, drive.ctx);
     candidates.push_back(
         PathCandidate{&pd, SourceChangeTicks(pd, drive.ctx), active});
   }
@@ -277,7 +335,10 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
 // `per_bit` asks for each bit's change time as well, which a path whose input
 // is a select of the variable reads (Variable::bit_change_ticks).
 static void WatchSourceVariable(Variable* var, SimContext& ctx, bool per_bit) {
-  if (per_bit) var->bit_change_ticks.assign(var->value.width, 0);
+  if (per_bit) {
+    var->bit_change_ticks.assign(var->value.width, 0);
+    var->bit_change_edges.assign(var->value.width, 0);
+  }
   auto seen = std::make_shared<std::vector<Logic4Word>>(
       var->value.words, var->value.words + var->value.nwords);
   var->AddWatcher([var, &ctx, seen]() {
@@ -289,6 +350,7 @@ static void WatchSourceVariable(Variable* var, SimContext& ctx, bool per_bit) {
     if (changed) {
       const uint64_t kNow = ctx.CurrentTime().ticks;
       if (!var->bit_change_ticks.empty()) RecordChangedBits(*var, *seen, kNow);
+      var->last_change_edge = LsbEdge(*seen, *var);
       seen->assign(var->value.words, var->value.words + var->value.nwords);
       var->last_change_ticks = kNow;
     }

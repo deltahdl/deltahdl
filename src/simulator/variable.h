@@ -125,6 +125,17 @@ struct Variable {
   // only where some registered path's source is a select of this variable, and
   // empty everywhere else.
   std::vector<uint64_t> bit_change_ticks;
+  // §30.4.3 (printed page 874): which edge the change recorded last was at the
+  // least significant bit, where "the edge transition shall be detected" of a
+  // vector source -- kEdgeRise for §9.4.2's posedge (0 to x, z or 1, and x or z
+  // to 1), kEdgeFall for its negedge, 0 for a change that left the bit alone.
+  // An edge-sensitive module path from this variable is active on its own edge
+  // alone. Written by the same watcher, and per bit, beside bit_change_ticks,
+  // where a path starts at a select.
+  static constexpr uint8_t kEdgeRise = 1;
+  static constexpr uint8_t kEdgeFall = 2;
+  uint8_t last_change_edge = 0;
+  std::vector<uint8_t> bit_change_edges;
 
   bool is_forced = false;
   Logic4Vec forced_value{};
