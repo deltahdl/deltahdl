@@ -1,0 +1,3 @@
+test/src/e2e/synth_unsynthesizable.sv:5:5: error: delay control is not synthesizable (§9.4.1)
+      #1 y = 1;
+      ^
