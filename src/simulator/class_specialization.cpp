@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -25,6 +26,10 @@
 namespace delta {
 
 namespace {
+
+// The packed dimensions a type writes, each a left and a right bound, outermost
+// first.
+using PackedDims = std::vector<std::pair<Expr*, Expr*>>;
 
 // §6.11 and §6.12 name the integral and real types the standard defines, each
 // of which a type actual may be written as; the keyword each such kind is
@@ -75,10 +80,19 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
 // Null where `type` names no typedef, where the chain ends at no built-in
 // type -- a class, an enum, a struct -- and where a step on it writes a
 // parameter list or declares unpacked dimensions, `typedef int iq_t[$];`
-// standing for a queue of int rather than for int.
-const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx) {
+// standing for a queue of int rather than for int. Each packed dimension a
+// step writes is appended to `dims`, the use-site's ahead of the typedef's,
+// since §7.4.4 stacks a dimension written where the name is used outside the
+// ones the typedef carries.
+const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx,
+                                     PackedDims& dims) {
   const DataType* step = &type;
   for (size_t hops = 0; hops <= ctx.TypeDeclarationCount(); ++hops) {
+    if (step->packed_dim_left != nullptr) {
+      dims.emplace_back(step->packed_dim_left, step->packed_dim_right);
+      dims.insert(dims.end(), step->extra_packed_dims.begin(),
+                  step->extra_packed_dims.end());
+    }
     if (step->kind != DataTypeKind::kNamed)
       return BuiltinTypeKeyword(step->kind).empty() ? nullptr : step;
     if (!step->type_params.empty()) return nullptr;
@@ -89,38 +103,117 @@ const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx) {
   return nullptr;
 }
 
+// §6.11 (printed page 109): whether the integral built-in `kind` is
+// 4-state, and the width it is predefined to have, 0 for bit, logic and reg,
+// which take theirs from their packed dimensions; §6.11.2 makes logic and reg
+// one type. Nullopt for a kind that is no integral built-in type.
+std::optional<std::pair<bool, uint32_t>> IntegralKindForm(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+      return std::pair{false, 0u};
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return std::pair{true, 0u};
+    case DataTypeKind::kByte:
+      return std::pair{false, 8u};
+    case DataTypeKind::kShortint:
+      return std::pair{false, 16u};
+    case DataTypeKind::kInt:
+      return std::pair{false, 32u};
+    case DataTypeKind::kLongint:
+      return std::pair{false, 64u};
+    case DataTypeKind::kInteger:
+      return std::pair{true, 32u};
+    case DataTypeKind::kTime:
+      return std::pair{true, 64u};
+    default:
+      return std::nullopt;
+  }
+}
+
+// §7.4.1 with §6.22.1: the bounds of the packed dimensions `dims` lists,
+// outermost first, each spelled "[left:right]". Nullopt where a bound cannot be
+// folded here or the bounds do not account for the `width` bits the type was
+// sized with, as RecordPackedRange (lowerer_register.cpp) declines such bounds
+// for a variable; the caller then spells the type by its width alone.
+std::optional<std::string> PackedBoundsKey(const PackedDims& dims,
+                                           uint32_t width, SimContext& ctx) {
+  std::string key;
+  uint64_t bits = 1;
+  for (const auto& [left, right] : dims) {
+    if (left == nullptr || right == nullptr) return std::nullopt;
+    Logic4Vec lv = EvalExpr(left, ctx, ctx.GetArena());
+    Logic4Vec rv = EvalExpr(right, ctx, ctx.GetArena());
+    if (HasUnknownBits(lv) || HasUnknownBits(rv)) return std::nullopt;
+    int64_t l = SelectBoundValue(lv);
+    int64_t r = SelectBoundValue(rv);
+    bits *= static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
+    key += "[" + std::to_string(l) + ":" + std::to_string(r) + "]";
+  }
+  if (bits != width) return std::nullopt;
+  return key;
+}
+
+// §6.22.1 (printed page 135): an integral built-in type spelled by what makes
+// two such types match -- 2- or 4-state, signed or not, and the bounds of each
+// packed dimension -- as the simple bit vector it matches, rule e) spelling a
+// type with a predefined width as the vector ranged [width-1:0] and rule g)
+// taking the signing a type ends with, however written. So `byte` and `bit
+// signed [7:0]` are both "bit signed[7:0]", `integer` and `logic signed
+// [31:0]` both "logic signed[31:0]", and `bit [2:0]` and `bit [3:1]`, which
+// rule f) keeps apart by their bounds, two keys. A scalar is the vector ranged
+// [0:0], and a type nothing sizes is spelled with no bounds. `form` is the
+// state and predefined width IntegralKindForm answers for `builtin`'s kind.
+std::string IntegralTypeKey(const DataType& builtin,
+                            std::pair<bool, uint32_t> form,
+                            const PackedDims& dims, uint32_t width,
+                            SimContext& ctx) {
+  const auto [four_state, predefined] = form;
+  std::string key = four_state ? "logic" : "bit";
+  if (builtin.is_signed) key += " signed";
+  if (width == 0) return key;
+  std::optional<std::string> bounds;
+  if (predefined == 0) bounds = PackedBoundsKey(dims, width, ctx);
+  if (!bounds.has_value() || bounds->empty())
+    bounds = "[" + std::to_string(width - 1) + ":0]";
+  return key + *bounds;
+}
+
 // §8.25 with §23.10.2.2: a type parameter's actual matches by matching types,
 // so the key has to tell two actuals apart exactly when their types differ. A
-// named type is told by its name. A built-in one is spelled by its keyword
-// together with the width its declaration gives it, which separates integer
-// from shortint by the keyword and `bit [2:0]` from `bit [7:0]` by the width,
-// whatever name it carries: ParseDataType (parser_types.cpp) records a
-// keyword's own text as the name of the type a declaration writes, which
-// leaves `bit [2:0]` and `bit [7:0]` both named bit, while the same keyword
-// read out of a scope form's list (TypeSpelledBy) carries no name at all, so
-// a name taken first keyed a declaration's `C #(byte)` as C#(byte) and the
-// scope form `C#(byte)::` as C#(byte[8]), two specializations of one type.
-// The declaration's own default stands where the specialization leaves the
-// parameter out, which is the type the default specialization binds.
+// named type is told by its name. A built-in one is spelled as §6.22.1 matches
+// it (IntegralTypeKey), whatever name it carries: ParseDataType
+// (parser_types.cpp) records a keyword's own text as the name of the type a
+// declaration writes, while the same keyword read out of a scope form's list
+// (TypeSpelledBy) carries no name at all, so a name taken first keyed a
+// declaration's `C #(byte)` and the scope form `C#(byte)::` as two
+// specializations of one type. The declaration's own default stands where the
+// specialization leaves the parameter out, which is the type the default
+// specialization binds.
 //
-// §6.22.1 (printed page 135 of IEEE 1800-2023) makes a typedef name match the
-// type it stands for, so a name reaching a built-in type through its chain of
-// typedefs (BuiltinTypedefTarget) is spelled as that type is: keyed by the
-// alias's own name, `S #(word_t)` under `typedef int word_t;` was a
-// specialization apart from `S #(int)`, with statics of its own.
+// §6.22.1 also makes a typedef name match the type it stands for, so a name
+// reaching a built-in type through its chain of typedefs (BuiltinTypedefTarget)
+// is spelled as that type is: keyed by the alias's own name, `S #(word_t)`
+// under `typedef int word_t;` was a specialization apart from `S #(int)`, with
+// statics of its own. Keyed by keyword and width, `C #(bit signed [7:0])` was
+// apart from `C #(byte)`, and `C #(bit [2:0])` one with `C #(bit [3:1])`. A
+// built-in type that is not integral is spelled by its keyword, realtime as
+// real, the two being one type (§6.12, printed page 110).
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx) {
   const DataType* type = actual;
   if (type == nullptr)
     type = i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
   if (type == nullptr) return {};
-  std::string key(BuiltinTypeKeyword(type->kind));
-  if (key.empty()) {
-    const DataType* target = BuiltinTypedefTarget(*type, ctx);
-    if (target == nullptr) return std::string(type->type_name);
-    key = BuiltinTypeKeyword(target->kind);
+  PackedDims dims;
+  const DataType* builtin = BuiltinTypedefTarget(*type, ctx, dims);
+  if (builtin == nullptr) return std::string(type->type_name);
+  if (const auto kForm = IntegralKindForm(builtin->kind)) {
+    return IntegralTypeKey(*builtin, *kForm, dims,
+                           DeclaredTypeWidth(*type, ctx), ctx);
   }
-  return key + "[" + std::to_string(DeclaredTypeWidth(*type, ctx)) + "]";
+  if (builtin->kind == DataTypeKind::kRealtime) return "real";
+  return std::string(BuiltinTypeKeyword(builtin->kind));
 }
 
 // §23.10.2.2 with §8.25.1: the `#(...)` of a scope form is a parameter value

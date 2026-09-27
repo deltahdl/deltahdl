@@ -759,4 +759,33 @@ TEST(ClassSim, StaticInitializerSizesItsSpecializationsTypeParameter) {
   EXPECT_EQ(out, "32 32 8\n");
 }
 
+// §8.25 (printed page 204): two specializations are one type exactly when each
+// type parameter's actuals are matching types, and §6.22.1 (printed page 135)
+// matches a type with a predefined width to the simple bit vector of the same
+// state, signing and width ranged [width-1:0], while two packed arrays match
+// only with the same bounds. So `bit signed [7:0]` and `byte` are one
+// specialization, as are `logic signed [31:0]` and `integer`, and `bit [2:0]`
+// and `bit [3:1]` are two. Keyed by keyword and width, each pair was split or
+// merged the wrong way.
+TEST(ClassSim, SpecializationsOfMatchingTypeActualsAreOneType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = int);\n"
+      "  static int n = 0;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(bit signed [7:0]) a = new;\n"
+      "  C #(byte) b = new;\n"
+      "  C #(bit [2:0]) c = new;\n"
+      "  C #(bit [3:1]) d = new;\n"
+      "  C #(logic signed [31:0]) e = new;\n"
+      "  C #(integer) g = new;\n"
+      "  initial $display(\"%0d %0d %0d %0d\", C#(byte)::n, C#(bit [2:0])::n,\n"
+      "                   C#(bit [3:1])::n, C#(integer)::n);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 1 1 2\n");
+}
+
 }  // namespace
