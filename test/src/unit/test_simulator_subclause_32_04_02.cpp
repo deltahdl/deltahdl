@@ -624,7 +624,8 @@ void AnnotateUnderDesignRoot(const std::string& sdf, SpecifyManager& mgr,
                              std::string_view design_root) {
   SdfFile file;
   ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, /*scope=*/{}, design_root);
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, /*region_prefix=*/{},
+                       design_root);
 }
 
 // One CELL record carrying one SETUP entry on the signals `d` and `clk`. An SDF
