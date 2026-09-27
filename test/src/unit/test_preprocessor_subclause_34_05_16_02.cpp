@@ -141,23 +141,30 @@ std::string NamesTheDigestProvider() {
   return Writes("digest_keyowner", kDigestProvider);
 }
 
-// The one region every case below encrypts. It asks for a digest, names an
-// entity and a key for that digest, names an entity and a key for its data, and
-// designates a provider for its own keys. The text says nothing about which of
-// the two arrangements it gets: what decides is whether the tool holds the key
-// the data name reaches.
-std::string RegionAskingForADigest() {
+// A region asking for a digest, naming an entity and a key for that digest and
+// an entity and a key for its data, with `key_provider` written ahead of its
+// design.
+std::string RegionAskingForADigestWith(const std::string& key_provider) {
   std::string text = "`pragma protect begin\n";
   text.append(kDigestBlockExpression);
   text.append(Writes("data_keyowner", kDesignProvider));
   text.append(Writes("data_keyname", kDesignName));
   text.append(NamesTheDigestProvider());
   text.append(Writes("digest_keyname", kDigestName));
-  text.append(Writes("key_keyowner", kSignatureProvider));
-  text.append(Writes("key_keyname", kSignatureName));
+  text.append(key_provider);
   text.append(kVouchedDesign);
   text.append("`pragma protect end\n");
   return text;
+}
+
+// The region the signed cases below encrypt, which also designates a provider
+// for its own keys. §34.5.25.2 (printed page 964) has "the key that shall be
+// used for encrypting the data encryption keys" be the one a key_keyname
+// names, so wherever the tool holds that provider's key the region's data key
+// travels in a key block.
+std::string RegionAskingForADigest() {
+  return RegionAskingForADigestWith(Writes("key_keyowner", kSignatureProvider) +
+                                    Writes("key_keyname", kSignatureName));
 }
 
 // The key that opens the region's own key block, beside the key the digest's
@@ -170,9 +177,8 @@ ProtectKeyList KeysWithoutTheDesignsOwnKey() {
   return held;
 }
 
-// Those two keys and the one the region's data name reaches. The region is
-// sealed under the third, so no key block is written and no digital signature
-// is used.
+// Those two keys and the one the region's data name reaches, which is what a
+// region designating no provider for its keys is sealed under.
 ProtectKeyList KeysReachingTheDesignsOwnKey() {
   ProtectKeyList held;
   held.Add(KeyOf(kSignatureProvider, kSignatureName, kSignatureKey));
@@ -184,11 +190,26 @@ ProtectKeyList KeysReachingTheDesignsOwnKey() {
 // The envelope this tool writes for that region under `held`, checked on the
 // way out to be one that sealed its design and one that carries a digest for
 // the named entity to be the owner of the key of.
-std::string EnvelopeUnder(const ProtectKeyList& held) {
-  std::string envelope = EncryptEnvelopes(RegionAskingForADigest(), {}, held);
+std::string EnvelopeUnder(const std::string& region,
+                          const ProtectKeyList& held) {
+  std::string envelope = EncryptEnvelopes(region, {}, held);
   EXPECT_FALSE(Holds(envelope, kVouchedDesign)) << envelope;
   EXPECT_TRUE(Holds(envelope, kDigestBlockExpression)) << envelope;
   return envelope;
+}
+
+// The envelope for the region that asks for a key block, under keys that open
+// none of the region's data but the one its block is under: the signed one.
+std::string SignedEnvelope() {
+  return EnvelopeUnder(RegionAskingForADigest(), KeysWithoutTheDesignsOwnKey());
+}
+
+// The envelope for the same region with no provider for its keys, under keys
+// reaching the one its data name reaches: nothing asks for a key block, so no
+// digital signature is used.
+std::string PlainEnvelope() {
+  return EnvelopeUnder(RegionAskingForADigestWith(""),
+                       KeysReachingTheDesignsOwnKey());
 }
 
 // §34.5.16.2: the entity is unchanged in the output file, except where a
@@ -202,19 +223,18 @@ std::string EnvelopeUnder(const ProtectKeyList& held) {
 // the exception.
 TEST(ProtectDigestKeyownerSignedEnvelope,
      TheEntityStandsInTheClearInASignedEnvelope) {
-  std::string envelope = EnvelopeUnder(KeysWithoutTheDesignsOwnKey());
+  std::string envelope = SignedEnvelope();
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 1U) << envelope;
   EXPECT_TRUE(Holds(envelope, NamesTheDigestProvider())) << envelope;
 }
 
 // §34.5.16.2's main clause, with no exception in sight. The source text is the
-// text the case above encrypted, character for character; what differs is that
-// the tool holds the key the region's data name reaches, so no key block is
-// formed. The name stands in the clear here too, which is what says the
-// exception changed nothing.
+// case above's without the provider for its keys, and the tool holds the key
+// the region's data name reaches, so no key block is formed. The name stands in
+// the clear here too, which is what says the exception changed nothing.
 TEST(ProtectDigestKeyownerSignedEnvelope,
      TheEntityStandsInTheClearWithoutASignature) {
-  std::string envelope = EnvelopeUnder(KeysReachingTheDesignsOwnKey());
+  std::string envelope = PlainEnvelope();
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 0U) << envelope;
   EXPECT_TRUE(Holds(envelope, NamesTheDigestProvider())) << envelope;
 }
@@ -226,10 +246,10 @@ TEST(ProtectDigestKeyownerSignedEnvelope,
 // expression into the signed envelope and fails here.
 TEST(ProtectDigestKeyownerSignedEnvelope,
      NoDigestKeyBlockIsWrittenForTheEntityToTravelIn) {
-  std::string signed_envelope = EnvelopeUnder(KeysWithoutTheDesignsOwnKey());
+  std::string signed_envelope = SignedEnvelope();
   EXPECT_FALSE(Holds(signed_envelope, kDigestKeyBlockExpression))
       << signed_envelope;
-  std::string plain_envelope = EnvelopeUnder(KeysReachingTheDesignsOwnKey());
+  std::string plain_envelope = PlainEnvelope();
   EXPECT_FALSE(Holds(plain_envelope, kDigestKeyBlockExpression))
       << plain_envelope;
 }
@@ -242,8 +262,7 @@ TEST(ProtectDigestKeyownerSignedEnvelope,
   PreprocFixture fixture;
   PreprocConfig config;
   config.protect_keys = KeysWithoutTheDesignsOwnKey();
-  std::string recovered =
-      Preprocess(EnvelopeUnder(KeysWithoutTheDesignsOwnKey()), fixture, config);
+  std::string recovered = Preprocess(SignedEnvelope(), fixture, config);
   EXPECT_FALSE(fixture.diag.HasErrors()) << recovered;
   EXPECT_TRUE(Holds(recovered, kVouchedDesign)) << recovered;
 }

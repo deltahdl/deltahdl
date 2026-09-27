@@ -393,16 +393,28 @@ constexpr std::string_view kBlockProviderKey = "cerulean-vault-wrapping-key";
 // envelope carrying one from an envelope that carries none.
 constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
 
-// The region every case below encrypts. It names a key for its digests, names
-// an entity and a key for its data, and designates a provider for its own keys,
-// so the text says nothing about which of the two arrangements it gets: what
-// decides is whether the tool holds the key the data name reaches.
+// The region the excepted cases below encrypt. It names a key for its digests,
+// names an entity and a key for its data, and designates a provider for its
+// own keys, and §34.5.25.2 (printed page 964) has "the key that shall be used
+// for encrypting the data encryption keys" be the one a key_keyname names, so
+// wherever the tool holds that provider's key the region's data key travels in
+// a key block.
 std::string RegionNamingBothProviders() {
   std::string described = Designates(kProvider, kProviderName);
   described += Written("data_keyowner", kDataParty);
   described += Written("data_keyname", kDataName);
   described += Written("key_keyowner", kBlockProvider);
   described += Written("key_keyname", kBlockProviderName);
+  return Sealing(described);
+}
+
+// The same region with no provider designated for its keys. Nothing asks for a
+// key block, so a tool holding the key the data name reaches seals the region
+// under it and writes none.
+std::string RegionNamingTheDataProviderAlone() {
+  std::string described = Designates(kProvider, kProviderName);
+  described += Written("data_keyowner", kDataParty);
+  described += Written("data_keyname", kDataName);
   return Sealing(described);
 }
 
@@ -414,8 +426,8 @@ ProtectKeyList OnlyTheBlockProvidersKey() {
   return keys;
 }
 
-// That key beside the one the region's data name reaches. The region is now
-// sealed under the second, and no key block is written at all.
+// That key beside the one the region's data name reaches, which is what a
+// region designating no provider for its keys is sealed under.
 ProtectKeyList TheDataKeyAsWell() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
@@ -455,13 +467,13 @@ TEST(ProtectDigestKeynameEncryptionOutput,
 
 // §34.5.18.2 excepts the digital envelope and nothing else, so an envelope
 // carrying no key block states the name in the clear. The source text is the
-// text the case above encrypted, character for character; what differs is that
-// the tool holds the key the region's data name reaches, so the exception does
-// not arise.
+// case above's without the provider for its keys, and the tool holds the key
+// the region's data name reaches, so nothing asks for a key block and the
+// exception does not arise.
 TEST(ProtectDigestKeynameEncryptionOutput,
      TheDigestNameStandsInTheClearWhereNoKeyBlockCarriesIt) {
-  std::string envelope =
-      EncryptEnvelopes(RegionNamingBothProviders(), {}, TheDataKeyAsWell());
+  std::string envelope = EncryptEnvelopes(RegionNamingTheDataProviderAlone(),
+                                          {}, TheDataKeyAsWell());
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 0U) << envelope;
   EXPECT_FALSE(Holds(envelope, kHiddenDesign)) << envelope;
   EXPECT_TRUE(Holds(envelope, Written("digest_keyname", kProviderName)))

@@ -253,16 +253,29 @@ std::string StatesTheCipherWeProvide() {
   return Writes(kDataMethodKeyword, kDataMethod);
 }
 
-// The region every case below encrypts. It names an entity and a key for its
-// data and designates a provider for its own keys, so the text says nothing
-// about which of the two arrangements it gets: what decides is whether the tool
-// holds the key the data name reaches.
+// The region the excepted cases below encrypt. It names an entity and a key
+// for its data and designates a provider for its own keys, and §34.5.25.2
+// (printed page 964) has "the key that shall be used for encrypting the data
+// encryption keys" be the one a key_keyname names, so wherever the tool holds
+// that provider's key the region's data key travels in a key block.
 std::string RegionNamingBothProviders() {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kDataProvider));
   text.append(Writes("data_keyname", kDataProviderName));
   text.append(Writes("key_keyowner", kBlockProvider));
   text.append(Writes("key_keyname", kBlockProviderName));
+  text.append(kSealedDesign);
+  text += "`pragma protect end\n";
+  return text;
+}
+
+// The same region with no provider designated for its keys. Nothing asks for a
+// key block, so a tool holding the key the data name reaches seals the region
+// under it and writes none.
+std::string RegionNamingTheDataProviderAlone() {
+  std::string text = "`pragma protect begin\n";
+  text.append(Writes("data_keyowner", kDataProvider));
+  text.append(Writes("data_keyname", kDataProviderName));
   text.append(kSealedDesign);
   text += "`pragma protect end\n";
   return text;
@@ -276,8 +289,8 @@ ProtectKeyList OnlyTheBlockProvidersKey() {
   return keys;
 }
 
-// Both keys. The region's data name now reaches one, so the region is sealed
-// under it and no key block is written at all.
+// Both keys. The region's data name now reaches one, which is what a region
+// designating no provider for its keys is sealed under.
 ProtectKeyList BothProvidersKeys() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
@@ -313,13 +326,13 @@ TEST(ProtectDataMethodEncryptionOutput,
 
 // §34.5.11.2 excepts the digital signature and nothing else, so an envelope
 // carrying no key block states the identifier in the clear. The source text is
-// the text the case above encrypted, character for character; what differs is
-// that the tool holds the key the region's data name reaches, so the exception
-// does not arise.
+// the case above's without the provider for its keys, and the tool holds the
+// key the region's data name reaches, so nothing asks for a key block and the
+// exception does not arise.
 TEST(ProtectDataMethodEncryptionOutput,
      TheCipherStandsInTheClearWhereNoKeyBlockCarriesIt) {
-  std::string envelope =
-      EncryptEnvelopes(RegionNamingBothProviders(), {}, BothProvidersKeys());
+  std::string envelope = EncryptEnvelopes(RegionNamingTheDataProviderAlone(),
+                                          {}, BothProvidersKeys());
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockLine), 0U) << envelope;
   EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
   EXPECT_TRUE(Holds(envelope, StatesTheCipherWeProvide())) << envelope;
