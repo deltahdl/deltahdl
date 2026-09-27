@@ -149,6 +149,34 @@ bool AnyDriverUnknownAt(const std::vector<Logic4Vec>& drivers, uint32_t bit) {
   });
 }
 
+namespace {
+
+// What the reachable states of one bit come to: the levels each side of the
+// scale is reached at, whether high impedance is reached, and whether the one
+// state reachable is an x a driver drives at one level.
+struct ReachSummary {
+  SideLevels side0;
+  SideLevels side1;
+  bool reaches_z = false;
+  bool one_exact_x = false;
+};
+
+ReachSummary SummarizeReach(const std::vector<BitState>& reach) {
+  ReachSummary sum;
+  sum.one_exact_x = reach.size() == 1 && reach[0].exact;
+  for (BitState s : reach) {
+    if (s.lvl == 0) {
+      sum.reaches_z = true;
+      continue;
+    }
+    if (s.val != 1) sum.side0.Take(s.lvl);
+    if (s.val != 0) sum.side1.Take(s.lvl);
+  }
+  return sum;
+}
+
+}  // namespace
+
 // The range runs over every level a reachable state stands at, and where the
 // states reach both sides of the scale, or reach high impedance, it runs down
 // through high impedance as §28.12.2 draws such a range (Figure 28-5, Figure
@@ -158,25 +186,17 @@ uint8_t ResolveBitOverDriverStates(const std::vector<Logic4Vec>& drivers,
                                    const std::vector<DriverStrength>& strengths,
                                    NetType type, uint32_t bit,
                                    NetStrength& out) {
-  SideLevels side0;
-  SideLevels side1;
-  bool reaches_z = false;
-  std::vector<BitState> reach = ReachableStates(drivers, strengths, type, bit);
-  const bool kOneExactX = reach.size() == 1 && reach[0].exact;
-  for (BitState s : reach) {
-    if (s.lvl == 0) {
-      reaches_z = true;
-      continue;
-    }
-    if (s.val != 1) side0.Take(s.lvl);
-    if (s.val != 0) side1.Take(s.lvl);
-  }
+  const ReachSummary kSum =
+      SummarizeReach(ReachableStates(drivers, strengths, type, bit));
+  const SideLevels& side0 = kSum.side0;
+  const SideLevels& side1 = kSum.side1;
   out = NetStrength{};
   if (side0.hi == 0 && side1.hi == 0) return 3;
-  bool both = side0.hi != 0 && side1.hi != 0 && !kOneExactX;
-  side0.WriteTo(out.s0_hi, out.s0_lo, both || reaches_z);
-  side1.WriteTo(out.s1_hi, out.s1_lo, both || reaches_z);
-  if (both || reaches_z || kOneExactX) return 2;
+  bool both = side0.hi != 0 && side1.hi != 0 && !kSum.one_exact_x;
+  bool spread = both || kSum.reaches_z;
+  side0.WriteTo(out.s0_hi, out.s0_lo, spread);
+  side1.WriteTo(out.s1_hi, out.s1_lo, spread);
+  if (spread || kSum.one_exact_x) return 2;
   return side0.hi != 0 ? 0 : 1;
 }
 
