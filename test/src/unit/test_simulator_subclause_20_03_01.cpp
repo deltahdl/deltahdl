@@ -189,4 +189,29 @@ TEST(SysTaskTime, ScaledValueUsedAsComparisonOperand) {
   EXPECT_EQ(out, "scaled_match\n");
 }
 
+// §20.3.1 with §23.6 (printed page 753): a function called by a hierarchical
+// name into a child instance runs in that instance, so `$time` in it reads the
+// time in the unit of the module declaring the function: 10 us into the run,
+// the 1 ns module's function answers 10000 to the 1 us module calling it
+// through `ia.time_in_a()`, as its own module calling it by its bare name 10
+// ns in reads 10. The hierarchical call read 0.
+TEST(SysTaskTime, HierarchicallyCalledFunctionReadsItsModulesUnit) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ns;\n"
+      "  function longint time_in_a(); return $time; endfunction\n"
+      "  initial #10 $display(\"a %0d\", time_in_a());\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "  a ia();\n"
+      "  initial #10 $display(\"b %0d\", ia.time_in_a());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 10\nb 10000\n");
+}
+
 }  // namespace
