@@ -754,7 +754,7 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
 }
 
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  stmt = DeclShapedByClassTypedef(stmt, ctx, arena);
+  stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 

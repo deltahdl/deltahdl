@@ -41,19 +41,22 @@ const ModuleItem* PropertyTypedefItem(const ClassMember* member,
                                       SimContext& ctx);
 
 // §6.18 with §7.4.4 and §8.3: a declaration in a method's body whose type names
-// a class-scope typedef, bare as `edges_t e;` from the declaring class's own
-// methods or through the class scope as `uvm_phase::edges_t edges;` from
-// anywhere, declares an object of the type the typedef stands for, the
-// typedef's unpacked dimensions included. The elaborator gives a module
-// procedure's declaration a typedef's dimensions (AdoptTypedefDimsInStmt) and
-// reaches neither a class's method bodies nor its typedefs, so such a local
-// was a scalar of the element type: uvm_phase_hopper::sync_phase's `edges`
-// held no predecessor and its foreach ran once with a null key. The
-// declaration `stmt` with the typedef's element type and dimensions written
-// on it, built once per declaration; `stmt` itself where it writes dimensions
-// of its own or names no such typedef.
-const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
-                                     Arena& arena);
+// a typedef -- a class-scope one, bare as `edges_t e;` from the declaring
+// class's own methods or through the class scope as `uvm_phase::edges_t
+// edges;` from anywhere, or one a package or the compilation unit declares,
+// as TypedefItemSeenFrom finds it -- declares an object of the type the
+// typedef stands for, the typedef's unpacked dimensions included. The
+// elaborator gives a module procedure's declaration a typedef's dimensions
+// (AdoptTypedefDimsInStmt) and reaches neither a class's method bodies nor its
+// typedefs, so such a local was a scalar of the element type:
+// uvm_phase_hopper::sync_phase's `edges` held no predecessor and its foreach
+// ran once with a null key, and `ue_t u;` under a compilation-unit `typedef
+// bit ue_t[int];` took none of `u[3] = 1`. The declaration `stmt` with the
+// typedef's element type and dimensions written on it, built once per
+// declaration; `stmt` itself where it writes dimensions of its own or names no
+// such typedef.
+const Stmt* DeclShapedByTypedef(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena);
 
 // §7.8/§8.5: a class property declared with an associative dimension, `int
 // count[severity_t]`, is an associative array of the object: §8.5 puts no

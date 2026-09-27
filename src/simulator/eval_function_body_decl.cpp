@@ -314,7 +314,7 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
 
 void ExecFuncVarDecl(const Stmt* stmt, std::string_view static_frame,
                      SimContext& ctx, Arena& arena) {
-  stmt = DeclShapedByClassTypedef(stmt, ctx, arena);
+  stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;

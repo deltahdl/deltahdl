@@ -211,8 +211,8 @@ const ModuleItem* PropertyTypedefItem(const ClassMember* member,
   return item;
 }
 
-const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
-                                     Arena& arena) {
+const Stmt* DeclShapedByTypedef(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
   const DataType& type = stmt->var_decl_type;
   if (!stmt->var_unpacked_dims.empty() || type.kind != DataTypeKind::kNamed) {
     return stmt;
@@ -228,7 +228,7 @@ const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
       from = ctx.CurrentThis()->type;
     }
   }
-  const ModuleItem* item = ClassScopeTypedefItem(from, type.type_name);
+  const ModuleItem* item = TypedefItemSeenFrom(type, from, ctx);
   if (item == nullptr || item->unpacked_dims.empty()) return stmt;
   auto* shaped = arena.Create<Stmt>(*stmt);
   shaped->var_decl_type = item->typedef_type;

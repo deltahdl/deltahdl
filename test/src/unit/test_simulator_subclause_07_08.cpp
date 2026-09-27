@@ -490,4 +490,28 @@ TEST(AssocArraySimulation, ProceduralLocalThroughAnAssocTypedefIsAnAssocArray) {
   EXPECT_EQ(out, "num=3\n");
 }
 
+// §7.4.4 as above, for a local of a class method through a typedef declared
+// outside any class: the local's type is the one the name stands for wherever
+// it was declared (§6.18), so `ue_t u;` is an associative array. The method's
+// local looked the name up among the class's own typedefs alone, found none,
+// and was a scalar the keyed writes never reached.
+TEST(AssocArraySimulation, MethodLocalThroughAUnitAssocTypedefIsAnAssocArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef bit ue_t[int];\n"
+      "class K;\n"
+      "  function int f();\n"
+      "    ue_t u;\n"
+      "    u[3] = 1;\n"
+      "    u[4] = 1;\n"
+      "    return u.num();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin K k = new; $display(\"num=%0d\", k.f()); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "num=2\n");
+}
+
 }  // namespace
