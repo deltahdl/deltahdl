@@ -1,0 +1,18 @@
+// §34.5.1 (printed page 953) makes a begin opened inside a begin-end region that
+// is still open an error. --encrypt reports it, writes the encrypted text anyway,
+// and exits with status 1.
+module encrypt_nested_region;
+`pragma protect begin_protected
+`pragma protect encrypt_agent="deltahdl"
+`pragma protect encrypt_agent_info="SystemVerilog elaborator and protect envelope writer"
+`pragma protect data_method="x-deltahdl-stream"
+`pragma protect encoding=(enctype="x-deltahdl-block")
+`pragma protect encoding=(enctype="x-deltahdl-block", bytes=56)
+`pragma protect data_block
+afbpzzfPORvDxVf468XCa2T75MxfjktQiwWYyThmwflvRhn1SthYQjj8g9PX4qTBsSja-NcPDIk
+`pragma protect end_protected
+`pragma protect reset
+endmodule
+test/src/e2e/encrypt_nested_region.sv:6:1: error: protect pragma begin expression opens a region inside a begin-end block that is still open (§34.5.1)
+  `pragma protect begin
+  ^

@@ -1,0 +1,19 @@
+// §34.3.1 (printed page 950): --encrypt writes the source text back with each
+// encryption envelope replaced by a decryption envelope sealing its body under
+// the exchange key given by --protect-key. Every line outside the envelope,
+// these comments included, comes back unchanged.
+module encrypt_envelope;
+`pragma protect data_keyowner="Vendor", data_keyname="k1"
+`pragma protect begin_protected
+`pragma protect encrypt_agent="deltahdl"
+`pragma protect encrypt_agent_info="SystemVerilog elaborator and protect envelope writer"
+`pragma protect data_method="x-deltahdl-stream"
+`pragma protect encoding=(enctype="x-deltahdl-block")
+`pragma protect data_keyowner="Vendor"
+`pragma protect data_keyname="k1"
+`pragma protect encoding=(enctype="x-deltahdl-block", bytes=34)
+`pragma protect data_block
+JAmGG3efIhTN3F-595eJe2jr4IBckgQbjWbcjTRmiqQ9LQ
+`pragma protect end_protected
+`pragma protect reset
+endmodule
