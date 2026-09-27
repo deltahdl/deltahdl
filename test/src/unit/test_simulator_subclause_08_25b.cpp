@@ -810,4 +810,37 @@ TEST(ClassSim, UnpackedTypedefActualKeepsItsOwnSpecialization) {
   EXPECT_EQ(out, "1 0\n");
 }
 
+// §8.25 (printed pages 203-204) with §6.20.3 (printed page 128): a property
+// typed by a type parameter, `T value`, is declared with the type the
+// specialization's actual names, so under `S #(bit [7:0])` and `S #(byte)` it
+// is an 8-bit variable, and §10.7 (printed page 258) keeps the low 8 bits of
+// 300 written to it, 8'h2C, which is 44. Written through a handle or in a
+// method alike, it kept all 32 bits of the default's width. Every other case
+// here uses a 32-bit actual, where the two widths cannot be told apart.
+TEST(ClassSim, TypeParameterPropertyTakesTheActualsWidth) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  T value;\n"
+      "  function void put(int v); value = v; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(bit [7:0]) a = new;\n"
+      "    S #(byte) b = new;\n"
+      "    S #(bit [7:0]) c = new;\n"
+      "    S d = new;\n"
+      "    a.value = 300;\n"
+      "    b.value = 300;\n"
+      "    c.put(300);\n"
+      "    d.value = 300;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", a.value, b.value, c.value, "
+      "d.value,\n"
+      "             $bits(a.value));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "44 44 44 300 8\n");
+}
+
 }  // namespace

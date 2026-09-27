@@ -1,6 +1,7 @@
 #include "simulator/class_specialization.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -452,6 +453,63 @@ void OwnVTableEntries(ClassTypeInfo* spec) {
   }
 }
 
+// §8.25 with §23.10.2.2: the actual `actuals` gives the type parameter `name`
+// of `decl`, null where the list leaves it at its default or `decl` declares
+// no parameter of that name.
+const DataType* TypeParamActualIn(const ClassDecl* decl,
+                                  const std::vector<DataType>& actuals,
+                                  std::string_view name) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first == name) return ActualForParam(actuals, i, name);
+  }
+  return nullptr;
+}
+
+// Whether `actual` sizes a property as one integral value: not a string, not
+// a real, and no typedef with unpacked dimensions, which #4367 makes a queue or
+// array property.
+bool ActualSizesIntegralProperty(const DataType& actual, SimContext& ctx) {
+  if (DeclaredTypeIsString(actual, ctx) || DeclaredTypeIsReal(actual, ctx))
+    return false;
+  if (actual.kind != DataTypeKind::kNamed) return true;
+  const ModuleItem* item = ctx.FindTypedefItem(actual.type_name);
+  return item == nullptr || item->unpacked_dims.empty();
+}
+
+// §8.25 (printed pages 203-204) with §6.20.3 (printed page 128): a property
+// whose declared type is a type parameter of the class, `T value`, is declared
+// with the type the specialization's actual names, so `value` of
+// `S #(bit [7:0])` is an 8-bit variable. The declaration's property table,
+// which the specialization copies, sizes such a property with the 32-bit
+// carrier its collector gives any name and leaves its width undeclared, so a
+// write kept all 32 bits of 300 where §10.7 keeps 8, and `$bits` answered 32.
+// The specialization's own table takes the actual's width and signedness, and
+// its state-ness where the actual is written as a keyword type rather than a
+// name. An actual this cannot size as one integral value -- a string, a real,
+// a class, a typedef with unpacked dimensions -- leaves the property as the
+// declaration sized it.
+void SizeTypeParamProperties(ClassTypeInfo* spec,
+                             const std::vector<DataType>& actuals,
+                             SimContext& ctx) {
+  const ClassDecl* decl = spec->decl;
+  for (auto& prop : spec->properties) {
+    if (prop.width_is_declared || prop.type_name.empty() ||
+        decl->type_param_names.count(prop.type_name) == 0) {
+      continue;
+    }
+    const DataType* actual = TypeParamActualIn(decl, actuals, prop.type_name);
+    if (actual == nullptr || !ActualSizesIntegralProperty(*actual, ctx))
+      continue;
+    uint32_t width = DeclaredTypeWidth(*actual, ctx);
+    if (width == 0) continue;
+    prop.width = width;
+    prop.width_is_declared = true;
+    prop.is_signed = DeclaredTypeIsSigned(*actual, ctx);
+    if (actual->kind != DataTypeKind::kNamed)
+      prop.is_4state = DeclaredTypeIs4State(*actual);
+  }
+}
+
 }  // namespace
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
@@ -486,6 +544,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // it where the name the `new` was written against carries no list of its
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
+  SizeTypeParamProperties(spec, spelled, ctx);
   BindSpecializationBase(spec, spelled, ctx, arena);
   OwnVTableEntries(spec);
   for (auto& [pname, value] : values)
