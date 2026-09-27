@@ -392,6 +392,7 @@ class Parser {
   SpecifyItem* ParsePulsestyleDecl();
   SpecifyItem* ParseShowcancelledDecl();
   void ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items);
+  bool RefusePathpulseTerminalSelect();
   void ParsePathPorts(std::vector<SpecifyTerminal>& ports);
   SpecifyTerminal ParseSpecifyTerminal();
   void ParsePathDelays(std::vector<Expr*>& delays);

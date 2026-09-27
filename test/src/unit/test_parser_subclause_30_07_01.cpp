@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -128,10 +131,21 @@ TEST(PulseControlSpecparamParsing, PulseControlSpecparamModuleLevel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §30.7.1: the module path input and output terminals may not be a bit-select
-// or part-select of a vector. Such a terminal cannot form a PATHPULSE$
-// identifier (the brackets terminate the identifier), so the declaration is
-// rejected.
+// Errors a run reported, however many there were.
+size_t ErrorCount(const std::vector<Diagnostic>& diags) {
+  return static_cast<size_t>(std::count_if(
+      diags.begin(), diags.end(),
+      [](const Diagnostic& d) { return d.severity == DiagSeverity::kError; }));
+}
+
+// §30.7.1 (printed page 887): a PATHPULSE$ specparam's terminals "shall
+// conform to the rules for module path inputs and outputs, with the following
+// restriction: the terminals may not be a bit-select or part-select of a
+// vector." Syntax 30-7 builds the name out of two terminal descriptors, each
+// admitting a range, so `PATHPULSE$a[0]$b` is that syntax with the select the
+// restriction forbids, and it is reported under it, once, at the select. Read
+// as an identifier ended by the bracket, it drew four parse errors under
+// §6.20.5, §11.2 and §30.3, none naming the rule.
 TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -139,24 +153,33 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
       "    specparam PATHPULSE$a[0]$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
-  // The '[' ends the identifier, so what the parser reports is the specparam
-  // name not being followed by '='; §6.20.5 owns that, not §30.7.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got '['", 3, "6.20.5"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam's terminals may not be a "
+                            "bit-select or part-select of a vector",
+                            3, "30.7.1"));
+  EXPECT_EQ(ErrorCount(r.diags), 1U);
 }
 
-// The other rejected select form: a part-select terminal. Like the bit-select
-// case, the `[` closes the identifier, so a range select cannot form part of a
-// PATHPULSE$ terminal name and the declaration is rejected.
+// The part-select form, and a select on the output terminal, each reported the
+// same way; the specparam after them still parses.
 TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
       "    specparam PATHPULSE$a[1:0]$b = (1, 3);\n"
+      "    specparam PATHPULSE$a$b[1] = 2;\n"
+      "    specparam PATHPULSE$a$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
-  // The '[' ends the identifier, so what the parser reports is the specparam
-  // name not being followed by '='; §6.20.5 owns that, not §30.7.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got '['", 3, "6.20.5"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam's terminals may not be a "
+                            "bit-select or part-select of a vector",
+                            3, "30.7.1"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam's terminals may not be a "
+                            "bit-select or part-select of a vector",
+                            4, "30.7.1"));
+  EXPECT_EQ(ErrorCount(r.diags), 2U);
 }
 
 // §30.7.1's own worked example, printed on page 888 and reproduced here

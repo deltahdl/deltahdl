@@ -859,6 +859,28 @@ static void DecodePathpulseName(SpecifyItem& sp) {
   sp.pathpulse_output = rest.substr(sep + 1);
 }
 
+// §30.7.1 (printed page 887): a PATHPULSE$ specparam's module path terminals
+// "shall conform to the rules for module path inputs and outputs, with the
+// following restriction: the terminals may not be a bit-select or part-select
+// of a vector." Syntax 30-7 spells the name out of two terminal descriptors,
+// each admitting a range, so `PATHPULSE$a[0]$y` is that syntax with a select
+// the restriction forbids. The name reads up to the select as one identifier,
+// and what follows it up to the `=` -- the select and whatever terminal comes
+// after -- is taken as part of the name the rule refuses rather than left to
+// be read as four unrelated parse errors. True where the select was there,
+// the specparam then declaring nothing.
+bool Parser::RefusePathpulseTerminalSelect() {
+  if (!Check(TokenKind::kLBracket)) return false;
+  diag_.Error(CurrentLoc(),
+              "a PATHPULSE$ specparam's terminals may not be a bit-select or "
+              "part-select of a vector",
+              Subclause("30.7.1"));
+  while (!AtEnd() && !Check(TokenKind::kEq) && !Check(TokenKind::kSemicolon)) {
+    Consume();
+  }
+  return true;
+}
+
 void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
   auto kw_loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam, Subclause("6.20.5"));
@@ -905,13 +927,15 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     sp->param_packed_left = packed_left;
     sp->param_packed_right = packed_right;
     sp->param_name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;
+    bool pathpulse = sp->param_name.starts_with("PATHPULSE$");
+    bool refused = pathpulse && RefusePathpulseTerminalSelect();
     Expect(TokenKind::kEq, Subclause("6.20.5"));
-    if (sp->param_name.starts_with("PATHPULSE$")) {
+    if (pathpulse) {
       parse_pathpulse_value(sp);
     } else {
       sp->param_value = ParseMinTypMaxExpr();
     }
-    items.push_back(sp);
+    if (!refused) items.push_back(sp);
   };
 
   parse_one();
