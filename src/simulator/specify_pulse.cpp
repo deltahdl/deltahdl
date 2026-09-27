@@ -462,10 +462,10 @@ void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
 
 // §30.3 puts a specify block inside a module declaration, so two instances of
 // one cell hold paths spelled identically and PathDelay::inst_prefix is what
-// tells them apart. `inst_prefix` is what SdfCellInstancePrefix
-// (simulator/sdf_annotate.cpp) made of the entry's CELLINSTANCE below the §32.9
-// module_instance operand, so the limits reach the paths of that one instance
-// and of no other in-scope instance of the cell.
+// tells them apart. `inst_prefix` is what SdfCellPrefixInRegion
+// (simulator/sdf_annotate.cpp) made of the entry's CELLINSTANCE, read from the
+// §32.9 region down, so the limits reach the paths of that one instance and of
+// no other in-scope instance of the cell.
 void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
                                       std::string_view inst_prefix) {
   for (auto& pd : path_delays_) {

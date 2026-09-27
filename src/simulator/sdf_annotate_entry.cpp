@@ -532,7 +532,7 @@ static void SplitSdfPortSelect(const std::string& port, std::string& name,
 // §32.4.1: an IOPATH names its terminals by the cell's own port names, so the
 // path it reaches is told from the identically spelled path of another instance
 // of the same cell by PathDelay::inst_prefix alone. The prefix the cell's
-// CELLINSTANCE gave (SdfCellInstancePrefix) is stamped on here, which is what
+// CELLINSTANCE gave (SdfCellPrefixInRegion) is stamped on here, which is what
 // SpecifyManager::AnnotateSdfPathDelay and IncrementSdfPathDelay match on.
 void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
                             SpecifyManager& mgr, SdfMtm mtm) {
@@ -672,7 +672,7 @@ std::vector<SdfDelayValue> SdfDeviceDelayValues(const SdfDevice& dev) {
 // reduction to three plus the delay to the x state.
 //
 // As with AnnotateSdfPulseLimitEntry above, `inst_prefix` is what
-// SdfCellInstancePrefix made of the cell's CELLINSTANCE, and it travels beside
+// SdfCellPrefixInRegion made of the cell's CELLINSTANCE, and it travels beside
 // the entry rather than on it because SdfDeviceAnnotation
 // (simulator/specify_sdf.h) has no field for it. It is what holds the delay to
 // the outputs of the one instance the entry names.
@@ -714,7 +714,7 @@ int64_t SdfPulseLimitValue(const SdfDelayValue& dv, SdfMtm mtm,
 //
 // §30.4 names a path's terminals by the module's own port names, so two
 // instances of one cell declare paths spelled identically. `inst_prefix` is
-// what SdfCellInstancePrefix worked out for the cell, and it travels beside the
+// what SdfCellPrefixInRegion worked out for the cell, and it travels beside the
 // entry rather than on it because SdfPulseLimitSpec (simulator/specify_sdf.h)
 // has no field for it. SpecifyManager::AddSdfPulseLimit matches it against
 // PathDelay::inst_prefix, so the limits reach the one instance the entry names.
@@ -735,7 +735,7 @@ void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
 }
 
 // §32.4.3: hand over one LABEL entry. §30.3 has a specify block declare its
-// specparams by bare names, so `inst_prefix` -- SdfCellInstancePrefix's answer
+// specparams by bare names, so `inst_prefix` -- SdfCellPrefixInRegion's answer
 // for the cell, as for the three siblings above -- holds it to that instance.
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp,
                                std::string_view inst_prefix,
@@ -791,7 +791,7 @@ std::string_view SdfCheckTypeName(SdfCheckType type) {
 // §31.2 puts a system timing check inside a specify block and §30.3 puts that
 // block inside a module declaration, so two instances of one cell declare
 // checks naming identically spelled signals. `inst_prefix` is what
-// SdfCellInstancePrefix made of the cell's CELLINSTANCE, and it travels beside
+// SdfCellPrefixInRegion made of the cell's CELLINSTANCE, and it travels beside
 // the annotation rather than on it because SdfTcAnnotation
 // (simulator/specify_sdf.h) has no field for it, as with AnnotateSdfDeviceEntry
 // above. It is what holds the constraint to the checks of the one instance the

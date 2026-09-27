@@ -1,12 +1,12 @@
 // Which cells an $sdf_annotate call reaches and the order one cell's
 // constructs are applied in. §32.9 has a module_instance operand name a level
-// of the design hierarchy: CellInScope narrows a file's cells to that level and
-// below, and SdfCellInstancePrefix works out the instance prefix the entries of
-// a cell carry, which is what holds an SDF record to the one module instance it
-// names. §32.5 has annotation proceed in order, so AnnotateSdfCell walks a
-// cell's constructs as the file wrote them, across its sections rather than
-// within each, and AnnotateSdfCellEntry hands each construct to the function
-// for its kind.
+// of the design hierarchy, and SdfCellPrefixInRegion reads each cell's
+// instance path from that level down, keeping the cells at or below it and
+// working out the instance prefix their entries carry, which is what holds an
+// SDF record to the one module instance it names. §32.5 has annotation proceed
+// in order, so AnnotateSdfCell walks a cell's constructs as the file wrote
+// them, across its sections rather than within each, and AnnotateSdfCellEntry
+// hands each construct to the function for its kind.
 //
 // Those six functions annotate the constructs of §32.4 and §32.7 and stand in
 // simulator/sdf_annotate_entry.cpp, together with the §32.8 Table 32-4 delay
@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -44,51 +45,27 @@ void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
                                  SpecifyManager& mgr, SdfMtm mtm,
                                  SdfAnnotationResult& result);
 
-// §32.9: a module_instance operand names a level of the design hierarchy, and
-// the annotator works from that level down. A SystemVerilog hierarchical name
-// divides its levels with '.' while an SDF instance path divides them with '/',
-// so the two are compared level by level with either divider accepted rather
-// than as raw text.
-bool CellInScope(std::string_view instance, std::string_view scope) {
-  if (scope.empty()) return true;
-  if (instance.size() < scope.size()) return false;
-  for (std::size_t i = 0; i < scope.size(); ++i) {
-    const char kInst = instance[i];
-    const char kScope = scope[i];
-    const bool kBothDividers =
-        (kInst == '/' || kInst == '.') && (kScope == '/' || kScope == '.');
-    if (kInst != kScope && !kBothDividers) return false;
-  }
-  if (instance.size() == scope.size()) return true;
-  const char kSep = instance[scope.size()];
-  return kSep == '/' || kSep == '.';
-}
-
-// §32.9: the cells the module_instance operand selects sit at or below the
-// level it names, so what tells two of them apart is the part of the SDF
-// instance path below that level. PathDelay::inst_prefix names the same thing
-// on the SystemVerilog side, in the spelling Lowerer::inst_prefix_ produces,
-// so the remainder is rewritten into that spelling here: '/' dividers become
-// '.', and a trailing '.' closes it. The scope root itself has no remainder
-// and answers empty, which is the prefix a module elaborated as a top carries.
-std::string SdfCellInstancePrefix(std::string_view instance,
-                                  std::string_view design_root) {
-  if (design_root.empty()) return {};
-  if (instance == design_root) return {};
-  std::string_view rest = instance;
-  // A file may write the cell's path from the root or from below it. Strip the
-  // root's own segment where it is there, and take what is left as written
-  // where it is not.
-  if (rest.size() > design_root.size() &&
-      rest.substr(0, design_root.size()) == design_root &&
-      (rest[design_root.size()] == '/' || rest[design_root.size()] == '.')) {
-    rest = rest.substr(design_root.size() + 1);
-  }
-  std::string prefix(rest);
-  for (char& divider : prefix) {
+std::optional<std::string> SdfCellPrefixInRegion(std::string_view instance,
+                                                 std::string_view region_prefix,
+                                                 std::string_view design_root) {
+  if (design_root.empty()) return std::string();
+  std::string path(instance);
+  for (char& divider : path) {
     if (divider == '/') divider = '.';
   }
-  if (!prefix.empty()) prefix.push_back('.');
+  std::string prefix;
+  if (path == design_root) {
+    prefix.clear();
+  } else if (path.size() > design_root.size() &&
+             path.compare(0, design_root.size(), design_root) == 0 &&
+             path[design_root.size()] == '.') {
+    prefix = path.substr(design_root.size() + 1) + ".";
+  } else {
+    prefix = std::string(region_prefix);
+    if (!path.empty()) prefix += path + ".";
+  }
+  if (prefix.compare(0, region_prefix.size(), region_prefix) != 0)
+    return std::nullopt;
   return prefix;
 }
 
@@ -128,8 +105,8 @@ std::vector<SdfCellEntryRef> BuildDerivedSdfCellOrder(const SdfCell& cell) {
 // being applied, the file it sits in, which an INTERCONNECT entry resolves its
 // port names against, and the instance prefix the cell's CELLINSTANCE names.
 //
-// `inst_prefix` is what SdfCellInstancePrefix (simulator/sdf_parser.h) made of
-// the cell's instance path against the §32.9 module_instance operand: the
+// `inst_prefix` is what SdfCellPrefixInRegion (simulator/sdf_parser.h) made of
+// the cell's instance path, read from the §32.9 region down: the
 // hierarchical prefix of the module instance whose specify block declared the
 // paths this cell annotates, in the spelling PathDelay::inst_prefix carries.
 struct SdfCellSource {
@@ -194,7 +171,7 @@ void AnnotateSdfCell(const SdfCellSource& src, SpecifyManager& mgr, SdfMtm mtm,
 
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
-                                         std::string_view scope,
+                                         std::string_view region_prefix,
                                          std::string_view design_root) {
   SdfAnnotationResult result;
 
@@ -211,13 +188,14 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   // walks the manager's existing values, so a timing value the file says
   // nothing about keeps whatever it held before backannotation.
   for (const auto& cell : file.cells) {
-    if (!CellInScope(cell.instance, scope)) continue;
-    // §32.9: the operand selected the cell, and the part of its instance path
-    // below the operand's level is what says which instance of the cell the
-    // entries below annotate. Working it out once here keeps every entry of
-    // the cell reading the one answer.
-    std::string prefix = SdfCellInstancePrefix(cell.instance, design_root);
-    AnnotateSdfCell({cell, file, prefix}, mgr, mtm, result);
+    // §32.9: the cell's instance path, read from the region down, says which
+    // instance of the cell the entries below annotate, and a cell it leaves
+    // outside the region is not annotated. Working it out once here keeps
+    // every entry of the cell reading the one answer.
+    std::optional<std::string> prefix =
+        SdfCellPrefixInRegion(cell.instance, region_prefix, design_root);
+    if (!prefix.has_value()) continue;
+    AnnotateSdfCell({cell, file, *prefix}, mgr, mtm, result);
   }
   return result;
 }

@@ -228,7 +228,8 @@ static void WriteSdfCellLogEntries(std::ostream& out, const SdfCell& cell) {
 }
 
 bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
-                           std::string_view scope) {
+                           std::string_view region_prefix,
+                           std::string_view design_root) {
   if (log_path.empty()) return true;
   std::ofstream out{std::string(log_path), std::ios::app};
   if (!out.is_open()) return false;
@@ -236,7 +237,8 @@ bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
   for (const auto& cell : file.cells) {
     // §32.9: the log records the annotations that were made, and a cell outside
     // the region the call named is never annotated, so it earns no entry.
-    if (!CellInScope(cell.instance, scope)) continue;
+    if (!SdfCellPrefixInRegion(cell.instance, region_prefix, design_root))
+      continue;
     WriteSdfCellLogEntries(out, cell);
   }
   return true;
@@ -396,7 +398,7 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
       ScaleSdfFile(file, kResolved.scale_type, kResolved.factors);
   const SdfMtm kMtm = ResolveSdfMtm(kResolved.mtm, tool_default);
   SdfAnnotationResult annotated = AnnotateSdfToManager(
-      kScaled, mgr, kMtm, args.module_instance, args.design_root);
+      kScaled, mgr, kMtm, args.region_prefix, args.design_root);
   for (auto& warning : annotated.warnings) {
     result.warnings.push_back(std::move(warning));
   }
@@ -404,7 +406,8 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
   // §32.9: with a log_file named, each individual annotation the file carries
   // is written out as its own entry.
   if (!args.log_file.empty() &&
-      !WriteSdfAnnotationLog(kScaled, args.log_file, args.module_instance)) {
+      !WriteSdfAnnotationLog(kScaled, args.log_file, args.region_prefix,
+                             args.design_root)) {
     result.warnings.push_back("SDF annotator: unable to write log file " +
                               args.log_file);
   }
@@ -443,6 +446,26 @@ std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena) {
 }
 
 namespace {
+
+// §32.9 (printed page 932): the instance prefix, in PathDelay::inst_prefix's
+// spelling, of the level a module_instance operand names, `name` as
+// SdfAnnotateScopeName wrote it. A name whose first level is the top module's
+// own, `top.m2`, or one written from $root, names the level that path reaches
+// from the top; any other is read downward from the instance of the module
+// holding the call, `caller_prefix`, so `m2` in top is top.m2. Taken as text to
+// be compared from its first character, `top.m2` was the one spelling a cell
+// path from the top had to begin with.
+std::string SdfRegionPrefix(std::string_view name, std::string_view design_root,
+                            std::string_view caller_prefix) {
+  constexpr std::string_view kRoot = "$root.";
+  if (name.starts_with(kRoot)) name.remove_prefix(kRoot.size());
+  if (name == design_root) return {};
+  if (name.size() > design_root.size() && name.starts_with(design_root) &&
+      name[design_root.size()] == '.') {
+    return std::string(name.substr(design_root.size() + 1)) + ".";
+  }
+  return std::string(caller_prefix) + std::string(name) + ".";
+}
 
 // §32.9: read one operand of a $sdf_annotate call as a character string. An
 // operand the call skipped over on its way to a later one is absent here and
@@ -489,19 +512,24 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
     return false;
   }
 
+  // The root every hierarchical name in the run counts from. Lowerer::Lower
+  // sets it to the top module's own name.
+  args.design_root = ctx.CurrentScopeName();
+
   // §32.9: module_instance names a level of the design hierarchy rather than a
-  // readable value, so it is taken as the name it writes. Left out, the
-  // annotator works from the module that holds the call.
+  // readable value, so it is taken as the name it writes, and the region is
+  // the instance it names. Left out, "the SDF annotator uses the module
+  // containing the call", which is the instance of that module running it --
+  // one of the two instances of a module instantiated twice, each call its
+  // own.
   if (call->args.size() > 1 && call->args[1] != nullptr) {
     args.module_instance = SdfAnnotateScopeName(call->args[1], ctx, arena);
+    args.region_prefix = SdfRegionPrefix(args.module_instance, args.design_root,
+                                         ctx.ActiveInstancePrefix());
   } else {
     args.module_instance = ctx.CurrentScopeName();
+    args.region_prefix = ctx.ActiveInstancePrefix();
   }
-
-  // The root every hierarchical name in the run counts from. Lowerer::Lower
-  // sets it to the top module's own name, which is also what module_instance
-  // falls back to above when the call names no scope.
-  args.design_root = ctx.CurrentScopeName();
 
   args.config_file = SdfAnnotateStringArg(call, 2, ctx, arena);
   args.log_file = SdfAnnotateStringArg(call, 3, ctx, arena);

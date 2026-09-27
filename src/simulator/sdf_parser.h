@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -252,11 +253,13 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
 SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
                      const SdfScaleFactors& factors);
 
-// §32.9: write one entry per individual annotation the file carries. `scope` is
-// the region the annotation was aimed at; cells outside it are not annotated
-// and so contribute no entries. An empty scope covers the whole file.
+// §32.9: write one entry per individual annotation the file carries. The
+// region is read as AnnotateSdfToManager reads it; cells outside it are not
+// annotated and so contribute no entries. An empty region covers the whole
+// file.
 bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
-                           std::string_view scope = {});
+                           std::string_view region_prefix = {},
+                           std::string_view design_root = {});
 
 struct SdfAnnotateConfig {
   std::string mtm_spec;
@@ -299,6 +302,10 @@ struct SdfAnnotateTaskArgs {
   // from the root while PathDelay::inst_prefix counts from below it, and only
   // the root's own name says where one becomes the other.
   std::string design_root;
+  // §32.9: the instance prefix, in PathDelay::inst_prefix's spelling, of the
+  // region the annotation runs at -- the level module_instance names, else the
+  // instance of the module holding the call -- which cell paths are read from.
+  std::string region_prefix;
   std::string config_file;
   std::string log_file;
   std::string mtm_spec;
@@ -329,9 +336,12 @@ struct SdfAnnotationResult {
   std::vector<std::string> warnings;
 };
 
+// §32.9: annotate each cell of `file` whose path lies in the region
+// `region_prefix` names (SdfCellPrefixInRegion), the whole design where it is
+// empty.
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
-                                         std::string_view scope = {},
+                                         std::string_view region_prefix = {},
                                          std::string_view design_root = {});
 
 // §32.9: carry out one $sdf_annotate call. The named SDF file is read, the
@@ -355,36 +365,24 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
 // it selects.
 std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
 
-// §32.9: whether an SDF cell instance path lies at or below a hierarchy level
-// named by a module_instance operand. A SystemVerilog hierarchical name
-// divides its levels with '.' while an SDF instance path divides them with
-// '/', so the two are compared level by level with either divider accepted.
-// An empty scope covers the whole design.
-bool CellInScope(std::string_view instance, std::string_view scope);
-
-// The instance prefix an SDF cell's paths belong to: `instance` expressed
-// relative to `design_root`, in the form PathDelay::inst_prefix carries --
-// dividers as `.`, a trailing `.`, and empty for the root itself.
+// §32.9 (printed page 932): the instance prefix, in the spelling
+// PathDelay::inst_prefix carries (dividers as `.`, a trailing `.`, empty for
+// the top), of the instance an SDF cell's path `instance` names, read from the
+// region the annotation runs at -- `region_prefix`, in the same spelling -- or
+// nullopt where that instance lies outside the region. "The SDF annotator uses
+// the hierarchy level of the specified instance for running the annotation",
+// so a path is read from the region down, `(INSTANCE inner)` under the region
+// m2 being m2.inner, and one written from the top, its first level the top
+// module's own name `design_root`, names the instance that path reaches from
+// there. An SDF path divides its levels with `/` where a SystemVerilog name
+// divides with `.`, and either is read.
 //
-// The root and not §32.9's module_instance operand is what it is measured
-// against, because PathDelay::inst_prefix counts from the module the design was
-// elaborated as -- Lowerer::inst_prefix_ is what fills it -- while the operand
-// may name any level below that. Measuring against the operand would shorten
-// every prefix by the levels between the two and land a cell's timing on the
-// scope's own paths instead. CellInScope is what the operand narrows, and it
-// runs before this.
-//
-// An SDF instance path divides its levels with `/` where a SystemVerilog
-// hierarchical name divides with `.`, which is the difference CellInScope
-// already accepts either way; a file may also write the path from below the
-// root, which is why the root's segment is stripped where it is present rather
-// than assumed.
-//
-// An empty `design_root` answers empty. Nothing is relative to nothing: with no
-// root the annotator cannot make an SDF instance path design-relative, and says
-// only that the cell belongs to whatever the manager holds at the top.
-std::string SdfCellInstancePrefix(std::string_view instance,
-                                  std::string_view design_root);
+// An empty `design_root` answers empty for every cell: with no root the
+// annotator cannot tell a path from the top from one below the region, and
+// says only that the cell belongs to whatever the manager holds at the top.
+std::optional<std::string> SdfCellPrefixInRegion(std::string_view instance,
+                                                 std::string_view region_prefix,
+                                                 std::string_view design_root);
 
 // §32.9: run a parsed $sdf_annotate call against the SpecifyManager bound to
 // `ctx`. Returns false when the call names no SDF file or nothing is bound to

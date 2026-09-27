@@ -122,11 +122,10 @@ class SpecifyManager {
   // which is how a declaration enters the manager in the first place.
   //
   // Like AddPathDelay, this matches on PathDelay::inst_prefix as well as the
-  // port pair. SdfCellInstancePrefix in simulator/sdf_annotate.cpp derives that
-  // prefix from the cell's own instance path, taken relative to the §32.9
-  // module_instance operand, so an SDF record reaches the instance it names and
-  // no other. CellInScope filters whole cells before any path is reached and is
-  // the coarser half of the same question.
+  // port pair. SdfCellPrefixInRegion in simulator/sdf_annotate.cpp derives
+  // that prefix from the cell's own instance path, read from the §32.9 region
+  // down, so an SDF record reaches the instance it names and no other; a cell
+  // outside the region it leaves out before any path is reached.
   bool AnnotateSdfPathDelay(PathDelay delay,
                             PathDelayPulseRetention retain = {});
 
@@ -154,7 +153,7 @@ class SpecifyManager {
   // The annotation's edge and condition stay permissive where its instance does
   // not, because §32.4.2 rules that an SDF check naming no edge and no
   // condition matches every corresponding declared check. No such unspecified
-  // instance exists: SdfCellInstancePrefix (simulator/sdf_parser.h) answers a
+  // instance exists: SdfCellPrefixInRegion (simulator/sdf_parser.h) answers a
   // definite prefix for every cell, so an empty value stands for the root
   // rather than for an instance the file left out.
   bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation,

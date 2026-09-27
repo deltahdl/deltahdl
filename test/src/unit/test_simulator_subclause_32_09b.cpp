@@ -366,7 +366,8 @@ TEST(SdfAnnotateTask, ModuleInstanceMayIndexPartWayAlongAPath) {
 // which case it names that instance's level directly.
 TEST(SdfAnnotateTask, ModuleInstanceMayBeABareInstanceName) {
   const std::string kSdf = WriteTempFile(
-      "bare.sdf", DelayFile(CellRecord("a", "24") + CellRecord("b", "25")));
+      "bare.sdf",
+      DelayFile(CellRecord("top/a", "24") + CellRecord("top/b", "25")));
   SdfDesign d;
   ASSERT_TRUE(BuildAndRun(d, TwoCellDesign("\"" + kSdf + "\", a")));
   EXPECT_EQ(DelayIn(d, "a."), 24u);
@@ -419,6 +420,95 @@ TEST(SdfAnnotateTask, OmittedModuleInstanceUsesTheModuleHoldingTheCall) {
   ASSERT_TRUE(BuildAndRun(d, TwoCellDesign("\"" + kSdf + "\"")));
   EXPECT_EQ(DelayIn(d, "a."), 10u);
   EXPECT_EQ(DelayIn(d, "b."), kDeclaredDelay);
+}
+
+// With module_instance left out, the region is the module holding the call,
+// and a cell's instance path is read from that region down, as the tools write
+// it: `(INSTANCE a)` from a call in top is top.a. The rooted spelling
+// `(INSTANCE top/a)` names the same instance. Only the rooted one landed.
+TEST(SdfAnnotateTask, CellPathIsRelativeToTheModuleHoldingTheCall) {
+  const std::string kSdf =
+      WriteTempFile("relative_to_caller.sdf", DelayFile(CellRecord("a", "10")));
+  SdfDesign d;
+  ASSERT_TRUE(BuildAndRun(d, TwoCellDesign("\"" + kSdf + "\"")));
+  EXPECT_EQ(DelayIn(d, "a."), 10u);
+  EXPECT_EQ(DelayIn(d, "b."), kDeclaredDelay);
+}
+
+// A design whose `mid` holds a cell `inner` and is instantiated twice, with
+// `call` placed in mid's initial block when `call_in_mid` is set and in top's
+// otherwise.
+std::string MidDesign(const std::string& call, bool call_in_mid) {
+  return CellDecl("timed_cell") +
+         "module mid(input A, output Z);\n"
+         "  timed_cell inner(A, Z);\n" +
+         (call_in_mid ? "  initial " + call + "\n" : std::string()) +
+         "endmodule\n"
+         "module top;\n"
+         "  wire src;\n"
+         "  wire o1;\n"
+         "  wire o2;\n"
+         "  mid m1(src, o1);\n"
+         "  mid m2(src, o2);\n" +
+         (call_in_mid ? std::string() : "  initial " + call + "\n") +
+         "endmodule\n";
+}
+
+// §32.9 (printed page 932): with module_instance left out the region is the
+// module containing the call, which for a call in mid is the instance of mid
+// running it, so a cell written `inner` is each calling instance's own inner.
+// A cell rooted at top/m1/inner lies in m1's region alone, so of the two calls
+// only m1's applies its INCREMENT. The region was the top for either call: the
+// relative cell named nothing, and the rooted one was applied by both.
+TEST(SdfAnnotateTask, CallInASubmoduleAnnotatesFromTheCallingInstance) {
+  const std::string kRelative =
+      WriteTempFile("call_in_mid.sdf", DelayFile(CellRecord("inner", "10")));
+  SdfDesign rel;
+  ASSERT_TRUE(BuildAndRun(
+      rel, MidDesign("$sdf_annotate(\"" + kRelative + "\");", true)));
+  EXPECT_EQ(DelayIn(rel, "m1.inner."), 10u);
+  EXPECT_EQ(DelayIn(rel, "m2.inner."), 10u);
+
+  const std::string kRooted = WriteTempFile(
+      "call_in_mid_rooted.sdf",
+      "(DELAYFILE (CELL (CELLTYPE \"timed_cell\") (INSTANCE top/m1/inner)"
+      " (DELAY (INCREMENT (IOPATH A Z (5))))))");
+  SdfDesign rooted;
+  ASSERT_TRUE(BuildAndRun(
+      rooted, MidDesign("$sdf_annotate(\"" + kRooted + "\");", true)));
+  EXPECT_EQ(DelayIn(rooted, "m1.inner."), kDeclaredDelay + 5);
+  EXPECT_EQ(DelayIn(rooted, "m2.inner."), kDeclaredDelay);
+}
+
+// §32.9: module_instance names the hierarchy level the annotation runs at, so
+// the file's `(INSTANCE inner)` under the operand m2 is m2's inner and m1's is
+// untouched; a rooted path naming an instance under the level applies, and the
+// operand may itself be a hierarchical name. Only `(INSTANCE m2/inner)`, a path
+// from the top written without the top's name, had landed.
+TEST(SdfAnnotateTask, ModuleInstanceIsTheRegionCellPathsAreReadFrom) {
+  const std::string kRelative = WriteTempFile(
+      "region_relative.sdf", DelayFile(CellRecord("inner", "11")));
+  SdfDesign rel;
+  ASSERT_TRUE(BuildAndRun(
+      rel, MidDesign("$sdf_annotate(\"" + kRelative + "\", m2);", false)));
+  EXPECT_EQ(DelayIn(rel, "m1.inner."), kDeclaredDelay);
+  EXPECT_EQ(DelayIn(rel, "m2.inner."), 11u);
+
+  const std::string kRooted = WriteTempFile(
+      "region_rooted.sdf", DelayFile(CellRecord("top/m2/inner", "12") +
+                                     CellRecord("top/m1/inner", "13")));
+  SdfDesign rooted;
+  ASSERT_TRUE(BuildAndRun(
+      rooted, MidDesign("$sdf_annotate(\"" + kRooted + "\", m2);", false)));
+  EXPECT_EQ(DelayIn(rooted, "m1.inner."), kDeclaredDelay);
+  EXPECT_EQ(DelayIn(rooted, "m2.inner."), 12u);
+
+  SdfDesign deep;
+  ASSERT_TRUE(BuildAndRun(
+      deep,
+      MidDesign("$sdf_annotate(\"" + kRooted + "\", top.m2.inner);", false)));
+  EXPECT_EQ(DelayIn(deep, "m1.inner."), kDeclaredDelay);
+  EXPECT_EQ(DelayIn(deep, "m2.inner."), 12u);
 }
 
 // Table 32-5: each mtm_spec keyword annotates its own member of the min:typ:max

@@ -440,7 +440,7 @@ void ReplaceWithSdfDelays(PathDelay& existing, PathDelay entry,
 }
 
 // §32.4.1 with §32.9: a nonconditional entry lands on every path of the
-// instance its cell named (PathDelay::inst_prefix, which SdfCellInstancePrefix
+// instance its cell named (PathDelay::inst_prefix, which SdfCellPrefixInRegion
 // in simulator/sdf_annotate.cpp stamped on it) between those two ports that it
 // names by edge. Returns true if at least one path matched.
 bool AnnotateNonconditionalSdfPaths(std::vector<PathDelay>& path_delays,
@@ -698,7 +698,7 @@ bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
   // of one cell declare checks naming identically spelled signals and the
   // instance is what tells them apart. The prefixes are compared exactly, an
   // empty one naming the module the design was elaborated as rather than every
-  // instance: SdfCellInstancePrefix (simulator/sdf_parser.h) answers a definite
+  // instance: SdfCellPrefixInRegion (simulator/sdf_parser.h) answers a definite
   // prefix for every cell, so no annotation arrives with its instance left
   // unspecified. The SpecifyEdge::kNone and the empty condition below do reach
   // a check carrying any edge or any condition, which is what §32.4.2 rules for
@@ -826,7 +826,7 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
 
   // §30.3 puts a specify block inside a module declaration, so two instances of
   // one cell hold outputs spelled identically. `inst_prefix` is what
-  // SdfCellInstancePrefix (simulator/sdf_annotate.cpp) made of the entry's
+  // SdfCellPrefixInRegion (simulator/sdf_annotate.cpp) made of the entry's
   // CELLINSTANCE, so both scans reach the outputs of that one instance.
   bool applied = false;
   for (auto& pd : path_delays_) {
