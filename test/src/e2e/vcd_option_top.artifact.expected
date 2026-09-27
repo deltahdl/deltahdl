@@ -1,0 +1,21 @@
+$date
+  Sep 27, 2026 18:34:56
+$end
+$version
+  DeltaHDL 0.1.0
+  $dumpfile("vcd_option_top.vcd")
+$end
+$timescale
+  1ns
+$end
+$scope module vcd_option_top $end
+$var reg 1 ! a $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0!
+$end
+#1
+1!
+#2

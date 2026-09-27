@@ -1,0 +1,14 @@
+$date
+  Sep 27, 2026 18:34:56
+$end
+$version
+  DeltaHDL 0.1.0
+  $dumpfile("vcd_option_no_top_module.vcd")
+$end
+$timescale
+  1ns
+$end
+$enddefinitions $end
+#0
+$dumpvars
+$end
