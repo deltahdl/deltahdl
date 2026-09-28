@@ -513,4 +513,25 @@ TEST(ArrayReduction, StringKeyedAssociativeArrayReductionSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 21u);
 }
 
+// §7.12.3: a reduction's with clause over a two-dimensional array sees each
+// element of the first dimension, a row, which a nested reduction reduces --
+// §7.12.3's own `m.sum with (item.sum with (item))`, 5 + 10 + 15 + 20 -- and a
+// row's product and first element are the row's own.
+TEST(ArrayReductionSim, NestedReductionOverTheRowsOfA2DArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [2][2] = '{ '{5, 10}, '{15, 20} };\n"
+      "  int y, p;\n"
+      "  initial begin\n"
+      "    y = m.sum with (item.sum with (item));\n"
+      "    p = m.sum with (int'(item[0]) * 100 + item.product with "
+      "(int'(item)));\n"
+      "    $display(\"%0d %0d\", y, p);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "50 2350\n");
+}
+
 }  // namespace

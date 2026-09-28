@@ -779,6 +779,10 @@ const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
        ++frame) {
     auto local = frame->arrays.find(name);
     if (local != frame->arrays.end()) return local->second;
+    // A frame declaring a variable of the name and no array under it hides
+    // an outer array of the name, as a nested with clause's iterator `item`
+    // hides the row the outer clause bound to `item` (§7.12.3).
+    if (frame->vars.count(name) != 0) return nullptr;
   }
   for (const std::string& key : ScopedObjectKeys(name)) {
     auto it = array_infos_.find(key);

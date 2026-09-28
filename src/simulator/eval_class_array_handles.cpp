@@ -32,6 +32,7 @@ namespace {
 // property record's bare type name, `Outer::Inner kids[2]` held plain
 // values: `x.kids[1] = new` constructed nothing and `x.kids[1].v` read 0.
 std::string_view ElementClassKey(const ClassArrayRef& ref, SimContext& ctx) {
+  if (ref.static_owner != nullptr) return {};
   return PropertyClassName(ref.obj, ref.obj->type, ref.prop->name, ctx);
 }
 

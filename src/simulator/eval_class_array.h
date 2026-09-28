@@ -43,12 +43,19 @@ const ClassTypeInfo::PropertyInfo* FindClassArrayProperty(
 // variable of an element's key stands for the element: a constraint's trial
 // binds each element so (18.5.7), and nothing outside the object's scope
 // does.
+//
+// §8.9: a static property is one storage shared by every object of the class,
+// so its elements and a dynamic one's count are held in the declaring
+// class's static_properties, `static_owner`, under the same keys; `obj` is
+// then the object it was reached through, or null where it was reached
+// through `C::` or from a static method.
 struct ClassArrayRef {
   ClassObject* obj = nullptr;
   const ClassTypeInfo::PropertyInfo* prop = nullptr;
   bool bare = false;
   uint32_t size = 0;
   int64_t lo = 0;
+  const ClassTypeInfo* static_owner = nullptr;
 };
 
 // §7.5: the element count a dynamic array property holds on `obj`, 0 where

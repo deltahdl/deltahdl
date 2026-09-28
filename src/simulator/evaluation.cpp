@@ -21,6 +21,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 // AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
 // reads.
 #include "simulator/sva_engine_sampling.h"
@@ -347,6 +348,17 @@ static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
 
 static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
                                std::string_view b, SimContext& ctx) {
+  // §7.6 with §7.4.2: a multidimensional array equals another of its shape
+  // where every leaf does, compared by position.
+  if (ai->dim_sizes.size() >= 2) {
+    for (const std::string& leaf : MultiDimLeafSuffixes(*ai)) {
+      auto* av = ctx.FindVariable(std::string(a) + leaf);
+      auto* bv = ctx.FindVariable(std::string(b) + leaf);
+      if (!av || !bv || av->value.ToUint64() != bv->value.ToUint64())
+        return false;
+    }
+    return true;
+  }
   for (uint32_t i = 0; i < ai->size; ++i) {
     auto an = std::string(a) + "[" + std::to_string(ai->lo + i) + "]";
     auto bn = std::string(b) + "[" + std::to_string(ai->lo + i) + "]";
@@ -368,7 +380,8 @@ static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* la = ctx.FindArrayInfo(expr->lhs->text);
   auto* ra = ctx.FindArrayInfo(expr->rhs->text);
   if (!la || !ra) return false;
-  bool eq = (la->size == ra->size && la->elem_width == ra->elem_width);
+  bool eq = (la->size == ra->size && la->elem_width == ra->elem_width &&
+             la->dim_sizes == ra->dim_sizes);
   if (eq) eq = ArrayElementsEqual(expr->lhs->text, la, expr->rhs->text, ctx);
   uint64_t val = (expr->op == TokenKind::kEqEq) == eq ? 1 : 0;
   out = MakeLogic4VecVal(arena, 1, val);

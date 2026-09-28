@@ -411,7 +411,18 @@ AssocArrayObject* ResolveOn(ClassObject* obj, const ClassTypeInfo* from,
     return slot;
   }
   if (obj == nullptr) return nullptr;
-  auto& slot = obj->assoc_properties[std::string(name)];
+  // §8.13 with §8.15: a base's declaration hidden by one of the same name in
+  // a class the object derives from is a property of its own, which `super.m`
+  // and the base's methods reach, so it is held under "Base::m"; the nearest
+  // declaration keeps the bare name. Held under the name alone, the two
+  // declarations shared one array.
+  const ClassTypeInfo* nearest = nullptr;
+  FindAssocPropertyDecl(obj->type, name, ctx, nearest);
+  std::string key =
+      nearest == declaring || declaring == nullptr
+          ? std::string(name)
+          : std::string(declaring->name) + "::" + std::string(name);
+  auto& slot = obj->assoc_properties[key];
   if (slot == nullptr) slot = MakeAssocProperty(declaring, member, obj, ctx);
   if (owner != nullptr) *owner = obj;
   return slot;

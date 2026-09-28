@@ -49,6 +49,32 @@ uint32_t ClassArraySize(const ClassObject* obj,
 
 namespace {
 
+// §8.9: the value `ref` holds under `key` -- in the declaring class for a
+// static property, in the object for any other -- or null where it holds
+// none.
+const Logic4Vec* FindSlot(const ClassArrayRef& ref, const std::string& key) {
+  if (ref.static_owner != nullptr) {
+    auto it = ref.static_owner->static_properties.find(key);
+    return it != ref.static_owner->static_properties.end() ? &it->second
+                                                           : nullptr;
+  }
+  auto it = ref.obj->properties.find(key);
+  return it != ref.obj->properties.end() ? &it->second : nullptr;
+}
+
+// Writes `value` under `key` where `ref` holds its elements, and tells the
+// object's watchers of the change (§9.4.2); a static property's storage is
+// the class's.
+void SetSlot(const ClassArrayRef& ref, const std::string& key,
+             const Logic4Vec& value, SimContext& ctx) {
+  if (ref.static_owner != nullptr) {
+    ref.static_owner->static_properties[key] = value;
+    return;
+  }
+  ref.obj->SetProperty(key, value);
+  ctx.NotifyClassHandleWatchers(ref.obj->handle);
+}
+
 // The object a member access's handle side names: the running method's object
 // for `this`, else the object the handle the side evaluates to refers to.
 ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
@@ -70,11 +96,22 @@ Logic4Vec ElementDefault(const ClassTypeInfo::PropertyInfo& prop,
                         : MakeLogic4VecVal(arena, prop.width, 0);
 }
 
-// The reference `obj` and `prop` make, with the elements the object holds.
-ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo::PropertyInfo* prop,
-                      bool bare) {
-  ClassArrayRef ref{obj, prop, bare, ClassArraySize(obj, *prop),
+// The reference `obj` and `prop` make, with the elements the object holds,
+// or, for a static property, the elements the class `type` or the base
+// declaring it holds (§8.9); `obj` may then be null.
+ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo* type,
+                      const ClassTypeInfo::PropertyInfo* prop, bool bare) {
+  ClassArrayRef ref{obj, prop, bare, prop->array_size,
                     prop->is_dynamic ? 0 : prop->array_lo};
+  if (prop->is_static)
+    ref.static_owner = type->StaticPropertyDeclarer(prop->name);
+  if (ref.static_owner == nullptr && obj == nullptr) {
+    ref.static_owner = type;
+  }
+  if (prop->is_dynamic) {
+    const Logic4Vec* count = FindSlot(ref, ClassArraySizeKey(prop->name));
+    ref.size = count != nullptr ? static_cast<uint32_t>(count->ToUint64()) : 0;
+  }
   return ref;
 }
 
@@ -177,26 +214,39 @@ bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
     // property empty.
     if (ctx.FindLocalVariable(base->text) != nullptr) return false;
     ClassObject* self = ctx.CurrentThis();
-    if (self == nullptr) return false;
-    const auto* prop = FindClassArrayProperty(self->type, base->text);
-    if (prop == nullptr) return false;
-    out = MakeRef(self, prop, /*bare=*/true);
+    // §8.10: a static method has no object, and names its class's static
+    // properties bare.
+    const ClassTypeInfo* type =
+        self != nullptr ? self->type : ctx.CurrentMethodClass();
+    if (type == nullptr) return false;
+    const auto* prop = FindClassArrayProperty(type, base->text);
+    if (prop == nullptr || (self == nullptr && !prop->is_static)) return false;
+    out = MakeRef(self, type, prop, /*bare=*/true);
     // 18.5.7.1: a constraint's trial binds a dynamic array's size as it binds
     // its elements, so the size is the local's where one is in scope.
     if (auto* size = ctx.FindVariable(ClassArraySizeKey(base->text)))
       out.size = static_cast<uint32_t>(size->value.ToUint64());
     return true;
   }
-  if (base->kind != ExprKind::kMemberAccess || base->is_scope_resolution ||
-      base->lhs == nullptr || base->rhs == nullptr ||
-      base->rhs->kind != ExprKind::kIdentifier) {
+  if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
+      base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return false;
+  }
+  // §8.23: `C::sarr` names the static property of class C.
+  if (base->is_scope_resolution) {
+    if (base->lhs->kind != ExprKind::kIdentifier) return false;
+    const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
+    if (cls == nullptr) return false;
+    const auto* prop = FindClassArrayProperty(cls, base->rhs->text);
+    if (prop == nullptr || !prop->is_static) return false;
+    out = MakeRef(nullptr, cls, prop, /*bare=*/false);
+    return true;
   }
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   if (obj == nullptr) return false;
   const auto* prop = FindClassArrayProperty(obj->type, base->rhs->text);
   if (prop == nullptr) return false;
-  out = MakeRef(obj, prop, /*bare=*/false);
+  out = MakeRef(obj, obj->type, prop, /*bare=*/false);
   return true;
 }
 
@@ -208,11 +258,10 @@ void ResizeClassArray(const ClassArrayRef& ref, uint32_t size,
         init != nullptr && i < init->size
             ? OwnRhsWords(ReadClassArrayElement(*init, i, ctx, arena), arena)
             : ElementDefault(*ref.prop, arena);
-    ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, i), val);
+    SetSlot(ref, ClassArrayElementKey(ref.prop->name, i), val, ctx);
   }
-  ref.obj->SetProperty(ClassArraySizeKey(ref.prop->name),
-                       MakeLogic4VecVal(arena, 32, size));
-  ctx.NotifyClassHandleWatchers(ref.obj->handle);
+  SetSlot(ref, ClassArraySizeKey(ref.prop->name),
+          MakeLogic4VecVal(arena, 32, size), ctx);
 }
 
 Logic4Vec ReadClassArrayElement(const ClassArrayRef& ref, int64_t index,
@@ -221,6 +270,10 @@ Logic4Vec ReadClassArrayElement(const ClassArrayRef& ref, int64_t index,
   std::string key = ClassArrayElementKey(ref.prop->name, index);
   if (ref.bare) {
     if (auto* local = ctx.FindVariable(key)) return local->value;
+  }
+  if (ref.static_owner != nullptr) {
+    const Logic4Vec* held = FindSlot(ref, key);
+    return held != nullptr ? *held : ElementDefault(*ref.prop, arena);
   }
   return ref.obj->GetProperty(key, arena);
 }
@@ -275,10 +328,10 @@ void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
                             const Logic4Vec& value, SimContext& ctx,
                             Arena& arena) {
   if (!IndexInRange(ref, index)) return;
-  Logic4Vec stored =
-      CoerceToPropertyType(ref.obj->type, ref.prop->name, value, arena);
-  ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), stored);
-  ctx.NotifyClassHandleWatchers(ref.obj->handle);
+  Logic4Vec stored = CoerceToPropertyType(
+      ref.static_owner != nullptr ? ref.static_owner : ref.obj->type,
+      ref.prop->name, value, arena);
+  SetSlot(ref, ClassArrayElementKey(ref.prop->name, index), stored, ctx);
 }
 
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {

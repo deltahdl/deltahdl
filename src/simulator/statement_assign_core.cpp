@@ -476,15 +476,14 @@ static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
   return false;
 }
 
-// §7.5.1/§7.10/§8.4: an assignment that sizes or rebuilds an array object,
-// or constructs an object into an element, rather than writing a value:
-// `new[]` to a dynamic array property, one array property to another (§7.6),
+// §7.6/§7.10/§8.4: an assignment that rebuilds an array object, or
+// constructs an object into an element, rather than writing a value: one
+// array property to another (§7.6),
 // `new` to an element of an array property of class handles or of a declared
 // associative array of them (§7.8), or any assignment to a queue.
 static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
-  return TryClassArrayNewAssign(stmt, ctx, arena) ||
-         TryClassArrayWholeAssign(stmt, ctx, arena) ||
+  return TryClassArrayWholeAssign(stmt, ctx, arena) ||
          TryClassArrayElementNewAssign(stmt, ctx, arena) ||
          TryAssocElementNewAssign(stmt, ctx, arena) ||
          TryQueueBlockingAssign(stmt, ctx, arena);
@@ -508,12 +507,22 @@ static bool TryDispatchSyncAssign(const Stmt* stmt, SimContext& ctx,
 // represents, which an interface instance name, another virtual interface and
 // `null` each evaluate to (EvalIdentifier in evaluation.cpp), so no arm has to
 // bind it.
+// §7.5.1 and §8.4: `new[]` to a dynamic array property, and `new` to a class
+// handle, a typed one or a member one, one arm of the dispatch below. The
+// array form is asked first, since the property's element type may be a
+// class, whose handle forms would construct one object for it.
+static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  return TryClassArrayNewAssign(stmt, ctx, arena) ||
+         TryClassNewAssign(stmt, ctx, arena) ||
+         TryTypedClassNewAssign(stmt, ctx, arena) ||
+         TryMemberClassNewAssign(stmt, ctx, arena);
+}
+
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryDispatchSyncAssign(stmt, ctx, arena)) return true;
-  if (TryClassNewAssign(stmt, ctx, arena)) return true;
-  if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
-  if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;
+  if (TryDispatchNewAssign(stmt, ctx, arena)) return true;
   if (TryAssocMapAssign(stmt, ctx, arena)) return true;
   if (TryAssocCopyAssign(stmt, ctx)) return true;
   if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;

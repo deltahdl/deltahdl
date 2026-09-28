@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -183,6 +186,37 @@ TEST(DynamicArraySim, MemberOfAStructElement) {
   EXPECT_EQ(RunAndGet(src, "mod"), 9u);
   EXPECT_EQ(RunAndGet(src, "loc"), 9u);
   EXPECT_EQ(RunAndGet(src, "fn"), 9u);
+}
+
+// §7.5 with §8.4 and §8.5: a dynamic array property of a class type is sized
+// by new[] -- in a method and through a handle alike -- and each element is a
+// handle whose object's property an element select reaches.
+TEST(DynamicArraySim, PropertyOfClassHandlesSizedByNew) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Item;\n"
+      "    int id;\n"
+      "    function new(int i); id = i; endfunction\n"
+      "  endclass\n"
+      "  class Holder;\n"
+      "    Item items[];\n"
+      "    function void fill(int n); items = new[n];\n"
+      "      foreach (items[i]) items[i] = new(10 + i); endfunction\n"
+      "    function int total(); int s = 0; foreach (items[i]) s += "
+      "items[i].id;\n"
+      "      return s; endfunction\n"
+      "  endclass\n"
+      "  Holder h, g;\n"
+      "  initial begin\n"
+      "    h = new; h.fill(3); g = new;\n"
+      "    g.items = new[2]; g.items[1] = new(5);\n"
+      "    $display(\"%0d %0d %0d %0d\", h.items[2].id, h.total(),\n"
+      "             g.items.size(), g.items[1].id);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12 33 2 5\n");
 }
 
 }  // namespace

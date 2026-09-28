@@ -477,6 +477,13 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
                      const Logic4Vec& rhs_val, Arena& arena);
 
+// §7.4.2: the address of every leaf of the multidimensional fixed-size array
+// `info` describes, "[i][j]..." from each dimension's low bound, the lowest
+// address first and the last dimension varying fastest, so that two arrays of
+// one shape pair their elements by position (§7.6). Empty for an array of one
+// dimension. Defined in statement_assign_select.cpp.
+std::vector<std::string> MultiDimLeafSuffixes(const ArrayInfo& info);
+
 // Defined in statement_assign_select.cpp; also used by the array-copy form of a
 // pattern assignment in statement_assign_pattern.cpp. Copies element by
 // element over the overlap of the two arrays, leaving any excess destination

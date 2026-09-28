@@ -407,4 +407,84 @@ TEST(ArrayAssignmentSimulation, QueueAndDynamicArrayPropertiesAssignedAcross) {
   EXPECT_EQ(out, "3 20 3 30\n");
 }
 
+// §7.6 with §7.4.2: whole assignment and equality of multidimensional
+// fixed-size arrays of one shape take every element, a two- and a three-
+// dimensional array alike, and an unequal element makes the arrays unequal.
+TEST(ArrayAssignmentSimulation, MultidimensionalArraysCopiedAndComparedWhole) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a2[2][3], b2[2][3];\n"
+      "  int a3[2][3][4], b3[2][3][4];\n"
+      "  initial begin\n"
+      "    b2[1][2] = 21; b3[1][2][3] = 123; b3[0][0][1] = 4;\n"
+      "    a2 = b2; a3 = b3;\n"
+      "    $display(\"%0d %0d %0d %0d\", a2[1][2], a3[1][2][3], a2 == b2,\n"
+      "             a3 == b3);\n"
+      "    a3[0][0][1] = 5;\n"
+      "    $display(\"%0d %0d\", a3 == b3, a3 != b3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "21 123 1 1\n0 1\n");
+}
+
+// §7.4.4 with §7.6: a select omitting the fastest-varying indices names a
+// subarray, assigned from another subarray or a one-dimensional array of its
+// size and read into one, each by position.
+TEST(ArrayAssignmentSimulation, SubarraysAssignedByPosition) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int A[2][3][4], B[2][3][4], C[5][4], R[4];\n"
+      "  initial begin\n"
+      "    foreach (B[i,j,k]) B[i][j][k] = i*100 + j*10 + k;\n"
+      "    foreach (C[i,j]) C[i][j] = 6 + j;\n"
+      "    A[0][2] = C[0];\n"
+      "    A[1] = B[0];\n"
+      "    R = B[1][2];\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", A[0][2][0], A[0][2][3],\n"
+      "             A[1][1][3], A[1][2][3], R[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 9 13 23 123\n");
+}
+
+// §7.6: a dynamic array assigned to a fixed-size subarray pairs left to
+// right, so B[0] reaches the left end of a `[100:1]` row, index 100; a
+// dynamic array of another size is a run-time error and writes nothing.
+TEST(ArrayAssignmentSimulation, DynamicArrayToAFixedSubarray) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[2][100:1];\n"
+      "  int B[] = new[100];\n"
+      "  int C[] = new[8];\n"
+      "  initial begin\n"
+      "    B[0] = 7; B[99] = 100;\n"
+      "    A[1] = B;\n"
+      "    A[0][3] = 42;\n"
+      "    A[0] = C;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 9, "7.6"));
+  auto* left = f.ctx.FindVariable("A[1][100]");
+  auto* right = f.ctx.FindVariable("A[1][1]");
+  auto* kept = f.ctx.FindVariable("A[0][3]");
+  ASSERT_NE(left, nullptr);
+  ASSERT_NE(right, nullptr);
+  ASSERT_NE(kept, nullptr);
+  EXPECT_EQ(left->value.ToUint64(), 7u);
+  EXPECT_EQ(right->value.ToUint64(), 100u);
+  EXPECT_EQ(kept->value.ToUint64(), 42u);
+}
+
 }  // namespace

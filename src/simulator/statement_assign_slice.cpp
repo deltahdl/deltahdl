@@ -5,11 +5,13 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -119,7 +121,149 @@ static bool IsCompoundSelect(const Expr* expr) {
          expr->base->kind == ExprKind::kSelect && !expr->index_end;
 }
 
+// §7.4.4: a fixed-size array, or the subarray a select of one names by
+// omitting its fastest-varying indices -- `A[1]` of `int A[2][3]`,
+// `A[0][2]` of `int A[2][3][4]` -- as the names of its elements in the
+// positional order §7.6 pairs two arrays by, and the sizes of its remaining
+// dimensions.
+struct SubarrayElems {
+  std::vector<std::string> names;
+  std::vector<uint32_t> shape;
+};
+
+// One dimension of a fixed-size array as §7.6 walks it: its low bound, its
+// element count, and whether it is declared from the higher bound down.
+struct DeclaredDim {
+  uint32_t lo;
+  uint32_t size;
+  bool descending;
+};
+
+// The dimensions `info` records, outermost first: a multidimensional array's
+// each, a one-dimensional array's one.
+static std::vector<DeclaredDim> DeclaredDims(const ArrayInfo& info) {
+  std::vector<DeclaredDim> dims;
+  if (info.dim_sizes.size() < 2 ||
+      info.dim_los.size() != info.dim_sizes.size()) {
+    dims.push_back({info.lo, info.size, info.is_descending});
+    return dims;
+  }
+  for (size_t d = 0; d < info.dim_sizes.size(); ++d) {
+    bool desc = d < info.dim_descending.size() ? info.dim_descending[d]
+                                               : d == 0 && info.is_descending;
+    dims.push_back({info.dim_los[d], info.dim_sizes[d], desc});
+  }
+  return dims;
+}
+
+// Appends the name of every element under `prefix` across `dims` from `d`
+// on, each dimension walked from its left bound (§7.6: "Correspondence
+// between elements is determined by the left-to-right order of elements in
+// each array").
+static void AppendLeftToRight(const std::vector<DeclaredDim>& dims, size_t d,
+                              const std::string& prefix,
+                              std::vector<std::string>& out) {
+  if (d == dims.size()) {
+    out.push_back(prefix);
+    return;
+  }
+  const DeclaredDim& dim = dims[d];
+  for (uint32_t i = 0; i < dim.size; ++i) {
+    uint32_t index = dim.descending ? dim.lo + dim.size - 1 - i : dim.lo + i;
+    AppendLeftToRight(dims, d + 1, prefix + "[" + std::to_string(index) + "]",
+                      out);
+  }
+}
+
+// `expr` as a whole fixed-size array or one of its subarrays, into `out`;
+// false for an expression naming an element, a slice or anything else.
+static bool ResolveSubarray(const Expr* expr, SimContext& ctx, Arena& arena,
+                            SubarrayElems& out) {
+  std::vector<const Expr*> indices;
+  const Expr* e = expr;
+  for (; e != nullptr && e->kind == ExprKind::kSelect; e = e->base) {
+    if (e->index == nullptr || e->index_end != nullptr) return false;
+    indices.insert(indices.begin(), e->index);
+  }
+  if (e == nullptr || e->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* info = ctx.FindArrayInfo(e->text);
+  if (info == nullptr || info->is_dynamic || info->is_queue) return false;
+  std::vector<DeclaredDim> dims = DeclaredDims(*info);
+  if (indices.size() >= dims.size()) return false;
+  std::string prefix(e->text);
+  for (const Expr* index : indices) {
+    prefix += "[" +
+              std::to_string(static_cast<int64_t>(
+                  EvalExpr(index, ctx, arena).ToUint64())) +
+              "]";
+  }
+  dims.erase(dims.begin(), dims.begin() + static_cast<long>(indices.size()));
+  for (const DeclaredDim& dim : dims) out.shape.push_back(dim.size);
+  AppendLeftToRight(dims, 0, prefix, out.names);
+  return true;
+}
+
+// The element values of the source of an assignment to the subarray `dst`:
+// another fixed-size array or subarray of its shape, or a dynamic array or
+// queue of its element count; false where the source is none of these, and
+// a §7.6 error, the assignment writing nothing, where the sizes differ.
+static bool SubarraySourceValues(const Stmt* stmt, const SubarrayElems& dst,
+                                 SimContext& ctx, Arena& arena,
+                                 std::vector<Logic4Vec>& vals) {
+  SubarrayElems src;
+  bool sized = false;
+  if (ResolveSubarray(stmt->rhs, ctx, arena, src)) {
+    sized = src.shape == dst.shape;
+    for (const std::string& name : src.names) {
+      const Variable* v = ctx.FindVariable(name);
+      vals.push_back(v != nullptr ? OwnRhsWords(v->value, arena)
+                                  : MakeLogic4VecVal(arena, 32, 0));
+    }
+  } else if (const QueueObject* q = stmt->rhs->kind == ExprKind::kIdentifier
+                                        ? ctx.FindQueue(stmt->rhs->text)
+                                        : nullptr) {
+    sized = dst.shape.size() == 1 && q->elements.size() == dst.shape[0];
+    for (const auto& elem : q->elements)
+      vals.push_back(OwnRhsWords(elem, arena));
+  } else {
+    return false;
+  }
+  if (!sized) {
+    ctx.GetDiag().Error(stmt->range.start,
+                        "array size mismatch in assignment to fixed-size array",
+                        Subclause("7.6"));
+    vals.clear();
+  }
+  return true;
+}
+
+// §7.4.4 with §7.6: an assignment one of whose sides is a subarray of a
+// multidimensional fixed-size array, `A[1] = B[0]`, `A[0][2] = C[0]`,
+// `R = B[1]`, or a dynamic array assigned to such a subarray, copies element
+// by element by position. False where neither side is a select naming a
+// subarray or the other side is no array.
+static bool TryFixedSubarrayAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (stmt->rhs == nullptr || (stmt->lhs->kind != ExprKind::kSelect &&
+                               stmt->rhs->kind != ExprKind::kSelect)) {
+    return false;
+  }
+  SubarrayElems dst;
+  if (!ResolveSubarray(stmt->lhs, ctx, arena, dst)) return false;
+  std::vector<Logic4Vec> vals;
+  if (!SubarraySourceValues(stmt, dst, ctx, arena, vals)) return false;
+  for (size_t i = 0; i < vals.size() && i < dst.names.size(); ++i) {
+    Variable* var = ctx.FindVariable(dst.names[i]);
+    if (var == nullptr) continue;
+    var->value = ResizeToWidth(vals[i], var->value.width, arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
+    var->NotifyWatchers();
+  }
+  return true;
+}
+
 bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (TryFixedSubarrayAssign(stmt, ctx, arena)) return true;
   if (!IsCompoundSelect(stmt->lhs) || !IsCompoundSelect(stmt->rhs))
     return false;
   std::string dst_prefix, src_prefix;

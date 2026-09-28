@@ -682,4 +682,32 @@ TEST(StaticPropertySim, StaticHandleInitializedWithNewHoldsAnObject) {
   EXPECT_EQ(RunAndGet(kSrc, "ci"), 5u);
 }
 
+// §8.9 with §7.4.2 and §7.5: a static fixed or dynamic array property is one
+// storage shared by every object -- written by a static method through
+// `C::`, it reads the same through `C::`, through two handles and from an
+// instance method, and a dynamic one keeps the count new[] gave it.
+TEST(StaticClassPropertySim, StaticArrayPropertiesAreShared) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    static int sarr[3];\n"
+      "    static int sd[];\n"
+      "    static function void init(); sarr[2] = 7; sd = new[3]; sd[1] = 5;\n"
+      "    endfunction\n"
+      "    function int get(); return sarr[2] * 10 + sd[1]; endfunction\n"
+      "  endclass\n"
+      "  C g, k;\n"
+      "  initial begin\n"
+      "    g = new; k = new;\n"
+      "    C::init();\n"
+      "    k.sarr[0] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", C::sarr[2], g.sarr[2],\n"
+      "             k.get(), C::sd.size(), g.sd[1], g.sarr[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 7 75 3 5 4\n");
+}
+
 }  // namespace

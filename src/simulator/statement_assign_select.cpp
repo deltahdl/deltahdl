@@ -444,9 +444,54 @@ Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
   return ResizeToWidth(val, q.elem_width, arena);
 }
 
+static void AppendLeafSuffixes(const ArrayInfo& info, size_t d,
+                               const std::string& prefix,
+                               std::vector<std::string>& out) {
+  if (d == info.dim_sizes.size()) {
+    out.push_back(prefix);
+    return;
+  }
+  for (uint32_t i = 0; i < info.dim_sizes[d]; ++i) {
+    AppendLeafSuffixes(info, d + 1,
+                       prefix + "[" + std::to_string(info.dim_los[d] + i) + "]",
+                       out);
+  }
+}
+
+std::vector<std::string> MultiDimLeafSuffixes(const ArrayInfo& info) {
+  std::vector<std::string> out;
+  if (info.dim_sizes.size() < 2 ||
+      info.dim_los.size() != info.dim_sizes.size()) {
+    return out;
+  }
+  AppendLeafSuffixes(info, 0, "", out);
+  return out;
+}
+
+// §7.6 with §7.4.2: a multidimensional array copied whole takes every leaf
+// of a source of its shape, by position; nothing where the shapes differ.
+static void CopyMultiDimLeaves(std::string_view dst_name, const ArrayInfo& dst,
+                               std::string_view src_name, const ArrayInfo& src,
+                               SimContext& ctx) {
+  if (dst.dim_sizes != src.dim_sizes) return;
+  std::vector<std::string> ds = MultiDimLeafSuffixes(dst);
+  std::vector<std::string> ss = MultiDimLeafSuffixes(src);
+  for (size_t i = 0; i < ds.size() && i < ss.size(); ++i) {
+    auto* sv = ctx.FindVariable(std::string(src_name) + ss[i]);
+    auto* dv = ctx.FindVariable(std::string(dst_name) + ds[i]);
+    if (sv == nullptr || dv == nullptr) continue;
+    dv->value = OwnRhsWords(sv->value, ctx.GetArena());
+    dv->NotifyWatchers();
+  }
+}
+
 void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
                        std::string_view src_name, const ArrayInfo& src,
                        SimContext& ctx) {
+  if (dst.dim_sizes.size() >= 2 || src.dim_sizes.size() >= 2) {
+    CopyMultiDimLeaves(dst_name, dst, src_name, src, ctx);
+    return;
+  }
   uint32_t n = std::min(dst.size, src.size);
   for (uint32_t i = 0; i < n; ++i) {
     uint32_t si =

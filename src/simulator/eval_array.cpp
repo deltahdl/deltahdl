@@ -298,8 +298,61 @@ struct ArrayCtx {
 // explicitly so this serves both the parenthesized call form (method name on
 // expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
 // name on expr->rhs). The result takes the width of the with expression.
+// §7.12.3: the with clause's value for row `row` of the two-dimensional array
+// of `ac`, the iterator bound to the row as the one-dimensional array it is,
+// its elements the row's, so that `item.sum with (item)` reduces the row.
+static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
+                                const IterNames& names, uint32_t row) {
+  SimContext& ctx = ac.ctx;
+  const ArrayInfo& info = ac.info;
+  ArrayInfo row_info;
+  row_info.lo = info.dim_los[1];
+  row_info.size = info.dim_sizes[1];
+  row_info.elem_width = info.elem_width;
+  row_info.is_4state = info.is_4state;
+  std::string prefix = std::string(ac.var_name) + "[" +
+                       std::to_string(info.dim_los[0] + row) + "]";
+  ctx.PushScope();
+  for (uint32_t j = 0; j < row_info.size; ++j) {
+    std::string index = "[" + std::to_string(row_info.lo + j) + "]";
+    const Variable* leaf = ctx.FindVariable(prefix + index);
+    auto* name =
+        ac.arena.Create<std::string>(std::string(names.iter_name) + index);
+    ctx.CreateLocalVariable(*name, info.elem_width)->value =
+        leaf != nullptr ? leaf->value
+                        : MakeLogic4VecVal(ac.arena, info.elem_width, 0);
+  }
+  ctx.RegisterArrayInScope(names.iter_name, row_info);
+  ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
+      MakeLogic4VecVal(ac.arena, 32, info.dim_los[0] + row);
+  Logic4Vec value = EvalExpr(expr->with_expr, ctx, ac.arena);
+  ctx.PopScope();
+  return value;
+}
+
+// §7.12.3: a two-dimensional fixed-size array reduced through a with clause
+// is reduced over the elements of its first dimension, each a row, which
+// §7.12.3's own `m.sum with (item.sum with (item))` example relies on.
+static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
+                                    std::string_view method) {
+  IterNames names = ExtractIterNames(expr);
+  std::vector<uint64_t> vals;
+  uint32_t width = 0;
+  for (uint32_t row = 0; row < ac.info.dim_sizes[0]; ++row) {
+    Logic4Vec value = EvalWithForRow(ac, expr, names, row);
+    if (row == 0) width = value.width;
+    vals.push_back(value.ToUint64());
+  }
+  if (width == 0) width = ac.info.elem_width;
+  return MakeLogic4VecVal(ac.arena, width, ApplyReduction(method, vals));
+}
+
 static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
                                 std::string_view method) {
+  if (ac.info.dim_sizes.size() == 2 && ac.info.dim_los.size() == 2 &&
+      expr->with_expr != nullptr) {
+    return ReduceRowsWithExpr(ac, expr, method);
+  }
   auto elems = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};

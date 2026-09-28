@@ -256,6 +256,11 @@ static bool TryFuncCompoundAssign(const Stmt* stmt, SimContext& ctx,
 static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   if (TryFuncCompoundAssign(stmt, ctx, arena)) return true;
+  // §7.5.1: `new[]` assigned to a dynamic array property of the enclosing
+  // class, or of an object a handle names, resizes it -- asked first, since
+  // the element type of such a property may be a class, which the handle
+  // forms below would take the `new` for and construct one object of.
+  if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
   // §8.4: resolve `new` against the property named on the left before the
   // right-hand side is evaluated without it.
   // A local of the same name shadows the property, so the unqualified form
@@ -276,9 +281,6 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // handle null. TryClassNewAssign declines unless the target has a known
   // class type.
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
-  // §7.5.1: `new[]` assigned to a dynamic array property of the enclosing
-  // class, or of an object a handle names, resizes it.
-  if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
   // §7.6: one array property assigned to another copies its elements.
   if (TryClassArrayWholeAssign(stmt, ctx, arena)) return true;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue

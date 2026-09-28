@@ -276,4 +276,32 @@ TEST(SuperSimulation, SuperNamesAnInheritedAssociativeProperty) {
   EXPECT_EQ(v, 294u);
 }
 
+// §8.15 with §8.13 and §7.8: a subclass's associative-array property of the
+// same name as its base's hides it without sharing it -- `m` in the subclass
+// and `super.m` are two arrays, and a method of the base counts its own.
+TEST(SuperSimulation, SuperReachesAHiddenBaseAssociativeProperty) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class Base;\n"
+      "    int m[string];\n"
+      "    function int base_num(); return m.num(); endfunction\n"
+      "  endclass\n"
+      "  class Sub extends Base;\n"
+      "    int m[string];\n"
+      "    function void fill(); m[\"a\"] = 9; super.m[\"b\"] = 1;\n"
+      "      super.m[\"c\"] = 2; endfunction\n"
+      "    function int show(); return super.m.num() * 100 + m.num() * 10\n"
+      "      + super.m[\"c\"]; endfunction\n"
+      "  endclass\n"
+      "  Sub s;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    s = new; s.fill();\n"
+      "    result = s.show() * 10 + s.base_num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 2122u);
+}
+
 }  // namespace
