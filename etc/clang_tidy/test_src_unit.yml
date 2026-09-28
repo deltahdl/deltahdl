@@ -69,7 +69,7 @@ CheckOptions:
   # Parenthesized for the reason FunctionIgnoredRegexp's comment gives: bare,
   # the check's ^…$ anchors bind to the first and last alternatives alone,
   # and an append_item passed on end.
-  readability-identifier-naming.MethodIgnoredRegexp: '(get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data)'
+  readability-identifier-naming.MethodIgnoredRegexp: '(get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|await_transform|push_back|begin|end|size|empty|data)'
   readability-identifier-naming.NamespaceCase: lower_case
   readability-identifier-naming.ParameterCase: lower_case
   # IEEE 1800-2023: the parameter names the prototypes of vpi_user.h and

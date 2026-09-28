@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/exec_task.h"

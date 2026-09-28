@@ -193,14 +193,16 @@ TEST(ClassSim, ThisMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 3u}, {"rb", 7u}});
 }
 
-// §9.4.2: "Changing the value of object data members, aggregate elements, or
-// the size of a dynamically sized array referenced by a method or function
-// shall cause the event expression to be reevaluated". A class handle's own
+// §9.4.2: a change to a data member of an object, to an element of an
+// aggregate or to the size of a dynamic array, read through a method or a
+// function, reevaluates the event expression. A class handle's own
 // bits never move, so the announcement is the whole of what a process reading
 // `obj.f` has to go on, and the clause draws no distinction between the
-// spellings the four cases below use. This one writes the property by its bare
-// name inside a method.
-TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+// spellings the four cases below use. The reader is an event control on the
+// property, `@(obj.f)`: an always_comb reading `obj.f` is no reader here,
+// since §9.2.2.2.1 keeps references to class objects out of its sensitivity.
+// This one writes the property by its bare name inside a method.
+TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -210,7 +212,7 @@ TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
       "  endclass\n"
       "  C obj = new();\n"
       "  int b;\n"
-      "  always_comb b = obj.f;\n"
+      "  always @(obj.f) b = obj.f;\n"
       "  initial begin\n"
       "    #1 obj.bump();\n"
       "    #1 $finish;\n"
@@ -222,7 +224,7 @@ TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
 }
 
 // §8.11's `this.f`, a different write site from the bare name above.
-TEST(ClassSim, ThisPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+TEST(ClassSim, ThisPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -232,7 +234,7 @@ TEST(ClassSim, ThisPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
       "  endclass\n"
       "  C obj = new();\n"
       "  int b;\n"
-      "  always_comb b = obj.f;\n"
+      "  always @(obj.f) b = obj.f;\n"
       "  initial begin\n"
       "    #1 obj.bump();\n"
       "    #1 $finish;\n"
@@ -244,7 +246,7 @@ TEST(ClassSim, ThisPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
 }
 
 // §8.15's `super.f`, which writes the parent slice through a third site again.
-TEST(ClassSim, SuperPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
+TEST(ClassSim, SuperPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -256,7 +258,7 @@ TEST(ClassSim, SuperPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
       "  endclass\n"
       "  D obj = new();\n"
       "  int b;\n"
-      "  always_comb b = obj.f;\n"
+      "  always @(obj.f) b = obj.f;\n"
       "  initial begin\n"
       "    #1 obj.bump();\n"
       "    #1 $finish;\n"
@@ -270,7 +272,7 @@ TEST(ClassSim, SuperPropertyWriteInMethodWakesAnAlwaysCombReadingIt) {
 // The guard: the write spelled through the handle, which announced itself all
 // along. It pins the arm that worked, so the three above cannot be paid for by
 // moving the notification off it.
-TEST(ClassSim, HandlePropertyWriteWakesAnAlwaysCombReadingIt) {
+TEST(ClassSim, HandlePropertyWriteWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -279,7 +281,7 @@ TEST(ClassSim, HandlePropertyWriteWakesAnAlwaysCombReadingIt) {
       "  endclass\n"
       "  C obj = new();\n"
       "  int b;\n"
-      "  always_comb b = obj.f;\n"
+      "  always @(obj.f) b = obj.f;\n"
       "  initial begin\n"
       "    #1 obj.f = 1;\n"
       "    #1 $finish;\n"
@@ -301,11 +303,10 @@ TEST(ClassSim, PropertyWriteThroughOneHandleWakesAnAliasOfTheSameObject) {
       "    int f;\n"
       "  endclass\n"
       "  C obj = new();\n"
-      "  C q;\n"
+      "  C q = obj;\n"
       "  int b;\n"
-      "  always_comb b = q.f;\n"
+      "  always @(q.f) b = q.f;\n"
       "  initial begin\n"
-      "    q = obj;\n"
       "    #1 obj.f = 1;\n"
       "    #1 $finish;\n"
       "  end\n"
