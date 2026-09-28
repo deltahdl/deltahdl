@@ -105,6 +105,9 @@ TEST(CastOperatorSim, CastUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// §6.24.1: the cast truncates to shortint's 16 bits and is signed, as a
+// shortint variable is, so 16'hABCD is a negative value, and its assignment
+// to the 32-bit `result` extends it by its sign (§10.7).
 TEST(CastOperatorSim, CastShortint) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -119,7 +122,7 @@ TEST(CastOperatorSim, CastShortint) {
       f, "result");
   ASSERT_NE(var, nullptr);
 
-  EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFABCDu);
 }
 
 TEST(TypeOperatorSim, TypeOpStructMemberWidth) {
