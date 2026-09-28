@@ -119,15 +119,57 @@ struct AggregateOperandNames {
   const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>& arrays;
 };
 
+// §11.3's Table 11-1: the operators whose operands are integral or real
+// alone -- arithmetic, bitwise, logical, relational, shift, implication and
+// equivalence, reduction and increment -- which an unpacked structure or union
+// is not. The equality and case equality operators, `?:`, the assignments and
+// `matches` (§12.6) take one, and are left out.
+bool TakesIntegralOrRealOperands(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPlus:
+    case TokenKind::kMinus:
+    case TokenKind::kStar:
+    case TokenKind::kSlash:
+    case TokenKind::kPercent:
+    case TokenKind::kPower:
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTilde:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kTildePipe:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+    case TokenKind::kAmpAmp:
+    case TokenKind::kPipePipe:
+    case TokenKind::kBang:
+    case TokenKind::kLt:
+    case TokenKind::kGt:
+    case TokenKind::kLtEq:
+    case TokenKind::kGtEq:
+    case TokenKind::kLtLt:
+    case TokenKind::kGtGt:
+    case TokenKind::kLtLtLt:
+    case TokenKind::kGtGtGt:
+    case TokenKind::kPlusPlus:
+    case TokenKind::kMinusMinus:
+    case TokenKind::kArrow:
+    case TokenKind::kLtDashGt:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool NamesIn(const Expr* e, const std::unordered_set<std::string_view>& set) {
   return e != nullptr && e->kind == ExprKind::kIdentifier &&
          set.count(e->text) != 0;
 }
 
 // §11.4.13 makes the left operand of `inside` singular, which neither an
-// unpacked array nor an unpacked structure is; §11.3's Table 11-1 takes an
-// unpacked structure or union as an operand of the equality, case equality,
-// conditional and assignment operators alone.
+// unpacked array nor an unpacked structure is; §11.3's Table 11-1 keeps an
+// unpacked structure or union out of the operators TakesIntegralOrRealOperands
+// lists.
 void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
                                DiagEngine& diag) {
   if (e->kind == ExprKind::kInside && e->lhs != nullptr &&
@@ -138,9 +180,10 @@ void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
                Subclause("11.4.13"));
     return;
   }
-  bool binary = e->kind == ExprKind::kBinary && !IsEqualityOp(e->op) &&
-                e->op != TokenKind::kEq;
-  if (!binary && e->kind != ExprKind::kUnary) return;
+  bool binary = e->kind == ExprKind::kBinary;
+  if ((!binary && e->kind != ExprKind::kUnary) ||
+      !TakesIntegralOrRealOperands(e->op))
+    return;
   for (const Expr* side : {e->lhs, binary ? e->rhs : nullptr}) {
     if (!NamesIn(side, n.structs)) continue;
     diag.Error(

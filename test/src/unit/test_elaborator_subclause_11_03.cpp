@@ -61,4 +61,20 @@ TEST(OperatorOperandTypeElaboration, PackedStructOperandAndEqualityAreLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §12.6 has `matches` take a tagged union, which is an unpacked union unless
+// declared packed, so a `matches` operand is not an operand Table 11-1 bars.
+TEST(OperatorOperandTypeElaboration, TaggedUnionOperandOfMatchesIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { struct { int v; int w; } a; void b; } u_t;\n"
+      "  u_t tmp = tagged a '{5, 0};\n"
+      "  int val;\n"
+      "  initial val = tmp matches tagged a '{.v, 0} ? v : 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
