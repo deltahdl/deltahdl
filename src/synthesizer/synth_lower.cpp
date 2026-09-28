@@ -359,7 +359,16 @@ bool SynthLower::IsSignedExpr(const Expr* expr) {
   }
 }
 
+// §11.8.2: an operand is extended to the size of the expression it stands in,
+// by its sign where the type propagated down to it is signed (§11.8.1 making
+// the expression signed only where every operand is). Above its own width a
+// signed identifier in a signed context therefore answers its top bit, so
+// `a ^ s` with `s` a four-bit signed 4'b1000 in an eight-bit signed context
+// reads 8'hF8 where the zeros GetSignalBit answers read 8'h08.
 uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
+  uint32_t width = SignalWidth(name);
+  if (propagated_signed_ && width > 0 && bit >= width && IsSignedSignal(name))
+    return GetSignalBit(name, width - 1);
   return GetSignalBit(name, bit);
 }
 

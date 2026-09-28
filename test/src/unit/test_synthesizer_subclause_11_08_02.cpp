@@ -74,4 +74,43 @@ TEST(ComparisonOperandSizeSynthesis,
       });
 }
 
+// The value `b` stands for in a four-bit signed context: its two bits with the
+// top one copied into bits 3 and 2.
+uint64_t SignExtendedFromTwoBits(uint64_t b) {
+  return (b & 0x2u) != 0 ? (b | 0xCu) : b;
+}
+
+// The test fails on a lowering that zero-extends a signed operand of a binary
+// operator narrower than the expression. §11.8.1 makes `a ^ b` signed with
+// both operands signed, §11.6.1 Table 11-21 makes both operands of `^`
+// context-determined, and §11.8.2 extends each to the expression's four bits
+// by its sign where the propagated type is signed. A zero-extending lowering
+// disagrees wherever `b` has its top bit set.
+TEST(OperandExtensionSynthesis, ASignedBitwiseOperandIsSignExtended) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input signed [1:0] b", "a ^ b"), 4,
+      [](uint64_t a, uint64_t b) -> uint64_t {
+        return (a ^ SignExtendedFromTwoBits(b)) & 0xFu;
+      });
+}
+
+// The same of `+`, whose operands Table 11-21 makes context-determined too:
+// `b` = 2'b10 is -2, so `a + b` subtracts 2 where a zero-extended `b` adds 2.
+TEST(OperandExtensionSynthesis, ASignedAdditionOperandIsSignExtended) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input signed [1:0] b", "a + b"), 4,
+      [](uint64_t a, uint64_t b) -> uint64_t {
+        return (a + SignExtendedFromTwoBits(b)) & 0xFu;
+      });
+}
+
+// §11.8.1 makes the expression unsigned where either operand is, so an
+// unsigned `b` beside a signed `a` is zero-extended. The test fails on a
+// lowering that sign-extends every narrower operand.
+TEST(OperandExtensionSynthesis, AnUnsignedOperandBesideASignedOneIsZeroFilled) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input [1:0] b", "a ^ b"), 4,
+      [](uint64_t a, uint64_t b) -> uint64_t { return (a ^ b) & 0xFu; });
+}
+
 }  // namespace
