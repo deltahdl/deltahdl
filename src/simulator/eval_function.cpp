@@ -401,23 +401,15 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   return *key;
 }
 
-static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
-                              ClassScopeInfo& info) {
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
-  info.access = expr->lhs;
-  info.class_name = ScopedClassKey(info.access->lhs, arena);
-  if (info.class_name.empty()) return false;
-  if (!info.access->rhs || info.access->rhs->kind != ExprKind::kIdentifier)
-    return false;
-  info.cls = ctx.FindClassType(info.class_name);
-  if (!info.cls) info.cls = ClassNamedByTypeParam(info.class_name, ctx, arena);
-  if (!info.cls) return false;
-  // §8.13 with §8.23: a class inherits its base's methods, so `Q::pk()` on
-  // `class Q extends P` calls P's static pk, run under the level declaring it
-  // -- the specialization `class E extends Mem #(4)` names, for `E::sk()`.
-  // Looked up on the named class alone, the call found nothing and answered
-  // 0. A constructor is the named class's own.
-  std::string name(info.access->rhs->text);
+// §8.13 with §8.23: a class inherits its base's methods, so `Q::pk()` on
+// `class Q extends P` calls P's static pk, run under the level declaring it
+// -- the specialization `class E extends Mem #(4)` names, for `E::sk()`.
+// Looked up on the named class alone, the call found nothing and answered
+// 0. A constructor is the named class's own. Sets info.method, and info.cls
+// to the declaring level for an inherited static method.
+static bool FindInheritedMethod(std::string_view method_name, SimContext& ctx,
+                                ClassScopeInfo& info) {
+  std::string name(method_name);
   for (const ClassTypeInfo* t = info.cls; t != nullptr; t = t->parent) {
     auto it = t->methods.find(name);
     if (it == t->methods.end()) {
@@ -429,10 +421,25 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
       if (ClassTypeInfo* declaring = ctx.FindClassType(t->name))
         info.cls = declaring;
     }
-    info.is_void = (info.method->return_type.kind == DataTypeKind::kVoid);
     return true;
   }
   return false;
+}
+
+static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
+                              ClassScopeInfo& info) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  info.access = expr->lhs;
+  info.class_name = ScopedClassKey(info.access->lhs, arena);
+  if (info.class_name.empty()) return false;
+  if (!info.access->rhs || info.access->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  info.cls = ctx.FindClassType(info.class_name);
+  if (!info.cls) info.cls = ClassNamedByTypeParam(info.class_name, ctx, arena);
+  if (!info.cls) return false;
+  if (!FindInheritedMethod(info.access->rhs->text, ctx, info)) return false;
+  info.is_void = (info.method->return_type.kind == DataTypeKind::kVoid);
+  return true;
 }
 
 // Computes the width of a class method's return variable, evaluating the
