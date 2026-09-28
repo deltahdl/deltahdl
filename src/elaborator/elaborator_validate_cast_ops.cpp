@@ -117,6 +117,13 @@ void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (s->kind == StmtKind::kAssign && s->rhs) {
     WalkExprForAssignInExpr(s->rhs, true);
   }
+  // §11.3.6 names the event expression without regard to where the event
+  // control stands: as a statement, `@((a = b)) ...`, or within an assignment,
+  // `c = @((a = b)) 2`, whose events the statement holds as its own.
+  for (const EventExpr& ev : s->events) {
+    WalkExprForAssignInExpr(ev.signal, true);
+    WalkExprForAssignInExpr(ev.iff_condition, true);
+  }
   // §11.3.6 says "It shall be illegal to include an assignment operator in an
   // event expression, in an expression within a procedural continuous
   // assignment, or in an expression that is not within a procedural

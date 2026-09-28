@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -56,6 +58,40 @@ TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
                                  "x", "y");
   EXPECT_EQ(x, 1u);
   EXPECT_EQ(y, 1u);
+}
+
+// §11.4.13 makes the left operand of `inside` a singular expression, and an
+// unpacked array is none, so `arr inside {q}` is illegal. It elaborated clean
+// and answered 1.
+TEST(InsideOperatorElaboration, UnpackedArrayLeftOperandIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int arr[3] = '{1, 2, 3};\n"
+      "  int q[$] = {1, 2, 3};\n"
+      "  bit r;\n"
+      "  initial r = arr inside {q};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the left operand of inside shall be singular", 5,
+                            "11.4.13"));
+}
+
+// An unpacked array in the set is where §11.4.13 puts one, each of its
+// elements a member, so it is not reported.
+TEST(InsideOperatorElaboration, UnpackedArrayInTheSetIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr[3] = '{1, 2, 3};\n"
+      "  int x = 2;\n"
+      "  bit r;\n"
+      "  initial r = x inside {arr};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

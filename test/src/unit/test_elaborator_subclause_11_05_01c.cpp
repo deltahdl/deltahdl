@@ -247,4 +247,48 @@ TEST(SelectElaboration, SelectOnConcatLvalueInAForLoopStepNames11_4_12) {
                             "11.4.12"));
 }
 
+// §11.5.1 bars a bit-select or part-select of a scalar alone, and §6.18 makes
+// a variable declared through a typedef the type the typedef names: `B y`
+// under `typedef logic [7:0] B` is an eight-bit vector, `T x` under `typedef
+// logic [1:0][3:0] T` a packed array, and `W w` under `typedef int W` an
+// integer atom. None of them is a scalar, so their selects elaborate. The
+// name was not followed to the type it stands for, and every one of them was
+// reported as a select of a scalar.
+TEST(SelectElaboration, SelectsOfTypedefDeclaredVectorsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef logic [7:0] B;\n"
+      "  typedef logic [1:0][3:0] T;\n"
+      "  typedef int W;\n"
+      "  B y; T x; W w;\n"
+      "  logic [1:0] v; logic u;\n"
+      "  initial begin\n"
+      "    v = y[1:0]; u = y[4];\n"
+      "    u = x[1][0]; v = x[0][3 -: 2];\n"
+      "    u = w[31];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A typedef of a scalar type stands for a scalar, so a select of a variable
+// declared through it is still the illegal case.
+TEST(SelectElaboration, SelectOfATypedefDeclaredScalarIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef logic L;\n"
+      "  L s;\n"
+      "  logic u;\n"
+      "  initial u = s[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            5, "11.5.1"));
+}
+
 }  // namespace

@@ -58,6 +58,11 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkStmtsForAssocOperand(const Stmt* s);
   void CheckAssocOperandInBinaryExpr(const Expr* e);
 
+  // §11.3 and §11.4.13: an unpacked structure or union as an operand of an
+  // operator that takes no aggregate, and an unpacked array or structure as
+  // the left operand of `inside`.
+  void ValidateAggregateOperands(const ModuleDecl* decl);
+
   void ValidateArrayPatternElemType(const ModuleDecl* decl);
   void WalkStmtsForArrayPatternElemType(const Stmt* s);
   void CheckArrayPatternElemTypeInAssign(const Stmt* s);
@@ -124,6 +129,12 @@ class ElaboratorOperationRules : public ElaboratorData {
   // which WalkExprForCast reaches for every expression.
   void CheckSigningSystemCallExpr(const Expr* expr);
   bool CastOperandIsReal(const Expr* operand) const;
+
+  // §11.12: a let used before its declaration in its scope, and a let
+  // referenced through a hierarchical name.
+  void ValidateLetScope(const ModuleDecl* decl);
+  void CheckLetUsedBeforeDeclared(const ModuleDecl* decl);
+  void CheckLetReferencedHierarchically(const ModuleDecl* decl);
 
   void ValidateAssignInExprRestrictions(const ModuleDecl* decl);
   void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);

@@ -184,4 +184,46 @@ TEST(AssignmentWithinExpressionElaboration,
                             5, "11.3.6"));
 }
 
+// §11.3.6 makes an assignment operator illegal in an event expression, and an
+// event control written as a statement holds one as surely as a procedure's
+// sensitivity list does. `@((a = b))` inside an initial block was never
+// looked at, and the process blocked on it for ever.
+TEST(AssignmentWithinExpressionElaboration,
+     AssignInAProceduralEventControlIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a = 0, b = 1;\n"
+      "  initial begin\n"
+      "    @((a = b)) $display(\"ran\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal",
+                            4, "11.3.6"));
+}
+
+// The same inside a nested statement and in an intra-assignment event control,
+// each an event expression of its own.
+TEST(AssignmentWithinExpressionElaboration,
+     AssignInANestedOrIntraAssignmentEventControlIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a = 0, b = 1, c;\n"
+      "  initial begin\n"
+      "    if (b) @(posedge (a += 1)) c = 1;\n"
+      "    c = @((a = b)) 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal",
+                            4, "11.3.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal",
+                            5, "11.3.6"));
+}
+
 }  // namespace

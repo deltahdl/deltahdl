@@ -555,6 +555,18 @@ static const DataType* ResolveNamedType(const DataType& dtype,
   return d;
 }
 
+// §6.18 with §11.5.1: whether `dtype` is a name standing for a type a select
+// may address -- one written with a packed dimension, `typedef logic [7:0] B`,
+// or an integer atom, `typedef int W` -- rather than for a scalar. A name
+// standing for nothing the table resolves answers false.
+static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
+  if (dtype.kind != DataTypeKind::kNamed) return false;
+  const DataType* d = ResolveNamedType(dtype, typedefs);
+  if (d == nullptr) return false;
+  return d->packed_dim_left != nullptr || !d->extra_packed_dims.empty() ||
+         d->has_unsized_packed_dim || IsIntegerAtomKind(d->kind);
+}
+
 static bool IsPackedAggregateVar(const DataType& dtype,
                                  const TypedefMap& typedefs) {
   const DataType* d = ResolveNamedType(dtype, typedefs);
@@ -666,6 +678,7 @@ static void RegisterVarDeclNames(const ModuleItem* item,
     else if (!IsIntegerAtomKind(item->data_type.kind) &&
              !IsRealType(item->data_type.kind) &&
              !IsPackedAggregateVar(item->data_type, typedefs) &&
+             !NamesVectorType(item->data_type, typedefs) &&
              !IsStringVar(item->data_type, typedefs))
       tables.scalar_var_names.insert(item->name);
   }

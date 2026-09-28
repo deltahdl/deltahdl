@@ -336,4 +336,67 @@ TEST(LetDeclElaboration, LetFormalWithEventTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.12 has a let declared before it is used, so a reference to `tmp` in a
+// procedure written above `let tmp = a && b;` is illegal. It elaborated clean
+// and read 0.
+TEST(LetDeclElaboration, LetUsedBeforeItsDeclarationIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic a = 1, b = 0;\n"
+      "  initial $display(\"ran %0d\", tmp);\n"
+      "  let tmp = a && b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "let 'tmp' is used before its declaration", 3,
+                            "11.12"));
+}
+
+// The same of a let with formals called before its declaration, from a
+// continuous assignment; the call after the declaration is the legal one.
+TEST(LetDeclElaboration, LetCalledBeforeItsDeclarationIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic a = 1, y, z;\n"
+      "  assign y = inv(a);\n"
+      "  let inv(x) = !x;\n"
+      "  assign z = inv(a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "let 'inv' is used before its declaration", 3,
+                            "11.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §11.12's example d: a let may be referred to only within the scope that
+// declares it and the scopes nested in it, and the reference to my_let
+// through the generate block's hierarchical name is the example's illegal
+// one. It elaborated clean.
+TEST(LetDeclElaboration, HierarchicalReferenceToALetIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire a = 1'b0, b = 1'b1;\n"
+      "  wire [2:0] c = 3'b101;\n"
+      "  wire [2:0] d;\n"
+      "  wire e;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 3; i++) begin : L0\n"
+      "    if (i != 1) begin : L1\n"
+      "      let my_let(x) = !x || b && c[i];\n"
+      "      assign d[2 - i] = my_let(a);\n"
+      "    end\n"
+      "  end\n"
+      "  assign e = L0[0].L1.my_let(a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a let shall not be referenced hierarchically", 13,
+                            "11.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

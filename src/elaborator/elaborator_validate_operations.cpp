@@ -1,11 +1,13 @@
 #include "elaborator/elaborator_validate_operations.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -683,6 +685,118 @@ void ElaboratorOperationRules::ValidateRealOperatorRestrictions(
       WalkExprForRealOps(item->assign_rhs);
     }
   }
+}
+
+namespace {
+
+// Runs `fn` over `e` and every expression under it, the member a member
+// access selects excepted: `h.tmp` and `L0[0].L1.my_let` name `tmp` and
+// `my_let` within the scope their prefix names, not the scope written in.
+template <typename Fn>
+void ForEachExprUnder(const Expr* e, Fn& fn) {
+  if (e == nullptr) return;
+  fn(e);
+  if (e->kind == ExprKind::kMemberAccess) {
+    ForEachExprUnder(e->lhs, fn);
+    return;
+  }
+  ForEachExprChild(e,
+                   [&fn](const Expr* child) { ForEachExprUnder(child, fn); });
+}
+
+template <typename Fn>
+void ForEachExprInStmt(const Stmt* s, Fn& fn) {
+  if (s == nullptr) return;
+  ForEachChildExpr(s, [&fn](Expr* const& e) { ForEachExprUnder(e, fn); });
+  ForEachChildStmt(s, [&fn](Stmt* const& sub) { ForEachExprInStmt(sub, fn); });
+}
+
+// Every expression one module item writes: its procedure's or subroutine's
+// statements, a continuous assignment's sides and a declaration's initializer.
+template <typename Fn>
+void ForEachExprOfItem(const ModuleItem* item, Fn& fn) {
+  ForEachExprInStmt(item->body, fn);
+  for (const Stmt* s : item->func_body_stmts) ForEachExprInStmt(s, fn);
+  ForEachExprUnder(item->assign_lhs, fn);
+  ForEachExprUnder(item->assign_rhs, fn);
+  ForEachExprUnder(item->init_expr, fn);
+}
+
+// `items` and the items of every generate block among them, in turn.
+template <typename Fn>
+void ForEachItemNested(const std::vector<ModuleItem*>& items, Fn& fn) {
+  for (const ModuleItem* item : items) {
+    if (item == nullptr) continue;
+    fn(item);
+    ForEachItemNested(item->gen_body, fn);
+    if (item->gen_else != nullptr)
+      ForEachItemNested(std::vector<ModuleItem*>{item->gen_else}, fn);
+    for (const GenerateCaseItem& ci : item->gen_case_items)
+      ForEachItemNested(ci.body, fn);
+  }
+}
+
+}  // namespace
+
+// §11.12: a let is declared before it is used in its scope. A name another
+// item of the module also declares is left alone, the use then being of that
+// declaration.
+void ElaboratorOperationRules::CheckLetUsedBeforeDeclared(
+    const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, size_t> let_at;
+  std::unordered_set<std::string_view> other_names;
+  for (size_t i = 0; i < decl->items.size(); ++i) {
+    const ModuleItem* item = decl->items[i];
+    if (item->kind == ModuleItemKind::kLetDecl) {
+      let_at.emplace(item->name, i);
+    } else if (!item->name.empty()) {
+      other_names.insert(item->name);
+    }
+  }
+  for (size_t i = 0; i < decl->items.size(); ++i) {
+    auto check = [&](const Expr* e) {
+      if (e->kind != ExprKind::kIdentifier) return;
+      auto it = let_at.find(e->text);
+      if (it == let_at.end() || i >= it->second || other_names.count(e->text))
+        return;
+      diag_.Error(
+          e->range.start,
+          std::format("let '{}' is used before its declaration", e->text),
+          Subclause("11.12"));
+    };
+    ForEachExprOfItem(decl->items[i], check);
+  }
+}
+
+// §11.12, example d: a let is referred to only within the scope declaring it
+// and the scopes nested in it, never through a hierarchical name, so a call
+// through a path whose last component names a let the module declares is
+// illegal.
+void ElaboratorOperationRules::CheckLetReferencedHierarchically(
+    const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> lets;
+  auto collect = [&lets](const ModuleItem* item) {
+    if (item->kind == ModuleItemKind::kLetDecl) lets.insert(item->name);
+  };
+  ForEachItemNested(decl->items, collect);
+  if (lets.empty()) return;
+  auto check = [&](const Expr* e) {
+    if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
+        e->lhs->kind != ExprKind::kMemberAccess || e->lhs->rhs == nullptr ||
+        !lets.count(e->lhs->rhs->text))
+      return;
+    diag_.Error(e->range.start, "a let shall not be referenced hierarchically",
+                Subclause("11.12"));
+  };
+  auto walk = [&check](const ModuleItem* item) {
+    ForEachExprOfItem(item, check);
+  };
+  ForEachItemNested(decl->items, walk);
+}
+
+void ElaboratorOperationRules::ValidateLetScope(const ModuleDecl* decl) {
+  CheckLetUsedBeforeDeclared(decl);
+  CheckLetReferencedHierarchically(decl);
 }
 
 namespace {
