@@ -8,6 +8,8 @@
 
 namespace delta {
 
+struct DataType;
+
 // §G.1: the built-in standard package, std, has the contents Annex G
 // describes -- the semaphore class, the mailbox class, the randomize
 // function, the process class and the weak reference class -- each with a
@@ -121,6 +123,12 @@ const std::vector<StdMethodPrototype>& ProcessPrototype();
 
 // §G.6: the members of the process class's nested enum state, in order.
 const std::vector<std::string_view>& ProcessStateEnumMembers();
+
+// §G.6: the enumeration a std class declares, where the named type `named`
+// denotes one -- process::state, the process class's enumeration of the
+// members ProcessStateEnumMembers lists over the default base type int -- or
+// null where it denotes none.
+const DataType* StdClassEnumType(const DataType& named);
 
 // §G.6: whether a std class is declared :final, which process alone is, so
 // that it cannot be extended; and whether it declares a constructor, which

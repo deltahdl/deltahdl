@@ -17,6 +17,11 @@
 // behavior within an always_comb procedure does not represent combinational
 // logic, such as if latched behavior can be inferred" -- read at one statement
 // position each. Those cases begin below the multiple-driver ones.
+//
+// The third, at the end of the file, is the multiple-driver rule where a
+// procedure declares a variable of its own: in a for loop's header (§12.7.1) or
+// in one of its blocks (§9.3.1). That variable is not the module's, so it is no
+// target the rule compares with another process's.
 
 #include <gtest/gtest.h>
 
@@ -435,6 +440,91 @@ TEST(AlwaysCombLatchWarning, ForStepAssignmentIsCombinational) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §12.7.1 makes a variable declared in a for loop's header local to the loop,
+// so each always_comb below has its own `j` and neither drives the other's.
+TEST(AlwaysCombMultiDriver, ForHeaderVariablesOfTwoProceduresAreNotShared) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a[3], not_a[3], b[3], z[3];\n"
+      "  always_comb begin\n"
+      "    for (int j = 0; j < 3; j++) not_a[j] = !a[j];\n"
+      "  end\n"
+      "  always_comb begin : a1\n"
+      "    for (int j = 0; j < 3; j++) z[j] = a[j] | b[j];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.1 lets a sequential block declare variables of its own, so each
+// always_comb below has its own `tmp`, and so does the initial procedure.
+TEST(AlwaysCombMultiDriver, BlockVariablesOfThreeProceduresAreNotShared) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y, z;\n"
+      "  always_comb begin\n"
+      "    logic tmp;\n"
+      "    tmp = !a; y = tmp;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    logic tmp;\n"
+      "    tmp = a | b; z = tmp;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    logic tmp;\n"
+      "    tmp = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The loop's `j` is local to the loop alone, so the `j` assigned after it is
+// the module's, which the second always_comb drives too.
+TEST(AlwaysCombMultiDriver,
+     ModuleVariableAssignedAfterAForHeaderLocalIsShared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y[2];\n"
+      "  int j;\n"
+      "  always_comb begin\n"
+      "    for (int j = 0; j < 2; j++) y[j] = a;\n"
+      "    j = 0;\n"
+      "  end\n"
+      "  always_comb j = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'j' driven by multiple", 8, "9.2.2.2"));
+}
+
+// The inner block's `y` is local to that block alone, so the `y` assigned
+// after it is the module's, which the second always_comb drives too.
+TEST(AlwaysCombMultiDriver, ModuleVariableAssignedOutsideABlockLocalIsShared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always_comb begin\n"
+      "    begin\n"
+      "      logic y;\n"
+      "      y = a;\n"
+      "    end\n"
+      "    y = b;\n"
+      "  end\n"
+      "  always_comb y = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by multiple", 10, "9.2.2.2"));
 }
 
 }  // namespace

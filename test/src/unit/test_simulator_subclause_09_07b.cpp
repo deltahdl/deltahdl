@@ -270,4 +270,22 @@ TEST(FineGrainProcessControlRun,
             "b back @7\n");
 }
 
+// §9.7 with §6.19.5.6: a module variable declared process::state holds a
+// member of that enumeration, so name() answers the member's name there as it
+// does for a procedural variable of the same type.
+TEST(FineGrainProcessControlRun, StatusNameOfAModuleStateVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  process c;\n"
+                       "  process::state ms;\n"
+                       "  initial begin\n"
+                       "    fork begin c = process::self(); #1; end join_none\n"
+                       "    #0 ms = c.status();\n"
+                       "    $display(\"%s\", ms.name());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "WAITING\n");
+}
+
 }  // namespace

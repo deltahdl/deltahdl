@@ -5,6 +5,8 @@
 #include <string_view>
 #include <vector>
 
+#include "parser/ast_type.h"
+
 namespace delta {
 
 const std::vector<StdPackageEntry>& StdPackageContents() {
@@ -152,6 +154,22 @@ const std::vector<std::string_view>& ProcessStateEnumMembers() {
   static const std::vector<std::string_view> kMembers{
       "FINISHED", "RUNNING", "WAITING", "SUSPENDED", "KILLED"};
   return kMembers;
+}
+
+const DataType* StdClassEnumType(const DataType& named) {
+  if (named.scope_name != "process" || named.type_name != "state")
+    return nullptr;
+  static const DataType kState = [] {
+    DataType state;
+    state.kind = DataTypeKind::kEnum;
+    for (std::string_view name : ProcessStateEnumMembers()) {
+      EnumMember member;
+      member.name = name;
+      state.enum_members.push_back(member);
+    }
+    return state;
+  }();
+  return &kState;
 }
 
 bool StdClassIsFinal(StdPackageMember member) {

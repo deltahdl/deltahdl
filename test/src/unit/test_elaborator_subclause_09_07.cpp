@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -168,6 +169,26 @@ TEST(FineGrainProcessControlElaboration, AllStateEnumMembersElaborate) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §9.7 with §G.6: the process class declares the enumeration state, whose
+// base type is int, so a module variable declared process::state is 32 bits
+// wide and names the enumeration under the key the simulator registers it by.
+// No typedef of the design declares it, and the variable was sized 0 and
+// named no enumeration while only the design's typedef table was asked.
+TEST(FineGrainProcessControlElaboration, ModuleStateVariableNamesTheEnum) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  process::state ms;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* ms = FindVar(design, "m", "ms");
+  ASSERT_NE(ms, nullptr);
+  EXPECT_EQ(ms->width, 32u);
+  EXPECT_EQ(ms->enum_type_name, "process::state");
 }
 
 }  // namespace

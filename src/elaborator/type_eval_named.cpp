@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/arena.h"
+#include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 
@@ -27,7 +28,9 @@ const DataType* FindNamedType(const DataType& dtype,
     std::string qualified =
         std::string(dtype.scope_name) + "::" + std::string(dtype.type_name);
     auto qit = typedefs.find(qualified);
-    return (qit != typedefs.end()) ? &qit->second : nullptr;
+    // §9.7 with §G.6: process::state is declared by the built-in process
+    // class, which no declaration of the design holds.
+    return (qit != typedefs.end()) ? &qit->second : StdClassEnumType(dtype);
   }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -21,6 +22,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -130,6 +132,45 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
   mod->processes.push_back(proc);
 }
 
+// §12.7.1: the variables a for loop's header declares, as in
+// `for (int j = 0; ...)`, appended to `locals`. Returns how many were appended.
+static size_t PushForHeaderLocals(const Stmt* stmt,
+                                  std::vector<std::string_view>& locals) {
+  if (stmt->kind != StmtKind::kFor) return 0;
+  size_t pushed = 0;
+  for (size_t k = 0;
+       k < stmt->for_inits.size() && k < stmt->for_init_types.size(); ++k) {
+    const Stmt* init = stmt->for_inits[k];
+    if (stmt->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
+    if (init == nullptr || init->lhs == nullptr) continue;
+    locals.push_back(init->lhs->text);
+    ++pushed;
+  }
+  return pushed;
+}
+
+// §9.3.1 and §9.3.2: the variables a sequential or parallel block declares,
+// appended to `locals`. Returns how many were appended.
+static size_t PushBlockLocals(const Stmt* stmt,
+                              std::vector<std::string_view>& locals) {
+  if (stmt->kind != StmtKind::kBlock && stmt->kind != StmtKind::kFork) return 0;
+  size_t pushed = 0;
+  for (const auto* item : stmt->stmts) {
+    if (item == nullptr || item->kind != StmtKind::kVarDecl) continue;
+    locals.push_back(item->var_name);
+    ++pushed;
+  }
+  return pushed;
+}
+
+// Whether the base identifier of the longest static prefix `prefix`, its text
+// up to the first member or index select, is one of `locals`.
+static bool IsDeclaredLocal(std::string_view prefix,
+                            const std::vector<std::string_view>& locals) {
+  std::string_view base = prefix.substr(0, prefix.find_first_of(".["));
+  return std::ranges::find(locals, base) != locals.end();
+}
+
 // Collects the longest static prefix (§11.5.3) of every assignment target
 // written in `stmt` or in any statement nested inside it.
 //
@@ -153,9 +194,16 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 // here. The visitor takes `Stmt* const&` because `stmt` is a `const Stmt*`,
 // which is how ForEachChildStmt lets a walk that only reads the tree share its
 // list with the walks that rewrite it.
-static void CollectStmtLhsPrefixes(const Stmt* stmt,
-                                   std::unordered_set<std::string>& out,
-                                   const ScopeMap& scope) {
+//
+// A variable the process declares for itself is none of the module's, so it is
+// no target the rules above compare: §12.7.1 makes a for loop's header variable
+// local to the loop, and §9.3.1 lets a block declare variables of its own.
+// `locals` holds the names so declared by the statements enclosing `stmt`, and
+// a target whose base identifier is one of them is left out.
+static void CollectLhsPrefixesInScope(const Stmt* stmt,
+                                      std::unordered_set<std::string>& out,
+                                      const ScopeMap& scope,
+                                      std::vector<std::string_view>& locals) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign) {
@@ -168,11 +216,23 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
       // the base identifier -- which would flag distinct constant-indexed
       // elements as one over-driven target.
       std::string prefix = LongestStaticPrefix(stmt->lhs, scope);
-      if (!prefix.empty()) out.insert(std::move(prefix));
+      if (!prefix.empty() && !IsDeclaredLocal(prefix, locals))
+        out.insert(std::move(prefix));
     }
   }
-  ForEachChildStmt(
-      stmt, [&](Stmt* const& sub) { CollectStmtLhsPrefixes(sub, out, scope); });
+  size_t pushed = PushForHeaderLocals(stmt, locals);
+  pushed += PushBlockLocals(stmt, locals);
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    CollectLhsPrefixesInScope(sub, out, scope, locals);
+  });
+  locals.resize(locals.size() - pushed);
+}
+
+static void CollectStmtLhsPrefixes(const Stmt* stmt,
+                                   std::unordered_set<std::string>& out,
+                                   const ScopeMap& scope) {
+  std::vector<std::string_view> locals;
+  CollectLhsPrefixesInScope(stmt, out, scope, locals);
 }
 
 // Collects the name of every subroutine called from `expr` or from any
