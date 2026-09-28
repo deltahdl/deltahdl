@@ -25,29 +25,24 @@ bool Preprocessor::EvalIfdefExpr(std::string_view expr) {
   return EvalIfdefEquiv(e);
 }
 
+// §22.6 resolves an ifdef expression by §11.8's rules, and Table 11-2 in
+// §11.3.2 puts `->` and `<->` on one precedence level, associating right to
+// left: `A -> B -> C` is `A -> (B -> C)` and `A -> B <-> C` is
+// `A -> (B <-> C)`. Each operator therefore takes the whole of the level to
+// its right, which this reaches by recursing into itself.
 bool Preprocessor::EvalIfdefEquiv(std::string_view& expr) {
-  bool result = EvalIfdefImpl(expr);
+  bool lhs = EvalIfdefOr(expr);
   SkipSpaces(expr);
-  while (expr.size() >= 3 && expr[0] == '<' && expr[1] == '-' &&
-         expr[2] == '>') {
+  if (expr.starts_with("<->")) {
     expr.remove_prefix(3);
-    bool rhs = EvalIfdefImpl(expr);
-    result = (result == rhs);
-    SkipSpaces(expr);
+    return lhs == EvalIfdefEquiv(expr);
   }
-  return result;
-}
-
-bool Preprocessor::EvalIfdefImpl(std::string_view& expr) {
-  bool result = EvalIfdefOr(expr);
-  SkipSpaces(expr);
-  while (expr.size() >= 2 && expr[0] == '-' && expr[1] == '>') {
+  if (expr.starts_with("->")) {
     expr.remove_prefix(2);
-    bool rhs = EvalIfdefOr(expr);
-    result = !result || rhs;
-    SkipSpaces(expr);
+    bool rhs = EvalIfdefEquiv(expr);
+    return !lhs || rhs;
   }
-  return result;
+  return lhs;
 }
 
 bool Preprocessor::EvalIfdefOr(std::string_view& expr) {

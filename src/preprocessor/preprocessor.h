@@ -203,7 +203,6 @@ class Preprocessor {
   void HandleElsif(std::string_view rest);
   bool EvalIfdefExpr(std::string_view expr);
   bool EvalIfdefEquiv(std::string_view& expr);
-  bool EvalIfdefImpl(std::string_view& expr);
   bool EvalIfdefOr(std::string_view& expr);
   bool EvalIfdefAnd(std::string_view& expr);
   bool EvalIfdefUnary(std::string_view& expr);

@@ -282,3 +282,49 @@ TEST(Preprocessor, NestedInlineConditionals) {
   EXPECT_EQ(result.find(" b "), std::string::npos);
   EXPECT_NE(result.find("paren_a"), std::string::npos);
 }
+// §22.6 resolves an ifdef expression by §11.8's rules, and the text beneath
+// Table 11-2 in §11.3.2 has `->` associate right to left. With nothing
+// defined, `A -> B -> C` is `A -> (B -> C)`, `0 -> 1`, which is 1 and keeps
+// the block; folded left to right it was `(A -> B) -> C`, `1 -> 0`, and the
+// block was skipped.
+TEST(Preprocessor, IfdefExprImplicationChainAssociatesRightToLeft) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef (A -> B -> C)\n"
+      "chain_kept\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("chain_kept"), std::string::npos);
+}
+
+// Table 11-2 puts `->` and `<->` on one row, one precedence level, so
+// `A -> B <-> C` is `A -> (B <-> C)`, `0 -> 1`, which is 1. With `<->` a level
+// below `->` it was `(A -> B) <-> C`, `1 <-> 0`, and the block was skipped.
+TEST(Preprocessor, IfdefExprImplicationAndEquivalenceShareALevel) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef (A -> B <-> C)\n"
+      "mixed_kept\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("mixed_kept"), std::string::npos);
+}
+
+// A control on the cases above: with A defined, `A -> B -> C` is
+// `1 -> (0 -> 0)`, `1 -> 1`, and keeps its block, while `A -> B` is `1 -> 0`
+// and skips its own, so reading every chain as true does not pass.
+TEST(Preprocessor, IfdefExprImplicationWithATrueLeftSideTakesItsRightSide) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "`ifdef (A -> B -> C)\n"
+      "right_true\n"
+      "`endif\n"
+      "`ifdef (A -> B)\n"
+      "only_a\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_NE(result.find("right_true"), std::string::npos);
+  EXPECT_EQ(result.find("only_a"), std::string::npos);
+}
