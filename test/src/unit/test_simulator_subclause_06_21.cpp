@@ -229,4 +229,59 @@ TEST(ScopeAndLifetimeSimulation, AutomaticLoopBodyLocalInitializedEachEntry) {
   EXPECT_EQ(RunAndGet(src, "rm"), 6u);
 }
 
+// §6.21 with §9.3.1: a variable declared in an unnamed block is the block's
+// own, visible there and in the blocks below it, and hides the module's
+// variable of the same name only inside the block. A static, an automatic and
+// an uninitialized declaration each write 0 to the block's x, and the
+// module's x reads its 1 after each block. Declared as the module's variable
+// itself, each block's write reached the module's x.
+TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksVariableLeavesTheModulesAlone) {
+  const char* src =
+      "module t;\n"
+      "  logic x = 1'b1;\n"
+      "  logic in_s, out_s, out_a, out_u;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      static bit x = 1'b0;\n"
+      "      in_s = x;\n"
+      "    end\n"
+      "    out_s = x;\n"
+      "    begin\n"
+      "      automatic bit x = 1'b0;\n"
+      "    end\n"
+      "    out_a = x;\n"
+      "    begin\n"
+      "      bit x;\n"
+      "      x = 1'b0;\n"
+      "    end\n"
+      "    out_u = x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "in_s"), 0u);
+  EXPECT_EQ(RunAndGet(src, "out_s"), 1u);
+  EXPECT_EQ(RunAndGet(src, "out_a"), 1u);
+  EXPECT_EQ(RunAndGet(src, "out_u"), 1u);
+}
+
+// §6.21: a variable a block declares without `automatic` in a static process
+// is static, one variable kept from one activation of the block to the next.
+// The repeat body's acc is set to 0 on the first pass alone and counts the
+// passes, so r reads 3; created afresh on each entry, acc read 0 and r 1.
+TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksStaticVariableKeepsItsValue) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    repeat (3) begin\n"
+      "      int acc;\n"
+      "      if (r == 0) acc = 0;\n"
+      "      acc++;\n"
+      "      r = acc;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
 }  // namespace

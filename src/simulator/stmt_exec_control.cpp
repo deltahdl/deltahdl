@@ -30,15 +30,45 @@
 
 namespace delta {
 
-// Tears down the static and named scope a named begin/end block pushed on
-// entry. A no-op for unnamed blocks. Always called immediately before
-// ExecBlock returns so the scope stack is balanced on every exit path.
-static void TeardownNamedBlockScope(const Stmt* stmt, SimContext& ctx,
-                                    bool named) {
-  if (!named) return;
-  ctx.PopActiveNamedScope();
-  ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-  ctx.PopStaticScope(stmt->label);
+// §6.21 with §9.3.1: a block declares variables of a scope of its own,
+// named or not. A named block's frame is kept under its label; an unnamed
+// block declaring variables outside any subroutine is given one kept under
+// UnnamedBlockFrameName, so its static variables last from one activation to
+// the next and its names hide the module's only inside it. Without it, the
+// declaration replaced the module's variable of the same name. Inside a task
+// or function the declaration already lands in the subroutine's frame.
+static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->label.empty()) return stmt->label;
+  if (!ctx.CurrentFuncName().empty()) return {};
+  bool declares = std::ranges::any_of(
+      stmt->stmts, [](const Stmt* s) { return s->kind == StmtKind::kVarDecl; });
+  return declares ? ctx.UnnamedBlockFrameName(stmt) : std::string_view{};
+}
+
+// Pushes the frame BlockFrameName gives `stmt`, and for a named block the
+// named scope beside it, answering the frame's name, empty where none.
+static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx) {
+  std::string_view frame = BlockFrameName(stmt, ctx);
+  if (frame.empty()) return frame;
+  ctx.PushStaticScope(frame);
+  if (!stmt->label.empty()) {
+    ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
+    ctx.PushActiveNamedScope(stmt->label);
+  }
+  return frame;
+}
+
+// Tears down what EnterBlockScope pushed. A no-op where it pushed nothing.
+// Always called immediately before ExecBlock returns so the scope stack is
+// balanced on every exit path.
+static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx,
+                               std::string_view frame) {
+  if (frame.empty()) return;
+  if (!stmt->label.empty()) {
+    ctx.PopActiveNamedScope();
+    ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+  }
+  ctx.PopStaticScope(frame);
 }
 
 // A named block is a scope of the hierarchy, and so is a task or function,
@@ -65,37 +95,33 @@ void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
 
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool named = !stmt->label.empty();
-  if (named) {
-    ctx.PushStaticScope(stmt->label);
-    ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
-    ctx.PushActiveNamedScope(stmt->label);
-  }
+  std::string_view frame = EnterBlockScope(stmt, ctx);
   for (auto* s : stmt->stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kDisable) {
       if (named && ctx.GetDisableTarget() == stmt->label) {
         ctx.ClearDisableTarget();
-        TeardownNamedBlockScope(stmt, ctx, named);
+        TeardownBlockScope(stmt, ctx, frame);
         co_return StmtResult::kDone;
       }
-      TeardownNamedBlockScope(stmt, ctx, named);
+      TeardownBlockScope(stmt, ctx, frame);
       co_return StmtResult::kDisable;
     }
     if (result != StmtResult::kDone) {
-      TeardownNamedBlockScope(stmt, ctx, named);
+      TeardownBlockScope(stmt, ctx, frame);
       co_return result;
     }
     if (ctx.StopRequested()) {
-      TeardownNamedBlockScope(stmt, ctx, named);
+      TeardownBlockScope(stmt, ctx, frame);
       co_return StmtResult::kDone;
     }
 
     if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
-      TeardownNamedBlockScope(stmt, ctx, named);
+      TeardownBlockScope(stmt, ctx, frame);
       co_return StmtResult::kDone;
     }
   }
-  TeardownNamedBlockScope(stmt, ctx, named);
+  TeardownBlockScope(stmt, ctx, frame);
   co_return StmtResult::kDone;
 }
 

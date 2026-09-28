@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <format>
 #include <iterator>
 #include <string>
 #include <string_view>
@@ -6,7 +7,9 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_stmt.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
@@ -218,6 +221,15 @@ void ScopeStack::PopFuncName() {
 std::string_view ScopeStack::CurrentFuncName() const {
   return func_name_stack_.empty() ? std::string_view{}
                                   : func_name_stack_.back();
+}
+
+std::string_view ScopeStack::UnnamedBlockFrameName(const Stmt* block) {
+  auto [it, inserted] = unnamed_block_frames_.try_emplace(block);
+  if (inserted) {
+    const SourceLoc& at = block->range.start;
+    it->second = std::format("block@{}:{}:{}", at.file_id, at.line, at.column);
+  }
+  return it->second;
 }
 
 }  // namespace delta

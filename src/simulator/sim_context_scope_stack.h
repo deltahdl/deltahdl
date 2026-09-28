@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -9,6 +10,7 @@
 namespace delta {
 
 struct DataType;
+struct Stmt;
 struct Variable;
 
 // §23.9 (printed page 761): the scope stack one simulation run keeps for the
@@ -64,6 +66,10 @@ class ScopeStack {
   void PushFuncName(std::string_view name);
   void PopFuncName();
   std::string_view CurrentFuncName() const;
+  // §6.21: the name the frame of `block`, an unnamed block, is kept under
+  // between activations, as a named block's is under its label; made once
+  // per block from where it begins, so no label or subroutine name spells it.
+  std::string_view UnnamedBlockFrameName(const Stmt* block);
   // The active subroutine call chain, outermost frame first. Used to report the
   // call stack for $stacktrace (§20.17.2).
   const std::vector<std::string_view>& FuncNameStack() const {
@@ -78,6 +84,7 @@ class ScopeStack {
                      std::unordered_map<std::string_view, Variable*>>
       static_frames_;
   std::vector<std::string_view> func_name_stack_;
+  std::unordered_map<const Stmt*, std::string> unnamed_block_frames_;
 };
 
 }  // namespace delta
