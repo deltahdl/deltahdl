@@ -315,3 +315,38 @@ TEST(UserNettypeSim, ResolutionFunctionGivesTheNetItsValue) {
                  f),
       "7 42 1 5\n");
 }
+
+// §6.6.7 with §8.25: a nettype's data type may be a structure a parameterized
+// class declares, named through a typedef of a specialization, as §6.6.7's
+// own `nettype MyBaseT::S` does. The net is of that structure as the
+// specialization binds it -- 96 bits under Base#(32), with a 32-bit data
+// member, and a 64-bit data member under Base#(64) -- and its members read
+// what the driver gives them.
+TEST(UserNettypeSim, ClassStructThroughATypedefOfASpecialization) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  class Base #(parameter p = 1);\n"
+                 "    typedef struct { real r; bit [p-1:0] data; } S;\n"
+                 "  endclass\n"
+                 "  typedef Base#(32) MyBaseT;\n"
+                 "  typedef Base#(64) MyBaseType;\n"
+                 "  nettype MyBaseT::S narrowT;\n"
+                 "  nettype MyBaseType::S wideT;\n"
+                 "  narrowT net1;\n"
+                 "  wideT net2;\n"
+                 "  MyBaseT::S s1;\n"
+                 "  MyBaseType::S s2;\n"
+                 "  assign net1 = s1;\n"
+                 "  assign net2 = s2;\n"
+                 "  initial begin\n"
+                 "    s1.data = 5; s1.r = 2.5; s2.data = 64'h1_0000_0003;\n"
+                 "    #1;\n"
+                 "    $display(\"%0d %0d %0d %0d %f %0h\", $bits(net1),\n"
+                 "             $bits(net2.data), $bits(net1.data), net1.data,\n"
+                 "             net1.r, net2.data);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "96 64 32 5 2.500000 100000003\n");
+}

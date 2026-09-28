@@ -14,6 +14,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -499,7 +500,7 @@ static bool IsIllegalNettypeDataTypeKind(DataTypeKind kind) {
   }
 }
 
-void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
+void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
   if (IsIllegalNettypeDataTypeKind(item->typedef_type.kind)) {
     diag_.Error(item->loc,
                 std::format("data type of user-defined nettype '{}' is not a "
@@ -507,6 +508,13 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
                             item->name),
                 Subclause("6.6.7"));
   }
+  // §6.6.7 with §8.25: a nettype's data type may be a structure a
+  // parameterized class declares, named through a typedef of a
+  // specialization, `MyBaseT::S`; the nettype is of that type as the
+  // specialization binds it, as a variable declared with the name is.
+  if (auto spec = SpecializeClassScopedType(
+          item->typedef_type, unit_, BuildParamScope(mod), typedefs_, arena_))
+    item->typedef_type = spec->type;
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
   RegisterNettypeResolutionAndCanonical(item);
