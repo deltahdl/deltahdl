@@ -93,7 +93,14 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
 
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
 
+  // §8.19: the checks on a const class property's declaration and on the
+  // writes to it from its class's own methods, over every class the unit
+  // declares. Defined in elaborator_validate_class_consts.cpp.
   void ValidateConstClassProperties();
+  // §8.19: a write to a const class property from a module's procedural code
+  // through a handle, `h.k`, or through the class scope, `C::k`. Defined in
+  // elaborator_validate_class_consts.cpp.
+  void ValidateConstPropertyWritesFromOutside(const ModuleDecl* decl);
 
   void ValidateVirtualMethodOverrides();
   void ValidateOneMethodOverride(const ClassDecl* cls, const ClassMember* m);

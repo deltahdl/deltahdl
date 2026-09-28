@@ -188,6 +188,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_net_delay.cpp
     elaborator/elaborator_validate.cpp
     elaborator/elaborator_validate_classes.cpp
+    elaborator/elaborator_validate_class_consts.cpp
     elaborator/elaborator_validate_operations.cpp
     elaborator/elaborator_validate_cast_ops.cpp
     elaborator/elaborator_validate_const_assign.cpp

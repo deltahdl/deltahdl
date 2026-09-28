@@ -400,4 +400,406 @@ TEST(ConstantClassPropertyElaboration,
                             "assignment to global constant", 5, "8.19"));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear, and
+// §8.19's rules are on the property, not on the scope its class stands in, so
+// a class declared in a module, a package, a program, an interface or another
+// class is held to them as a class at file scope is.
+TEST(ConstantClassPropertyElaboration, ModuleClassGlobalConstAssignError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  class C;\n"
+      "    const int k = 5;\n"
+      "    function void f();\n"
+      "      k = 6;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin h = new; h.f(); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 5, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, PackageClassGlobalConstAssignError) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  class C;\n"
+      "    const int k = 5;\n"
+      "    function void f();\n"
+      "      k = 6;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  p::C h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 5, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     ProgramClassInstanceConstAssignInMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "program pr;\n"
+      "  class C;\n"
+      "    const int id;\n"
+      "    function new();\n"
+      "      id = 1;\n"
+      "    endfunction\n"
+      "    function void reset();\n"
+      "      id = 0;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endprogram\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant 'id'", 8, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, InterfaceClassInstanceConstStaticError) {
+  ElabFixture f;
+  ElabOk(
+      "interface ifc;\n"
+      "  class C;\n"
+      "    static const int size;\n"
+      "  endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  ifc i();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance constant cannot be declared static", 3,
+                            "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, NestedClassGlobalConstAssignError) {
+  ElabFixture f;
+  ElabOk(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    const int k = 5;\n"
+      "    function void f();\n"
+      "      k = 6;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  Outer o;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 5, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, ModuleClassInstanceConstInCtorOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  class C;\n"
+             "    const int size;\n"
+             "    function new();\n"
+             "      size = 4096;\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "  C h;\n"
+             "  initial h = new;\n"
+             "endmodule\n"));
+}
+
+// §8.19's rules are on the property whatever name an assignment reaches it
+// by: `this.k` inside the class, `h.k` through a handle and `C::k` through the
+// class scope resolution operator of §8.23 are the same property as `k`.
+TEST(ConstantClassPropertyElaboration, GlobalConstAssignThroughThisError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int k = 5;\n"
+      "  function void f();\n"
+      "    this.k = 6;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 4, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     InstanceConstAssignThroughThisOutsideCtorError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    this.id = 1;\n"
+      "  endfunction\n"
+      "  function void reset();\n"
+      "    this.id = 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant 'id'", 7, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, InstanceConstAssignThroughThisInCtorOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  const int id;\n"
+             "  function new();\n"
+             "    this.id = 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C h;\n"
+             "  initial h = new;\n"
+             "endmodule\n"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignThroughClassScopeError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  static const int k = 5;\n"
+      "  static function void f();\n"
+      "    C::k = 6;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 4, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, GlobalConstAssignThroughHandleError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int k = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.k = 6;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 8, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, InstanceConstAssignThroughHandleError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    id = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    h.id = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant 'id'", 10,
+                            "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     StaticGlobalConstAssignThroughClassScopeFromModuleError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  static const int k = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C::k = 6;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 6, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, NonConstPropertyAssignThroughHandleOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  const int k = 5;\n"
+             "  int v;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C h;\n"
+             "  initial begin\n"
+             "    h = new;\n"
+             "    h.v = h.k;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.13 gives a derived class its base's properties, so a derived class's
+// method names the base's constant by its bare name and §8.19 still forbids
+// the write. The constructor that may assign an instance constant is the one
+// of the class declaring it, so the derived class's own constructor may not.
+TEST(ConstantClassPropertyElaboration,
+     InheritedGlobalConstAssignInDerivedMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class B;\n"
+      "  const int k = 5;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  function void f();\n"
+      "    k = 6;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 6, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     InheritedInstanceConstAssignInDerivedCtorError) {
+  ElabFixture f;
+  ElabOk(
+      "class B;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    id = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  function new();\n"
+      "    super.new();\n"
+      "    id = 2;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant 'id'", 10,
+                            "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration, ShadowingPropertyOfInheritedConstOk) {
+  EXPECT_TRUE(
+      ElabOk("class B;\n"
+             "  const int k = 5;\n"
+             "endclass\n"
+             "class D extends B;\n"
+             "  int k;\n"
+             "  function void f();\n"
+             "    k = 6;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  D h;\n"
+             "endmodule\n"));
+}
+
+// §8.19 holds for a write through a handle wherever the write stands, so a
+// subroutine body is held to it as an initial block is, with the handle's
+// class taken from a formal, a local or a property of the enclosing class.
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignThroughFormalInOtherClassMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int k = 5;\n"
+      "endclass\n"
+      "class E;\n"
+      "  function void g(C h);\n"
+      "    h.k = 6;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  E e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 6, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignThroughPropertyHandleInOtherClassMethodError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int k = 5;\n"
+      "endclass\n"
+      "class E;\n"
+      "  C h;\n"
+      "  function void g();\n"
+      "    h.k = 6;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  E e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 7, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     GlobalConstAssignThroughFormalInModuleTaskError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int k = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  task t(C h);\n"
+      "    h.k = 6;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant 'k'", 6, "8.19"));
+}
+
+TEST(ConstantClassPropertyElaboration,
+     InstanceConstAssignThroughLocalInModuleFunctionError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    id = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function void f();\n"
+      "    C h = new;\n"
+      "    h.id = 2;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant 'id'", 10,
+                            "8.19"));
+}
+
 }  // namespace
