@@ -387,8 +387,12 @@ const DataType* DeclaredNameTables::PackedTypeBehind(
        d != nullptr && d->kind == DataTypeKind::kNamed &&
        d->packed_dim_left == nullptr && hops <= TypeDeclarationCount();
        ++hops) {
-    std::string key(d->type_name);
-    if (!d->scope_name.empty()) key = std::string(d->scope_name) + "::" + key;
+    std::string key;
+    if (!d->scope_name.empty()) {
+      key += d->scope_name;
+      key += "::";
+    }
+    key += d->type_name;
     d = FindTypeDeclaration(key);
   }
   return d;
