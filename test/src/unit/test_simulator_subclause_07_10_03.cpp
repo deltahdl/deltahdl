@@ -495,8 +495,10 @@ TEST(QueueRefPersistence, EmptyConcatAssignOutdatesAllRefs) {
 }
 
 // §7.10.3: `q = new[2]` is an assignment whose target is the entire queue, so
-// the reference held to the element that keeps both its value and its index is
-// outdated with the rest.
+// the reference held to the element at index 1, which the new array still
+// has, is outdated with the rest, and the 99 written through it is dropped.
+// §7.5.1 gives each element of the new array its default, which reads 0, and
+// keeps none of the old values.
 TEST(QueueRefPersistence, NewSizedAssignOutdatesAllRefs) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -505,8 +507,8 @@ TEST(QueueRefPersistence, NewSizedAssignOutdatesAllRefs) {
                     MakeSelect(f.arena, "q", 1));
 
   ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 0u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 0u);
 }
 
 // --- Rule B over the §11.4.14.4 streaming unpack
