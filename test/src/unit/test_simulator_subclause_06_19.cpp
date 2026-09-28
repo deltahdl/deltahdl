@@ -302,4 +302,70 @@ TEST(EnumerationSimulation, XOrZMemberOfA4StateEnumHoldsItsValue) {
   EXPECT_EQ(out, "1 1 1 1 2 zz zz\n");
 }
 
+// A.2.8 admits a typedef among a block's items, in a begin-end block and in a
+// task body, and §6.19 makes its enumeration's members named constants of
+// the block, which the statements after it read; a variable declared with the
+// typedef is of the enumeration, so §6.19.5's methods answer for it.
+TEST(EnumerationSimulation, BlockTypedefEnumHasItsMembersAndVariables) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    typedef enum {p, q} e_t;\n"
+      "    e_t z;\n"
+      "    z = z.last();\n"
+      "    $display(\"[%s] %0d %0d %0d\", z.name(), z, z.num(), q);\n"
+      "  end\n"
+      "  task automatic tk;\n"
+      "    typedef enum {a1, b1} f_t;\n"
+      "    int j;\n"
+      "    j = b1;\n"
+      "    $display(\"%0d\", j);\n"
+      "  endtask\n"
+      "  initial #1 tk();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[q] 1 2 1\n1\n");
+}
+
+// Each block's typedef is a type of that block alone (§23.9), so two blocks
+// declaring `e_t` over different bases and members keep apart; a member value
+// may name a parameter of the module; a function body's typedef is its own;
+// and a `V[2]` member declares V0 and V1 (§6.19.2) in a fork's block.
+TEST(EnumerationSimulation, BlockTypedefEnumsOfTheSameNameKeepApart) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  parameter int K = 5;\n"
+      "  function automatic int fn();\n"
+      "    typedef enum {m0 = K, m1} h_t;\n"
+      "    h_t hv;\n"
+      "    hv = m1;\n"
+      "    return hv + hv.num();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    typedef enum bit [1:0] {p = 1, q = 3} e_t;\n"
+      "    e_t z;\n"
+      "    z = q;\n"
+      "    $display(\"A %s %0d %0d %0d\", z.name(), z, $bits(z), z.num());\n"
+      "  end\n"
+      "  initial #1 begin\n"
+      "    typedef enum {p, q, r} e_t;\n"
+      "    e_t z;\n"
+      "    z = r;\n"
+      "    $display(\"B %s %0d %0d %0d\", z.name(), z, z.num(), fn());\n"
+      "  end\n"
+      "  initial #2 fork\n"
+      "    begin\n"
+      "      typedef enum {V[2], w} g_t;\n"
+      "      g_t g;\n"
+      "      g = V1;\n"
+      "      $display(\"C %s %0d %0d\", g.name(), g, w);\n"
+      "    end\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "A q 3 2 2\nB r 2 3 8\nC V1 1 2\n");
+}
+
 }  // namespace

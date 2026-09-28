@@ -566,4 +566,25 @@ TEST(EnumMethodNameSim, EveryVariableOfAnInlineEnumListIsOfTheEnum) {
             "e f d d e 3 3\n");
 }
 
+// R1 with §6.19's 4-state members: a variable holding an x or z member's
+// value holds that member, matched bit for bit, x and z included, so its
+// name() is the member's; read as a number, XX's 'x was IDLE's 0 and named
+// IDLE. A 4-state variable left at its default x holds no member of an
+// enumeration without an x member (R2).
+TEST(EnumMethodNameSim, NameOfAnXOrZMember) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  enum integer {IDLE, XX='x, S1='b01, S2='b10} s;\n"
+                       "  enum logic [1:0] {A, Z='z, B=2} lz;\n"
+                       "  enum integer {P, Q} u;\n"
+                       "  initial begin\n"
+                       "    s = XX; lz = Z;\n"
+                       "    $display(\"%s %s %s [%s]\", s.name(), lz.name(),\n"
+                       "             lz.next().name(), u.name());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "XX Z B []\n");
+}
+
 }  // namespace

@@ -911,6 +911,7 @@ static ExecTask ExecStmtDispatch(const Stmt* stmt, SimContext& ctx,
     case StmtKind::kRandsequence:
       return ExecRandsequence(stmt, ctx, arena);
     case StmtKind::kVarDecl:
+    case StmtKind::kBlockItemDecl:
       return ExecTask::Immediate(ExecVarDeclImpl(stmt, ctx, arena));
     default:
       return ExecTask::Immediate(StmtResult::kDone);

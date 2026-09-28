@@ -14,6 +14,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -449,6 +450,9 @@ static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
     EnumTypeInfo type;
     type.type_name = *arena.Create<std::string>(
         std::string(info->name) + "::" + std::string(member->name));
+    const DataType& decl_type = member->typedef_item->typedef_type;
+    type.width = EvalTypeWidth(decl_type);
+    type.is_4state = Is4stateType(decl_type, TypedefMap{});
     int64_t next_val = 0;
     for (const auto& em : enum_members) {
       if (em.value) next_val = static_cast<int64_t>(em.value->int_val);

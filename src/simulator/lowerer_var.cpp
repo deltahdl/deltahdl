@@ -11,6 +11,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "simulator/block_enums.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -877,16 +878,39 @@ void Lowerer::RegisterEnumForCast(std::string_view name,
   ctx_.SetVariableEnumType(name, var.enum_type_name);
 }
 
+// The width of the enumeration the module declares under `name`, and whether
+// its base type is 4-state: a variable declared with it carries both, as the
+// elaborator computed them from the declared type; the design's typedef
+// table has the declaration of one no variable is declared with. The width
+// is what BuildEnumMembers (src/elaborator/elaborator_typedef.cpp) gives
+// each member's constant.
+static void SetModuleEnumShape(const RtlirModule* mod,
+                               const RtlirDesign* design, EnumTypeInfo& info) {
+  for (const auto& v : mod->variables) {
+    if (v.enum_type_name != info.type_name) continue;
+    info.width = v.width;
+    info.is_4state = v.is_4state;
+    return;
+  }
+  if (design == nullptr) return;
+  auto it = design->type_enums.find(info.type_name);
+  if (it == design->type_enums.end() || it->second == nullptr) return;
+  info.width = EvalTypeWidth(*it->second);
+  info.is_4state = Is4stateType(*it->second, TypedefMap{});
+}
+
 void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
   for (const auto& [name, members] : mod->enum_types) {
     if (ctx_.FindEnumType(name)) continue;
     EnumTypeInfo info;
     info.type_name = name;
+    SetModuleEnumShape(mod, design_, info);
     for (const auto& m : members) {
-      info.members.push_back({m.name, static_cast<uint64_t>(m.value)});
+      info.members.push_back(EnumMemberInfoOf(m, info.width, ctx_, arena_));
     }
     ctx_.RegisterEnumType(name, info);
   }
+  RegisterBlockEnumTypes(mod, design_, ctx_, arena_);
 }
 
 // A parameter is lowered to a variable ahead of the module's enumerations

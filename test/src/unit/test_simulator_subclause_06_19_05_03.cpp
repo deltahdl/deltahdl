@@ -184,11 +184,14 @@ endmodule
 
 // C3: a value that is not a member of the enumeration is produced by casting an
 // out-of-range integer onto the enum type (§6.19.4 casting performs no validity
-// check). next() then returns the default initial value, the first member.
+// check). next() then returns the default initial value, which Table 6-7 makes
+// the base type's, 0 for the 2-state `int`. RED is given the value 1 so that
+// the default is no member, and a next() answering the first member instead
+// reads 1.
 TEST(EnumNextMethod, NonMemberValueReturnsDefault) {
   const char* src = R"(
 module m;
-  typedef enum { RED, GREEN, BLUE } color_t;
+  typedef enum { RED = 1, GREEN, BLUE } color_t;
   color_t c;
   int r;
   initial begin
@@ -198,6 +201,24 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 0u);
+}
+
+// C3 over a 4-state base: an `integer` enumeration's default initial value is
+// x in every bit (Table 6-7), which a variable left at its default holds, no
+// member being x; next() returns that x rather than the first member.
+TEST(EnumNextMethod, NonMemberValueOfA4StateEnumReturnsX) {
+  const char* src = R"(
+module m;
+  enum integer { A = 1, B = 2 } c;
+  integer v;
+  int r;
+  initial begin
+    v = c.next();
+    r = (v === 'x);
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
 // C1, result used as an operand within a larger expression: the returned enum
@@ -292,6 +313,25 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
+}
+
+// C1 with §6.19's 4-state members: `XX='x` is the second member of §6.19's own
+// example, so IDLE's next is XX, and a variable holding XX's value, x in every
+// bit, is at XX and steps to S1. Read as a number, 'x was IDLE's 0, and
+// IDLE's next was taken for IDLE.
+TEST(EnumNextMethod, StepsOntoAndFromAnXMember) {
+  const char* src = R"(
+module m;
+  enum integer {IDLE, XX='x, S1='b01, S2='b10} s, n;
+  int r;
+  initial begin
+    s = XX;
+    n = s.next();
+    r = (IDLE.next() === XX) * 10 + (n === S1);
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 11u);
 }
 
 }  // namespace

@@ -755,8 +755,8 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Expr*, Expr*>& ParenFreeCalls() {
     return paren_free_calls_;
   }
-  // §6.18 with §8.3: each method-body declaration reshaped by the class-scope
-  // typedef it names (DeclShapedByTypedef in eval_array_class_assoc.cpp).
+  // §6.18: each declaration reshaped by the class-scope (§8.3) or block
+  // typedef it names (DeclShapedByTypedef, RegisterBlockEnumTypes).
   std::unordered_map<const Stmt*, const Stmt*>& ClassTypedefShapedDecls() {
     return class_typedef_shaped_decls_;
   }

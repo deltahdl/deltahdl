@@ -625,6 +625,9 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       ExecFuncVarDecl(stmt, {exec.static_frame, exec.is_static_sub}, exec.ctx,
                       exec.arena);
       return FuncFlow::kNext;
+    case StmtKind::kBlockItemDecl:
+      ExecBlockItemDeclImpl(stmt, exec.ctx, exec.arena);
+      return FuncFlow::kNext;
     case StmtKind::kIf:
       return ExecFuncIf(stmt, exec);
     case StmtKind::kCase:

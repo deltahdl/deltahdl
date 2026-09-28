@@ -267,6 +267,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_expr_cast.cpp
     simulator/eval_member_path.cpp
     simulator/eval_enum.cpp
+    simulator/block_enums.cpp
     simulator/eval_array.cpp
     simulator/eval_class_array.cpp
     simulator/eval_class_array_handles.cpp

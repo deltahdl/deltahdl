@@ -31,6 +31,10 @@ struct FileIoError {
 struct EnumMemberInfo {
   std::string_view name;
   uint64_t value = 0;
+  // §6.19: the x and z bits of a member of a 4-state enumeration assigned
+  // such a value, the bval word of its value, whose aval word `value` holds;
+  // 0 for a member whose value is a number.
+  uint64_t xz = 0;
 };
 
 // §27.4 with §13.4 and §23.6: the scope a subroutine declared in a generate
@@ -54,6 +58,12 @@ struct GenBlockSubroutineScope {
 struct EnumTypeInfo {
   std::string_view type_name;
   std::vector<EnumMemberInfo> members;
+  // §6.19.5.3 and §6.19.5.4 with Table 6-7: the enumeration's width and
+  // whether its base type is 4-state, which decide its default initial value,
+  // all x or all 0, that next() and prev() return for a value that is no
+  // member.
+  uint32_t width = 32;
+  bool is_4state = false;
 };
 
 struct StructTypeInfo;

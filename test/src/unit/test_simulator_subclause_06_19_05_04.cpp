@@ -185,11 +185,14 @@ endmodule
 
 // P3: a value that is not a member of the enumeration is produced by casting an
 // out-of-range integer onto the enum type (§6.19.4 casting performs no validity
-// check). prev() then returns the default initial value, the first member.
+// check). prev() then returns the default initial value, which Table 6-7 makes
+// the base type's, 0 for the 2-state `int`. RED is given the value 1 so that
+// the default is no member, and a prev() answering the first member instead
+// reads 1.
 TEST(EnumPrevMethod, NonMemberValueReturnsDefault) {
   const char* src = R"(
 module m;
-  typedef enum { RED, GREEN, BLUE } color_t;
+  typedef enum { RED = 1, GREEN, BLUE } color_t;
   color_t c;
   int r;
   initial begin
@@ -199,6 +202,24 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 0u);
+}
+
+// P3 over a 4-state base: an `integer` enumeration's default initial value is
+// x in every bit (Table 6-7), which a variable left at its default holds, no
+// member being x; prev() returns that x rather than the first member.
+TEST(EnumPrevMethod, NonMemberValueOfA4StateEnumReturnsX) {
+  const char* src = R"(
+module m;
+  enum integer { A = 1, B = 2 } c;
+  integer v;
+  int r;
+  initial begin
+    v = c.prev();
+    r = (v === 'x);
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
 // P1, result used as an operand within a larger expression: the returned enum
@@ -270,6 +291,24 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// §6.19 lets a member of a 4-state enumeration hold x, `XX='x`, so S1's
+// previous member is XX, and a variable holding XX's value steps back to
+// IDLE.
+TEST(EnumPrevMethod, StepsOntoAndFromAnXMember) {
+  const char* src = R"(
+module m;
+  enum integer {IDLE, XX='x, S1='b01, S2='b10} s, p;
+  int r;
+  initial begin
+    s = XX;
+    p = s.prev();
+    r = (S1.prev() === XX) * 10 + (p === IDLE);
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 11u);
 }
 
 }  // namespace

@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 
@@ -131,6 +132,14 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
 // has this to ask instead.
 void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena);
+// §6.19: the record the enum methods walk of the member `m` of an enumeration
+// `width` bits wide. A member assigned x or z (RtlirEnumMember::xz_value) is
+// given its value as written at that width, x and z bits included; any other
+// member, the number it folded to. Defined in
+// src/simulator/lowerer_var_layout.cpp.
+EnumMemberInfo EnumMemberInfoOf(const RtlirEnumMember& m, uint32_t width,
+                                SimContext& ctx, Arena& arena);
+
 // §6.19.5 with §6.18: the enumeration behind each scoped typedef name the
 // design records (RtlirDesign::type_enums), "C::name" or "P::name",
 // registered in the enum table under that key with its member values folded

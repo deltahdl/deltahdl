@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -28,52 +29,83 @@ bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
   return false;
 }
 
+// §6.19: a member's value as the methods return it, x and z bits included.
+static Logic4Vec MemberValue(const EnumMemberInfo& m, Arena& arena) {
+  Logic4Vec v = MakeLogic4VecVal(arena, 32, m.value);
+  v.words[0].bval = m.xz;
+  return v;
+}
+
 static Logic4Vec EnumFirst(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  return MakeLogic4VecVal(arena, 32, info.members.front().value);
+  return MemberValue(info.members.front(), arena);
 }
 
 static Logic4Vec EnumLast(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  return MakeLogic4VecVal(arena, 32, info.members.back().value);
+  return MemberValue(info.members.back(), arena);
 }
 
-static int FindMemberIndex(const EnumTypeInfo& info, uint64_t value) {
+// §6.19.5.3, §6.19.5.4 and §6.19.5.6 ask which member a value is, and §6.19
+// lets a member of a 4-state enumeration hold x or z, `XX='x`. So a value is
+// a member where every bit matches, x and z included, as `===` compares; read
+// as a number, `'x` was 0 and matched the member whose value is 0.
+static bool IsMemberValue(const EnumMemberInfo& m, Logic4Word current) {
+  return m.value == current.aval && m.xz == current.bval;
+}
+
+// §6.19.5.3 and §6.19.5.4: what next() and prev() return for a value that is
+// no member, the enumeration's default initial value, which Table 6-7 makes
+// its base type's: all x for a 4-state base, all 0 for a 2-state one. Neither
+// need be a member; the first member was returned in its place.
+static Logic4Vec EnumDefault(const EnumTypeInfo& info, Arena& arena) {
+  Logic4Vec v = MakeLogic4Vec(arena, info.width);
+  if (!info.is_4state) return v;
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    uint32_t bits = std::min<uint32_t>(64, info.width - i * 64);
+    uint64_t mask = bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
+    v.words[i].aval = mask;
+    v.words[i].bval = mask;
+  }
+  return v;
+}
+
+static int FindMemberIndex(const EnumTypeInfo& info, Logic4Word current) {
   for (size_t i = 0; i < info.members.size(); ++i) {
-    if (info.members[i].value == value) return static_cast<int>(i);
+    if (IsMemberValue(info.members[i], current)) return static_cast<int>(i);
   }
   return -1;
 }
 
-static Logic4Vec EnumNext(const EnumTypeInfo& info, uint64_t current,
+static Logic4Vec EnumNext(const EnumTypeInfo& info, Logic4Word current,
                           uint32_t count, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
   int idx = FindMemberIndex(info, current);
-  if (idx < 0) return MakeLogic4VecVal(arena, 32, info.members.front().value);
+  if (idx < 0) return EnumDefault(info, arena);
   auto n = static_cast<int>(info.members.size());
   int new_idx = (idx + static_cast<int>(count % n)) % n;
-  return MakeLogic4VecVal(arena, 32, info.members[new_idx].value);
+  return MemberValue(info.members[new_idx], arena);
 }
 
-static Logic4Vec EnumPrev(const EnumTypeInfo& info, uint64_t current,
+static Logic4Vec EnumPrev(const EnumTypeInfo& info, Logic4Word current,
                           uint32_t count, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
   int idx = FindMemberIndex(info, current);
-  if (idx < 0) return MakeLogic4VecVal(arena, 32, info.members.front().value);
+  if (idx < 0) return EnumDefault(info, arena);
   auto n = static_cast<int>(info.members.size());
   int offset = static_cast<int>(count % n);
   int new_idx = ((idx - offset) % n + n) % n;
-  return MakeLogic4VecVal(arena, 32, info.members[new_idx].value);
+  return MemberValue(info.members[new_idx], arena);
 }
 
 static Logic4Vec EnumNum(const EnumTypeInfo& info, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, info.members.size());
 }
 
-static Logic4Vec EnumName(const EnumTypeInfo& info, uint64_t current,
+static Logic4Vec EnumName(const EnumTypeInfo& info, Logic4Word current,
                           Arena& arena) {
   for (auto& m : info.members) {
-    if (m.value != current) continue;
+    if (!IsMemberValue(m, current)) continue;
     auto name = m.name;
     uint32_t width = static_cast<uint32_t>(name.size()) * 8;
     if (width == 0) width = 8;
@@ -99,7 +131,7 @@ static uint32_t ParseStepCount(const Expr* call_expr, SimContext& ctx,
 
 struct EnumMethodArgs {
   const EnumTypeInfo& info;
-  uint64_t current;
+  Logic4Word current;
   const Expr* call_expr;
   SimContext& ctx;
   Arena& arena;
@@ -505,15 +537,19 @@ const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
 // The value the method starts from: the variable's own for a name denoting
 // one, and for any other receiver the value it evaluates to -- a property, a
 // literal, a call's result, evaluated through this same dispatch when it is a
-// chained method.
-static uint64_t CurrentValueOfBase(const Expr* base, SimContext& ctx,
-                                   Arena& arena) {
+// chained method. Its x and z bits are kept, which a member may hold (§6.19).
+static Logic4Word LowWord(const Logic4Vec& v) {
+  return v.nwords == 0 ? Logic4Word{} : v.words[0];
+}
+
+static Logic4Word CurrentValueOfBase(const Expr* base, SimContext& ctx,
+                                     Arena& arena) {
   if (base->kind == ExprKind::kIdentifier) {
     std::string key = IdentifierLookupKey(base);
     if (NameDenotesVariable(key, ctx))
-      return ctx.FindVariable(key)->value.ToUint64();
+      return LowWord(ctx.FindVariable(key)->value);
   }
-  return EvalExpr(base, ctx, arena).ToUint64();
+  return LowWord(EvalExpr(base, ctx, arena));
 }
 
 // The six method names of §6.19.5.1 through §6.19.5.6, asked before the
@@ -537,7 +573,7 @@ static bool TryEvalEnumMethod(const Expr* access, const Expr* call_expr,
   if (!IsEnumMethodName(access->rhs->text)) return false;
   const auto* info = EnumTypeOfExpr(access->lhs, ctx, arena);
   if (!info) return false;
-  uint64_t current = CurrentValueOfBase(access->lhs, ctx, arena);
+  Logic4Word current = CurrentValueOfBase(access->lhs, ctx, arena);
   EnumMethodArgs args{*info, current, call_expr, ctx, arena};
   return DispatchEnumMethod(access->rhs->text, args, out);
 }

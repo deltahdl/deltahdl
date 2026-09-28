@@ -4,10 +4,12 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -95,6 +97,19 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
   RegisterPackageClassVariables(design, ctx, arena);
 }
 
+EnumMemberInfo EnumMemberInfoOf(const RtlirEnumMember& m, uint32_t width,
+                                SimContext& ctx, Arena& arena) {
+  EnumMemberInfo info{m.name, static_cast<uint64_t>(m.value)};
+  if (m.xz_value == nullptr || width == 0) return info;
+  Logic4Vec v = EvalExpr(m.xz_value, ctx, arena, width);
+  if (v.fills_width) v = FillUnbasedUnsized(v, width, arena);
+  if (v.nwords == 0) return info;
+  uint64_t mask = width >= 64 ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  info.value = v.words[0].aval & mask;
+  info.xz = v.words[0].bval & mask;
+  return info;
+}
+
 // §6.19.5 with §6.18: the enumeration behind each typedef name the design
 // records (RtlirDesign::type_enums), registered under the typedef's key, so
 // that a value declared with a class's "C::name" (§8.23) or a package's
@@ -111,9 +126,11 @@ void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
     }
     EnumTypeInfo info;
     info.type_name = name;
+    info.width = EvalTypeWidth(*dtype);
+    info.is_4state = Is4stateType(*dtype, TypedefMap{});
     for (const RtlirEnumMember& m :
          FoldEnumMembers(dtype->enum_members, design->unit_constants, arena)) {
-      info.members.push_back({m.name, static_cast<uint64_t>(m.value)});
+      info.members.push_back(EnumMemberInfoOf(m, info.width, ctx, arena));
     }
     ctx.RegisterEnumType(name, info);
   }
