@@ -36,10 +36,10 @@ namespace delta {
 // had nothing to read and left `v` addressed as [5:0], and `v[13:10]` read
 // four bits outside it (#3808). The resolved type is set as `dtype`, the way
 // SetEnumTypeInfo in elaborator_decls.cpp sets an enum's, for a name standing
-// for a vector of one packed dimension; a name written with a dimension of its
-// own stacks it on the type (§7.4.4) and keeps the declaration's own DataType,
-// and a type of more than one packed dimension addresses elements (§7.4.1) and
-// is left as it was.
+// for a vector of one packed dimension or more (§7.4.4 letting a typedef write
+// them all, and §7.4.1 having each index of a multidimensional one address an
+// element); a name written with a dimension of its own stacks it on the type
+// and keeps the declaration's own DataType.
 void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena) {
   if (var.dtype != nullptr || item->data_type.kind != DataTypeKind::kNamed ||
@@ -48,7 +48,7 @@ void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
   const DataType* bound = FindNamedType(item->data_type, typedefs);
   if (bound == nullptr || bound->kind == DataTypeKind::kNamed ||
-      bound->packed_dim_left == nullptr || !bound->extra_packed_dims.empty()) {
+      bound->packed_dim_left == nullptr) {
     return;
   }
   var.dtype = arena.Create<DataType>(*bound);

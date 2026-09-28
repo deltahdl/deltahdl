@@ -887,4 +887,27 @@ TEST(MultidimensionalArraySimulation, TypedefDefinesThePackedDimensions) {
   EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
 }
 
+// The same at module scope, where the elaborator gives a variable declared
+// through a type name the type the name stands for. It gave one of a single
+// packed dimension alone, so a module variable of a two-dimensional typedef
+// reached the run with no dimensions and each index read a single bit.
+TEST(MultidimensionalArraySimulation, TypedefDefinesAModuleVariablesDims) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef logic [1:0][3:0] T;\n"
+      "  T x;\n"
+      "  initial begin\n"
+      "    x = 8'hA5;\n"
+      "    $display(\"%h %h %b %b\", x[1], x[0], x[1][2], x[0][2]);\n"
+      "    x[0] = 4'h3;\n"
+      "    $display(\"%h\", x);\n"
+      "    x = '{1, 2};\n"
+      "    $display(\"%h\", x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
+}
+
 }  // namespace
