@@ -132,6 +132,27 @@ class SynthLower {
   void RecordSignal(std::string_view name, uint32_t width, bool is_signed,
                     const RtlirModule* mod);
 
+  // §6.20: a parameter is a constant fixed at elaboration, so where its name
+  // stands as an operand it stands for its value. Each value parameter of the
+  // module is recorded as a signal whose bits are the constants of that value,
+  // at the width and signedness §6.20.2 reads it at and with the range it was
+  // declared with, so that every reader of a signal's bits, width, type and
+  // range answers the parameter as it answers a declared signal. A parameter
+  // array is recorded as an array whose elements are constants. A parameter
+  // this cannot record is kept in unlowered_params_, so that an operand naming
+  // it is reported rather than read as zero.
+  void MapParams(const RtlirModule* mod);
+  // Record `param` and answer whether it was recorded. Defined, with the two
+  // below, in synth_lower_param.cpp.
+  bool MapParam(const RtlirParamDecl& param);
+  bool MapParamArray(const RtlirParamDecl& param, ParamStorageShape shape);
+  void RecordParamSignal(const RtlirParamDecl& param, ParamStorageShape shape,
+                         std::vector<uint32_t> bits);
+
+  // Report `expr` where `name` names a parameter MapParams could not record,
+  // and answer whether it did.
+  bool ReportIfUnloweredParam(const Expr* expr, const Expr* name);
+
   // Give an input port one AIG input per bit of `width`, and record an output
   // port so that RegisterOutputs can emit what drove it. `width` is the port's
   // storage rather than RtlirPort::width, which is one element's worth where
@@ -492,6 +513,11 @@ class SynthLower {
   // §11.5.2, and a select on one of these names is left alone rather than
   // resolved against the packed range of its element type.
   std::unordered_set<std::string_view> unpacked_arrays_;
+
+  // The value parameters of the module MapParams could not record as signals:
+  // a real or a string parameter, one declared in a generate block, and a
+  // parameter array whose elements did not fold from a positional pattern.
+  std::unordered_set<std::string_view> unlowered_params_;
 
   // §11.5.2: the shape of each unpacked array this can address, which is the
   // one-dimensional arrays a variable declaration gives a low bound for.

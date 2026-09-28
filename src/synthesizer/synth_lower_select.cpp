@@ -386,6 +386,9 @@ uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
 
 uint32_t SynthLower::LowerSelectBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
+  if (ReportIfUnloweredParam(expr, SelectRootName(expr))) {
+    return AigGraph::kConstFalse;
+  }
   SelectStorage storage = ResolveSelect(expr);
   if (storage.count == 0) return LowerVariableSelectBit(expr, aig, bit);
   if (bit >= storage.count) return AigGraph::kConstFalse;

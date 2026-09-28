@@ -12,6 +12,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/design_scopes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clocking_sampled_value.h"

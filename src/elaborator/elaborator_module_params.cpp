@@ -304,10 +304,9 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
     // a parameter port declared with neither type nor range, and the words
     // above bit 63 of one declared wider, are recorded as a parameter among
     // the items has them recorded (ResolveParamConstValue in
-    // elaborator_items_params.cpp), for the storage the lowerer gives the
-    // instance that keeps the default (ParamStorageShapeOf in
-    // src/simulator/lowerer_register.cpp); an override records its own
-    // (ApplyParamOverride).
+    // elaborator_items_params.cpp), for the width the parameter is read at
+    // in the instance that keeps the default (ParamStorageShapeOf in
+    // const_eval_bits.cpp); an override records its own (ApplyParamOverride).
     RecordResolvedHighWords(pd, pval, scope);
   }
 }

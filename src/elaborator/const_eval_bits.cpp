@@ -98,6 +98,20 @@ static bool HasDeclaredWidth(const RtlirParamDecl& pd) {
   return pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit);
 }
 
+// The simulator's Lowerer::LowerParams read decl_width wherever it was not 0
+// and took 32 bits otherwise, which sized every untyped parameter to 32
+// whatever its literal said, `$bits(p1)` answering 32 for `parameter p1 =
+// 13'h7e`, and a bare `signed` to the one bit EvalTypeWidth gives the
+// implicit type.
+ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param) {
+  bool declared = HasDeclaredWidth(param);
+  if (declared && param.decl_width > 0)
+    return {param.decl_width, param.decl_is_signed};
+  if (!declared && param.value_width > 0)
+    return {param.value_width, param.value_is_signed || param.decl_is_signed};
+  return {32, param.decl_is_signed};
+}
+
 // §23.10.2: the expression an instance override gave the parameter where it
 // is a literal, which names nothing and so reads the same in every scope.
 // Null for an override written as anything else, which stands in the

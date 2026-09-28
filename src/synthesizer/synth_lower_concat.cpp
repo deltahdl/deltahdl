@@ -36,7 +36,8 @@ std::optional<uint32_t> SynthLower::ExprWidth(const Expr* expr) {
     case ExprKind::kIdentifier: {
       // InferExprWidth answers 0 for a name, because it reads the expression
       // and not the declaration. SynthLower recorded every declared width in
-      // MapPorts, so the name is answered here.
+      // MapPorts and every parameter's in MapParams, so the name is answered
+      // here.
       auto it = signal_widths_.find(expr->text);
       if (it == signal_widths_.end()) return std::nullopt;
       return it->second;

@@ -16,6 +16,7 @@ struct Expr;
 struct ModuleItem;
 struct ClassDecl;
 struct RtlirModule;
+struct RtlirParamDecl;
 struct DataType;
 
 using ScopeMap = std::unordered_map<std::string_view, int64_t>;
@@ -204,6 +205,26 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
 // (§6.20.2), where a bound does not fold, and for a typedef name, which
 // EvalTypeWidth has no map to resolve. Defined in const_eval_bits.cpp.
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope);
+
+// §6.20.2 (printed pages 126-127): the width and signedness a value
+// parameter is read at wherever its name stands for its value -- the storage
+// the simulator gives it and the constant bits the synthesizer lowers it to.
+// A parameter declared with a range has the range of its declaration, and one
+// declared with a type and no range is of that type, whatever value either
+// took, so both are read at decl_width with the declaration's sign. One
+// declared with neither, or with a bare `signed`, takes the type and range of
+// its final value -- a logic vector as wide as that value's self-determined
+// width, 13 bits for `parameter p1 = 13'h7e`, 3 for `newconst3 = 3'h4` and at
+// least 32 for the unsized `newconst4 = 4`, the clause's own examples -- which
+// the elaborator records with the value as RtlirParamDecl::value_width and
+// value_is_signed (RecordResolvedHighWords). Where it recorded none, the value
+// not having folded, 32 bits with the declaration's sign, the implied range of
+// an unsized value. Defined in const_eval_bits.cpp.
+struct ParamStorageShape {
+  uint32_t width;
+  bool is_signed;
+};
+ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param);
 
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);

@@ -197,6 +197,7 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   signal_signed_.clear();
   signal_ranges_.clear();
   unpacked_arrays_.clear();
+  unlowered_params_.clear();
   array_shapes_.clear();
   output_ports_.clear();
   reported_exprs_.clear();
@@ -504,6 +505,7 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
   if (!expr) return AigGraph::kConstFalse;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
+      if (ReportIfUnloweredParam(expr, expr)) return AigGraph::kConstFalse;
       return LowerIdentBit(expr->text, bit);
     case ExprKind::kIntegerLiteral:
       return LowerLiteralBit(expr, bit);
@@ -825,6 +827,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   auto* aig = arena_.Create<AigGraph>();
   ResetForModule(mod);
   MapPorts(mod, *aig);
+  MapParams(mod);
 
   for (const auto& assign : mod->assigns) {
     LowerContAssign(assign, *aig);
