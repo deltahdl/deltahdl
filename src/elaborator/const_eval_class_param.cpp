@@ -105,6 +105,21 @@ static SpecializationArg Answer(const SpecializationArg& arg) {
   return {};
 }
 
+// What the specialization gives the class's i-th header parameter: its
+// override, named or ordered, where the list writes one, and otherwise its
+// default folded over `values`, the parameters before it.
+static SpecializationArg HeaderParamArg(const Expr* expr, const ClassDecl* decl,
+                                        size_t i, const ScopeMap& scope,
+                                        const ScopeMap& values) {
+  const auto& [pname, pexpr] = decl->params[i];
+  SpecializationArg arg = NamedParamOverride(*expr->lhs, pname, scope);
+  if (!arg.supplied) arg = OrderedParamOverride(*expr->lhs, i, scope);
+  if (arg.supplied) return arg;
+  const DataType* type =
+      i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
+  return {false, FoldClassParamDefault(pexpr, type, values)};
+}
+
 // §8.25 gives each specialization its own parameter values, and §6.20.1 lets a
 // parameter depend on earlier ones, a class body localparam on the header's.
 // So the parameter `C#(args)::name` names is found by walking the class's
@@ -122,14 +137,7 @@ static SpecializationArg FoldUnderSpecialization(const Expr* expr,
   for (size_t i = 0; i < decl->params.size(); ++i) {
     std::string_view pname = decl->params[i].first;
     if (decl->type_param_names.count(pname) != 0) continue;
-    SpecializationArg arg = NamedParamOverride(*expr->lhs, pname, scope);
-    if (!arg.supplied) arg = OrderedParamOverride(*expr->lhs, i, scope);
-    if (!arg.supplied) {
-      const DataType* type =
-          i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
-      arg = {arg.supplied,
-             FoldClassParamDefault(decl->params[i].second, type, values)};
-    }
+    SpecializationArg arg = HeaderParamArg(expr, decl, i, scope, values);
     if (pname == target) return Answer(arg);
     Bind(values, pname, arg.value);
   }
