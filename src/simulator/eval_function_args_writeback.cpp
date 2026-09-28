@@ -152,7 +152,11 @@ static bool TakesElementsByPosition(const Expr* actual, SimContext& ctx,
 // formal, or be a dynamic array or queue, and §7.6 pairs the elements left to
 // right, so the formal's k-th element from the left goes to the actual's
 // k-th: to the element variable at that position of the actual's own bounds,
-// or into the actual's queue (AggregateWriteback::elements).
+// or into the actual's queue (AggregateWriteback::elements). A
+// multidimensional formal holds its elements as the leaves `a[i][j]`, which
+// the copy-out named one index deep and so never found, leaving the actual
+// as it was; every leaf is now named at its position on both sides
+// (ArrayElementSuffixAt).
 static void CollectElementWritebacks(const FunctionArg& formal,
                                      const Expr* actual, SimContext& ctx,
                                      Arena& arena, CallerWrites& out) {
@@ -166,24 +170,25 @@ static void CollectElementWritebacks(const FunctionArg& formal,
   const ArrayInfo* actual_info = nullptr;
   bool by_position = TakesElementsByPosition(actual, ctx, actual_info);
   // The actual's own bounds, where it declares as many elements as the
-  // formal; otherwise the formal's, as the copy-out has always named them.
-  const ArrayInfo& target =
-      (actual_info != nullptr && actual_info->size == info->size) ? *actual_info
-                                                                  : *info;
+  // formal in every dimension; otherwise the formal's, as the copy-out has
+  // always named them.
+  bool same_sizes = actual_info != nullptr && actual_info->size == info->size &&
+                    actual_info->dim_sizes == info->dim_sizes;
+  const ArrayInfo& target = same_sizes ? *actual_info : *info;
   AggregateWriteback to_queue;
   to_queue.actual = actual;
-  for (uint32_t k = 0; k < info->size; ++k) {
-    std::string suffix = "[" + std::to_string(ElementIndexAt(*info, k)) + "]";
-    auto* elem = ctx.FindLocalVariable(std::string(formal.name) + suffix);
+  uint32_t count = ArrayElementCount(*info);
+  for (uint32_t k = 0; k < count; ++k) {
+    auto* elem = ctx.FindLocalVariable(std::string(formal.name) +
+                                       ArrayElementSuffixAt(*info, k));
     if (elem == nullptr) continue;
     Logic4Vec value = OwnRhsWords(elem->value, arena);
     if (by_position) {
       to_queue.elements.push_back(value);
       continue;
     }
-    out.elements.push_back({std::string(actual->text) + "[" +
-                                std::to_string(ElementIndexAt(target, k)) + "]",
-                            value});
+    out.elements.push_back(
+        {std::string(actual->text) + ArrayElementSuffixAt(target, k), value});
   }
   if (by_position) out.aggregates.push_back(std::move(to_queue));
 }

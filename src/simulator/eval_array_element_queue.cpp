@@ -145,10 +145,7 @@ QueueObject* OfQueueElement(QueueObject* outer, const Expr* sel,
   if (HasUnknownBits(idx)) return nullptr;
   uint64_t pos = idx.ToUint64();
   if (pos >= outer->elements.size()) return nullptr;
-  uint64_t key = outer->element_ids.size() == outer->elements.size()
-                     ? outer->element_ids[pos]
-                     : pos;
-  QueueObject*& q = outer->element_queues[key];
+  QueueObject*& q = outer->element_queues[outer->ElementQueueKeyAt(pos)];
   if (q == nullptr) q = NewElementQueue(ShapeOf(*outer), arena);
   return q;
 }

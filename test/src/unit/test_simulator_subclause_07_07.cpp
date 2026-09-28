@@ -691,4 +691,152 @@ TEST(ArrayArgPassing, BarePropertyActualInMethodCopiesBack) {
   EXPECT_EQ(v, 987u);
 }
 
+// §7.7 passes a multidimensional array by value like a one-dimensional one:
+// every element of every dimension reaches the formal, not only those one
+// index deep.
+TEST(ArrayArgPassing, TwoDimFixedActualReachesFunctionFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int b[2][3];\n"
+      "  int result;\n"
+      "  function automatic int g(int a[2][3]);\n"
+      "    return a[1][2] * 10 + a[0][1];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    b[1][2] = 7; b[0][1] = 4;\n"
+      "    result = g(b);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 74u);
+}
+
+// §7.7's `int b[1:3][0:2]` for `fun(int a[3:1][3:1])`: §7.6 pairs the
+// elements left to right in each dimension, so b[2][0], the middle row's
+// leftmost element, is the formal's a[2][3].
+TEST(ArrayArgPassing, TwoDimActualOfOtherRangesPairsByPosition) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int b[1:3][0:2];\n"
+      "  int result;\n"
+      "  task automatic fun(int a[3:1][3:1]);\n"
+      "    result = a[2][3] * 10 + a[1][1];\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    b[2][0] = 7; b[3][2] = 5;\n"
+      "    fun(b);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 75u);
+}
+
+// §13.5 copies an output formal back on return, by position as §7.6 pairs
+// the elements: the formal's a[2][3] is the actual's b[2][1].
+TEST(ArrayArgPassing, TwoDimOutputFormalCopiedBackByPosition) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int b[1:3][1:3];\n"
+      "  int result;\n"
+      "  task automatic fill(output int a[3:1][3:1]);\n"
+      "    a[2][3] = 7; a[1][1] = 5;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fill(b);\n"
+      "    result = b[2][1] * 10 + b[3][3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 75u);
+}
+
+TEST(ArrayArgPassing, TwoDimInoutFormalCopiedInAndBack) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int c[2][2];\n"
+      "  int result;\n"
+      "  task automatic inc(inout int a[2][2]);\n"
+      "    a[1][0] = a[1][0] + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    c[1][0] = 8;\n"
+      "    inc(c);\n"
+      "    result = c[1][0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 9u);
+}
+
+// §7.7 lets a fixed-size formal take a dynamic array of equal size, and a
+// dynamic array of dynamic arrays brings each level's size at run time: d's
+// element at position (1, 0) is the formal's a[2][3].
+TEST(ArrayArgPassing, DynamicOfDynamicActualReachesTwoDimFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[][];\n"
+      "  int result;\n"
+      "  function automatic int dd(int a[3:1][3:1]);\n"
+      "    return a[2][3] * 10 + a[1][1];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    d = new[3];\n"
+      "    foreach (d[i]) d[i] = new[3];\n"
+      "    d[1][0] = 9; d[2][2] = 6;\n"
+      "    result = dd(d);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 96u);
+}
+
+// The run-time size check reaches every level: a row of two elements where
+// the formal's rows hold three is the §7.7 error, reported at the call.
+TEST(ArrayArgPassing, DynamicOfDynamicInnerSizeMismatchRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[][];\n"
+      "  int result;\n"
+      "  function automatic int dd(int a[3:1][3:1]);\n"
+      "    return a[2][3];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    d = new[3];\n"
+      "    foreach (d[i]) d[i] = new[3];\n"
+      "    d[1] = new[2];\n"
+      "    result = dd(d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: formal expects 3 elements "
+                            "in dimension 2, actual has 2",
+                            11, "7.7"));
+}
+
+// §7.7 copies a string array into a formal of string elements, so §6.16.1's
+// len() on an element of the formal counts the string's characters: the
+// actual's leftmost element "abc" is the formal's a[4].
+TEST(ArrayArgPassing, StringMethodOnElementOfStringArrayFormal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string ss[5:2];\n"
+      "  int result;\n"
+      "  function automatic int f(string a[4:1]);\n"
+      "    return a[4].len() * 10 + a[1].len();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    ss[5] = \"abc\"; ss[2] = \"z\";\n"
+      "    result = f(ss);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 31u);
+}
+
 }  // namespace

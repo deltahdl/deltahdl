@@ -531,17 +531,30 @@ static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
 // An element of a declared array of strings is one more (SelectsStringElement).
 // Answers false for any other receiver, a call's result among them, which
 // TryEvalCallResultMethodCall reads by the kind the call's value carries.
+// §7.7: whether `name` is a fixed-size array formal of the running call. Such
+// a formal has no variable of its own name, only its element variables local
+// to the call (BindFixedArrayArg in eval_function_args_array.cpp).
+static bool NamesArrayFormal(std::string_view name, SimContext& ctx) {
+  const ArrayInfo* info = ctx.FindArrayInfo(name);
+  return info != nullptr &&
+         ctx.FindLocalVariable(std::string(name) + "[" +
+                               std::to_string(info->lo) + "]") != nullptr;
+}
+
 // §6.16 with §7.4, §7.5 and §7.10: whether `receiver` selects one element of
 // an array of strings -- a queue, a dynamic or a fixed one, declared or a
 // class property, `h.names[0]` -- whose declaration, and not the value read,
-// says that it holds strings.
+// says that it holds strings. A fixed-size array formal, `a[4]` of `string
+// a[4:1]` (§7.7), is one too: its name was taken for no variable's, so
+// `a[4].len()` read an empty string.
 static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
   if (receiver->kind != ExprKind::kSelect || receiver->index_end != nullptr ||
       receiver->base == nullptr) {
     return false;
   }
   if (receiver->base->kind == ExprKind::kIdentifier &&
-      NameDenotesVariable(receiver->base->text, ctx)) {
+      (NameDenotesVariable(receiver->base->text, ctx) ||
+       NamesArrayFormal(receiver->base->text, ctx))) {
     std::string_view name = receiver->base->text;
     const ArrayInfo* info = ctx.FindArrayInfo(name);
     if (info == nullptr)

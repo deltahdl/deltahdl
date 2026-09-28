@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -135,6 +136,16 @@ class CalleeScopeAside {
 // §7.7 (printed 162) passes an array of another range. Defined in
 // eval_function_args_array.cpp.
 uint32_t ElementIndexAt(const ArrayInfo& info, uint32_t k);
+
+// §7.4.2 with §7.6 (printed pages 153 and 160): how many elements the fixed-
+// size array `info` holds across all its unpacked dimensions, and the address
+// suffix, `[i]` or `[i0][i1]...`, of the one at row-major position `k`, each
+// dimension counted from its left bound. Two arrays of the same sizes pair
+// their elements at equal positions whatever their ranges, which is how §7.7
+// (printed 162) passes a multidimensional array. Defined in
+// eval_function_args_array.cpp.
+uint32_t ArrayElementCount(const ArrayInfo& info);
+std::string ArrayElementSuffixAt(const ArrayInfo& info, uint32_t k);
 
 // §7.4.2 with §7.5: the shape of the fixed or dynamic array property `ref`
 // addresses, a dynamic one counting from 0 up. Defined in

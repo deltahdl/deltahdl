@@ -247,6 +247,12 @@ struct QueueObject {
   int64_t element_array_lo = 0;
   bool element_array_descending = false;
   std::map<uint64_t, QueueObject*> element_queues;
+  // The key element_queues keeps the queue of the element at position `pos`
+  // under: the element's identity where this queue keeps one per element, and
+  // the position otherwise.
+  uint64_t ElementQueueKeyAt(uint64_t pos) const {
+    return element_ids.size() == elements.size() ? element_ids[pos] : pos;
+  }
   // §7.4.2: where this queue keeps an element that is a fixed-size array, the
   // bounds that array was declared with, so that its declared index `index`
   // addresses the position PositionOf gives: from `index_lo` up, or, for a

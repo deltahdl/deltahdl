@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -37,19 +38,45 @@ uint32_t ElementIndexAt(const ArrayInfo& info, uint32_t k) {
   return info.is_descending ? info.lo + info.size - 1 - k : info.lo + k;
 }
 
-// §7.4.2 (printed pages 153-154): the shape a fixed-size formal of one
-// unpacked dimension declares, `[4:1]` or the C-style `[4]` that §7.4.2 makes
-// `[0:3]`, with the element width `elem_width`. §7.7 (printed page 162)
-// accepts an actual of the same size whatever its range, so the formal has
-// its own bounds rather than the actual's. Empty for a formal of any other
-// shape: an unsized, queue or associative dimension, several dimensions, or a
-// bound that does not evaluate to an address.
-static std::optional<ArrayInfo> FixedFormalShape(const FunctionArg& formal,
-                                                 uint32_t elem_width,
-                                                 SimContext& ctx,
-                                                 Arena& arena) {
-  if (formal.unpacked_dims.size() != 1) return std::nullopt;
-  const Expr* dim = formal.unpacked_dims[0];
+uint32_t ArrayElementCount(const ArrayInfo& info) {
+  if (info.dim_sizes.empty()) return info.size;
+  uint32_t count = 1;
+  for (uint32_t size : info.dim_sizes) count *= size;
+  return count;
+}
+
+std::string ArrayElementSuffixAt(const ArrayInfo& info, uint32_t k) {
+  if (info.dim_sizes.empty()) {
+    return "[" + std::to_string(ElementIndexAt(info, k)) + "]";
+  }
+  std::string suffix;
+  for (size_t d = info.dim_sizes.size(); d-- > 0;) {
+    uint32_t size = info.dim_sizes[d];
+    uint32_t pos = size == 0 ? 0 : k % size;
+    if (size != 0) k /= size;
+    uint32_t lo = d < info.dim_los.size() ? info.dim_los[d] : 0;
+    bool descending = d < info.dim_descending.size() && info.dim_descending[d];
+    uint32_t idx = descending ? lo + size - 1 - pos : lo + pos;
+    suffix.insert(0, "[" + std::to_string(idx) + "]");
+  }
+  return suffix;
+}
+
+namespace {
+
+// §7.4.2 (printed pages 153-154): one fixed-size unpacked dimension as a
+// formal declares it, `[4:1]`, or the C-style `[4]` that §7.4.2 makes
+// `[0:3]`: its smaller bound, its size and whether it was written from the
+// higher bound down. Empty for an unsized, queue or associative dimension, or
+// a bound that does not evaluate to an address.
+struct FixedDim {
+  uint32_t lo = 0;
+  uint32_t size = 0;
+  bool descending = false;
+};
+
+std::optional<FixedDim> FixedDimOf(const Expr* dim, SimContext& ctx,
+                                   Arena& arena) {
   if (dim == nullptr || IsQueueDim(dim) || IsAssocIndexDim(dim, ctx))
     return std::nullopt;
   int64_t left = 0;
@@ -63,11 +90,42 @@ static std::optional<ArrayInfo> FixedFormalShape(const FunctionArg& formal,
     right = size - 1;
   }
   if (std::min(left, right) < 0) return std::nullopt;
+  return FixedDim{static_cast<uint32_t>(std::min(left, right)),
+                  static_cast<uint32_t>(std::abs(left - right) + 1),
+                  left > right};
+}
+
+}  // namespace
+
+// §7.4.2 with §7.7 (printed pages 153 and 162): the shape a formal of fixed-
+// size unpacked dimensions declares, with the element width `elem_width`.
+// §7.7 accepts an actual of the same sizes whatever its ranges, so the formal
+// has its own bounds rather than the actual's. lo/size/is_descending describe
+// the outermost dimension, and a formal of several dimensions also has every
+// one in dim_los/dim_sizes/dim_descending, as a declared multidimensional
+// array does (TryCreateMultiDimArray in lowerer_var.cpp). Empty where any
+// dimension is not fixed.
+static std::optional<ArrayInfo> FixedFormalShape(const FunctionArg& formal,
+                                                 uint32_t elem_width,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  if (formal.unpacked_dims.empty()) return std::nullopt;
   ArrayInfo info;
-  info.lo = static_cast<uint32_t>(std::min(left, right));
-  info.size = static_cast<uint32_t>(std::abs(left - right) + 1);
   info.elem_width = elem_width;
-  info.is_descending = left > right;
+  bool multi = formal.unpacked_dims.size() > 1;
+  for (const Expr* dim : formal.unpacked_dims) {
+    auto fixed = FixedDimOf(dim, ctx, arena);
+    if (!fixed) return std::nullopt;
+    if (info.size == 0) {
+      info.lo = fixed->lo;
+      info.size = fixed->size;
+      info.is_descending = fixed->descending;
+    }
+    if (!multi) continue;
+    info.dim_los.push_back(fixed->lo);
+    info.dim_sizes.push_back(fixed->size);
+    info.dim_descending.push_back(fixed->descending);
+  }
   return info;
 }
 
@@ -103,6 +161,92 @@ static void BindAssocArg(const AssocArrayObject* src, const FunctionArg& formal,
   dst->index_type_name = src->index_type_name;
 }
 
+namespace {
+
+// §7.7 (printed page 162): the level at which a dynamic array of dynamic
+// arrays fails the run-time size check against a formal of several fixed
+// dimensions, counted from 1 at the outermost, with the size the formal
+// declares there and the size the actual brought.
+struct LevelSizeMismatch {
+  size_t dim = 0;
+  size_t want = 0;
+  size_t got = 0;
+};
+
+// §7.7 with §7.6 (printed pages 162 and 160): appends to `out`, in row-major
+// order, the elements of `q`, a dynamic array or queue at level `d` of the
+// actual whose elements below it are dynamic arrays or queues of their own
+// (QueueObject::element_queues). Each level shall hold as many elements as the
+// formal's dimension there, `sizes[d]`; false at the first that does not,
+// with `mismatch` saying where. An element whose queue was never made holds
+// none.
+bool FlattenElementQueues(const QueueObject& q,
+                          const std::vector<uint32_t>& sizes, size_t d,
+                          std::vector<Logic4Vec>& out,
+                          LevelSizeMismatch& mismatch) {
+  if (q.elements.size() != sizes[d]) {
+    mismatch = {d + 1, sizes[d], q.elements.size()};
+    return false;
+  }
+  if (d + 1 == sizes.size()) {
+    out.insert(out.end(), q.elements.begin(), q.elements.end());
+    return true;
+  }
+  for (uint64_t pos = 0; pos < q.elements.size(); ++pos) {
+    auto it = q.element_queues.find(q.ElementQueueKeyAt(pos));
+    if (it == q.element_queues.end() || it->second == nullptr) {
+      mismatch = {d + 2, sizes[d + 1], 0};
+      return false;
+    }
+    if (!FlattenElementQueues(*it->second, sizes, d + 1, out, mismatch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+// §7.7 (printed page 162): a dynamic array of dynamic arrays, `int d[][]`,
+// bound to a formal of several fixed dimensions, `int a[3:1][3:1]`. Each
+// level's size is known only now and is checked against the formal's, and
+// §7.6 pairs the elements by position, so the element at row-major position k
+// of the actual is the formal's leaf at position k under the formal's own
+// bounds (ArrayElementSuffixAt). The actual's inner arrays sit in the element
+// queues of the outer one, which the one-dimensional bind below never looked
+// in, so every leaf of the formal read the default. An output formal takes
+// nothing in (§13.3, printed 337) and starts at the default.
+static bool BindQueueToMultiDimFormal(const QueueObject& src_q,
+                                      const FunctionArg& formal,
+                                      ArrayInfo shape, SimContext& ctx,
+                                      Arena& arena, SourceLoc loc) {
+  bool is_output = formal.direction == Direction::kOutput;
+  std::vector<Logic4Vec> leaves;
+  LevelSizeMismatch mismatch;
+  if (!is_output &&
+      !FlattenElementQueues(src_q, shape.dim_sizes, 0, leaves, mismatch)) {
+    ctx.GetDiag().Error(
+        loc,
+        "array size mismatch: formal expects " + std::to_string(mismatch.want) +
+            " elements in dimension " + std::to_string(mismatch.dim) +
+            ", actual has " + std::to_string(mismatch.got),
+        Subclause("7.7"));
+    return true;
+  }
+  shape.is_4state = src_q.is_4state;
+  // §13.4: the shape lives as long as the call does.
+  ctx.RegisterArrayInScope(formal.name, shape);
+  uint32_t count = ArrayElementCount(shape);
+  for (uint32_t k = 0; k < count; ++k) {
+    auto dst = std::string(formal.name) + ArrayElementSuffixAt(shape, k);
+    auto* dst_var = ctx.CreateLocalVariable(
+        *arena.Create<std::string>(std::move(dst)), src_q.elem_width);
+    dst_var->value = is_output ? MakeLogic4VecVal(arena, src_q.elem_width, 0)
+                               : OwnRhsWords(leaves[k], arena);
+  }
+  return true;
+}
+
 // Binds a dynamic-array/queue actual to a fixed-size formal. §7.7 (printed
 // page 162) accepts one of equal size, which "requires run-time check", and
 // the elements correspond left to right as §7.6's assignment has them: the
@@ -122,6 +266,9 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
                                    Arena& arena, SourceLoc loc) {
   auto shape = FixedFormalShape(formal, src_q->elem_width, ctx, arena);
   if (!shape) return false;
+  if (!shape->dim_sizes.empty()) {
+    return BindQueueToMultiDimFormal(*src_q, formal, *shape, ctx, arena, loc);
+  }
   bool is_output = formal.direction == Direction::kOutput;
   if (!is_output && src_q->elements.size() != shape->size) {
     ctx.GetDiag().Error(
@@ -194,8 +341,14 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
 // declares and takes the actual's leftmost element at its own leftmost
 // index. The formal stood under the actual's bounds, so `arr[2]` read the
 // actual's `b[2]`, the fourth element from the left rather than the third.
-// A formal whose shape is not one dimension of the actual's size keeps the
-// actual's, as a multidimensional one always has.
+// A formal whose shape is not the actual's sizes keeps the actual's bounds.
+//
+// §7.7's own `fun(int a[3:1][3:1])` takes a two-dimensional actual, whose
+// elements are the leaves `b[i][j]` (CreateMultiDimLeaves in lowerer_var.cpp),
+// and §7.6 pairs them by position in every dimension. Only `b[k]`, one index
+// deep, was copied, which names no leaf, so every element of the formal read
+// the default. Every leaf is now copied, named at its position on each side
+// (ArrayElementSuffixAt).
 //
 // §13.3 (printed page 337) has an output formal copy its value out at the end
 // and nothing in at the beginning, so an output formal's element starts at
@@ -214,20 +367,19 @@ static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
                               const ArrayInfo& info, SimContext& ctx,
                               Arena& arena) {
   ArrayInfo shape = info;
-  if (info.dim_sizes.empty()) {
-    auto own = FixedFormalShape(formal, info.elem_width, ctx, arena);
-    if (own && own->size == info.size) {
-      shape.lo = own->lo;
-      shape.is_descending = own->is_descending;
-    }
+  auto own = FixedFormalShape(formal, info.elem_width, ctx, arena);
+  if (own && own->size == info.size && own->dim_sizes == info.dim_sizes) {
+    shape.lo = own->lo;
+    shape.is_descending = own->is_descending;
+    shape.dim_los = own->dim_los;
+    shape.dim_descending = own->dim_descending;
   }
   // §13.4, as above: the shape lives as long as the call does.
   ctx.RegisterArrayInScope(formal.name, shape);
-  for (uint32_t k = 0; k < info.size; ++k) {
-    auto src = IdentifierLookupKey(call_arg) + "[" +
-               std::to_string(ElementIndexAt(info, k)) + "]";
-    auto dst = std::string(formal.name) + "[" +
-               std::to_string(ElementIndexAt(shape, k)) + "]";
+  uint32_t count = ArrayElementCount(info);
+  for (uint32_t k = 0; k < count; ++k) {
+    auto src = IdentifierLookupKey(call_arg) + ArrayElementSuffixAt(info, k);
+    auto dst = std::string(formal.name) + ArrayElementSuffixAt(shape, k);
     auto* src_var = ctx.FindVariable(src);
     auto val =
         src_var ? src_var->value : MakeLogic4VecVal(arena, info.elem_width, 0);
