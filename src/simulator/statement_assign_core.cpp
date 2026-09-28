@@ -598,12 +598,13 @@ static bool KnownPredicateHolds(const Logic4Vec& cond) {
 }
 
 // Writes each element of the array `dst_name` describes by `dst` the element
-// MergedConditionalElement makes of the elements of the arrays `t` and `e` at
-// the same position, left to right.
+// MergedConditionalElement makes of the elements of the conditional `cond`'s
+// two arms at the same position, left to right.
 static void WriteMergedConditionalArray(std::string_view dst_name,
-                                        const ArrayInfo& dst, const Expr* t,
-                                        const Expr* e, SimContext& ctx,
-                                        Arena& arena) {
+                                        const ArrayInfo& dst, const Expr* cond,
+                                        SimContext& ctx, Arena& arena) {
+  const Expr* t = cond->true_expr;
+  const Expr* e = cond->false_expr;
   std::vector<Logic4Vec> tv;
   std::vector<Logic4Vec> ev;
   CollectFixedArrayElements(t->text, *ctx.FindArrayInfo(t->text), ctx, tv);
@@ -642,7 +643,7 @@ static bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx,
     return false;
   Logic4Vec cond = EvalExpr(rhs->condition, ctx, arena);
   if (!cond.IsKnown()) {
-    WriteMergedConditionalArray(stmt->lhs->text, *dst, t, e, ctx, arena);
+    WriteMergedConditionalArray(stmt->lhs->text, *dst, rhs, ctx, arena);
     return true;
   }
   const Expr* src = KnownPredicateHolds(cond) ? t : e;
