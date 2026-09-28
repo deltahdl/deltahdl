@@ -289,4 +289,90 @@ TEST(CastOperatorSim, IntegerCastToShortrealIsItsValueInSinglePrecision) {
             "2.000000 -3.000000 -5.000000 -5.000000\n");
 }
 
+// §6.24.1: a cast yields what a variable of the casting type holds once the
+// operand is assigned to it, and a 4-state variable keeps x and z bits
+// (§10.7) while a 2-state one reads them as 0 (§6.3.2.2): `integer'(l)` is
+// l zero-extended with its x and z, `integer'(4'bx)` holds x in the low four
+// bits, `time'(l)` is 64 bits wide, and `int'(l)` has the x and z at 0. The
+// cast was rebuilt from the operand's numeric projection, which read x and z
+// as 0 and made every cast 2-state.
+TEST(CastOperatorSim, CastToA4StateTypeKeepsXAndZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef logic [7:0] l8_t;\n"
+                       "  logic [3:0] l;\n"
+                       "  initial begin\n"
+                       "    l = 4'b1x0z;\n"
+                       "    $display(\"%b %b %b\", integer'(l), l8_t'(l),\n"
+                       "             integer'(4'bx));\n"
+                       "    $display(\"%b %b %0d\", logic'(1'bx), int'(l),\n"
+                       "             $bits(time'(l)));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "00000000000000000000000000001x0z 00001x0z "
+            "0000000000000000000000000000xxxx\n"
+            "x 00000000000000000000000000001000 64\n");
+}
+
+// §6.24.1 with §11.8.1: a cast to a signed type is signed, as a variable of
+// the type is, so an expression whose operands are all signed casts is
+// evaluated signed: §11.7's `byte'(regA) + byte'(regB)` with 8'h80 and 8'h01
+// is -127, and `int'(1) - 4` is -3. The cast's result was unsigned.
+TEST(CastOperatorSim, CastToASignedTypeIsSigned) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] regA, regB;\n"
+                       "  int r;\n"
+                       "  initial begin\n"
+                       "    regA = 8'h80; regB = 8'h01;\n"
+                       "    r = byte'(regA) + byte'(regB);\n"
+                       "    $display(\"%0d %0d %0d\", r, int'(1) - 4,\n"
+                       "             byte'(8'h80) + 0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-127 -3 -128\n");
+}
+
+// §6.24.1 with §11.6.1: a size cast evaluates its operand as if assigned to a
+// vector of the cast's width, which is the operand's context width, so the
+// product in §11.12's `($bits(x) + $bits(y))'(x * y)` is taken at 10 bits:
+// 15 * 10 is 150, where the 6-bit product of the operands alone is 22.
+TEST(CastOperatorSim, SizeCastIsItsOperandsContextWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] x = 4'hF;\n"
+                       "  logic [5:0] y = 6'hA;\n"
+                       "  let mult(a, b) = ($bits(a) + $bits(b))'(a * b);\n"
+                       "  initial $display(\"%0d %0d %0d\", 10'(x * y),\n"
+                       "                   ($bits(x) + $bits(y))'(x * y),\n"
+                       "                   mult(x, y));\n"
+                       "endmodule\n",
+                       f),
+            "150 150 150\n");
+}
+
+// A.2.2.1 admits a class or package scope before a casting type, so a typedef
+// named through its class (§8.23) or its package (§26.3) is a casting type,
+// and a bare typedef name inside the class's method names the class's: each
+// converts to the type, `byte` truncating 261 to 5 and `shortint` 70000 to
+// 4464. The scoped name was read as a size and the operand passed through.
+TEST(CastOperatorSim, CastToAClassOrPackageTypedef) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p; typedef shortint S; endpackage\n"
+                       "module t;\n"
+                       "  class C;\n"
+                       "    typedef byte T;\n"
+                       "    static function int narrow(int v);\n"
+                       "      return T'(v);\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  initial $display(\"%0d %0d %0d\", C::T'(261),\n"
+                       "                   C::narrow(261), p::S'(70000));\n"
+                       "endmodule\n",
+                       f),
+            "5 5 4464\n");
+}
+
 }  // namespace

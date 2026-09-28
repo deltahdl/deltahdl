@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
@@ -184,6 +185,88 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   return MakeRealVec(arena, d, target_width);
 }
 
+// §6.24.1 with A.2.2.1: the key the type tables hold a named casting type
+// under. A casting type written behind a class or a package, `C::T'(v)` or
+// `p::S'(v)` (§8.23, §26.3), stands in the cast's rhs as a scope resolution
+// and is held under "C::T"; a bare name inside a method names the running
+// class's typedef, or that of a class enclosing it or one it extends, as it
+// would in a declaration there, held under that class's key. Empty for a cast
+// that names no type this way.
+static std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
+  const Expr* rhs = expr->rhs;
+  if (expr->text.empty()) {
+    if (rhs == nullptr || rhs->kind != ExprKind::kMemberAccess ||
+        !rhs->is_scope_resolution || rhs->lhs == nullptr ||
+        rhs->rhs == nullptr || rhs->lhs->kind != ExprKind::kIdentifier ||
+        rhs->rhs->kind != ExprKind::kIdentifier)
+      return {};
+    return std::string(rhs->lhs->text) + "::" + std::string(rhs->rhs->text);
+  }
+  for (const ClassTypeInfo* cls = ctx.CurrentMethodClass(); cls != nullptr;
+       cls = cls->enclosing) {
+    for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
+      std::string key = std::string(c->name) + "::" + std::string(expr->text);
+      if (ctx.FindTypeWidth(key) > 0) return key;
+    }
+  }
+  return std::string(expr->text);
+}
+
+// §6.24.1: what a variable of the casting type is, which the cast's result
+// takes on: its width, whether it holds x and z (§6.11.2), and whether it is
+// signed (§6.11.3). A keyword answers by itself; a typedef by what the design
+// registered for its name, an enumeration by its base type (§6.19).
+struct CastTarget {
+  uint32_t width = 32;
+  bool is_4state = true;
+  bool is_signed = false;
+};
+
+static bool IsTwoStateKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool KeywordCastTarget(std::string_view name, CastTarget& out) {
+  static constexpr std::string_view kTwoState[] = {"bit", "byte", "shortint",
+                                                   "int", "longint"};
+  static constexpr std::string_view kFourState[] = {"logic", "reg", "integer",
+                                                    "time"};
+  static constexpr std::string_view kSigned[] = {"byte", "shortint", "int",
+                                                 "longint", "integer"};
+  bool two = false;
+  bool four = false;
+  for (auto k : kTwoState) two = two || name == k;
+  for (auto k : kFourState) four = four || name == k;
+  if (!two && !four) return false;
+  out.width = name == "time" ? 64 : CastTargetWidth(name);
+  out.is_4state = four;
+  out.is_signed = false;
+  for (auto k : kSigned) out.is_signed = out.is_signed || name == k;
+  return true;
+}
+
+static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
+  CastTarget t;
+  if (KeywordCastTarget(key, t)) return t;
+  t.width = ResolveCastWidth(key, ctx);
+  t.is_signed = ctx.FindTypeSigned(key);
+  if (const EnumTypeInfo* e = ctx.FindEnumType(key)) {
+    t.is_4state = e->is_4state;
+  } else {
+    t.is_4state = !IsTwoStateKind(ctx.FindTypeKind(key));
+  }
+  return t;
+}
+
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   uint32_t w = CastTargetWidth(type_name);
   if (w > 0) return w;
@@ -277,13 +360,21 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->lhs->kind == ExprKind::kAssignmentPattern ||
       expr->rhs->kind == ExprKind::kTypeRef)
     return false;
+  // A class's or a package's typedef, `C::T'(v)`, is a casting type rather
+  // than a size, though it stands where a size expression does.
+  if (std::string key = CastTypeKey(expr, ctx);
+      !key.empty() && ctx.FindTypeWidth(key) > 0)
+    return false;
   auto width_v = EvalExpr(expr->rhs, ctx, arena);
   if (!width_v.IsKnown()) return false;
   uint64_t w64 = width_v.ToUint64();
   if (w64 == 0 || w64 > 0xFFFF) return false;
   auto tw = static_cast<uint32_t>(w64);
 
-  auto inner = EvalExpr(expr->lhs, ctx, arena);
+  // §6.24.1 with §11.6.1: the operand is evaluated as if assigned to a
+  // [tw-1:0] vector, so tw is its context width, and `10'(x * y)` multiplies
+  // at 10 bits rather than at the wider operand's own.
+  auto inner = EvalExpr(expr->lhs, ctx, arena, tw);
   auto result = MakeLogic4Vec(arena, tw);
   if (result.nwords > 0 && inner.nwords > 0)
     WriteSizeCastWord(inner, tw, result.words[0]);
@@ -349,7 +440,9 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
 
-  uint32_t target_width = ResolveCastWidth(type_name, ctx);
+  std::string key = CastTypeKey(expr, ctx);
+  CastTarget target = ResolveCastTarget(key, ctx);
+  uint32_t target_width = target.width;
 
   if (inner.is_real != IsRealCastTarget(type_name)) {
     return CastRealConversion(inner, type_name, target_width, arena);
@@ -364,9 +457,17 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (inner.is_real) {
     return ConvertRealForKnownLhs(inner, true, target_width, arena);
   }
-  uint64_t val = inner.ToUint64();
-  if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
-  return MakeLogic4VecVal(arena, target_width, val);
+  // §6.24.1: the value a variable of the casting type holds once the operand
+  // is assigned to it (§10.7): extended by the operand's own signedness or
+  // truncated, x and z kept for a 4-state type and read as 0 for a 2-state
+  // one (§6.3.2.2), and signed as the type is. Rebuilt from the operand's
+  // numeric projection, every cast came out 2-state, unsigned and at most 64
+  // bits wide: `integer'(4'bx)` was 0 and `byte'(8'h80) + 0` was 128.
+  Logic4Vec result =
+      OwnRhsWords(ResizeToWidth(inner, target_width, arena), arena);
+  if (!target.is_4state) CoerceTo2State(result);
+  result.is_signed = target.is_signed;
+  return result;
 }
 
 }  // namespace delta
