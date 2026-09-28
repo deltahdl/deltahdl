@@ -718,4 +718,19 @@ bool TryEvalStringProperty(std::string_view var_name, std::string_view prop,
   return true;
 }
 
+bool TryEvalStringMethodWithoutParens(const Expr* access, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out) {
+  if (access->kind != ExprKind::kMemberAccess || access->is_scope_resolution ||
+      access->with_expr != nullptr || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier ||
+      !StringMethodAnswersAValue(access->rhs->text)) {
+    return false;
+  }
+  auto* call = arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->lhs = const_cast<Expr*>(access);
+  call->range = access->range;
+  return TryEvalStringMethodCall(call, ctx, arena, out);
+}
+
 }  // namespace delta

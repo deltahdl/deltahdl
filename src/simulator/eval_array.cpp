@@ -682,6 +682,22 @@ bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
 // elements.
 static void ArraySortByValue(std::string_view var_name, const ArrayInfo& info,
                              bool ascending, SimContext& ctx, Arena& arena) {
+  // §7.12.2 with §6.16: strings are ordered lexicographically, and each keeps
+  // its own text; read as integers they were ordered by their packed value
+  // and written back empty.
+  if (IsStringArray(var_name, info, ctx)) {
+    auto elems = CollectVecElements(var_name, info, ctx, arena);
+    std::vector<std::string> text;
+    text.reserve(elems.size());
+    for (const auto& e : elems) text.push_back(Logic4VecToString(e));
+    auto order = IdentityOrder(elems.size());
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+      return ascending ? text[a] < text[b] : text[a] > text[b];
+    });
+    WriteVecElements(var_name, info, GatherByOrder(elems, order), ctx);
+    ApplyDynArrayIdPermutation(var_name, info, order, ctx);
+    return;
+  }
   auto vals = CollectElements(var_name, info, ctx);
   auto order = IdentityOrder(vals.size());
   std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {

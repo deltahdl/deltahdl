@@ -575,10 +575,14 @@ int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
   // type is sign-extended, an unsigned index type is zero-extended. Because
   // the key map orders by signed int64, a zero-extended (non-negative) key
   // yields the unsigned numeric ordering an unsigned index type requires.
+  // The value is cut to the index width first, since SignExtend reads the
+  // sign bit of a value already that wide: -3 to an 8-bit signed index,
+  // 0xfffffffd from its 32-bit literal, kept its upper bits and keyed
+  // 4294967293, ordered after 5.
   if (is_wildcard) return static_cast<int64_t>(val.ToUint64());
-  if (is_signed) return SignExtend(val.ToUint64(), index_width);
   uint64_t raw = val.ToUint64();
   if (index_width < 64) raw &= (uint64_t{1} << index_width) - 1;
+  if (is_signed) return SignExtend(raw, index_width);
   return static_cast<int64_t>(raw);
 }
 

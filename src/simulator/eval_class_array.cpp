@@ -314,11 +314,8 @@ static int64_t IndexFromLeft(const ClassArrayRef& ref, uint32_t i) {
              : ref.lo + i;
 }
 
-// §7.6: the elements of the array property `src` names -- a fixed or dynamic
-// one, or a queue -- from the left, into `out`; false for any other
-// expression.
-static bool PropertyArrayElements(const Expr* src, SimContext& ctx,
-                                  Arena& arena, std::vector<Logic4Vec>& out) {
+bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,
+                           std::vector<Logic4Vec>& out) {
   if (src == nullptr || (src->kind != ExprKind::kIdentifier &&
                          src->kind != ExprKind::kMemberAccess)) {
     return false;

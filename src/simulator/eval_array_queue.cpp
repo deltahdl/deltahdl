@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -303,15 +304,34 @@ bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
   return DispatchQueueEval(prop, q, arena, out);
 }
 
-static void SortQueueWithIds(QueueObject* q, bool ascending) {
-  auto& elems = q->elements;
-  auto& ids = q->element_ids;
+// §7.12.2 with §6.16: the order the elements of `q` take, ascending or
+// descending. A queue of strings, whose elements have no declared width, is
+// ordered lexicographically; by the packed value a shorter string came first.
+static std::vector<size_t> QueueSortOrder(const QueueObject& q,
+                                          bool ascending) {
+  const auto& elems = q.elements;
   std::vector<size_t> order(elems.size());
   for (size_t i = 0; i < order.size(); ++i) order[i] = i;
-  std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+  if (q.elem_width == 0 && !q.holds_class_handles && !q.elements_are_queues) {
+    std::vector<std::string> text;
+    text.reserve(elems.size());
+    for (const auto& e : elems) text.push_back(Logic4VecToString(e));
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+      return ascending ? text[a] < text[b] : text[a] > text[b];
+    });
+    return order;
+  }
+  std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
     return ascending ? elems[a].ToUint64() < elems[b].ToUint64()
                      : elems[a].ToUint64() > elems[b].ToUint64();
   });
+  return order;
+}
+
+static void SortQueueWithIds(QueueObject* q, bool ascending) {
+  auto& elems = q->elements;
+  auto& ids = q->element_ids;
+  std::vector<size_t> order = QueueSortOrder(*q, ascending);
   std::vector<Logic4Vec> sorted_elems(elems.size());
   std::vector<uint64_t> sorted_ids(ids.size());
   for (size_t i = 0; i < order.size(); ++i) {

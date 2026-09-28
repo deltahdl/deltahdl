@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -483,6 +484,54 @@ TEST(DynamicArrayNewSimulation, DeclNewWithInitGivesDestinationItsOwnWords) {
   LowerAndRun(design, f);
   ASSERT_NO_FATAL_FAILURE(ExpectElementsCopiedOwningWords(
       f.ctx.FindQueue("s"), f.ctx.FindQueue("d"), {0x12345678u, 0x0BADF00Du}));
+}
+
+// §7.5.1: the initialization expression of new[] may be a fixed-size array,
+// whose elements are copied in order -- truncated to a shorter size and
+// padded with the element default to a longer one -- and a new[] without one
+// makes a new array rather than keeping what the old one held.
+TEST(DynamicArrayNewSimulation, NewCopiesAFixedArrayInitializer) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int isrc[3] = '{5, 6, 7};\n"
+      "  int a[], b[], c[];\n"
+      "  initial begin\n"
+      "    a = new[3](isrc); b = new[2](isrc); c = new[4](isrc);\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", a[0], a[2], b.size(),\n"
+      "             b[1], c[2], c[3]);\n"
+      "    c = new[4];\n"
+      "    $display(\"%0d %0d\", c.size(), c[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 7 2 6 7 0\n4 0\n");
+}
+
+// §7.5.1 with Table 6-7: new[] initializes each element to the default of its
+// type, x for a 4-state element and 0 for a 2-state one, in a declared
+// dynamic array and in one that is a class property alike.
+TEST(DynamicArrayNewSimulation, NewFillsA4StateArrayWithX) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  logic [3:0] lda[];\n"
+      "  bit [3:0] bda[];\n"
+      "  function void init(); lda = new[2]; bda = new[2]; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [3:0] lda[];\n"
+      "  bit [3:0] bda[];\n"
+      "  C c = new;\n"
+      "  initial begin\n"
+      "    lda = new[2]; bda = new[2]; c.init();\n"
+      "    $display(\"%b %0d %0d %b %0d %0d\", lda[1], $isunknown(lda),\n"
+      "             $isunknown(bda), c.lda[0], $isunknown(c.lda),\n"
+      "             $isunknown(c.bda));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xxxx 1 0 xxxx 1 0\n");
 }
 
 }  // namespace

@@ -75,6 +75,16 @@ std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena);
 // matches its scope arguments against it; $readmem and $writemem (§21.4,
 // §21.5) find a memory named hierarchically the same way.
 std::string FlattenHierPath(const Expr* arg);
+
+// §20.6.2 with §7.4.4: the bits the type the typedef `name` declares holds.
+// A typedef of a fixed-size unpacked array, `typedef bit Bits [36:1]`, holds
+// every element's, 36, where the width table declines to answer for the
+// name; the element type may be a typedef of an array in turn (§7.4.4's
+// definition in stages), followed to `depth` 8. 0 for a dimension of no fixed
+// size, whose bit stream has no size before a variable holds one. Defined in
+// eval_systask_query.cpp.
+uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
+                     int depth = 0);
 // §21.3.2: render the file-output task `expr` (named `name`, whose suffix
 // picks an unformatted argument's radix) and write it to every file
 // `descriptor` selects. Defined in eval_systask_io.cpp.

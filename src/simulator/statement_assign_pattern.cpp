@@ -823,11 +823,15 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
                         Arena& arena) {
   if (rhs->args.size() < 2) return;
   auto* init_expr = rhs->args[1];
-  if (!init_expr || init_expr->kind != ExprKind::kIdentifier) return;
-  auto* src = ctx.FindQueue(init_expr->text);
-  if (!src) return;
-
-  const auto& src_elems = (src == q) ? saved : src->elements;
+  if (!init_expr) return;
+  // The initializer may be any unpacked array of the element type, a fixed
+  // one, `new[3](isrc)` with `int isrc[3]`, as well as a dynamic array or a
+  // queue; the array being sized is read as it stood before (`saved`).
+  std::vector<Logic4Vec> collected;
+  const bool kSelf = init_expr->kind == ExprKind::kIdentifier &&
+                     ctx.FindQueue(init_expr->text) == q;
+  if (!kSelf) CollectQueueElements(init_expr, ctx, arena, collected);
+  const auto& src_elems = kSelf ? saved : collected;
   size_t copy_len = std::min(q->elements.size(), src_elems.size());
   for (size_t i = 0; i < copy_len; ++i)
     q->elements[i] = OwnRhsWords(src_elems[i], arena);
@@ -895,12 +899,18 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // resize(n, value) copy-constructs every element it adds from the one
     // value it is handed, and a Logic4Vec copy copies the `words` pointer, so
     // filling that way would leave `d = new[4]` holding one buffer read four
-    // times. Growing one element at a time gives each its own allocation;
-    // shrinking is left to resize, which drops entries rather than making any.
-    size_t grown_from = q->elements.size();
-    q->elements.resize(static_cast<size_t>(sz));
-    for (size_t i = grown_from; i < q->elements.size(); ++i)
-      q->elements[i] = MakeLogic4VecVal(arena, q->elem_width, 0);
+    // times. Making one element at a time gives each its own allocation.
+    // The default is Table 6-7's: x for a 4-state element, 0 for a 2-state
+    // one. The array is a new one, so no element keeps what the array held
+    // before; the initialization expression is what carries values over.
+    // A handle's default is null, and a string's, which has no width, "".
+    const bool kFillX = q->is_4state && !q->holds_class_handles &&
+                        !q->elements_are_queues && q->elem_width > 0;
+    q->elements.clear();
+    q->elements.reserve(static_cast<size_t>(sz));
+    for (int64_t i = 0; i < sz; ++i)
+      q->elements.push_back(kFillX ? MakeAllX(arena, q->elem_width)
+                                   : MakeLogic4VecVal(arena, q->elem_width, 0));
     CopyNewInit(stmt->rhs, q, saved, ctx, arena);
     EnforceQueueBound(q, "new[]", stmt->rhs->range.start, ctx);
     q->AssignFreshIds();

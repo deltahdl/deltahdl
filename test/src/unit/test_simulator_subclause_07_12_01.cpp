@@ -715,4 +715,49 @@ TEST(ArrayLocator, StringItemComparesLexicographicallyInWith) {
   EXPECT_EQ(out, "2 2 4\n1 4\n4\n0\n");
 }
 
+// §7.12.1 with §6.16 and A.8.2: a string method written without parentheses
+// in a with clause, `item.atoi` or a renamed `s.tolower`, is called on the
+// element, so max orders "100" above "7" and unique folds "a" with "A" -- as
+// the same call on a variable and on an element does outside one.
+TEST(ArrayLocator, WithClauseCallsAStringMethodWithoutParentheses) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string SA[4] = '{\"7\", \"100\", \"42\", \"9\"};\n"
+      "  string SB[5] = '{\"a\", \"A\", \"b\", \"a\", \"B\"};\n"
+      "  string qs[$], qt[$], s = \"42\";\n"
+      "  initial begin\n"
+      "    qs = SA.max with (item.atoi);\n"
+      "    qt = SB.unique(v) with (v.tolower);\n"
+      "    $display(\"%0s %0d %0d %0d\", qs[0], qt.size(), s.atoi,\n"
+      "             SA[1].atoi);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "100 2 42 100\n");
+}
+
+// §7.12.1 with §7.8.1: the locators on a string-keyed associative array walk
+// its entries in first() order, the keys' lexicographic one -- apple, fig,
+// pear -- and the index locators return a queue of the string keys.
+TEST(ArrayLocator, LocatorsOnAStringKeyedAssociativeArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int m[string];\n"
+      "  string ks[$], kl[$]; int vs[$], vf[$];\n"
+      "  initial begin\n"
+      "    m[\"pear\"] = 7; m[\"apple\"] = 5; m[\"fig\"] = 2;\n"
+      "    ks = m.find_index with (item > 3);\n"
+      "    kl = m.find_last_index with (item > 3);\n"
+      "    vs = m.find with (item > 3);\n"
+      "    vf = m.find_first with (item.index != \"apple\");\n"
+      "    $display(\"%0d %0s %0s %0s %0d %0d %0d\", ks.size(), ks[0], ks[1],\n"
+      "             kl[0], vs.size(), vs[0], vf[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 apple pear pear 2 5 2\n");
+}
+
 }  // namespace

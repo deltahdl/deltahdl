@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -272,6 +274,26 @@ TEST(PrimarySim, BitsOfClassAndPackageScopedTypedefs) {
                        "endmodule\n",
                        f),
             "8 8 8 16 4\n");
+}
+
+// §20.6.2 with §7.4.4: a typedef that declares a fixed-size unpacked array
+// holds every element's bits -- `Bits [36:1]` 36, `B8 [8:1]` 8, a two-
+// dimensional `byte M [2][3]` 48, and `Bits BB [2]`, an array of it defined in
+// stages, 72 -- as a variable declared with the name does.
+TEST(PrimarySim, BitsOfAnUnpackedArrayTypedefName) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit Bits [36:1];\n"
+      "  typedef bit B8 [8:1];\n"
+      "  typedef byte M [2][3];\n"
+      "  typedef Bits BB [2];\n"
+      "  Bits b;\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d\", $bits(Bits), $bits(b),\n"
+      "                   $bits(B8), $bits(M), $bits(BB));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "36 36 8 48 72\n");
 }
 
 }  // namespace

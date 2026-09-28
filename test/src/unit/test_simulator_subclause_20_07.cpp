@@ -568,4 +568,23 @@ TEST(ArrayQuerySim, StructArrayMemberIsQueried) {
   EXPECT_EQ(out, "8 7 5 32 4 8\n");
 }
 
+// §20.7: the query functions return an integer, which is signed -- the -1
+// of $increment for the ascending `[1:10]` prints as -1 under %0d and is
+// less than 0, and so is the $right of an empty dynamic array.
+TEST(ArrayQuerySim, QueryResultIsASignedInteger) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] joe [1:10];\n"
+      "  int d[];\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %0d %0d\", $increment(joe), $increment(joe) < "
+      "0,\n"
+      "             $right(d), $increment(joe, 2));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-1 1 -1 1\n");
+}
+
 }  // namespace

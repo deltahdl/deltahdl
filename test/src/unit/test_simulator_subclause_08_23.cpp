@@ -690,4 +690,31 @@ TEST(ClassScopeResolutionSim, AssocArrayPropertyOfANestedClassHoldsHandles) {
             7u);
 }
 
+// §8.23 with §7.2: a structure typedef a class declares is a type like any
+// other in a subroutine -- a method's return value and local named bare,
+// `S`, and a module function's named `P2::S` -- whose members, the real one
+// above bit 32 included, keep what is written to them.
+TEST(ClassScopeResolutionSim, SubroutineVariablesOfAClassStructTypedef) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P2;\n"
+      "    typedef struct { real r; bit [31:0] data; } S;\n"
+      "    static function S One(); One.data = 7; One.r = 1.5; endfunction\n"
+      "    static function S Two(); S v; v.data = 9; return v; endfunction\n"
+      "  endclass\n"
+      "  function automatic P2::S f1(); f1.data = 4; endfunction\n"
+      "  function automatic int f3(); P2::S v; v.data = 5;\n"
+      "    return v.data; endfunction\n"
+      "  P2::S y, w, x;\n"
+      "  initial begin\n"
+      "    y = P2::One(); w = P2::Two(); x = f1();\n"
+      "    $display(\"%0d %f %0d %0d %0d\", y.data, y.r, w.data, x.data,\n"
+      "             f3());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 1.500000 9 4 5\n");
+}
+
 }  // namespace

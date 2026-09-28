@@ -125,10 +125,11 @@ static std::string ScopedTypeName(const Expr* arg) {
 // on the running specialization, or a typedef by its bare name -- and, with
 // §8.23 and §26.3, one named through its class or package, which read as an
 // expression, `C::T`, was 1 bit. 0 where `arg` names no type.
-static uint32_t NamedTypeBits(const Expr* arg, SimContext& ctx) {
+
+static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
     uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
-    return tw > 0 ? tw : ctx.FindTypeWidth(arg->text);
+    return tw > 0 ? tw : TypedefBits(arg->text, ctx, arena);
   }
   if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution)
     return 0;
@@ -148,7 +149,7 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (uint64_t bits = FixedArrayBits(arg, ctx); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
-  if (uint32_t tw = NamedTypeBits(arg, ctx); tw > 0) {
+  if (uint64_t tw = NamedTypeBits(arg, ctx, arena); tw > 0) {
     return MakeLogic4VecVal(arena, 32, tw);
   }
   // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream

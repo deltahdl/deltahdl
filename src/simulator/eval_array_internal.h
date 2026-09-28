@@ -21,6 +21,13 @@ std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                           const ArrayInfo& info,
                                           SimContext& ctx, Arena& arena);
 
+// §7.12 with §6.16: whether the fixed-size or dynamic array `var_name`
+// describes by `info` holds strings, by its declared element type or, where
+// that was not recorded, by the string registration of the array or its first
+// element. Defined in eval_array_locator.cpp.
+bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
+                   SimContext& ctx);
+
 // The iterator-argument names parsed from an array method call's optional
 // `with` clause arguments: the item name (default "item"), the index name
 // (default "index"), and the synthesized "<item>.<index>" variable name.

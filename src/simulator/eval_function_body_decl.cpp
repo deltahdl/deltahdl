@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "common/arena.h"
@@ -47,11 +48,40 @@ bool DeclaredTypeIs4State(const DataType& type) {
 // written inline, which has no name the table could hold -- binds nothing.
 // The subroutine's implicit variable (BindReturnStructLayout) and a body
 // local (BindLocalAggregateLayout) are bound through here alike.
+//
+// §8.23 with §7.2: a structure typedef a class declares is registered under
+// "C::S", its name with the class's, and a variable declared with it names
+// it so, `P2::S v` in a module's function, or bare, `S v` or a function
+// returning `S` in a method of the class or of one extending it. Asked by the
+// bare name alone, neither was bound, and every member written to it was
+// lost. A specialization's methods read the class's typedef as the
+// specialization binds it, which the declaration's own layout does not hold,
+// so only the class itself, its default specialization, is asked.
+static std::string_view NamedLayoutKey(const DataType& type, SimContext& ctx) {
+  std::string_view name = type.type_name;
+  if (name.empty()) return {};
+  auto key_in = [&](std::string_view scope) -> std::string_view {
+    auto* key = ctx.GetArena().Create<std::string>(std::string(scope) +
+                                                   "::" + std::string(name));
+    return ctx.FindStructType(*key) != nullptr ? std::string_view(*key)
+                                               : std::string_view{};
+  };
+  if (!type.scope_name.empty())
+    return type.type_params.empty() ? key_in(type.scope_name)
+                                    : std::string_view{};
+  if (ctx.FindStructType(name) != nullptr) return name;
+  for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
+       c = c->parent) {
+    if (c->param_actuals != nullptr) return {};
+    if (std::string_view key = key_in(c->name); !key.empty()) return key;
+  }
+  return {};
+}
+
 bool BindNamedLayout(std::string_view var_name, const DataType& type,
                      SimContext& ctx) {
-  std::string_view type_name = type.type_name;
-  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
-    return false;
+  std::string_view type_name = NamedLayoutKey(type, ctx);
+  if (type_name.empty()) return false;
   ctx.SetVariableStructType(var_name, type_name);
   return true;
 }

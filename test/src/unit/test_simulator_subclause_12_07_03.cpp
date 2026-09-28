@@ -885,4 +885,33 @@ TEST(LoopStatementSim, ForeachOverArrayPropertiesInMethods) {
   EXPECT_EQ(out, "10 40 20 3100\n");
 }
 
+// §12.7.3 with §7.8.4: the loop variable of a foreach over an associative
+// array has the index type, so a signed one, `byte` or `bit signed [4:1]`,
+// reads the key -3 as -3, in a module and in a function; an unsigned 4-bit
+// one reads -1's key as 15.
+TEST(LoopStatementSim, ForeachOverASignedAssociativeIndex) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit signed [4:1] SNibble;\n"
+      "  int b[byte];\n"
+      "  int s[SNibble];\n"
+      "  int u[bit [3:0]];\n"
+      "  function automatic void f(); foreach (b[i]) $write(\" f%0d\", i);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    b[5] = 1; b[-3] = 2;\n"
+      "    s[-3] = 2; s[0] = 3;\n"
+      "    u[-1] = 1;\n"
+      "    foreach (b[i]) $write(\" %0d\", i);\n"
+      "    f();\n"
+      "    foreach (s[k]) $write(\" %0d\", k);\n"
+      "    foreach (u[k]) $write(\" u%0d\", k);\n"
+      "    $display(\"\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, " -3 5 f-3 f5 -3 0 u15\n");
+}
+
 }  // namespace

@@ -276,4 +276,25 @@ TEST(ArrayMethodsSim, ReadingMethodsOnArrayPropertiesThroughAHandle) {
   EXPECT_EQ(out, "9 2 1 17\n");
 }
 
+// §7.12: an array manipulation method returns a queue, which may be the
+// receiver of a further method or the base of an element select -- the size
+// of a unique() result, the unique elements of a find's result, the first
+// element of min()'s, and the size of a find's.
+TEST(ArrayMethodsSim, MethodResultIsAReceiver) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string SA[5] = '{\"a\", \"b\", \"a\", \"c\", \"b\"};\n"
+      "  int IA[int], q[$];\n"
+      "  initial begin\n"
+      "    IA[0] = 9; IA[1] = 2; IA[2] = 9; IA[3] = 5;\n"
+      "    q = IA.find(x) with (x > 5).unique;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", SA.unique().size(), q.size(),\n"
+      "             q[0], IA.min()[0], IA.find with (item == 9).size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 9 2 2\n");
+}
+
 }  // namespace

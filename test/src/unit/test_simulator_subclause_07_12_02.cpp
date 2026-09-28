@@ -570,4 +570,41 @@ TEST(ArrayOrderingSim, WithClauseReadsAMemberOfAStructElement) {
   EXPECT_EQ(out, "1 2 3 5 1 2 6\n");
 }
 
+// §7.12.2 with §6.16: sort and rsort order a queue of strings
+// lexicographically -- apple, fig, pear -- and not by the packed value that
+// puts a shorter string first.
+TEST(ArrayOrderingSim, SortOrdersAStringQueueLexicographically) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string q[$] = {\"pear\", \"apple\", \"fig\"};\n"
+      "  string r[$] = {\"pear\", \"apple\", \"fig\"};\n"
+      "  initial begin\n"
+      "    q.sort(); r.rsort();\n"
+      "    $display(\"%s %s %s %s %s %s\", q[0], q[1], q[2], r[0], r[1],\n"
+      "             r[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "apple fig pear pear fig apple\n");
+}
+
+// §7.12.2 with §6.16: sort and rsort reorder a fixed-size or dynamic array
+// of strings, each element keeping its text.
+TEST(ArrayOrderingSim, SortKeepsTheStringsOfAnArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string fa[3] = '{\"pear\", \"apple\", \"fig\"};\n"
+      "  string d[] = '{\"pear\", \"apple\", \"fig\"};\n"
+      "  initial begin\n"
+      "    fa.sort(); d.rsort();\n"
+      "    $display(\"%s %s %s %s %s %s\", fa[0], fa[1], fa[2], d[0], d[1],\n"
+      "             d[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "apple fig pear pear fig apple\n");
+}
+
 }  // namespace

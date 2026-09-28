@@ -21,8 +21,8 @@
 
 namespace delta {
 
-static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx) {
+bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
+                   SimContext& ctx) {
   // §7.12.1 with §6.16: an array declared of string elements holds strings,
   // which its with clause compares lexicographically, whatever its first
   // element's variable was registered as.
@@ -289,24 +289,23 @@ static AssocArrayObject* LocatorAssocReceiver(const Expr* expr,
 // evaluator, match predicate, and sort key) so each dispatch arm reads the same
 // way as the indexed-array path.
 struct AssocLocatorState {
-  const std::vector<int64_t>& keys;
+  const std::vector<Logic4Vec>& keys;
   const std::vector<Logic4Vec>& vals;
   const LocatorCtx& lc;
-  uint32_t iw;
+  bool string_keys;
   SimContext& ctx;
   Arena& arena;
 
-  Logic4Vec KeyVec(size_t i) const {
-    return MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
-  }
+  Logic4Vec KeyVec(size_t i) const { return keys[i]; }
   // Evaluates the with expression for entry i, binding the element iterator to
-  // the value and the index iterator to the key.
+  // the value and the index iterator to the key, a string for a string index.
   Logic4Vec EvalWith(size_t i) const {
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
     item_var->value = vals[i];
-    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, keys[i].width);
     idx_var->value = KeyVec(i);
+    if (string_keys) ctx.RegisterStringVariable(lc.idx_var_name);
     Logic4Vec r = EvalExpr(lc.with_expr, ctx, arena);
     ctx.PopScope();
     return r;
@@ -438,9 +437,8 @@ static bool DispatchAssocLocator(std::string_view method,
 // return a queue of the *index type* holding the matching keys rather than a
 // queue of int holding 0-based positions; and "first"/"last" are the entries
 // with the smallest/largest index (the first()/last() ordering of 7.9), which a
-// std::map gives for free by visiting keys in ascending order. Only integer
-// keys are representable through this value vector — string-keyed and wildcard
-// arrays are left for the caller to handle.
+// std::map gives for free by visiting keys in ascending order, for integral
+// and string keys alike.
 // Emits the mandatory-with-clause diagnostic for the associative-array find*
 // locators. Returns false (with an error raised) when a with clause is required
 // but absent; true otherwise.
@@ -460,13 +458,25 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
   return true;
 }
 
-// Flattens the integer-keyed associative array into parallel key/value vectors
-// in std::map ascending-key order (the first()/last() ordering of §7.9).
-static void CollectAssocKeyVals(const AssocArrayObject& aa,
-                                std::vector<int64_t>& keys,
+// Flattens the associative array into parallel key/value vectors in
+// ascending-key order, the first()/last() ordering of §7.9: an integral key
+// at the index width with the index type's signedness, a string key as its
+// text (§7.8.1), which std::map orders lexicographically as §7.9 does.
+static void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
+                                std::vector<Logic4Vec>& keys,
                                 std::vector<Logic4Vec>& vals) {
+  if (aa.is_string_key) {
+    for (const auto& [k, v] : aa.str_data) {
+      keys.push_back(StringToLogic4Vec(arena, k));
+      vals.push_back(v);
+    }
+    return;
+  }
   for (const auto& [k, v] : aa.int_data) {
-    keys.push_back(k);
+    Logic4Vec key =
+        MakeLogic4VecVal(arena, aa.index_width, static_cast<uint64_t>(k));
+    key.is_signed = aa.is_index_signed;
+    keys.push_back(key);
     vals.push_back(v);
   }
 }
@@ -500,15 +510,14 @@ static bool TryCollectAssocLocatorResult(const LocatorEnv& env,
   if (method == "map") return false;  // not a 7.12.1 locator method
 
   if (!CheckAssocWithClauseRequired(method, env.expr, env.ctx)) return false;
-  if (aa.is_string_key) return false;  // index type not representable here
 
-  std::vector<int64_t> keys;
+  std::vector<Logic4Vec> keys;
   std::vector<Logic4Vec> vals;
-  CollectAssocKeyVals(aa, keys, vals);
+  CollectAssocKeyVals(aa, env.arena, keys, vals);
 
   LocatorCtx lc =
       MakeLocatorCtx(vals, /*is_str=*/false, env.expr, env.ctx, env.arena);
-  AssocLocatorState st{keys, vals, lc, aa.index_width, env.ctx, env.arena};
+  AssocLocatorState st{keys, vals, lc, aa.is_string_key, env.ctx, env.arena};
   return DispatchAssocLocator(method, st, out);
 }
 

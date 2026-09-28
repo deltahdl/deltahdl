@@ -726,6 +726,7 @@ static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
   if (TryContainerElementMember(expr, ctx, arena, out)) return out;
+  if (TryEvalStringMethodWithoutParens(expr, ctx, arena, out)) return out;
   if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;

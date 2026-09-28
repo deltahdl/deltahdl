@@ -311,6 +311,27 @@ QueueObject* FindQueueOfName(std::string_view name, SimContext& ctx,
   return ResolveOn(ctx.CurrentThis(), from, name, ctx, owner);
 }
 
+// §7.12: an array manipulation method returns a queue, an expression like any
+// other, so its result may be the receiver of a further method or the base of
+// an element select: `SA.unique().size()`, `IA.min()[0]`, `IA.find(x) with
+// (x > 5).unique`. The queue the call `base` returns, built afresh, or null
+// where `base` calls no locator method; a queue of no variable, which nothing
+// else holds.
+static QueueObject* MethodResultQueue(const Expr* base, SimContext& ctx,
+                                      Arena& arena) {
+  const bool kCallForm = base->kind == ExprKind::kCall;
+  const bool kWithForm =
+      base->kind == ExprKind::kMemberAccess && base->with_expr != nullptr;
+  if (!kCallForm && !kWithForm) return nullptr;
+  std::vector<Logic4Vec> elems;
+  if (!TryCollectLocatorResult(base, ctx, arena, elems)) return nullptr;
+  auto* q = arena.Create<QueueObject>();
+  q->elem_width = elems.empty() ? 32 : elems.front().width;
+  q->elements = std::move(elems);
+  q->AssignFreshIds();
+  return q;
+}
+
 QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
                              ClassObject** owner) {
   if (owner != nullptr) *owner = nullptr;
@@ -326,6 +347,7 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
   // `aq["a"].size()`, a missing entry is allocated by nothing.
   if (base->kind == ExprKind::kSelect)
     return ElementQueueOfSelect(base, ctx, arena, /*allocate=*/false);
+  if (QueueObject* result = MethodResultQueue(base, ctx, arena)) return result;
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
@@ -415,16 +437,20 @@ QueuePropertyReceiver::QueuePropertyReceiver(const Expr* call, SimContext& ctx,
   }
   const Expr* receiver = access->lhs;
   const bool kBare = receiver->kind == ExprKind::kIdentifier;
+  const bool kCall = receiver->kind == ExprKind::kCall;
   if (kBare ? ctx.FindQueue(receiver->text) != nullptr
-            : receiver->kind != ExprKind::kMemberAccess) {
+            : receiver->kind != ExprKind::kMemberAccess && !kCall) {
     return;
   }
   QueueObject* q = FindQueueOfBase(receiver, ctx, arena);
   if (q == nullptr) q = ClassArrayElementsCopy(receiver, ctx, arena);
   if (q == nullptr) return;
-  std::string_view name = kBare ? receiver->text
-                                : std::string_view(*arena.Create<std::string>(
-                                      FlattenHierPath(receiver)));
+  // A method's result, `IA.find(x) with (x > 5).unique`, has no spelling of
+  // its own; `$` begins no identifier a description can write.
+  std::string_view name = kBare   ? receiver->text
+                          : kCall ? std::string_view("$method.result")
+                                  : std::string_view(*arena.Create<std::string>(
+                                        FlattenHierPath(receiver)));
   ctx.PushScope();
   std::vector<Scope> stack = ctx.SwapScopeStack({});
   stack.back().queues[name] = q;

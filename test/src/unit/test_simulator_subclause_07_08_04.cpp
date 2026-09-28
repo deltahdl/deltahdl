@@ -380,4 +380,31 @@ TEST(IntegralIndexAssocArraySimulation,
             1u);
 }
 
+// §7.8.4: entries of an integral index type are ordered numerically, signed
+// where the index type is signed -- a `byte` index and a `bit signed [4:1]`
+// typedef order -3 before 0 and 5 -- where an unsigned 4-bit index keys -1 as
+// 15, the largest.
+TEST(IntegralIndexAssocArraySimulation,
+     SignedIndexTypesOrderNegativeKeysFirst) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit signed [4:1] SNibble;\n"
+      "  typedef bit [4:1] UNibble;\n"
+      "  int s[SNibble], u[UNibble], b[byte];\n"
+      "  SNibble sk; UNibble uk; byte bk;\n"
+      "  initial begin\n"
+      "    s[5] = 1; s[-3] = 2; s[0] = 3;\n"
+      "    u[2] = 1; u[-1] = 2;\n"
+      "    b[5] = 1; b[-3] = 2;\n"
+      "    void'(s.first(sk)); $write(\"%0d\", sk);\n"
+      "    void'(s.last(sk)); $write(\" %0d\", sk);\n"
+      "    void'(u.last(uk)); $write(\" %0d\", uk);\n"
+      "    void'(b.first(bk)); $display(\" %0d\", bk);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 5 15 -3\n");
+}
+
 }  // namespace

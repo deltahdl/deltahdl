@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/types.h"
 #include "simulator/class_object.h"
@@ -91,6 +92,13 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
 // dynamic array property, resized as ResizeClassArray does; false where its
 // target names no dynamic array property or its value is no `new[]`.
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §7.6: the elements of the array property `src` names -- a fixed or dynamic
+// one, or a queue, bare in a method or through a handle -- from the left,
+// into `out`; a declared queue a bare name answers is read too. False for any
+// other expression.
+bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,
+                           std::vector<Logic4Vec>& out);
 
 // §7.6 with §7.5, §7.10 and §8.5: `stmt` as an assignment of one array
 // property to another -- fixed, dynamic or queue, through handles or bare in

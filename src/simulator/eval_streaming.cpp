@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
@@ -467,6 +468,15 @@ Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena) {
     if (TryExpandAggregateElement(arg, ctx, arena, parts, total_width)) {
       return AssembleBitStreamParts(parts, total_width, arena);
     }
+  }
+  // §8.5: an array property, bare in a method or `h.a` through a handle, is
+  // streamed element by element as a declared array is, so `$isunknown(c.lda)`
+  // sees the x an element holds.
+  if (std::vector<Logic4Vec> parts;
+      PropertyArrayElements(arg, ctx, arena, parts)) {
+    uint32_t total_width = 0;
+    for (const auto& part : parts) total_width += part.width;
+    return AssembleBitStreamParts(parts, total_width, arena);
   }
   return EvalExpr(arg, ctx, arena);
 }

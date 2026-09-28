@@ -445,6 +445,8 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   if (!iter_name.empty()) {
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
     iter_var->is_string = aa != nullptr && aa->is_string_key;
+    iter_var->is_signed =
+        aa != nullptr && !aa->is_string_key && aa->is_index_signed;
     // §12.7.3: the loop variable has the index type of an associative array.
     TypeForeachIterVar(iter_name, aa, exec.ctx);
   }

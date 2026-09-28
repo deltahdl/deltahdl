@@ -29,6 +29,15 @@ void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
 // tables, which the caller asks about first.
 bool NamesStringProperty(const Expr* e, SimContext& ctx);
 
+// §6.16 with A.8.2: a method call's argument list is optional, so the member
+// access `s.atoi` is the call `s.atoi()`. `access` read as a call of the
+// string method it names, with no arguments, on a string receiver -- a
+// variable, an element of a string array, a string property, or a with
+// clause's iterator over strings -- into `out`; false where it names no
+// method answering a value or its receiver is no string.
+bool TryEvalStringMethodWithoutParens(const Expr* access, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out);
+
 // §6.16 (printed page 113): the indexed character assignment `s[i] = c` on a
 // string that is a class property rather than a variable of the run's tables
 // -- `h.p[0] = "x"` through a handle, `p[0] = "x"` bare or through `this`

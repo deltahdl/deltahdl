@@ -104,11 +104,31 @@ static uint32_t SpecializedTypedefWidth(const DataType& type, SimContext& ctx) {
   return width;
 }
 
+// §8.23: a typedef a class declares, named bare in a method of the class or
+// of one extending it, `S v` for the class's `S`, is as wide as the table
+// holds it under "C::S". The class itself is its default specialization; a
+// specialization's own typedef folds with its values, which that entry does
+// not hold, so the walk stops at one. 0 outside a method or where no class of
+// the chain declares the name.
+static uint32_t MethodClassTypedefWidth(std::string_view name,
+                                        SimContext& ctx) {
+  for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
+       c = c->parent) {
+    if (c->param_actuals != nullptr) return 0;
+    if (uint32_t width =
+            ctx.FindTypeWidth(std::string(c->name) + "::" + std::string(name)))
+      return width;
+  }
+  return 0;
+}
+
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
   uint32_t base = ctx.FindTypeWidth(TypeTableKey(type));
+  if (base == 0 && type.scope_name.empty())
+    base = MethodClassTypedefWidth(type.type_name, ctx);
   if (base == 0) return SpecializedTypedefWidth(type, ctx);
   // §7.4.4: "Multiple packed dimensions can also be defined in stages with
   // typedef", and a dimension written where the name is used stacks on the ones

@@ -815,6 +815,10 @@ static Variable* CreateForeachIterVar(std::string_view iter_name,
   if (iter_name.empty()) return nullptr;
   Variable* iter_var = ctx.CreateLocalVariable(iter_name, 32);
   TypeForeachIterVar(iter_name, setup.aa, ctx);
+  // §7.8.4: a signed integral index type, `byte` or `bit signed [4:1]`,
+  // makes the loop variable signed, so the key -3 reads -3.
+  iter_var->is_signed = setup.aa != nullptr && !setup.aa->is_string_key &&
+                        setup.aa->is_index_signed;
   return iter_var;
 }
 

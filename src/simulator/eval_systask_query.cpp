@@ -4,7 +4,10 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -315,8 +318,12 @@ static uint32_t CountTotalDims(const QueryArgInfo& info,
 // Produce the integer result for a per-dimension query ($left/$right/...).
 static Logic4Vec SelectDimQueryResult(std::string_view name,
                                       const QueryDimBounds& q, Arena& arena) {
+  // §20.7: each function returns an integer, which is signed, so the -1 of
+  // $increment for an ascending dimension reads -1 and not 4294967295.
   auto as_int = [&](int64_t v) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(v));
+    Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(v));
+    out.is_signed = true;
+    return out;
   };
   if (name == "$left") return as_int(q.left);
   if (name == "$right") return as_int(q.right);
@@ -356,6 +363,37 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // the last dimension when the element is a bit vector.
   QueryDimBounds q = ComputeQueryDimBounds(info, dim, unpacked_dims);
   return SelectDimQueryResult(name, q, arena);
+}
+
+// The element count of the unpacked dimension `dim`, `[36:1]` or `[3]`; 0
+// for a dynamic one or one of no positive size.
+static int64_t FixedDimCount(const Expr* dim, SimContext& ctx, Arena& arena) {
+  if (dim == nullptr) return 0;
+  auto bound = [&](const Expr* e) {
+    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+  };
+  if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
+    return bound(dim);
+  int64_t left = bound(dim->lhs);
+  int64_t right = bound(dim->rhs);
+  return (left > right ? left - right : right - left) + 1;
+}
+
+uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
+                     int depth) {
+  const ModuleItem* item = ctx.FindTypedefItem(name);
+  if (item == nullptr || item->unpacked_dims.empty() || depth > 8)
+    return ctx.FindTypeWidth(name);
+  const DataType& elem = item->typedef_type;
+  uint64_t bits = elem.kind == DataTypeKind::kNamed && elem.scope_name.empty()
+                      ? TypedefBits(elem.type_name, ctx, arena, depth + 1)
+                      : DeclaredTypeWidth(elem, ctx);
+  for (const Expr* dim : item->unpacked_dims) {
+    int64_t count = FixedDimCount(dim, ctx, arena);
+    if (count <= 0) return 0;
+    bits *= static_cast<uint64_t>(count);
+  }
+  return bits;
 }
 
 }  // namespace delta
