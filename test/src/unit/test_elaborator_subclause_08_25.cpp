@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -460,6 +461,38 @@ TEST(ParameterizedClassElaboration, ModuleLocalparamValueArgumentInExtendsOk) {
              "  class D extends C#(K);\n"
              "  endclass\n"
              "endmodule\n"));
+}
+
+// §8.25 gives each specialization its own parameter values, and §6.20.1 lets a
+// parameter depend on earlier ones, so the class body localparam `N` and the
+// header's `M` are both `W * 2` with the specialization's `W`: 8 in `C#(4)`,
+// 16 in the default and 6 under the named override `.W(3)`, and `M` written
+// out as 5 in `C#(4, 5)` is 5. Each is folded at elaboration as the
+// right-hand side of a module localparam. This fails on a fold that reads a
+// parameter the list does not override with the class's default `W = 8` in
+// scope, which answered 16 wherever it read `W * 2`.
+TEST(ParameterizedClassElaboration,
+     ParameterThroughASpecializationFoldsWithItsParameters) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int W = 8, int M = W * 2);\n"
+      "  localparam int N = W * 2;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int X = C#(4)::N;\n"
+      "  localparam int Y = C#()::N;\n"
+      "  localparam int Z = C#(.W(3))::N;\n"
+      "  localparam int A = C#(4)::M;\n"
+      "  localparam int B = C#(4, 5)::M;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "X"), 8);
+  EXPECT_EQ(ParamValue(design, "Y"), 16);
+  EXPECT_EQ(ParamValue(design, "Z"), 6);
+  EXPECT_EQ(ParamValue(design, "A"), 8);
+  EXPECT_EQ(ParamValue(design, "B"), 5);
 }
 
 }  // namespace

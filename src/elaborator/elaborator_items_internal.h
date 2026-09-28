@@ -21,11 +21,6 @@ namespace delta {
 struct RtlirModule;
 struct ClassDecl;
 
-// §6.20.1: folds and checks the parameter defaults of a class declared inside a
-// module, which RegisterClassParams (elaborator_resolve.cpp) does for a class
-// declared at compilation-unit scope. `module_scope` is the enclosing module's
-// parameter scope, which a default may name; the folded values are recorded
-// under their "Class.name" keys in `cu_param_scope`.
 // §16.13.4: a bare name of a named sequence in a property's body, which the
 // parser read as a boolean, is made the sequence operand it is, in every
 // property declaration of `decl`, once the registry names the sequences;
@@ -34,6 +29,18 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
                                           const PropertyRegistry& registry,
                                           Arena& arena);
 
+// §8.23 with §6.20.1: folds and checks the parameter defaults of every class
+// declared at compilation-unit scope, recording each value under its
+// "Class.name" key in `cu_param_scope`. Defined in elaborator_class_params.cpp.
+void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
+                         Arena& arena, DiagEngine& diag);
+
+// §6.20.1: folds and checks the parameter defaults of a class declared inside a
+// module, which RegisterClassParams does for a class declared at
+// compilation-unit scope. `module_scope` is the enclosing module's parameter
+// scope, which a default may name; the folded values are recorded under their
+// "Class.name" keys in `cu_param_scope`. Defined in
+// elaborator_class_params.cpp.
 void RegisterModuleClassParams(const ClassDecl* cls,
                                const ScopeMap& module_scope,
                                ScopeMap& cu_param_scope, Arena& arena,

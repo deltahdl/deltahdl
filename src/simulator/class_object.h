@@ -375,6 +375,13 @@ struct ClassObject {
   // (ClassDecl::param_types), which is §8.25.1's default specialization. The
   // pointed-to types live in the AST, which outlives the run.
   std::unordered_map<std::string, const DataType*> type_param_actuals;
+  // §6.20.7 (printed page 131): the value parameters of the object's class
+  // that hold `$` in the specialization it was constructed as -- assigned `$`
+  // itself, or another parameter holding it -- which §20.6.3's $isunbounded
+  // answers 1'b1 for. `$` stands for no number, so the value stored under the
+  // name cannot say it (MarkUnboundedClassParams and ApplyClassParamOverrides
+  // in src/simulator/eval_class_params.cpp keep it).
+  std::unordered_set<std::string> unbounded_params;
   // §9.4.2: the processes waiting on a change of this object's state -- an
   // event control whose operand is a member of the object, `@(p.status)`
   // through a handle or `@(status)` inside a method. A member write announces

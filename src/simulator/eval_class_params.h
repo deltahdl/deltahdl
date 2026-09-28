@@ -11,6 +11,7 @@ namespace delta {
 
 class Arena;
 struct ClassDecl;
+struct ClassObject;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
@@ -66,6 +67,12 @@ struct ClassParamBinding {
   Variable* value = nullptr;
   const DataType* type = nullptr;
 };
+// §6.20.7 (printed page 131): marks in obj->unbounded_params each value
+// parameter `decl` declares, in its header or its body, whose default is `$`
+// or names another parameter of the class already marked, for §20.6.3's
+// $isunbounded.
+void MarkUnboundedClassParams(ClassObject* obj, const ClassDecl* decl);
+
 std::vector<ClassParamBinding> CollectClassParamBindings(
     const ClassTypeInfo* cls, SimContext& ctx);
 void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,

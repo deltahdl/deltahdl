@@ -294,6 +294,21 @@ bool ExprMentionsAny(const Expr* e,
 // constant expression that failed to fold.
 std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls);
 
+// §23.10.2 with §8.25: whether `e`, the value a specialization of a class
+// assigns one of its value parameters, is a constant expression over `scope`.
+// §6.20.2 lets that value be integral or real, and §6.20.7 lets it be `$`, so
+// it folds as either kind of constant or is `$` itself. Defined in
+// elaborator_class_params.cpp.
+bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope);
+
+// §6.20.7 and §6.20.2: the parameters among `items`, a module's or the
+// compilation unit's declarations, whose value is a constant a ScopeMap
+// cannot carry -- `$`, a real, or the name of one of those -- so that an
+// override naming one is known constant where the integer fold of the scope,
+// `values`, cannot say so. Defined in elaborator_class_params.cpp.
+std::unordered_set<std::string_view> NonIntegralParamNames(
+    const std::vector<ModuleItem*>* items, const ScopeMap& values);
+
 // §8.23: the type that the class-scoped name `cls_name::type_name` denotes,
 // where `cls_name` names a class and `type_name` names a typedef declared in
 // its body. Returns null when no such class is visible or the class declares no

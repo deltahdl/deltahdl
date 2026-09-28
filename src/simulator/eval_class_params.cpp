@@ -63,14 +63,19 @@ static bool TryEnumLiteralDefault(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §6.20.2 (printed page 127) applies §6.12.1's conversion between real and
+// integer values to parameters, so a real value given to a parameter of an
+// integral type is rounded to that type rather than carried as the bits of
+// its double: `class C #(int N = 2.5)` holds 3.
 static Logic4Vec ParamDefaultValue(const Expr* expr, uint32_t width,
                                    SimContext& ctx, Arena& arena) {
   uint64_t literal = 0;
   if (TryEnumLiteralDefault(expr, ctx, literal))
     return MakeLogic4VecVal(arena, width == 0 ? 32 : width, literal);
-  return width == 0
-             ? EvalExpr(expr, ctx, arena)
-             : ResizeToWidth(EvalExpr(expr, ctx, arena, width), width, arena);
+  if (width == 0) return EvalExpr(expr, ctx, arena);
+  Logic4Vec val = ConvertRealForKnownLhs(EvalExpr(expr, ctx, arena, width),
+                                         false, width, arena);
+  return ResizeToWidth(val, width, arena);
 }
 
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
@@ -130,6 +135,48 @@ void BindSpecializationTypeParams(ClassObject* obj) {
   BindTypeParamActuals(obj, obj->type->param_actuals);
 }
 
+// §6.20.7: `$` assigned to a parameter, which stands for no number.
+static bool IsDollarValue(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kIdentifier && e->text == "$";
+}
+
+// Whether `value`, assigned to a parameter of `obj`'s class, leaves it holding
+// `$`: `$` itself, or a name that `names_unbounded` says holds it -- §6.20.7
+// makes it "legal ... to assign a $ parameter to another parameter".
+static void MarkIfUnbounded(ClassObject* obj, std::string_view pname,
+                            const Expr* value, bool names_unbounded) {
+  bool unbounded = IsDollarValue(value) ||
+                   (value != nullptr && value->kind == ExprKind::kIdentifier &&
+                    names_unbounded);
+  if (unbounded) {
+    obj->unbounded_params.insert(std::string(pname));
+  } else {
+    obj->unbounded_params.erase(std::string(pname));
+  }
+}
+
+// Whether `value` names a parameter of `obj`'s class already marked.
+static bool NamesMarkedParam(const ClassObject* obj, const Expr* value) {
+  return value != nullptr &&
+         obj->unbounded_params.count(std::string(value->text)) != 0;
+}
+
+// The body parameters are marked after the header's, which they may name.
+static void MarkUnboundedBodyParams(ClassObject* obj, const ClassDecl* decl) {
+  for (const auto* m : decl->members) {
+    if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
+    MarkIfUnbounded(obj, m->name, m->init_expr,
+                    NamesMarkedParam(obj, m->init_expr));
+  }
+}
+
+void MarkUnboundedClassParams(ClassObject* obj, const ClassDecl* decl) {
+  for (const auto& [pname, pexpr] : decl->params) {
+    MarkIfUnbounded(obj, pname, pexpr, NamesMarkedParam(obj, pexpr));
+  }
+  MarkUnboundedBodyParams(obj, decl);
+}
+
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena) {
   auto* obj = ctx.GetClassObject(handle);
@@ -161,6 +208,10 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
     if (actual == nullptr || actual->type_ref_expr == nullptr) {
       auto kept = obj->properties.find(std::string(params[i].first));
       if (kept != obj->properties.end()) sizer.Record(i, kept->second);
+      // §6.20.7: a default naming a parameter the list overrode is marked
+      // again, `M = N` bounded once `N` is 4.
+      MarkIfUnbounded(obj, params[i].first, params[i].second,
+                      NamesMarkedParam(obj, params[i].second));
       continue;
     }
     // §6.8, as in the default arm of InitClassPropertyDefaults in
@@ -170,13 +221,19 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
     // `C #(.W(n)) c;` stored as it arrived left the object and the variable
     // n as one buffer. One copy serves both keys, which are two names for
     // the one parameter.
-    auto val =
-        OwnRhsWords(sizer.Value(i, actual->type_ref_expr, ctx, arena), arena);
+    // §6.20.7: an override assigns the parameter as its default does, so `$`
+    // there, or a name of the declaring scope holding it, leaves the
+    // parameter unbounded.
+    const Expr* written = actual->type_ref_expr;
+    MarkIfUnbounded(obj, params[i].first, written,
+                    ctx.IsUnboundedParam(written->text));
+    auto val = OwnRhsWords(sizer.Value(i, written, ctx, arena), arena);
     obj->properties[std::string(params[i].first)] = val;
     std::string scoped =
         std::string(obj->type->name) + "::" + std::string(params[i].first);
     obj->properties[scoped] = val;
   }
+  MarkUnboundedBodyParams(obj, obj->type->decl);
 }
 
 std::vector<ClassParamBinding> CollectClassParamBindings(

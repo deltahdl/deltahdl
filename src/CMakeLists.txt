@@ -98,6 +98,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/single_pass_compile.cpp
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
+    elaborator/elaborator_class_params.cpp
     elaborator/elaborator_extern_modules.cpp
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
@@ -202,6 +203,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/const_eval_func.cpp
     elaborator/const_eval_is_constant.cpp
     elaborator/const_eval_builtin_method.cpp
+    elaborator/const_eval_class_param.cpp
     elaborator/const_eval_context.cpp
     elaborator/const_eval_wide.cpp
     elaborator/const_eval_wide_arith.cpp

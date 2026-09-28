@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
@@ -130,6 +132,78 @@ TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §20.6.3 answers 1'b1 where the parameter's value is `$`, and §6.20.7 lets
+// `$` be a class value parameter's value as it is a module's. The default
+// specialization holds `$` and `C #(4)` holds 4, so the two method calls
+// disagree; beside them a module parameter of each kind gives the same pair.
+// This fails on a class that rejects `$` as its default, and on one that
+// answers every class parameter as bounded.
+TEST(RangeSystemFunctionSim, ClassParameterHoldingDollarIsUnbounded) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C #(int N = $);\n"
+                 "  function int ub();\n"
+                 "    return $isunbounded(N);\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  parameter int i = $;\n"
+                 "  parameter int j = 5;\n"
+                 "  C #() cd = new;\n"
+                 "  C #(4) cs = new;\n"
+                 "  initial $display(\"%0d %0d %0d %0d\", $isunbounded(i),\n"
+                 "                   $isunbounded(j), cd.ub(), cs.ub());\n"
+                 "endmodule\n",
+                 f),
+      "1 0 1 0\n");
+}
+
+// §6.20.7 makes it legal to assign a `$` parameter to another parameter, and
+// the one assigned holds `$` in its turn: `M = N` does in the default
+// specialization, and so does the body localparam `L = $`. Under `C #(4)` N
+// holds 4, so M, whose default names N, holds 4 and is bounded; under
+// `C #(.M(3))` M is overridden and bounded while N keeps `$`. Each digit of
+// ub() is one parameter, N M L. This fails on a mark taken from a default
+// alone, which left M unbounded under `C #(4)`.
+TEST(RangeSystemFunctionSim, ClassParameterAssignedADollarParameterFollowsIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "class C #(int N = $, int M = N);\n"
+                "  localparam int L = $;\n"
+                "  function int ub();\n"
+                "    return $isunbounded(N) * 100 + $isunbounded(M) * 10\n"
+                "           + $isunbounded(L);\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  C a = new; C #(4) b = new; C #(.M(3)) c = new;\n"
+                "  initial $display(\"%0d %0d %0d\", a.ub(), b.ub(), c.ub());\n"
+                "endmodule\n",
+                f),
+            "111 1 101\n");
+}
+
+// §6.20.7: an override naming a parameter that holds `$` hands the class's
+// parameter `$`, so $isunbounded on it answers 1; one naming a bounded
+// parameter answers 0. This fails on an override that reads the name's value
+// alone, which `$` does not have.
+TEST(RangeSystemFunctionSim, OverrideNamingADollarParameterIsUnbounded) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C #(int N = 4);\n"
+                 "  function int ub(); return $isunbounded(N); endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  parameter int P = $;\n"
+                 "  parameter int Q = 7;\n"
+                 "  C #(P) d = new;\n"
+                 "  C #(Q) e = new;\n"
+                 "  initial $display(\"%0d %0d\", d.ub(), e.ub());\n"
+                 "endmodule\n",
+                 f),
+      "1 0\n");
 }
 
 }  // namespace

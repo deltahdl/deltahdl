@@ -374,4 +374,58 @@ TEST(DollarConstantElaboration,
   EXPECT_TRUE(found_q);
 }
 
+// §6.20.7 (printed page 131) lets `$` be assigned to a value parameter of a
+// simple bit vector type, and §8.25 gives a class's parameter port list the
+// module rules. Each case fails on a registration that folds a class value
+// parameter as an integer and reports the value when that fold fails, which is
+// what rejected `class C #(int N = $)` while `parameter int i = $;` in a
+// module was accepted.
+TEST(DollarConstantElaboration, DollarClassParamDefaultIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int N = $);\n"
+             "endclass\n"
+             "module t;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(DollarConstantElaboration, DollarClassBodyLocalparamIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  localparam int N = $;\n"
+             "endclass\n"
+             "module t;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// An override assigns the parameter as a default does, so `$` is as legal
+// there. §23.10.2's constant-expression rule is what reported it.
+TEST(DollarConstantElaboration, DollarClassParamOverrideIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int N = 4);\n"
+             "endclass\n"
+             "module t;\n"
+             "  C #($) c;\n"
+             "  class D extends C #($);\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// §6.20.7 lets a parameter holding `$` stand wherever `$` may be written as a
+// literal, and an override is such a place, in a declaration and in an extends
+// clause alike. The parameter's value is not in the scope the override is
+// folded over, which is what reported `C #(P)` as not a constant expression.
+TEST(DollarConstantElaboration, OverrideNamingADollarParameterIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int N = 4);\n"
+             "endclass\n"
+             "module t;\n"
+             "  parameter int P = $;\n"
+             "  C #(P) d;\n"
+             "  class D extends C #(P);\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

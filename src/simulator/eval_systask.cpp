@@ -858,6 +858,13 @@ static bool FlattenParamRefName(const Expr* e, std::string& out) {
   return false;
 }
 
+// §6.20.7 with §8.25: whether `name`, read in a method, is a value parameter
+// of the object's class that holds `$` in the object's specialization.
+static bool IsUnboundedClassParam(const std::string& name, SimContext& ctx) {
+  const ClassObject* obj = ctx.CurrentThis();
+  return obj != nullptr && obj->unbounded_params.count(name) != 0;
+}
+
 static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   // §20.6.3: $isunbounded reports whether its parameter argument holds the
@@ -867,7 +874,7 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
   if (!expr->args.empty()) {
     std::string name;
     if (FlattenParamRefName(expr->args[0], name)) {
-      bool ub = ctx.IsUnboundedParam(name);
+      bool ub = IsUnboundedClassParam(name, ctx) || ctx.IsUnboundedParam(name);
       return MakeLogic4VecVal(arena, 1, ub ? 1 : 0);
     }
   }

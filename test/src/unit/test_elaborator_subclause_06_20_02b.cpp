@@ -3,6 +3,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -110,6 +111,94 @@ TEST(DeclaredWidth, DefparamValueIsCutToTheRangeWrittenAsAParameter) {
   ASSERT_NE(q, nullptr);
   EXPECT_TRUE(q->is_resolved);
   EXPECT_EQ(q->resolved_value, 0xABCD);
+}
+
+// §6.20.2 (printed page 126) gives a parameter declared `real` a real value,
+// and §8.25 declares `real D = 1.5` in a class parameter port list in its own
+// example. Each case fails on a registration that folds a class value
+// parameter as an integer alone and reports the value when that fold fails,
+// which is what rejected every real default and every real override.
+TEST(ValueParameters, RealClassParamDefaultIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Mem #(int size = 4, real D = 1.5);\n"
+             "endclass\n"
+             "module t;\n"
+             "  Mem m;\n"
+             "endmodule\n"));
+}
+
+TEST(ValueParameters, RealClassParamDefaultOfAModuleScopedClassIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  class Mem #(int size = 4, real D = 1.5);\n"
+             "  endclass\n"
+             "  Mem m;\n"
+             "endmodule\n"));
+}
+
+// §6.20.2's first rule: a parameter declared with neither type nor range takes
+// the type of its final value, and "if the expression is real, the parameter
+// is real".
+TEST(ValueParameters, UntypedClassParamWithARealDefaultIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(D = 1.5);\n"
+             "endclass\n"
+             "module t;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §23.10.2 makes an override a constant expression, which 2.25 is, and §8.25
+// applies that rule to a specialization of a class whether it is written in a
+// declaration or in an extends clause.
+TEST(ValueParameters, RealClassParamOverrideInADeclarationIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Mem #(real D = 1.5);\n"
+             "endclass\n"
+             "module t;\n"
+             "  Mem #(.D(2.25)) o;\n"
+             "endmodule\n"));
+}
+
+TEST(ValueParameters, RealClassParamOverrideInAnExtendsClauseIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Mem #(real D = 1.5);\n"
+             "endclass\n"
+             "module t;\n"
+             "  class E extends Mem #(2.25);\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// A real default is still a constant_param_expression, so one that reads a
+// variable is reported as an integer one is. This fails on a repair that
+// accepts every default of a real parameter. The `r` stands on line 3.
+TEST(ValueParameters, NonConstantRealClassParamDefaultIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  class C #(real D = r);\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class parameter 'D' value is not a constant expression", 3, "6.20.2"));
+}
+
+// §6.20.2's real parameter is a constant as an integral one is, so it is a
+// legal override in an extends clause. That clause's check folds the module's
+// parameters as integers, and read the real `R` as a name it could not fold.
+TEST(ValueParameters, RealModuleParamAsAnExtendsOverrideIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Mem #(real D = 1.5);\n"
+             "endclass\n"
+             "module t;\n"
+             "  parameter real R = 2.5;\n"
+             "  class E extends Mem #(R);\n"
+             "  endclass\n"
+             "endmodule\n"));
 }
 
 }  // namespace

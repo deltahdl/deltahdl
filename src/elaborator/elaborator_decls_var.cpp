@@ -89,7 +89,7 @@ static void ValidateSpecializationArgsConstant(const ModuleItem* item,
                                                DiagEngine& diag) {
   for (const auto& tp : item->data_type.type_params) {
     if (!tp.type_name.empty() || tp.type_ref_expr == nullptr) continue;
-    if (ConstEvalInt(tp.type_ref_expr, scope)) continue;
+    if (IsConstantClassParamValue(tp.type_ref_expr, scope)) continue;
     diag.Error(tp.type_ref_expr->range.start,
                std::format("class '{}' parameter override is not a constant "
                            "expression",

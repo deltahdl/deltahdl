@@ -292,6 +292,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
         obj->properties[scoped] = val;
       }
     }
+    MarkUnboundedClassParams(obj, info->decl);
   }
 }
 

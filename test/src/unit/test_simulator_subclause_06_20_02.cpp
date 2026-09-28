@@ -315,4 +315,47 @@ TEST(ValueParameterSim, UntypedParameterPortWithARealDefaultIsReal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.20.2 gives a class value parameter declared `real` a real value, as it
+// does a module's (§8.25's own example declares `real D = 1.5`). The default,
+// a named override, twice each in a method, and the default read through a
+// typedef of a specialization are five different reals, so the value read at
+// every site has to be the specialization's own and keep its fraction.
+TEST(ValueParameterSim, RealClassParamKeepsItsFractionInEverySpecialization) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class Mem #(int size = 4, real D = 1.5);\n"
+                 "  function real d(); return D; endfunction\n"
+                 "  function real twice(); return D * 2; endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  typedef Mem #(1024) Kbyte;\n"
+                 "  Mem m; Mem #(.D(2.25)) o;\n"
+                 "  initial begin\n"
+                 "    m = new; o = new;\n"
+                 "    $display(\"%g %g %g %g %g\", m.d(), o.d(), m.twice(),\n"
+                 "             o.twice(), Kbyte::D);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1.5 2.25 3 4.5 1.5\n");
+}
+
+// §6.20.2 applies §6.12.1's conversion between real and integer values to
+// parameters, a class's included, so an int class parameter given 2.5 holds
+// 3 (round to nearest, ties away from zero) rather than being rejected or
+// truncated to 2.
+TEST(ValueParameterSim, IntegerClassParamFromRealConstantRounds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C #(int N = 2.5);\n"
+                 "  function int n(); return N; endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  C c;\n"
+                 "  initial begin c = new; $display(\"%0d\", c.n()); end\n"
+                 "endmodule\n",
+                 f),
+      "3\n");
+}
+
 }  // namespace

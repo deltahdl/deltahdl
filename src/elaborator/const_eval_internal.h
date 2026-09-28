@@ -364,6 +364,28 @@ bool AllElementsConstant(const std::vector<Expr*>& elems,
 // evaluate is not one a constant expression may hold.
 std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr);
 
+// §8.25.1: what a specialization's argument list says about one value
+// parameter. `supplied` records that the parameter has an answer in the
+// specialization -- an argument occupied it, named or ordered, or its default
+// was folded under the arguments; `value` records what that answer folded
+// to. The two are kept apart because they are separate facts, and one
+// optional cannot hold both: an argument that is not a constant expression is
+// supplied and has no value. Reading that as "no argument was written" is
+// what made `C#(v)::P` fold to the class default, which is a number the
+// source did not write.
+struct SpecializationArg {
+  bool supplied = false;
+  std::optional<ConstVal> value;
+};
+
+// §8.25: the value of `C#(args)::name`, a value parameter of a class a live
+// ParamClassRegistryGuard registered, in that specialization. Not supplied
+// where the access is not of that shape, where the class is not registered,
+// or where `name` is none of its value parameters. Defined in
+// const_eval_class_param.cpp.
+SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
+                                                 const ScopeMap& scope);
+
 // Whether `expr` is a constant built-in method call, or empty when it is not a
 // built-in method call at all. The empty answer is what lets a member access
 // spelling one of the method names fall through to the ordinary compound

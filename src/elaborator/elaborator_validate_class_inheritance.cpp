@@ -864,14 +864,25 @@ static ScopeMap ScopeParamValues(const ClassScope& scope,
 // constant expression that failed to fold, and Elaborator::RecordClassParam
 // draws the same distinction with the same test for a class parameter's own
 // initializer.
+//
+// `non_integral` names the scope's parameters holding `$` or a real, which
+// the ScopeMap does not carry and an override may still name (§6.20.7,
+// §6.20.2).
+struct OverrideNames {
+  std::unordered_set<std::string_view> formals;
+  std::unordered_set<std::string_view> non_integral;
+};
+
 static void ReportNonConstantSpecializationArgs(
     std::string_view base_name, const std::vector<DataType>& type_params,
-    const ScopeMap& scope, const std::unordered_set<std::string_view>& formals,
-    DiagEngine& diag) {
+    const ScopeMap& scope, const OverrideNames& names, DiagEngine& diag) {
   for (const auto& dt : type_params) {
     if (!dt.type_name.empty() || dt.type_ref_expr == nullptr) continue;
-    if (ConstEvalInt(dt.type_ref_expr, scope)) continue;
-    if (ExprMentionsAny(dt.type_ref_expr, formals)) continue;
+    const Expr* e = dt.type_ref_expr;
+    if (IsConstantClassParamValue(e, scope)) continue;
+    if (e->kind == ExprKind::kIdentifier && names.non_integral.count(e->text))
+      continue;
+    if (ExprMentionsAny(e, names.formals)) continue;
     diag.Error(dt.type_ref_expr->range.start,
                std::format("class '{}' parameter override is not a constant "
                            "expression",
@@ -881,17 +892,19 @@ static void ReportNonConstantSpecializationArgs(
 }
 
 static void ValidateSpecializationArgsInInheritance(const ClassDecl* cls,
+                                                    const ClassScope& where,
                                                     const ScopeMap& scope,
                                                     DiagEngine& diag) {
-  auto formals = ClassParamNames(cls);
+  OverrideNames names{ClassParamNames(cls),
+                      NonIntegralParamNames(where.items, scope)};
   ReportNonConstantSpecializationArgs(
-      cls->base_class, cls->base_class_type_params, scope, formals, diag);
+      cls->base_class, cls->base_class_type_params, scope, names, diag);
   for (const auto& iref : cls->extends_interfaces)
     ReportNonConstantSpecializationArgs(iref.name, iref.type_params, scope,
-                                        formals, diag);
+                                        names, diag);
   for (const auto& iref : cls->implements_types)
     ReportNonConstantSpecializationArgs(iref.name, iref.type_params, scope,
-                                        formals, diag);
+                                        names, diag);
 }
 
 void ElaboratorClassRules::ValidateInterfaceClassRules() {
@@ -913,7 +926,7 @@ void ElaboratorClassRules::ValidateInterfaceClassRules() {
 
       ValidateParamTypeConflicts(cls, look, diag_);
 
-      ValidateSpecializationArgsInInheritance(cls, params, diag_);
+      ValidateSpecializationArgsInInheritance(cls, scope, params, diag_);
     }
   }
 }

@@ -302,8 +302,9 @@ void ElaboratorClassRules::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   // Substituting zero for it made a method-argument default naming that
   // parameter fold, so §8.26.8 read as satisfied by a default whose value the
   // source never wrote and the elaborator could not compute.
-  // RegisterClassParams in elaborator_resolve.cpp reports the parameter itself
-  // under §6.20.2, so the breach is named once, at the value that caused it.
+  // RegisterClassParams in elaborator_class_params.cpp reports the parameter
+  // itself under §6.20.2, so the breach is named once, at the value that caused
+  // it.
   auto add_param = [&](std::string_view pname, const Expr* pexpr) {
     if (pname.empty() || method_scope.count(pname)) return;
     if (auto val = ConstEvalInt(pexpr, method_scope))
