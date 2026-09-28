@@ -456,4 +456,72 @@ TEST(BlockingAssignSim, DelayedDynamicArrayElementIndexEvaluatedOnce) {
   EXPECT_EQ(out, "1 7 0\n");
 }
 
+// §10.4.1 with §11.5.1 and §8.5: a bit-select, a part-select and an indexed
+// part-select of a packed variable are lvalues of a blocking assignment, and a
+// property named by its bare name inside a method is the object's property.
+// `this.v[3] = 1` beside the bare-name writes shows the object is reached; a
+// bare-name select that went astray left its bits of `v` unchanged.
+TEST(BlockingAssignSim, SelectsOfAPropertyByItsBareNameInAMethod) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [7:0] v;\n"
+      "    function void f();\n"
+      "      v = 0; this.v[3] = 1; v[0] = 1; v[6:5] = 2'b11;\n"
+      "    endfunction\n"
+      "    function void g(); v = 0; v[7 -: 4] = 4'hB; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new; h.f(); $display(\"%0d\", h.v);\n"
+      "    h.g(); $display(\"%0d\", h.v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "105\n176\n");
+}
+
+// §8.24: an out-of-block method body names the class's properties as an
+// in-class body does, so its bare-name select writes the object's property.
+TEST(BlockingAssignSim, SelectOfAPropertyByItsBareNameInAnOutOfBlockBody) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [7:0] v;\n"
+      "    extern function void f();\n"
+      "  endclass\n"
+      "  function void C::f(); v = 0; v[0] = 1; v[2 +: 2] = 2'b11; "
+      "endfunction\n"
+      "  C h;\n"
+      "  initial begin h = new; h.f(); $display(\"%0d\", h.v); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "13\n");
+}
+
+// §10.4.1 with §11.4.12: a concatenation on the left-hand side hands each
+// operand the bits its own width claims, and a packed class property reached
+// through a handle is such an operand (§8.5), flat or nested. A property that
+// claimed no bits took none, and the operands to its left were handed the
+// wrong ones.
+TEST(BlockingAssignSim, ConcatenationTargetHandsAPropertyItsSlice) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C; logic [3:0] p; endclass\n"
+      "  C h; logic [1:0] c; logic [3:0] a[2];\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    {c, h.p, a[1]} = 10'b10_0101_0011;\n"
+      "    $display(\"%0d %0d %0d\", c, h.p, a[1]);\n"
+      "    {c, {a[1], h.p}} = 10'b01_1100_0110;\n"
+      "    $display(\"%0d %0d %0d\", c, h.p, a[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 5 3\n1 6 12\n");
+}
+
 }  // namespace

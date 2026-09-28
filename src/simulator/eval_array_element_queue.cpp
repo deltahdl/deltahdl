@@ -1,5 +1,6 @@
 #include "simulator/eval_array_element_queue.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -182,6 +183,9 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   ElementQueueShape empty = ShapeOf(*outer);
   empty.fixed_size = 0;
   QueueObject* q = NewElementQueue(empty, arena);
+  // §10.9: a pattern typed with the element's queue type, `T_QI'{2, 3}`,
+  // lists the element's items as the bare pattern does.
+  item = UnwrapTypedPattern(item);
   bool listed = item->kind == ExprKind::kConcatenation ||
                 (item->kind == ExprKind::kAssignmentPattern &&
                  item->pattern_keys.empty());
@@ -194,6 +198,24 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   FitToFixedSize(q, outer->element_array_size, arena);
   q->AllocateIdsForAppended();
   return q;
+}
+
+bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
+                       Arena& arena) {
+  if (!q->elements_are_queues ||
+      pattern->kind != ExprKind::kAssignmentPattern ||
+      !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
+    return false;
+  q->elements.clear();
+  q->element_queues.clear();
+  for (size_t i = 0; i < pattern->elements.size(); ++i)
+    q->elements.push_back(NonexistentQueueElement(q, arena));
+  q->AssignFreshIds();
+  for (size_t i = 0; i < pattern->elements.size(); ++i) {
+    q->element_queues[q->ElementQueueKeyAt(i)] =
+        ElementQueueFromItem(q, pattern->elements[i], ctx, arena);
+  }
+  return true;
 }
 
 QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,

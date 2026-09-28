@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/block_enums.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -555,6 +556,10 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
                            Arena& arena) {
   if (!q || !init) return;
   if (LowerDynArrayNewInit(init, q, ctx, arena)) return;
+  if (FillQueueOfQueues(q, init, ctx, arena)) {
+    EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
+    return;
+  }
   if (init->kind != ExprKind::kAssignmentPattern &&
       init->kind != ExprKind::kConcatenation)
     return;

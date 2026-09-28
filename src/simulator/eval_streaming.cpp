@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -522,6 +523,42 @@ static Logic4Vec MemberBits(const Logic4Vec& val, uint32_t width,
   if (val.fills_width && width > val.width)
     return FillUnbasedUnsized(val, width, arena);
   return ExtractBitField(arena, val, 0, width);
+}
+
+// §10.9 with §10.9.1 (printed pages 261-262): a positional pattern for a
+// packed array fills it element for element, each item converted to the
+// element as an assignment to the element converts it, and an item that is
+// itself a pattern fills its element over the next dimension the same way.
+static Logic4Vec PackedArrayItem(const Expr* item,
+                                 std::span<const uint32_t> inner,
+                                 uint32_t elem_width, SimContext& ctx,
+                                 Arena& arena) {
+  if (item->kind == ExprKind::kAssignmentPattern && !inner.empty()) {
+    if (auto nested =
+            EvalPackedArrayPattern(item, inner, elem_width, ctx, arena))
+      return *nested;
+  }
+  return MemberBits(EvalExpr(item, ctx, arena, elem_width), elem_width, arena);
+}
+
+std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
+                                                std::span<const uint32_t> spans,
+                                                uint32_t width, SimContext& ctx,
+                                                Arena& arena) {
+  if (spans.empty() || pattern->repeat_count != nullptr ||
+      !pattern->pattern_keys.empty())
+    return std::nullopt;
+  uint32_t count = spans.front();
+  if (count == 0 || width % count != 0 || pattern->elements.size() != count)
+    return std::nullopt;
+  uint32_t elem_width = width / count;
+  Logic4Vec result = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < count; ++i) {
+    Logic4Vec bits = PackedArrayItem(pattern->elements[i], spans.subspan(1),
+                                     elem_width, ctx, arena);
+    DepositBitField(result, (count - 1 - i) * elem_width, bits, elem_width);
+  }
+  return result;
 }
 
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,

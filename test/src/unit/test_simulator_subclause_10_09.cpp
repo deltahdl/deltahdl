@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -376,6 +377,82 @@ TEST(AssignmentPatternSimulation, SizeMismatchIsReportedAtTheConcatenation) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "unpacked array concatenation size mismatch", 6,
                             "10.10"));
+}
+
+// §10.9 (printed page 261): an assignment pattern expression is the value a
+// variable of its type holds once initialized with the pattern, and the
+// clause's own `shortint'({T'{1,2}, T'{3,4}})` yields 16'h1234, so each item
+// of a pattern for a packed array fills one element at the element's width.
+// §10.9.1 fills a packed array assigned an untyped pattern the same way, and
+// an item that is itself a pattern fills its element over the next dimension.
+// Concatenated at the items' own 32 bits and cut to the target's width, only
+// the last item survived: 8'h02, 8'h04, 24'h000003, 16'h0204.
+TEST(AssignmentPatternSim, PackedArrayPatternFillsEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef logic [1:0][3:0] T;\n"
+      "  logic [7:0] z; logic [1:0][3:0] x; logic [2:0][7:0] y;\n"
+      "  shortint v; logic [1:0][1:0][3:0] w;\n"
+      "  initial begin\n"
+      "    z = T'{1,2}; x = '{3,4}; y = '{8'h1, 2, 3};\n"
+      "    v = shortint'({T'{1,2}, T'{3,4}});\n"
+      "    w = '{'{1,2}, '{3,4}};\n"
+      "    $display(\"%h %h %h %h %h\", z, x, y, v, w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12 34 010203 1234 1234\n");
+}
+
+// §10.9 (printed page 261), the clause's own example: an assignment pattern on
+// the left deconstructs an unpacked array, each member taking one element and
+// the first member the leftmost, and a pattern on the right is evaluated whole
+// before any member is written, so `U'{c, a, b} = '{a+1, b+1, c+1}` leaves c,
+// a and b the sums 2, 3 and 4. A queue deconstructs the same way, and so does
+// the array into its own elements, which a member-by-member copy that read
+// an element after writing it would get wrong. Cut as a packed concatenation,
+// only the last member received anything: `0 0 3` and `0 4 0`.
+TEST(AssignmentPatternSim, PatternTargetDeconstructsAnUnpackedArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef byte U[3];\n"
+      "  U A = '{1, 2, 3}; byte a, b, c; int q[$] = '{7, 8, 9};\n"
+      "  initial begin\n"
+      "    U'{a, b, c} = A; $display(\"%0d %0d %0d\", a, b, c);\n"
+      "    U'{c, a, b} = '{a+1, b+1, c+1};\n"
+      "    $display(\"%0d %0d %0d\", a, b, c);\n"
+      "    '{a, b, c} = q; $display(\"%0d %0d %0d\", a, b, c);\n"
+      "    '{A[2], A[0], A[1]} = A;\n"
+      "    $display(\"%0d %0d %0d\", A[0], A[1], A[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3\n3 4 2\n7 8 9\n2 3 1\n");
+}
+
+// §10.9: an assignment pattern expression has a self-determined type, the
+// value a variable of the type holds once initialized with it, wherever it is
+// written. §10.9.2 places each member of a structure at its own offset and
+// width, so `st'{3,4}` over two bytes is 16'h0304 as a system task argument
+// and as an item of a queue concatenation, as it is assigned to an `st`.
+// Concatenated at the items' 32 bits and cut to sixteen, it was 16'h0004.
+TEST(AssignmentPatternSim, TypedStructurePatternIsPackedWhereverWritten) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct packed {byte a; byte b;} st;\n"
+      "  st s; st sq[$];\n"
+      "  initial begin\n"
+      "    s = st'{3,4};\n"
+      "    $display(\"%h %h\", s, st'{3,4});\n"
+      "    sq = {st'{1,2}, st'{3,4}};\n"
+      "    $display(\"%0d %h %h\", sq.size(), sq[0], sq[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0304 0304\n2 0102 0304\n");
 }
 
 }  // namespace

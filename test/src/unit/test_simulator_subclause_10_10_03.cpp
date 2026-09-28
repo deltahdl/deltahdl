@@ -150,4 +150,62 @@ TEST(UnpackedArrayConcatSim, StringConcatItemInDeclInitFusesIntoSingleElement) {
       "SQ", {"aa", "xbb"});
 }
 
+// §10.10.3's own example, `SQ = {S1, SQ, T_SQ'{"element 3 is ", S2}}`: only a
+// plain inner brace pair is a string concatenation, and an item that is an
+// assignment pattern typed as an array of strings contributes each of its
+// elements. Read as the string concatenation "element 3 is S2", the item gave
+// one element where the pattern gives two.
+TEST(UnpackedArrayConcatSim, TypedPatternItemContributesEachElement) {
+  RunAndExpectStringQueue(
+      "module t;\n"
+      "  typedef string T_SQ[$];\n"
+      "  string SQ[$];\n"
+      "  initial SQ = {\"S1\", T_SQ'{\"element 3 is \", \"S2\"}};\n"
+      "endmodule\n",
+      "SQ", {"S1", "element 3 is ", "S2"});
+}
+
+// The same of a queue of integers, `{1, T_IQ'{2, 3}}`, and of a typed item
+// beside a named queue.
+TEST(UnpackedArrayConcatSim, TypedIntegerPatternItemContributesEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef int T_IQ[$];\n"
+      "  int s[$], q[$] = '{9};\n"
+      "  initial begin\n"
+      "    s = {1, T_IQ'{2, 3}, q};\n"
+      "    $display(\"%0d %0d %0d %0d\", s.size(), s[1], s[2], s[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 2 3 9\n");
+}
+
+// §10.10.3's jagged array example: a queue whose elements are queues, given a
+// positional pattern, holds one element per item, and each item is that
+// element's queue -- the one-item concatenation {1}, the typed pattern
+// T_QI'{2,3,4} and the concatenation {5,6}. No inner queue was built, so every
+// element read 0 and jagged[1] was empty. The declaration initializer and the
+// procedural assignment take the same pattern.
+TEST(UnpackedArrayConcatSim, JaggedQueueOfQueuesBuildsEachInnerQueue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef int T_QI[$];\n"
+      "  T_QI jagged[$] = '{ {1}, T_QI'{2,3,4}, {5,6} };\n"
+      "  T_QI later[$];\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", jagged[0][0],\n"
+      "             jagged[1][0], jagged[1][1], jagged[1][2], jagged[2][0],\n"
+      "             jagged[2][1], jagged[1].size());\n"
+      "    later = '{ T_QI'{7}, {8, 9} };\n"
+      "    $display(\"%0d %0d %0d %0d\", later.size(), later[0][0],\n"
+      "             later[1].size(), later[1][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3 4 5 6 3\n2 7 2 9\n");
+}
+
 }  // namespace

@@ -1,8 +1,10 @@
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -469,9 +471,64 @@ static Logic4Vec EvalCastOperand(const Expr* operand, std::string_view cast,
   return inner;
 }
 
+// §10.9: the element count of each packed dimension of `dtype`, outermost
+// first, where it is a packed array of logic, bit or reg whose bounds are
+// known; empty for any other type.
+static std::vector<uint32_t> PackedDimSpans(const DataType& dtype,
+                                            SimContext& ctx, Arena& arena) {
+  std::vector<uint32_t> spans;
+  bool vector_kind = dtype.kind == DataTypeKind::kLogic ||
+                     dtype.kind == DataTypeKind::kBit ||
+                     dtype.kind == DataTypeKind::kReg;
+  if (!vector_kind || dtype.packed_dim_left == nullptr) return spans;
+  std::vector<std::pair<Expr*, Expr*>> dims{
+      {dtype.packed_dim_left, dtype.packed_dim_right}};
+  dims.insert(dims.end(), dtype.extra_packed_dims.begin(),
+              dtype.extra_packed_dims.end());
+  for (const auto& [left, right] : dims) {
+    Logic4Vec l = EvalExpr(left, ctx, arena);
+    Logic4Vec r = EvalExpr(right, ctx, arena);
+    if (!l.IsKnown() || !r.IsKnown()) return {};
+    int64_t lo = SelectBoundValue(l);
+    int64_t hi = SelectBoundValue(r);
+    spans.push_back(static_cast<uint32_t>(std::abs(hi - lo) + 1));
+  }
+  return spans;
+}
+
+// §10.9 (printed page 261): `T'{1,2}` is the value a variable of T holds once
+// initialized with the pattern, wherever it is written. With T a structure,
+// §10.9.2 places each member at its own offset and width, so `st'{3,4}` over
+// two bytes is 16'h0304; with T a packed array, each item fills its element at
+// the element's width -- 8'h12 for `typedef logic [1:0][3:0] T`. Evaluated as
+// a bare pattern and then cut to T's width, the items were concatenated at
+// their own 32 bits and only the last survived.
+static bool TryTypedPatternCast(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kAssignmentPattern)
+    return false;
+  std::string key = CastTypeKey(expr, ctx);
+  if (const StructTypeInfo* layout = ctx.FindStructType(key)) {
+    out = EvalStructPatternValue(expr->lhs, layout, ctx, arena);
+    return true;
+  }
+  const DataType* dtype = ctx.FindTypeDeclaration(key);
+  if (dtype == nullptr) return false;
+  std::vector<uint32_t> spans = PackedDimSpans(*dtype, ctx, arena);
+  auto value = EvalPackedArrayPattern(expr->lhs, spans, ctx.FindTypeWidth(key),
+                                      ctx, arena);
+  if (!value) return false;
+  value->is_signed = ctx.FindTypeSigned(key);
+  if (dtype->kind == DataTypeKind::kBit) CoerceTo2State(*value);
+  out = *value;
+  return true;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
+  Logic4Vec pattern_out;
+  if (TryTypedPatternCast(expr, ctx, arena, pattern_out)) return pattern_out;
 
   Logic4Vec size_out;
   if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;

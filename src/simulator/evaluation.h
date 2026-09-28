@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -324,6 +326,17 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena);
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
+// §10.9 with §10.9.1: the value of the positional pattern `pattern` for a
+// packed array of `width` bits whose packed dimensions hold `spans` elements
+// each, outermost first -- every item converted to its element, the first in
+// the leftmost, and an item that is itself a pattern filling its element over
+// the next dimension. None where the pattern is keyed or replicated or holds a
+// count of items the outermost dimension does not, which leaves the caller its
+// own evaluation.
+std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
+                                                std::span<const uint32_t> spans,
+                                                uint32_t width, SimContext& ctx,
+                                                Arena& arena);
 
 Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
                             SimContext& ctx, Arena& arena);

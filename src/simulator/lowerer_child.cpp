@@ -1,11 +1,17 @@
 #include "simulator/lowerer_child.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <map>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -13,7 +19,10 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/switch_network.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -115,9 +124,119 @@ static void CreateChildModuleNets(const std::string& inst_prefix,
 // net or none, and an instance's nets stayed apart. The prefixed name is
 // interned in the arena because the variable and net maps hold the key rather
 // than a copy of it.
+// §10.11: one bit an alias operand lists, as the net holding it and its offset
+// from the net's least significant end.
+struct AliasBit {
+  Net* net;
+  uint32_t offset;
+};
+
+// The offsets from the least significant end `sel` spans within `var`, low
+// then high: the bit it selects, the bits between its two bounds, or those of
+// an indexed part-select. None where a bound does not fold or runs off the
+// declaration.
+static std::optional<std::pair<int64_t, int64_t>> AliasSelectOffsets(
+    const Expr* sel, const Variable& var, SimContext& ctx, Arena& arena) {
+  auto value = [&](const Expr* e) {
+    return SelectBoundValue(EvalExpr(e, ctx, arena));
+  };
+  int64_t first = value(sel->index);
+  int64_t second = first;
+  if (sel->is_part_select_plus || sel->is_part_select_minus) {
+    int64_t width = value(sel->index_end);
+    second = sel->is_part_select_plus ? first + width - 1 : first - width + 1;
+  } else if (sel->index_end != nullptr) {
+    second = value(sel->index_end);
+  }
+  PackedRange range = var.DeclaredRange();
+  if (!range.Contains(first) || !range.Contains(second)) return std::nullopt;
+  int64_t a = range.OffsetOf(first);
+  int64_t b = range.OffsetOf(second);
+  return std::make_pair(std::min(a, b), std::max(a, b));
+}
+
+// Appends the bits the alias operand `e` lists, the most significant first: a
+// net's, a bit-select's or a part-select's of one, or those of each operand
+// of a concatenation in turn. False where `e` is none of these.
+static bool AppendAliasBits(const Expr* e, const std::string& prefix,
+                            SimContext& ctx, Arena& arena,
+                            std::vector<AliasBit>& out) {
+  if (e->kind == ExprKind::kConcatenation) {
+    for (const Expr* el : e->elements) {
+      if (!AppendAliasBits(el, prefix, ctx, arena, out)) return false;
+    }
+    return true;
+  }
+  const Expr* base = e->kind == ExprKind::kSelect ? e->base : e;
+  if (base == nullptr || base->kind != ExprKind::kIdentifier) return false;
+  Net* net = ctx.FindNet(prefix + std::string(base->text));
+  if (net == nullptr || net->resolved == nullptr) return false;
+  std::pair<int64_t, int64_t> span{0, net->resolved->value.width - 1};
+  if (e->kind == ExprKind::kSelect) {
+    auto offsets = AliasSelectOffsets(e, *net->resolved, ctx, arena);
+    if (!offsets) return false;
+    span = *offsets;
+  }
+  for (int64_t off = span.second; off >= span.first; --off)
+    out.push_back({net, static_cast<uint32_t>(off)});
+  return true;
+}
+
+using AliasBitMap = std::vector<std::pair<uint32_t, uint32_t>>;
+
+// The bits `operands` join, as a map for every ordered pair of distinct nets
+// holding bits at one position of two operands: the bit of the first net,
+// then the bit of the second it is one with.
+static std::map<std::pair<Net*, Net*>, AliasBitMap> JoinedBitMaps(
+    const std::vector<std::vector<AliasBit>>& operands) {
+  std::map<std::pair<Net*, Net*>, AliasBitMap> maps;
+  for (size_t pos = 0; pos < operands.front().size(); ++pos) {
+    for (const auto& x : operands) {
+      for (const auto& y : operands) {
+        if (x[pos].net == y[pos].net) continue;
+        maps[{x[pos].net, y[pos].net}].emplace_back(x[pos].offset,
+                                                    y[pos].offset);
+      }
+    }
+  }
+  return maps;
+}
+
+// §10.11: an alias whose operands list bits rather than whole nets, `alias
+// {A[7:0], A[15:8], A[23:16], A[31:24]} = B;` of §10.11's byte_swap, joins
+// the bits standing at one position of every operand, each operand being as
+// wide as the others. The join is a link that always conducts and carries a
+// bit map (SwitchLink::bit_map), made between every two nets sharing a
+// position so that no map is followed across another net: each net then
+// resolves from its own drivers and those of the bits joined to it. Bits of
+// one net joined to each other are left apart.
+static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
+                          SimContext& ctx, Arena& arena) {
+  std::vector<std::vector<AliasBit>> operands;
+  for (const Expr* e : alias.nets) {
+    operands.emplace_back();
+    if (!AppendAliasBits(e, prefix, ctx, arena, operands.back())) return;
+    if (operands.back().size() != operands.front().size()) return;
+  }
+  auto* join = arena.Create<BidirSwitchState>();
+  join->state = BidirSwitchState::kOn;
+  join->is_alias = true;
+  for (auto& [nets, pairs] : JoinedBitMaps(operands)) {
+    nets.first->switch_links.push_back(
+        {nets.second, join, arena.Create<AliasBitMap>(std::move(pairs))});
+  }
+}
+
 void Lowerer::LowerAliases(const RtlirModule* mod) {
   for (const auto& alias : mod->aliases) {
     if (alias.nets.size() < 2) continue;
+    bool whole_nets = std::all_of(
+        alias.nets.begin(), alias.nets.end(),
+        [](const Expr* e) { return e->kind == ExprKind::kIdentifier; });
+    if (!whole_nets) {
+      LowerBitAlias(alias, inst_prefix_, ctx_, arena_);
+      continue;
+    }
     std::string_view primary;
     for (auto* net : alias.nets) {
       if (net->kind != ExprKind::kIdentifier) continue;

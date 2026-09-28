@@ -281,11 +281,20 @@ struct Reached {
   const SwitchLink* link;
 };
 
+// §10.11: a link joining bits (SwitchLink::bit_map) maps the bits of the
+// member it belongs to alone, so it is followed from the member and no
+// further; LowerBitAlias links every net sharing a bit with the member to it
+// directly.
+bool FollowsFrom(const SwitchLink& link, const Reached& from, size_t i) {
+  if (from.link != nullptr && from.link->bit_map != nullptr) return false;
+  return link.bit_map == nullptr || i == 0;
+}
+
 std::vector<Reached> ReachAcrossConducting(Net& member) {
   std::vector<Reached> reached{{&member, 0, nullptr}};
   for (size_t i = 0; i < reached.size(); ++i) {
     for (const SwitchLink& link : reached[i].net->switch_links) {
-      if (!LinkConducts(link)) continue;
+      if (!LinkConducts(link) || !FollowsFrom(link, reached[i], i)) continue;
       bool seen = std::any_of(
           reached.begin(), reached.end(),
           [&link](const Reached& r) { return r.net == link.other; });
@@ -328,7 +337,7 @@ void OwnSources(const Net& net, Arena& arena, std::vector<Logic4Vec>& values,
 // rtranif1 is reduced by Table 28-8; §28.8 has no reduction across a switch
 // joining nets of user-defined net types.
 DriverStrength ReduceAcross(DriverStrength ds, const SwitchLink& link) {
-  if (link.sw->user_defined_nets) return ds;
+  if (link.sw->user_defined_nets || link.sw->is_alias) return ds;
   Strength (*reduce)(Strength) = IsNonresistiveBidir(link.sw->kind)
                                      ? &ReduceNonresistive
                                      : &ReduceResistive;
@@ -364,6 +373,19 @@ void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
   }
 }
 
+// A source value as it lands on a member `width` bits wide: resized to it, or,
+// across a link joining bits (§10.11), each bit the link maps placed at the
+// member's bit it is one with and every other bit z, which drives nothing.
+Logic4Vec ArrivingValue(const Logic4Vec& value, const SwitchLink* link,
+                        uint32_t width, Arena& arena) {
+  if (link == nullptr || link->bit_map == nullptr)
+    return ResizeToWidth(value, width, arena);
+  Logic4Vec v = MakeAllHighZ(arena, width);
+  for (const auto& [mine, theirs] : *link->bit_map)
+    DepositBitField(v, mine, ExtractBitField(arena, value, theirs, 1), 1);
+  return v;
+}
+
 // The sources of `reached[j]` as they arrive at the member, reduced across
 // every switch on the way back and made L or H by one whose control is x or
 // z.
@@ -381,7 +403,7 @@ void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
       unknown =
           unknown || reached[k].link->sw->state == BidirSwitchState::kUnknown;
     }
-    Logic4Vec v = ResizeToWidth(values[d], width, arena);
+    Logic4Vec v = ArrivingValue(values[d], reached[j].link, width, arena);
     if (unknown) {
       AppendThroughUnknown(member, v, ds, arena);
     } else {

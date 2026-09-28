@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -26,6 +27,11 @@ struct BidirSwitchState;
 struct SwitchLink {
   Net* other = nullptr;
   const BidirSwitchState* sw = nullptr;
+  // §10.11: where the link joins bits of the two nets rather than the nets
+  // whole, the pairs it joins -- a bit of this net, then the bit of `other`
+  // it is one with, each counted from the least significant end. Null for a
+  // switch, which joins its terminals whole.
+  const std::vector<std::pair<uint32_t, uint32_t>>* bit_map = nullptr;
 };
 
 struct NetStrength {

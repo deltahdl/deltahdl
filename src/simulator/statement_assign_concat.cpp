@@ -1,11 +1,14 @@
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_member_path.h"
@@ -30,6 +33,15 @@ const Expr* UnwrapTypedPattern(const Expr* expr) {
       expr->lhs->kind == ExprKind::kAssignmentPattern)
     return expr->lhs;
   return expr;
+}
+
+const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx) {
+  if (expr->kind != ExprKind::kCast || expr->lhs == nullptr ||
+      expr->lhs->kind != ExprKind::kAssignmentPattern ||
+      !expr->lhs->pattern_keys.empty())
+    return nullptr;
+  const ModuleItem* item = ctx.FindTypedefItem(expr->text);
+  return item != nullptr && !item->unpacked_dims.empty() ? expr->lhs : nullptr;
 }
 
 bool IsConcatLhs(const Expr* lhs) {
@@ -70,6 +82,28 @@ static const StructTypeInfo* SelectedElementLayout(const Expr* lhs,
   if (ctx.FindArrayInfo(base) == nullptr && ctx.FindQueue(base) == nullptr)
     return nullptr;
   return StructLayoutOfName(base, ctx);
+}
+
+// §10.9.1: `x = '{1,2}` with `x` a packed array fills it element for element
+// (EvalPackedArrayPattern) by the dimensions its declaration records, the
+// items converted to the element's width; concatenated at their own widths
+// and cut to x's, only the last item survived. An unpacked array or a queue
+// under the name takes its pattern element by element elsewhere.
+static std::optional<Logic4Vec> PackedVariablePattern(std::string_view name,
+                                                      const Expr* pattern,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  const Variable* var = ctx.FindVariable(name);
+  if (var == nullptr || !var->has_packed_range ||
+      ctx.FindArrayInfo(name) != nullptr || ctx.FindQueue(name) != nullptr)
+    return std::nullopt;
+  auto span = [](const PackedRange& r) {
+    return static_cast<uint32_t>(r.HighIndex() - r.LowIndex() + 1);
+  };
+  std::vector<uint32_t> spans{span(var->packed_range)};
+  for (const PackedRange& dim : var->inner_packed_dims)
+    spans.push_back(span(dim));
+  return EvalPackedArrayPattern(pattern, spans, var->value.width, ctx, arena);
 }
 
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
@@ -113,8 +147,12 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   // be a structure property of the object (ContainerElementLayout).
   const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
   if (!sinfo) sinfo = ContainerElementLayout(stmt->lhs, ctx);
-  if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
-  return EvalStructPatternValue(inner, sinfo, ctx, arena);
+  if (sinfo != nullptr) return EvalStructPatternValue(inner, sinfo, ctx, arena);
+  if (stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+    if (auto packed = PackedVariablePattern(stmt->lhs->text, inner, ctx, arena))
+      return *packed;
+  }
+  return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
 }
 
 // particular bit from a vector, packed array, packed structure, parameter, or
@@ -220,7 +258,11 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
     return total;
   }
   auto* var = ResolveLhsVariable(e, ctx);
-  if (var == nullptr) return 0;
+  // §11.4.12 with §8.5: a member access names no variable when its storage is
+  // a class property, `h.p`, held on the object; the property's declared width
+  // is what the element claims.
+  if (var == nullptr)
+    return e->kind == ExprKind::kMemberAccess ? FieldLhsWidth(e, ctx) : 0;
   // Two questions, not one. SelectExprWidth answers how many bits a select
   // names within a packed object; an index of a collection names a whole
   // element, whose width is the base variable's, itself one element wide.
@@ -270,7 +312,12 @@ static void WriteConcatLhsElement(const Expr* el, const Logic4Vec& slice,
   if (TryQueueIndexedWrite(el, slice, ctx, arena)) return;
   if (TryAssocIndexedWrite(el, slice, ctx, arena)) return;
   auto* var = ResolveLhsVariable(el, ctx);
-  if (var == nullptr) return;
+  if (var == nullptr) {
+    // The class property ConcatLhsElemWidth sized through its field target
+    // takes its slice through the same target.
+    if (el->kind == ExprKind::kMemberAccess) WriteStructField(el, slice, ctx);
+    return;
+  }
   // A select element takes the bits it named and leaves the rest of its
   // variable standing; writing the variable whole gave `{a[3:0], b}` all of
   // `a`. WriteBitSelect resolves the window §11.5.1 gives the indices.

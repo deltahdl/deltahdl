@@ -226,6 +226,19 @@ bool IsConcatLhs(const Expr* lhs);
 // the pattern a typed pattern wraps, and the expression itself otherwise.
 const Expr* UnwrapTypedPattern(const Expr* expr);
 
+// §10.10 with §10.9: the positional pattern `expr` wraps where `expr` is an
+// assignment pattern expression whose type is an unpacked array, `T_SQ'{"p",
+// "q"}` under `typedef string T_SQ[$]`, whose items are that many elements of
+// an unpacked array concatenation; null for any other expression. Defined in
+// statement_assign_concat.cpp.
+const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx);
+
+// §10.10: the values of the elements of the fixed-size unpacked array `name`
+// that `ai` describes, appended to `out` in the left-to-right order its
+// declaration writes them. Defined in statement_assign_pattern.cpp.
+void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
+                               SimContext& ctx, std::vector<Logic4Vec>& out);
+
 // Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
 // unpack in statement_assign_stream.cpp, which sizes a target element that is a
 // select with it. §11.5.1: how wide the select `sel` on `var` is as an

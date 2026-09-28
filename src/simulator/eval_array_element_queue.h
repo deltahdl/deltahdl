@@ -40,6 +40,17 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
 QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
                                   SimContext& ctx, Arena& arena);
 
+// §7.4 with §10.9 (printed pages 153 and 261): `q`, a queue or dynamic array
+// whose elements are queues, assigned the positional assignment pattern
+// `pattern`, holds one element per item, each item making that element's
+// queue as a pushed argument makes it (ElementQueueFromItem): §10.10.3's
+// `'{ {1}, T_QI'{2,3,4}, {5,6} }` is three elements of one, three and two
+// values. What `q` held before, the queues of its elements with it, is gone.
+// False, with `q` left alone, where its elements are no queues or `pattern`
+// is no positional pattern.
+bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
+                       Arena& arena);
+
 // §7.6 with §7.4 and §7.10 (printed pages 159, 153 and 169): `stmt`, whose
 // target is the fixed-size array `dst` describes, as an assignment from one
 // element of an array whose elements are queues, `row = q[0]` on `int

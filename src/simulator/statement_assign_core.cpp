@@ -1,8 +1,11 @@
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -519,8 +522,57 @@ static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
          TryMemberClassNewAssign(stmt, ctx, arena);
 }
 
+// §10.9 (printed page 261): the elements of the unpacked array the right-hand
+// side of a deconstructing assignment names, left to right -- an array or a
+// queue named whole, or the items of an assignment pattern, each evaluated
+// before any member of the target is written -- else none.
+static std::optional<std::vector<Logic4Vec>> DeconstructedElements(
+    const Expr* rhs, SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> elems;
+  if (rhs->kind == ExprKind::kIdentifier) {
+    if (const ArrayInfo* ai = ctx.FindArrayInfo(rhs->text);
+        ai != nullptr && !ai->is_dynamic && !ai->is_queue) {
+      CollectFixedArrayElements(rhs->text, *ai, ctx, elems);
+    } else if (const QueueObject* q = ctx.FindQueue(rhs->text)) {
+      elems = q->elements;
+    } else {
+      return std::nullopt;
+    }
+  } else {
+    const Expr* pattern = UnwrapTypedPattern(rhs);
+    if (pattern->kind != ExprKind::kAssignmentPattern ||
+        !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
+      return std::nullopt;
+    for (const Expr* item : pattern->elements)
+      elems.push_back(EvalExpr(item, ctx, arena));
+  }
+  for (Logic4Vec& elem : elems) elem = OwnRhsWords(elem, arena);
+  return elems;
+}
+
+// §10.9: an assignment pattern on the left of an assignment from an unpacked
+// array deconstructs the array, each member taking one element, the first
+// member the leftmost: `U'{a, b, c} = A` with `typedef byte U[3]` gives a, b
+// and c A's three elements, and `U'{c, a, b} = '{a+1, b+1, c+1}` evaluates the
+// three sums before c, a and b take them. Cut as a packed concatenation, the
+// array's name read as one element and the last member alone received it.
+static bool TryDeconstructingPatternAssign(const Stmt* stmt, SimContext& ctx,
+                                           Arena& arena) {
+  if (stmt->rhs == nullptr) return false;
+  const Expr* target = UnwrapTypedPattern(stmt->lhs);
+  if (target->kind != ExprKind::kAssignmentPattern ||
+      !target->pattern_keys.empty())
+    return false;
+  auto elems = DeconstructedElements(stmt->rhs, ctx, arena);
+  if (!elems || elems->size() != target->elements.size()) return false;
+  for (size_t i = 0; i < elems->size(); ++i)
+    PerformBlockingAssign(target->elements[i], (*elems)[i], ctx, arena);
+  return true;
+}
+
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
+  if (TryDeconstructingPatternAssign(stmt, ctx, arena)) return true;
   if (TryDispatchSyncAssign(stmt, ctx, arena)) return true;
   if (TryDispatchNewAssign(stmt, ctx, arena)) return true;
   if (TryAssocMapAssign(stmt, ctx, arena)) return true;

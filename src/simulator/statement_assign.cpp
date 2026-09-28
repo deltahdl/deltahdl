@@ -789,11 +789,24 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
 // A property whose width the collector could not size -- a typedef name, a
 // class handle, a string -- is declined rather than addressed through a carrier
 // width the declaration never gave.
+//
+// §8.10 and §8.11 let a method name its object's property bare, so `v[0] = 1`
+// in a method selects the same bits `this.v[0] = 1` does. A local of the name
+// shadows the property and a module variable does not (§23.9), which
+// NameDenotesVariable tells apart as the whole-property write does.
+static FieldTarget SelectBaseFieldTarget(const Expr* base, SimContext& ctx) {
+  if (base->kind == ExprKind::kMemberAccess)
+    return ResolveFieldTarget(base, ctx);
+  if (base->kind == ExprKind::kIdentifier &&
+      !NameDenotesVariable(base->text, ctx))
+    return ResolveBarePropertyTarget(base->text, ctx);
+  return {};
+}
+
 bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
                                SimContext& ctx, Arena& arena) {
   if (!lhs || lhs->kind != ExprKind::kSelect || !lhs->base) return false;
-  if (lhs->base->kind != ExprKind::kMemberAccess) return false;
-  FieldTarget target = ResolveFieldTarget(lhs->base, ctx);
+  FieldTarget target = SelectBaseFieldTarget(lhs->base, ctx);
   if (target.kind != FieldTarget::Kind::kProperty || target.obj == nullptr)
     return false;
   const ClassTypeInfo* start = target.type ? target.type : target.obj->type;
@@ -842,6 +855,10 @@ static uint32_t FieldTargetWidth(const FieldTarget& target) {
       return 0;
   }
   return 0;
+}
+
+uint32_t FieldLhsWidth(const Expr* lhs, SimContext& ctx) {
+  return FieldTargetWidth(ResolveFieldTarget(lhs, ctx));
 }
 
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,

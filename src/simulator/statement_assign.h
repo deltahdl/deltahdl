@@ -283,9 +283,10 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena);
 
 // §11.5.1: writes the window `lhs` names of the class property its base selects
-// from, e.g. `c.p[7:0] = 8'h00`. Answers false for anything that is not a
-// select over a member access naming a property of a declared width, so a
-// caller goes on to the writers that name a context variable. Defined in
+// from, e.g. `c.p[7:0] = 8'h00`, or `p[7:0] = 8'h00` with `p` a property named
+// bare inside a method. Answers false for anything that is not a select over
+// such a property of a declared width, so a caller goes on to the writers that
+// name a context variable. Defined in
 // statement_assign.cpp; the definition's comment gives the reason it exists.
 bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
                                SimContext& ctx, Arena& arena);
@@ -298,6 +299,11 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 // is left alone where the target has no declared width to report.
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx, uint32_t* written_width = nullptr);
+
+// The declared width of the storage the member path `lhs` names, resolved as
+// ResolveFieldTarget resolves it, or 0 where it names no storage of a declared
+// width.
+uint32_t FieldLhsWidth(const Expr* lhs, SimContext& ctx);
 
 // §7.4.1: how many selects within `var` stand between `sel` and `var`'s own
 // name -- one for `y[0][3]` under `y[0][3][1]` with the element `y[0]` the

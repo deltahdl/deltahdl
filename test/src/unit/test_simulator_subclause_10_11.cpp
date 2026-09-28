@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 
@@ -173,6 +174,42 @@ TEST(NetAliasingSimulation, ChildAliasLeavesTheTopsLikeNamedNetsApart) {
   ASSERT_NE(child_b, nullptr);
   EXPECT_EQ(top_b->value.ToUint64(), 0u);
   EXPECT_EQ(child_b->value.ToUint64(), 1u);
+}
+
+// §10.11's byte_swap example: an alias operand may be a concatenation of
+// part-selects, and the bits the two sides list are joined in order, so B is
+// the byte-swapped A. Joined whole net to whole net, the concatenation named
+// no net and B was left at z.
+TEST(NetAliasingSimulation, ByteSwapAliasOfPartSelects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  wire [31:0] A, B; logic [31:0] drv;\n"
+      "  assign A = drv;\n"
+      "  alias {A[7:0], A[15:8], A[23:16], A[31:24]} = B;\n"
+      "  initial begin drv = 32'h12345678; #1 $display(\"%h %h\", A, B); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12345678 78563412\n");
+}
+
+// The join carries a value whichever side is driven: driving the whole net on
+// the right reaches the nets the concatenation on the left lists, and a later
+// change of it reaches them again.
+TEST(NetAliasingSimulation, PartSelectAliasCarriesTheOtherWay) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  wire [7:0] lo, hi; wire [15:0] w; logic [15:0] d;\n"
+      "  assign w = d;\n"
+      "  alias {hi, lo} = w;\n"
+      "  initial begin\n"
+      "    d = 16'hABCD; #1 $display(\"%h %h\", hi, lo);\n"
+      "    d = 16'h0102; #1 $display(\"%h %h\", hi, lo);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ab cd\n01 02\n");
 }
 
 }  // namespace

@@ -272,10 +272,6 @@ static void DistributePatternToArray(std::string_view arr_name,
   }
 }
 
-static void CollectFixedArrayElements(std::string_view name,
-                                      const ArrayInfo& ai, SimContext& ctx,
-                                      std::vector<Logic4Vec>& out);
-
 // §10.10: an element of an unpacked array concatenation may itself be an
 // assignment pattern that contributes its elements (not a single value),
 // either bare ('{...}) or typed (AI3'{5, 6, 7}). The typed form parses as a
@@ -718,9 +714,8 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
 // Left to right is the order the declaration writes, so an array declared
 // `int a[3:0]` contributes a[3] first and a[0] last, and one declared
 // `int a[0:3]` contributes them the other way round.
-static void CollectFixedArrayElements(std::string_view name,
-                                      const ArrayInfo& ai, SimContext& ctx,
-                                      std::vector<Logic4Vec>& out) {
+void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
+                               SimContext& ctx, std::vector<Logic4Vec>& out) {
   for (uint32_t i = 0; i < ai.size; ++i) {
     uint32_t idx = ai.is_descending ? (ai.lo + ai.size - 1 - i) : (ai.lo + i);
     auto ename = std::string(name) + "[" + std::to_string(idx) + "]";
@@ -744,7 +739,8 @@ static void CollectFixedArrayElements(std::string_view name,
 // one element.
 //
 // An item that names a queue or an unpacked array still contributes that
-// object's elements; it is the brace form alone that stops being expanded.
+// object's elements, and so does an assignment pattern typed as one,
+// `T_SQ'{"p", "q"}`; it is the brace form alone that stops being expanded.
 // The queue is a declared one by its bare name or a property of an object
 // (§8.5), bare in a method or through a handle, so `q = {q, x}` in a method
 // of the class declaring `q` appends to the property.
@@ -762,6 +758,11 @@ static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
     return;
   }
   if (CollectFromQueueElem(expr, ctx, arena, out)) return;
+  if (const Expr* pattern = UnpackedArrayTypedPattern(expr, ctx)) {
+    for (auto* item : pattern->elements)
+      out.push_back(EvalExpr(item, ctx, arena));
+    return;
+  }
   if (expr->kind == ExprKind::kIdentifier ||
       expr->kind == ExprKind::kMemberAccess) {
     auto* q = FindQueueOfBase(expr, ctx, arena);
@@ -931,12 +932,15 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     AnnounceQueueChange(stmt->lhs, owner, ctx);
     return true;
   }
-  std::vector<Logic4Vec> elems;
-  CollectQueueElements(stmt->rhs, ctx, arena, elems);
-  OwnConcatElements(elems, arena);
-  q->elements = std::move(elems);
+  // §7.4: the fill keys each element's queue by the identity it gives it.
+  if (!FillQueueOfQueues(q, UnwrapTypedPattern(stmt->rhs), ctx, arena)) {
+    std::vector<Logic4Vec> elems;
+    CollectQueueElements(stmt->rhs, ctx, arena, elems);
+    OwnConcatElements(elems, arena);
+    q->elements = std::move(elems);
+    q->AssignFreshIds();
+  }
   EnforceQueueBound(q, "assignment", stmt->rhs->range.start, ctx);
-  q->AssignFreshIds();
   ++q->generation;
   AnnounceQueueChange(stmt->lhs, owner, ctx);
   return true;

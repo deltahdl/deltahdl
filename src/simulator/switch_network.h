@@ -74,6 +74,10 @@ struct BidirSwitchState {
   BidirSwitchKind kind = BidirSwitchKind::kTran;
   uint8_t state = kOff;
   bool user_defined_nets = false;
+  // §10.11: the join an alias statement makes, which is no switch but one net
+  // under several names: always on, and a signal crosses it at the strength it
+  // has.
+  bool is_alias = false;
 };
 
 // The state a control value puts a switch of `kind` in.
