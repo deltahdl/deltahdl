@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Start, restart or stop the standing reminders, with or without the loop that works through open issues. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders or to switch from one form to another ("restart autopilot", "switch to reminders only"). Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>", "start reminders-only", the same four forms after "restart", or "stop"; every "start" or "restart" form but "reminders-only" also takes `--skip-label <label>`, repeatable.
+description: Start, restart or stop the standing reminders, with or without the loop that works through open issues. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "go autonomous clause by clause", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders or to switch from one form to another ("restart autopilot", "switch to reminders only"). Takes "start bysubclause", "start byclause", "start byissuefloor <issue-number>", "start bylabel <label>", "start reminders-only", the same five forms after "restart", or "stop"; every "start" or "restart" form but "reminders-only" also takes `--skip-label <label>`, repeatable.
 ---
 
 # Autopilot
@@ -29,6 +29,12 @@ On `1,21,41 * * * *`, by form:
 
 ```text
 REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq 'map(select(.title | test("^Satisfy IEEE 1800-2023 §([A-Z]|[0-9]+)(\\.[0-9]+)*$")) | .subclause = (.title | ltrimstr("Satisfy IEEE 1800-2023 §"))) | sort_by((.subclause | split(".") | map(tonumber? // .)), .number) | (first.subclause // "" | split(".") | first) as $c | map(select(.subclause | split(".") | first == $c)) | .[] | "§\(.subclause) #\(.number)"' for the lowest subclause with an open issue tracking it, followed by the other open subclauses of its clause, each with its issue's number. Solve the first of them whatever its number, together with those of the rest whose fixes land in its subsystem under src/, as one batch pushed as one commit; when they close, the same command names the next. The open issues the command does not name are not this loop's work.
+```
+
+`start byclause`:
+
+```text
+REMINDER: Run gh issue list --state open --limit 1000 --json number,title,labels --jq 'map({number, title, labels: [.labels[].name]}) | (map(.labels[] | select(test("^§[0-9]+$")) | ltrimstr("§") | tonumber | select(. >= 5)) | min | if . then "§\(.)" else null end) as $c | (map(.labels[] | select(test("^Annex [A-Z]$"))) | min) as $a | ($c // $a) as $l | map(select(.labels | index([$l]))) | {label: $l, issues: .}' for the open issues of the lowest numbered clause, from §5 upward, that labels any open issue, or, when no open issue carries the label of a numbered clause from §5 upward, of the first annex in letter order that labels one; take one, together with every other issue in the list of its matter (that clause or annex, fixed in its subsystem under src/), as one batch pushed as one commit, and run the same command again when they close. The open issues the command does not list, those labelled only §1 to §4 among them, are not this loop's work.
 ```
 
 `start byissuefloor <issue-number>`:
