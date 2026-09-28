@@ -3,19 +3,23 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -192,22 +196,71 @@ void ElaboratorOperationRules::CheckTypeRefCompareOp(const Expr* expr) {
 // that never resolves to a built-in or a table entry (for instance a plain
 // variable used as `type(v)`) is left unresolved so the caller does not fold
 // it.
-std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
-    const Expr* op) const {
-  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
-  DataType dt;
+// §6.23 with §26.3, §8.23 and §6.25: the type a scope-qualified name in a type
+// reference stands for. A typedef of a parameterized class is specialized,
+// with arguments folded outside any module's scope; a package's or class's
+// typedef is read under its "scope::name" key, or from a class the key misses,
+// one declared inside a module. Nothing where the name resolves to none, or to
+// a type carrying unpacked dimensions, which a data type alone does not hold.
+static std::optional<DataType> ScopedTypeRefType(const DataType& dt,
+                                                 const TypedefMap& typedefs,
+                                                 const CompilationUnit* unit,
+                                                 Arena& arena) {
+  if (auto spec = SpecializeClassScopedType(dt, unit, {}, typedefs, arena)) {
+    if (!spec->unpacked_dims.empty()) return std::nullopt;
+    return spec->type;
+  }
+  auto it = typedefs.find(std::string(dt.scope_name) +
+                          "::" + std::string(dt.type_name));
+  if (it != typedefs.end()) return it->second;
+  const DataType* in_class =
+      FindClassScopedTypedefType(dt.scope_name, dt.type_name, unit);
+  if (in_class != nullptr) return *in_class;
+  return std::nullopt;
+}
+
+// Whether `e` is a scope resolution of one identifier by another, `p::t_s`.
+static bool IsScopedTypeName(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kMemberAccess &&
+         e->is_scope_resolution && e->lhs != nullptr &&
+         e->lhs->kind == ExprKind::kIdentifier && e->rhs != nullptr &&
+         e->rhs->kind == ExprKind::kIdentifier;
+}
+
+// The data type a type reference names as written, before any name in it is
+// resolved: the one the parser read, or a name standing alone or behind a
+// package's scope. Nothing for a type reference to an expression.
+static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
   if (op->type_value != nullptr) {
     // The data type the parser read, packed dimensions and signing included:
     // `type(bit[12:0])` is a 13-bit vector, where its name alone is `bit`.
-    dt = *op->type_value;
-  } else if (!op->text.empty()) {
-    dt = TypeNameToDataType(op->text);
-  } else if (op->lhs && op->lhs->kind == ExprKind::kIdentifier) {
-    dt = TypeNameToDataType(op->lhs->text);
-  } else {
-    return std::nullopt;
+    return *op->type_value;
   }
+  if (!op->text.empty()) return TypeNameToDataType(op->text);
+  if (op->lhs && op->lhs->kind == ExprKind::kIdentifier)
+    return TypeNameToDataType(op->lhs->text);
+  if (!IsScopedTypeName(op->lhs)) return std::nullopt;
+  // `type(p::t_s)` with p a package reads as a scope resolution expression.
+  DataType dt;
+  dt.kind = DataTypeKind::kNamed;
+  dt.scope_name = op->lhs->lhs->text;
+  dt.type_name = op->lhs->rhs->text;
+  return dt;
+}
+
+std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
+    const Expr* op) const {
+  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
+  std::optional<DataType> written = TypeRefWrittenType(op);
+  if (!written) return std::nullopt;
+  DataType dt = *written;
   for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
+    if (!dt.scope_name.empty()) {
+      auto scoped = ScopedTypeRefType(dt, typedefs_, unit_, arena_);
+      if (!scoped) break;
+      dt = *scoped;
+      continue;
+    }
     DataType builtin = TypeNameToDataType(dt.type_name);
     if (builtin.kind != DataTypeKind::kNamed) {
       dt = builtin;

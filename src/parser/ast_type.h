@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "parser/ast_expr.h"
 
 namespace delta {
@@ -128,6 +129,13 @@ struct DataType {
   // parameter_value_assignment given in the named form ".name(value)", this
   // holds the formal parameter name it binds to. Empty for the ordered form.
   std::string_view param_arg_name;
+
+  // §6.22.1(c) and (d): where an enum, struct or union type was declared, its
+  // keyword's position. Such a type matches only a type of the same
+  // declaration, which a typedef naming it carries along, so two types alike
+  // member for member but declared apart do not match. Unset for any other
+  // type, and for one no declaration wrote.
+  SourceLoc decl_loc;
 };
 
 struct FunctionArg {

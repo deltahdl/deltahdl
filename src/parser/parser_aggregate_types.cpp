@@ -45,6 +45,7 @@ bool IsStructOrUnionKw(TokenKind tk) {
 DataType Parser::ParseEnumType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kEnum;
+  dtype.decl_loc = CurrentLoc();
   Expect(TokenKind::kKwEnum, Subclause("6.19"));
 
   auto base = ParseDataType();
@@ -153,6 +154,7 @@ DataType Parser::ParseStructOrUnionType() {
   DataType dtype;
   dtype.kind = Check(TokenKind::kKwStruct) ? DataTypeKind::kStruct
                                            : DataTypeKind::kUnion;
+  dtype.decl_loc = CurrentLoc();
   Consume();
 
   if (dtype.kind == DataTypeKind::kUnion) ParseUnionQualifiers(dtype);

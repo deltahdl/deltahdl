@@ -411,9 +411,10 @@ bool ExportPrototypeMatchesBody(const ModuleItem* proto,
     const DataType& pa = proto->func_args[i].data_type;
     const DataType& ba = body->func_args[i].data_type;
     if (!TypesMatch(pa, ba)) return false;
-    // §25.7 requires an exact match: TypesMatch treats same-canonical-kind
-    // vectors as matching regardless of width, so compare widths too to reject
-    // arguments such as logic [7:0] against logic [3:0].
+    // §25.7 requires an exact match: TypesMatch does not tell apart packed
+    // bounds that fold only in a scope, so widths are compared too, which
+    // rejects arguments such as logic [7:0] against logic [3:0] however their
+    // bounds are written.
     if (EvalTypeWidth(pa) != EvalTypeWidth(ba)) return false;
     if (proto->func_args[i].direction != body->func_args[i].direction)
       return false;

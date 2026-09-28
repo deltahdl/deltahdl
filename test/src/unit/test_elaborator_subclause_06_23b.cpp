@@ -329,6 +329,130 @@ TEST(TypeOperatorGenerate, EqualVectorsWithOtherBoundsSelectElseBranch) {
   EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 0);
 }
 
+// §6.22.1(d): a struct or enum typedef matches only itself, so §6.22.1's own
+// AB_t and otherAB_t, alike member for member, do not match, nor do two enum
+// typedefs; a typedef renaming AB_t (§6.22.1(b)) still matches it.
+TEST(TypeOperatorGenerate, DistinctAggregateTypedefsSelectElseBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  typedef struct packed {int A; int B;} AB_t;\n"
+      "  typedef struct packed {int A; int B;} otherAB_t;\n"
+      "  typedef AB_t sameAB_t;\n"
+      "  typedef enum {X, Y} e1_t;\n"
+      "  typedef enum {P, Q} e2_t;\n"
+      "  if (type(AB_t) == type(otherAB_t)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "  if (type(e1_t) == type(e2_t)) begin\n"
+      "    logic c;\n"
+      "  end else begin\n"
+      "    logic d;\n"
+      "  end\n"
+      "  if (type(AB_t) == type(sameAB_t)) begin\n"
+      "    logic e;\n"
+      "  end else begin\n"
+      "    logic f;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 0);
+}
+
+// §6.23 with §26.3 and §8.23: a type reference may name a typedef through its
+// package or its class, and the comparison stays a constant, so `p::t_s`
+// matches shortint and `D::t_i` matches int, and neither matches the other.
+TEST(TypeOperatorGenerate, ScopedTypedefsInTypeReferencesAreConstant) {
+  auto r = RunGenerateElaboration(
+      "package p;\n"
+      "  typedef shortint t_s;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class D;\n"
+      "    typedef int t_i;\n"
+      "  endclass\n"
+      "  if (type(p::t_s) == type(shortint)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "  if (type(D::t_i) == type(int)) begin\n"
+      "    logic c;\n"
+      "  end else begin\n"
+      "    logic d;\n"
+      "  end\n"
+      "  if (type(D::t_i) == type(p::t_s)) begin\n"
+      "    logic e;\n"
+      "  end else begin\n"
+      "    logic f;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  EXPECT_EQ(r.f.diag.WarningCount(), 0u);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 1);
+}
+
+// §6.25: a typedef of a parameterized class reached through a specialization is
+// the typedef in that specialization's parameters, so `C#(4)::t_v` is
+// `bit [3:0]`, not `bit [7:0]`; and two specializations of one struct typedef
+// with different values are different types (§6.22.1(d)).
+TEST(TypeOperatorGenerate, SpecializedClassTypedefsInTypeReferences) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  class C #(parameter SIZE = 1);\n"
+      "    typedef bit [SIZE-1:0] t_v;\n"
+      "    typedef struct packed { bit [SIZE-1:0] m; } t_struct;\n"
+      "  endclass\n"
+      "  if (type(C#(4)::t_v) == type(bit [3:0])) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "  if (type(C#(4)::t_v) == type(bit [7:0])) begin\n"
+      "    logic c;\n"
+      "  end else begin\n"
+      "    logic d;\n"
+      "  end\n"
+      "  if (type(C#(4)::t_struct) == type(C#(8)::t_struct)) begin\n"
+      "    logic e;\n"
+      "  end else begin\n"
+      "    logic f;\n"
+      "  end\n"
+      "  if (type(C#(4)::t_struct) == type(C#(4)::t_struct)) begin\n"
+      "    logic g;\n"
+      "  end else begin\n"
+      "    logic h;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  EXPECT_EQ(r.f.diag.WarningCount(), 0u);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'g'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'h'), 0);
+}
+
 // §6.23 — the inequality form negates the match result: nonmatching types make
 // `!=` true, selecting the then-block.
 TEST(TypeOperatorGenerate, NotEqualNonMatchingTypesSelectsThenBranch) {
