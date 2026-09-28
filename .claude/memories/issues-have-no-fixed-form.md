@@ -18,5 +18,6 @@ act on it.
 **How to apply:** do not mirror an earlier issue's layout for its own sake;
 do keep the substance rules that are not about form — one indivisible problem
 per issue ([[one-indivisible-problem-per-issue]]), the closing-keyword rules
-([[closing-keyword-form]]), and the LRM cited never quoted
-([[lrm-text-is-copyrighted]]).
+([[closing-keyword-form]]), the LRM cited never quoted
+([[lrm-text-is-copyrighted]]), and sections opened with headings
+([[issue-sections-take-headings]]).
