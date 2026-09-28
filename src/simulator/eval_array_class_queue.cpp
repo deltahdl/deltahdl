@@ -150,6 +150,7 @@ QueueObject* MakeQueueProperty(const ClassTypeInfo* declaring,
   auto* q = ctx.GetArena().Create<QueueObject>();
   q->elem_width = prop == nullptr ? 32 : prop->is_string ? 0 : prop->width;
   q->is_4state = prop != nullptr && prop->is_4state;
+  q->is_signed = prop != nullptr && prop->is_signed;
   q->max_size =
       PropertyQueueBound(QueuePropertyDim(member, declaring, ctx), obj, ctx);
   q->holds_class_handles = ElementTypeIsClass(member, declaring, obj, ctx);

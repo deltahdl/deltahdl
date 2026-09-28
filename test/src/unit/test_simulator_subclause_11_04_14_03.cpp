@@ -659,4 +659,36 @@ TEST(StreamingUnpackSim, PropertiesThroughAHandleAreUnpackedInto) {
   EXPECT_EQ(out, "4 10 13 13 2 deadbeef 5 6 0506\n");
 }
 
+// §11.4.14.3 unpacks a stream into its targets as assignments to them, and
+// §6.11 with §7.5 and §7.10 makes each element of `int lq[$]`, `int d[]` or a
+// class's `int q[$]` an int, which is signed, however the element was
+// written. 32'hDEADBEEF in one is -559038737, below 0, whether a stream, a
+// push_back of an unsigned value or an element assignment put it there. The
+// element read back carried the sign of the value written, none of these.
+TEST(StreamingUnpackSim, AnElementOfASignedQueueOrDynamicArrayIsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class H; int q[$]; endclass\n"
+      "  int lq[$];\n"
+      "  int d[];\n"
+      "  bit [31:0] u;\n"
+      "  H h;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    {>>{lq}} = 64'hDEADBEEF_00000007;\n"
+      "    lq.push_back(u);\n"
+      "    d = new[1];\n"
+      "    d[0] = u;\n"
+      "    h = new;\n"
+      "    {>>{h.q}} = u;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", lq[0], lq[1], lq[2], lq[2] < "
+      "0,\n"
+      "             d[0], h.q[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-559038737 7 -559038737 1 -559038737 -559038737\n");
+}
+
 }  // namespace

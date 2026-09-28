@@ -88,6 +88,7 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
       sampled != nullptr ? *sampled : q->elements;
   out = (idx < elements.size()) ? elements[idx]
                                 : NonexistentQueueElement(q, arena);
+  if (q->is_signed) out.is_signed = true;  // §6.11 (QueueObject::is_signed)
   return true;
 }
 

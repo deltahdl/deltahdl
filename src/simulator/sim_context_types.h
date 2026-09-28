@@ -181,6 +181,10 @@ struct QueueObject {
   // element of the queue is absent (Table 7-1, see 7.4.5): x for 4-state
   // element types, 0 for 2-state ones.
   bool is_4state = true;
+  // §6.11 with §7.5 and §7.10: whether the element type is signed, so that
+  // an element reads signed however the value written into it was typed:
+  // `push_back(u)` of an unsigned u into `int q[$]` stores an int.
+  bool is_signed = false;
   int32_t max_size = -1;
   uint32_t generation = 0;
   // §8.4: whether the element type is a class, so that each element is a

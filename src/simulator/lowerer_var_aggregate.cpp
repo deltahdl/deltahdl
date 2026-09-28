@@ -90,6 +90,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
   if (var.is_queue) {
     auto* q =
         ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
+    q->is_signed = var.is_signed;
     // §8.4: a queue of a class type holds handles, so `q[i].v` names a
     // property of the object an element refers to (TryEvalQueueElementMember
     // in eval_array_class_queue.h).
@@ -107,6 +108,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // Carry the element's state-ness onto the backing store: §21.4.2 keys the
     // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
     auto* q = ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
+    q->is_signed = var.is_signed;
     q->elements_are_queues = var.elements_are_queues;
     q->nested_queue_levels = var.element.nested_queue_levels;
     q->element_array_size = var.element.array_size;

@@ -335,6 +335,7 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   }
   auto* q = ctx.CreateQueue(stmt->var_name, elem_width, max_size,
                             Is4stateType(stmt->var_decl_type.kind));
+  q->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   // §8.4 (printed page 181): a queue of a class type holds handles, so
   // `q[i].v` names a property of the object an element refers to
   // (TryEvalQueueElementMember in eval_array_class_queue.h). §8.23 (printed
@@ -400,6 +401,7 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
   QueueObject* q =
       ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
+  q->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   MarkElementQueues(stmt, q, ctx, arena);
   ArrayInfo info;
   info.is_dynamic = true;

@@ -215,6 +215,7 @@ static QueueObject* CopyQueue(const QueueObject* src, Arena& arena) {
   auto* dst = arena.Create<QueueObject>();
   dst->elem_width = src->elem_width;
   dst->is_4state = src->is_4state;
+  dst->is_signed = src->is_signed;
   dst->max_size = src->max_size;
   dst->holds_class_handles = src->holds_class_handles;
   dst->elements.reserve(src->elements.size());

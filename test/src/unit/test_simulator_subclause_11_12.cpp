@@ -687,4 +687,30 @@ TEST(LetConstructSim, ALetDeclaredInATaskIsUsedThere) {
   EXPECT_EQ(out, "11 8\n");
 }
 
+// §11.12's example b: a let body is bound where the let is declared, so `y`
+// names the module's x even where it is used inside a block declaring an x
+// of its own, and `b = a | y` with a 0 gives 1. The block's x is written
+// `static` because §6.21 requires that on a static variable declared with an
+// initializer in a procedural block. deltahdl printed 0: the block's
+// declaration replaced the module's x, which the let then read.
+TEST(LetConstructSim, ExampleBsLetReadsItsDeclarationScopesX) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module top;\n"
+      "  logic x = 1'b1;\n"
+      "  logic a, b;\n"
+      "  let y = x;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    begin\n"
+      "      static bit x = 1'b0;\n"
+      "      b = a | y;\n"
+      "      $display(\"%0d\", b);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace
