@@ -599,7 +599,9 @@ void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
   }
   auto else_bits = signal_bits_;
 
-  uint32_t sel = LowerExprBit(stmt->condition, aig, 0);
+  // §12.4 executes the first statement where the condition has a nonzero known
+  // value, and gives the condition no context to size it.
+  uint32_t sel = LowerTruthValue(stmt->condition, aig, Subclause("12.4"));
   for (auto& [name, bits] : signal_bits_) {
     auto then_it = then_bits.find(name);
     if (then_it == then_bits.end()) continue;
