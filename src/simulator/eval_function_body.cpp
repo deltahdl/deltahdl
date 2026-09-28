@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -19,6 +20,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -396,6 +398,13 @@ static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
   if (const QueueObject* q =
           FindQueueOfBase(stmt->expr, exec.ctx, exec.arena)) {
     size = static_cast<uint32_t>(q->elements.size());
+  } else if (const StructFieldInfo* member =
+                 ResolveStructArrayMember(stmt->expr, exec.ctx)) {
+    // §12.7.3 with §7.2 and §7.4.2: an unpacked array member of a structure,
+    // a property's `r.v` bare in the method among them, from the lower of its
+    // bounds.
+    size = member->elem_count;
+    lo = std::min(member->elem_left, member->elem_right);
   } else if (ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref)) {
     // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
     // (§8.5) holds its elements on the object, the declared dimension's count

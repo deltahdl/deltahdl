@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/eval_array.h"
@@ -324,6 +326,114 @@ TEST(QueueAccess, ElementQueueOfAClassScopeTypedefIsAConcatenationItem) {
                       "endmodule\n",
                       "out"),
             3756u);
+}
+
+// §7.10 with §7.2 and §10.9.2: a pattern pushed into a queue of structures is
+// packed member by member at each member's width, and `q[1].green` reads the
+// member of the element; foreach over the queue reads each element's red. The
+// pattern was concatenated at its elements' own widths and the member read
+// as a name, both giving 0.
+TEST(QueueSim, MembersOfPushedStructElements) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { byte red, green, blue; } c_t;\n"
+      "  c_t q[$];\n"
+      "  int n, green, reds;\n"
+      "  initial begin\n"
+      "    q.push_back('{3, 5, 3});\n"
+      "    q.push_back('{1, 10, 3});\n"
+      "    q.push_front('{2, 20, 9});\n"
+      "    n = q.size();\n"
+      "    green = q[2].green;\n"
+      "    reds = 0;\n"
+      "    foreach (q[i]) reds = reds * 10 + q[i].red;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "n"), 3u);
+  EXPECT_EQ(RunAndGet(src, "green"), 10u);
+  EXPECT_EQ(RunAndGet(src, "reds"), 231u);
+}
+
+// §7.10 with §6.16 and §8.5: a queue property of strings holds each element
+// whole -- read in a method, through the handle, into a string variable, and
+// returned by pop_front -- and not the four characters of a 32-bit value.
+TEST(QueueSim, StringQueuePropertyKeepsWholeElements) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    string names[$];\n"
+      "    function void fill(); names.push_back(\"hello\");\n"
+      "      names.push_front(\"greetings\"); endfunction\n"
+      "    function void show(); $display(\"%s\", names[1]); endfunction\n"
+      "  endclass\n"
+      "  C h; string s;\n"
+      "  initial begin\n"
+      "    h = new; h.fill(); h.show();\n"
+      "    s = h.names[1];\n"
+      "    $display(\"%s %0d %s\", h.names[0], s.len(), h.names.pop_front());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hello\ngreetings 5 greetings\n");
+}
+
+// §7.10 with §8.7 and §7.12: a queue property declared with an unpacked
+// array concatenation holds its elements once the object is constructed, and
+// a method reduces them and filters them by a with clause that reads another
+// property, a local and a static property.
+TEST(QueueSim, InitializedQueuePropertyReadInItsMethods) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int q[$] = {1, 5, 9, 12};\n"
+      "    int threshold = 4;\n"
+      "    static int limit = 8;\n"
+      "    function int total(); return q.sum(); endfunction\n"
+      "    function int above(); int lim = 10; int r[$], s[$], u[$];\n"
+      "      r = q.find with (item > threshold);\n"
+      "      s = q.find with (item > lim);\n"
+      "      u = q.find with (item > limit);\n"
+      "      return r.size() * 100 + s.size() * 10 + u.size(); endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%0d %0d %0d %0d\", h.q.size(), h.q[3], h.total(),\n"
+      "             h.above());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 12 27 312\n");
+}
+
+// §7.10 with §8.4 and §7.12: a queue of a class type holds handles, so an
+// element select, pop_front()'s result, q[$] and the item of a with clause
+// each reach the object's property and method.
+TEST(QueueSim, ElementsOfAQueueOfHandlesReachTheirObjects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Item;\n"
+      "    int id;\n"
+      "    function new(int i); id = i; endfunction\n"
+      "    function int twice(); return id * 2; endfunction\n"
+      "  endclass\n"
+      "  Item q[$], r[$];\n"
+      "  Item it;\n"
+      "  initial begin\n"
+      "    it = new(8); q.push_back(it); it = new(1); q.push_back(it);\n"
+      "    it = new(4); q.push_back(it);\n"
+      "    $display(\"%0d %0d\", q[0].id, q[0].twice());\n"
+      "    q.sort with (item.id);\n"
+      "    r = q.find_first with (item.id == 4);\n"
+      "    $display(\"%0d %0d %0d\", q[0].id, q[$].twice(), r[0].id);\n"
+      "    $display(\"%0d %0d\", q.pop_front().id, q.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 16\n1 16 4\n1 2\n");
 }
 
 }  // namespace

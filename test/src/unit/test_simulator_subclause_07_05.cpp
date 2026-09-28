@@ -153,4 +153,36 @@ TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByItsNewInitializer) {
             405u);
 }
 
+// §7.5 with §7.2: each element of a dynamic array of structures is a
+// structure, so `md[1].f1` reads the member of the element `md[1] = e`
+// stored -- for a module variable, a block local and a subroutine's `input T
+// a[]` formal alike. Built into a name, `md[1]` named no variable and read 0.
+TEST(DynamicArraySim, MemberOfAStructElement) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { int f1; bit f2; } T;\n"
+      "  T md[];\n"
+      "  int mod, loc, fn;\n"
+      "  function automatic int g(input T a[]);\n"
+      "    return a[1].f1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    T ld[];\n"
+      "    T e;\n"
+      "    md = new[2];\n"
+      "    ld = new[2];\n"
+      "    e.f1 = 9;\n"
+      "    e.f2 = 1;\n"
+      "    md[1] = e;\n"
+      "    ld[1] = e;\n"
+      "    mod = md[1].f1;\n"
+      "    loc = ld[1].f1;\n"
+      "    fn = g(md);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "mod"), 9u);
+  EXPECT_EQ(RunAndGet(src, "loc"), 9u);
+  EXPECT_EQ(RunAndGet(src, "fn"), 9u);
+}
+
 }  // namespace

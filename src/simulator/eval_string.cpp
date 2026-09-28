@@ -14,10 +14,12 @@
 #include "common/string_methods.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
@@ -526,11 +528,39 @@ static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
 // method or as `C::name`, or a property reached through a handle or a chain
 // of them. The declaration is asked because the value read is not: a literal
 // stored into the property is a packed value (§5.9) that carries no kind.
+// An element of a declared array of strings is one more (SelectsStringElement).
 // Answers false for any other receiver, a call's result among them, which
 // TryEvalCallResultMethodCall reads by the kind the call's value carries.
+// §6.16 with §7.4, §7.5 and §7.10: whether `receiver` selects one element of
+// an array of strings -- a queue, a dynamic or a fixed one, declared or a
+// class property, `h.names[0]` -- whose declaration, and not the value read,
+// says that it holds strings.
+static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
+  if (receiver->kind != ExprKind::kSelect || receiver->index_end != nullptr ||
+      receiver->base == nullptr) {
+    return false;
+  }
+  if (receiver->base->kind == ExprKind::kIdentifier &&
+      NameDenotesVariable(receiver->base->text, ctx)) {
+    std::string_view name = receiver->base->text;
+    const ArrayInfo* info = ctx.FindArrayInfo(name);
+    if (info == nullptr)
+      return ctx.FindQueue(name) != nullptr && ctx.IsStringVariable(name);
+    return info->elem_type_kind == DataTypeKind::kString ||
+           ctx.IsStringVariable(name) ||
+           ctx.IsStringVariable(std::string(name) + "[" +
+                                std::to_string(info->lo) + "]");
+  }
+  return NamesStringProperty(receiver->base, ctx);
+}
+
 static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
                                Arena& arena, std::string& str) {
   if (receiver == nullptr) return false;
+  if (SelectsStringElement(receiver, ctx)) {
+    str = Logic4VecToString(EvalExpr(receiver, ctx, arena));
+    return true;
+  }
   if (receiver->kind == ExprKind::kIdentifier)
     return ReadBareStringProperty(receiver, ctx, arena, str);
   if (receiver->kind != ExprKind::kMemberAccess || receiver->lhs == nullptr ||

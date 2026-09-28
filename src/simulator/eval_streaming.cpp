@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -578,11 +579,56 @@ struct PatternState {
 // low end of p. The value of the member's expression: a pattern for a nested
 // structure placed by that structure's layout, as the enclosing pattern is by
 // `info`'s, and any other expression evaluated as it was.
-static Logic4Vec EvalMemberExpr(const Expr* elem, const StructFieldInfo& field,
+// §10.9.1: the items a pattern for an array lists, in order, a replication
+// `'{4{1}}` or `'{2{a, b}}` giving its items that many times over.
+static std::vector<const Expr*> ArrayPatternItems(const Expr* pattern,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  std::vector<const Expr*> items;
+  for (const Expr* e : pattern->elements) {
+    if (e->kind != ExprKind::kReplicate || e->repeat_count == nullptr) {
+      items.push_back(e);
+      continue;
+    }
+    uint64_t n = EvalExpr(e->repeat_count, ctx, arena).ToUint64();
+    for (uint64_t r = 0; r < n; ++r) {
+      items.insert(items.end(), e->elements.begin(), e->elements.end());
+    }
+  }
+  return items;
+}
+
+// §10.9.1 with §7.2 and §7.4.2: a pattern for an unpacked array member gives
+// each of its elements a value, left to right, each evaluated as assigned to
+// the element's type, the leftmost element in the member's most significant
+// bits. Concatenated at their own widths, `'{2, 3, 4, 5}` for `byte
+// data[4]` left the four 32-bit values' low 32 bits, one byte of them 5.
+// Nothing where the pattern lists other than one item per element.
+static std::optional<Logic4Vec> EvalArrayMemberPattern(
+    const Expr* pattern, const StructFieldInfo& field, SimContext& ctx,
+    Arena& arena) {
+  std::vector<const Expr*> items = ArrayPatternItems(pattern, ctx, arena);
+  if (items.size() != field.elem_count) return std::nullopt;
+  uint32_t ew = field.width / field.elem_count;
+  Logic4Vec result = MakeLogic4Vec(arena, field.width);
+  for (size_t i = 0; i < items.size(); ++i) {
+    Logic4Vec val = EvalExpr(items[i], ctx, arena, ew);
+    DepositBitField(result,
+                    static_cast<uint32_t>(field.elem_count - 1 - i) * ew,
+                    MemberBits(val, ew, arena), ew);
+  }
+  return result;
+}
+
+Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
                                 SimContext& ctx, Arena& arena) {
   const Expr* pattern = UnwrapTypedPattern(elem);
   if (field.nested != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
     return EvalStructPatternValue(pattern, field.nested, ctx, arena);
+  if (field.elem_count > 0 && pattern->kind == ExprKind::kAssignmentPattern) {
+    if (auto val = EvalArrayMemberPattern(pattern, field, ctx, arena))
+      return *val;
+  }
   return EvalExpr(elem, ctx, arena);
 }
 
@@ -594,8 +640,8 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
     if (!IsMemberNameKey(key, info)) continue;
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (info->fields[fi].name != key) continue;
-      auto val =
-          EvalMemberExpr(expr->elements[i], info->fields[fi], s.ctx, s.arena);
+      auto val = EvalStructMemberValue(expr->elements[i], info->fields[fi],
+                                       s.ctx, s.arena);
       PlaceFieldValue(s.result, info->fields[fi], val, s.arena);
       s.assigned[fi] = true;
       break;
@@ -648,6 +694,28 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
   return result;
 }
 
+void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
+                         uint32_t base, SimContext& ctx, Arena& arena) {
+  if (layout.is_union) return;
+  for (const auto& f : layout.fields) {
+    if (f.default_expr != nullptr) {
+      Logic4Vec v = EvalStructMemberValue(f.default_expr, f, ctx, arena);
+      DepositBitField(value, base + f.bit_offset, MemberBits(v, f.width, arena),
+                      f.width);
+    } else if (f.nested != nullptr) {
+      ApplyLayoutDefaults(value, *f.nested, base + f.bit_offset, ctx, arena);
+    }
+  }
+}
+
+Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
+                            SimContext& ctx, Arena& arena) {
+  const Expr* pattern = UnwrapTypedPattern(item);
+  if (layout != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
+    return EvalStructPatternValue(pattern, layout, ctx, arena);
+  return EvalExpr(item, ctx, arena);
+}
+
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
                                  SimContext& ctx, Arena& arena) {
   // Keyed form (member name / type / default keys): field-by-field placement.
@@ -672,7 +740,8 @@ Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
   if (!is_replication && expr->elements.size() == info->fields.size()) {
     auto result = MakeLogic4Vec(arena, info->total_width);
     for (size_t i = 0; i < info->fields.size(); ++i) {
-      auto val = EvalMemberExpr(expr->elements[i], info->fields[i], ctx, arena);
+      auto val =
+          EvalStructMemberValue(expr->elements[i], info->fields[i], ctx, arena);
       PlaceFieldValue(result, info->fields[i], val, arena);
     }
     return result;

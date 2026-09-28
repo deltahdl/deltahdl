@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
@@ -354,6 +356,55 @@ TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "c6"), 5u);
   EXPECT_EQ(RunAndGet(src, "a0"), 9u);
+}
+
+// §7.6 with §8.5: a fixed array property assigned from another object's
+// property of the same shape takes every element, and the two stay
+// independent: a later write to one leaves the other as copied.
+TEST(ArrayAssignmentSimulation, FixedArrayPropertyCopiedBetweenObjects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C; int arr[4]; endclass\n"
+      "  C g, h;\n"
+      "  initial begin\n"
+      "    g = new; h = new;\n"
+      "    h.arr[0] = 10; h.arr[1] = 20; h.arr[2] = 30; h.arr[3] = 40;\n"
+      "    g.arr = h.arr;\n"
+      "    h.arr[1] = 77;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", g.arr[0], g.arr[1], g.arr[2],\n"
+      "             g.arr[3], h.arr[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 20 30 40 77\n");
+}
+
+// §7.6 with §7.5, §7.10 and §8.5: a queue property assigned to a dynamic array
+// property gives it the queue's size and elements, and the dynamic array
+// assigned back to the emptied queue refills it, inside a method as through
+// handles.
+TEST(ArrayAssignmentSimulation, QueueAndDynamicArrayPropertiesAssignedAcross) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Q; int q[$]; endclass\n"
+      "  class D; int d[]; int e[];\n"
+      "    function void keep(); e = d; endfunction\n"
+      "  endclass\n"
+      "  Q a; D b;\n"
+      "  initial begin\n"
+      "    a = new; b = new;\n"
+      "    a.q.push_back(10); a.q.push_back(20); a.q.push_back(30);\n"
+      "    b.d = a.q; b.keep();\n"
+      "    a.q.delete();\n"
+      "    a.q = b.e;\n"
+      "    $display(\"%0d %0d %0d %0d\", b.d.size(), b.d[1], a.q.size(),\n"
+      "             a.q[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 20 3 30\n");
 }
 
 }  // namespace

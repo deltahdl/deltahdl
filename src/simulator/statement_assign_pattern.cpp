@@ -223,6 +223,9 @@ static void DistributePatternToArray(std::string_view arr_name,
                    rhs->elements[0]->kind == ExprKind::kReplicate;
   uint32_t inner_count =
       replicate ? static_cast<uint32_t>(rhs->elements[0]->elements.size()) : 0;
+  // §10.9.2 with §7.4: the items for an array of structures are each packed by
+  // the element's layout.
+  const StructTypeInfo* layout = StructLayoutOfName(arr_name, ctx);
   for (uint32_t i = 0; i < info.size; ++i) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
@@ -235,9 +238,10 @@ static void DistributePatternToArray(std::string_view arr_name,
                             info.is_4state};
       val = FindArrayKeyedValue(rhs, slot, ctx, arena);
     } else if (replicate && inner_count > 0) {
-      val = EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);
+      val = EvalItemForLayout(rhs->elements[0]->elements[i % inner_count],
+                              layout, ctx, arena);
     } else if (i < rhs->elements.size()) {
-      val = EvalExpr(rhs->elements[i], ctx, arena);
+      val = EvalItemForLayout(rhs->elements[i], layout, ctx, arena);
     } else {
       val = MakeLogic4VecVal(arena, info.elem_width, 0);
     }

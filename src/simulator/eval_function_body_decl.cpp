@@ -220,7 +220,13 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
     // the tag a `tagged` initializer gives a tagged union local.
     BindLocalAggregateLayout(name, type, init, ctx);
   }
-  if (init == nullptr) return v;
+  // §7.2.2: a local of a structure type with no initializer takes the default
+  // each member's declaration writes.
+  if (init == nullptr) {
+    if (const StructTypeInfo* layout = ctx.GetVariableStructType(name))
+      ApplyLayoutDefaults(v->value, *layout, 0, ctx, arena);
+    return v;
+  }
   // §8.4: `P p = new;` creates an object of class P and assigns its handle to
   // p. `new` names a construction, not a value to be read, so evaluating it as
   // an ordinary initializer expression yields no object and leaves the handle

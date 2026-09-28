@@ -13,10 +13,13 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -201,6 +204,20 @@ IterNames ExtractIterNames(const Expr* expr) {
   return IterNames{iter_name, index_name, std::move(idx_var_name)};
 }
 
+IteratorLayout::IteratorLayout(std::string_view iter_name,
+                               std::string_view array_name, SimContext& ctx)
+    : ctx_(ctx), iter_name_(iter_name) {
+  std::string_view type_name = ctx.VariableStructTypeName(array_name);
+  if (type_name.empty()) return;
+  previous_ = ctx.VariableStructTypeName(iter_name);
+  ctx.SetVariableStructType(iter_name, type_name);
+  bound_ = true;
+}
+
+IteratorLayout::~IteratorLayout() {
+  if (bound_) ctx_.SetVariableStructType(iter_name_, previous_);
+}
+
 static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
                                         const WithIterEnv& env,
                                         const Logic4Vec& elem, size_t index) {
@@ -286,6 +303,7 @@ static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
   auto elems = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
+  IteratorLayout layout(names.iter_name, ac.var_name, ac.ctx);
 
   uint32_t result_width = 0;
   auto vals = EvalReduceWithValues(elems, expr, env, result_width);
@@ -448,14 +466,64 @@ static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
 
 // §26.3 admits a package-qualified array as the receiver, `p::a.sum()`,
 // resolved by the key ExtractHandleMethodCallParts answers.
+// §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
+// unpacked array, so `r.v.size()` answers its element count and a reduction
+// method, `r.v.sum()`, folds its elements, the result of the element's type
+// (§7.12.3). The member names no array of its own name, so the array paths
+// below found none and answered 0. A with clause is left to those paths.
+static bool TryStructArrayMemberMethod(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || expr->with_expr != nullptr)
+    return false;
+  std::string_view method = access->rhs->text;
+  if (method != "size" && !IsReductionMethod(method)) return false;
+  const StructFieldInfo* member = ResolveStructArrayMember(access->lhs, ctx);
+  if (member == nullptr) return false;
+  if (method == "size") {
+    out = MakeLogic4VecVal(arena, 32, member->elem_count);
+    return true;
+  }
+  Logic4Vec whole = EvalExpr(access->lhs, ctx, arena);
+  uint32_t ew = member->width / member->elem_count;
+  std::vector<uint64_t> vals;
+  vals.reserve(member->elem_count);
+  for (uint32_t i = 0; i < member->elem_count; ++i) {
+    vals.push_back(
+        ExtractBitField(arena, whole, (member->elem_count - 1 - i) * ew, ew)
+            .ToUint64());
+  }
+  out = MakeLogic4VecVal(arena, ew, ApplyReduction(method, vals));
+  out.is_signed = member->is_signed;
+  return true;
+}
+
+// §7.12.3 with §8.5: `expr` as a reduction on a queue property, which
+// QueuePropertyReceiver names for the reduction to read; false for a call of
+// another method or on another receiver.
+static bool TryQueuePropertyReduction(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || !IsReductionMethod(access->rhs->text)) {
+    return false;
+  }
+  QueuePropertyReceiver receiver(expr, ctx, arena);
+  return receiver.Call() != nullptr &&
+         TryEvalArrayMethodCall(receiver.Call(), ctx, arena, out);
+}
+
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
+  if (TryStructArrayMemberMethod(expr, ctx, arena, out)) return true;
   MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts))
+    return TryQueuePropertyReduction(expr, ctx, arena, out);
   ArrayInfo scratch;
   const auto* info =
       ArrayInfoForReduction(parts.var_name, parts.method_name, ctx, scratch);
-  if (!info) return false;
+  if (!info) return TryQueuePropertyReduction(expr, ctx, arena, out);
   ArrayCtx ac{parts.var_name, *info, ctx, arena};
   if (DispatchReductionExpr(parts.method_name, ac, expr, out)) return true;
   if (DispatchQuery(parts.method_name, ac, out)) return true;
@@ -535,6 +603,7 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
   auto vals = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
+  IteratorLayout layout(names.iter_name, ac.var_name, ac.ctx);
   auto keys = BuildSortKeys(vals, expr, env);
   SortKeysByValue(keys, ascending);
   std::vector<Logic4Vec> sorted = ReorderByKeys(vals, keys);
@@ -599,6 +668,7 @@ bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (QueueObject* q = ctx.FindQueue(var_name)) {
+    IteratorLayout layout(ExtractIterNames(expr).iter_name, var_name, ctx);
     SortQueueByWithExpr(q, expr, ascending, ctx, arena);
     return true;
   }

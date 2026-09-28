@@ -354,6 +354,23 @@ void Elaborator::AdoptProceduralTypedefDims(const ModuleDecl* decl) {
   for (auto* item : decl->items) visit(item);
 }
 
+// §7.2 with §7.4.4: a structure or union member declared with a typedef that
+// carries unpacked dimensions, `a_t m1;` under `typedef bit a_t [3:0];`, has
+// those dimensions, as the same member written out, `bit m1 [3:0]`, does. A
+// member writing dimensions of its own keeps them. Left without them, the
+// member was laid out and sized as one element.
+static void AdoptMemberTypedefDims(
+    DataType& type,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>& td_dims) {
+  for (StructMember& m : type.struct_members) {
+    if (m.type_kind != DataTypeKind::kNamed || !m.scope_name.empty() ||
+        !m.unpacked_dims.empty())
+      continue;
+    auto dims = td_dims.find(m.type_name);
+    if (dims != td_dims.end()) m.unpacked_dims = dims->second;
+  }
+}
+
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (HandleForwardTypedef(item, typedefs_, forward_typedef_kinds_, diag_)) {
     return;
@@ -375,6 +392,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                             item->name, TypedefKindName(it->second)),
                 Subclause("6.18"));
   }
+  AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
   typedefs_[item->name] = item->typedef_type;
   // §6.18: the dimensions belong to the type the name stands for, so a name
   // written with any of them stands for an aggregate rather than for one

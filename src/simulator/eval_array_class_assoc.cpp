@@ -473,6 +473,16 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
     return nullptr;
   }
   if (base->is_scope_resolution) return ScopeResolvedAssocProperty(base, ctx);
+  // §8.15: `super.m` is the property m as the base of the running method's
+  // class declares it, on the running object.
+  if (base->lhs->kind == ExprKind::kIdentifier && base->lhs->text == "super") {
+    const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+    if (ctx.CurrentThis() == nullptr || cls == nullptr ||
+        cls->parent == nullptr)
+      return nullptr;
+    return ResolveOn(ctx.CurrentThis(), cls->parent, base->rhs->text, ctx,
+                     owner);
+  }
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   if (obj == nullptr) return nullptr;
   return ResolveOn(obj, obj->type, base->rhs->text, ctx, owner);

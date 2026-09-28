@@ -92,6 +92,20 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
 // target names no dynamic array property or its value is no `new[]`.
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// §7.6 with §7.5, §7.10 and §8.5: `stmt` as an assignment of one array
+// property to another -- fixed, dynamic or queue, through handles or bare in
+// a method: `g.arr = h.arr`, `b.d = a.q`, `a.q = b.d` -- which copies the
+// source's elements from the left into the target, a dynamic target or a
+// queue taking the source's size. False where either side names no array
+// property, a declared queue on the left among them.
+bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §8.11 with §23.9: whether `base` is a bare name a method's own array
+// property answers -- the running object's class declares a fixed-size or
+// dynamic array property of the name and no local of the method shadows it --
+// which a variable of the module the class is declared in does not shadow.
+bool NamesOwnArrayProperty(const Expr* base, SimContext& ctx);
+
 // §7.4.6: writes the element at declared index `index` of `ref` with `value`
 // coerced as a write to the property is; an index that addresses no element
 // writes nothing.

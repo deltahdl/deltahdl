@@ -12,6 +12,7 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -660,12 +661,22 @@ ScopeMap SpecializationParamScope(const ClassTypeInfo* spec,
 // `C #(16)`. Each property the class declares is folded again with the
 // specialization's own values; one whose type does not fold -- a name, a type
 // parameter, which SizeTypeParamProperties sizes -- is left as it was.
-void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values) {
+//
+// §7.4.2 with §8.25: a fixed unpacked dimension naming one, `int g[N]`, is
+// folded again the same way, so `Box #(string, 6)` holds six elements where
+// the default specialization holds three.
+void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
+                              SimContext& ctx, Arena& arena) {
   if (values.empty()) return;
   ScopeMap scope = SpecializationParamScope(spec, values);
   for (auto& prop : spec->properties) {
     const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
     if (member == nullptr) continue;
+    if (prop.array_size > 0 && member->unpacked_dims.size() == 1) {
+      PropertyArrayDim dim =
+          FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
+      if (dim.size > 0) prop.array_size = dim.size;
+    }
     uint32_t width = EvalTypeWidth(member->data_type, {}, scope);
     if (width == 0) continue;
     prop.width = width;
@@ -674,6 +685,44 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values) {
 }
 
 }  // namespace
+
+// §7.4.2 with §23.9: a size `scope` does not fold, `[K]` or `[P * 2]` naming
+// a parameter of the module the class is declared in, as the running scope
+// reads it; nothing for a name no variable of that scope answers, which is
+// how an associative array's index type or a type parameter, `[T]`, is
+// written, and nothing where the value is unknown.
+static std::optional<int64_t> RunningScopeSize(const Expr* dim, SimContext& ctx,
+                                               Arena& arena) {
+  bool readable = dim->kind == ExprKind::kIdentifier
+                      ? ctx.FindVariable(dim->text) != nullptr
+                      : dim->kind == ExprKind::kBinary;
+  if (!readable) return std::nullopt;
+  Logic4Vec value = EvalExpr(dim, ctx, arena);
+  if (!value.IsKnown()) return std::nullopt;
+  return static_cast<int64_t>(value.ToUint64());
+}
+
+PropertyArrayDim FoldPropertyDimension(const Expr* dim, const ScopeMap& scope,
+                                       SimContext& ctx, Arena& arena) {
+  if (dim == nullptr) return {};
+  if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon ||
+      dim->lhs == nullptr || dim->rhs == nullptr) {
+    std::optional<int64_t> size = ConstEvalInt(dim, scope);
+    if (!size) size = RunningScopeSize(dim, ctx, arena);
+    if (!size || *size <= 0) return {};
+    return {static_cast<uint32_t>(*size), 0, false};
+  }
+  auto bound = [&](const Expr* e) {
+    if (auto v = ConstEvalInt(e, scope)) return *v;
+    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+  };
+  int64_t left = bound(dim->lhs);
+  int64_t right = bound(dim->rhs);
+  if (left < right) {
+    return {static_cast<uint32_t>(right - left + 1), left, false};
+  }
+  return {static_cast<uint32_t>(left - right + 1), right, left > right};
+}
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
@@ -708,7 +757,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
-  SizeValueParamProperties(spec, values);
+  SizeValueParamProperties(spec, values, ctx, arena);
   BindSpecializationBase(spec, spelled, ctx, arena);
   OwnVTableEntries(spec);
   for (auto& [pname, value] : values)

@@ -723,6 +723,17 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
     Arena& arena) {
   if (expr->index_end) return std::nullopt;
   auto level = SelectBaseLevel(expr->base, base_val.width, ctx, arena);
+  // §7.4.1 with §7.2: a structure member of several packed dimensions,
+  // `u.b[0]` of `bit [1:0][7:0] b`, selects an element of its outermost
+  // dimension; taken as the flat member, the index selected a bit.
+  if (!level) {
+    const StructFieldInfo* member = ResolveStructMember(expr->base, ctx);
+    if (member != nullptr && member->packed_elem_width > 0 &&
+        member->width == base_val.width) {
+      level = PackedLevel{{member->packed_left, member->packed_right},
+                          member->packed_elem_width};
+    }
+  }
   if (!level || level->elem_width <= 1) return std::nullopt;
   uint32_t w = level->elem_width;
   auto range = level->range;
@@ -775,7 +786,7 @@ static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
     out = MakeAllX(arena, ref.width);
     return true;
   }
-  out = ExtractBitField(arena, ref.var->value, ref.bit_offset, ref.width);
+  out = ExtractBitField(arena, *ref.value, ref.bit_offset, ref.width);
   out.is_signed = ref.is_signed;
   return true;
 }
@@ -783,6 +794,16 @@ static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryStructArrayMemberSelect(expr, ctx, arena, result)) return result;
+  // §8.11 with §23.9: in a method, `d[1]` is an element of the object's array
+  // property ahead of a variable `d` of the module declaring the class.
+  if (expr->index_end == nullptr && NamesOwnArrayProperty(expr->base, ctx)) {
+    auto idx_val = EvalExpr(expr->index, ctx, arena);
+    if (!HasUnknownBits(idx_val) &&
+        TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
+                                   result)) {
+      return result;
+    }
+  }
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);

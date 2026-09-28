@@ -12,6 +12,7 @@ struct ClassTypeInfo;
 struct Expr;
 struct Logic4Vec;
 class SimContext;
+struct StructFieldInfo;
 struct StructTypeInfo;
 struct Variable;
 
@@ -21,6 +22,9 @@ struct Variable;
 // outside the member's bounds or holding x or z, which reads x and writes
 // nothing.
 struct StructArrayElementRef {
+  // The value holding the structure: a variable's, or a class property's
+  // (§8.5), which no variable stands for, `var` then null.
+  Logic4Vec* value = nullptr;
   Variable* var = nullptr;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
@@ -30,10 +34,40 @@ struct StructArrayElementRef {
 
 // Resolves `select` when it indexes an unpacked array member of a structure
 // variable -- a module's, a block's or a subroutine's, bare or through a
-// nested member, `m.v[1]` or `m.s.v[1]`. False for any other select, which
-// the caller reads or writes as before.
+// nested member, `m.v[1]` or `m.s.v[1]` -- or of a structure a class property
+// holds, named bare in a method, through `this` or through a handle,
+// `s.data[2]`, `this.s.data[2]`, `h.s.data[2]`. False for any other select,
+// which the caller reads or writes as before.
 bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
                                Arena& arena, StructArrayElementRef& out);
+
+// §7.2 with §7.4.2: the unpacked array member a member access names, `m.v`,
+// `r.v` bare in a method, `this.r.v` or `h.r.v`, as the structure's layout
+// records it (its element count and bounds); null where the access names no
+// such member.
+const StructFieldInfo* ResolveStructArrayMember(const Expr* access,
+                                                SimContext& ctx);
+
+// §7.2 with §7.4, §7.5, §7.8 and §7.10: the structure layout of the elements of
+// the container a select's base names -- an unpacked array, a dynamic array, a
+// queue or an associative array of structures, declared as a variable or as a
+// class property, named bare in a method, through `this` or through a handle,
+// `q`, `d`, `this.d`, `h.m`; null for a container of any other elements.
+const StructTypeInfo* ContainerElementLayout(const Expr* base, SimContext& ctx);
+
+// §7.2 with §7.5, §7.8 and §7.10: `q[1].green` reads a member of the structure
+// an element of a queue, a dynamic, associative or fixed array of structures
+// holds, a variable or a class property -- the element read as a select reads
+// it, and the member taken out of it by the element type's layout
+// (ContainerElementLayout). Built into a name, `q[1]`, the path named no
+// variable and read 0. False for an access of any other shape.
+bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out);
+
+// §7.2: the member of a structure a member access names, the same roots as
+// ResolveStructArrayMember takes, whatever the member's type; null where the
+// access names no structure member.
+const StructFieldInfo* ResolveStructMember(const Expr* access, SimContext& ctx);
 
 // §7.3.2 (printed page 151): a tagged union holds the member's value beside a
 // tag naming the member, and §11.9 (printed 304) builds such a value with a

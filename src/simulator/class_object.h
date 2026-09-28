@@ -169,6 +169,14 @@ struct ClassTypeInfo {
     // that constrains the size (§18.4), and its elements under the element
     // keys from index 0 up to that count.
     bool is_dynamic = false;
+    // §7.4.2 with §20.7: the lowest index and the element count of each
+    // unpacked dimension of a property that declares more than one, outermost
+    // first, as ArrayInfo::dim_los and dim_sizes hold them for a variable;
+    // empty for every other property. The object holds such a property as the
+    // one value under its name, and these are what the array query functions
+    // read its dimensions from.
+    std::vector<uint32_t> dim_los = {};
+    std::vector<uint32_t> dim_sizes = {};
 
     bool IsArray() const { return array_size > 0 || is_dynamic; }
   };

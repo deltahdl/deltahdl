@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -16,6 +17,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/process.h"
@@ -754,6 +756,13 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     // queue's name, once per bit of one element, and over a property not at
     // all.
     setup.size = static_cast<uint32_t>(q->elements.size());
+  } else if (const StructFieldInfo* member =
+                 ResolveStructArrayMember(stmt->expr, ctx)) {
+    // §12.7.3 with §7.2 and §7.4.2: an unpacked array member of a structure,
+    // `m.v`, holds its elements in the structure's bits, from the lower of
+    // its bounds. Looked up as an array of its name, it was none.
+    setup.size = member->elem_count;
+    setup.lo = std::min(member->elem_left, member->elem_right);
   } else if (ClassArrayRef ref;
              ResolveClassArray(stmt->expr, ctx, arena, ref)) {
     // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property

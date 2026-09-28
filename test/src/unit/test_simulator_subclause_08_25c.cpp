@@ -190,4 +190,29 @@ TEST(ClassParamsSim, BodyLocalTypeParamFollowsTheSpecialization) {
   EXPECT_EQ(out, "8 8\n");
 }
 
+// §8.25 with §7.8: a class variable declared among a module's items with a
+// specialization, `Box #(string, 6) bs;`, binds the type parameter to string,
+// so its `int m[T]` property is keyed by strings: two keys written through
+// the handle stay two entries, each with its own value, while the default
+// specialization's `int m[T]` keys by int.
+TEST(ClassParamsSim, ModuleLevelSpecializationKeysATypeIndexedProperty) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class Box #(type T = int, int N = 3);\n"
+      "    int m[T];\n"
+      "  endclass\n"
+      "  Box #(string, 6) bs;\n"
+      "  Box bi;\n"
+      "  initial begin\n"
+      "    bs = new; bi = new;\n"
+      "    bs.m[\"k\"] = 77; bs.m[\"kk\"] = 5; bi.m[3] = 9;\n"
+      "    $display(\"%0d %0d %0d %0d\", bs.m.num(), bs.m[\"k\"],\n"
+      "             bs.m[\"kk\"], bi.m[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 77 5 9\n");
+}
+
 }  // namespace

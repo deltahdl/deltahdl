@@ -295,6 +295,12 @@ const StructTypeInfo* DeclaredNameTables::GetVariableStructType(
   return FindStructType(it->second);
 }
 
+std::string_view DeclaredNameTables::VariableStructTypeName(
+    std::string_view var_name) const {
+  auto it = var_struct_types_.find(var_name);
+  return it != var_struct_types_.end() ? it->second : std::string_view{};
+}
+
 void DeclaredNameTables::RegisterTypeWidth(std::string_view name,
                                            uint32_t width) {
   type_widths_[name] = width;

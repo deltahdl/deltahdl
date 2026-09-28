@@ -75,4 +75,30 @@ void AnnounceQueueChange(const Expr* base, ClassObject* owner, SimContext& ctx);
 bool TryEvalQueueElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
 
+// §7.12 with §8.5: the array manipulation methods apply to a queue property
+// as to any queue, but read their receiver by the name SimContext::FindQueue
+// answers, which a property has none of. For the call `call` -- `h.q.sum()`,
+// `h.q.find with (...)`, or `q.sum()` in a method, where no declared queue
+// answers `q` -- on a queue property, a scope frame is pushed for as long as
+// this lives in which the receiver's spelling, "h.q" or "q", names the
+// property's queue, and Call() is `call` with that spelling as a bare name
+// for its receiver. A fixed or dynamic array property, `h.d.max`, is named
+// so too, by a queue holding a copy of its elements, which serves the
+// reductions and locators this is for, as they only read the elements.
+// Nothing is pushed, and Call() is null, for a call of any other shape or on
+// any other receiver.
+class QueuePropertyReceiver {
+ public:
+  QueuePropertyReceiver(const Expr* call, SimContext& ctx, Arena& arena);
+  ~QueuePropertyReceiver();
+  QueuePropertyReceiver(const QueuePropertyReceiver&) = delete;
+  QueuePropertyReceiver& operator=(const QueuePropertyReceiver&) = delete;
+
+  const Expr* Call() const { return call_; }
+
+ private:
+  SimContext& ctx_;
+  const Expr* call_ = nullptr;
+};
+
 }  // namespace delta

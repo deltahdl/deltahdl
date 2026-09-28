@@ -35,6 +35,27 @@ struct IterNames {
 // once in eval_array.cpp; also used by eval_array_locator.cpp.
 IterNames ExtractIterNames(const Expr* expr);
 
+// §7.12 with §7.2: for as long as this lives, the iterator `iter_name` of a
+// with clause over the array `array_name` is laid out by the structure type
+// of the array's elements, so that `item.red` reads the member of the element
+// the iterator holds; left as it was for an array of any other elements, and
+// given back its own binding afterwards. Unbound, the iterator was a plain
+// vector and every member of it read 0.
+class IteratorLayout {
+ public:
+  IteratorLayout(std::string_view iter_name, std::string_view array_name,
+                 SimContext& ctx);
+  ~IteratorLayout();
+  IteratorLayout(const IteratorLayout&) = delete;
+  IteratorLayout& operator=(const IteratorLayout&) = delete;
+
+ private:
+  SimContext& ctx_;
+  std::string_view iter_name_;
+  std::string_view previous_;
+  bool bound_ = false;
+};
+
 // §7.12.3: the array reduction methods over an associative array, which reach
 // its elements by a route of their own rather than through ArrayInfo. Empty
 // where `method` names no reduction, which is what lets a caller go on to try

@@ -225,4 +225,125 @@ TEST(StructType, UnpackedArrayMemberHoldsEachElement) {
   EXPECT_EQ(out, "20 40 5 160 7 9 3\n");
 }
 
+// §7.2 with §7.4.4: a member declared with an unpacked-array typedef has the
+// typedef's dimensions, `a_t m1;` under `typedef bit a_t [3:0];` being four
+// bits as `bit m1 [3:0]` is, so the struct is 12 bits, m1[3] keeps the 1
+// written to it and the byte after m1 keeps its own value.
+TEST(StructType, MemberDeclaredWithAnArrayTypedefHoldsEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit a_t [3:0];\n"
+      "  typedef struct { a_t m1; byte tail; } st;\n"
+      "  st s;\n"
+      "  initial begin\n"
+      "    s.m1[3] = 1; s.tail = 8'h5A;\n"
+      "    $display(\"%0d %0d %0d %h\", $bits(s), $bits(s.m1), s.m1[3], "
+      "s.tail);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12 4 1 5a\n");
+}
+
+// §10.9.2 with §7.2 and §7.4.2: a nested pattern for an unpacked array member
+// gives each element its value, left to right, each as wide as the element:
+// `'{2, 3, 4, 5}` fills `byte data[4]` in a declaration initializer and in an
+// assignment, and `'{1, 2, 3, 4}` fills `int v[4]`. Concatenated at their own
+// widths, the byte member kept only the last value.
+TEST(StructType, NestedPatternFillsAnArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int addr; int crc; byte data[4]; } packet1;\n"
+      "  typedef struct { int n; int v[4]; } rec_t;\n"
+      "  packet1 pi = '{1, 2, '{2, 3, 4, 5}};\n"
+      "  rec_t l;\n"
+      "  packet1 p2;\n"
+      "  initial begin\n"
+      "    l = '{5, '{1, 2, 3, 4}};\n"
+      "    p2 = '{7, 8, '{9, 10, 11, 12}};\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", pi.data[0], pi.data[3],\n"
+      "             l.v[0], l.v[3], p2.data[0], p2.data[3], p2.crc);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 5 1 4 9 12 8\n");
+}
+
+// §7.2.2 with §10.9.1: a member default gives a variable with no initializer
+// its value, and a replicated default pattern for an unpacked array member,
+// `byte data[4] = '{4{1}}`, gives every element 1, beside addr's default 6.
+// Evaluated as one value, it reached the last element alone.
+TEST(StructType, ArrayMemberDefaultFillsEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr = 6; int crc; byte data[4] = '{4{1}};\n"
+      "  } packet1;\n"
+      "  packet1 p1;\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d\", p1.addr, p1.data[0],\n"
+      "                   p1.data[1], p1.data[2], p1.data[3]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 1 1 1 1\n");
+}
+
+// §12.7.3 with §7.2 and §7.4.2: foreach over an unpacked array member iterates
+// its elements -- a module variable's `m.v`, a property's `r.v` bare in a
+// method, and `h.r.v` through a handle -- so the four elements written with
+// (i+1)*10 and (i+1)*100 sum to 100 and 1000. Found no array, each loop ran
+// no iteration.
+TEST(StructType, ForeachOverAnArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int n; int v[4]; } rec_t;\n"
+      "  class C;\n"
+      "    rec_t r;\n"
+      "    function void fill(); foreach (r.v[i]) r.v[i] = (i+1)*100; "
+      "endfunction\n"
+      "    function int total();\n"
+      "      int s = 0;\n"
+      "      foreach (r.v[i]) s += r.v[i];\n"
+      "      return s;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  rec_t m;\n"
+      "  C h;\n"
+      "  int s, hs;\n"
+      "  initial begin\n"
+      "    foreach (m.v[i]) m.v[i] = (i+1)*10;\n"
+      "    s = 0; foreach (m.v[i]) s += m.v[i];\n"
+      "    h = new; h.fill();\n"
+      "    hs = 0; foreach (h.r.v[i]) hs += h.r.v[i];\n"
+      "    $display(\"%0d %0d %0d\", s, h.total(), hs);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "100 1000 1000\n");
+}
+
+// §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
+// unpacked array, so after `r.v = '{4, 5, 6}` its size() is 3 and its sum()
+// 15, while the member beside it keeps its own value. Named no array of its
+// own, the member answered 0 to both.
+TEST(StructType, ArrayMethodsOnAnArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int n; int v[3]; } rec_t;\n"
+      "  rec_t r;\n"
+      "  initial begin\n"
+      "    r.v = '{4, 5, 6};\n"
+      "    r.n = 1;\n"
+      "    $display(\"%0d %0d %0d %0d\", r.v.sum(), r.v.size(), r.v.product(), "
+      "r.n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "15 3 120 1\n");
+}
+
 }  // namespace

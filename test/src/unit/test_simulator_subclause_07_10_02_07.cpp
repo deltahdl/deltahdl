@@ -222,4 +222,27 @@ TEST(QueuePushBackSim, PushedValueRoundTripsThroughPopBack) {
   EXPECT_EQ(v, 9u);
 }
 
+// The element pushed is the value the item had when it was pushed: a later
+// member write to the struct variable pushed, `e.a = 0`, leaves the element
+// holding 11, and so does one after `insert` placed a copy of it.
+TEST(QueuePushBackSim, ElementKeepsTheValueOfAStructPushed) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  s_t q[$];\n"
+      "  s_t e;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    e.a = 11; e.b = 22;\n"
+      "    q.push_back(e);\n"
+      "    e.a = 3;\n"
+      "    q.insert(0, e);\n"
+      "    e.a = 0;\n"
+      "    result = q[1].a * 10000 + q[0].a * 100 + q[1].b;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 110322u);
+}
+
 }  // namespace

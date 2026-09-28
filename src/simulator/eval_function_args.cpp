@@ -14,6 +14,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
@@ -244,13 +245,35 @@ static void AliasAggregateObjects(const AggregateStorage& storage,
 // was. §3.12.1 (printed page 56): `push($unit::q)` binds the unit's queue
 // by its key (IdentifierLookupKey), as TryBindArrayArg copies it; by the
 // text alone a module's own q was bound.
+//
+// §13.5.2 with §8.5: a queue property, `feed(h.q)` or the bare `q` of a
+// method's object, is the object's QueueObject, which the formal is made to
+// name; bound as a copy, a push through the formal left the property empty.
+static bool TryBindRefQueuePropertyArg(const Expr* call_arg,
+                                       const FunctionArg& param,
+                                       SimContext& ctx, Arena& arena) {
+  if (param.unpacked_dims.empty()) return false;
+  AggregateStorage storage;
+  {
+    CalleeScopeAside aside(ctx);
+    storage.queue = FindQueueOfBase(call_arg, ctx, arena);
+  }
+  if (storage.queue == nullptr) return false;
+  AliasAggregateObjects(storage, param.name, ctx);
+  return true;
+}
+
 static bool TryBindRefAggregateArg(const Expr* call_arg,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
-  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
+  if (!call_arg) return false;
+  if (call_arg->kind == ExprKind::kMemberAccess)
+    return TryBindRefQueuePropertyArg(call_arg, param, ctx, arena);
+  if (call_arg->kind != ExprKind::kIdentifier) return false;
   std::string actual = IdentifierLookupKey(call_arg);
   AggregateStorage storage = FindAggregateStorage(actual, ctx);
-  if (!storage.queue && !storage.assoc && !storage.info) return false;
+  if (!storage.queue && !storage.assoc && !storage.info)
+    return TryBindRefQueuePropertyArg(call_arg, param, ctx, arena);
   if (storage.info && !storage.info->dim_sizes.empty()) return false;
   AliasAggregateObjects(storage, param.name, ctx);
   if (storage.info) {

@@ -857,4 +857,32 @@ TEST(ForeachEnumKeySim, LoopVariableInASubroutineIsOfTheEnum) {
             "[GREEN BLUE ] [RED GREEN ]\n");
 }
 
+// §12.7.3 with §7.4.2, §7.5 and §8.5: inside a method, a foreach over the
+// object's fixed array property and over its dynamic array property, sized in
+// the constructor, writes each element and reads each back.
+TEST(LoopStatementSim, ForeachOverArrayPropertiesInMethods) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int arr[4];\n"
+      "    int d[];\n"
+      "    function new(int n); d = new[n]; foreach (d[i]) d[i] = i * 10;\n"
+      "    endfunction\n"
+      "    function void fill(); foreach (arr[i]) arr[i] = (i + 1) * 10;\n"
+      "    endfunction\n"
+      "    function int total(); int s = 0; foreach (arr[i]) s += arr[i];\n"
+      "      foreach (d[i]) s += d[i] * 100; return s; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new(3); h.fill();\n"
+      "    $display(\"%0d %0d %0d %0d\", h.arr[0], h.arr[3], h.d[2],\n"
+      "             h.total());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 40 20 3100\n");
+}
+
 }  // namespace

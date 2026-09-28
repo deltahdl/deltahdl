@@ -323,7 +323,12 @@ static bool TryThisSuperMember(std::string_view base_name,
                                Arena& arena, Logic4Vec& out) {
   if (base_name == "this") {
     auto* self = ctx.CurrentThis();
-    out = self ? self->GetProperty(field_name, arena) : MakeLogic4Vec(arena, 1);
+    // §8.11 with §7.2: `this.s.a` is a member of the structure the property s
+    // holds, a path the property name alone does not answer; it is resolved
+    // as a handle's `h.s.a` is, from the running method's class.
+    out = self ? ResolveClassFieldChain(self, ctx.CurrentMethodClass(),
+                                        field_name, ctx, arena)
+               : MakeLogic4Vec(arena, 1);
     return true;
   }
   if (base_name == "super") {
@@ -720,6 +725,7 @@ static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
+  if (TryContainerElementMember(expr, ctx, arena, out)) return out;
   if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;

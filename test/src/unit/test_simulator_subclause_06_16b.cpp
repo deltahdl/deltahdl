@@ -428,4 +428,49 @@ TEST(StringMethodReceivers, ItoaIntoAnOutputStringFormal) {
       "out=abc-3\no=abc-3\n");
 }
 
+// §6.16 with §7.4, §7.5 and §7.10: an element of a declared array of strings
+// is a string, so a method called on it reads the element's text -- in a
+// queue, a fixed array and a dynamic array -- and a two-character element is
+// told from a longer one.
+TEST(StringMethodReceivers, ElementOfAStringArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string m[$];\n"
+                       "  string a[2];\n"
+                       "  string d[];\n"
+                       "  initial begin\n"
+                       "    m.push_back(\"hello\"); m.push_back(\"ok\");\n"
+                       "    a[1] = \"abc\"; d = new[1]; d[0] = \"wxyz\";\n"
+                       "    $display(\"%0d %0d %0d %0d %s %s\", m[0].len(),\n"
+                       "             m[1].len(), a[1].len(), d[0].len(),\n"
+                       "             m[0].toupper(), a[1].toupper());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 2 3 4 HELLO ABC\n");
+}
+
+// §6.16 with §7.10 and §8.5: an element of a queue property of strings is a
+// string too, named bare in a method or through a handle.
+TEST(StringMethodReceivers, ElementOfAStringQueueProperty) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  class C;\n"
+                 "    string names[$];\n"
+                 "    function void fill(); names.push_back(\"hello\");\n"
+                 "      names.push_back(\"world\"); endfunction\n"
+                 "    function int l(); return names[1].len(); endfunction\n"
+                 "  endclass\n"
+                 "  C h;\n"
+                 "  initial begin\n"
+                 "    h = new; h.fill();\n"
+                 "    $display(\"%0d %0d %s\", h.l(), h.names[0].len(),\n"
+                 "             h.names[1].toupper());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "5 5 WORLD\n");
+}
+
 }  // namespace

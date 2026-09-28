@@ -248,4 +248,32 @@ TEST(SuperSim, BaseWriteLeavesAShadowingDerivedPropertyAlone) {
             7u);
 }
 
+// §8.15 with §7.8: `super.m` in a method of the subclass names the
+// associative-array property the base declares, on the running object: an
+// entry written through it joins the one written by the bare name, and its
+// num() and a read through it answer for both.
+TEST(SuperSimulation, SuperNamesAnInheritedAssociativeProperty) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class Base;\n"
+      "    int m[string];\n"
+      "  endclass\n"
+      "  class Sub extends Base;\n"
+      "    function void fill(); m[\"a\"] = 9; super.m[\"b\"] = 4; "
+      "endfunction\n"
+      "    function int show(); return super.m.num() * 100 + super.m[\"a\"] * "
+      "10\n"
+      "      + m[\"b\"]; endfunction\n"
+      "  endclass\n"
+      "  Sub s;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    s = new; s.fill();\n"
+      "    result = s.show();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 294u);
+}
+
 }  // namespace

@@ -12,10 +12,13 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_queue.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -59,15 +62,38 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   return false;
 }
 
+// The structure layout of the elements of the queue a method call is made
+// on, `q` of `q.push_back(...)`; null for a queue of any other elements.
+static const StructTypeInfo* QueueElementLayout(const Expr* call,
+                                                SimContext& ctx) {
+  const Expr* access = call->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->lhs == nullptr || access->lhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return StructLayoutOfName(access->lhs->text, ctx);
+}
+
 // The value a push puts in the queue `q` for the argument `item`, the
 // element being given the identity `id`. §7.10.2 with §7.4: where each element
 // of `q` is itself a queue, the argument is a queue value, which is kept under
 // the element's identity (ElementQueueFromItem in
-// eval_array_element_queue.h), and the element holds a placeholder.
-static Logic4Vec PushedValue(QueueObject* q, const Expr* item, uint64_t id,
-                             SimContext& ctx, Arena& arena) {
-  if (!q->elements_are_queues)
-    return SizedForQueueElement(*q, EvalExpr(item, ctx, arena), arena);
+// eval_array_element_queue.h), and the element holds a placeholder. §10.9.2:
+// where the elements are structures, a pattern argument, `q.push_back('{1,
+// 10, 3})`, is packed by the structure's layout (EvalItemForLayout);
+// concatenated at its items' own widths it held the low bits of three 32-bit
+// values, and `q[1].green` read 0. The element owns its words: a variable's
+// value shares them with the variable, and a member write to it after the
+// push, depositing in place, reached the element too.
+static Logic4Vec PushedValue(QueueObject* q, const Expr* call, const Expr* item,
+                             uint64_t id, SimContext& ctx, Arena& arena) {
+  if (!q->elements_are_queues) {
+    return OwnRhsWords(
+        SizedForQueueElement(
+            *q,
+            EvalItemForLayout(item, QueueElementLayout(call, ctx), ctx, arena),
+            arena),
+        arena);
+  }
   q->element_queues[id] = ElementQueueFromItem(q, item, ctx, arena);
   return NonexistentQueueElement(q, arena);
 }
@@ -75,7 +101,7 @@ static Logic4Vec PushedValue(QueueObject* q, const Expr* item, uint64_t id,
 static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   uint64_t id = q->AllocateId();
-  q->elements.push_back(PushedValue(q, expr->args[0], id, ctx, arena));
+  q->elements.push_back(PushedValue(q, expr, expr->args[0], id, ctx, arena));
   q->element_ids.push_back(id);
   ++q->generation;
   EnforceQueueBound(q, "push_back", expr->range.start, ctx);
@@ -85,7 +111,7 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
                            Arena& arena) {
   uint64_t id = q->AllocateId();
   q->elements.insert(q->elements.begin(),
-                     PushedValue(q, expr->args[0], id, ctx, arena));
+                     PushedValue(q, expr, expr->args[0], id, ctx, arena));
   q->element_ids.insert(q->element_ids.begin(), id);
   EnforceQueueBound(q, "push_front", expr->range.start, ctx);
   ++q->generation;
@@ -94,8 +120,13 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
 static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   auto idx_val = EvalExpr(expr->args[0], ctx, arena);
-  auto val =
-      SizedForQueueElement(*q, EvalExpr(expr->args[1], ctx, arena), arena);
+  auto val = OwnRhsWords(
+      SizedForQueueElement(
+          *q,
+          EvalItemForLayout(expr->args[1], QueueElementLayout(expr, ctx), ctx,
+                            arena),
+          arena),
+      arena);
   if (!idx_val.IsKnown()) return;
   auto raw = static_cast<int64_t>(idx_val.ToUint64());
   if (idx_val.is_signed && raw < 0) return;
@@ -218,15 +249,16 @@ static QueueCall ResolveQueueCall(const Expr* expr, SimContext& ctx,
   return call;
 }
 
-// §7.12.2's ordering methods over the queue of `call`, which
-// TryExecQueuePropertyStmt performs by the receiver's bare name and so for
-// the queue a bare name resolves to: a declared one or the running method's
-// property.
-static bool ExecQueueOrdering(const QueueCall& call, SimContext& ctx,
-                              Arena& arena) {
+// §7.12.2's ordering methods over the queue `q`, answering whether `prop`
+// names one of them.
+static bool OrderQueue(QueueObject* q, std::string_view prop, SimContext& ctx);
+
+// §7.12.2's ordering methods over the queue of `call`, whatever names it: a
+// declared one, the running method's property, or, §8.5, a property through
+// a handle, `h.q.sort()`, which read by a bare name was left in its order.
+static bool ExecQueueOrdering(const QueueCall& call, SimContext& ctx) {
   return IsQueueOrderingMethod(call.method) &&
-         call.receiver->kind == ExprKind::kIdentifier &&
-         TryExecQueuePropertyStmt(call.receiver->text, call.method, ctx, arena);
+         OrderQueue(call.queue, call.method, ctx);
 }
 
 bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -241,7 +273,7 @@ bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   if (DispatchQueuePush(call.method, call.queue, expr, ctx, arena) ||
       DispatchQueueDelete(call.method, call.queue, expr, ctx, arena) ||
-      ExecQueueOrdering(call, ctx, arena)) {
+      ExecQueueOrdering(call, ctx)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     AnnounceQueueChange(call.receiver, call.owner, ctx);
     return true;
@@ -302,16 +334,7 @@ static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
   ++q->generation;
 }
 
-bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
-                              SimContext& ctx, Arena&) {
-  auto* q = FindQueueOfName(var_name, ctx);
-  if (!q) return false;
-  if (prop == "delete") {
-    q->elements.clear();
-    q->element_ids.clear();
-    ++q->generation;
-    return true;
-  }
+static bool OrderQueue(QueueObject* q, std::string_view prop, SimContext& ctx) {
   if (prop == "sort") {
     SortQueueWithIds(q, true);
     return true;
@@ -331,6 +354,19 @@ bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
     return true;
   }
   return false;
+}
+
+bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
+                              SimContext& ctx, Arena&) {
+  auto* q = FindQueueOfName(var_name, ctx);
+  if (!q) return false;
+  if (prop == "delete") {
+    q->elements.clear();
+    q->element_ids.clear();
+    ++q->generation;
+    return true;
+  }
+  return OrderQueue(q, prop, ctx);
 }
 
 }  // namespace delta

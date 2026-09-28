@@ -24,6 +24,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -190,6 +191,22 @@ static uint32_t BoundPropertyWidth(const ClassTypeInfo::PropertyInfo& prop,
   return width != 0 ? width : prop.width;
 }
 
+// §7.2.2 with §8.7: a property of a structure type with no initializer of its
+// own is the structure's width, each member holding the default its
+// declaration writes, `struct { int a = 7; int b = 11; }` 7 and 11. Filled
+// as any other property, it held 0 in the 32-bit carrier. False for a
+// property of any other type.
+static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
+                                     SimContext& ctx, Arena& arena,
+                                     Logic4Vec& val) {
+  if (prop.type_name.empty()) return false;
+  const StructTypeInfo* layout = ctx.FindStructType(prop.type_name);
+  if (layout == nullptr) return false;
+  val = MakeLogic4VecVal(arena, layout->total_width, 0);
+  ApplyLayoutDefaults(val, *layout, 0, ctx, arena);
+  return true;
+}
+
 // §8.7: the property `prop` of the level `info` of `obj` initialized to its
 // explicit default if one is given, otherwise to its type's uninitialized
 // value — X for a 4-state type, 0 for a 2-state one — rather than being
@@ -243,10 +260,10 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     val = CoerceToPropertyType(
         info, prop.name, EvalExpr(prop.init_expr, ctx, arena, context_width),
         arena);
-  } else if (prop.is_4state) {
-    val = MakeAllX(arena, BoundPropertyWidth(prop, c));
-  } else {
-    val = MakeLogic4VecVal(arena, BoundPropertyWidth(prop, c), 0);
+  } else if (!TryStructPropertyDefault(prop, ctx, arena, val)) {
+    val = prop.is_4state
+              ? MakeAllX(arena, BoundPropertyWidth(prop, c))
+              : MakeLogic4VecVal(arena, BoundPropertyWidth(prop, c), 0);
   }
   StoreClassPropertyDefault(info, prop, val, obj, arena);
 }

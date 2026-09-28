@@ -6,7 +6,10 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -81,15 +84,61 @@ static bool DescribeClassArray(const Expr* arg0, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §20.7 with §7.4.2 and §8.5: describes into `class_array` the unpacked
+// dimensions of the property with more than one that `arg0` names -- bare
+// in a method of the object, where no local shadows it, or through a handle
+// -- answering whether it names one.
+static bool DescribeMultiDimProperty(const Expr* arg0, SimContext& ctx,
+                                     Arena& arena, ArrayInfo& class_array) {
+  const ClassObject* obj = nullptr;
+  std::string_view name;
+  if (arg0->kind == ExprKind::kIdentifier) {
+    if (ctx.FindLocalVariable(arg0->text) != nullptr) return false;
+    obj = ctx.CurrentThis();
+    name = arg0->text;
+  } else if (arg0->kind == ExprKind::kMemberAccess &&
+             !arg0->is_scope_resolution && arg0->rhs != nullptr) {
+    obj = HandleSideObject(arg0->lhs, ctx, arena);
+    name = arg0->rhs->text;
+  }
+  const auto* prop = obj != nullptr ? obj->type->FindProperty(name) : nullptr;
+  if (prop == nullptr || prop->dim_sizes.size() < 2) return false;
+  class_array.dim_los = prop->dim_los;
+  class_array.dim_sizes = prop->dim_sizes;
+  class_array.lo = prop->dim_los[0];
+  class_array.size = prop->dim_sizes[0];
+  class_array.elem_width = prop->width;
+  class_array.is_4state = prop->is_4state;
+  return true;
+}
+
+// §20.7 with §7.2 and §7.4.2: describes into `class_array` the unpacked array
+// member of a structure `arg0` names, `m.v`, `r.v` bare in a method or
+// `h.r.v`, from the structure's layout, answering whether it names one.
+static bool DescribeStructArrayMember(const Expr* arg0, SimContext& ctx,
+                                      ArrayInfo& class_array) {
+  const StructFieldInfo* field = ResolveStructArrayMember(arg0, ctx);
+  if (field == nullptr || field->elem_count == 0) return false;
+  class_array.lo = static_cast<uint32_t>(field->elem_left < field->elem_right
+                                             ? field->elem_left
+                                             : field->elem_right);
+  class_array.size = field->elem_count;
+  class_array.elem_width = field->width / field->elem_count;
+  class_array.is_descending = field->elem_left > field->elem_right;
+  return true;
+}
+
 // Resolve the first argument to an unpacked container (if any) and determine
 // the width/kind of its packed element dimension. §20.7: a string is a nonarray
 // type equivalent to a simple bit vector (one packed dimension); a real type
 // contributes no packed dimension.
 //
 // §20.7 with §8.5: an unpacked array property of a class object, named bare in
-// one of its methods or through a handle, is an array too. Its dimension is
-// described into `class_array`, which the caller keeps for as long as it
-// reads the result.
+// one of its methods or through a handle, is an array too, a queue one
+// included, and so is an unpacked array member of a structure. A fixed or
+// dynamic one's dimension, a multidimensional one's dimensions, or the
+// member's, are described into `class_array`, which the caller keeps for as
+// long as it reads the result.
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
                                      Arena& arena, ArrayInfo& class_array) {
   QueryArgInfo info;
@@ -100,7 +149,15 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
   }
   bool found =
       info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
-  if (!found && DescribeClassArray(arg0, ctx, arena, class_array)) {
+  // §7.10 with §8.5: a queue property, bare in a method or `h.q` through a
+  // handle, is the queue its object holds.
+  if (!found && arg0 != nullptr) {
+    info.queue = FindQueueOfBase(arg0, ctx, arena);
+    found = info.queue != nullptr;
+  }
+  if (!found && (DescribeClassArray(arg0, ctx, arena, class_array) ||
+                 DescribeMultiDimProperty(arg0, ctx, arena, class_array) ||
+                 DescribeStructArrayMember(arg0, ctx, class_array))) {
     info.arr = &class_array;
   }
   info.dynamic_outer =

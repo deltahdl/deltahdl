@@ -18,6 +18,7 @@ struct DataType;
 struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
+struct StructFieldInfo;
 struct StructTypeInfo;
 struct TimeFormatSpec;
 struct Net;
@@ -330,6 +331,30 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
 // against a known struct layout, coercing each member expression to the
 // corresponding member's type/width. Falls back to width-summing concatenation
 // for the replication form and for structs wider than a single word.
+// §10.9.2: the value of the expression `elem` assigned to the structure member
+// `field` lays out: a pattern for a nested structure placed by that
+// structure's layout, one for an unpacked array member (§7.4.2) placed element
+// by element, and any other expression evaluated as it is. Defined in
+// eval_streaming.cpp.
+Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
+                                SimContext& ctx, Arena& arena);
+
+// §10.9.2 with §7.4 and §7.10: the value of the item `item` given to an element
+// of an array or queue whose elements are structures laid out by `layout`: a
+// pattern is packed by the layout, member by member at each member's width,
+// and any other item is evaluated as it is, as is every item where `layout`
+// is null. Defined in eval_streaming.cpp.
+Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
+                            SimContext& ctx, Arena& arena);
+
+// §7.2.2: gives the structure `value` holds, laid out by `layout` from bit
+// `base`, the default value each member's declaration writes -- a member of a
+// nested structure its own -- leaving a member written with none as it is. A
+// variable of the structure takes these where it has no initializer, whether
+// it is a module's, a subroutine's or a block's variable, a package's, or a
+// class property. A union takes none. Defined in eval_streaming.cpp.
+void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
+                         uint32_t base, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
                                  SimContext& ctx, Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);

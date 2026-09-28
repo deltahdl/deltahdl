@@ -18,9 +18,12 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_element_queue.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
@@ -136,13 +139,16 @@ int32_t PropertyQueueBound(const Expr* dim, ClassObject* obj, SimContext& ctx) {
 // §7.10: the queue the declaration `member` of class `declaring` asks for on
 // `obj`, empty. The element takes the width and state-ness the class's
 // property record gives it, which is what a scalar property of the same
-// declaration is written with; the bound is PropertyQueueBound's.
+// declaration is written with; the bound is PropertyQueueBound's. §6.16: a
+// string element has no width, as a declared string queue's has none, so a
+// string is kept whole; the record's width for it is the 32-bit carrier,
+// which cut `push_back("hello")` to "ello".
 QueueObject* MakeQueueProperty(const ClassTypeInfo* declaring,
                                const ClassMember* member, ClassObject* obj,
                                SimContext& ctx) {
   const auto* prop = declaring->FindProperty(member->name);
   auto* q = ctx.GetArena().Create<QueueObject>();
-  q->elem_width = prop != nullptr ? prop->width : 32;
+  q->elem_width = prop == nullptr ? 32 : prop->is_string ? 0 : prop->width;
   q->is_4state = prop != nullptr && prop->is_4state;
   q->max_size =
       PropertyQueueBound(QueuePropertyDim(member, declaring, ctx), obj, ctx);
@@ -376,6 +382,70 @@ bool TryEvalQueueElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
   if (obj == nullptr) return false;
   out = obj->GetProperty(expr->rhs->text, arena);
   return true;
+}
+
+// §7.12 with §7.4 and §7.5: a queue holding a copy of the elements of the
+// fixed or dynamic array property `receiver` names, in index order from 0,
+// for a method that only reads them; null where it names none, or one whose
+// dimension starts elsewhere or descends, whose indexes a copy would not keep.
+static QueueObject* ClassArrayElementsCopy(const Expr* receiver,
+                                           SimContext& ctx, Arena& arena) {
+  ClassArrayRef ref;
+  if (!ResolveClassArray(receiver, ctx, arena, ref) || ref.lo != 0 ||
+      ref.prop->array_descending) {
+    return nullptr;
+  }
+  auto* q = arena.Create<QueueObject>();
+  q->elem_width = ref.prop->width;
+  q->is_4state = ref.prop->is_4state;
+  for (uint32_t i = 0; i < ref.size; ++i)
+    q->elements.push_back(ReadClassArrayElement(ref, i, ctx, arena));
+  q->AssignFreshIds();
+  return q;
+}
+
+QueuePropertyReceiver::QueuePropertyReceiver(const Expr* call, SimContext& ctx,
+                                             Arena& arena)
+    : ctx_(ctx) {
+  const Expr* access =
+      call != nullptr && call->kind == ExprKind::kCall ? call->lhs : call;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->lhs == nullptr) {
+    return;
+  }
+  const Expr* receiver = access->lhs;
+  const bool kBare = receiver->kind == ExprKind::kIdentifier;
+  if (kBare ? ctx.FindQueue(receiver->text) != nullptr
+            : receiver->kind != ExprKind::kMemberAccess) {
+    return;
+  }
+  QueueObject* q = FindQueueOfBase(receiver, ctx, arena);
+  if (q == nullptr) q = ClassArrayElementsCopy(receiver, ctx, arena);
+  if (q == nullptr) return;
+  std::string_view name = kBare ? receiver->text
+                                : std::string_view(*arena.Create<std::string>(
+                                      FlattenHierPath(receiver)));
+  ctx.PushScope();
+  std::vector<Scope> stack = ctx.SwapScopeStack({});
+  stack.back().queues[name] = q;
+  ctx.SwapScopeStack(std::move(stack));
+  auto* bare = arena.Create<Expr>();
+  bare->kind = ExprKind::kIdentifier;
+  bare->text = name;
+  bare->range = receiver->range;
+  auto* renamed = arena.Create<Expr>(*access);
+  renamed->lhs = bare;
+  if (access == call) {
+    call_ = renamed;
+    return;
+  }
+  auto* renamed_call = arena.Create<Expr>(*call);
+  renamed_call->lhs = renamed;
+  call_ = renamed_call;
+}
+
+QueuePropertyReceiver::~QueuePropertyReceiver() {
+  if (call_ != nullptr) ctx_.PopScope();
 }
 
 }  // namespace delta

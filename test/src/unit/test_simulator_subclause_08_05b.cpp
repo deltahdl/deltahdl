@@ -138,4 +138,100 @@ TEST(ObjectPropertySim, PackageScopedEnumReturnedByAMethod) {
             233u);
 }
 
+// §8.5 with §7.2 and §7.4.2: an unpacked array member of a structure a
+// property holds is an array of elements, each written and read on its own --
+// bare in a method, through `this` and through a handle -- so data[2], data[0]
+// and data[1] keep 9, 4 and 7. Taken as a bit-select of the member's value,
+// every element read 0.
+TEST(ObjectPropertySim, ElementsOfAStructPropertysArrayMember) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { int a; byte data[3]; } pkt_t;\n"
+      "  class C;\n"
+      "    pkt_t s;\n"
+      "    function void fill(); s.data[2] = 9; s.data[0] = 4; endfunction\n"
+      "    function int get(); return s.data[2]; endfunction\n"
+      "    function int get_this(); return this.s.data[0]; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int d2, d0, d1, g, gt;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    h.s.data[1] = 7;\n"
+      "    d2 = h.s.data[2];\n"
+      "    d0 = h.s.data[0];\n"
+      "    d1 = h.s.data[1];\n"
+      "    g = h.get();\n"
+      "    gt = h.get_this();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "d2"), 9u);
+  EXPECT_EQ(RunAndGet(src, "d0"), 4u);
+  EXPECT_EQ(RunAndGet(src, "d1"), 7u);
+  EXPECT_EQ(RunAndGet(src, "g"), 9u);
+  EXPECT_EQ(RunAndGet(src, "gt"), 4u);
+}
+
+// §8.5 with §7.5 and §7.2: a dynamic array property of structures is sized
+// and its elements' members written in a method, and read through the handle
+// -- `d = new[2]; d[1].a = 11;` -- even where the module declaring the class
+// has a variable `d` of its own, which §8.11 and §23.9 put behind the
+// property inside a method. The module's `d` took the new[] and the member.
+TEST(ObjectPropertySim, DynamicArrayPropertyOfStructsInAMethod) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  class C;\n"
+      "    s_t d[];\n"
+      "    function void fill(); d = new[2]; d[1].a = 11; endfunction\n"
+      "  endclass\n"
+      "  s_t d[];\n"
+      "  C h;\n"
+      "  int n, a1, md;\n"
+      "  initial begin\n"
+      "    d = new[3];\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    n = h.d.size();\n"
+      "    a1 = h.d[1].a;\n"
+      "    md = d.size();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "n"), 2u);
+  EXPECT_EQ(RunAndGet(src, "a1"), 11u);
+  EXPECT_EQ(RunAndGet(src, "md"), 3u);
+}
+
+// §8.5 with §7.8 and §7.2: an associative array property of structures has
+// an element's members written in a method and through the handle, which
+// creates the entry its key names, and read back through the handle: `a` holds
+// 3 and 4, `b` 9, and the array two entries. Each member write went nowhere.
+TEST(ObjectPropertySim, AssociativeArrayPropertyOfStructMemberWrites) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { int x; int y; } pt_t;\n"
+      "  class C;\n"
+      "    pt_t m[string];\n"
+      "    function void fill(); m[\"a\"].x = 3; m[\"a\"].y = 4; "
+      "endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int ax, ay, bx, n;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fill();\n"
+      "    h.m[\"b\"].x = 9;\n"
+      "    ax = h.m[\"a\"].x;\n"
+      "    ay = h.m[\"a\"].y;\n"
+      "    bx = h.m[\"b\"].x;\n"
+      "    n = h.m.num();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ax"), 3u);
+  EXPECT_EQ(RunAndGet(src, "ay"), 4u);
+  EXPECT_EQ(RunAndGet(src, "bx"), 9u);
+  EXPECT_EQ(RunAndGet(src, "n"), 2u);
+}
+
 }  // namespace

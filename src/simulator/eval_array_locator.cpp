@@ -12,6 +12,7 @@
 #include "parser/ast_type.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -635,8 +636,8 @@ static void DispatchIndexedLocator(std::string_view method,
   LocatorFindDispatch(method, lc, out);
 }
 
-bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
-                             std::vector<Logic4Vec>& out) {
+static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
   // A property reached through a handle has no bare name to extract, so the
   // associative receiver is asked for first, by expression.
@@ -676,8 +677,24 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return false;
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  IteratorLayout layout(lc.iter_name, parts.var_name, ctx);
   DispatchIndexedLocator(parts.method_name, lc, out);
   return true;
+}
+
+// §7.12.1 with §8.5: a locator on a queue property, `h.q.find with (...)` or
+// a bare `q` in a method, is run on the queue QueuePropertyReceiver names.
+bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
+                             std::vector<Logic4Vec>& out) {
+  if (CollectLocatorResult(expr, ctx, arena, out)) return true;
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || !IsLocatorMethod(access->rhs->text)) {
+    return false;
+  }
+  QueuePropertyReceiver receiver(expr, ctx, arena);
+  return receiver.Call() != nullptr &&
+         CollectLocatorResult(receiver.Call(), ctx, arena, out);
 }
 
 // Maps a string-keyed associative source: preserves the string key set and

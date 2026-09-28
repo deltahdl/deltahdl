@@ -445,4 +445,127 @@ TEST(ArrayQuerySim, ClassArrayPropertyIsQueried) {
   EXPECT_EQ(out, "3 1 3 8\n5 4\n5 2 1\n");
 }
 
+// §20.7 with §7.10 and §8.5: a queue property is an array whose size is its
+// element count -- two after two pushes -- and not the 32 bits of its int
+// element, whether named bare in a method or through a handle.
+TEST(ArrayQuerySim, QueuePropertySizeIsItsElementCount) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int q[$];\n"
+      "    function void fill; q.push_back(1); q.push_back(2); endfunction\n"
+      "    function void show; $display(\"%0d %0d\", $size(q), $high(q));\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new; h.fill(); h.show();\n"
+      "    h.q.push_back(3);\n"
+      "    $display(\"%0d %0d\", $size(h.q), $unpacked_dimensions(h.q));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 1\n3 1\n");
+}
+
+// §20.7 with §7.4.2 and §8.5: a property declared with two unpacked
+// dimensions, `bit [1:0] m[3][5]`, has both, 3 elements in the first and 5 in
+// the second, ahead of its 2-bit packed one.
+TEST(ArrayQuerySim, TwoDimensionalPropertyHasBothUnpackedDimensions) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    bit [1:0] m[3][5];\n"
+      "    function void show;\n"
+      "      $display(\"%0d %0d\", $unpacked_dimensions(m), $size(m, 2));\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new; h.show();\n"
+      "    $display(\"%0d %0d %0d %0d\", $unpacked_dimensions(h.m),\n"
+      "             $size(h.m, 1), $size(h.m, 2), $size(h.m, 3));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 5\n2 3 5 2\n");
+}
+
+// §20.7 with §7.4.2 and §8.25: an unpacked dimension sized by a value
+// parameter, `int g[N]`, holds as many elements as the specialization binds
+// N -- 3 by default, 6 in `Box #(string, 6)` -- and each is an element of
+// its own.
+TEST(ArrayQuerySim, ParameterSizedPropertyFollowsTheSpecialization) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Box #(type T = int, int N = 3);\n"
+      "    T f[N];\n"
+      "    int g[N];\n"
+      "    function int size_f; return $size(f); endfunction\n"
+      "  endclass\n"
+      "  Box #(string, 6) bs;\n"
+      "  Box b0;\n"
+      "  initial begin\n"
+      "    bs = new; b0 = new;\n"
+      "    b0.g[2] = 11; b0.g[1] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", bs.size_f(), $size(bs.g),\n"
+      "             $size(b0.g), b0.g[2], b0.g[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 6 3 11 4\n");
+}
+
+// §20.7 with §7.4.2 and §8.5: an unpacked dimension naming a parameter of
+// the module the class is declared in, `int fk[K]` or `int fp[P * 2]`, holds
+// as many elements as the parameter gives it, each an element of its own.
+TEST(ArrayQuerySim, ModuleParameterSizedPropertyIsAnArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t #(parameter int P = 3);\n"
+      "  localparam int K = 4;\n"
+      "  class C;\n"
+      "    int fk[K];\n"
+      "    int fp[P * 2];\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.fk[3] = 9; h.fk[2] = 5;\n"
+      "    $display(\"%0d %0d %0d %0d\", $size(h.fk), h.fk[3], h.fk[2],\n"
+      "             $size(h.fp));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 9 5 6\n");
+}
+
+// §20.7 with §7.2 and §7.4.2: an unpacked array member of a structure is an
+// array the query functions read by its own dimension -- `m0 [7:0]` of eight
+// elements from left 7, `v [2:5]` to right 5 with its int's 32-bit second
+// dimension -- in a variable, bare in a method and through a handle.
+TEST(ArrayQuerySim, StructArrayMemberIsQueried) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { logic [3:0] m0 [7:0]; int v [2:5]; } s_t;\n"
+      "  class C;\n"
+      "    s_t r;\n"
+      "    function int q(); return $size(r.v); endfunction\n"
+      "  endclass\n"
+      "  s_t p;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", $size(p.m0), $left(p.m0),\n"
+      "             $right(p.v), $size(p.v, 2), h.q(), $size(h.r.m0));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 7 5 32 4 8\n");
+}
+
 }  // namespace

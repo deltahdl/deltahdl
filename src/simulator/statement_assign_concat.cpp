@@ -11,6 +11,7 @@
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -51,9 +52,32 @@ uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena) {
   return ConcatLhsElemWidth(lhs, ctx, arena);
 }
 
+// §10.9.2 with §7.4 and §7.10: the layout an element of an unpacked array or
+// queue of structures has, where `lhs` selects one, `c[2]`; null for any
+// other target, a bit-select of a packed structure among them.
+static const StructTypeInfo* SelectedElementLayout(const Expr* lhs,
+                                                   SimContext& ctx) {
+  if (lhs->kind != ExprKind::kSelect || lhs->index_end != nullptr ||
+      lhs->base == nullptr || lhs->base->kind != ExprKind::kIdentifier)
+    return nullptr;
+  std::string_view base = lhs->base->text;
+  if (ctx.FindArrayInfo(base) == nullptr && ctx.FindQueue(base) == nullptr)
+    return nullptr;
+  return StructLayoutOfName(base, ctx);
+}
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
+  if (stmt->rhs != nullptr) {
+    // `c[2] = '{9, 8, 7}` packs the pattern by the element's layout, member
+    // by member at each member's width; concatenated at the items' own
+    // widths it left red and green 0.
+    const StructTypeInfo* element = SelectedElementLayout(stmt->lhs, ctx);
+    const Expr* pattern = UnwrapTypedPattern(stmt->rhs);
+    if (element != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
+      return EvalStructPatternValue(pattern, element, ctx, arena);
+  }
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }

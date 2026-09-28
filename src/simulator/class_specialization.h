@@ -13,10 +13,12 @@
 // ClassTypeInfo of its own, so that the map, and the class parameters stored
 // beside it, belong to the one set of actuals rather than to the declaration.
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 
 namespace delta {
 
@@ -25,6 +27,27 @@ class SimContext;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
+
+// §7.4.2: the one fixed unpacked dimension a class property declares -- its
+// element count, lowest index, and whether it runs from a higher left bound
+// down to a lower right one.
+struct PropertyArrayDim {
+  uint32_t size = 0;
+  int64_t lo = 0;
+  bool descending = false;
+};
+
+// §7.4.2 with §8.25: the dimension `dim` declares, `[N]` addressing 0 to N-1
+// and a range `[a:b]` addressing the smaller of a and b to the larger, each
+// bound folded against `scope`, the constants a class's parameters give it,
+// so that `int g[N]` holds as many elements as the specialization binds N. A
+// size or a range bound `scope` does not fold, one naming a parameter of the
+// module the class is declared in, is evaluated as the running scope reads
+// it. Zero elements for a dimension of any other form -- a dynamic array's
+// absent bound, a queue's `$`, an associative array's index type, or a size
+// that folds to no positive constant.
+PropertyArrayDim FoldPropertyDimension(const Expr* dim, const ScopeMap& scope,
+                                       SimContext& ctx, Arena& arena);
 
 // The class type for `generic` specialized by `actuals`, registered under a
 // key that spells the actuals -- `vector#(4)` -- and created on the first

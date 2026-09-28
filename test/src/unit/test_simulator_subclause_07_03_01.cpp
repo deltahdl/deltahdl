@@ -258,4 +258,32 @@ TEST(PackedUnionSimulation, PackedUnionSignedQualifier_SignExtendsOnAssign) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
+// §7.3.1 with §7.4.1: a member of several packed dimensions selects an element
+// of its outermost dimension by one index, so `u.b[0]` and `u.b[1]` of a
+// packed union's `bit [1:0][7:0] b` read the bytes 8'h34 and 8'h12 that
+// `u.w = 16'h1234` wrote, and a packed struct's `bit [3:0][3:0] n` reads its
+// nibbles. Taken as the flat member, the index selected one bit.
+TEST(PackedUnionSim, IndexOnAPackedArrayMemberSelectsAnElement) {
+  const char* src =
+      "module t;\n"
+      "  typedef union packed { bit [15:0] w; bit [1:0][7:0] b; } u_t;\n"
+      "  typedef struct packed { bit [3:0][3:0] n; bit [7:0] t; } s_t;\n"
+      "  u_t u;\n"
+      "  s_t s;\n"
+      "  int b0, b1, n3, n0;\n"
+      "  initial begin\n"
+      "    u.w = 16'h1234;\n"
+      "    s = 24'hABCD12;\n"
+      "    b0 = u.b[0];\n"
+      "    b1 = u.b[1];\n"
+      "    n3 = s.n[3];\n"
+      "    n0 = s.n[0];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "b0"), 0x34u);
+  EXPECT_EQ(RunAndGet(src, "b1"), 0x12u);
+  EXPECT_EQ(RunAndGet(src, "n3"), 0xAu);
+  EXPECT_EQ(RunAndGet(src, "n0"), 0xDu);
+}
+
 }  // namespace

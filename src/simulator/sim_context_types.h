@@ -16,8 +16,6 @@
 #include "simulator/variable.h"
 
 namespace delta {
-
-struct Expr;
 struct ModuleItem;
 struct Process;
 
@@ -94,6 +92,17 @@ struct StructFieldInfo {
   uint32_t elem_count = 0;
   int64_t elem_left = 0;
   int64_t elem_right = 0;
+  // §7.2.2: the member's default value as its declaration writes it, which a
+  // variable of the structure takes where it has no initializer of its own;
+  // null for a member written with none.
+  const Expr* default_expr = nullptr;
+  // §7.4.1: for a member of more than one packed dimension, `bit [1:0][7:0]`,
+  // the bounds of its outermost dimension and the width of one of that
+  // dimension's elements, which a single index selects; 0 elements wide for a
+  // member of one packed dimension or none, which an index selects a bit of.
+  int64_t packed_left = 0;
+  int64_t packed_right = 0;
+  uint32_t packed_elem_width = 0;
 };
 
 struct StructTypeInfo {

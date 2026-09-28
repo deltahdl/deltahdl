@@ -87,8 +87,11 @@ static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
   return val;
 }
 
+// `layout` is the element's structure layout for an array of structures,
+// whose pattern items are packed by it (§10.9.2), and null for any other.
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
-                             Variable* elem, SimContext& ctx, Arena& arena) {
+                             Variable* elem, const StructTypeInfo* layout,
+                             SimContext& ctx, Arena& arena) {
   if (!var.init_expr) {
     elem->value = Table67ElementDefault(var, arena);
     return;
@@ -103,7 +106,7 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   auto& elements = var.init_expr->elements;
   if (elem_idx < elements.size()) {
     elem->value = CoerceArrayInitItem(
-        var, EvalExpr(elements[elem_idx], ctx, arena), arena);
+        var, EvalItemForLayout(elements[elem_idx], layout, ctx, arena), arena);
     return;
   }
   // Past the end of the pattern's items no value was supplied for this element
@@ -112,8 +115,8 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
 }
 
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
-                                   Variable* elem, SimContext& ctx,
-                                   Arena& arena) {
+                                   Variable* elem, const StructTypeInfo* layout,
+                                   SimContext& ctx, Arena& arena) {
   auto* rep = var.init_expr->elements[0];
   auto inner_count = static_cast<uint32_t>(rep->elements.size());
   if (inner_count == 0) {
@@ -121,7 +124,10 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
     return;
   }
   elem->value = CoerceArrayInitItem(
-      var, EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena), arena);
+      var,
+      EvalItemForLayout(rep->elements[elem_idx % inner_count], layout, ctx,
+                        arena),
+      arena);
 }
 
 // §10.9.1: "An index:value specifies an explicit value for a keyed element
@@ -403,7 +409,8 @@ static std::string ArrayElementKey(std::string_view name,
 // where it names none; a keyed item is found by the element's address and a
 // positional one counted from the declaration's left bound (§11.5.2).
 static void FillArrayElement(const RtlirVariable& var, uint32_t i,
-                             Variable* elem, SimContext& ctx, Arena& arena) {
+                             Variable* elem, const StructTypeInfo* layout,
+                             SimContext& ctx, Arena& arena) {
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
                    var.init_expr->elements[0]->kind == ExprKind::kReplicate;
@@ -412,9 +419,9 @@ static void FillArrayElement(const RtlirVariable& var, uint32_t i,
   if (named) {
     InitArrayFromNamed(var, idx, elem, ctx, arena);
   } else if (replicate) {
-    InitArrayFromReplicate(var, pat_idx, elem, ctx, arena);
+    InitArrayFromReplicate(var, pat_idx, elem, layout, ctx, arena);
   } else {
-    InitArrayElement(var, pat_idx, elem, ctx, arena);
+    InitArrayElement(var, pat_idx, elem, layout, ctx, arena);
   }
 }
 
@@ -449,7 +456,7 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     // rather than by whatever value flowed in.
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
-    FillArrayElement(var, i, elem, ctx, arena);
+    FillArrayElement(var, i, elem, ctx.GetVariableStructType(name), ctx, arena);
   }
 }
 
@@ -463,7 +470,9 @@ void InitArrayElements(std::string_view name, const RtlirVariable& var,
   }
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     Variable* elem = ExistingElement(ctx, ArrayElementKey(name, var, i));
-    if (elem != nullptr) FillArrayElement(var, i, elem, ctx, arena);
+    if (elem != nullptr)
+      FillArrayElement(var, i, elem, ctx.GetVariableStructType(name), ctx,
+                       arena);
   }
 }
 
@@ -597,16 +606,7 @@ static void ApplyStructMemberDefaults(std::string_view name,
   if (var.dtype->kind == DataTypeKind::kUnion) return;
   auto* sinfo = ctx.GetVariableStructType(name);
   if (!sinfo) return;
-  for (const auto& f : sinfo->fields) {
-    for (const auto& m : var.dtype->struct_members) {
-      if (m.name != f.name || !m.init_expr) continue;
-      // Multi-word safe: a field at bit offset >= 64 cannot be reached through
-      // ToUint64() (which keeps only the low 64 bits).
-      Logic4Vec val = EvalExpr(m.init_expr, ctx, arena);
-      DepositBitField(v->value, f.bit_offset, val, f.width);
-      break;
-    }
-  }
+  ApplyLayoutDefaults(v->value, *sinfo, 0, ctx, arena);
 }
 
 // §21.7.5 (Table 21-11): the effective type keyword under which a variable is

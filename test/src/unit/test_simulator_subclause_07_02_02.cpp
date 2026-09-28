@@ -134,4 +134,41 @@ TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   LowerRunAndCheck(f, design, {{"ra", 10}, {"rb", 20}, {"rc", 30}});
 }
 
+// §7.2.2: a variable of a structure type with no initializer takes each
+// member's default, wherever the variable is declared -- a class property, a
+// method's local, a block's local and a package's variable, read through
+// `pkg::` and a wildcard import -- so every one reads a = 7 and b = 11, as a
+// module variable already did. Each read 0 0.
+TEST(StructDefaultSim, MemberDefaultsReachEveryKindOfVariable) {
+  const char* src =
+      "package p;\n"
+      "  typedef struct { int a = 7; int b = 11; } d_t;\n"
+      "  d_t pv;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  class C;\n"
+      "    d_t s;\n"
+      "    function int loc(); d_t l; return l.a * 100 + l.b; endfunction\n"
+      "    function int prop(); return s.a * 100 + s.b; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int lo, pr, bl, pk, im;\n"
+      "  initial begin\n"
+      "    d_t b;\n"
+      "    h = new;\n"
+      "    lo = h.loc();\n"
+      "    pr = h.prop();\n"
+      "    bl = b.a * 100 + b.b;\n"
+      "    pk = p::pv.a * 100 + p::pv.b;\n"
+      "    im = pv.a * 100 + pv.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "lo"), 711u);
+  EXPECT_EQ(RunAndGet(src, "pr"), 711u);
+  EXPECT_EQ(RunAndGet(src, "bl"), 711u);
+  EXPECT_EQ(RunAndGet(src, "pk"), 711u);
+  EXPECT_EQ(RunAndGet(src, "im"), 711u);
+}
+
 }  // namespace

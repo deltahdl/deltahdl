@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "builders_ast.h"
@@ -221,6 +222,58 @@ TEST(ArrayMethodWithClause, OrderingIteratorWithoutWithNames7_12) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "iterator argument without 'with' clause", 0,
                             "7.12"));
+}
+
+// §7.12 with §8.5: the manipulation methods act on a queue property as on
+// any queue -- a locator named bare in a method, a reduction and a locator
+// through a handle, and an ordering method that reorders the object's queue.
+TEST(ArrayMethodsSim, ManipulationMethodsOnAQueueProperty) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int q[$];\n"
+      "    function void fill(); q = {7, 2, 9}; endfunction\n"
+      "    function int big(); int b[$]; b = q.find with (item > 5);\n"
+      "      return b.size() * 100 + q.sum(); endfunction\n"
+      "  endclass\n"
+      "  C h; int b[$];\n"
+      "  initial begin\n"
+      "    h = new; h.fill();\n"
+      "    b = h.q.find with (item > 5);\n"
+      "    $display(\"%0d %0d %0d %0d\", h.big(), h.q.sum(), b.size(), b[1]);\n"
+      "    h.q.sort();\n"
+      "    $display(\"%0d %0d %0d\", h.q[0], h.q[1], h.q[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "218 18 2 9\n2 7 9\n");
+}
+
+// §7.12 with §7.5 and §8.5: the reductions and locators read a dynamic or
+// fixed array property through a handle as they read any array -- the
+// largest element, the index of the first match, and the sum.
+TEST(ArrayMethodsSim, ReadingMethodsOnArrayPropertiesThroughAHandle) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int d[];\n"
+      "    int f[4];\n"
+      "    function void fill(); d = new[3]; d[0] = 7; d[1] = 2; d[2] = 9;\n"
+      "      f[0] = 5; f[1] = 1; f[2] = 8; f[3] = 3;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h; int mx[$], ix[$], mn[$];\n"
+      "  initial begin\n"
+      "    h = new; h.fill();\n"
+      "    mx = h.d.max; ix = h.f.find_first_index with (item > 6);\n"
+      "    mn = h.f.min;\n"
+      "    $display(\"%0d %0d %0d %0d\", mx[0], ix[0], mn[0], h.f.sum());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 2 1 17\n");
 }
 
 }  // namespace

@@ -279,6 +279,8 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // §7.5.1: `new[]` assigned to a dynamic array property of the enclosing
   // class, or of an object a handle names, resizes it.
   if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
+  // §7.6: one array property assigned to another copies its elements.
+  if (TryClassArrayWholeAssign(stmt, ctx, arena)) return true;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue
   // assignment path -- it rebuilds the element list, allocates fresh element
   // ids, and bumps the generation so prior references are outdated -- rather

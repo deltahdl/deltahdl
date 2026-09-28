@@ -544,4 +544,30 @@ TEST(ArrayOrdering, ShuffleLeavesDynArrayRefValid) {
   EXPECT_EQ(kept, 0u);
 }
 
+// §7.12 with §7.2: the iterator of a with clause over an array of structures
+// holds a structure, so `item.red` is its member -- sort orders a fixed array
+// and a queue by it, find keeps the elements whose member matches, and sum
+// adds the members.
+TEST(ArrayOrderingSim, WithClauseReadsAMemberOfAStructElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { byte red, green, blue; } c_t;\n"
+      "  c_t c[3] = '{'{3, 0, 0}, '{1, 0, 0}, '{2, 0, 0}};\n"
+      "  c_t q[$], r[$];\n"
+      "  int s;\n"
+      "  initial begin\n"
+      "    q.push_back('{7, 1, 1}); q.push_back('{5, 2, 2});\n"
+      "    r = c.find with (item.red > 1);\n"
+      "    s = c.sum with (int'(item.red));\n"
+      "    c.sort with (item.red);\n"
+      "    q.sort with (item.red);\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", c[0].red, c[1].red,\n"
+      "             c[2].red, q[0].red, q[1].green, r.size(), s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3 5 1 2 6\n");
+}
+
 }  // namespace

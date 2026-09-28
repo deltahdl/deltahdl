@@ -261,4 +261,33 @@ TEST(UnpackedArraySimulation, NetArrayElementsDrivenThroughOutputPorts) {
             "z0z1 010 5 z\n");
 }
 
+// §7.4.2 with §7.2 and §10.9.2: each element of an unpacked array of
+// structures is a structure, so a nested pattern initializer packs each item
+// by the element's layout -- reds 3, 1 and 2 -- and a member write to an
+// element, `c[1].green = 7`, and a whole-element pattern assignment,
+// `c[2] = '{9, 8, 7}`, are stored and read back through `c[i].member`.
+// Packed at the items' own widths and written to no layout, every member read
+// 0.
+TEST(UnpackedArraySim, StructElementsInitializedWrittenAndRead) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { byte red, green, blue; } c_t;\n"
+      "  c_t c[3] = '{'{3, 0, 0}, '{1, 0, 0}, '{2, 0, 0}};\n"
+      "  int reds, g1, b2, sum;\n"
+      "  initial begin\n"
+      "    reds = c[0].red * 100 + c[1].red * 10 + c[2].red;\n"
+      "    c[1].green = 7;\n"
+      "    c[2] = '{9, 8, 7};\n"
+      "    g1 = c[1].green;\n"
+      "    b2 = c[2].blue;\n"
+      "    sum = 0;\n"
+      "    foreach (c[i]) sum += c[i].red;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "reds"), 312u);
+  EXPECT_EQ(RunAndGet(src, "g1"), 7u);
+  EXPECT_EQ(RunAndGet(src, "b2"), 7u);
+  EXPECT_EQ(RunAndGet(src, "sum"), 13u);
+}
+
 }  // namespace

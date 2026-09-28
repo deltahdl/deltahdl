@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -26,6 +28,23 @@ static std::string_view NestedLayoutName(const StructMember& m, Arena& arena) {
   if (m.scope_name.empty()) return m.type_name;
   return *arena.Create<std::string>(std::string(m.scope_name) +
                                     "::" + std::string(m.type_name));
+}
+
+// §7.4.1: the outermost packed dimension of a member of several, and the width
+// of one element of it, the member's width over the dimension's size.
+static void RecordOuterPackedDim(const StructMember& m, StructFieldInfo& fi) {
+  if (m.extra_packed_dims.empty() || m.packed_dim_left == nullptr ||
+      m.packed_dim_right == nullptr)
+    return;
+  auto left = ConstEvalInt(m.packed_dim_left);
+  auto right = ConstEvalInt(m.packed_dim_right);
+  if (!left || !right) return;
+  auto size = static_cast<uint32_t>(std::abs(*left - *right) + 1);
+  uint32_t width = EvalStructMemberWidth(m);
+  if (size == 0 || width % size != 0) return;
+  fi.packed_left = *left;
+  fi.packed_right = *right;
+  fi.packed_elem_width = width / size;
 }
 
 // Builds the layout of a struct/union DataType: each field's bit offset (within
@@ -59,6 +78,8 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
       fi.elem_count = UnpackedMemberCount(m);
+    fi.default_expr = m.init_expr;
+    RecordOuterPackedDim(m, fi);
     if (m.nested_type && !m.nested_type->struct_members.empty()) {
       fi.nested = BuildStructTypeInfo(m.nested_type, EvalStructMemberWidth(m),
                                       NestedLayoutName(m, arena), arena);

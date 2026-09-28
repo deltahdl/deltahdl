@@ -903,6 +903,14 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
   BindBlockLocalLayout(stmt, width, ctx, arena);
+  // §7.2.2: a block's structure variable with no initializer takes the
+  // default each member's declaration writes.
+  if (stmt->var_init == nullptr) {
+    Variable* local = ctx.FindVariable(stmt->var_name);
+    const StructTypeInfo* layout = ctx.GetVariableStructType(stmt->var_name);
+    if (local != nullptr && layout != nullptr)
+      ApplyLayoutDefaults(local->value, *layout, 0, ctx, arena);
+  }
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   if (is_class) ctx.SetVariableClassType(stmt->var_name, class_key);
   auto* var = ctx.FindVariable(stmt->var_name);

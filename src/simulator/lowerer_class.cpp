@@ -10,7 +10,6 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -317,12 +316,25 @@ static ScopeMap ClassParamScope(const ClassDecl* cls,
   return scope;
 }
 
+// §7.2 with §8.5: the width of a property declared with a structure's typedef
+// name, the structure's layout's; 0 for any other type. Sized against no
+// typedef table, the name had no width and the property took the 32-bit
+// carrier, which cut an element of an array of such structures to 32 bits.
+static uint32_t StructPropertyWidth(const DataType& type, SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
+      type.packed_dim_left != nullptr)
+    return 0;
+  const StructTypeInfo* layout = ctx.FindStructType(type.type_name);
+  return layout != nullptr ? layout->total_width : 0;
+}
+
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
-                                const ScopeMap& constants) {
+                                const ScopeMap& constants, SimContext& ctx) {
   ScopeMap params = ClassParamScope(cls, constants);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {}, params);
+      if (w == 0) w = StructPropertyWidth(member->data_type, ctx);
       bool sized = w != 0;
       if (w == 0) w = 32;
       info->properties.push_back(
@@ -340,39 +352,6 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   }
 }
 
-// §7.4.2: the one fixed unpacked dimension a class property declares -- its
-// element count, lowest index, and whether it runs from a higher left bound
-// down to a lower right one.
-struct PropertyArrayDim {
-  uint32_t size = 0;
-  int64_t lo = 0;
-  bool descending = false;
-};
-
-// §7.4.2: the dimension `dim` declares, a literal `[N]` addressing 0 to N-1
-// and a range `[a:b]` addressing the smaller of a and b to the larger. Zero
-// elements for a dimension of any other form -- a dynamic array's absent
-// bound, a queue's `$`, an associative array's index type, or an expression
-// the simulator does not fold here -- which the object then models as it did,
-// one value under the property's name.
-static PropertyArrayDim FixedDimension(const Expr* dim, SimContext& ctx,
-                                       Arena& arena) {
-  if (dim == nullptr) return {};
-  if (dim->kind == ExprKind::kIntegerLiteral) {
-    return {static_cast<uint32_t>(dim->int_val), 0, false};
-  }
-  if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon ||
-      dim->lhs == nullptr || dim->rhs == nullptr) {
-    return {};
-  }
-  auto left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
-  auto right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
-  if (left < right) {
-    return {static_cast<uint32_t>(right - left + 1), left, false};
-  }
-  return {static_cast<uint32_t>(left - right + 1), right, left > right};
-}
-
 // Gives the property named `name` the unpacked dimension RecordArrayProperties
 // read for it.
 static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
@@ -386,24 +365,64 @@ static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
   }
 }
 
+// §7.4.2 with §20.7: gives `prop` the extents of the unpacked dimensions
+// `dims` declares where it declares more than one and each folds to a fixed
+// one, which is what the array query functions read.
+static void FoldMultiDimExtents(const std::vector<Expr*>& dims,
+                                const ScopeMap& scope, SimContext& ctx,
+                                Arena& arena,
+                                ClassTypeInfo::PropertyInfo* prop) {
+  if (prop == nullptr) return;
+  std::vector<uint32_t> los;
+  std::vector<uint32_t> sizes;
+  for (const Expr* dim : dims) {
+    PropertyArrayDim folded = FoldPropertyDimension(dim, scope, ctx, arena);
+    if (folded.size == 0) return;
+    los.push_back(static_cast<uint32_t>(folded.lo));
+    sizes.push_back(folded.size);
+  }
+  prop->dim_los = std::move(los);
+  prop->dim_sizes = std::move(sizes);
+}
+
+// The property `info` itself declares under `name`, null where it declares
+// none.
+static ClassTypeInfo::PropertyInfo* OwnProperty(ClassTypeInfo* info,
+                                                std::string_view name) {
+  for (auto& prop : info->properties) {
+    if (prop.name == name) return &prop;
+  }
+  return nullptr;
+}
+
 // §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
 // dynamic unpacked dimension as the array it is, so the object holds its
 // elements one by one and a constraint can iterate over them or reduce them.
 // §7.4.4 (printed page 155): the dimension may be the typedef's the property
 // is declared through (PropertyTypedefItem), `arr_t a;` under `typedef int
 // arr_t[3];`, which left read off the declaration made `a` one element wide.
-// A property with more than one unpacked dimension is left as it was.
+// §8.25: a dimension naming one of the class's parameters, `int g[N]`, folds
+// against the constants `constants` and the parameters' defaults give it.
+// A property with more than one unpacked dimension keeps one value, and has
+// only its extents recorded.
 static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
-                                  SimContext& ctx, Arena& arena) {
+                                  const ScopeMap& constants, SimContext& ctx,
+                                  Arena& arena) {
+  ScopeMap scope = ClassParamScope(cls, constants);
   for (const auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kProperty) continue;
     const ModuleItem* item = PropertyTypedefItem(member, info, ctx);
     const std::vector<Expr*>& dims =
         item != nullptr ? item->unpacked_dims : member->unpacked_dims;
+    if (dims.size() > 1) {
+      FoldMultiDimExtents(dims, scope, ctx, arena,
+                          OwnProperty(info, member->name));
+    }
     if (dims.size() != 1) continue;
     const bool kDynamic = dims[0] == nullptr;
     PropertyArrayDim dim =
-        kDynamic ? PropertyArrayDim{} : FixedDimension(dims[0], ctx, arena);
+        kDynamic ? PropertyArrayDim{}
+                 : FoldPropertyDimension(dims[0], scope, ctx, arena);
     if (dim.size == 0 && !kDynamic) continue;
     MarkArrayProperty(info, member->name, dim, kDynamic);
   }
@@ -541,9 +560,9 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
     auto* iface = ctx.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
-  CollectClassMembers(info, cls, scope.constants);
+  CollectClassMembers(info, cls, scope.constants, ctx);
   AttachScopeMethodBodies(info, cls, scope.items);
-  RecordArrayProperties(info, cls, ctx, arena);
+  RecordArrayProperties(info, cls, scope.constants, ctx, arena);
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);

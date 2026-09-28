@@ -143,6 +143,9 @@ class DeclaredNameTables {
   void SetVariableStructType(std::string_view var_name,
                              std::string_view type_name);
   const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
+  // The name of the structure type SetVariableStructType gave `var_name`;
+  // empty where it gave none.
+  std::string_view VariableStructTypeName(std::string_view var_name) const;
 
   void RegisterTypeWidth(std::string_view name, uint32_t width);
   uint32_t FindTypeWidth(std::string_view name) const;

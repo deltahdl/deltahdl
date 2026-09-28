@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_expr_internal.h"
@@ -41,8 +42,8 @@ size_t MemberPathSplit(const std::string& path, SimContext& ctx) {
   return first;
 }
 
-const StructTypeInfo* StructLayoutOfName(std::string_view name,
-                                         SimContext& ctx) {
+static const StructTypeInfo* StructLayoutOfWholeName(std::string_view name,
+                                                     SimContext& ctx) {
   if (ctx.FindLocalVariable(name) != nullptr) {
     return ctx.GetVariableStructType(name);
   }
@@ -51,6 +52,19 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
     return info;
   }
   return ctx.GetVariableStructType(name);
+}
+
+const StructTypeInfo* StructLayoutOfName(std::string_view name,
+                                         SimContext& ctx) {
+  if (const StructTypeInfo* info = StructLayoutOfWholeName(name, ctx))
+    return info;
+  // §7.4.2 with §7.2: an element of an unpacked array of structures, the
+  // variable `c[1]` of `c_t c[3]`, has the array's element layout, which the
+  // array registers under its own name.
+  if (name.empty() || name.back() != ']') return nullptr;
+  auto open = name.find('[');
+  if (open == std::string_view::npos || open == 0) return nullptr;
+  return StructLayoutOfWholeName(name.substr(0, open), ctx);
 }
 
 // §11.9 (printed page 304) with §3.12.1 (printed 56) and §26.3 (printed
@@ -197,21 +211,139 @@ static bool MemberChainPath(const Expr* access, std::string_view& root,
   return true;
 }
 
+// §8.5: the structure layout of the property `name` the class of `obj`
+// declares or inherits, null where its type names no structure.
+static const StructTypeInfo* PropertyStructLayout(const ClassObject* obj,
+                                                  std::string_view name,
+                                                  SimContext& ctx) {
+  for (const ClassTypeInfo* t = obj->type; t != nullptr; t = t->parent) {
+    for (const auto& p : t->properties) {
+      if (p.name != name || p.is_static) continue;
+      return p.type_name.empty() ? nullptr : ctx.FindStructType(p.type_name);
+    }
+  }
+  return nullptr;
+}
+
+// The structure a member path starts from: the root variable's, or, §8.5,
+// the one a class property holds, reached through a handle variable or
+// `this` with the property as the path's first member, or named bare in a
+// method. The path is left as the part inside the structure.
+struct StructRoot {
+  Logic4Vec* value = nullptr;
+  Variable* var = nullptr;
+  const StructTypeInfo* info = nullptr;
+};
+
+static bool PropertyRoot(ClassObject* obj, std::string_view prop,
+                         SimContext& ctx, StructRoot& root) {
+  if (obj == nullptr) return false;
+  auto it = obj->properties.find(std::string(prop));
+  if (it == obj->properties.end()) return false;
+  root.info = PropertyStructLayout(obj, prop, ctx);
+  if (root.info == nullptr) return false;
+  // A property its collector could not size holds the 32-bit carrier until a
+  // member write widens it to its layout; an element of an array member may
+  // stand above the carrier, so the value is widened here as that write
+  // widens it, keeping the bits it holds.
+  if (it->second.width < root.info->total_width) {
+    Logic4Vec wide = MakeLogic4Vec(ctx.GetArena(), root.info->total_width);
+    DepositBitField(wide, 0, it->second, it->second.width);
+    it->second = wide;
+  }
+  root.value = &it->second;
+  return true;
+}
+
+static bool FindStructRoot(std::string_view name, std::string& path,
+                           SimContext& ctx, StructRoot& root) {
+  Variable* var = ctx.FindVariable(name);
+  if (var != nullptr) {
+    if (const StructTypeInfo* info = StructLayoutOfName(name, ctx)) {
+      root = {&var->value, var, info};
+      return true;
+    }
+  }
+  ClassObject* obj = nullptr;
+  if (name == "this") {
+    obj = ctx.CurrentThis();
+  } else if (var != nullptr && !ctx.GetVariableClassType(name).empty()) {
+    obj = ctx.GetClassObject(var->value.ToUint64());
+  }
+  if (obj != nullptr) {
+    auto dot = path.find('.');
+    if (dot == std::string::npos) return false;
+    std::string prop = path.substr(0, dot);
+    path.erase(0, dot + 1);
+    return PropertyRoot(obj, prop, ctx, root);
+  }
+  return var == nullptr && PropertyRoot(ctx.CurrentThis(), name, ctx, root);
+}
+
+const StructTypeInfo* ContainerElementLayout(const Expr* base,
+                                             SimContext& ctx) {
+  if (base == nullptr) return nullptr;
+  if (base->kind == ExprKind::kIdentifier) {
+    // §8.11 with §23.9: in a method a property of the object is found ahead
+    // of a variable of the module the class is declared in; a local of the
+    // method shadows both.
+    const ClassObject* self = ctx.CurrentThis();
+    if (self != nullptr && ctx.FindLocalVariable(base->text) == nullptr) {
+      if (const StructTypeInfo* info =
+              PropertyStructLayout(self, base->text, ctx))
+        return info;
+    }
+    return StructLayoutOfName(base->text, ctx);
+  }
+  std::string_view name;
+  std::string path;
+  if (base->kind != ExprKind::kMemberAccess ||
+      !MemberChainPath(base, name, path) || path.find('.') != std::string::npos)
+    return nullptr;
+  ClassObject* obj = nullptr;
+  if (name == "this") {
+    obj = ctx.CurrentThis();
+  } else if (Variable* var = ctx.FindVariable(name);
+             var != nullptr && !ctx.GetVariableClassType(name).empty()) {
+    obj = ctx.GetClassObject(var->value.ToUint64());
+  }
+  return obj != nullptr ? PropertyStructLayout(obj, path, ctx) : nullptr;
+}
+
+const StructFieldInfo* ResolveStructMember(const Expr* access,
+                                           SimContext& ctx) {
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess)
+    return nullptr;
+  std::string_view name;
+  std::string path;
+  if (!MemberChainPath(access, name, path)) return nullptr;
+  StructRoot root;
+  if (!FindStructRoot(name, path, ctx, root)) return nullptr;
+  uint32_t offset = 0;
+  return ResolveStructField(root.info, path, &offset);
+}
+
+const StructFieldInfo* ResolveStructArrayMember(const Expr* access,
+                                                SimContext& ctx) {
+  const StructFieldInfo* field = ResolveStructMember(access, ctx);
+  return field != nullptr && field->elem_count > 0 ? field : nullptr;
+}
+
 bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
                                Arena& arena, StructArrayElementRef& out) {
   if (select->kind != ExprKind::kSelect || select->index_end != nullptr ||
       select->base == nullptr || select->base->kind != ExprKind::kMemberAccess)
     return false;
-  std::string_view root;
+  std::string_view name;
   std::string path;
-  if (!MemberChainPath(select->base, root, path)) return false;
-  const StructTypeInfo* info = StructLayoutOfName(root, ctx);
-  Variable* var = ctx.FindVariable(root);
-  if (info == nullptr || var == nullptr) return false;
+  if (!MemberChainPath(select->base, name, path)) return false;
+  StructRoot root;
+  if (!FindStructRoot(name, path, ctx, root)) return false;
   uint32_t offset = 0;
-  const StructFieldInfo* field = ResolveStructField(info, path, &offset);
+  const StructFieldInfo* field = ResolveStructField(root.info, path, &offset);
   if (field == nullptr || field->elem_count == 0) return false;
-  out.var = var;
+  out.value = root.value;
+  out.var = root.var;
   out.width = field->width / field->elem_count;
   out.is_signed = field->is_signed;
   Logic4Vec idx = EvalExpr(select->index, ctx, arena);
@@ -224,6 +356,29 @@ bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
   out.bit_offset =
       offset + (field->elem_count - 1 - static_cast<uint32_t>(pos)) * out.width;
   out.in_range = true;
+  return true;
+}
+
+bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  const Expr* select = expr->lhs;
+  if (select == nullptr || select->kind != ExprKind::kSelect ||
+      select->index_end != nullptr || select->base == nullptr ||
+      expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  const StructTypeInfo* info = ContainerElementLayout(select->base, ctx);
+  if (info == nullptr) return false;
+  uint32_t offset = 0;
+  const StructFieldInfo* field =
+      ResolveStructField(info, expr->rhs->text, &offset);
+  if (field == nullptr) return false;
+  Logic4Vec element = EvalExpr(select, ctx, arena);
+  if (element.width < info->total_width) return false;
+  out = ExtractBitField(arena, element, offset, field->width);
+  out.is_real = field->type_kind == DataTypeKind::kReal ||
+                field->type_kind == DataTypeKind::kShortreal ||
+                field->type_kind == DataTypeKind::kRealtime;
+  out.is_signed = field->is_signed && !out.is_real;
   return true;
 }
 

@@ -11,6 +11,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
@@ -26,6 +27,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
@@ -253,16 +255,68 @@ static bool TryStructArrayMemberWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                                       SimContext& ctx, Arena& arena) {
   StructArrayElementRef ref;
   if (!ResolveStructArrayElement(lhs, ctx, arena, ref)) return false;
-  if (!ref.in_range || ref.var->is_forced) return true;
-  DepositBitField(ref.var->value, ref.bit_offset,
+  if (!ref.in_range || (ref.var != nullptr && ref.var->is_forced)) return true;
+  DepositBitField(*ref.value, ref.bit_offset,
                   ResizeToWidth(rhs_val, ref.width, arena), ref.width);
-  ref.var->NotifyWatchers();
+  if (ref.var != nullptr) ref.var->NotifyWatchers();
+  return true;
+}
+
+// §7.8.6: whether the element a select of an associative array names exists;
+// true for a select of any other container. A member write to an entry the
+// key names none of yet creates it from nothing rather than reading it, which
+// §7.8.6 reports as a read of a nonexistent index.
+static bool ContainerHoldsElement(const Expr* select, SimContext& ctx,
+                                  Arena& arena) {
+  const AssocArrayObject* aa = FindAssocArrayOfBase(select->base, ctx, arena);
+  if (aa == nullptr) return true;
+  Logic4Vec key = EvalExpr(select->index, ctx, arena);
+  if (aa->is_string_key) return aa->str_data.count(AssocStringKey(key)) != 0;
+  if (HasUnknownBits(key)) return false;
+  return aa->int_data.count(AssocIntKey(key, aa->is_wildcard, aa->index_width,
+                                        aa->is_index_signed)) != 0;
+}
+
+// §7.2 with §7.5, §7.8 and §7.10: `d[1].a = 11` writes a member of the
+// structure an element of a dynamic, associative or queue container holds, a
+// variable or a class property: the element is read, the member's bits set in
+// it, and the element written back as `d[1] = ...` writes it, which allocates
+// an associative entry the key names no element of yet. Built into a name,
+// `d[1]` named no variable and the write went nowhere.
+static bool TryContainerElementMemberWrite(const Expr* lhs,
+                                           const Logic4Vec& rhs_val,
+                                           SimContext& ctx, Arena& arena) {
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
+      lhs->lhs->kind != ExprKind::kSelect || lhs->lhs->index_end != nullptr ||
+      lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  const Expr* select = lhs->lhs;
+  const StructTypeInfo* layout = ContainerElementLayout(select->base, ctx);
+  if (layout == nullptr) return false;
+  uint32_t offset = 0;
+  const StructFieldInfo* field =
+      ResolveStructField(layout, lhs->rhs->text, &offset);
+  if (field == nullptr) return false;
+  Logic4Vec element =
+      ContainerHoldsElement(select, ctx, arena)
+          ? OwnRhsWords(ResizeToWidth(EvalExpr(select, ctx, arena),
+                                      layout->total_width, arena),
+                        arena)
+          : MakeLogic4VecVal(arena, layout->total_width, 0);
+  DepositBitField(element, offset, ResizeToWidth(rhs_val, field->width, arena),
+                  field->width);
+  PerformBlockingAssign(select, element, ctx, arena);
   return true;
 }
 
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena) {
   if (TryStructArrayMemberWrite(lhs, rhs_val, ctx, arena)) return true;
+  // §8.11 with §23.9: in a method, `d[1] = v` writes the object's array
+  // property ahead of a variable `d` of the module declaring the class.
+  if (NamesOwnArrayProperty(lhs->base, ctx) &&
+      TryWriteClassArrayElement(lhs, rhs_val, ctx, arena))
+    return true;
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
     WriteVar(elem, rhs_val, arena);
     return true;
@@ -416,12 +470,13 @@ static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
 
 // §7.5.1/§7.10/§8.4: an assignment that sizes or rebuilds an array object,
 // or constructs an object into an element, rather than writing a value:
-// `new[]` to a dynamic array property, `new` to an element of an array
-// property of class handles or of a declared associative array of them
-// (§7.8), or any assignment to a queue.
+// `new[]` to a dynamic array property, one array property to another (§7.6),
+// `new` to an element of an array property of class handles or of a declared
+// associative array of them (§7.8), or any assignment to a queue.
 static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   return TryClassArrayNewAssign(stmt, ctx, arena) ||
+         TryClassArrayWholeAssign(stmt, ctx, arena) ||
          TryClassArrayElementNewAssign(stmt, ctx, arena) ||
          TryAssocElementNewAssign(stmt, ctx, arena) ||
          TryQueueBlockingAssign(stmt, ctx, arena);
@@ -489,6 +544,7 @@ void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
     return;
   }
   rhs_val = ApplyStreamPackToTargetWidening(stmt, rhs_val, ctx, arena);
+  if (TryContainerElementMemberWrite(stmt->lhs, rhs_val, ctx, arena)) return;
   if (stmt->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
     return;

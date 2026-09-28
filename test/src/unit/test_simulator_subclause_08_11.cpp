@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
@@ -344,6 +346,30 @@ TEST(ClassSim, TaskLocalHandleHidesTheSameNamedProperty) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 31u);
+}
+
+// §8.11 with §7.2: `this.s` is the property s of the object the method runs on,
+// so `this.s.a` reads the member the bare `s.a` wrote, 17, as `h.s.a` does
+// from outside.
+TEST(ClassThisSim, ThisPathReadsAMemberOfAStructProperty) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef struct { int a; int b; } s_t;\n"
+                 "  class C;\n"
+                 "    s_t s;\n"
+                 "    function void fill(); s.a = 17; s.b = 42; endfunction\n"
+                 "    function int sum(); return this.s.a + this.s.b; "
+                 "endfunction\n"
+                 "  endclass\n"
+                 "  C h;\n"
+                 "  initial begin\n"
+                 "    h = new; h.fill();\n"
+                 "    $display(\"%0d %0d\", h.sum(), h.s.a);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "59 17\n");
 }
 
 }  // namespace

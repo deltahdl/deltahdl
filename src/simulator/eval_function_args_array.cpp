@@ -22,6 +22,7 @@
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_args_internal.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
@@ -172,6 +173,9 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
   // callee reads the copy through the same queue-backed select path.
   auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width, src_q->max_size,
                                 src_q->is_4state);
+  // §7.2 with §7.5: a formal of structure elements, `input T a[]`, is laid
+  // out by its element type, so `a[1].f1` in the body reads a member.
+  BindNamedLayout(formal.name, formal.data_type, ctx);
   if (formal.direction != Direction::kOutput) {
     dst_q->elements.reserve(src_q->elements.size());
     for (const auto& elem : src_q->elements)

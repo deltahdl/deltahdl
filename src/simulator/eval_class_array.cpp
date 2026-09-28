@@ -3,15 +3,18 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -154,14 +157,25 @@ Logic4Vec ReduceClassArray(const Expr* expr, const ClassArrayRef& ref,
 
 }  // namespace
 
+bool NamesOwnArrayProperty(const Expr* base, SimContext& ctx) {
+  if (base == nullptr || base->kind != ExprKind::kIdentifier ||
+      ctx.FindLocalVariable(base->text) != nullptr)
+    return false;
+  const ClassObject* self = ctx.CurrentThis();
+  return self != nullptr &&
+         FindClassArrayProperty(self->type, base->text) != nullptr;
+}
+
 bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
                        ClassArrayRef& out) {
   if (base == nullptr) return false;
   if (base->kind == ExprKind::kIdentifier) {
-    if (ctx.FindVariable(base->text) != nullptr ||
-        ctx.FindArrayInfo(base->text) != nullptr) {
-      return false;
-    }
+    // §8.11 with §23.9: inside a method a bare name is the object's property
+    // ahead of a variable of the module the class is declared in; only a
+    // local of the method's own shadows it. Deferring to any variable of the
+    // name, `d = new[2]` in a method sized the module's `d` and left the
+    // property empty.
+    if (ctx.FindLocalVariable(base->text) != nullptr) return false;
     ClassObject* self = ctx.CurrentThis();
     if (self == nullptr) return false;
     const auto* prop = FindClassArrayProperty(self->type, base->text);
@@ -289,6 +303,77 @@ bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       rhs->args.size() > 1 && ResolveClassArray(rhs->args[1], ctx, arena, init);
   ResizeClassArray(ref, static_cast<uint32_t>(size), has_init ? &init : nullptr,
                    ctx, arena);
+  return true;
+}
+
+// The declared index of the i-th element from the left of `ref`, the higher
+// bound first for a descending dimension (§7.4.2).
+static int64_t IndexFromLeft(const ClassArrayRef& ref, uint32_t i) {
+  return ref.prop->array_descending
+             ? ref.lo + static_cast<int64_t>(ref.size) - 1 - i
+             : ref.lo + i;
+}
+
+// §7.6: the elements of the array property `src` names -- a fixed or dynamic
+// one, or a queue -- from the left, into `out`; false for any other
+// expression.
+static bool PropertyArrayElements(const Expr* src, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out) {
+  if (src == nullptr || (src->kind != ExprKind::kIdentifier &&
+                         src->kind != ExprKind::kMemberAccess)) {
+    return false;
+  }
+  ClassArrayRef ref;
+  if (ResolveClassArray(src, ctx, arena, ref)) {
+    for (uint32_t i = 0; i < ref.size; ++i)
+      out.push_back(
+          ReadClassArrayElement(ref, IndexFromLeft(ref, i), ctx, arena));
+    return true;
+  }
+  const QueueObject* q = FindQueueOfBase(src, ctx, arena);
+  if (q == nullptr) return false;
+  out = q->elements;
+  return true;
+}
+
+// §7.6 with §7.10: `lhs`, a queue property, rebuilt from `elems`.
+static bool AssignQueueProperty(const Expr* lhs,
+                                const std::vector<Logic4Vec>& elems,
+                                SimContext& ctx, Arena& arena) {
+  if (lhs->kind == ExprKind::kIdentifier &&
+      ctx.FindQueue(lhs->text) != nullptr) {
+    return false;
+  }
+  ClassObject* owner = nullptr;
+  QueueObject* q = FindQueueOfBase(lhs, ctx, arena, &owner);
+  if (q == nullptr) return false;
+  q->elements.clear();
+  for (const auto& elem : elems)
+    q->elements.push_back(
+        SizedForQueueElement(*q, OwnRhsWords(elem, arena), arena));
+  q->AssignFreshIds();
+  ++q->generation;
+  AnnounceQueueChange(lhs, owner, ctx);
+  return true;
+}
+
+bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  const Expr* lhs = stmt->lhs;
+  if (lhs == nullptr || (lhs->kind != ExprKind::kIdentifier &&
+                         lhs->kind != ExprKind::kMemberAccess)) {
+    return false;
+  }
+  std::vector<Logic4Vec> elems;
+  if (!PropertyArrayElements(stmt->rhs, ctx, arena, elems)) return false;
+  ClassArrayRef dst;
+  if (!ResolveClassArray(lhs, ctx, arena, dst))
+    return AssignQueueProperty(lhs, elems, ctx, arena);
+  if (dst.prop->is_dynamic) {
+    dst.size = static_cast<uint32_t>(elems.size());
+    ResizeClassArray(dst, dst.size, nullptr, ctx, arena);
+  }
+  for (uint32_t i = 0; i < dst.size && i < elems.size(); ++i)
+    StoreClassArrayElement(dst, IndexFromLeft(dst, i), elems[i], ctx, arena);
   return true;
 }
 

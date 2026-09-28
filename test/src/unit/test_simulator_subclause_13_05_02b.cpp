@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
@@ -110,6 +112,33 @@ TEST(PassByRef, ClassStaticMethodWithARefFormalKeepsAutomaticLocals) {
       "endmodule\n",
       "res");
   EXPECT_EQ(val, 2410u);
+}
+
+// §13.5.2 with §7.10 and §8.5: a queue property passed to a ref queue formal
+// is the object's queue, so a push through the formal is there at once and
+// after the task resumes from its delay -- one element at time 5 and two at
+// 15 -- and a push through the formal of a method's own bare property too.
+TEST(PassByRef, QueuePropertyActualIsTheObjectsQueue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C; int q[$];\n"
+      "    task grow(); feed(q); endtask\n"
+      "  endclass\n"
+      "  task automatic feed(ref int q[$]);\n"
+      "    q.push_back(1); #10; q.push_back(2);\n"
+      "  endtask\n"
+      "  C h, g;\n"
+      "  initial begin\n"
+      "    h = new; g = new;\n"
+      "    fork feed(h.q); g.grow(); join_none\n"
+      "    #5 $display(\"%0d %0d\", h.q.size(), g.q.size());\n"
+      "    #10 $display(\"%0d %0d %0d\", h.q.size(), h.q[0] + h.q[1],\n"
+      "                 g.q.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n2 3 2\n");
 }
 
 }  // namespace
