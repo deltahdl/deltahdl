@@ -160,6 +160,11 @@ class SynthLower {
   void MapPortBits(const RtlirPort& port, uint32_t width, AigGraph& aig);
 
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
+  // §11.8.2: bit `bit` of a context-determined operand of a binary arithmetic
+  // or bitwise operator, a signed identifier extended by its sign where the
+  // propagated type is signed. Defined in synth_lower.cpp.
+  uint32_t LowerContextOperandBit(const Expr* operand, AigGraph& aig,
+                                  uint32_t bit);
 
   // §5.7.1: lower one bit of an integer literal. The literal's own digits are
   // what answers it, because §5.7.1 sizes a literal by its size constant and

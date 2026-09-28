@@ -359,17 +359,24 @@ bool SynthLower::IsSignedExpr(const Expr* expr) {
   }
 }
 
-// §11.8.2: an operand is extended to the size of the expression it stands in,
-// by its sign where the type propagated down to it is signed (§11.8.1 making
-// the expression signed only where every operand is). Above its own width a
-// signed identifier in a signed context therefore answers its top bit, so
-// `a ^ s` with `s` a four-bit signed 4'b1000 in an eight-bit signed context
-// reads 8'hF8 where the zeros GetSignalBit answers read 8'h08.
 uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
-  uint32_t width = SignalWidth(name);
-  if (propagated_signed_ && width > 0 && bit >= width && IsSignedSignal(name))
-    return GetSignalBit(name, width - 1);
   return GetSignalBit(name, bit);
+}
+
+// §11.8.2: an operand of a binary arithmetic or bitwise operator is extended
+// to the size of the expression it stands in, by its sign where the type
+// propagated down to it is signed (§11.8.1 making the expression signed only
+// where every operand is), and §11.6.1 Table 11-21 makes both operands of
+// those operators context-determined. An identifier is extended here through
+// LowerExtendedOperandBit, so `a ^ s` with `s` a four-bit signed 4'b1000 in an
+// eight-bit signed context reads 8'hF8 where zeros read 8'h08. Every other
+// operand lowers to the context itself.
+uint32_t SynthLower::LowerContextOperandBit(const Expr* operand, AigGraph& aig,
+                                            uint32_t bit) {
+  if (operand != nullptr && operand->kind == ExprKind::kIdentifier &&
+      IsSignedSignal(operand->text))
+    return LowerExtendedOperandBit(operand, aig, bit, propagated_signed_);
+  return LowerExprBit(operand, aig, bit);
 }
 
 const PatternBits& SynthLower::LiteralBits(const Expr* expr) {
@@ -445,8 +452,8 @@ uint32_t SynthLower::LowerAddSubBit(const Expr* expr, AigGraph& aig,
   uint32_t carry = subtract ? AigGraph::kConstTrue : AigGraph::kConstFalse;
   uint32_t sum = AigGraph::kConstFalse;
   for (uint32_t b = 0; b <= bit; ++b) {
-    uint32_t l = LowerExprBit(expr->lhs, aig, b);
-    uint32_t r = LowerExprBit(expr->rhs, aig, b);
+    uint32_t l = LowerContextOperandBit(expr->lhs, aig, b);
+    uint32_t r = LowerContextOperandBit(expr->rhs, aig, b);
     sum = FullAdderBit(aig, l, subtract ? aig.AddNot(r) : r, carry);
   }
   return sum;
@@ -488,8 +495,8 @@ uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
   if (IsShiftOp(expr->op)) return LowerShiftBit(expr, aig, bit);
   if (IsLogicalOp(expr->op)) return LowerLogicalBit(expr, aig, bit);
   if (ReportArithIfUnlowered(expr)) return AigGraph::kConstFalse;
-  uint32_t l = LowerExprBit(expr->lhs, aig, bit);
-  uint32_t r = LowerExprBit(expr->rhs, aig, bit);
+  uint32_t l = LowerContextOperandBit(expr->lhs, aig, bit);
+  uint32_t r = LowerContextOperandBit(expr->rhs, aig, bit);
   switch (expr->op) {
     case TokenKind::kAmp:
       return aig.AddAnd(l, r);
