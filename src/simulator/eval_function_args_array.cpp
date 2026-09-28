@@ -205,6 +205,16 @@ bool FlattenElementQueues(const QueueObject& q,
   return true;
 }
 
+// §7.7 (printed page 162): one dynamic-array or queue actual bound to a
+// fixed-size formal -- the actual's queue, the formal, and where the actual
+// was written, which a size-mismatch report names since the formal carries no
+// position of its own.
+struct QueueFormalBinding {
+  const QueueObject& src_q;
+  const FunctionArg& formal;
+  SourceLoc loc;
+};
+
 }  // namespace
 
 // §7.7 (printed page 162): a dynamic array of dynamic arrays, `int d[][]`,
@@ -216,17 +226,18 @@ bool FlattenElementQueues(const QueueObject& q,
 // queues of the outer one, which the one-dimensional bind below never looked
 // in, so every leaf of the formal read the default. An output formal takes
 // nothing in (§13.3, printed 337) and starts at the default.
-static bool BindQueueToMultiDimFormal(const QueueObject& src_q,
-                                      const FunctionArg& formal,
+static bool BindQueueToMultiDimFormal(const QueueFormalBinding& binding,
                                       ArrayInfo shape, SimContext& ctx,
-                                      Arena& arena, SourceLoc loc) {
+                                      Arena& arena) {
+  const QueueObject& src_q = binding.src_q;
+  const FunctionArg& formal = binding.formal;
   bool is_output = formal.direction == Direction::kOutput;
   std::vector<Logic4Vec> leaves;
   LevelSizeMismatch mismatch;
   if (!is_output &&
       !FlattenElementQueues(src_q, shape.dim_sizes, 0, leaves, mismatch)) {
     ctx.GetDiag().Error(
-        loc,
+        binding.loc,
         "array size mismatch: formal expects " + std::to_string(mismatch.want) +
             " elements in dimension " + std::to_string(mismatch.dim) +
             ", actual has " + std::to_string(mismatch.got),
@@ -267,7 +278,7 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
   auto shape = FixedFormalShape(formal, src_q->elem_width, ctx, arena);
   if (!shape) return false;
   if (!shape->dim_sizes.empty()) {
-    return BindQueueToMultiDimFormal(*src_q, formal, *shape, ctx, arena, loc);
+    return BindQueueToMultiDimFormal({*src_q, formal, loc}, *shape, ctx, arena);
   }
   bool is_output = formal.direction == Direction::kOutput;
   if (!is_output && src_q->elements.size() != shape->size) {
