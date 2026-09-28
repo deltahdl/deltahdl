@@ -341,26 +341,43 @@ static bool LayoutHas4StateMember(const StructTypeInfo& layout) {
   return false;
 }
 
+// The record of the property `member` declares: its width, folded against
+// the class's parameters `params` or taken from the layout a structure's
+// typedef name stands for, with the 32-bit carrier for a type neither sizes,
+// and the facts of its declaration a write and a read consult.
+static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
+                                                  const ScopeMap& params,
+                                                  SimContext& ctx) {
+  const DataType& type = member->data_type;
+  uint32_t w = EvalTypeWidth(type, {}, params);
+  const StructTypeInfo* layout =
+      w == 0 ? StructPropertyLayout(type, ctx) : nullptr;
+  if (layout != nullptr) w = layout->total_width;
+  bool sized = w != 0;
+  bool four_state = layout != nullptr ? LayoutHas4StateMember(*layout)
+                                      : Is4stateType(type, {});
+  return {member->name,
+          sized ? w : 32,
+          member->is_static,
+          member->is_local,
+          member->is_protected,
+          member->is_const,
+          member->init_expr,
+          four_state,
+          sized,
+          IsRealKind(type.kind),
+          type.kind == DataTypeKind::kString,
+          IsSignedType(type, {}),
+          type.type_name,
+          type.kind == DataTypeKind::kVirtualInterface};
+}
+
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
                                 const ScopeMap& constants, SimContext& ctx) {
   ScopeMap params = ClassParamScope(cls, constants);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
-      uint32_t w = EvalTypeWidth(member->data_type, {}, params);
-      const StructTypeInfo* layout =
-          w == 0 ? StructPropertyLayout(member->data_type, ctx) : nullptr;
-      if (layout != nullptr) w = layout->total_width;
-      bool sized = w != 0;
-      if (w == 0) w = 32;
-      bool four_state = layout != nullptr ? LayoutHas4StateMember(*layout)
-                                          : Is4stateType(member->data_type, {});
-      info->properties.push_back(
-          {member->name, w, member->is_static, member->is_local,
-           member->is_protected, member->is_const, member->init_expr,
-           four_state, sized, IsRealKind(member->data_type.kind),
-           member->data_type.kind == DataTypeKind::kString,
-           IsSignedType(member->data_type, {}), member->data_type.type_name,
-           member->data_type.kind == DataTypeKind::kVirtualInterface});
+      info->properties.push_back(PropertyRecord(member, params, ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
