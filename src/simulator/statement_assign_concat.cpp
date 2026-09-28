@@ -106,6 +106,21 @@ static std::optional<Logic4Vec> PackedVariablePattern(std::string_view name,
   return EvalPackedArrayPattern(pattern, spans, var->value.width, ctx, arena);
 }
 
+// The right-hand side of `stmt`, whose target is no structure, evaluated in
+// the target's context `ctx_width`: an untyped pattern filling a packed array
+// target element for element (PackedVariablePattern), anything else as it
+// stands.
+static Logic4Vec EvalRhsForUnstructuredTarget(const Stmt* stmt,
+                                              uint32_t ctx_width,
+                                              SimContext& ctx, Arena& arena) {
+  if (stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+    if (auto packed =
+            PackedVariablePattern(stmt->lhs->text, stmt->rhs, ctx, arena))
+      return *packed;
+  }
+  return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
+}
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
@@ -148,11 +163,7 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
   if (!sinfo) sinfo = ContainerElementLayout(stmt->lhs, ctx);
   if (sinfo != nullptr) return EvalStructPatternValue(inner, sinfo, ctx, arena);
-  if (stmt->rhs->kind == ExprKind::kAssignmentPattern) {
-    if (auto packed = PackedVariablePattern(stmt->lhs->text, inner, ctx, arena))
-      return *packed;
-  }
-  return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
+  return EvalRhsForUnstructuredTarget(stmt, ctx_width, ctx, arena);
 }
 
 // particular bit from a vector, packed array, packed structure, parameter, or
