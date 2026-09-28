@@ -237,6 +237,53 @@ TEST(TypeOperatorGenerate, EqualMatchingTypesSelectsThenBranch) {
   EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
 }
 
+// §6.23's generate-case example: a type reference is a constant, so a generate
+// case over one selects the item whose type reference matches (§6.22.1) --
+// `bit [12:0]` for bus_t, the type of A_bus, packed dimension and all, and
+// `real` for rbus_t, the type of R1.
+TEST(TypeOperatorGenerate, CaseOverTypeReferencesSelectsTheMatchingItem) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  bit [12:0] A_bus;\n"
+      "  real R1;\n"
+      "  parameter type bus_t = type(A_bus);\n"
+      "  parameter type rbus_t = type(R1);\n"
+      "  case (type(bus_t))\n"
+      "    type(bit[12:0]): begin logic a; end\n"
+      "    type(real): begin logic b; end\n"
+      "  endcase\n"
+      "  case (type(rbus_t))\n"
+      "    type(bit[12:0]): begin logic c; end\n"
+      "    type(real): begin logic d; end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 1);
+}
+
+// A type matching no item's type reference takes the default item: a 12-bit
+// vector matches neither `bit [12:0]` nor `int`.
+TEST(TypeOperatorGenerate, CaseOverTypeReferencesFallsToTheDefault) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = bit [11:0];\n"
+      "  case (type(T))\n"
+      "    type(bit[12:0]), type(int): begin logic a; end\n"
+      "    default: begin logic b; end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+}
+
 // §6.23 — the rejecting path for `==`: `int` and `real` are nonmatching types,
 // so the condition folds to false and the else-block is the one instantiated.
 TEST(TypeOperatorGenerate, EqualNonMatchingTypesSelectsElseBranch) {
@@ -652,6 +699,52 @@ TEST(TypeOperatorElab, DynamicElementInTypeArgInARandsequenceCodeBlock) {
       "        main : { r = (type(d[0]) == type(int)); };\n"
       "      endsequence\n"
       "    end");
+}
+
+// §6.23's own type parameter example: a type reference naming a packed data
+// type stands for that whole type, its packed dimension included, so `T` is
+// `bit [12:0]` and a variable of it 13 bits wide and unsigned.
+TEST(TypeOperatorElab, TypeParamSetToAPackedTypeReference) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam type T = type(bit [12:0]);\n"
+      "  T tv;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* tv = FindVar(design, "m", "tv");
+  ASSERT_NE(tv, nullptr);
+  EXPECT_EQ(tv->width, 13u);
+  EXPECT_FALSE(tv->is_signed);
+}
+
+// §6.23's `parameter type bus_t = type(A_bus);`: a type reference to an
+// expression is the expression's self-determined type, here the 13-bit
+// `bit [12:0]` of A_bus, and a signed `int` operand carries its signedness.
+TEST(TypeOperatorElab, TypeParamSetToAnExpressionTypeReference) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  bit [12:0] A_bus;\n"
+      "  int n;\n"
+      "  parameter type bus_t = type(A_bus);\n"
+      "  localparam type int_t = type(n);\n"
+      "  bus_t bv;\n"
+      "  int_t iv;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* bv = FindVar(design, "m", "bv");
+  ASSERT_NE(bv, nullptr);
+  EXPECT_EQ(bv->width, 13u);
+  EXPECT_FALSE(bv->is_signed);
+  const RtlirVariable* iv = FindVar(design, "m", "iv");
+  ASSERT_NE(iv, nullptr);
+  EXPECT_EQ(iv->width, 32u);
+  EXPECT_TRUE(iv->is_signed);
 }
 
 }  // namespace

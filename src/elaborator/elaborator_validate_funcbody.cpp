@@ -850,8 +850,68 @@ static void CheckAutoVarWritesInProc(
   });
 }
 
+static bool IsLoopStmtKind(StmtKind kind) {
+  switch (kind) {
+    case StmtKind::kFor:
+    case StmtKind::kForeach:
+    case StmtKind::kWhile:
+    case StmtKind::kForever:
+    case StmtKind::kRepeat:
+    case StmtKind::kDoWhile:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §6.21 (printed pages 133 and 134): a variable of a static task, function or
+// procedural block is static by default, and a declaration of one that gives
+// an initialization value shall say `static`, stating that the initialization
+// runs once, or `automatic`, making it run on each entry to its block. The
+// clause's top_illegal example is a loop body's `int loop3 = 0;`, which reads
+// as run on every iteration and as a static runs once. `in_loop` says whether
+// `s` stands in a loop body. The rule reaches the declarations outside a loop
+// too, which #4482 holds.
+static void ReportImplicitlyStaticInitInLoop(const Stmt* s, bool in_loop,
+                                             DiagEngine& diag) {
+  if (s == nullptr) return;
+  if (in_loop && s->kind == StmtKind::kVarDecl && s->var_init != nullptr &&
+      !s->var_is_static && !s->var_is_automatic) {
+    diag.Error(s->range.start,
+               std::format("variable '{}' declared with an initializer in a "
+                           "loop of a static block, task or function must be "
+                           "declared static or automatic",
+                           s->var_name),
+               Subclause("6.21"));
+  }
+  const bool kBodyInLoop = in_loop || IsLoopStmtKind(s->kind);
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    ReportImplicitlyStaticInitInLoop(sub, kBodyInLoop, diag);
+  });
+}
+
+// §6.21: a module's procedural blocks are static unless the module is declared
+// `automatic`, and so are its tasks and functions unless the subroutine or the
+// module says automatic, a subroutine's own `static` outranking the module's.
+static void ReportImplicitlyStaticInitsOfItem(const ModuleItem* item,
+                                              bool module_is_automatic,
+                                              DiagEngine& diag) {
+  if (IsProceduralItemKind(item->kind)) {
+    if (!module_is_automatic)
+      ReportImplicitlyStaticInitInLoop(item->body, false, diag);
+    return;
+  }
+  if (item->kind != ModuleItemKind::kTaskDecl &&
+      item->kind != ModuleItemKind::kFunctionDecl)
+    return;
+  if (item->is_automatic || (module_is_automatic && !item->is_static)) return;
+  for (const auto* s : item->func_body_stmts)
+    ReportImplicitlyStaticInitInLoop(s, false, diag);
+}
+
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
+    ReportImplicitlyStaticInitsOfItem(item, decl->is_automatic, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     std::unordered_set<std::string_view> auto_vars;

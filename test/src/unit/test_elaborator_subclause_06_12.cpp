@@ -221,4 +221,45 @@ TEST(RealDataType, RealAndRealtimeInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.12 bars an edge event on a real variable wherever the event control is
+// written, and §9.4.2's event control on a procedural statement is one such
+// place: `@(posedge r)` inside an initial block's fork is reported where the
+// statement stands.
+TEST(RealDataType, RealEdgeInAProceduralEventControlError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r = 0.0;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      @(posedge r) $display(\"edge\");\n"
+      "      #1 r = 1.0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 5, "6.12"));
+}
+
+// A real the block itself declares is a real variable too, so an edge on it in
+// a task's event control is reported, while a change event on a real, `@(r)`,
+// is not an edge and stays legal.
+TEST(RealDataType, RealEdgeOnABlockLocalRealError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real m;\n"
+      "  task tk;\n"
+      "    real x;\n"
+      "    @(m);\n"
+      "    @(negedge x);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 6, "6.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

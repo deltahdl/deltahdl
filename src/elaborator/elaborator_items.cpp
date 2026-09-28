@@ -1,5 +1,8 @@
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,6 +20,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -25,6 +29,8 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -402,6 +408,67 @@ bool HasInstanceArrayRange(const ModuleItem* item) {  // §28.3.6
   return item->inst_range_left != nullptr && item->inst_range_right != nullptr;
 }
 
+// A name a procedure declares, with the type and unpacked dimensions it was
+// declared with.
+struct ProceduralLocal {
+  std::string_view name;
+  const DataType* type;
+  const std::vector<Expr*>* unpacked_dims;
+};
+
+using ModuleTypeRefResolver = std::function<void(DataType&, SourceLoc)>;
+
+// §6.23 with A.2.8: `var type(a) v;` among a block's items declares v with the
+// self-determined type of `a`, taken with the names in scope at the
+// declaration. A name the procedure declared earlier, in this block or one
+// enclosing it, or as a formal of the subroutine, hides the module's, and v
+// takes that declaration's type and unpacked dimensions; any other reference
+// is resolved as a module item's is. `locals` holds the procedure's names in
+// declaration order, and a block's own are dropped when the walk leaves it.
+void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
+                           const ModuleTypeRefResolver& resolve_module_ref) {
+  if (s == nullptr) return;
+  if (s->kind != StmtKind::kVarDecl) {
+    const size_t kOuter = locals.size();
+    ForEachChildStmt(s, [&](Stmt* const& sub) {
+      ResolveTypeRefsInStmt(sub, locals, resolve_module_ref);
+    });
+    locals.resize(kOuter);
+    return;
+  }
+  const Expr* ref = s->var_decl_type.type_ref_expr;
+  if (ref != nullptr) {
+    auto local = std::find_if(
+        locals.rbegin(), locals.rend(), [&](const ProceduralLocal& l) {
+          return ref->kind == ExprKind::kIdentifier && l.name == ref->text;
+        });
+    if (local == locals.rend()) {
+      resolve_module_ref(s->var_decl_type, s->range.start);
+    } else {
+      s->var_decl_type = *local->type;
+      if (s->var_unpacked_dims.empty()) {
+        s->var_unpacked_dims = *local->unpacked_dims;
+      }
+    }
+  }
+  locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
+}
+
+// The procedures an item holds, an initial, final or always block's body and a
+// task's or function's, walked for §6.23's block type references with the
+// subroutine's formals as the first names in scope.
+void ResolveProceduralTypeRefs(
+    ModuleItem* item, const ModuleTypeRefResolver& resolve_module_ref) {
+  std::vector<ProceduralLocal> locals;
+  for (const auto& arg : item->func_args) {
+    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
+  }
+  ResolveTypeRefsInStmt(item->body, locals, resolve_module_ref);
+  for (auto* s : item->func_body_stmts) {
+    ResolveTypeRefsInStmt(s, locals, resolve_module_ref);
+  }
+}
+
 }  // namespace
 
 // The instance range is what makes §28.3.6's widths a question at all, so an
@@ -430,6 +497,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     ValidateItemDelaysNonNegative(item, BuildParamScope(mod), diag_);
   }
   if (ElaborateDeclItem(item, mod)) return;
+  ResolveProceduralTypeRefs(
+      item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
   ElaborateBehavioralItem(item, mod);
 }
 

@@ -801,7 +801,8 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
 // §6.19 with A.2.8 and §23.9: an enumeration a block's typedef declares has
 // its members as named constants of the block, declared where the typedef
 // stands with the values RegisterBlockEnumTypes (block_enums.cpp) folded, so
-// the statements after it read them.
+// the statements after it read them. So does the inline enumeration of a
+// block variable's declaration.
 StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   ForEachBlockEnumMember(
@@ -816,9 +817,23 @@ StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
+// §6.19 with A.2.8: a block variable declared with an inline enumerated type
+// has its enumeration's members declared ahead of it, for its initializer to
+// read, and is declared through the copy RegisterBlockEnumTypes reshaped to
+// name that enumeration, so §6.19.5's methods answer for it.
+static const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
+                                       Arena& arena) {
+  if (stmt->var_decl_type.kind != DataTypeKind::kEnum) return stmt;
+  ExecBlockItemDeclImpl(stmt, ctx, arena);
+  const auto& shaped = ctx.ClassTypedefShapedDecls();
+  auto it = shaped.find(stmt);
+  return it == shaped.end() ? stmt : it->second;
+}
+
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
+  stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;

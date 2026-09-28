@@ -26,6 +26,7 @@ Expr* Parser::ParseTypeRefExpr() {
     // of class C rather than a T of the enclosing scope. The DataType holding
     // that prefix dies with this call, so carry it onto the expression.
     ref->scope_prefix = dtype.scope_name;
+    ref->type_value = arena_.Create<DataType>(dtype);
   } else {
     ref->lhs = ParseExpr();
   }

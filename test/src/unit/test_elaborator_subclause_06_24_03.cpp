@@ -452,4 +452,73 @@ TEST(BitStreamCastElaboration,
                             6, "6.24.3"));
 }
 
+// §6.24.3's Control/Bits example: the structure's bit-stream size counts every
+// element of its unpacked array member, so `byte command [2]` adds sixteen
+// bits, the whole is 36, and the casts both ways to `bit Bits [36:1]` agree in
+// size.
+TEST(BitStreamCastElab, UnpackedArrayMemberCountsEveryElement) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct { shortint address; logic [3:0] code;\n"
+             "                   byte command [2]; } Control;\n"
+             "  typedef bit Bits [36:1];\n"
+             "  Control p, q; Bits b;\n"
+             "  initial begin\n"
+             "    b = Bits'(p);\n"
+             "    q = Control'(b);\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The same structure is still 36 bits against a 28-bit unpacked destination,
+// so the cast with an unpacked operand of a different size stays reported.
+TEST(BitStreamCastElab, UnpackedArrayMemberSizeMismatchStillReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { shortint address; logic [3:0] code;\n"
+      "                   byte command [2]; } Control;\n"
+      "  typedef bit Bits [28:1];\n"
+      "  Control q; Bits b;\n"
+      "  initial q = Control'(b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (28 bits to 36 bits) with an "
+                            "unpacked operand is illegal",
+                            6, "6.24.3"));
+}
+
+// §6.24.3: a cast between fixed-size types of different sizes where either is
+// unpacked is an error, and a variable of an unpacked structure is such an
+// operand: 24 bits of `struct { bit [7:0] a; shortint b; }` cast to a 32-bit
+// int.
+TEST(BitStreamCastElab, UnpackedStructOperandOfAnotherSizeReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  struct { bit [7:0] a; shortint b; } a;\n"
+      "  int b;\n"
+      "  initial b = int'(a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast between fixed-size types of "
+                            "different sizes (24 bits to 32 bits) with an "
+                            "unpacked operand is illegal",
+                            4, "6.24.3"));
+}
+
+// An unpacked structure of the destination's size, 32 bits of two shortints,
+// casts to an int.
+TEST(BitStreamCastElab, UnpackedStructOperandOfTheSameSizeAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  struct { shortint a; shortint b; } a;\n"
+             "  int b;\n"
+             "  initial b = int'(a);\n"
+             "endmodule\n"));
+}
+
 }  // namespace

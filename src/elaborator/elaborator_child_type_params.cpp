@@ -4,6 +4,7 @@
 #include <format>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -106,31 +107,58 @@ static std::optional<DataType> ResolveChildTypeParam(
   return std::nullopt;
 }
 
+// §23.10.2: a parameter value assignment is written in the instantiating
+// module, so a type name it gives, a typedef or type parameter of that module,
+// stands for the type the name has there and not for a child's declaration of
+// the same name. `typedefs` still holds the instantiating module's names, and
+// the name is replaced by the type it stands for among them. Published as the
+// name, `child #(bus_t)` into a child whose own type parameter is bus_t made
+// bus_t stand for itself, and sizing it recursed without end. A name carrying
+// packed dimensions written on it, and one scoped to a class or package, keep
+// their form; the hop limit keeps a cyclic typedef from looping.
+static DataType InInstantiatingScope(DataType dt, const TypedefMap& typedefs) {
+  for (int hops = 0; hops < 8 && dt.kind == DataTypeKind::kNamed &&
+                     dt.scope_name.empty() && dt.packed_dim_left == nullptr;
+       ++hops) {
+    auto it = typedefs.find(dt.type_name);
+    if (it == typedefs.end()) break;
+    dt = it->second;
+  }
+  return dt;
+}
+
 // §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
 // type and publish it in `typedefs` so the child's dependent declarations
-// elaborate against the chosen type. A type parameter whose type
-// ResolveChildTypeParam could not settle publishes nothing, so the child's
-// declarations that depend on it are left unresolved rather than bound to a
-// type the instantiation did not ask for. Returns the prior entries so the
-// caller can restore the shared map after the child is elaborated.
+// elaborate against the chosen type. Every type is resolved before any is
+// published, so each override reads the instantiating module's names. A type
+// parameter whose type ResolveChildTypeParam could not settle publishes
+// nothing, so the child's declarations that depend on it are left unresolved
+// rather than bound to a type the instantiation did not ask for. Returns the
+// prior entries so the caller can restore the shared map after the child is
+// elaborated.
 std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
                                                const ModuleDecl* child_decl,
                                                TypedefMap& typedefs,
                                                const CompilationUnit* unit,
                                                DiagEngine& diag) {
-  std::vector<SavedTypedef> saved;
+  std::vector<std::pair<std::string_view, DataType>> resolved_params;
   for (size_t i = 0; i < child_decl->params.size(); ++i) {
     std::string_view pname = child_decl->params[i].first;
     if (child_decl->type_param_names.count(pname) == 0) continue;
     auto resolved = ResolveChildTypeParam(from, child_decl, i, unit, diag);
     if (!resolved) continue;
+    resolved_params.emplace_back(pname,
+                                 InInstantiatingScope(*resolved, typedefs));
+  }
+  std::vector<SavedTypedef> saved;
+  for (auto& [pname, type] : resolved_params) {
     SavedTypedef s;
     s.name = pname;
     auto it = typedefs.find(pname);
     s.existed = it != typedefs.end();
     if (s.existed) s.prev = it->second;
     saved.push_back(s);
-    typedefs[pname] = *resolved;
+    typedefs[pname] = std::move(type);
   }
   return saved;
 }

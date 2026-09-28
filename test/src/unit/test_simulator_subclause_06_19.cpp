@@ -368,4 +368,28 @@ TEST(EnumerationSimulation, BlockTypedefEnumsOfTheSameNameKeepApart) {
   EXPECT_EQ(out, "A q 3 2 2\nB r 2 3 8\nC V1 1 2\n");
 }
 
+// A.2.8 admits a variable declaration with an inline enumerated type among a
+// block's items, in a begin-end block and in a task body, and §6.19 makes the
+// enumeration's members named constants of the block, which the declaration's
+// own initializer and the statements after it read; the variable is of the
+// enumeration, so §6.19.5's name() answers for it.
+TEST(EnumerationSimulation, BlockInlineEnumVariableHasItsMembers) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  task tk;\n"
+      "    enum {p, q} z;\n"
+      "    z = q;\n"
+      "    $display(\"%s %0d\", z.name(), z);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    automatic enum {r, s} y = s;\n"
+      "    $display(\"%s %0d\", y.name(), r);\n"
+      "    tk();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "s 0\nq 1\n");
+}
+
 }  // namespace

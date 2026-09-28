@@ -3,8 +3,10 @@
 // which holds the pending-generate driver, the item walk and the loop
 // generate, at its size limit.
 
+#include <algorithm>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,8 +16,10 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -137,12 +141,25 @@ static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
 
 void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                                        const ScopeMap& scope) {
-  auto selector = ConstEvalInt(item->gen_cond, scope);
-  if (!selector) {
+  // §6.23 (printed page 138): a type reference is a constant usable where a
+  // generate case's selector stands, and its items' type references are
+  // compared with it by §6.22.1's matching, as `==` compares two of them.
+  std::optional<DataType> selector_type =
+      ResolveTypeRefOperandType(item->gen_cond);
+  std::optional<int64_t> selector;
+  if (!selector_type) selector = ConstEvalInt(item->gen_cond, scope);
+  if (!selector_type && !selector) {
     diag_.Warning(item->loc, "generate-case selector is not constant",
                   Subclause("27.5"));
     return;
   }
+  auto matches = [&](const std::vector<Expr*>& patterns) {
+    if (!selector_type) return MatchesCasePattern(patterns, *selector, scope);
+    return std::any_of(patterns.begin(), patterns.end(), [&](const Expr* p) {
+      auto type = ResolveTypeRefOperandType(p);
+      return type && TypesMatch(*selector_type, *type);
+    });
+  };
   // Hold the default alternative itself rather than its body, because the scope
   // it opens is named by its own label and shaped by its own begin-end
   // keywords, and neither is reachable from the body alone.
@@ -152,7 +169,7 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
       default_item = &ci;
       continue;
     }
-    if (MatchesCasePattern(ci.patterns, *selector, scope)) {
+    if (matches(ci.patterns)) {
       ElaborateConditionalGenerateBlock(
           {ci.label, ci.name_is_generated, ci.body, ci.has_begin_end}, mod,
           scope);

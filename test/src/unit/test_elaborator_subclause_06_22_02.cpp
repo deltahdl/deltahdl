@@ -167,4 +167,39 @@ TEST(EquivalentTypesElaboration, NonEquivalentStructComparisonNames6_22_2) {
       "6.22.2"));
 }
 
+// §6.22.2's own example: item a) makes the typedef name uint10 equivalent to
+// `bit [10:1]`, and item d) makes that packed array equivalent to `bit [9:0]`,
+// both 2-state, unsigned and 10 bits, so §7.6 accepts the unpacked-array
+// assignment of `bit [9:0] A [0:5]` to `uint10 C [6:1]` in either direction.
+TEST(EquivalentTypesElaboration, TypedefElementArrayAssignmentAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef bit [10:1] uint10;\n"
+             "  bit [9:0] A [0:5];\n"
+             "  uint10 C [6:1];\n"
+             "  initial begin\n"
+             "    C = A;\n"
+             "    A = C;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// A typedef element type is compared as the type it names, so a `bit [8:0]`
+// element, nine bits against uint10's ten, is still not equivalent.
+TEST(EquivalentTypesElaboration, TypedefElementOfAnotherWidthRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef bit [10:1] uint10;\n"
+      "  bit [8:0] A [0:5];\n"
+      "  uint10 C [6:1];\n"
+      "  initial C = A;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array element type mismatch in assignment "
+                            "('C' vs 'A')",
+                            5, "7.6"));
+}
+
 }  // namespace

@@ -720,7 +720,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
   // built.
-  ResolveTypeRef(item, mod);
+  ResolveTypeRef(item->data_type, item->loc, mod);
 
   // §8.23: and `wire Cfg::beat_t w;` names a type declared in a class, which a
   // net reaches by this path and not by ElaborateVarDecl's. It has to be

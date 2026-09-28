@@ -34,6 +34,13 @@ std::string BlockEnumKey(const ModuleItem* td, std::string_view path) {
                      path, reinterpret_cast<std::uintptr_t>(td));
 }
 
+// The key the inline enumeration of a block variable's declaration `s`,
+// `enum {r, s} y;`, is registered under: the declaration's address, which no
+// other declaration shares, in the `$block::` scope BlockEnumKey's are.
+std::string BlockVarEnumKey(const Stmt* s) {
+  return std::format("$block::@{:x}", reinterpret_cast<std::uintptr_t>(s));
+}
+
 // The typedef a block item declaration `s` declares, or null.
 const ModuleItem* BlockTypedefOf(const Stmt* s) {
   if (s == nullptr || s->kind != StmtKind::kBlockItemDecl) return nullptr;
@@ -76,6 +83,20 @@ struct BlockEnumWalk {
     ctx.RegisterTypeSigned(key, IsSignedType(type, TypedefMap{}));
   }
 
+  // §6.19 with A.2.8: a block variable declared with an inline enumerated
+  // type is of that enumeration, which is registered under the declaration's
+  // own key and named by a reshaped copy of the declaration, as a typedef's
+  // is.
+  void RegisterInlineEnum(const Stmt* s) {
+    auto* key = arena.Create<std::string>(BlockVarEnumKey(s));
+    if (ctx.FindEnumType(*key) == nullptr) Register(*key, s->var_decl_type);
+    auto* shaped = arena.Create<Stmt>(*s);
+    shaped->var_decl_type.kind = DataTypeKind::kNamed;
+    shaped->var_decl_type.type_name = *key;
+    shaped->var_decl_type.enum_members.clear();
+    ctx.ClassTypedefShapedDecls()[s] = shaped;
+  }
+
   // §6.18: a declaration naming a typedef of the block is of the typedef's
   // type, so it is reshaped to name the key that type is registered under.
   void ReshapeDecl(const Stmt* s, const BlockEnumAliases& aliases) {
@@ -104,7 +125,12 @@ struct BlockEnumWalk {
 
   void Walk(const Stmt* s, const BlockEnumAliases& aliases) {
     if (s == nullptr) return;
-    if (s->kind == StmtKind::kVarDecl) ReshapeDecl(s, aliases);
+    if (s->kind == StmtKind::kVarDecl &&
+        s->var_decl_type.kind == DataTypeKind::kEnum) {
+      RegisterInlineEnum(s);
+    } else if (s->kind == StmtKind::kVarDecl) {
+      ReshapeDecl(s, aliases);
+    }
     if (s->kind == StmtKind::kBlock) return WalkList(s->stmts, aliases);
     if (s->kind == StmtKind::kFork) return WalkList(s->fork_stmts, aliases);
     ForEachChildStmt(s, [&](Stmt* const& sub) { Walk(sub, aliases); });
@@ -140,6 +166,13 @@ void RegisterBlockEnumTypes(const RtlirModule* mod, const RtlirDesign* design,
 void ForEachBlockEnumMember(
     const Stmt* stmt, SimContext& ctx,
     const std::function<void(const EnumMemberInfo&, const EnumTypeInfo&)>& fn) {
+  if (stmt != nullptr && stmt->kind == StmtKind::kVarDecl &&
+      stmt->var_decl_type.kind == DataTypeKind::kEnum) {
+    const EnumTypeInfo* info = ctx.FindEnumType(BlockVarEnumKey(stmt));
+    if (info == nullptr) return;
+    for (const EnumMemberInfo& m : info->members) fn(m, *info);
+    return;
+  }
   const ModuleItem* td = BlockTypedefOf(stmt);
   if (td == nullptr) return;
   ForEachEnumTypeOfItem(td, [&](std::string_view path, const DataType&) {

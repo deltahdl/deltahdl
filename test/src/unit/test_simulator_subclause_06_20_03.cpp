@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -85,6 +88,47 @@ TEST(TypeParameterSim, MultipleTypeParamsResolveCorrectly) {
   EXPECT_EQ(vx->value.ToUint64(), 0xDEADBEEFu);
   EXPECT_EQ(vy->value.width, 16u);
   EXPECT_EQ(vy->value.ToUint64(), 0xCAFEu);
+}
+
+// §23.10.2 with §6.20.3: an override is written in the instantiating module,
+// so `child #(bus_t)` hands the child the parent's bus_t, 13 bits, although the
+// child's own type parameter has the same name; so does §6.23's
+// `parameter type bus_t = type(A_bus)` for a parent's bus_t.
+TEST(TypeParameterSim, OverrideNamesTheParentsTypeOfTheSameName) {
+  const std::string kSrc =
+      "module child #(type bus_t = bit [7:0]) ();\n"
+      "  bus_t v;\n"
+      "  int w;\n"
+      "  initial w = $bits(v);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  bit [12:0] A_bus;\n"
+      "  parameter type bus_t = bit [12:0];\n"
+      "  parameter type ref_t = type(A_bus);\n"
+      "  child #(bus_t) u1 ();\n"
+      "  child #(.bus_t(ref_t)) u2 ();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "u1.w"), 13u);
+  EXPECT_EQ(RunAndGet(kSrc, "u2.w"), 13u);
+}
+
+// Each override reads the parent's names, not a child parameter an earlier
+// override has already set: `.A(B), .B(A)` swaps the parent's byte and
+// shortint into the child.
+TEST(TypeParameterSim, OverridesSwappingTwoNamesReadTheParents) {
+  const std::string kSrc =
+      "module child #(type A = int, type B = int) ();\n"
+      "  A a; B b;\n"
+      "  int wa, wb;\n"
+      "  initial begin wa = $bits(a); wb = $bits(b); end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  parameter type A = byte;\n"
+      "  parameter type B = shortint;\n"
+      "  child #(.A(B), .B(A)) u ();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "u.wa"), 16u);
+  EXPECT_EQ(RunAndGet(kSrc, "u.wb"), 8u);
 }
 
 }  // namespace

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <unordered_set>
@@ -320,27 +321,39 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
 }
 
 // §6.23/§6.20.3: a type-parameter default written with the type operator,
-// e.g. `localparam type T = type(int)`, arrives as a kTypeRef init expression
-// (its text is the inner type name) rather than a typedef_type. Resolves it to
-// a concrete type so dependent declarations elaborate against the chosen
-// type, carrying the built-in's implicit signedness (so `T x` is signed for
-// int). §8.23 also permits a class scope resolution to prefix that type name,
-// as in `type(Frame::payload_t)`, which the kTypeRef expression carries in
-// scope_prefix. That form is resolved through the class instead, and
-// typedef_type left unchanged when the class or its typedef is not visible.
-// Answers whether the item is a type parameter after that, false for one
-// written any other way.
-bool ResolveTypeOperatorDefault(ModuleItem* item, const CompilationUnit* unit) {
+// e.g. `localparam type T = type(bit [12:0])`, arrives as a kTypeRef init
+// expression rather than a typedef_type. Resolves it to a concrete type so
+// dependent declarations elaborate against the chosen type: the data type the
+// parser read, packed dimensions and the built-in's implicit signedness
+// included (so `T x` is signed for int). §8.23 also permits a class scope
+// resolution to prefix that type name, as in `type(Frame::payload_t)`, which
+// the kTypeRef expression carries in scope_prefix. That form is resolved
+// through the class instead, and typedef_type left unchanged when the class or
+// its typedef is not visible. A reference to an expression, §6.23's
+// `parameter type bus_t = type(A_bus);`, is the expression's self-determined
+// type, which `resolve_expr_type` gives from the names declared above the
+// parameter. Answers whether the item is a type parameter after that, false for
+// one written any other way.
+bool ResolveTypeOperatorDefault(
+    ModuleItem* item, const CompilationUnit* unit,
+    const std::function<void(DataType&)>& resolve_expr_type) {
   if (item->data_type.kind != DataTypeKind::kVoid ||
       item->typedef_type.kind != DataTypeKind::kImplicit ||
-      item->init_expr == nullptr ||
-      item->init_expr->kind != ExprKind::kTypeRef ||
-      item->init_expr->text.empty())
+      item->init_expr == nullptr || item->init_expr->kind != ExprKind::kTypeRef)
     return false;
-  if (item->init_expr->scope_prefix.empty()) {
-    item->typedef_type = TypeNameToDataType(item->init_expr->text);
+  const Expr* ref = item->init_expr;
+  if (ref->text.empty()) {
+    if (ref->lhs == nullptr) return false;
+    DataType dt;
+    dt.type_ref_expr = ref->lhs;
+    resolve_expr_type(dt);
+    if (dt.type_ref_expr == nullptr) item->typedef_type = dt;
+  } else if (ref->scope_prefix.empty()) {
+    item->typedef_type = ref->type_value != nullptr
+                             ? *ref->type_value
+                             : TypeNameToDataType(ref->text);
   } else if (const DataType* scoped = FindClassScopedTypedefType(
-                 item->init_expr->scope_prefix, item->init_expr->text, unit)) {
+                 ref->scope_prefix, ref->text, unit)) {
     item->typedef_type = *scoped;
   }
   return item->typedef_type.kind != DataTypeKind::kImplicit;
@@ -428,7 +441,10 @@ static void RecordUntypedRealParam(
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
-  if (!is_type) is_type = ResolveTypeOperatorDefault(item, unit_);
+  if (!is_type) {
+    is_type = ResolveTypeOperatorDefault(
+        item, unit_, [&](DataType& dt) { ResolveTypeRef(dt, item->loc, mod); });
+  }
 
   CheckTypeParamNotSetToValue(item, diag_);
 

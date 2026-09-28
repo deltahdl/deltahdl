@@ -458,21 +458,27 @@ static std::string_view PersistentName(std::string name) {
 // block's items, so `typedef enum {p, q} e_t;` in a begin-end block declares
 // p and q in that block (§23.9), as it would in a module. Collects them, and
 // those of an enumeration written as a member's type of a structure or union
-// the typedef declares. Their bounds fold against no scope, as
-// AddEnumMemberNames' do.
+// the typedef declares. A.2.8 admits a data_declaration there too, so the
+// inline enumeration of `enum {r, s} y;` declares r and s in the block alike.
+// Their bounds fold against no scope, as AddEnumMemberNames' do.
 static void CollectBlockEnumMemberNames(
     const Stmt* s, std::unordered_set<std::string_view>& names) {
+  const ScopeMap kNoScope;
+  auto collect = [&](std::string_view, const DataType& type) {
+    for (const auto& em : type.enum_members) {
+      for (auto& n : EnumMemberDeclaredNames(em, kNoScope))
+        names.insert(PersistentName(std::move(n)));
+    }
+  };
+  if (s->kind == StmtKind::kVarDecl) {
+    if (s->var_decl_type.kind == DataTypeKind::kEnum)
+      collect({}, s->var_decl_type);
+    return;
+  }
   if (s->kind != StmtKind::kBlockItemDecl || s->decl_item == nullptr ||
       s->decl_item->kind != ModuleItemKind::kTypedef)
     return;
-  const ScopeMap kNoScope;
-  ForEachEnumTypeOfItem(
-      s->decl_item, [&](std::string_view, const DataType& type) {
-        for (const auto& em : type.enum_members) {
-          for (auto& n : EnumMemberDeclaredNames(em, kNoScope))
-            names.insert(PersistentName(std::move(n)));
-        }
-      });
+  ForEachEnumTypeOfItem(s->decl_item, collect);
 }
 
 // Over-approximated set of names that are local to a procedural block: block

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -125,6 +127,59 @@ TEST(TypeOfThisSim, MatchesEnclosingClassInStaticMethod) {
                       "endmodule\n",
                       "result"),
             1u);
+}
+
+// §6.23 with A.2.8: `var type(a) v;` among a block's items declares v with the
+// self-determined type of `a`, so v is the 32-bit signed int of `int a` and
+// holds -7, which a one-bit v would read as 1.
+TEST(TypeOfExprBlockVarSim, TakesTheIntTypeOfAModuleVariable) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int a = 3;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    var automatic type(a) v = -7;\n"
+                      "    r = v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0xFFFFFFF9u);
+}
+
+// §6.23: the type of `w`, `logic [11:0]`, gives x twelve bits, so all twelve
+// written ones survive and $bits(x) is 12.
+TEST(TypeOfExprBlockVarSim, TakesTheVectorTypeOfAModuleVariable) {
+  const std::string kSrc =
+      "module t;\n"
+      "  logic [11:0] w;\n"
+      "  int r, b;\n"
+      "  initial begin\n"
+      "    var type(w) x;\n"
+      "    x = 12'hFFF;\n"
+      "    r = x;\n"
+      "    b = $bits(x);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 4095u);
+  EXPECT_EQ(RunAndGet(kSrc, "b"), 12u);
+}
+
+// §6.23 takes the type of the expression with the names in scope at the
+// declaration, so the block's own `shortint a` hides the module's 4-bit `a`:
+// z is 16 bits wide and signed, and holds -2.
+TEST(TypeOfExprBlockVarSim, TakesTheTypeOfAnEarlierBlockLocal) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] a;\n"
+      "  int r, b;\n"
+      "  initial begin\n"
+      "    shortint a;\n"
+      "    var automatic type(a) z = -2;\n"
+      "    r = z;\n"
+      "    b = $bits(z);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0xFFFFFFFEu);
+  EXPECT_EQ(RunAndGet(kSrc, "b"), 16u);
 }
 
 }  // namespace

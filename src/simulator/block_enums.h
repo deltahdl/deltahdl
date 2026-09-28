@@ -30,10 +30,10 @@ void RegisterBlockEnumTypes(const RtlirModule* mod, const RtlirDesign* design,
                             SimContext& ctx, Arena& arena);
 
 // Calls `fn` for each member of each enumeration the block item declaration
-// `stmt` declares, with the enumeration it belongs to, as
-// RegisterBlockEnumTypes registered it; a statement declaring none calls
-// nothing. The caller declares each member as a constant of the running
-// block.
+// `stmt` declares, a typedef's or a variable declaration's inline one, with the
+// enumeration it belongs to, as RegisterBlockEnumTypes registered it; a
+// statement declaring none calls nothing. The caller declares each member as a
+// constant of the running block.
 void ForEachBlockEnumMember(
     const Stmt* stmt, SimContext& ctx,
     const std::function<void(const EnumMemberInfo&, const EnumTypeInfo&)>& fn);

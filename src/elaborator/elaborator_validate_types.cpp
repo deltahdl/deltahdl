@@ -14,6 +14,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -645,6 +646,85 @@ void RegisterForHeaderEnumVars(
   }
 }
 
+// What EnumTypeOfName reads: the module's variables declared with a type name,
+// each with that name, the typedefs in scope, and the names the procedure
+// declares, which hide the module's.
+struct EnumTypeLookup {
+  const std::unordered_map<std::string_view, std::string_view>& var_types;
+  const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& locals;
+};
+
+// The typedef that writes the enumeration the type name `name` stands for,
+// through any chain of typedefs renaming it (§6.22.1 makes a renamed type the
+// same type); empty where `name` stands for no enumeration. The hop limit
+// keeps a cyclic typedef from looping.
+std::string_view EnumTypedefBehind(std::string_view name,
+                                   const TypedefMap& typedefs) {
+  for (int hops = 0; hops < 8; ++hops) {
+    auto it = typedefs.find(name);
+    if (it == typedefs.end()) return {};
+    if (it->second.kind == DataTypeKind::kEnum) return name;
+    if (it->second.kind != DataTypeKind::kNamed) return {};
+    name = it->second.type_name;
+  }
+  return {};
+}
+
+// The enumeration typedef that declares `member` as a member; empty where none
+// does, and where more than one does.
+std::string_view EnumTypedefDeclaringMember(std::string_view member,
+                                            const TypedefMap& typedefs) {
+  std::string_view found;
+  for (const auto& [td, type] : typedefs) {
+    if (type.kind != DataTypeKind::kEnum) continue;
+    bool declares =
+        std::any_of(type.enum_members.begin(), type.enum_members.end(),
+                    [&](const EnumMember& em) { return em.name == member; });
+    if (!declares) continue;
+    if (!found.empty() && found != td) return {};
+    found = td;
+  }
+  return found;
+}
+
+// The enumeration typedef the value named `name` is of: a module variable's
+// declared enumeration, or the one of the typedef that declares `name` as a
+// member. Empty for any other name, for a name the procedure declares, and
+// for a member more than one typedef declares.
+std::string_view EnumTypeOfName(std::string_view name,
+                                const EnumTypeLookup& lookup) {
+  if (name.empty() || lookup.locals.count(name) != 0) return {};
+  auto var = lookup.var_types.find(name);
+  if (var != lookup.var_types.end())
+    return EnumTypedefBehind(var->second, lookup.typedefs);
+  return EnumTypedefDeclaringMember(name, lookup.typedefs);
+}
+
+// §6.19.3 (printed page 122): an enum variable is not directly assigned a value
+// outside its enumeration set, and a value of another enumerated type, a
+// variable or a member of it, is one: `c = w;` with Colors c and Week w needs
+// the cast. The bare name reaches IsBareEnumAssignable's acceptance, which
+// asks no type, so this is the check that tells the two enumerations apart.
+void ReportCrossEnumAssigns(const Stmt* s, const EnumTypeLookup& lookup,
+                            DiagEngine& diag) {
+  if (s == nullptr) return;
+  if (StmtIsProceduralAssign(s) && s->rhs != nullptr &&
+      s->rhs->kind == ExprKind::kIdentifier) {
+    std::string_view to = EnumTypeOfName(ExprIdent(s->lhs), lookup);
+    std::string_view from = EnumTypeOfName(s->rhs->text, lookup);
+    if (!to.empty() && !from.empty() && to != from) {
+      diag.Error(s->range.start,
+                 std::format("value of enum type '{}' assigned to enum "
+                             "variable of type '{}' without cast",
+                             from, to),
+                 Subclause("6.19.3"));
+    }
+  }
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { ReportCrossEnumAssigns(sub, lookup, diag); });
+}
+
 }  // namespace
 
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
@@ -698,6 +778,10 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForEnumAssign(item->body);
+      std::unordered_set<std::string_view> locals;
+      CollectProcLocalNames(item->body, locals);
+      ReportCrossEnumAssigns(item->body, {var_named_types_, typedefs_, locals},
+                             diag_);
     }
   }
 }

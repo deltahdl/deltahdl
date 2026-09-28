@@ -1,5 +1,8 @@
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -18,18 +21,66 @@
 
 namespace delta {
 
-void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
-  if (!IsProceduralItemKind(item->kind)) return;
-  for (const auto& ev : item->sensitivity) {
+// Whether an event list holds an edge event on a name `is_real` answers true
+// for.
+template <typename IsReal>
+static bool HasEdgeOnReal(const std::vector<EventExpr>& events,
+                          IsReal&& is_real) {
+  for (const auto& ev : events) {
     if (ev.edge == Edge::kNone) continue;
     auto name = ExprIdent(ev.signal);
-    if (name.empty()) continue;
-    auto it = var_types_.find(name);
-    if (it != var_types_.end() && IsRealType(it->second)) {
-      diag_.Error(item->loc, "edge event on real type is illegal",
-                  Subclause("6.12"));
-    }
+    if (!name.empty() && is_real(name)) return true;
   }
+  return false;
+}
+
+// §6.12 with §9.4.2: an event control a procedural statement carries,
+// `@(posedge r) stmt` or `@(negedge r);`, is an edge event as an always
+// block's is, so the edge on a real is reported at the statement. A real the
+// procedure declares, in the block holding the event control or one enclosing
+// it, is a real variable as a module's is; `locals` holds the names the
+// enclosing blocks declared real, and a block's own are dropped when the walk
+// leaves it.
+template <typename IsModuleReal>
+static void ReportEdgeOnRealInStmt(const Stmt* s,
+                                   std::vector<std::string_view>& locals,
+                                   IsModuleReal&& is_module_real,
+                                   DiagEngine& diag) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kVarDecl) {
+    if (IsRealType(s->var_decl_type.kind) && s->var_unpacked_dims.empty())
+      locals.push_back(s->var_name);
+    return;
+  }
+  auto is_real = [&](std::string_view name) {
+    return std::find(locals.begin(), locals.end(), name) != locals.end() ||
+           is_module_real(name);
+  };
+  if (HasEdgeOnReal(s->events, is_real)) {
+    diag.Error(s->range.start, "edge event on real type is illegal",
+               Subclause("6.12"));
+  }
+  const size_t kOuter = locals.size();
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    ReportEdgeOnRealInStmt(sub, locals, is_module_real, diag);
+  });
+  locals.resize(kOuter);
+}
+
+void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
+  auto is_module_real = [this](std::string_view name) {
+    auto it = var_types_.find(name);
+    return it != var_types_.end() && IsRealType(it->second);
+  };
+  if (IsProceduralItemKind(item->kind) &&
+      HasEdgeOnReal(item->sensitivity, is_module_real)) {
+    diag_.Error(item->loc, "edge event on real type is illegal",
+                Subclause("6.12"));
+  }
+  std::vector<std::string_view> locals;
+  ReportEdgeOnRealInStmt(item->body, locals, is_module_real, diag_);
+  for (const auto* s : item->func_body_stmts)
+    ReportEdgeOnRealInStmt(s, locals, is_module_real, diag_);
 }
 
 static bool IsChandleVar(const Expr* e, const TypeMap& types) {

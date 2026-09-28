@@ -761,4 +761,55 @@ TEST(Elaboration, EnumArrayPatternOfIntegers_Error) {
                             "6.19.3"));
 }
 
+// §6.19.3: an enum variable is directly assigned only values of its own
+// enumeration set, so a value of another enumerated type, a Week variable or
+// a Week member, lies outside Colors' set and needs a cast.
+TEST(Elaboration, EnumAssignedFromAnotherEnumTypeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {red, green} Colors;\n"
+      "  typedef enum {Mo, Tu} Week;\n"
+      "  Colors c; Week w;\n"
+      "  initial begin\n"
+      "    w = Mo;\n"
+      "    c = w;\n"
+      "    c = Tu;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of enum type 'Week' assigned to enum "
+                            "variable of type 'Colors' without cast",
+                            7, "6.19.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of enum type 'Week' assigned to enum "
+                            "variable of type 'Colors' without cast",
+                            8, "6.19.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// A value of the variable's own enumeration, named through a typedef that
+// renames it (§6.22.1 makes the two names one type), and one cast from another
+// enumeration, are assignable; so is a name a block declares, whatever the
+// module's variable of that name is.
+TEST(Elaboration, EnumAssignedFromItsOwnTypeOrThroughACastAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef enum {red, green} Colors;\n"
+             "  typedef Colors hue_t;\n"
+             "  typedef enum {Mo, Tu} Week;\n"
+             "  Colors c; hue_t h; Week w;\n"
+             "  initial begin\n"
+             "    c = h;\n"
+             "    h = green;\n"
+             "    c = Colors'(w);\n"
+             "  end\n"
+             "  initial begin\n"
+             "    Week c;\n"
+             "    c = w;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

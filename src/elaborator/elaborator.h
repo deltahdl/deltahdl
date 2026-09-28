@@ -515,7 +515,7 @@ class Elaborator : public ElaboratorClassRules {
   // mutable member it is copied from. Empty outside any generate construct.
   std::string_view InternedGenPrefix();
 
-  void ResolveTypeRef(ModuleItem* item, const RtlirModule* mod);
+  void ResolveTypeRef(DataType& dt, SourceLoc loc, const RtlirModule* mod);
 
   void ValidateArrayInitPattern(const ModuleItem* item);
   void ValidateStructInitPattern(const ModuleItem* item);

@@ -1,5 +1,6 @@
 #include <charconv>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
 #include <optional>
 #include <string>
@@ -7,6 +8,7 @@
 #include <system_error>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -15,10 +17,12 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -327,7 +331,8 @@ struct BitStreamCast {
 // §6.24.3: the elaboration context the bit-stream-cast checks consult to
 // resolve the types named in a cast: the diagnostic sink plus the type maps
 // (class names, class-handle variable types, unpacked-array variable info,
-// typedefs) and the enclosing compilation unit.
+// typedefs, the widths of the unpacked-array typedefs, the module variables'
+// declared types) and the enclosing compilation unit.
 struct BitStreamCastCtx {
   DiagEngine& diag;
   const std::unordered_set<std::string_view>& class_names;
@@ -335,8 +340,106 @@ struct BitStreamCastCtx {
   const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
       var_array_info;
   const TypedefMap& typedefs;
+  const std::unordered_map<std::string_view, uint32_t>& unpacked_typedef_widths;
+  const std::unordered_map<std::string_view, const DataType*>& var_decl_types;
   CompilationUnit* unit;
 };
+
+// The number of elements a declaration's unpacked dimensions give it, each
+// written `[size]` or `[left:right]`; zero where one does not fold to a fixed
+// size, a dynamic, queue or associative dimension among them.
+uint32_t FixedUnpackedElementCount(const std::vector<Expr*>& dims) {
+  uint32_t count = 1;
+  for (const Expr* dim : dims) {
+    if (dim == nullptr) return 0;
+    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      auto left = ConstEvalInt(dim->lhs);
+      auto right = ConstEvalInt(dim->rhs);
+      if (!left || !right) return 0;
+      count *= static_cast<uint32_t>(std::abs(*left - *right) + 1);
+    } else if (auto size = ConstEvalInt(dim); size && *size > 0) {
+      count *= static_cast<uint32_t>(*size);
+    } else {
+      return 0;
+    }
+  }
+  return count;
+}
+
+// §6.24.3 (printed page 142): the size of a fixed-size bit-stream type is the
+// number of bits it holds, an unpacked structure's being every bit of every
+// member, so its `byte command [2]` holds sixteen. EvalTypeWidth gives such a
+// member the width of one element, so an unpacked structure is summed here,
+// each member's element size times its element count, and any other type is
+// EvalTypeWidth's. Zero where a member's size is not fixed. The depth bounds a
+// cyclic typedef.
+uint32_t BitStreamTypeWidth(const DataType& type, const TypedefMap& typedefs,
+                            int depth = 0);
+
+// One member's share of an unpacked structure's bit-stream size: its element
+// size times its unpacked element count, zero where either is not fixed.
+uint32_t MemberBitStreamWidth(const StructMember& m, const TypedefMap& typedefs,
+                              int depth) {
+  const DataType* member_type =
+      m.nested_type != nullptr ? m.nested_type : MemberNamedType(m, typedefs);
+  uint32_t element = member_type == nullptr
+                         ? EvalStructMemberWidth(m, typedefs)
+                         : BitStreamTypeWidth(*member_type, typedefs, depth);
+  return element * FixedUnpackedElementCount(m.unpacked_dims);
+}
+
+uint32_t BitStreamTypeWidth(const DataType& type, const TypedefMap& typedefs,
+                            int depth) {
+  if (depth > 8) return 0;
+  if (type.kind == DataTypeKind::kNamed) {
+    auto td = typedefs.find(type.type_name);
+    if (td == typedefs.end()) return 0;
+    return BitStreamTypeWidth(td->second, typedefs, depth + 1);
+  }
+  if (type.kind != DataTypeKind::kStruct || type.is_packed)
+    return EvalTypeWidth(type, typedefs);
+  uint32_t total = 0;
+  for (const StructMember& m : type.struct_members) {
+    uint32_t member = MemberBitStreamWidth(m, typedefs, depth + 1);
+    if (member == 0) return 0;
+    total += member;
+  }
+  return total;
+}
+
+// The size of the cast's destination type, a keyword type, an unpacked-array
+// typedef, or another typedef; zero where none is known.
+uint32_t BitStreamDestinationWidth(std::string_view target,
+                                   const BitStreamCastCtx& ctx) {
+  if (uint32_t simple = CastTargetSimpleWidth(target)) return simple;
+  auto unpacked = ctx.unpacked_typedef_widths.find(target);
+  if (unpacked != ctx.unpacked_typedef_widths.end()) return unpacked->second;
+  auto td = ctx.typedefs.find(target);
+  if (td == ctx.typedefs.end()) return 0;
+  return BitStreamTypeWidth(td->second, ctx.typedefs);
+}
+
+// The size of the unpacked operand named `name`, a fixed-size unpacked array or
+// a variable of an unpacked structure; zero for any other operand.
+uint32_t UnpackedOperandWidth(std::string_view name,
+                              const BitStreamCastCtx& ctx) {
+  auto var_it = ctx.var_array_info.find(name);
+  if (var_it != ctx.var_array_info.end()) {
+    const auto& info = var_it->second;
+    if (info.is_dynamic || info.is_assoc) return 0;
+    return info.unpacked_size * info.elem_width;
+  }
+  auto decl = ctx.var_decl_types.find(name);
+  if (decl == ctx.var_decl_types.end()) return 0;
+  const DataType* type = decl->second;
+  for (int hops = 0; hops < 8 && type->kind == DataTypeKind::kNamed; ++hops) {
+    auto td = ctx.typedefs.find(type->type_name);
+    if (td == ctx.typedefs.end()) return 0;
+    type = &td->second;
+  }
+  if (type->kind != DataTypeKind::kStruct || type->is_packed) return 0;
+  return BitStreamTypeWidth(*type, ctx.typedefs);
+}
 
 // §6.24.3: a class handle whose class exposes local or protected members is an
 // illegal bit-stream-cast source, except for the current instance `this` and
@@ -366,25 +469,15 @@ bool CheckBitStreamCastClassSource(const BitStreamCast& cast,
 
 // §6.24.3: when both source and destination are fixed-size types of different
 // sizes and either is unpacked, the cast generates a compile-time error. This
-// handles the case where the operand is a fixed-size unpacked-array variable.
+// handles the case where the operand is a fixed-size unpacked-array variable
+// or a variable of an unpacked structure.
 void CheckBitStreamCastUnpackedOperand(const BitStreamCast& cast,
                                        const BitStreamCastCtx& ctx) {
   const Expr* expr = cast.expr;
   if (expr->lhs->kind != ExprKind::kIdentifier) return;
-  auto src_name = expr->lhs->text;
-  auto var_it = ctx.var_array_info.find(src_name);
-  if (var_it == ctx.var_array_info.end()) return;
-  const auto& info = var_it->second;
-  if (info.is_dynamic || info.is_assoc) return;
-  if (info.unpacked_size == 0 || info.elem_width == 0) return;
-  uint32_t src_width = info.unpacked_size * info.elem_width;
-
-  uint32_t dst_width = CastTargetSimpleWidth(cast.target);
-  if (dst_width == 0) {
-    auto td = ctx.typedefs.find(cast.target);
-    if (td != ctx.typedefs.end())
-      dst_width = EvalTypeWidth(td->second, ctx.typedefs);
-  }
+  uint32_t src_width = UnpackedOperandWidth(expr->lhs->text, ctx);
+  if (src_width == 0) return;
+  uint32_t dst_width = BitStreamDestinationWidth(cast.target, ctx);
   if (dst_width == 0) return;
   if (src_width == dst_width) return;
   ctx.diag.Error(expr->range.start,
@@ -414,8 +507,14 @@ void ElaboratorOperationRules::CheckBitStreamCastExpr(const Expr* expr) {
   }
 
   BitStreamCast cast{expr, target};
-  BitStreamCastCtx ctx{diag_,           class_names_, class_var_types_,
-                       var_array_info_, typedefs_,    unit_};
+  BitStreamCastCtx ctx{diag_,
+                       class_names_,
+                       class_var_types_,
+                       var_array_info_,
+                       typedefs_,
+                       fixed_unpacked_typedef_widths_,
+                       bit_stream_var_types_,
+                       unit_};
 
   // §6.24.3: a class handle whose class exposes local or protected members
   // shall be illegal as a source type, except when the handle is the current
@@ -434,7 +533,13 @@ void ElaboratorOperationRules::CheckBitStreamCastExpr(const Expr* expr) {
 
   auto dst_unpacked_it = fixed_unpacked_typedef_widths_.find(target);
   if (dst_unpacked_it != fixed_unpacked_typedef_widths_.end()) {
-    uint32_t src_width = InferExprWidth(expr->lhs, typedefs_);
+    // An unpacked structure operand is as wide as all its members' elements,
+    // which InferExprWidth, answering one element of an unpacked member, is
+    // not.
+    uint32_t src_width = expr->lhs->kind == ExprKind::kIdentifier
+                             ? UnpackedOperandWidth(expr->lhs->text, ctx)
+                             : 0;
+    if (src_width == 0) src_width = InferExprWidth(expr->lhs, typedefs_);
     if (src_width > 0 && src_width != dst_unpacked_it->second) {
       diag_.Error(expr->range.start,
                   std::format("bit-stream cast between fixed-size types of "
@@ -481,6 +586,11 @@ void ElaboratorOperationRules::WalkStmtsForBitStreamCast(const Stmt* s) {
 }
 
 void ElaboratorOperationRules::ValidateBitStreamCast(const ModuleDecl* decl) {
+  bit_stream_var_types_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->unpacked_dims.empty())
+      bit_stream_var_types_[item->name] = &item->data_type;
+  }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

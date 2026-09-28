@@ -593,7 +593,7 @@ TEST(ScopeAndLifetimeElaboration, ForLoopVariableDefaultsAutomaticElaborates) {
       "module m;\n"
       "  initial begin\n"
       "    for (int i = 0; i < 4; i++) begin\n"
-      "      int local_val = i;\n"
+      "      automatic int local_val = i;\n"
       "    end\n"
       "  end\n"
       "endmodule\n",

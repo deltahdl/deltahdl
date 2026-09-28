@@ -196,7 +196,11 @@ std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
     const Expr* op) const {
   if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
   DataType dt;
-  if (!op->text.empty()) {
+  if (op->type_value != nullptr) {
+    // The data type the parser read, packed dimensions and signing included:
+    // `type(bit[12:0])` is a 13-bit vector, where its name alone is `bit`.
+    dt = *op->type_value;
+  } else if (!op->text.empty()) {
     dt = TypeNameToDataType(op->text);
   } else if (op->lhs && op->lhs->kind == ExprKind::kIdentifier) {
     dt = TypeNameToDataType(op->lhs->text);

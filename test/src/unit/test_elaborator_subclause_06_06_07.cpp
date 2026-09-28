@@ -535,4 +535,43 @@ TEST(NettypeElaboration, FixedUnpackedArrayDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.6.7's own example scopes a resolution function by a typedef of a class
+// specialization, `typedef Base#(32) MyBaseT;` and `with MyBaseT::Ssum`, so
+// the typedef names the class whose static function resolves the net and no
+// scope is reported unknown.
+TEST(NettypeElaboration, ResolutionFunctionScopedByATypedefOfASpecialization) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  class Base #(parameter p = 1);\n"
+             "    typedef struct { real r; bit [p-1:0] data; } S;\n"
+             "    static function S Ssum(input S driver[]);\n"
+             "      Ssum.r = 0.0;\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "  typedef Base#(32) MyBaseT;\n"
+             "  nettype MyBaseT::S narrowTsum with MyBaseT::Ssum;\n"
+             "  typedef MyBaseT alias_t;\n"
+             "  nettype alias_t::S aliasTsum with alias_t::Ssum;\n"
+             "endmodule\n"));
+}
+
+// The typedef still has to lead to a class declaring the function: one naming
+// a class without it is reported as a missing function, not an unknown scope.
+TEST(NettypeElaboration, ResolutionFunctionMissingFromATypedefsClassReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  class Base #(parameter p = 1);\n"
+      "    typedef struct { real r; bit [p-1:0] data; } S;\n"
+      "  endclass\n"
+      "  typedef Base#(32) MyBaseT;\n"
+      "  nettype MyBaseT::S narrowTsum with MyBaseT::Ssum;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'MyBaseT::Ssum' of "
+                            "user-defined nettype 'narrowTsum' does not exist",
+                            6, "6.6.7"));
+}
+
 }  // namespace

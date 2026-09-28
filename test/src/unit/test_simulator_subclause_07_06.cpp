@@ -334,4 +334,26 @@ TEST(ArrayAssignmentSimulation,
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, q->elements[0]));
 }
 
+// §6.22.2's example run: `C = A` copies A's elements left to right into C's,
+// so A[0] lands in C[6], and `A = C` copies them back, C[6] into A[0].
+TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
+  const char* kSrc =
+      "module t;\n"
+      "  typedef bit [10:1] uint10;\n"
+      "  bit [9:0] A [0:5];\n"
+      "  uint10 C [6:1];\n"
+      "  int c6, a0;\n"
+      "  initial begin\n"
+      "    A[0] = 5;\n"
+      "    C = A;\n"
+      "    c6 = C[6];\n"
+      "    C[6] = 9;\n"
+      "    A = C;\n"
+      "    a0 = A[0];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "c6"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "a0"), 9u);
+}
+
 }  // namespace

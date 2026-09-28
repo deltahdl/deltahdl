@@ -131,29 +131,28 @@ static bool ResolveClassScopedTypeRef(DataType& dt, const Expr* ref,
   return true;
 }
 
-void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
-  if (!item->data_type.type_ref_expr) return;
-  auto* ref = item->data_type.type_ref_expr;
-  CheckTypeRefArgInner(ref, item->loc);
-  if (ResolveClassScopedTypeRef(item->data_type, ref, unit_)) return;
+void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
+                                const RtlirModule* mod) {
+  if (!dt.type_ref_expr) return;
+  auto* ref = dt.type_ref_expr;
+  CheckTypeRefArgInner(ref, loc);
+  if (ResolveClassScopedTypeRef(dt, ref, unit_)) return;
   if (ref->kind != ExprKind::kIdentifier) {
-    item->data_type.kind = DataTypeKind::kLogic;
-    SetTypeRefPackedDims(item->data_type, InferTypeRefExprWidth(ref, mod),
-                         arena_);
-    item->data_type.is_signed = InferTypeRefExprSigned(ref, mod);
-    item->data_type.type_ref_expr = nullptr;
+    dt.kind = DataTypeKind::kLogic;
+    SetTypeRefPackedDims(dt, InferTypeRefExprWidth(ref, mod), arena_);
+    dt.is_signed = InferTypeRefExprSigned(ref, mod);
+    dt.type_ref_expr = nullptr;
     return;
   }
   for (const auto& v : mod->variables) {
     if (v.name != ref->text) continue;
-    item->data_type.kind = var_types_[ref->text];
-    item->data_type.is_signed = v.is_signed;
-    if (item->data_type.kind == DataTypeKind::kLogic ||
-        item->data_type.kind == DataTypeKind::kBit ||
-        item->data_type.kind == DataTypeKind::kReg) {
-      SetTypeRefPackedDims(item->data_type, v.width, arena_);
+    dt.kind = var_types_[ref->text];
+    dt.is_signed = v.is_signed;
+    if (dt.kind == DataTypeKind::kLogic || dt.kind == DataTypeKind::kBit ||
+        dt.kind == DataTypeKind::kReg) {
+      SetTypeRefPackedDims(dt, v.width, arena_);
     }
-    item->data_type.type_ref_expr = nullptr;
+    dt.type_ref_expr = nullptr;
     return;
   }
   // §6.23: type(net) yields the net's underlying data type (a logic vector of
@@ -161,16 +160,16 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   // its own net keyword, not from the type_reference.
   for (const auto& n : mod->nets) {
     if (n.name != ref->text) continue;
-    item->data_type.kind = DataTypeKind::kLogic;
-    item->data_type.is_signed = n.is_signed;
-    SetTypeRefPackedDims(item->data_type, n.width, arena_);
-    item->data_type.type_ref_expr = nullptr;
+    dt.kind = DataTypeKind::kLogic;
+    dt.is_signed = n.is_signed;
+    SetTypeRefPackedDims(dt, n.width, arena_);
+    dt.type_ref_expr = nullptr;
     return;
   }
   auto it = var_types_.find(ref->text);
   if (it != var_types_.end()) {
-    item->data_type.kind = it->second;
-    item->data_type.type_ref_expr = nullptr;
+    dt.kind = it->second;
+    dt.type_ref_expr = nullptr;
   }
 }
 

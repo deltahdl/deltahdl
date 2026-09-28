@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -176,6 +177,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkExprForBitStreamCast(const Expr* expr);
   void WalkStmtsForBitStreamCast(const Stmt* s);
   void CheckBitStreamCastExpr(const Expr* expr);
+  // The declared type of each module variable without an unpacked dimension,
+  // which says whether a bit-stream cast's operand is an unpacked structure;
+  // ValidateBitStreamCast fills it for the module it walks.
+  std::unordered_map<std::string_view, const DataType*> bit_stream_var_types_;
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;

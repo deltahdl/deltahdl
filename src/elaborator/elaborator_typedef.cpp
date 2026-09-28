@@ -638,15 +638,35 @@ static const PackageDecl* FindNettypeScopePackage(const CompilationUnit* unit,
   return nullptr;
 }
 
+// The class the scope of a resolution function names: a class by its own name,
+// or one a typedef names, which §6.6.7's own example does with `typedef
+// Base#(32) MyBaseT;` and `with MyBaseT::Ssum` (printed page 99). A chain of
+// typedefs is followed to the class; the hop limit keeps a cyclic typedef from
+// looping.
+static const ClassDecl* NettypeScopeClass(std::string_view scope,
+                                          const CompilationUnit* unit,
+                                          const TypedefMap& typedefs) {
+  for (int hops = 0; hops < 8; ++hops) {
+    if (const ClassDecl* cls = FindClassDecl(scope, unit)) return cls;
+    auto td = typedefs.find(scope);
+    if (td == typedefs.end() || td->second.kind != DataTypeKind::kNamed)
+      return nullptr;
+    scope = td->second.type_name;
+  }
+  return nullptr;
+}
+
 static NettypeResolutionTarget FindNettypeResolutionFunction(
     const ModuleItem* item, const CompilationUnit* unit,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const TypedefMap& typedefs) {
   if (item->nettype_resolve_scope.empty()) {
     auto fit = func_decls.find(item->nettype_resolve_func);
     if (fit == func_decls.end()) return {};
     return {fit->second, false, false, false};
   }
-  if (const ClassDecl* cls = FindClassDecl(item->nettype_resolve_scope, unit))
+  if (const ClassDecl* cls =
+          NettypeScopeClass(item->nettype_resolve_scope, unit, typedefs))
     return ClassResolutionMethod(cls, item->nettype_resolve_func);
   if (const PackageDecl* pkg =
           FindNettypeScopePackage(unit, item->nettype_resolve_scope))
@@ -657,7 +677,7 @@ static NettypeResolutionTarget FindNettypeResolutionFunction(
 
 void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
   NettypeResolutionTarget target =
-      FindNettypeResolutionFunction(item, unit_, func_decls_);
+      FindNettypeResolutionFunction(item, unit_, func_decls_, typedefs_);
   // An unqualified name that is not found is left alone. func_decls_ holds the
   // functions of the design element being elaborated, so a name it does not
   // hold may still be declared somewhere this does not see; only a qualifier

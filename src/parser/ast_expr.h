@@ -128,12 +128,15 @@ struct Expr {
   // substitution of the actuals for the formals reads the tree.
   PropertyExprNode* property_actual = nullptr;
 
-  // kTypeRef only, on an element of a parameter_value_assignment: the
-  // data_type A.8.3's param_expression admits, read by ParseDataType because
-  // an expression cannot spell it -- A.2.2.1's signing after an integer type,
-  // or a virtual interface type. A keyword type written alone stays the
-  // identifier node ParseCastOrTypedPattern makes, with its packed dimensions
-  // as selects, which is the shape the elaborator's override readers take.
+  // kTypeRef only: the data_type the node stands for, read by ParseDataType.
+  // It is set on `type(data_type)`, whose text keeps only the type's name, so
+  // the packed dimensions of `type(bit [12:0])` are here alone (§6.23), and on
+  // an element of a parameter_value_assignment holding a data_type A.8.3's
+  // param_expression admits and an expression cannot spell -- A.2.2.1's
+  // signing after an integer type, or a virtual interface type. A keyword type
+  // written alone there stays the identifier node ParseCastOrTypedPattern
+  // makes, with its packed dimensions as selects, which is the shape the
+  // elaborator's override readers take.
   DataType* type_value = nullptr;
 };
 
