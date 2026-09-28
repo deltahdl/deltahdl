@@ -861,4 +861,30 @@ TEST(MultidimensionalArraySimulation, QueriesNumberEachPackedDimension) {
   EXPECT_EQ(out, "3 1\n4 3 0 1\n8 7 0\n");
 }
 
+// §7.4.4 lets a typedef define a packed array's dimensions, and §7.4.1 has
+// each index of a packed multidimensional array address one element of its
+// dimension, so `x[1]` of `T x` under `typedef logic [1:0][3:0] T` is the four
+// bits 7:4 and `x[0][2]` bit 2 of the element below them. Declared through the
+// type's name alone, the variable recorded none of those dimensions, and each
+// index read a single bit. An assignment pattern fills it element by element
+// by the same dimensions (§10.9.1).
+TEST(MultidimensionalArraySimulation, TypedefDefinesThePackedDimensions) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef logic [1:0][3:0] T;\n"
+      "  initial begin\n"
+      "    T x;\n"
+      "    x = 8'hA5;\n"
+      "    $display(\"%h %h %b %b\", x[1], x[0], x[1][2], x[0][2]);\n"
+      "    x[0] = 4'h3;\n"
+      "    $display(\"%h\", x);\n"
+      "    x = '{1, 2};\n"
+      "    $display(\"%h\", x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
+}
+
 }  // namespace

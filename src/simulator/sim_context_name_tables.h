@@ -203,6 +203,12 @@ class DeclaredNameTables {
   // recorded (FindTypedefItem), and its type is read off the item.
   void RegisterTypeDeclaration(std::string_view name, const ModuleItem* item);
   const DataType* FindTypeDeclaration(std::string_view name) const;
+  // §7.4.4: `type` followed through the typedefs a name written alone stands
+  // for, to the first declaration writing a packed dimension or naming no
+  // type -- `logic [1:0][3:0]` for `T` under `typedef logic [1:0][3:0] T`.
+  // `type` itself where it writes a dimension of its own or is no name, and
+  // null where a name on the way stands for nothing recorded.
+  const DataType* PackedTypeBehind(const DataType& type) const;
   const ModuleItem* FindTypedefItem(std::string_view name) const;
   size_t TypeDeclarationCount() const;
 

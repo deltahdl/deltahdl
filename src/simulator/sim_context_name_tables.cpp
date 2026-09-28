@@ -380,6 +380,20 @@ const DataType* DeclaredNameTables::FindTypeDeclaration(
   return item != nullptr ? &item->typedef_type : nullptr;
 }
 
+const DataType* DeclaredNameTables::PackedTypeBehind(
+    const DataType& type) const {
+  const DataType* d = &type;
+  for (size_t hops = 0;
+       d != nullptr && d->kind == DataTypeKind::kNamed &&
+       d->packed_dim_left == nullptr && hops <= TypeDeclarationCount();
+       ++hops) {
+    std::string key(d->type_name);
+    if (!d->scope_name.empty()) key = std::string(d->scope_name) + "::" + key;
+    d = FindTypeDeclaration(key);
+  }
+  return d;
+}
+
 const ModuleItem* DeclaredNameTables::FindTypedefItem(
     std::string_view name) const {
   auto it = type_declarations_.find(name);

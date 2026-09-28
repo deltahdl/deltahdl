@@ -48,6 +48,9 @@ namespace delta {
 // b[4] was bit 4 and b[-1] out of range.
 void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
                        Arena& arena) {
+  // §7.4.4: a type written as a name alone has the dimensions its typedef
+  // writes, `T x` under `typedef logic [1:0][3:0] T` two elements of four bits.
+  if (dt != nullptr) dt = ctx.PackedTypeBehind(*dt);
   if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
   auto eval = [&](const Expr* e) {
     return SelectBoundValue(EvalExpr(e, ctx, arena));
