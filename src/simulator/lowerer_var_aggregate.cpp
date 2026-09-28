@@ -97,6 +97,8 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     q->elements_are_queues = var.elements_are_queues;
     q->nested_queue_levels = var.element.nested_queue_levels;
     q->element_array_size = var.element.array_size;
+    q->element_array_lo = var.element.array_lo;
+    q->element_array_descending = var.element.array_descending;
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
@@ -108,6 +110,8 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     q->elements_are_queues = var.elements_are_queues;
     q->nested_queue_levels = var.element.nested_queue_levels;
     q->element_array_size = var.element.array_size;
+    q->element_array_lo = var.element.array_lo;
+    q->element_array_descending = var.element.array_descending;
     LowerDynArrayInit(q, var);
 
     ArrayInfo info;

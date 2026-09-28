@@ -326,4 +326,29 @@ TEST(UnpackedArraySim, MultidimensionalClassPropertyElementsAreVariables) {
   EXPECT_EQ(out, "53 5 3 7 15\n2 4 15\n");
 }
 
+// §12.7.3 with §7.4.2 and §8.5: a foreach naming a loop variable per
+// dimension of a multidimensional class property reached through a handle,
+// `foreach (h.g[i, j])` in an initial block, runs as nested loops over all
+// six elements, the last dimension varying fastest.
+TEST(UnpackedArraySim, ForeachOverAMultidimensionalPropertyThroughAHandle) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int g[2][3];\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int s, n, last;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    foreach (h.g[i, j]) begin h.g[i][j] = i * 3 + j; n++; last = j; "
+      "end\n"
+      "    foreach (h.g[i, j]) s += h.g[i][j];\n"
+      "    $display(\"%0d %0d %0d %0d\", n, s, h.g[1][2], last);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 15 5 2\n");
+}
+
 }  // namespace

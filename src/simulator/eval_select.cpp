@@ -48,7 +48,9 @@ static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
   auto val = EvalExpr(idx_expr, ctx, arena);
   ctx.PopScope();
   if (has_xz) *has_xz = HasUnknownBits(val);
-  return val.ToUint64();
+  // §7.4.2: an element that is a fixed-size array is addressed by its
+  // declared bounds (QueueObject::PositionOf).
+  return static_cast<uint64_t>(q->PositionOf(SelectBoundValue(val)));
 }
 
 // §7.10: the queue an element select reads is a declared one under its bare

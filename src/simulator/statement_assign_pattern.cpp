@@ -655,7 +655,7 @@ static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
     uint64_t sign = uint64_t{1} << (val.width - 1);
     if (raw & sign) raw |= ~uint64_t{0} << val.width;
   }
-  return static_cast<int64_t>(raw);
+  return q->PositionOf(static_cast<int64_t>(raw));
 }
 
 int64_t QueueElementIndex(const Expr* index, QueueObject* q, SimContext& ctx,

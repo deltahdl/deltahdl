@@ -30,8 +30,13 @@ struct RtlirElementShape {
   uint32_t nested_queue_levels = 0;
   // For a queue or dynamic array whose elements are fixed-size arrays, `int
   // q[$][3]`, the number of elements each holds, each element being kept as
-  // a queue of exactly that many; 0 otherwise.
+  // a queue of exactly that many; 0 otherwise. `array_lo` is the lower of
+  // the dimension's bounds and `array_descending` says whether it was
+  // written from a higher left bound down, `[2:0]`, so that its leftmost
+  // element is the one of the higher index.
   uint32_t array_size = 0;
+  int64_t array_lo = 0;
+  bool array_descending = false;
   // For an associative array whose element type is itself an associative
   // array, `int m[string][int]`, the index its elements have; empty for any
   // other variable.

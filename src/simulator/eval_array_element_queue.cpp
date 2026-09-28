@@ -27,18 +27,26 @@ namespace {
 // of: elements of `width` bits, four-state where `is_4state` says so, class
 // handles where `handles` does, `levels` further levels of queues below it
 // (QueueObject::nested_queue_levels), and, where the element is a fixed-size
-// array, `fixed_size` elements (QueueObject::element_array_size).
+// array, `fixed_size` elements addressed by the bounds `fixed_lo` and
+// `fixed_descending` give (QueueObject::element_array_size, index_lo).
 struct ElementQueueShape {
   uint32_t width;
   bool is_4state;
   bool handles;
   uint32_t levels;
   uint32_t fixed_size = 0;
+  int64_t fixed_lo = 0;
+  bool fixed_descending = false;
 };
 
 ElementQueueShape ShapeOf(const QueueObject& outer) {
-  return {outer.elem_width, outer.is_4state, outer.holds_class_handles,
-          outer.nested_queue_levels, outer.element_array_size};
+  return {outer.elem_width,
+          outer.is_4state,
+          outer.holds_class_handles,
+          outer.nested_queue_levels,
+          outer.element_array_size,
+          outer.element_array_lo,
+          outer.element_array_descending};
 }
 
 ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
@@ -70,6 +78,8 @@ QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   q->holds_class_handles = shape.handles;
   q->elements_are_queues = shape.levels > 0;
   q->nested_queue_levels = shape.levels > 0 ? shape.levels - 1 : 0;
+  q->index_lo = shape.fixed_lo;
+  q->index_descending = shape.fixed_descending;
   FitToFixedSize(q, shape.fixed_size, arena);
   q->AllocateIdsForAppended();
   return q;

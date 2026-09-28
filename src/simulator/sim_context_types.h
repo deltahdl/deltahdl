@@ -242,7 +242,22 @@ struct QueueObject {
   // that many, each the element type's default, and keeps that many. 0 where
   // the elements are queues of their own size or no queues.
   uint32_t element_array_size = 0;
+  // The bounds of that fixed-size array, the lower of them and whether it
+  // was written from the higher down, `[2:0]` (RtlirElementShape).
+  int64_t element_array_lo = 0;
+  bool element_array_descending = false;
   std::map<uint64_t, QueueObject*> element_queues;
+  // §7.4.2: where this queue keeps an element that is a fixed-size array, the
+  // bounds that array was declared with, so that its declared index `index`
+  // addresses the position PositionOf gives: from `index_lo` up, or, for a
+  // dimension written from the higher bound down, from the higher bound
+  // down. 0 and ascending for any other queue, whose index is its position.
+  int64_t index_lo = 0;
+  bool index_descending = false;
+  int64_t PositionOf(int64_t index) const {
+    if (!index_descending) return index - index_lo;
+    return index_lo + static_cast<int64_t>(elements.size()) - 1 - index;
+  }
 
  private:
   uint64_t next_elem_id_ = 0;

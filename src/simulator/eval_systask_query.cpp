@@ -246,22 +246,6 @@ static QueryDimBounds AssocDimBounds(AssocArrayObject* assoc) {
   return q;
 }
 
-// Bounds for a queue or dynamic array dimension: indices run 0 .. size-1,
-// descending.
-static QueryDimBounds DynamicDimBounds(const QueryArgInfo& info) {
-  QueryDimBounds q;
-  int64_t count = info.queue
-                      ? static_cast<int64_t>(info.queue->elements.size())
-                      : static_cast<int64_t>(info.arr ? info.arr->size : 0);
-  q.left = 0;
-  q.right = count - 1;  // -1 when the dimension is currently empty
-  q.low = 0;
-  q.high = count - 1;
-  q.increment = -1;
-  q.size = count;
-  return q;
-}
-
 // Bounds for a fixed-size unpacked dimension with declared bounds.
 static QueryDimBounds FixedUnpackedDimBounds(const ArrayInfo* arr) {
   QueryDimBounds q;
@@ -273,6 +257,33 @@ static QueryDimBounds FixedUnpackedDimBounds(const ArrayInfo* arr) {
   q.high = hi;
   q.size = arr->size;
   q.increment = (q.left >= q.right) ? 1 : -1;
+  return q;
+}
+
+// Bounds for a queue or dynamic array dimension: indices run 0 .. size-1,
+// descending.
+//
+// §7.4.2: a queue keeping an element that is a fixed-size array, `q[0]` of
+// `int q[$][1:3]`, answers that array's declared bounds.
+static QueryDimBounds DynamicDimBounds(const QueryArgInfo& info) {
+  if (info.queue != nullptr &&
+      (info.queue->index_lo != 0 || info.queue->index_descending)) {
+    ArrayInfo element;
+    element.size = static_cast<uint32_t>(info.queue->elements.size());
+    element.lo = static_cast<uint32_t>(info.queue->index_lo);
+    element.is_descending = info.queue->index_descending;
+    return FixedUnpackedDimBounds(&element);
+  }
+  QueryDimBounds q;
+  int64_t count = info.queue
+                      ? static_cast<int64_t>(info.queue->elements.size())
+                      : static_cast<int64_t>(info.arr ? info.arr->size : 0);
+  q.left = 0;
+  q.right = count - 1;  // -1 when the dimension is currently empty
+  q.low = 0;
+  q.high = count - 1;
+  q.increment = -1;
+  q.size = count;
   return q;
 }
 
@@ -341,6 +352,8 @@ static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
 static QueryDimBounds ElementArrayDimBounds(const QueueObject* q) {
   ArrayInfo element;
   element.size = q->element_array_size;
+  element.lo = static_cast<uint32_t>(q->element_array_lo);
+  element.is_descending = q->element_array_descending;
   return FixedUnpackedDimBounds(&element);
 }
 

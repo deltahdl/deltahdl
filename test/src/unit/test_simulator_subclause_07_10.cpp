@@ -486,4 +486,27 @@ TEST(QueueSim, QueueAndAssocArrayOfAnInterfaceInstance) {
   EXPECT_EQ(out, "2 2 8 2 0\n");
 }
 
+// §7.10 with §7.4.2 and §20.7: the fixed-size array a queue's elements are
+// may have any declared bounds. Under `int q[$][1:3]` an element's indices
+// run 1 to 3 from the left, and under `int r[$][2:0]` 2 down to 0, so the
+// leftmost value pushed is `q[0][1]` and `r[0][2]`.
+TEST(QueueSim, QueueOfFixedArraysKeepsTheElementBounds) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$][1:3];\n"
+      "  int r[$][2:0];\n"
+      "  initial begin\n"
+      "    q.push_back('{4, 5, 6}); r.push_back('{7, 8, 9});\n"
+      "    q[0][2] = 50;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", $size(q, 2), $left(q, 2),\n"
+      "             q[0][1], q[0][2], q[0][3]);\n"
+      "    $display(\"%0d %0d %0d %0d\", $left(r, 2), r[0][2], r[0][1],\n"
+      "             r[0][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 4 50 6\n2 7 8 9\n");
+}
+
 }  // namespace

@@ -532,6 +532,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_slice.cpp
     simulator/statement_assign_stream.cpp
     simulator/statement_assign_stream_widen.cpp
+    simulator/stmt_exec_case.cpp
     simulator/stmt_exec_control.cpp
     simulator/timing_check_delayed_signals.cpp
     simulator/timing_check_driver.cpp
