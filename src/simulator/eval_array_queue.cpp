@@ -73,7 +73,7 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
   return StructLayoutOfName(access->lhs->text, ctx);
 }
 
-// The value a push puts in the queue `q` for the argument `item`, the
+// The value the push `call` puts in the queue `q` for its argument `item`, the
 // element being given the identity `id`. §7.10.2 with §7.4: where each element
 // of `q` is itself a queue, the argument is a queue value, which is kept under
 // the element's identity (ElementQueueFromItem in
@@ -84,8 +84,9 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
 // values, and `q[1].green` read 0. The element owns its words: a variable's
 // value shares them with the variable, and a member write to it after the
 // push, depositing in place, reached the element too.
-static Logic4Vec PushedValue(QueueObject* q, const Expr* call, const Expr* item,
-                             uint64_t id, SimContext& ctx, Arena& arena) {
+static Logic4Vec PushedValue(QueueObject* q, const Expr* call, uint64_t id,
+                             SimContext& ctx, Arena& arena) {
+  const Expr* item = call->args[0];
   if (!q->elements_are_queues) {
     return OwnRhsWords(
         SizedForQueueElement(
@@ -101,7 +102,7 @@ static Logic4Vec PushedValue(QueueObject* q, const Expr* call, const Expr* item,
 static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   uint64_t id = q->AllocateId();
-  q->elements.push_back(PushedValue(q, expr, expr->args[0], id, ctx, arena));
+  q->elements.push_back(PushedValue(q, expr, id, ctx, arena));
   q->element_ids.push_back(id);
   ++q->generation;
   EnforceQueueBound(q, "push_back", expr->range.start, ctx);
@@ -110,8 +111,7 @@ static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
 static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
                            Arena& arena) {
   uint64_t id = q->AllocateId();
-  q->elements.insert(q->elements.begin(),
-                     PushedValue(q, expr, expr->args[0], id, ctx, arena));
+  q->elements.insert(q->elements.begin(), PushedValue(q, expr, id, ctx, arena));
   q->element_ids.insert(q->element_ids.begin(), id);
   EnforceQueueBound(q, "push_front", expr->range.start, ctx);
   ++q->generation;

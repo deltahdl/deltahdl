@@ -128,6 +128,23 @@ static bool DescribeStructArrayMember(const Expr* arg0, SimContext& ctx,
   return true;
 }
 
+// The container `arg0` names where no declared array answers its name: a
+// queue property, bare in a method or `h.q` through a handle, the queue its
+// object holds (§7.10 with §8.5); a fixed, dynamic or multidimensional array
+// property; or a structure's unpacked array member -- the last three
+// described into `class_array`.
+static void ClassifyUnnamedArray(const Expr* arg0, SimContext& ctx,
+                                 Arena& arena, QueryArgInfo& info,
+                                 ArrayInfo& class_array) {
+  info.queue = FindQueueOfBase(arg0, ctx, arena);
+  if (info.queue != nullptr) return;
+  if (DescribeClassArray(arg0, ctx, arena, class_array) ||
+      DescribeMultiDimProperty(arg0, ctx, arena, class_array) ||
+      DescribeStructArrayMember(arg0, ctx, class_array)) {
+    info.arr = &class_array;
+  }
+}
+
 // Resolve the first argument to an unpacked container (if any) and determine
 // the width/kind of its packed element dimension. §20.7: a string is a nonarray
 // type equivalent to a simple bit vector (one packed dimension); a real type
@@ -149,17 +166,8 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
   }
   bool found =
       info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
-  // §7.10 with §8.5: a queue property, bare in a method or `h.q` through a
-  // handle, is the queue its object holds.
-  if (!found && arg0 != nullptr) {
-    info.queue = FindQueueOfBase(arg0, ctx, arena);
-    found = info.queue != nullptr;
-  }
-  if (!found && (DescribeClassArray(arg0, ctx, arena, class_array) ||
-                 DescribeMultiDimProperty(arg0, ctx, arena, class_array) ||
-                 DescribeStructArrayMember(arg0, ctx, class_array))) {
-    info.arr = &class_array;
-  }
+  if (!found && arg0 != nullptr)
+    ClassifyUnnamedArray(arg0, ctx, arena, info, class_array);
   info.dynamic_outer =
       info.queue != nullptr ||
       (info.arr != nullptr && (info.arr->is_dynamic || info.arr->is_queue));

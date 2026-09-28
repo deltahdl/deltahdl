@@ -316,16 +316,29 @@ static ScopeMap ClassParamScope(const ClassDecl* cls,
   return scope;
 }
 
-// §7.2 with §8.5: the width of a property declared with a structure's typedef
-// name, the structure's layout's; 0 for any other type. Sized against no
+// §7.2 with §8.5: the layout of the structure a property's declared type
+// names by its typedef name; null for any other type. Sized against no
 // typedef table, the name had no width and the property took the 32-bit
 // carrier, which cut an element of an array of such structures to 32 bits.
-static uint32_t StructPropertyWidth(const DataType& type, SimContext& ctx) {
+static const StructTypeInfo* StructPropertyLayout(const DataType& type,
+                                                  SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
       type.packed_dim_left != nullptr)
-    return 0;
-  const StructTypeInfo* layout = ctx.FindStructType(type.type_name);
-  return layout != nullptr ? layout->total_width : 0;
+    return nullptr;
+  return ctx.FindStructType(type.type_name);
+}
+
+// §6.11 with §7.2: whether a member of the structure `layout` lays out is of
+// a 4-state type, a nested structure's members included. A property of such
+// a structure keeps the x and z bits written into it; asked of the typedef
+// name against no typedef table, it read 2-state and lost them.
+static bool LayoutHas4StateMember(const StructTypeInfo& layout) {
+  for (const auto& field : layout.fields) {
+    if (field.nested != nullptr ? LayoutHas4StateMember(*field.nested)
+                                : Is4stateType(field.type_kind))
+      return true;
+  }
+  return false;
 }
 
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
@@ -334,14 +347,17 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {}, params);
-      if (w == 0) w = StructPropertyWidth(member->data_type, ctx);
+      const StructTypeInfo* layout =
+          w == 0 ? StructPropertyLayout(member->data_type, ctx) : nullptr;
+      if (layout != nullptr) w = layout->total_width;
       bool sized = w != 0;
       if (w == 0) w = 32;
+      bool four_state = layout != nullptr ? LayoutHas4StateMember(*layout)
+                                          : Is4stateType(member->data_type, {});
       info->properties.push_back(
           {member->name, w, member->is_static, member->is_local,
            member->is_protected, member->is_const, member->init_expr,
-           Is4stateType(member->data_type, {}), sized,
-           IsRealKind(member->data_type.kind),
+           four_state, sized, IsRealKind(member->data_type.kind),
            member->data_type.kind == DataTypeKind::kString,
            IsSignedType(member->data_type, {}), member->data_type.type_name,
            member->data_type.kind == DataTypeKind::kVirtualInterface});

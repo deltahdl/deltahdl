@@ -87,11 +87,19 @@ static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
   return val;
 }
 
-// `layout` is the element's structure layout for an array of structures,
-// whose pattern items are packed by it (§10.9.2), and null for any other.
+// The element variable an initializer's item is stored in, with the
+// element's structure layout for an array of structures, whose pattern items
+// are packed by it (§10.9.2), and null for any other.
+struct ElementTarget {
+  Variable* elem = nullptr;
+  const StructTypeInfo* layout = nullptr;
+};
+
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
-                             Variable* elem, const StructTypeInfo* layout,
-                             SimContext& ctx, Arena& arena) {
+                             const ElementTarget& target, SimContext& ctx,
+                             Arena& arena) {
+  Variable* elem = target.elem;
+  const StructTypeInfo* layout = target.layout;
   if (!var.init_expr) {
     elem->value = Table67ElementDefault(var, arena);
     return;
@@ -115,8 +123,9 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
 }
 
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
-                                   Variable* elem, const StructTypeInfo* layout,
-                                   SimContext& ctx, Arena& arena) {
+                                   const ElementTarget& target, SimContext& ctx,
+                                   Arena& arena) {
+  Variable* elem = target.elem;
   auto* rep = var.init_expr->elements[0];
   auto inner_count = static_cast<uint32_t>(rep->elements.size());
   if (inner_count == 0) {
@@ -125,8 +134,8 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
   }
   elem->value = CoerceArrayInitItem(
       var,
-      EvalItemForLayout(rep->elements[elem_idx % inner_count], layout, ctx,
-                        arena),
+      EvalItemForLayout(rep->elements[elem_idx % inner_count], target.layout,
+                        ctx, arena),
       arena);
 }
 
@@ -409,19 +418,19 @@ static std::string ArrayElementKey(std::string_view name,
 // where it names none; a keyed item is found by the element's address and a
 // positional one counted from the declaration's left bound (§11.5.2).
 static void FillArrayElement(const RtlirVariable& var, uint32_t i,
-                             Variable* elem, const StructTypeInfo* layout,
-                             SimContext& ctx, Arena& arena) {
+                             const ElementTarget& target, SimContext& ctx,
+                             Arena& arena) {
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
                    var.init_expr->elements[0]->kind == ExprKind::kReplicate;
   uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
   uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
   if (named) {
-    InitArrayFromNamed(var, idx, elem, ctx, arena);
+    InitArrayFromNamed(var, idx, target.elem, ctx, arena);
   } else if (replicate) {
-    InitArrayFromReplicate(var, pat_idx, elem, layout, ctx, arena);
+    InitArrayFromReplicate(var, pat_idx, target, ctx, arena);
   } else {
-    InitArrayElement(var, pat_idx, elem, layout, ctx, arena);
+    InitArrayElement(var, pat_idx, target, ctx, arena);
   }
 }
 
@@ -456,7 +465,8 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     // rather than by whatever value flowed in.
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
-    FillArrayElement(var, i, elem, ctx.GetVariableStructType(name), ctx, arena);
+    FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
+                     arena);
   }
 }
 
@@ -471,7 +481,7 @@ void InitArrayElements(std::string_view name, const RtlirVariable& var,
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     Variable* elem = ExistingElement(ctx, ArrayElementKey(name, var, i));
     if (elem != nullptr)
-      FillArrayElement(var, i, elem, ctx.GetVariableStructType(name), ctx,
+      FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
                        arena);
   }
 }

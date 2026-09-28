@@ -543,10 +543,8 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
   // §7.2.2 with §26.3: a package's structure variable with no initializer
   // takes the default each member's declaration writes.
-  if (item->init_expr == nullptr) {
-    if (const StructTypeInfo* layout = ctx.GetVariableStructType(*qname))
-      ApplyLayoutDefaults(var->value, *layout, 0, ctx, arena);
-  }
+  if (item->init_expr == nullptr)
+    ApplyVariableLayoutDefaults(*qname, var, ctx, arena);
   std::string_view sync_type = PackageSyncObjectType(item);
   if (!sync_type.empty()) {
     CreatePackageSyncObject(sync_type, *qname, ctx);

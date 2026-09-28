@@ -223,8 +223,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // §7.2.2: a local of a structure type with no initializer takes the default
   // each member's declaration writes.
   if (init == nullptr) {
-    if (const StructTypeInfo* layout = ctx.GetVariableStructType(name))
-      ApplyLayoutDefaults(v->value, *layout, 0, ctx, arena);
+    ApplyVariableLayoutDefaults(name, v, ctx, arena);
     return v;
   }
   // §8.4: `P p = new;` creates an object of class P and assigns its handle to

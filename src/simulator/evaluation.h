@@ -355,6 +355,10 @@ Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
 // class property. A union takes none. Defined in eval_streaming.cpp.
 void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
                          uint32_t base, SimContext& ctx, Arena& arena);
+// The same for the variable `var` declared under `name`, by the layout
+// SimContext records for the name; nothing where it records none.
+void ApplyVariableLayoutDefaults(std::string_view name, Variable* var,
+                                 SimContext& ctx, Arena& arena);
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
                                  SimContext& ctx, Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);

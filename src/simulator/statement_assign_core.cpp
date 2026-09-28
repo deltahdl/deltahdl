@@ -262,19 +262,31 @@ static bool TryStructArrayMemberWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// §7.8.6: whether the element a select of an associative array names exists;
-// true for a select of any other container. A member write to an entry the
-// key names none of yet creates it from nothing rather than reading it, which
-// §7.8.6 reports as a read of a nonexistent index.
-static bool ContainerHoldsElement(const Expr* select, SimContext& ctx,
-                                  Arena& arena) {
+// The element `select` names, `layout_width` bits wide, as a member write
+// finds it: its value where the container holds it, and for an associative
+// entry that does not exist yet the value §7.8.7 allocates it with, the
+// element type's default or initial value (AssocAllocValue) -- its members'
+// declared defaults among them -- rather than the nonexistent-entry value a
+// read would answer with its warning.
+static Logic4Vec ElementBeforeMemberWrite(const Expr* select,
+                                          uint32_t layout_width,
+                                          SimContext& ctx, Arena& arena) {
   const AssocArrayObject* aa = FindAssocArrayOfBase(select->base, ctx, arena);
-  if (aa == nullptr) return true;
-  Logic4Vec key = EvalExpr(select->index, ctx, arena);
-  if (aa->is_string_key) return aa->str_data.count(AssocStringKey(key)) != 0;
-  if (HasUnknownBits(key)) return false;
-  return aa->int_data.count(AssocIntKey(key, aa->is_wildcard, aa->index_width,
-                                        aa->is_index_signed)) != 0;
+  if (aa != nullptr) {
+    Logic4Vec key = EvalExpr(select->index, ctx, arena);
+    bool held =
+        aa->is_string_key
+            ? aa->str_data.count(AssocStringKey(key)) != 0
+            : !HasUnknownBits(key) && aa->int_data.count(AssocIntKey(
+                                          key, aa->is_wildcard, aa->index_width,
+                                          aa->is_index_signed)) != 0;
+    if (!held)
+      return OwnRhsWords(
+          ResizeToWidth(AssocAllocValue(aa, arena), layout_width, arena),
+          arena);
+  }
+  return OwnRhsWords(
+      ResizeToWidth(EvalExpr(select, ctx, arena), layout_width, arena), arena);
 }
 
 // §7.2 with §7.5, §7.8 and §7.10: `d[1].a = 11` writes a member of the
@@ -298,11 +310,7 @@ static bool TryContainerElementMemberWrite(const Expr* lhs,
       ResolveStructField(layout, lhs->rhs->text, &offset);
   if (field == nullptr) return false;
   Logic4Vec element =
-      ContainerHoldsElement(select, ctx, arena)
-          ? OwnRhsWords(ResizeToWidth(EvalExpr(select, ctx, arena),
-                                      layout->total_width, arena),
-                        arena)
-          : MakeLogic4VecVal(arena, layout->total_width, 0);
+      ElementBeforeMemberWrite(select, layout->total_width, ctx, arena);
   DepositBitField(element, offset, ResizeToWidth(rhs_val, field->width, arena),
                   field->width);
   PerformBlockingAssign(select, element, ctx, arena);

@@ -694,6 +694,13 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
   return result;
 }
 
+void ApplyVariableLayoutDefaults(std::string_view name, Variable* var,
+                                 SimContext& ctx, Arena& arena) {
+  const StructTypeInfo* layout = ctx.GetVariableStructType(name);
+  if (var != nullptr && layout != nullptr)
+    ApplyLayoutDefaults(var->value, *layout, 0, ctx, arena);
+}
+
 void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
                          uint32_t base, SimContext& ctx, Arena& arena) {
   if (layout.is_union) return;
