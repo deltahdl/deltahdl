@@ -20,6 +20,8 @@ TEST(PackedArraySimulation, MultiDimPackedArrayAsSingleVector) {
   EXPECT_EQ(v, 0xABCDu);
 }
 
+// §7.4.5: a slice of a packed array selects contiguous elements, so `x[1:1]`
+// of `logic [1:0][7:0] x` is the byte element 1, not bit 1.
 TEST(PackedArraySimulation, MultiDimPackedArrayPartSelect) {
   auto v = RunAndGet(
       "module t;\n"
@@ -27,7 +29,7 @@ TEST(PackedArraySimulation, MultiDimPackedArrayPartSelect) {
       "  logic [7:0] result;\n"
       "  initial begin\n"
       "    x = 16'hABCD;\n"
-      "    result = x[15:8];\n"
+      "    result = x[1:1];\n"
       "  end\n"
       "endmodule\n",
       "result");

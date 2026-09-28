@@ -75,6 +75,18 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
 void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                        RtlirVariable& var);
 
+// §7.4 (printed pages 153-156): what the unpacked dimensions `item` declares
+// make of `var`: each dimension's kind and extent (ComputeUnpackedDims), a
+// dynamic array's size from its initializer (InferDynArraySize), and whether
+// and how its elements are arrays themselves, `td_array_dims` holding each
+// typedef's unpacked dimensions and the scope in `ctx` folding the bounds.
+// Defined in elaborator_decls_element.cpp.
+void ElaborateUnpackedDims(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        td_array_dims,
+    const UnpackedDimContext& ctx, RtlirVariable& var);
+
 // §11.5.1 with §6.18: sets the resolved type as `var.dtype` for a declaration
 // written with a typedef name standing for a vector of one packed dimension,
 // so that the lowerer records the range the name was declared with; see the
