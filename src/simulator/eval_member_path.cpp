@@ -187,8 +187,8 @@ static bool MemberChainPath(const Expr* access, std::string_view& root,
   while (e != nullptr && e->kind == ExprKind::kMemberAccess &&
          !e->is_scope_resolution && e->rhs != nullptr &&
          e->rhs->kind == ExprKind::kIdentifier) {
-    path = path.empty() ? std::string(e->rhs->text)
-                        : std::string(e->rhs->text) + "." + path;
+    if (!path.empty()) path.insert(0, 1, '.');
+    path.insert(0, e->rhs->text);
     e = e->lhs;
   }
   if (e == access || e == nullptr || e->kind != ExprKind::kIdentifier)
