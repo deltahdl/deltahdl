@@ -2,6 +2,8 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -179,6 +181,30 @@ TEST(TypeParameterParsing, ValueGroupAfterATypeGroupContinuesAsValues) {
   EXPECT_TRUE(m->type_param_names.count("T"));
   EXPECT_FALSE(m->type_param_names.count("A"));
   EXPECT_FALSE(m->type_param_names.count("B"));
+}
+
+// §6.20.3 with §8.25: a type parameter declared in a class body of a class
+// with a parameter port list cannot be overridden, so it names the one type
+// its default does in each specialization and is carried as a class typedef
+// of that type: `localparam type U = T;` is a typedef U of T. Carried as a
+// value parameter, the type it named was dropped.
+TEST(TypeParameterParsing, ClassBodyLocalTypeParamIsATypedefOfItsType) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  localparam type U = T;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  const ClassMember* u = nullptr;
+  for (const auto* m : r.cu->classes[0]->members) {
+    if (m->name == "U") u = m;
+  }
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->kind, ClassMemberKind::kTypedef);
+  ASSERT_NE(u->typedef_item, nullptr);
+  EXPECT_EQ(u->typedef_item->typedef_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(u->typedef_item->typedef_type.type_name, "T");
 }
 
 }  // namespace

@@ -543,15 +543,37 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
 // carried so the lowerer can evaluate it into the class type's
 // static-property store (a class parameter is a compile-time constant of the
 // class).
+// A local type parameter whose default is written as a data type, which a
+// class typedef can carry; one written as an expression, `type(x)`, is not,
+// and neither is one restricted to a kind, `type enum E`, which a typedef
+// item carrying the kind would read as a forward typedef (§6.18).
+static bool IsLocalTypeParam(const ModuleItem* item) {
+  return item->data_type.kind == DataTypeKind::kVoid && item->is_localparam &&
+         item->typedef_type.kind != DataTypeKind::kImplicit &&
+         item->forward_type_kind == DataTypeKind::kImplicit;
+}
+
 void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
                                         ClassMember* member) {
   std::vector<ModuleItem*> param_items;
   ParseParamDecl(param_items);
   for (size_t i = 0; i < param_items.size(); ++i) {
     auto* m = (i == 0) ? member : arena_.Create<ClassMember>();
+    m->name = param_items[i]->name;
+    if (IsLocalTypeParam(param_items[i])) {
+      // §6.20.3 with §8.25: a type parameter of the class body that cannot
+      // be overridden names one type in each specialization, as a typedef of
+      // it does, so it is carried as one: `localparam type U = T;` is `typedef
+      // T U;`. Carried as a value parameter, its type was lost and U named
+      // nothing.
+      param_items[i]->kind = ModuleItemKind::kTypedef;
+      m->kind = ClassMemberKind::kTypedef;
+      m->typedef_item = param_items[i];
+      members.push_back(m);
+      continue;
+    }
     m->kind = ClassMemberKind::kProperty;
     m->is_param = true;
-    m->name = param_items[i]->name;
     m->data_type = param_items[i]->data_type;
     m->init_expr = param_items[i]->init_expr;
     members.push_back(m);

@@ -168,4 +168,26 @@ TEST(ClassParamsSim, TypedefOfATypeParameterFollowsTheSpecialization) {
   EXPECT_EQ(out, "8 -1\n");
 }
 
+// §6.20.3 with §8.25: a local type parameter of the class body names its
+// default's type in each specialization, so in C #(byte) `localparam type U
+// = T;` is byte and $bits(U) in a method is 8, as $bits(T) is.
+TEST(ClassParamsSim, BodyLocalTypeParamFollowsTheSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = int);\n"
+      "  localparam type U = T;\n"
+      "  function int b(); return $bits(U); endfunction\n"
+      "  function int t(); return $bits(T); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(byte) c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    $display(\"%0d %0d\", c.b(), c.t());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 8\n");
+}
+
 }  // namespace
