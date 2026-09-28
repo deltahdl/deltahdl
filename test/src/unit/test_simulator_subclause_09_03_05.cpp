@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -247,6 +249,23 @@ TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 55u);
+}
+
+// §9.3.5 with §9.6.2: a statement label makes the statement one a disable
+// can name, as a named block is, so the disable from another process ends it
+// where it waits.
+TEST(StatementLabelSimulation, LabeledStatementDisabledFromAnotherProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v;\n"
+                       "  initial begin\n"
+                       "    L1: #10 v = 1;\n"
+                       "    $display(\"after @%0d v=%0d\", $time, v);\n"
+                       "  end\n"
+                       "  initial #2 disable L1;\n"
+                       "endmodule\n",
+                       f),
+            "after @2 v=0\n");
 }
 
 }  // namespace

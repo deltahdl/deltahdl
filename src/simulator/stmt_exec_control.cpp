@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -38,6 +39,28 @@ static void TeardownNamedBlockScope(const Stmt* stmt, SimContext& ctx,
   ctx.PopActiveNamedScope();
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopStaticScope(stmt->label);
+}
+
+// A named block is a scope of the hierarchy, and so is a task or function,
+// which stands under its module rather than under the blocks of the process
+// calling it; the path therefore starts at the innermost subroutine.
+void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
+  const std::vector<std::string_view>& scopes = ctx.ActiveNamedScopes();
+  if (scopes.empty()) return;
+  size_t first = 0;
+  for (size_t i = scopes.size(); i-- > 0;) {
+    if (ctx.FindFunction(scopes[i]) != nullptr) {
+      first = i;
+      break;
+    }
+  }
+  std::string path = ctx.ActiveInstancePrefix();
+  for (size_t i = first; i < scopes.size(); ++i) {
+    path += scopes[i];
+    path += '.';
+  }
+  path += name;
+  ctx.AliasVariable(*ctx.GetArena().Create<std::string>(std::move(path)), name);
 }
 
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {

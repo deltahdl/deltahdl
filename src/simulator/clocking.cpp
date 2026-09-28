@@ -10,7 +10,9 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -142,7 +144,22 @@ struct ClockWatch {
   std::vector<ClockingSignal> signals;
   Edge edge = Edge::kPosedge;
   std::shared_ptr<uint64_t> last_clock;
+  const Expr* iff = nullptr;
 };
+
+// §14.3 with §9.4.2.3: whether the clocking event's `iff` qualifier lets this
+// edge through. §12.4 decides what true means, so any bit at 1 passes and a
+// zero, x or z condition does not. The condition names the block's instance's
+// variables, so it is evaluated from that instance.
+static bool ClockIffHolds(const ClockWatch& watch, SimContext& ctx) {
+  if (watch.iff == nullptr) return true;
+  if (watch.inst_prefix.empty()) {
+    return EvalExpr(watch.iff, ctx, ctx.GetArena()).IsTruthy();
+  }
+  InstancePrefixOverride in_block(ctx.InstancePrefixOverride(),
+                                  watch.inst_prefix);
+  return EvalExpr(watch.iff, ctx, ctx.GetArena()).IsTruthy();
+}
 
 static void SampleBlockInputs(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, bool only_zero_skew) {
@@ -180,11 +197,11 @@ static void RearmClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, Scheduler& sched) {
   const auto* blk = mgr->Find(watch.block_name);
   if (blk == nullptr) return;
-  RegisterClockWatcher(
-      mgr,
-      ClockWatch{watch.block_name, watch.inst_prefix, watch.clk_var,
-                 blk->signals, blk->clock_edge, watch.last_clock},
-      ctx, sched);
+  RegisterClockWatcher(mgr,
+                       ClockWatch{watch.block_name, watch.inst_prefix,
+                                  watch.clk_var, blk->signals, blk->clock_edge,
+                                  watch.last_clock, blk->clock_iff},
+                       ctx, sched);
 }
 
 // §14.13: "Upon processing its specified clocking event, a clocking block shall
@@ -212,7 +229,8 @@ static void RegisterClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
   Variable* clk_var = watch.clk_var;
   clk_var->AddWatcher([mgr, watch, &ctx, &sched]() {
     uint64_t cur = watch.clk_var->value.ToUint64() & 1;
-    bool fired = CheckClockEdge(*watch.last_clock, cur, watch.edge);
+    bool fired = CheckClockEdge(*watch.last_clock, cur, watch.edge) &&
+                 ClockIffHolds(watch, ctx);
     // Recorded whether or not the transition was the one this block waits for,
     // because it is what the clock now stands at either way.
     *watch.last_clock = cur;
@@ -258,7 +276,8 @@ void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
     RegisterClockWatcher(
         this,
         ClockWatch{std::string(block.name), std::string(block.inst_prefix),
-                   clk_var, block.signals, block.clock_edge, last_clock},
+                   clk_var, block.signals, block.clock_edge, last_clock,
+                   block.clock_iff},
         ctx, sched);
   }
   // §14.13: a 1step input is the value of the signal at the Postponed region

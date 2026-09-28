@@ -95,6 +95,10 @@ struct NamedEventAwaiter {
     auto* proc = ctx.CurrentProcess();
     auto* ctx_ptr = &ctx;
     var->AddWatcher([h, proc, ctx_ptr]() mutable {
+      // §9.7: a suspended process is desensitized to the event it waits on, so
+      // the trigger passes it by and the watcher stays for the next one, the
+      // one resume() resensitizes it to.
+      if (proc && proc->is_suspended) return false;
       // The watcher fires synchronously inside the triggering process's
       // NotifyWatchers; set the current process to the waiter's own for the
       // resume (so the post-resume flush point sees the right process) and

@@ -693,4 +693,27 @@ TEST(AlwaysCombSensitivitySim,
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
+// §9.2.2.2.1: references to class objects add nothing to an always_comb's
+// sensitivity, so a write to `h.a` leaves the block as it last ran, while the
+// module variable it reads still retriggers it.
+TEST(AlwaysCombSensitivitySim, WriteThroughAClassHandleDoesNotRetrigger) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C; int a = 7; endclass\n"
+                       "module t;\n"
+                       "  C h = new;\n"
+                       "  int x = 1, y;\n"
+                       "  always_comb y = x + h.a;\n"
+                       "  initial begin\n"
+                       "    #5 x = 2;\n"
+                       "    #5 h.a = 20;\n"
+                       "    #2 $display(\"y@12=%0d\", y);\n"
+                       "    #3 x = 3;\n"
+                       "    #5 $display(\"y@20=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y@12=9\n"
+            "y@20=23\n");
+}
+
 }  // namespace

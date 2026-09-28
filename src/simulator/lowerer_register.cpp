@@ -935,15 +935,4 @@ void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
   }
 }
 
-void RegisterProcessClassType(SimContext& ctx, Arena& arena) {
-  auto* proc_type = arena.Create<ClassTypeInfo>();
-  proc_type->name = "process";
-  proc_type->enum_members["FINISHED"] = 0;
-  proc_type->enum_members["RUNNING"] = 1;
-  proc_type->enum_members["WAITING"] = 2;
-  proc_type->enum_members["SUSPENDED"] = 3;
-  proc_type->enum_members["KILLED"] = 4;
-  ctx.RegisterClassType("process", proc_type);
-}
-
 }  // namespace delta

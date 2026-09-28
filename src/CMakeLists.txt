@@ -292,6 +292,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_format_template.cpp
     simulator/stmt_exec.cpp
     simulator/stmt_exec_deferred.cpp
+    simulator/stmt_exec_disable.cpp
+    simulator/stmt_exec_process.cpp
     simulator/systf_call_statement.cpp
     simulator/statement_assign.cpp
     simulator/statement_assign_compound.cpp
@@ -302,6 +304,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_nonblocking.cpp
     simulator/assertion_read_names.cpp
     simulator/lowerer.cpp
+    simulator/lowerer_always_comb.cpp
     simulator/lowerer_child.cpp
     simulator/lowerer_clocking.cpp
     simulator/lowerer_contassign.cpp

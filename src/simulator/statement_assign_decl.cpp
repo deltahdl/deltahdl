@@ -924,6 +924,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (is_class) ctx.SetVariableClassType(stmt->var_name, class_key);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
+    BindNamedBlockVariable(stmt->var_name, ctx);
     var->is_virtual_interface = is_virtual_interface;
     if (is_virtual_interface) var->value = MakeLogic4VecVal(arena, width, 0);
     // §11.5.1: which bit an index of this variable addresses is decided by

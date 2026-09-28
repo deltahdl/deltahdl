@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/net.h"
 
@@ -84,6 +85,10 @@ struct ClockingBlock {
   std::string_view inst_prefix;
   std::string_view clock_signal;
   Edge clock_edge = Edge::kPosedge;
+  // §14.3 with §9.4.2.3: the `iff` qualifier of the clocking event, null when
+  // none was written. The block samples and its event fires only at the edges
+  // where the condition holds, evaluated in the block's instance.
+  const Expr* clock_iff = nullptr;
   SimTime default_input_skew{0};
   SimTime default_output_skew{0};
   std::vector<ClockingSignal> signals;

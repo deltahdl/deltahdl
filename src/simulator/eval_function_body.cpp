@@ -64,19 +64,24 @@ struct FuncExecCtx {
   // §13.4.2: whether the subroutine is static, so a local declared with no
   // lifetime is static storage kept between calls (ExecFuncVarDecl).
   bool is_static_sub = false;
+  // §9.6.2: the labels of the named blocks and labeled loops the running
+  // statement stands in, innermost last, which a `disable` in the body can end.
+  std::vector<std::string_view>* named_scopes = nullptr;
 };
 
 // Where control goes once a statement of the body has run (§12.8): on to
 // the statement after it, out of the innermost enclosing loop (`break`), to
 // the end of the innermost enclosing loop's body (`continue`), or out of the
-// subroutine (`return`). Every executor here answers one of these; a block,
-// a conditional and a case hand up whatever the statement they ran answered,
-// a loop consumes kBreak and kContinue and hands up kReturn, and
-// ExecFunctionBody stops at anything but kNext. Before this the executors
-// answered a bool meaning "a return ran", and a break or continue reached
-// nothing that acted on it: uvm_report_server::reset_severity_counts, a
+// subroutine (`return`), or to the end of the named block or labeled loop a
+// `disable` named (§9.6.2), which SimContext::GetDisableTarget holds. Every
+// executor here answers one of these; a block, a conditional and a case hand
+// up whatever the statement they ran answered, a loop consumes kBreak and
+// kContinue and hands up kReturn, the block or loop a disable named consumes
+// that kDisable, and ExecFunctionBody stops at anything but kNext. Before this
+// the executors answered a bool meaning "a return ran", and a break or continue
+// reached nothing that acted on it: uvm_report_server::reset_severity_counts, a
 // `forever` over an enumeration that breaks at its last member, never ended.
-enum class FuncFlow : uint8_t { kNext, kBreak, kContinue, kReturn };
+enum class FuncFlow : uint8_t { kNext, kBreak, kContinue, kReturn, kDisable };
 
 static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
 static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec);
@@ -88,12 +93,43 @@ static bool LoopGoesOn(FuncFlow flow) {
 }
 
 // What a loop answers once it has stopped iterating, given what its body
-// answered last: a `return` leaves the subroutine and so passes through, and
-// a `break`, a `continue` or a body that ran to the end is consumed by the
-// loop, which is then followed by the statement after it.
+// answered last: a `return` leaves the subroutine and a `disable` of a scope
+// around the loop leaves the loop too, so both pass through, and a `break`, a
+// `continue` or a body that ran to the end is consumed by the loop, which is
+// then followed by the statement after it.
 static FuncFlow LoopExitFlow(FuncFlow last) {
-  return last == FuncFlow::kReturn ? FuncFlow::kReturn : FuncFlow::kNext;
+  if (last == FuncFlow::kReturn || last == FuncFlow::kDisable) return last;
+  return FuncFlow::kNext;
 }
+
+// §9.6.2: the named block or labeled statement `label` enters, which a
+// disable in it can end. Leave() answers what the scope hands on: a disable
+// naming this scope ends here and control goes on after it.
+class FuncNamedScope {
+ public:
+  FuncNamedScope(std::string_view label, const FuncExecCtx& exec)
+      : label_(label), exec_(exec) {
+    if (!label_.empty()) exec_.named_scopes->push_back(label_);
+  }
+  ~FuncNamedScope() {
+    if (!label_.empty()) exec_.named_scopes->pop_back();
+  }
+  FuncNamedScope(const FuncNamedScope&) = delete;
+  FuncNamedScope& operator=(const FuncNamedScope&) = delete;
+
+  FuncFlow Leave(FuncFlow flow) const {
+    if (flow != FuncFlow::kDisable || label_.empty() ||
+        exec_.ctx.GetDisableTarget() != label_) {
+      return flow;
+    }
+    exec_.ctx.ClearDisableTarget();
+    return FuncFlow::kNext;
+  }
+
+ private:
+  std::string_view label_;
+  const FuncExecCtx& exec_;
+};
 
 // Returns the trailing unconditional else of an if/else-if chain, or null when
 // the chain has no final else.
@@ -220,13 +256,32 @@ static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
   bool named = !stmt->label.empty();
   if (named) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope scope(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   for (auto* c : stmt->stmts) {
     flow = ExecFuncStmt(c, exec);
     if (flow != FuncFlow::kNext) break;
   }
   if (named) exec.ctx.PopStaticScope(stmt->label);
-  return flow;
+  return scope.Leave(flow);
+}
+
+// §9.6.2 with its Example 5: a `disable` in a subroutine body naming a named
+// block or labeled loop the statement stands in ends that scope -- a
+// `continue` when the block is a loop's body, a `break` when it encloses the
+// loop. A target outside the body is not the body's to end, and the
+// statement goes on to the next.
+static FuncFlow ExecFuncDisable(const Stmt* stmt, const FuncExecCtx& exec) {
+  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
+    return FuncFlow::kNext;
+  }
+  std::string_view target = stmt->expr->text;
+  const auto& scopes = *exec.named_scopes;
+  if (std::find(scopes.begin(), scopes.end(), target) == scopes.end()) {
+    return FuncFlow::kNext;
+  }
+  exec.ctx.SetDisableTarget(target);
+  return FuncFlow::kDisable;
 }
 
 // True when any for-loop init declares a new variable (has an explicit type),
@@ -305,13 +360,14 @@ static FuncFlow ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope named(stmt->label, exec);
   bool scoped = ForInitNeedsScope(stmt);
   if (scoped) exec.ctx.PushScope();
   ExecFuncForInits(stmt, exec);
   FuncFlow flow = ExecFuncForLoop(stmt, exec);
   if (scoped) exec.ctx.PopScope();
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return flow;
+  return named.Leave(flow);
 }
 
 static std::string GetForeachArrayName(const Expr* expr) {
@@ -331,6 +387,7 @@ static std::string GetForeachArrayName(const Expr* expr) {
 static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope named(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   while (stmt->condition &&
          EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy()) {
@@ -338,7 +395,7 @@ static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
     if (!LoopGoesOn(flow)) break;
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return LoopExitFlow(flow);
+  return named.Leave(LoopExitFlow(flow));
 }
 
 // §12.7.7/§12.8: the body runs once before the condition is first read; a
@@ -347,6 +404,7 @@ static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope named(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   do {
     flow = ExecFuncStmt(stmt->body, exec);
@@ -354,7 +412,7 @@ static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   } while (stmt->condition &&
            EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy());
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return LoopExitFlow(flow);
+  return named.Leave(LoopExitFlow(flow));
 }
 
 // §12.7.2/§12.8: a `forever` in a subroutine body ends only through a `break`
@@ -362,13 +420,14 @@ static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncForever(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope named(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   for (;;) {
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return LoopExitFlow(flow);
+  return named.Leave(LoopExitFlow(flow));
 }
 
 // Resolves the iteration count for a foreach over the named array: the array's
@@ -659,6 +718,8 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       return FuncFlow::kReturn;
     case StmtKind::kBreak:
       return FuncFlow::kBreak;
+    case StmtKind::kDisable:
+      return ExecFuncDisable(stmt, exec);
     case StmtKind::kContinue:
       return FuncFlow::kContinue;
     case StmtKind::kBlockingAssign:
@@ -800,13 +861,15 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // body constructs, recorded as a body local's is.
   ShapeClassReturnVariable(func, ret_var, ctx, arena);
   std::string_view static_frame = StaticLocalFrame(func, ctx, arena);
+  std::vector<std::string_view> named_scopes;
   FuncExecCtx exec{ret_var,
                    func->name,
                    static_frame,
                    ctx,
                    arena,
                    ret_width,
-                   func->is_static && !func->is_automatic};
+                   func->is_static && !func->is_automatic,
+                   &named_scopes};
   BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
   // the body's own statement list has no loop to act on it; the body ends

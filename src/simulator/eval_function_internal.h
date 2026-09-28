@@ -18,6 +18,7 @@ struct ModuleItem;
 struct Stmt;
 class SimContext;
 class Arena;
+struct Process;
 
 // §6.11.2 names the 4-state types -- logic, reg, integer and time -- and says
 // "the other types do not have unknown values", which decides whether an
@@ -411,6 +412,27 @@ bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out);
 bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out);
+// §9.7 with A.8.2: the same methods written without an argument list, `p.kill`
+// or `p.status`, which arrive as a member select rather than a call.
+bool TryEvalProcessMethodWithoutArgs(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out);
+
+// §9.7: whether `recv`, the receiver of a method select, is declared with the
+// process class: a variable by its bare name, a property of the running
+// object, a property through a handle, `w.q`, or an element of an array of
+// any of them, `arr[i]` and `job[k]` as §9.7's own example keeps them.
+bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena);
+
+// §9.7: the process a method call through a process handle targets and the
+// method it names, for `p.kill()`, `arr[i].await()` and `job[k].status()`.
+// False when the call is not one through a process handle; `proc` is null
+// where the handle names no live process.
+struct ProcessMethodCall {
+  Process* proc = nullptr;
+  std::string_view method;
+};
+bool ResolveProcessMethodCall(const Expr* call, SimContext& ctx, Arena& arena,
+                              ProcessMethodCall& out);
 
 // §15.5.3: routes the parenthesized call form of the named-event triggered
 // method (ev.triggered()) to the same triggered-state evaluation used for the

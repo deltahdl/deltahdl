@@ -1,5 +1,7 @@
+#include <coroutine>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -7,10 +9,14 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -42,6 +48,80 @@ bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   uint64_t handle = ctx.RegisterProcessHandle(proc);
   out = MakeLogic4VecVal(arena, 64, handle);
+  return true;
+}
+
+// The name an element select reads from: `arr` for `arr[i]` and `m[i][j]`.
+static const Expr* SelectedName(const Expr* e) {
+  while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
+  return e;
+}
+
+// A process handle a method select names by a variable's key: `p`, or
+// `p::proc` under the key ExtractHandleAccessParts answers (§26.3).
+static const Variable* ProcessVariableOf(const Expr* access, SimContext& ctx,
+                                         Arena& arena) {
+  MethodCallParts parts;
+  if (!ExtractHandleAccessParts(access, arena, parts)) return nullptr;
+  if (ctx.GetVariableClassType(parts.var_name) != "process") return nullptr;
+  return ctx.FindVariable(parts.var_name);
+}
+
+// Whether the bare name `name` is declared with the process class: a variable,
+// or a property of the running object (§8.6).
+static bool ProcessTypedName(std::string_view name, SimContext& ctx) {
+  if (ctx.GetVariableClassType(name) == "process") return true;
+  const ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr || self->type == nullptr) return false;
+  const auto* prop = self->type->FindProperty(name);
+  return prop != nullptr && prop->type_name == "process";
+}
+
+// Whether `access`, a property selected through a handle, `w.q`, is declared
+// with the process class by the class of the object the handle holds.
+static bool ProcessTypedMember(const Expr* access, SimContext& ctx,
+                               Arena& arena) {
+  if (access->kind != ExprKind::kMemberAccess || access->is_scope_resolution ||
+      access->lhs == nullptr || access->rhs == nullptr ||
+      access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const ClassObject* obj =
+      ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
+  if (obj == nullptr || obj->type == nullptr) return false;
+  const auto* prop = obj->type->FindProperty(access->rhs->text);
+  return prop != nullptr && prop->type_name == "process";
+}
+
+bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena) {
+  const Expr* name = SelectedName(recv);
+  if (name == nullptr) return false;
+  if (name->kind == ExprKind::kIdentifier)
+    return ProcessTypedName(name->text, ctx);
+  return ProcessTypedMember(name, ctx, arena);
+}
+
+bool ResolveProcessMethodCall(const Expr* call, SimContext& ctx, Arena& arena,
+                              ProcessMethodCall& out) {
+  // A.8.2 makes the argument list of a method call optional, so `p.kill` is
+  // the call as `p.kill()` is; the select is the call's callee or the call.
+  const Expr* access = call;
+  if (call != nullptr && call->kind == ExprKind::kCall) access = call->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  uint64_t handle = 0;
+  if (const Variable* var = ProcessVariableOf(access, ctx, arena)) {
+    handle = var->value.ToUint64();
+  } else if (NamesProcessHandle(access->lhs, ctx, arena)) {
+    handle = EvalExpr(access->lhs, ctx, arena).ToUint64();
+  } else {
+    return false;
+  }
+  out.proc = ctx.FindProcessByHandle(handle);
+  out.method = access->rhs->text;
   return true;
 }
 
@@ -126,23 +206,23 @@ static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
   out = MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §9.7: drive a just-resumed process. Replay a delay wake that elapsed while it
-// was suspended (its handle was stashed by the DelayAwaiter), resuming the
-// exact parked continuation; if none is pending, the process was suspended
-// while not waiting on an elapsed delay, so drive it through its own coro
-// handle.
+// §9.7: drive a just-resumed process. A wake that came while it was suspended
+// -- a delay that elapsed, or the process's own suspend() -- was stashed as the
+// parked continuation, and is replayed; a start that found it suspended is
+// run. Otherwise the process is still blocked where it was, resensitized, and
+// the wait it is parked in wakes it: resuming Process::coro there would resume
+// the outer frame beneath the one that is parked.
 static void DriveResumedProcess(Process* target, SimContext& ctx) {
   if (!target->active) return;
-  if (target->pending_wake) {
-    auto h = target->pending_wake;
-    target->pending_wake = {};
-    if (!h.done()) {
-      ctx.SetCurrentProcess(target);
-      h.resume();
-    }
+  std::coroutine_handle<> h = target->pending_wake;
+  target->pending_wake = {};
+  if (h && !h.done()) {
+    ctx.SetCurrentProcess(target);
+    h.resume();
     return;
   }
-  if (!target->Done()) {
+  if (target->start_deferred) {
+    target->start_deferred = false;
     ctx.SetCurrentProcess(target);
     target->Resume();
   }
@@ -218,45 +298,69 @@ static void EvalProcessSetRandState(Process* proc, const Expr* expr,
 
 // §26.3 admits a package-qualified handle as the receiver, `p::proc.kill()`,
 // resolved by the key ExtractHandleMethodCallParts answers.
+bool TryEvalProcessMethodWithoutArgs(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  return TryEvalProcessMethodCall(expr, ctx, arena, out);
+}
+
 bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
-  if (ctx.GetVariableClassType(parts.var_name) != "process") return false;
-  auto* var = ctx.FindVariable(parts.var_name);
-  if (!var) return false;
-  auto proc_handle = var->value.ToUint64();
-  auto* proc = ctx.FindProcessByHandle(proc_handle);
-  if (parts.method_name == "status") {
+  ProcessMethodCall call;
+  if (!ResolveProcessMethodCall(expr, ctx, arena, call)) return false;
+  Process* proc = call.proc;
+  std::string_view method = call.method;
+  if (method == "status") {
     out = MakeLogic4VecVal(arena, 32, ObservedProcessState(proc, ctx));
     return true;
   }
-  if (parts.method_name == "kill") {
+  if (method == "kill") {
     EvalProcessKill(proc, ctx, arena, out, expr->range.start);
     return true;
   }
-  if (parts.method_name == "suspend") {
+  if (method == "suspend") {
     EvalProcessSuspend(proc, ctx, arena, out, expr->range.start);
     return true;
   }
-  if (parts.method_name == "srandom") {
+  if (method == "srandom") {
     EvalProcessSrandom(proc, expr, ctx, arena, out);
     return true;
   }
-  if (parts.method_name == "get_randstate") {
+  if (method == "get_randstate") {
     // §18.13.4 via §9.7: retrieve the process RNG state as a string.
     out = StringToLogic4Vec(arena, proc ? ctx.GetRandState(proc) : "");
     return true;
   }
-  if (parts.method_name == "set_randstate") {
+  if (method == "set_randstate") {
     EvalProcessSetRandState(proc, expr, ctx, arena, out);
     return true;
   }
-  if (parts.method_name == "resume") {
+  if (method == "resume") {
     EvalProcessResume(proc, ctx, arena, out, expr->range.start);
     return true;
   }
   return false;
+}
+
+void RegisterProcessClassType(SimContext& ctx, Arena& arena) {
+  auto* proc_type = arena.Create<ClassTypeInfo>();
+  proc_type->name = "process";
+  proc_type->enum_members["FINISHED"] = 0;
+  proc_type->enum_members["RUNNING"] = 1;
+  proc_type->enum_members["WAITING"] = 2;
+  proc_type->enum_members["SUSPENDED"] = 3;
+  proc_type->enum_members["KILLED"] = 4;
+  ctx.RegisterClassType("process", proc_type);
+  // §9.7 with §6.19.5.6: the enumeration `process::state` that status()
+  // answers, so name() on a status value, chained or held in a variable
+  // declared with the type, yields the member's name.
+  EnumTypeInfo state;
+  state.type_name = "process::state";
+  for (const char* name :
+       {"FINISHED", "RUNNING", "WAITING", "SUSPENDED", "KILLED"}) {
+    state.members.push_back(
+        {name, static_cast<uint64_t>(state.members.size()), 0});
+  }
+  ctx.RegisterEnumType(state.type_name, state);
 }
 
 }  // namespace delta

@@ -155,7 +155,7 @@ ClassObject* StaticPropertyObject(const StaticPropertyRef& ref, SimContext& ctx,
   // §9.7 with §26.7: a built-in class's handle, `static process p`, numbers
   // no ClassObject of the run and is the built-in method paths' to read; the
   // built-in class is the one registered with no declaration of its own
-  // (RegisterProcessClassType in lowerer_register.cpp).
+  // (RegisterProcessClassType in eval_process_methods.cpp).
   if (declared == nullptr || declared->decl == nullptr) return nullptr;
   return ctx.GetClassObject(ref.slot->ToUint64());
 }

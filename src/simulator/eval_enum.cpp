@@ -12,6 +12,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -448,6 +449,10 @@ static const EnumTypeInfo* EnumTypeOfSubroutineResult(const Expr* callee,
     return nullptr;
   }
   if (!callee->is_scope_resolution) {
+    // §9.7: status() through a process handle answers `process::state`.
+    if (callee->rhs->text == "status" &&
+        NamesProcessHandle(callee->lhs, ctx, arena))
+      return ctx.FindEnumType("process::state");
     return EnumTypeOfMethodResult(ClassBehindHandle(callee->lhs, ctx, arena),
                                   callee->rhs->text, ctx);
   }

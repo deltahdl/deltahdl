@@ -469,4 +469,201 @@ TEST(DisableStatementExecution,
                          "        alt : { in_rs = 8'd37; };\n");
 }
 
+// §9.6.2 with its Example 5: in a class function, disabling the named block
+// that is a loop's body ends that iteration and the loop goes on.
+TEST(DisableStatementExecution,
+     DisableInAClassFunctionOfItsLoopBodyBlockActsAsContinue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  function void cont;\n"
+                       "    int sum = 0, i;\n"
+                       "    for (i = 0; i < 10; i = i + 1) begin : inner\n"
+                       "      if (i == 1) disable inner;\n"
+                       "      sum = sum + i + 2;\n"
+                       "    end\n"
+                       "    $display(\"cont sum=%0d i=%0d\", sum, i);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C h = new;\n"
+                       "  initial h.cont();\n"
+                       "endmodule\n",
+                       f),
+            "cont sum=62 i=10\n");
+}
+
+// §9.6.2 with its Example 5: in a class function, disabling a named block
+// around a loop ends the whole loop, on the object's properties as on locals.
+TEST(DisableStatementExecution,
+     DisableInAClassFunctionOfABlockAroundTheLoopActsAsBreak) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C;\n"
+                 "  int sum, i;\n"
+                 "  function void run(int n, int stop);\n"
+                 "    begin : outer_block\n"
+                 "      for (i = 0; i < n; i = i + 1) begin : inner_block\n"
+                 "        if (i == 1) disable inner_block;\n"
+                 "        if (i == stop) disable outer_block;\n"
+                 "        sum = sum + i + 2;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  C h = new;\n"
+                 "  initial begin h.run(10, 3); $display(\"method sum=%0d "
+                 "i=%0d\", h.sum, h.i); end\n"
+                 "endmodule\n",
+                 f),
+      "method sum=6 i=3\n");
+}
+
+// §9.6.2: a disable issued by another process ends the named block where
+// its process waits, and that process goes on after the block.
+TEST(DisableStatementExecution,
+     DisableFromAnotherProcessEndsTheBlockWhereItWaits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v;\n"
+                       "  initial begin\n"
+                       "    begin : waiter\n"
+                       "      #10 v = 1;\n"
+                       "    end\n"
+                       "    $display(\"other @%0d v=%0d\", $time, v);\n"
+                       "  end\n"
+                       "  initial #3 disable waiter;\n"
+                       "endmodule\n",
+                       f),
+            "other @3 v=0\n");
+}
+
+// §9.6.2: disabling a task from another process ends the activation where
+// it waits, and its caller goes on after the call.
+TEST(DisableStatementExecution,
+     DisableOfATaskFromAnotherProcessReturnsToItsCaller) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  int v;\n"
+          "  task tk; #10 v = 1; endtask\n"
+          "  initial begin tk(); $display(\"back @%0d v=%0d\", $time, v); end\n"
+          "  initial #4 disable tk;\n"
+          "endmodule\n",
+          f),
+      "back @4 v=0\n");
+}
+
+// §9.6.2: a fork branch may disable a named block of a sibling branch, in a
+// delay or on an event, and the fork then joins.
+TEST(DisableStatementExecution,
+     ForkBranchDisablingASiblingBlockLetsTheForkJoin) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  event e; int x, y;\n"
+                       "  initial begin\n"
+                       "    fork\n"
+                       "      begin : blkA #10 x = 1; end\n"
+                       "      #2 disable blkA;\n"
+                       "    join\n"
+                       "    $display(\"A @%0d x=%0d\", $time, x);\n"
+                       "    fork\n"
+                       "      begin : blkB @e y = 1; end\n"
+                       "      #2 disable blkB;\n"
+                       "    join\n"
+                       "    $display(\"B @%0d y=%0d\", $time, y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "A @2 x=0\n"
+            "B @4 y=0\n");
+}
+
+// §9.6.2's Example 6: the reset branch disables the block waiting on the
+// event expression, which then never acts, and the fork joins.
+TEST(DisableStatementExecution, ClauseExample6DisablesTheEventExpressionBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  event ev1, trig, reset; int acted;\n"
+                       "  initial begin\n"
+                       "    fork\n"
+                       "      begin : event_expr\n"
+                       "        @ev1;\n"
+                       "        repeat (3) @trig;\n"
+                       "        #4 acted = 1;\n"
+                       "      end\n"
+                       "      @reset disable event_expr;\n"
+                       "    join\n"
+                       "    $display(\"end @%0d acted=%0d\", $time, acted);\n"
+                       "  end\n"
+                       "  initial begin #1 -> ev1; #1 -> trig; #1 -> trig; #1 "
+                       "-> trig; #1 -> reset; #5; end\n"
+                       "endmodule\n",
+                       f),
+            "end @5 acted=0\n");
+}
+
+// §9.6.2: a branch disabling the named fork it belongs to ends every branch
+// of it, and the join completes at once.
+TEST(DisableStatementExecution, BranchDisablingItsOwnForkEndsEveryBranch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int x;\n"
+                       "  initial begin\n"
+                       "    fork : f\n"
+                       "      #1 disable f;\n"
+                       "      #10 x = 1;\n"
+                       "    join\n"
+                       "    $display(\"joined @%0d x=%0d\", $time, x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "joined @1 x=0\n");
+}
+
+// §9.6.2: disabling a named fork from outside it ends its branches, and the
+// process waiting at its join goes on.
+TEST(DisableStatementExecution,
+     DisableOfANamedForkFromAnotherProcessEndsTheJoin) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int x, y;\n"
+                 "  initial begin\n"
+                 "    fork : f\n"
+                 "      #10 x = 1;\n"
+                 "      #10 y = 1;\n"
+                 "    join\n"
+                 "    $display(\"joined @%0d x=%0d y=%0d\", $time, x, y);\n"
+                 "  end\n"
+                 "  initial #3 disable f;\n"
+                 "endmodule\n",
+                 f),
+      "joined @3 x=0 y=0\n");
+}
+
+// §9.6.2 with §23.6: a disable names its block by a hierarchical name, here
+// a block inside a task, and the task goes on after the block.
+TEST(DisableStatementExecution, HierarchicalDisableOfABlockInATask) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int n, after;\n"
+                 "  task counter();\n"
+                 "    begin : cnt\n"
+                 "      forever begin #10 n++; end\n"
+                 "    end\n"
+                 "    after = 1;\n"
+                 "  endtask\n"
+                 "  initial begin #35 disable t.counter.cnt; end\n"
+                 "  initial begin\n"
+                 "    counter();\n"
+                 "    $display(\"n=%0d t=%0t after=%0d\", n, $time, after);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "n=3 t=35 after=1\n");
+}
+
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 #include "simulator/exec_task.h"
@@ -68,6 +69,16 @@ StmtResult ExecImmediateBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                        Arena& arena);
 
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §9.6.2's disable and §9.6.3's disable fork, defined in
+// stmt_exec_disable.cpp.
+StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx);
+StmtResult ExecDisableForkImpl(SimContext& ctx);
+// §9.7: a call statement through a process handle that suspends the calling
+// process -- `h.await()`, or `suspend()` on the running process itself -- and
+// its execution. Defined in stmt_exec_process.cpp.
+bool IsSuspendingProcessCall(const Expr* expr, SimContext& ctx, Arena& arena);
+ExecTask ExecSuspendingProcessCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena);
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
@@ -75,6 +86,11 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Defined in stmt_exec_control.cpp.
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §9.3.4: binds the hierarchical name of the variable `name` the running
+// statement declares -- the named blocks and task around it, `b1.cnt` or
+// `tk.inner.w`, under the instance's prefix -- so another process reaches it.
+// Defined in stmt_exec_control.cpp.
+void BindNamedBlockVariable(std::string_view name, SimContext& ctx);
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §12.5: the body of the item the case statement `stmt` selects, its case

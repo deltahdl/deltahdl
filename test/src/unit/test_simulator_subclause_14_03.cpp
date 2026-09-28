@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
@@ -270,6 +272,57 @@ TEST(ClockingBlockSim, ClockReachedThroughAnInterfacePortFires) {
                  "endmodule\n",
                  f),
       "t=5 data=33\nt=6 write=1\n$finish at time 6\n");
+}
+
+// §14.3 with §9.4.2.3: the clocking event may carry an `iff` qualifier, and
+// the block samples and its event fires only at the edges where it holds.
+TEST(ClockingBlockSim, ClockingEventIffQualifierGatesTheEdges) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0, en = 0;\n"
+                       "  logic [7:0] d = 1;\n"
+                       "  clocking cb @(posedge clk iff en);\n"
+                       "    input d;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin\n"
+                       "    #7 d = 2;\n"
+                       "    #10 d = 3;\n"
+                       "    #4 en = 1;\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    $display(\"t=%0t cb.d=%0d\", $time, cb.d);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "t=25 cb.d=3\n"
+            "$finish at time 25\n");
+}
+
+// §14.3 with §23.9: the `iff` condition of a block declared in a module
+// instance names that instance's variables.
+TEST(ClockingBlockSim, ClockingEventIffReadsTheBlocksInstance) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m(input logic clk);\n"
+                 "  logic en = 0;\n"
+                 "  int n;\n"
+                 "  clocking cb @(posedge clk iff en);\n"
+                 "  endclocking\n"
+                 "  always @(cb) n++;\n"
+                 "  initial #12 en = 1;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  m u(clk);\n"
+                 "  initial #40 begin $display(\"n=%0d\", u.n); $finish; end\n"
+                 "endmodule\n",
+                 f),
+      "n=3\n"
+      "$finish at time 40\n");
 }
 
 }  // namespace

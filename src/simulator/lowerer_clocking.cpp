@@ -145,6 +145,7 @@ std::optional<ClockingBlock> BuildClockingBlock(
     block.clock_signal = *scope.arena.Create<std::string>(std::move(path));
   }
   block.clock_edge = item->clocking_event[0].edge;
+  block.clock_iff = item->clocking_event[0].iff_condition;
   block.default_input_skew =
       ClockingSkewOf(item->default_input_skew_delay, scope);
   block.default_output_skew =

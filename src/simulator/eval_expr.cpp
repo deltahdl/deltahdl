@@ -642,13 +642,12 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// The member selects that are something other than a read of a member of a
-// value: a sequence's end point (§16.9.11), an array reduction or ordering
-// method with a with clause (§7.12), a parameter of a parameterized class
-// scope (§8.25.1), and an enumeration method written without an argument
-// list (§6.19.5.7), `c.name` or `c.next`, asked ahead of the member reads
-// since a receiver of an enumeration type leaves no member of the name for
-// them to read. True with `out` set when the select was one of them.
+// The member selects that are no read of a member of a value: a sequence's
+// end point (§16.9.11), an array reduction or ordering method with a with
+// clause (§7.12), a parameter of a parameterized class scope (§8.25.1), and a
+// process (§9.7) or enumeration (§6.19.5.7) method written without an
+// argument list, `p.kill` or `c.next`, which leave no member of the name to
+// read. True with `out` set when the select was one of them.
 static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
   if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
@@ -661,6 +660,7 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
   }
   if (TryParameterizedScopeParam(expr, ctx, arena, out)) return true;
   if (TryScopeSpecializationStaticMember(expr, ctx, arena, out)) return true;
+  if (TryEvalProcessMethodWithoutArgs(expr, ctx, arena, out)) return true;
   return TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out);
 }
 

@@ -18,6 +18,7 @@
 #include "simulator/clocking.h"
 #include "simulator/coverage.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/exec_task.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
@@ -30,6 +31,8 @@ namespace delta {
 // Defined here, where CoverageDB is a complete type, so the owning unique_ptr
 // member can be destroyed.
 SimContext::~SimContext() {
+  // The running process's park slot belongs to this run.
+  g_park_slot = nullptr;
   // §35.5.3: the C layer reaches this run's registry through a free function
   // (DpiForeignRuntime), so a run that installed one takes it back out when it
   // goes away rather than leaving a pointer to storage that no longer exists.
@@ -504,6 +507,10 @@ void SimContext::SetCurrentProcess(Process* proc) {
     method_class_stack_.clear();
   }
   current_process_ = proc;
+  // §9.6.2: the wait the running process parks in is recorded on it, while
+  // the named scopes it stands in are the ones in active_scope_stack_.
+  g_park_slot = proc != nullptr ? &proc->park : nullptr;
+  if (proc != nullptr) proc->park.named_scopes = &active_scope_stack_;
 }
 
 // §9.3.2 with §8.6 and §13.3.2: a branch spawned inside a method runs on the

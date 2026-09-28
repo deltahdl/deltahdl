@@ -346,6 +346,8 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
 // §16.8 and §16.12: the module's named sequence and property declarations,
 // which an instance of one is expanded from at the run.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
+// §9.7: the built-in process class and its enumeration `state`. Defined in
+// eval_process_methods.cpp, beside the class's methods.
 void RegisterProcessClassType(SimContext& ctx, Arena& arena);
 
 }  // namespace delta

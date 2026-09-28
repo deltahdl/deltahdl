@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -24,7 +23,6 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
-#include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -100,9 +98,14 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
   auto region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
+  // A watcher answers false when this trigger does not wake it -- its process
+  // is suspended (§9.7) or its `iff` does not hold (§9.4.2.3) -- and it stays
+  // armed for the next trigger, as Variable::NotifyWatchers keeps it.
   for (auto& cb : pending) {
     auto* event = sched.GetEventPool().Acquire();
-    event->callback = std::move(cb);
+    event->callback = [var, cb = std::move(cb)]() mutable {
+      if (!cb()) var->AddWatcher(std::move(cb));
+    };
     sched.ScheduleEvent(ctx.CurrentTime(), region, event);
   }
   return StmtResult::kDone;
@@ -200,14 +203,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 // Marks the just-completed fork child process finished and wakes any thread
 // blocked on its await(). No-op for a process that was killed.
 static void FinalizeForkChildProcess(SimContext& ctx) {
-  auto* child_proc = ctx.CurrentProcess();
-  if (child_proc && child_proc->sv_state != ProcessState::kKilled) {
-    child_proc->sv_state = ProcessState::kFinished;
-    for (auto& w : child_proc->await_waiters) {
-      if (w) w.resume();
-    }
-    child_proc->await_waiters.clear();
-  }
+  if (auto* child_proc = ctx.CurrentProcess()) child_proc->Finish();
 }
 
 // Decrements the join/wait-fork tallies for one finished (or, when
@@ -334,13 +330,34 @@ static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
   }
 }
 
+// The join of a fork, awaited as a statement of its own so that a disable
+// taking the parent out of it (TryUnwindForDisable) lands in ExecFork, which
+// then closes the fork's scope.
+static ExecTask AwaitForkJoin(ForkJoinState* state) {
+  co_await ForkJoinAwaiter{state};
+  co_return StmtResult::kDone;
+}
+
+// §9.3.5 with §9.6.2: a fork's label names a block a disable can end, from one
+// of its own branches or from another process. The label is a named scope of
+// the spawning process for as long as it waits at the join, and of every
+// branch (RegisterForkChildScopes), so the disable kills the branches and
+// takes the parent out of the join, which then completes at once.
+static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx) {
+  ctx.PushStaticScope(stmt->label);
+  ctx.PushActiveNamedScope(stmt->label);
+  ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
+}
+
+static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx) {
+  ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+  ctx.PopActiveNamedScope();
+  ctx.PopStaticScope(stmt->label);
+}
+
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
-  if (stmt->fork_stmts.empty()) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return StmtResult::kDone;
-  }
+  if (labeled) EnterForkLabelScope(stmt, ctx);
 
   uint32_t process_count = 0;
   for (auto* s : stmt->fork_stmts) {
@@ -351,36 +368,42 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
 
-  if (process_count == 0) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return StmtResult::kDone;
+  StmtResult result = StmtResult::kDone;
+  if (process_count != 0) {
+    auto* state = arena.Create<ForkJoinState>();
+    state->remaining = process_count;
+    state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
+
+    auto* spawning_proc = ctx.CurrentProcess();
+    state->parent_proc = spawning_proc;
+
+    // §9.6.1: wait fork blocks until every immediate child subprocess of the
+    // current process has terminated, however the child was spawned. Each
+    // child is registered against the spawning process's wait-fork tally for
+    // every join kind, not join_none alone: after join_any the unblocked
+    // siblings keep running and a later wait fork must still wait on them, and
+    // for plain join the count is drained by the join site, so the
+    // bookkeeping is inert.
+    Process* parent_proc = spawning_proc;
+    WaitForkState* parent_wfs =
+        parent_proc ? &parent_proc->wait_fork_state : nullptr;
+
+    SpawnForkChildren(stmt, ctx, arena, spawning_proc,
+                      {state, parent_wfs, parent_proc});
+
+    if (stmt->join_kind != TokenKind::kKwJoinNone) {
+      result = co_await AwaitForkJoin(state);
+    }
   }
-
-  auto* state = arena.Create<ForkJoinState>();
-  state->remaining = process_count;
-  state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
-
-  auto* spawning_proc = ctx.CurrentProcess();
-  state->parent_proc = spawning_proc;
-
-  // §9.6.1: wait fork blocks until every immediate child subprocess of the
-  // current process has terminated, however the child was spawned. Each child
-  // is registered against the spawning process's wait-fork tally for every
-  // join kind, not join_none alone: after join_any the unblocked siblings keep
-  // running and a later wait fork must still wait on them, and for plain join
-  // the count is drained by the join site, so the bookkeeping is inert.
-  Process* parent_proc = spawning_proc;
-  WaitForkState* parent_wfs =
-      parent_proc ? &parent_proc->wait_fork_state : nullptr;
-
-  SpawnForkChildren(stmt, ctx, arena, spawning_proc,
-                    {state, parent_wfs, parent_proc});
-
-  if (stmt->join_kind != TokenKind::kKwJoinNone) {
-    co_await ForkJoinAwaiter{state};
+  if (labeled) {
+    ExitForkLabelScope(stmt, ctx);
+    if (result == StmtResult::kDisable &&
+        ctx.GetDisableTarget() == stmt->label) {
+      ctx.ClearDisableTarget();
+      result = StmtResult::kDone;
+    }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
-  co_return StmtResult::kDone;
+  co_return result;
 }
 
 // §13.4.4: a function body must not block, so it spawns background processes
@@ -419,57 +442,6 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
   if (!proc) co_return StmtResult::kDone;
   co_await WaitForkAwaiter{&proc->wait_fork_state};
   co_return StmtResult::kDone;
-}
-
-// The process a `<handle>.await()` call targets, validated: null, with the
-// diagnostic, where the call names none a process may legally await. §26.3
-// admits a package-qualified handle, `p::proc.await()`, by the key
-// ExtractHandleMethodCallParts answers.
-static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx,
-                                          Arena& arena) {
-  MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts) ||
-      ctx.GetVariableClassType(parts.var_name) != "process" ||
-      parts.method_name != "await") {
-    return nullptr;
-  }
-  auto* var = ctx.FindVariable(parts.var_name);
-  if (!var) return nullptr;
-  auto proc_handle = var->value.ToUint64();
-  auto* proc = ctx.FindProcessByHandle(proc_handle);
-  if (!proc) return nullptr;
-  if (proc->kind == ProcessKind::kFinal ||
-      proc->kind == ProcessKind::kContAssign) {
-    ctx.GetDiag().Error(
-        expr->range.start,
-        "await() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block",
-        Subclause("9.7"));
-    return nullptr;
-  }
-  if (proc == ctx.CurrentProcess()) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "process cannot await its own termination",
-                        Subclause("9.7"));
-    return nullptr;
-  }
-  return proc;
-}
-
-static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
-                                 Arena& arena) {
-  auto* proc = ResolveProcessAwaitTarget(expr, ctx, arena);
-  if (proc) co_await ProcessAwaitAwaiter{proc};
-  co_return StmtResult::kDone;
-}
-
-// Reports whether the expression is a `<process handle>.await()` method call.
-static bool IsProcessAwaitCall(const Expr* expr, SimContext& ctx,
-                               Arena& arena) {
-  MethodCallParts parts;
-  return ExtractHandleMethodCallParts(expr, arena, parts) &&
-         ctx.GetVariableClassType(parts.var_name) == "process" &&
-         parts.method_name == "await";
 }
 
 // Drops the named-scope registration and active-scope push established for a
@@ -530,8 +502,8 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     co_return StmtResult::kDone;
   }
 
-  if (IsProcessAwaitCall(expr, ctx, arena)) {
-    co_return co_await ExecProcessAwait(expr, ctx, arena);
+  if (IsSuspendingProcessCall(expr, ctx, arena)) {
+    co_return co_await ExecSuspendingProcessCall(expr, ctx, arena);
   }
 
   // §15.3: a process calling get() procures the keys it asks for before it can
@@ -694,103 +666,6 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
                          trigger.reactive, ctx);
 }
 
-// §16.4.4: a disable of the outermost scope of a procedure holding a deferred
-// assertion queue flushes that queue beside §9.6.2's own activities, whether
-// or not the block is executing -- the clause's own example disables b2 from
-// another always block while b2 sits on its event control -- so the outermost
-// scope is looked up on its own rather than among the blocks a process is
-// inside. The queue alone is touched: §9.6.2 leaves a block that is not
-// executing unaffected, so the process keeps running. §16.14.6.4 has the same
-// disable flush the procedure's procedural assertion queue, its matured
-// attempts untouched, the procedure disabling its own outermost scope flushing
-// its own. Answers whether the target named any procedure's outermost scope,
-// so that a name answered here is not also taken for an assertion label.
-static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
-                                               const Process* current,
-                                               SimContext& ctx) {
-  const auto& procs = ctx.FindOutermostScopeProcesses(target);
-  for (auto* proc : procs) {
-    FlushProceduralAssertionQueue(*proc);
-    if (proc == current) continue;
-    proc->deferred_report_generation++;
-  }
-  return !procs.empty();
-}
-
-static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier)
-    return StmtResult::kDone;
-
-  auto target = stmt->expr->text;
-  if (target.empty()) return StmtResult::kDone;
-
-  auto* current = ctx.CurrentProcess();
-
-  auto procs = ctx.FindNamedScopeProcesses(target);
-  bool self_disable = false;
-
-  for (auto* proc : procs) {
-    if (proc == current) {
-      self_disable = true;
-      continue;
-    }
-
-    proc->active = false;
-    // §16.4.4: applying a disable to the outermost scope of another procedure
-    // that has an active deferred assertion queue flushes that queue -- every
-    // pending (not-yet-matured) deferred immediate assertion report on it is
-    // cleared, in addition to the normal disable activities of §9.6.2. A
-    // pending report's scheduled Reactive/Postponed event is gated only on the
-    // process's deferred report generation (not on its active flag), so bumping
-    // that generation invalidates the reports this process queued earlier in
-    // the time step, mirroring FlushPendingDeferredReports for the disabled
-    // process (see §16.4.2). Reports that already matured have run and are
-    // unaffected.
-    proc->deferred_report_generation++;
-  }
-
-  bool named_a_procedure_scope =
-      FlushDeferredQueueOfOutermostScope(target, current, ctx);
-
-  if (self_disable) {
-    ctx.SetDisableTarget(target);
-    return StmtResult::kDisable;
-  }
-
-  // §16.4.4: a `disable <label>` that names no block, task, or process scope
-  // may instead name a specific deferred immediate assertion. Such a disable
-  // cancels only that assertion's still-pending reports and does not unwind the
-  // process (unlike disabling a scope). Record the label on the current
-  // process; each pending report queued by that assertion skips execution when
-  // its region runs (see ScheduleDeferredAction /
-  // ScheduleDeferredSeverityReport). Reports of other assertions, and any
-  // report that has already matured, are untouched.
-  if (procs.empty() && !named_a_procedure_scope && current) {
-    current->cancelled_deferred_labels.insert(std::string(target));
-    // §16.14.6.4: or a specific procedural concurrent assertion, whose
-    // pending instances alone are cleared.
-    DisableProceduralAssertion(*current, target);
-  }
-
-  return StmtResult::kDone;
-}
-
-static void DisableDescendants(Process* proc) {
-  for (auto* child : proc->children) {
-    child->active = false;
-    DisableDescendants(child);
-  }
-}
-
-static StmtResult ExecDisableForkImpl(SimContext& ctx) {
-  auto* proc = ctx.CurrentProcess();
-  if (!proc) return StmtResult::kDone;
-  DisableDescendants(proc);
-  proc->wait_fork_state.remaining = 0;
-  proc->children.clear();
-  return StmtResult::kDone;
-}
-
 // Selects the blocking-assignment execution form (timed, event/repeat-event,
 // or immediate) for a kBlockingAssign statement.
 static ExecTask DispatchBlockingAssign(const Stmt* stmt, SimContext& ctx,
@@ -922,11 +797,21 @@ static ExecTask ExecStmtDispatch(const Stmt* stmt, SimContext& ctx,
 // task invoked under the labeled statement reports the label in %m. The label
 // scope is active only while the statement runs; it is popped on every exit
 // path, including a propagating disable.
+//
+// §9.3.5 with §9.6.2: the label also makes the statement one a disable can
+// name, from within it or from another process, as a named block is; the
+// disable ends the statement and control goes on after it.
 static ExecTask ExecLabeledStmt(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   ctx.PushActiveNamedScope(stmt->label);
+  ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
   auto result = co_await ExecStmtDispatch(stmt, ctx, arena);
+  ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopActiveNamedScope();
+  if (result == StmtResult::kDisable && ctx.GetDisableTarget() == stmt->label) {
+    ctx.ClearDisableTarget();
+    result = StmtResult::kDone;
+  }
   co_return result;
 }
 

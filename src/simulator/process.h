@@ -8,11 +8,13 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_stmt.h"
+#include "simulator/exec_task.h"
 #include "simulator/scope.h"
 
 namespace delta {
@@ -144,6 +146,12 @@ struct Process {
   // inner handle here and replay it on resume(). Empty when no elapsed wake is
   // pending.
   std::coroutine_handle<> pending_wake;
+  // §9.6.2: the wait the process is parked in, for a disable from another
+  // process to take it out of (ParkSlot in exec_task.h).
+  ParkSlot park;
+  // §9.7: a process suspended before its start ran is started by resume(),
+  // since its start event found it suspended and ran nothing.
+  bool start_deferred = false;
   std::vector<std::coroutine_handle<>> await_waiters;
 
   uint32_t rng_seed = 0;
@@ -286,10 +294,26 @@ struct Process {
 
   bool Done() const { return !coro || coro.done(); }
 
-  void Resume() {
-    if (active && !is_suspended && coro && !coro.done()) {
-      coro.resume();
+  // §9.7: the process has terminated normally, so status() answers FINISHED
+  // and every await() on it returns. A process killed meanwhile stays KILLED.
+  void Finish() {
+    if (sv_state == ProcessState::kKilled) return;
+    sv_state = ProcessState::kFinished;
+    auto waiters = std::move(await_waiters);
+    await_waiters.clear();
+    for (auto& w : waiters) {
+      if (w) w.resume();
     }
+  }
+
+  // Starts the process: every caller is the event that begins its run.
+  void Resume() {
+    if (!active || !coro || coro.done()) return;
+    if (is_suspended) {
+      start_deferred = true;
+      return;
+    }
+    coro.resume();
   }
 };
 
