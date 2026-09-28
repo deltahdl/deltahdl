@@ -1,5 +1,7 @@
 {
   "autoMemoryEnabled": true,
+  "model": "opus",
+  "effortLevel": "high",
   "env": {
     "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1"
   }

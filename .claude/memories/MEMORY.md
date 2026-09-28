@@ -97,6 +97,10 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [One action per task](one-action-per-task.md) — a subject naming several actions is divisible by construction, and so is an umbrella verb like "Solve #N"; count the steps it commits to and split by action.
 
+## Models and delegation
+
+- [Delegating code to the coder](delegating-code-to-the-coder.md) — research and orchestrate on the latest Opus; hand every code edit to the `coder` subagent, on the latest Sonnet, with a brief that stands alone; name models by alias, never by version.
+
 ## The notes themselves
 
 - [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory.
