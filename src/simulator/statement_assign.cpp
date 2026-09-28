@@ -256,6 +256,26 @@ static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
 static FieldTarget StaticPropertyTarget(const ClassTypeInfo* cls,
                                         std::string_view field_name);
 
+// §8.5 with §8.15: the class the handle property `name` of `holder` is
+// declared with, which scopes the member a chain reaches through it, `k` of
+// `h.d.k` being Inner's where `d` is declared `Inner d`; the object's own
+// class where the declaration names no class the run holds. Descended with
+// no class, `h.d.k = 64` stored the bare key alone, and a read that asks
+// the declaring class's key first -- `i.k` for `Inner i = h.d`, or `k` in a
+// method of Inner, so `h.d.getk()` -- read the 0 standing under it.
+static const ClassTypeInfo* HandlePropertyClass(const ClassTypeInfo* holder,
+                                                std::string_view name,
+                                                const ClassObject* next,
+                                                SimContext& ctx) {
+  const ClassTypeInfo::PropertyInfo* prop =
+      holder != nullptr ? holder->FindProperty(name) : nullptr;
+  if (prop != nullptr && !prop->type_name.empty()) {
+    if (const ClassTypeInfo* declared = ctx.FindClassType(prop->type_name))
+      return declared;
+  }
+  return next->type;
+}
+
 static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
                                            const ClassTypeInfo* declared_type,
                                            std::string_view field_path,
@@ -287,8 +307,11 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
         declared_type ? obj->GetPropertyForType(first, declared_type, arena)
                       : obj->GetProperty(first, arena);
     if (auto* next_obj = ctx.GetClassObject(handle_val.ToUint64())) {
-      return ResolveClassFieldTarget(next_obj, nullptr,
-                                     field_path.substr(dot + 1), ctx);
+      return ResolveClassFieldTarget(
+          next_obj,
+          HandlePropertyClass(declared_type ? declared_type : obj->type, first,
+                              next_obj, ctx),
+          field_path.substr(dot + 1), ctx);
     }
   }
   // §8.9 (printed page 186): a static property named through a handle,

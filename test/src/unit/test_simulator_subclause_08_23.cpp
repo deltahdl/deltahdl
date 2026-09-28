@@ -717,4 +717,27 @@ TEST(ClassScopeResolutionSim, SubroutineVariablesOfAClassStructTypedef) {
   EXPECT_EQ(out, "7 1.500000 9 4 5\n");
 }
 
+// §8.13 with §8.23: a static method a class inherits is called through that
+// class's scope, and runs under the level declaring it, the specialization
+// `Mem #(4)` for `E::sk()`.
+TEST(ClassScopeResolutionSim, InheritedStaticMethodThroughTheDerivedScope) {
+  auto v = RunAndGet(
+      "class Mem #(int K = 1);\n"
+      "  static function int sk(); return K; endfunction\n"
+      "endclass\n"
+      "class E extends Mem #(4);\n"
+      "endclass\n"
+      "class P;\n"
+      "  static function int pk(); return 5; endfunction\n"
+      "endclass\n"
+      "class Q extends P;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = Q::pk() * 10 + E::sk();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 54u);
+}
+
 }  // namespace

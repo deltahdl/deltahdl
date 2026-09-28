@@ -1,12 +1,15 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <unordered_set>
 
 #include "simulator/exec_task.h"
 #include "simulator/stmt_result.h"
 
 namespace delta {
 
+struct Expr;
 struct Stmt;
 struct Logic4Vec;
 class SimContext;
@@ -95,5 +98,14 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // or fails, and runs its action block after the Observed region that
 // concluded it (expect_statement.cpp).
 ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §10.3.2 with §8.9: the names whose change re-evaluates `expr` -- the
+// variables it reads (CollectExprReads) and, as `C::n`, each static class
+// property it reads through the class scope operator, which is the class's
+// own storage and no variable, and which AnyChangeAwaiter arms on the class.
+// `assign w = C::s + 1;` collected `C` and `s` alone, neither a variable, and
+// was never evaluated again. Defined in stmt_exec_wait.cpp.
+void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
+                               std::unordered_set<std::string>& reads);
 
 }  // namespace delta

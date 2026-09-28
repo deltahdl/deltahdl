@@ -222,6 +222,32 @@ static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
 // explicit default if one is given, otherwise to its type's uninitialized
 // value — X for a 4-state type, 0 for a 2-state one — rather than being
 // forced to zero.
+// §8.7 with §10.9.1: a fixed-size array property whose declaration
+// initializer is an array assignment pattern, `int f[4] = '{5, 1, 8, 3};`,
+// takes each item into the element at its position (StoreClassArrayPattern).
+// Evaluated as one value, the pattern answered its last item, which every
+// element was given. The elements are first made at their type's default, as
+// for a property with no initializer, so an element the pattern leaves
+// uncovered still exists. False for any other property or initializer.
+static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
+                                     Construction& c) {
+  if (prop.init_expr == nullptr ||
+      prop.init_expr->kind != ExprKind::kAssignmentPattern ||
+      prop.array_size == 0 || prop.is_dynamic || prop.dim_sizes.size() >= 2) {
+    return false;
+  }
+  uint32_t width = BoundPropertyWidth(prop, c);
+  Logic4Vec fill = prop.is_4state ? MakeAllX(c.arena, width)
+                                  : MakeLogic4VecVal(c.arena, width, 0);
+  StoreClassPropertyDefault(c.obj->type, prop, fill, c.obj, c.arena);
+  ClassArrayRef ref;
+  ref.obj = c.obj;
+  ref.prop = &prop;
+  ref.size = prop.array_size;
+  ref.lo = prop.array_lo;
+  return StoreClassArrayPattern(ref, prop.init_expr, c.ctx, c.arena);
+}
+
 static void InitClassPropertyDefault(const ClassTypeInfo* info,
                                      const ClassTypeInfo::PropertyInfo& prop,
                                      Construction& c) {
@@ -251,6 +277,7 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     StoreClassPropertyDefault(info, prop, val, obj, arena);
     return;
   }
+  if (TryInitClassArrayPattern(prop, c)) return;
   if (prop.init_expr) {
     // §6.8 executes a declaration's initializer as an assignment to the
     // declared object, so it is coerced into the property exactly as a later
@@ -279,6 +306,28 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   StoreClassPropertyDefault(info, prop, val, obj, arena);
 }
 
+// §8.25 with §8.13: a level of the object's class chain that is a
+// specialization -- the base an extends clause names, `class E extends Mem
+// #(2.25, 4)` (BindDeclarationBase) -- has its value parameters as the
+// specialization binds them, which InitSpecializationStaticProperties holds
+// on the level. Stored from the default expressions, the base level of an E
+// read Mem's 1.5 and 1 in its own methods. True where the i-th parameter was
+// so stored on `obj`, under its bare and its class-scoped name.
+static bool StoreSpecializationParam(const ClassTypeInfo* info, size_t i,
+                                     ClassParamSizer& sizer, ClassObject* obj,
+                                     Arena& arena) {
+  if (info->param_actuals == nullptr) return false;
+  std::string_view pname = info->decl->params[i].first;
+  if (info->decl->type_param_names.count(pname) != 0) return false;
+  auto bound = info->static_properties.find(std::string(pname));
+  if (bound == info->static_properties.end()) return false;
+  Logic4Vec val = OwnRhsWords(bound->second, arena);
+  sizer.Record(i, val);
+  obj->properties[std::string(pname)] = val;
+  obj->properties[std::string(info->name) + "::" + std::string(pname)] = val;
+  return true;
+}
+
 static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       Construction& c) {
   ClassObject* obj = c.obj;
@@ -302,6 +351,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     const auto& params = info->decl->params;
     for (size_t i = 0; i < params.size(); ++i) {
       const auto& [pname, pexpr] = params[i];
+      if (StoreSpecializationParam(info, i, sizer, obj, arena)) continue;
       if (pexpr) {
         // §6.8 makes the object's stored parameter and whatever the default
         // expression read two data storage elements, each storing "a value

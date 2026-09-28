@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
+#include "helpers_scheduler.h"
 #include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 #include "simulator/variable.h"
@@ -129,6 +130,32 @@ TEST(CycleDelaySim, ZeroDelayEventTimeRecordedFromClockWatcher) {
   EXPECT_TRUE(cmgr.DidBlockEventOccurAt("cb", SimTime{10}));
   EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{10}));
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{5}));
+}
+
+// §14.11 with §8.6: a class task resumed from a cycle delay still runs on the
+// object it was called on, so the property written after `##2` is that
+// object's.
+TEST(CycleDelaySim, ClassTaskResumedFromACycleDelayWritesItsObject) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  class C;\n"
+      "    int v;\n"
+      "    task run; ##2; v = 3; endtask\n"
+      "  endclass\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    #4 h.run();\n"
+      "    result = h.v * 100 + $time;\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 315u);
 }
 
 }  // namespace

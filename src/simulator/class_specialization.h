@@ -159,4 +159,21 @@ ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
 bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out);
 
+// §8.25: the type the running method's scope binds `name`, a type parameter
+// of the running method's class, to: the binding a call through a
+// specialization made in the running frame (eval_class_scope_types.h), else
+// the actual the running specialization carries, else the one the object
+// the method runs on was constructed with, else the default the class
+// declares, which §8.25.1 makes the default specialization's. Null where no
+// method is running or `name` is no type parameter of its class.
+//
+// The object's actual is read only where the object's class is the running
+// one's declaration: `R #(A) r = new;` builds an object of R carrying A for
+// T (ApplyClassParamOverrides), and a call reaching make() through a handle
+// of R's base binds nothing in the frame, so `T obj; obj = new();` read R's
+// default for T. A base level's method reads its own class's parameters,
+// which the object's table, keyed by the object's class's names, does not
+// hold.
+const DataType* RunningTypeActual(std::string_view name, SimContext& ctx);
+
 }  // namespace delta

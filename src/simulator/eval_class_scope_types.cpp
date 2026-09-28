@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -126,6 +127,31 @@ uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx) {
   }
   const DataType* def = TypeParamActual(nullptr, cls->decl, name);
   return def != nullptr ? DeclaredTypeWidth(*def, ctx) : 0;
+}
+
+uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,
+                                      Arena& arena) {
+  if (scope == nullptr || scope->kind != ExprKind::kMemberAccess ||
+      !scope->is_scope_resolution || scope->rhs == nullptr ||
+      scope->rhs->kind != ExprKind::kIdentifier) {
+    return 0;
+  }
+  const ClassTypeInfo* spec = ScopeNamedSpecialization(scope->lhs, ctx, arena);
+  if (spec == nullptr || spec->decl == nullptr ||
+      spec->param_actuals == nullptr) {
+    return 0;
+  }
+  const ClassDecl* decl = spec->decl;
+  std::string_view pname = scope->rhs->text;
+  if (decl->type_param_names.count(pname) == 0) return 0;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first != pname) continue;
+    const DataType* actual = ActualForParam(*spec->param_actuals, i, pname);
+    if (actual == nullptr || actual->kind == DataTypeKind::kImplicit)
+      actual = TypeParamActual(nullptr, decl, pname);
+    return actual != nullptr ? DeclaredTypeWidth(*actual, ctx) : 0;
+  }
+  return 0;
 }
 
 }  // namespace delta

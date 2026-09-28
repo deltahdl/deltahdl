@@ -211,6 +211,29 @@ static void DistributeDimPattern(const PatternDist& pd,
   }
 }
 
+Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
+                        uint32_t i, SimContext& ctx, Arena& arena) {
+  const ArrayInfo& info = target.info;
+  bool replicate = rhs->elements.size() == 1 &&
+                   rhs->elements[0]->kind == ExprKind::kReplicate;
+  uint32_t inner_count =
+      replicate ? static_cast<uint32_t>(rhs->elements[0]->elements.size()) : 0;
+  if (!rhs->pattern_keys.empty()) {
+    uint32_t idx =
+        info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
+    PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind,
+                          info.is_4state};
+    return FindArrayKeyedValue(rhs, slot, ctx, arena);
+  }
+  if (replicate && inner_count > 0) {
+    return EvalItemForLayout(rhs->elements[0]->elements[i % inner_count],
+                             target.layout, ctx, arena);
+  }
+  if (i < rhs->elements.size())
+    return EvalItemForLayout(rhs->elements[i], target.layout, ctx, arena);
+  return MakeLogic4VecVal(arena, info.elem_width, 0);
+}
+
 static void DistributePatternToArray(std::string_view arr_name,
                                      const ArrayInfo& info, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
@@ -219,33 +242,16 @@ static void DistributePatternToArray(std::string_view arr_name,
                          0, rhs);
     return;
   }
-  bool named = !rhs->pattern_keys.empty();
-  bool replicate = rhs->elements.size() == 1 &&
-                   rhs->elements[0]->kind == ExprKind::kReplicate;
-  uint32_t inner_count =
-      replicate ? static_cast<uint32_t>(rhs->elements[0]->elements.size()) : 0;
   // §10.9.2 with §7.4: the items for an array of structures are each packed by
   // the element's layout.
-  const StructTypeInfo* layout = StructLayoutOfName(arr_name, ctx);
+  const ArrayPatternTarget kTarget{info, StructLayoutOfName(arr_name, ctx)};
   for (uint32_t i = 0; i < info.size; ++i) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
     auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
-    Logic4Vec val;
-    if (named) {
-      PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind,
-                            info.is_4state};
-      val = FindArrayKeyedValue(rhs, slot, ctx, arena);
-    } else if (replicate && inner_count > 0) {
-      val = EvalItemForLayout(rhs->elements[0]->elements[i % inner_count],
-                              layout, ctx, arena);
-    } else if (i < rhs->elements.size()) {
-      val = EvalItemForLayout(rhs->elements[i], layout, ctx, arena);
-    } else {
-      val = MakeLogic4VecVal(arena, info.elem_width, 0);
-    }
+    Logic4Vec val = PatternItemAt(rhs, kTarget, i, ctx, arena);
     // §10.9.1 gives the element the value of its pattern item, and §6.8 makes
     // the element "an abstraction of a data storage element" that "shall store
     // a value from one assignment to the next" -- its own value, not a handle

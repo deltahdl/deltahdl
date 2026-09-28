@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 // §8.25 (printed pages 203-204 of IEEE 1800-2023): a specialization's methods
 // run under that specialization, and an initializer that constructs one builds
@@ -242,6 +243,82 @@ TEST(ClassParamsSim, SubroutineVariableOfAParameterizedStructTypedef) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "200 44 | 7 1.500000 | 300\n");
+}
+
+// §8.25 with §20.6.2: a type parameter named through a specialization is the
+// type its list binds, shortint for `C#(shortint)::T`, and the default for
+// `C#()::T`.
+TEST(ClassSim, BitsOfATypeParameterNamedThroughASpecialization) {
+  auto v = RunAndGet(
+      "class C #(type T = int);\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = $bits(C#(shortint)::T) * 100 + $bits(C#()::T);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1632u);
+}
+
+// §8.25: a method local declared with the class's type parameter is of the
+// type the running specialization binds, a signed byte under `C #(byte)`, so
+// 8'hFF held in it reads -1.
+TEST(ClassSim, MethodLocalOfATypeParameterHasTheBoundType) {
+  auto v = RunAndGet(
+      "class C #(type T = int);\n"
+      "  function int w(); T x; x = 8'hFF; return x; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(byte) c;\n"
+      "  int result;\n"
+      "  initial begin c = new; result = c.w() + 2; end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+// §8.25: bound to a structure type, the local has the structure's members.
+TEST(ClassSim, MethodLocalOfATypeParameterBoundToAStruct) {
+  auto v = RunAndGet(
+      "typedef struct { byte a; shortint b; } pair_t;\n"
+      "class S #(type T = int);\n"
+      "  function int m(); T x; x.a = -3; x.b = 300; return x.a + x.b;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  S #(pair_t) s;\n"
+      "  int result;\n"
+      "  initial begin s = new; result = s.m(); end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 297u);
+}
+
+// §8.13 with §8.25: a base named by an extends clause is the specialization
+// its list names, positional or named, and an actual naming the derived
+// class's own parameter stands for that parameter's value in each
+// specialization of the derived class.
+TEST(ClassSim, ExtendsClauseValueParametersBindTheBaseLevel) {
+  auto v = RunAndGet(
+      "class Mem #(real D = 1.5, int K = 1);\n"
+      "  function real d(); return D; endfunction\n"
+      "  function int k(); return K; endfunction\n"
+      "endclass\n"
+      "class E extends Mem #(2.25, 4);\n"
+      "endclass\n"
+      "class G #(int W = 3) extends Mem #(.K(W));\n"
+      "endclass\n"
+      "module t;\n"
+      "  E e; G g; G #(8) g8;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    e = new; g = new; g8 = new;\n"
+      "    result = (e.d() == 2.25) * 1000 + e.k() * 100 + g.k() * 10 +\n"
+      "             g8.k();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1438u);
 }
 
 }  // namespace

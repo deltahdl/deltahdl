@@ -26,7 +26,6 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/contassign_delay.h"
@@ -831,7 +830,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   // reused buffer, FindVariable misses, and the assignment stops reacting to
   // later operand changes (IEEE 1800 §28 gate/net delays).
   std::unordered_set<std::string> read_strs;
-  CollectExprReads(params.rhs, read_strs);
+  CollectExprAndStaticReads(params.rhs, ctx, read_strs);
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   DropUnwatchableNames(ctx, read_vars);
 

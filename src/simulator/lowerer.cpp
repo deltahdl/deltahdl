@@ -857,14 +857,6 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
 // over an import, so the imports bind first (InitCompilationUnitData, which
 // Lower runs ahead of this) and a unit class rebinds its name over them; the
 // first of two unit classes of one name keeps it.
-void Lowerer::LowerCompilationUnitClasses() {
-  std::unordered_set<std::string_view> unit_class_names;
-  for (auto* cls : design_->cu_class_decls) {
-    if (unit_class_names.insert(cls->name).second)
-      LowerClassDecl(cls, design_->cu_function_decls);
-  }
-}
-
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
   // §20.10.1: a $fatal or $error elaboration severity task that survived

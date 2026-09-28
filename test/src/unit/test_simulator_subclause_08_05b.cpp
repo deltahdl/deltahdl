@@ -234,4 +234,129 @@ TEST(ObjectPropertySim, AssociativeArrayPropertyOfStructMemberWrites) {
   EXPECT_EQ(RunAndGet(src, "n"), 2u);
 }
 
+// §8.7 with §10.9.1: an array assignment pattern initializing a fixed-size
+// array property gives each element the item at its position, where the
+// pattern evaluated as one value gave every element the last item.
+TEST(ObjectPropertySim, PatternInitializerOfArrayPropertyFillsEachElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int f[4] = '{5, 1, 8, 3};\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    result = h.f[0] * 1000 + h.f[1] * 100 + h.f[2] * 10 + h.f[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5183u);
+}
+
+// §8.11 with §10.9.1: a pattern assigned to an array property by its bare name
+// in a method is stored element by element on the object.
+TEST(ObjectPropertySim, PatternAssignedToArrayPropertyInAMethodIsStored) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int a[3];\n"
+      "    function new(); a = '{1, 2, 3}; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    result = h.a[0] * 100 + h.a[1] * 10 + h.a[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 123u);
+}
+
+// §8.5 with §10.9.1: through a handle, an index key, `default` and a
+// replication each place their items into the array property.
+TEST(ObjectPropertySim, KeyedAndReplicatedPatternsIntoArrayPropertyViaHandle) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C; int a[3]; int r[3]; endclass\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.a = '{1:9, default:1};\n"
+      "    h.r = '{3{3}};\n"
+      "    result = (h.a[0] * 100 + h.a[1] * 10 + h.a[2]) * 10 + h.r[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1913u);
+}
+
+// §8.5 with §10.9.2: `'{default:8}` into a structure property through a handle
+// fills every member by the property's layout, where evaluated as one 32-bit
+// value it set the last member alone.
+TEST(ObjectPropertySim, DefaultPatternIntoStructPropertyViaHandleFillsAll) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x; int y; } st;\n"
+      "  class C; st s; endclass\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.s = '{default:8};\n"
+      "    result = h.s.x * 10 + h.s.y;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 88u);
+}
+
+// §8.11 with §10.9.2: the same by the property's bare name in a method, with a
+// member key beside the default.
+TEST(ObjectPropertySim, KeyedPatternIntoStructPropertyInAMethodFillsAll) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int x; int y; } st;\n"
+      "  class C;\n"
+      "    st s;\n"
+      "    function void f(); s = '{x:6, default:1}; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.f();\n"
+      "    result = h.s.x * 10 + h.s.y;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 61u);
+}
+
+// §8.5 with §8.15: `h.d.k = 64` writes the property of the object `h.d` refers
+// to as its declared class Inner holds it, so a method of Inner called
+// through the chain and a handle of type Inner both read 64.
+TEST(ObjectPropertySim, WriteThroughChainedHandleIsTheObjectsProperty) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class Inner;\n"
+      "    int k;\n"
+      "    function int getk(); return k; endfunction\n"
+      "  endclass\n"
+      "  class Holder; Inner d; endclass\n"
+      "  Holder h; Inner i;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new; h.d = new;\n"
+      "    h.d.k = 64;\n"
+      "    i = h.d;\n"
+      "    result = h.d.getk() * 1000 + i.k;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 64064u);
+}
+
 }  // namespace

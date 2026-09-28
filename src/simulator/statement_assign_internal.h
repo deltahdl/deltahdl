@@ -17,6 +17,7 @@ struct AssocArraySpec;
 struct DataType;
 struct Expr;
 struct Stmt;
+struct StructTypeInfo;
 struct Variable;
 class SimContext;
 class Arena;
@@ -433,6 +434,24 @@ bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
 // definitely as a bare number does. `default` and a simple-type key name no
 // index and are not asked about here.
 uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
+
+// §10.9.1 with §7.4: the one-dimensional unpacked array an array assignment
+// pattern is assigned to -- its bounds, element width and state -- and, for an
+// array of structures, the element's layout, by which each item is packed
+// (§10.9.2); null for any other element type.
+struct ArrayPatternTarget {
+  const ArrayInfo& info;
+  const StructTypeInfo* layout;
+};
+
+// Defined in statement_assign_pattern.cpp.
+// §10.9.1: the value the array assignment pattern `rhs` gives the element at
+// position `i` of `target`, counted from the left: the item keyed by its
+// index, by its type or by `default`, the replicated item that falls there, or
+// the positional item. An element no item reaches reads the default of its
+// type.
+Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
+                        uint32_t i, SimContext& ctx, Arena& arena);
 
 // §7.10.4: the elements a right-hand side contributes to a queue it is
 // assigned to. An item naming a queue or an unpacked array contributes that

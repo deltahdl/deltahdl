@@ -332,6 +332,33 @@ std::string_view GenericNameOf(std::string_view name) {
 // `static this_type m_t_inst` in uvm_typed_callbacks#(T), which
 // uvm_callbacks#(T,CB) extends -- was read off a copy that
 // uvm_typed_callbacks#(T)'s own static methods never wrote.
+// §8.13 with §8.25: the specialization of `base` that the extends clause of
+// `info` names. A value actual may name one of the class's own value
+// parameters, `extends Mem #(.K(W))`, which stands for the value `info` binds
+// it to -- its declaration's default for the class itself, the actual for a
+// specialization of it -- so those values are bound in a scope of their own
+// while the list is read. Read with nothing bound, `G #(8)`'s base was Mem
+// #(0).
+ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
+                                  ClassTypeInfo* base, SimContext& ctx,
+                                  Arena& arena) {
+  const ClassDecl* decl = info->decl;
+  if (!info->package.empty()) ctx.PushScope(info->package);
+  ctx.PushScope();
+  for (const auto& [pname, pexpr] : decl->params) {
+    if (decl->type_param_names.count(pname) != 0) continue;
+    auto entry = info->static_properties.find(std::string(pname));
+    if (entry == info->static_properties.end()) continue;
+    ctx.CreateLocalVariable(pname, entry->second.width)->value = entry->second;
+  }
+  ClassTypeInfo* spec = SpecializationOf(
+      base, ActualsUnderSpecialization(info, decl->base_class_type_params, ctx),
+      ctx, arena);
+  ctx.PopScope();
+  if (!info->package.empty()) ctx.PopScope();
+  return spec;
+}
+
 void BindSpecializationBase(ClassTypeInfo* spec,
                             const std::vector<DataType>& actuals,
                             SimContext& ctx, Arena& arena) {
@@ -347,10 +374,7 @@ void BindSpecializationBase(ClassTypeInfo* spec,
             ? ctx.FindClassType(GenericNameOf(spec->parent->name))
             : nullptr;
     if (base == nullptr) return;
-    spec->parent = SpecializationOf(
-        base,
-        ActualsUnderSpecialization(spec, decl->base_class_type_params, ctx),
-        ctx, arena);
+    spec->parent = BaseUnderOwnParams(spec, base, ctx, arena);
     return;
   }
   const DataType* actual = BaseActual(decl, actuals);
@@ -390,21 +414,8 @@ std::vector<DataType> SpelledActuals(const ClassDecl* decl,
   return spelled;
 }
 
-// §8.25: the type the running method's scope binds `name`, a type parameter
-// of the running method's class, to: the binding a call through a
-// specialization made in the running frame (eval_class_scope_types.h), else
-// the actual the running specialization carries, else the one the object
-// the method runs on was constructed with, else the default the class
-// declares, which §8.25.1 makes the default specialization's. Null where no
-// method is running or `name` is no type parameter of its class.
-//
-// The object's actual is read only where the object's class is the running
-// one's declaration: `R #(A) r = new;` builds an object of R carrying A for
-// T (ApplyClassParamOverrides), and a call reaching make() through a handle
-// of R's base binds nothing in the frame, so `T obj; obj = new();` read R's
-// default for T. A base level's method reads its own class's parameters,
-// which the object's table, keyed by the object's class's names, does not
-// hold.
+}  // namespace
+
 const DataType* RunningTypeActual(std::string_view name, SimContext& ctx) {
   const ClassTypeInfo* running = ctx.CurrentMethodClass();
   if (running == nullptr || running->decl == nullptr ||
@@ -418,6 +429,8 @@ const DataType* RunningTypeActual(std::string_view name, SimContext& ctx) {
              self->type->decl == running->decl;
   return TypeParamActual(own ? self : nullptr, running->decl, name);
 }
+
+namespace {
 
 // §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
 // resolves to a type only after elaboration, so a scope form written in a
@@ -758,10 +771,12 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
   SizeValueParamProperties(spec, values, ctx, arena);
-  BindSpecializationBase(spec, spelled, ctx, arena);
-  OwnVTableEntries(spec);
+  // The values are the specialization's before its base is bound, since an
+  // extends clause's list may name them, `extends Mem #(.K(W))`.
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
+  BindSpecializationBase(spec, spelled, ctx, arena);
+  OwnVTableEntries(spec);
   // §6.20.4 with §8.25: the body's parameters are the specialization's too,
   // `C#(4)::N` 8 where the declaration's copy, folded with W's default, is 16.
   FoldClassBodyParams(generic->decl, ClassStaticLookup(spec),
@@ -790,22 +805,7 @@ void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena) {
   }
   ClassTypeInfo* base = ctx.FindClassType(info->parent->name);
   if (base == nullptr) return;
-  // A value actual may name one of the class's own value parameters, `extends
-  // C #(N)`, which stands for the default the declaration gives it, bound as
-  // InitSpecializationStaticProperties binds a specialization's.
-  if (!info->package.empty()) ctx.PushScope(info->package);
-  ctx.PushScope();
-  for (const auto& [pname, pexpr] : decl->params) {
-    if (decl->type_param_names.count(pname) != 0) continue;
-    auto entry = info->static_properties.find(std::string(pname));
-    if (entry == info->static_properties.end()) continue;
-    ctx.CreateLocalVariable(pname, entry->second.width)->value = entry->second;
-  }
-  ClassTypeInfo* spec = SpecializationOf(
-      base, ActualsUnderSpecialization(info, decl->base_class_type_params, ctx),
-      ctx, arena);
-  ctx.PopScope();
-  if (!info->package.empty()) ctx.PopScope();
+  ClassTypeInfo* spec = BaseUnderOwnParams(info, base, ctx, arena);
   if (spec == nullptr || spec == base) return;
   info->parent = spec;
   // The vtable was built against the generic base, so an entry the base

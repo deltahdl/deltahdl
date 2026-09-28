@@ -412,11 +412,27 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
   info.cls = ctx.FindClassType(info.class_name);
   if (!info.cls) info.cls = ClassNamedByTypeParam(info.class_name, ctx, arena);
   if (!info.cls) return false;
-  auto it = info.cls->methods.find(std::string(info.access->rhs->text));
-  if (it == info.cls->methods.end()) return false;
-  info.method = it->second;
-  info.is_void = (info.method->return_type.kind == DataTypeKind::kVoid);
-  return true;
+  // §8.13 with §8.23: a class inherits its base's methods, so `Q::pk()` on
+  // `class Q extends P` calls P's static pk, run under the level declaring it
+  // -- the specialization `class E extends Mem #(4)` names, for `E::sk()`.
+  // Looked up on the named class alone, the call found nothing and answered
+  // 0. A constructor is the named class's own.
+  std::string name(info.access->rhs->text);
+  for (const ClassTypeInfo* t = info.cls; t != nullptr; t = t->parent) {
+    auto it = t->methods.find(name);
+    if (it == t->methods.end()) {
+      if (name == "new") return false;
+      continue;
+    }
+    info.method = it->second;
+    if (info.method->is_static_method && t != info.cls) {
+      if (ClassTypeInfo* declaring = ctx.FindClassType(t->name))
+        info.cls = declaring;
+    }
+    info.is_void = (info.method->return_type.kind == DataTypeKind::kVoid);
+    return true;
+  }
+  return false;
 }
 
 // Computes the width of a class method's return variable, evaluating the

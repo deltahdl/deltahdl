@@ -55,8 +55,14 @@ uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena) {
 // §10.9.2 with §7.4 and §7.10: the layout an element of an unpacked array or
 // queue of structures has, where `lhs` selects one, `c[2]`; null for any
 // other target, a bit-select of a packed structure among them.
+//
+// §10.9.2 with §8.5: so has a structure property reached through a handle,
+// `h.s` (ContainerElementLayout). Evaluated with no layout, `h.s =
+// '{default:8}` was the one value 8, which set the last member alone.
 static const StructTypeInfo* SelectedElementLayout(const Expr* lhs,
                                                    SimContext& ctx) {
+  if (lhs->kind == ExprKind::kMemberAccess)
+    return ContainerElementLayout(lhs, ctx);
   if (lhs->kind != ExprKind::kSelect || lhs->index_end != nullptr ||
       lhs->base == nullptr || lhs->base->kind != ExprKind::kIdentifier)
     return nullptr;
@@ -103,7 +109,10 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   // was concatenated in written order instead of placed by member.
   if (inner->kind != ExprKind::kAssignmentPattern)
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
+  // §8.11: in a method, a bare name no variable of the scope answers to may
+  // be a structure property of the object (ContainerElementLayout).
   const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
+  if (!sinfo) sinfo = ContainerElementLayout(stmt->lhs, ctx);
   if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   return EvalStructPatternValue(inner, sinfo, ctx, arena);
 }

@@ -203,6 +203,12 @@ std::vector<std::string_view> RemainingWaitOrderNames(
 
 }  // namespace
 
+void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
+                               std::unordered_set<std::string>& reads) {
+  CollectExprReads(expr, reads);
+  CollectStaticPropertyReads(expr, ctx, reads);
+}
+
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);

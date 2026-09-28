@@ -781,6 +781,28 @@ void Lowerer::LowerCompilationUnitImports() {
   }
 }
 
+void Lowerer::LowerCompilationUnitClasses() {
+  std::unordered_set<std::string_view> unit_class_names;
+  for (auto* cls : design_->cu_class_decls) {
+    if (unit_class_names.insert(cls->name).second)
+      LowerClassDecl(cls, design_->cu_function_decls);
+  }
+  // §24.6: an anonymous program declares its items in the compilation unit's
+  // space without a scope of its own, so a class it declares is a unit class
+  // like one written outside it. The parser keeps such a class among the
+  // unit's items rather than its classes, and left there it was never lowered:
+  // `b = new(19)` in a program using it built nothing and `b` stayed null.
+  if (design_->compilation_unit == nullptr) return;
+  for (const auto* item : design_->compilation_unit->cu_items) {
+    if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl ||
+        !item->from_anonymous_program) {
+      continue;
+    }
+    if (unit_class_names.insert(item->class_decl->name).second)
+      LowerClassDecl(item->class_decl, design_->cu_function_decls);
+  }
+}
+
 void Lowerer::LowerUnimportedClassesOf(const PackageDecl* pkg) {
   // LowerClassDecl binds the bare name while it lowers, and a class of the
   // package that extends an earlier one resolves its base through that

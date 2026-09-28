@@ -124,7 +124,9 @@ static std::string ScopedTypeName(const Expr* arg) {
 // §20.6.2: the width of the data type `arg` names -- a type parameter bound
 // on the running specialization, or a typedef by its bare name -- and, with
 // §8.23 and §26.3, one named through its class or package, which read as an
-// expression, `C::T`, was 1 bit. 0 where `arg` names no type.
+// expression, `C::T`, was 1 bit. §8.25: through a specialization,
+// `C#(shortint)::T`, the type is the one its list binds, where the table's
+// "C::T" holds the declaration's default. 0 where `arg` names no type.
 
 static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
@@ -133,6 +135,8 @@ static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   }
   if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution)
     return 0;
+  if (uint32_t tw = SpecializationTypeParamWidth(arg, ctx, arena); tw > 0)
+    return tw;
   std::string name = ScopedTypeName(arg);
   return name.empty() ? 0 : ctx.FindTypeWidth(name);
 }

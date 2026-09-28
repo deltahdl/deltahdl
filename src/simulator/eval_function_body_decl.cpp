@@ -9,6 +9,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/class_typedef_layout.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -393,9 +394,32 @@ static const Stmt* DeclOfThisTypeRef(const Stmt* stmt, SimContext& ctx,
   return copy;
 }
 
+// §8.25: a type parameter of a parameterized class stands for the type the
+// specialization binds it to throughout the class, so `T x;` in a method of
+// `C #(byte)` declares a byte. The local was sized by the name through the
+// type tables, which hold the declaration's default, and `x = 8'hFF` read 255.
+// A declaration naming a type parameter of the running class, with no packed
+// dimension of its own, is taken as one of the type RunningTypeActual gives.
+// Any other declaration is returned as it is.
+static const Stmt* DeclOfTypeParam(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  const DataType& type = stmt->var_decl_type;
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
+      type.packed_dim_left != nullptr || !type.type_params.empty()) {
+    return stmt;
+  }
+  const DataType* actual = RunningTypeActual(type.type_name, ctx);
+  if (actual == nullptr || actual->kind == DataTypeKind::kImplicit) return stmt;
+  auto* copy = arena.Create<Stmt>(*stmt);
+  copy->var_decl_type = *actual;
+  copy->var_decl_type.param_arg_name = {};
+  return copy;
+}
+
 void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
                      Arena& arena) {
   stmt = DeclOfThisTypeRef(stmt, ctx, arena);
+  stmt = DeclOfTypeParam(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);

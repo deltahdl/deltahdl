@@ -304,4 +304,27 @@ TEST(SuperSimulation, SuperReachesAHiddenBaseAssociativeProperty) {
   EXPECT_EQ(v, 2122u);
 }
 
+// §8.15 with §25.9: `super.vif` is the base's virtual interface property of
+// the running object, so a member of the instance it refers to is read
+// through it as through `this.vif`.
+TEST(SuperSim, VirtualInterfaceMemberReadThroughSuper) {
+  auto v = RunAndGet(
+      "interface SBus; int a; endinterface\n"
+      "class Base; virtual SBus vif; endclass\n"
+      "class Derived extends Base;\n"
+      "  function int sv(); return super.vif.a; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  SBus s();\n"
+      "  Derived d;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    d = new; d.vif = s; s.a = 64;\n"
+      "    result = d.sv();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 64u);
+}
+
 }  // namespace

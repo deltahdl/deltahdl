@@ -57,4 +57,13 @@ void BindStaticInitTypeActuals(const ClassTypeInfo* cls, SimContext& ctx);
 // outside a method, or for a type nothing sizes.
 uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx);
 
+// §8.25 with §20.6.2: the number of bits of the type a type parameter stands
+// for when it is named through a specialization, `C#(shortint)::T`: the type
+// the specialization's `#(...)` list binds it to, else the default the class
+// declares (§8.25.1). `scope` is the member access. 0 where its left side
+// names no specialization of a class with a list, or its right side no type
+// parameter of the class.
+uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,
+                                      Arena& arena);
+
 }  // namespace delta

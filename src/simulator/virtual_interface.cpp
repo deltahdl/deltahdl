@@ -107,7 +107,9 @@ static bool HoldsAClassHandle(const ClassTypeInfo* type, std::string_view name,
 // declared so denotes no object here, whatever its value.
 static const ClassObject* ObjectOfName(std::string_view name, SimContext& ctx,
                                        Arena& arena) {
-  if (name == "this") return ctx.CurrentThis();
+  // §8.15: `super` denotes the same object, its members looked up from the
+  // base of the running method's class (ResolveVirtualInterfaceBaseExpr).
+  if (name == "this" || name == "super") return ctx.CurrentThis();
   if (const Variable* var = ctx.FindVariable(name); var != nullptr) {
     if (var->is_virtual_interface || ctx.GetVariableClassType(name).empty())
       return nullptr;
@@ -157,8 +159,15 @@ VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
   // §8.15: `this.p` names the property as the running method's class
   // declares it, which is what a bare `p` in the same method names; a
   // property of any other object is read against that object's own type.
+  // `super.p` names it as the base of that class declares it, and read
+  // against the running method's class instead, `super.vif.a` found no
+  // `vif` and read 0 where `this.vif.a` read the member.
   const ClassTypeInfo* method_cls =
       holder == ctx.CurrentThis() ? ctx.CurrentMethodClass() : nullptr;
+  if (method_cls != nullptr && base->lhs->kind == ExprKind::kIdentifier &&
+      base->lhs->text == "super" && method_cls->parent != nullptr) {
+    method_cls = method_cls->parent;
+  }
   const ClassTypeInfo* scope =
       method_cls != nullptr ? method_cls : holder->type;
   return PropertyBase(scope, holder, method_cls, base->rhs->text, arena);

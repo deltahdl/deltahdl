@@ -452,11 +452,37 @@ static bool AssignQueueProperty(const Expr* lhs,
   return true;
 }
 
+bool StoreClassArrayPattern(const ClassArrayRef& dst, const Expr* rhs,
+                            SimContext& ctx, Arena& arena) {
+  if (rhs == nullptr || rhs->kind != ExprKind::kAssignmentPattern ||
+      dst.prop->is_dynamic || ClassArrayHoldsSubarrays(dst)) {
+    return false;
+  }
+  ArrayInfo shape;
+  shape.lo = static_cast<uint32_t>(dst.lo);
+  shape.size = dst.size;
+  shape.is_descending = dst.prop->array_descending;
+  shape.elem_width = dst.prop->width;
+  shape.is_4state = dst.prop->is_4state;
+  const ArrayPatternTarget kTarget{shape, nullptr};
+  for (uint32_t i = 0; i < dst.size; ++i) {
+    StoreClassArrayElement(dst, IndexFromLeft(dst, i),
+                           PatternItemAt(rhs, kTarget, i, ctx, arena), ctx,
+                           arena);
+  }
+  return true;
+}
+
 bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   const Expr* lhs = stmt->lhs;
   if (lhs == nullptr || (lhs->kind != ExprKind::kIdentifier &&
                          lhs->kind != ExprKind::kMemberAccess)) {
     return false;
+  }
+  if (stmt->rhs != nullptr && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+    ClassArrayRef pattern_dst;
+    return ResolveClassArray(lhs, ctx, arena, pattern_dst) &&
+           StoreClassArrayPattern(pattern_dst, stmt->rhs, ctx, arena);
   }
   std::vector<Logic4Vec> elems;
   if (!PropertyArrayElements(stmt->rhs, ctx, arena, elems)) return false;

@@ -166,10 +166,21 @@ struct SequenceEventAwaiter {
 // Resuming such a suspension immediately is not the alternative, because each
 // of those loops evaluates and awaits without advancing time, so a suspension
 // that resumes itself spins for ever.
+//
+// §8.9: `C::n`, a static property of a class, designates the class's own
+// storage, which AnyChangeAwaiter arms on the class, so it is kept.
+inline bool NamesStaticProperty(SimContext& ctx, std::string_view name) {
+  auto scope = name.rfind("::");
+  if (scope == std::string_view::npos) return false;
+  const ClassTypeInfo* cls = ctx.FindClassType(name.substr(0, scope));
+  return cls != nullptr &&
+         cls->StaticPropertyDeclarer(name.substr(scope + 2)) != nullptr;
+}
+
 inline void DropUnwatchableNames(SimContext& ctx,
                                  std::vector<std::string_view>& names) {
   auto designates_no_object = [&ctx](std::string_view name) {
-    return ctx.FindVariable(name) == nullptr;
+    return ctx.FindVariable(name) == nullptr && !NamesStaticProperty(ctx, name);
   };
   names.erase(std::remove_if(names.begin(), names.end(), designates_no_object),
               names.end());
@@ -695,28 +706,45 @@ struct CycleDelayAwaiter {
       h.resume();
       return;
     }
+    auto* proc = ctx.CurrentProcess();
     if (cycles == 0) {
       // §14.11: a ##0 whose clocking event has not yet occurred this time step
       // suspends until that event fires, then proceeds. Resume exactly once.
       auto* done = new bool(false);
       mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
-                                [h, done]() mutable {
+                                [h, done, proc, &ctx = ctx]() mutable {
                                   if (*done) return;
                                   *done = true;
                                   delete done;
-                                  h.resume();
+                                  ResumeIn(h, proc, ctx);
                                 });
       return;
     }
     auto* counter = new uint32_t(cycles);
     mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
-                              [h, counter]() mutable {
+                              [h, counter, proc, &ctx = ctx]() mutable {
                                 if (*counter > 0) --(*counter);
                                 if (*counter == 0) {
                                   delete counter;
-                                  h.resume();
+                                  ResumeIn(h, proc, ctx);
                                 }
                               });
+  }
+
+  // §9.7 with §14.11: resumes `h` as DelayAwaiter's event does, in the process
+  // that waited, whose `this` and scopes the coroutine resumes into. Resumed
+  // under whichever process the clocking event ran in, a class task's `##2;
+  // v = 3;` wrote `v` on no object. A process killed meanwhile is not resumed,
+  // and a suspended one keeps the wake to replay.
+  static void ResumeIn(std::coroutine_handle<> h, Process* proc,
+                       SimContext& ctx) {
+    if (proc && !proc->active) return;
+    if (proc && proc->is_suspended) {
+      proc->pending_wake = h;
+      return;
+    }
+    if (proc) ctx.SetCurrentProcess(proc);
+    h.resume();
   }
 
   void await_resume() const noexcept {}

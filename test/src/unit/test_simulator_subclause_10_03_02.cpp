@@ -4,6 +4,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -525,6 +526,25 @@ TEST(ContAssignStatementSim, ConcatTargetFollowsItsOperandsAfterTimeZero) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1 0010\n0 0011\n");
+}
+
+// §10.3.2 with §8.9: a static class property read through the class scope is
+// an operand of the continuous assignment, which is evaluated again when it
+// is written.
+TEST(ContAssignSim, ReEvaluatedWhenAStaticClassPropertyItReadsChanges) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  class C; static int s = 60; endclass\n"
+      "  wire [31:0] w;\n"
+      "  int result;\n"
+      "  assign w = C::s + 1;\n"
+      "  initial begin\n"
+      "    #1 C::s = 61;\n"
+      "    #1 result = w;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 62u);
 }
 
 }  // namespace
