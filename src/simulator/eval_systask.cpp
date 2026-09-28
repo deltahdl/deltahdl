@@ -65,8 +65,9 @@ static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
   if (self == nullptr) return ScopedTypeParamWidth(name, ctx);
   if (self->type == nullptr || self->type->decl == nullptr) return 0;
   const ClassDecl* decl = self->type->decl;
-  if (decl->type_param_names.count(name) == 0) return 0;
-  const DataType* actual = TypeParamActual(self, decl, name);
+  std::string_view pname = TypeParamNamedBy(decl, name);
+  if (pname.empty()) return 0;
+  const DataType* actual = TypeParamActual(self, decl, pname);
   return actual != nullptr ? DeclaredTypeWidth(*actual, ctx) : 0;
 }
 

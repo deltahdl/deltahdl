@@ -45,7 +45,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
 
   uint32_t offset = total_width;
   for (const auto& m : dtype->struct_members) {
-    uint32_t fw = EvalStructMemberWidth(m);
+    uint32_t fw = EvalStructMemberWidth(m) * UnpackedMemberCount(m);
     uint32_t field_off = 0;
     if (!info->is_union) {
       offset -= fw;
@@ -57,8 +57,10 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     // none was (ApplyMemberType in parser_aggregate_types.cpp).
     fi.is_signed = m.is_signed;
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
+    if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
+      fi.elem_count = UnpackedMemberCount(m);
     if (m.nested_type && !m.nested_type->struct_members.empty()) {
-      fi.nested = BuildStructTypeInfo(m.nested_type, fw,
+      fi.nested = BuildStructTypeInfo(m.nested_type, EvalStructMemberWidth(m),
                                       NestedLayoutName(m, arena), arena);
     }
     info->fields.push_back(fi);
@@ -73,7 +75,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
 static uint32_t AggregateTypeWidth(const DataType* dtype) {
   uint32_t total = 0;
   for (const auto& m : dtype->struct_members) {
-    uint32_t w = EvalStructMemberWidth(m);
+    uint32_t w = EvalStructMemberWidth(m) * UnpackedMemberCount(m);
     if (dtype->kind == DataTypeKind::kUnion) {
       total = std::max(total, w);
     } else {

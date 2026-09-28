@@ -68,6 +68,15 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 
 struct StructMember;
 uint32_t EvalStructMemberWidth(const StructMember& m);
+// §7.2 with §7.4.2: the number of elements an unpacked array member of a
+// structure or union holds, the product of its unpacked dimensions; 1 for a
+// member that is no array, or whose dimensions do not fold. A member takes
+// EvalStructMemberWidth bits per element.
+uint32_t UnpackedMemberCount(const StructMember& m);
+// The bounds of a one-dimensional unpacked array member, left first, the size
+// form `[n]` as [0:n-1]. False for a member of none or of several dimensions,
+// or one whose bounds do not fold.
+bool UnpackedMemberBounds(const StructMember& m, int64_t* left, int64_t* right);
 uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs);
 

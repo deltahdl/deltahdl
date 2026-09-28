@@ -33,10 +33,9 @@ TEST(ParameterizedDataTypesSim, SpecializedClassArrayTypedefHoldsItsElements) {
 }
 
 // §6.25's t_struct through `C#(bit,4)`: every member is written in the class's
-// parameters, so m2 is `bit [3:0]` and holds 4'hB, and the structure is laid
-// out as the same structure written with 4 for SIZE and bit for T is: m0 as
-// eight 4-bit vectors, m1 as four bits. Reading an element of an unpacked
-// array member back is #3884's, for any unpacked structure.
+// parameters, so m2 is `bit [3:0]` and holds 4'hB, m0 is eight 4-bit vectors
+// as the same member written out with 4 for SIZE is, and the structure is
+// 8*4 + 4 + 4 = 40 bits, m1 being t_array's four bits.
 TEST(ParameterizedDataTypesSim,
      SpecializedClassStructTypedefSpecializesMembers) {
   const std::string kSrc =
@@ -50,24 +49,22 @@ TEST(ParameterizedDataTypesSim,
       "      bit [SIZE-1:0] m2;\n"
       "    } t_struct;\n"
       "  endclass\n"
-      "  typedef logic [3:0] v_t;\n"
-      "  typedef bit a_t [3:0];\n"
-      "  typedef struct { v_t m0 [7:0]; a_t m1; bit [3:0] m2; } plain_t;\n"
+      "  typedef struct { logic [3:0] m0 [7:0]; } plain_t;\n"
       "  C#(bit,4)::t_struct s0;\n"
       "  plain_t p0;\n"
-      "  int b2, e2, same0, same;\n"
+      "  int b2, e2, same0, bs;\n"
       "  initial begin\n"
       "    s0.m2 = 4'hB;\n"
       "    b2 = $bits(s0.m2);\n"
       "    e2 = s0.m2;\n"
       "    same0 = $bits(s0.m0) == $bits(p0.m0);\n"
-      "    same = $bits(s0) == $bits(p0);\n"
+      "    bs = $bits(s0);\n"
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(kSrc, "b2"), 4u);
   EXPECT_EQ(RunAndGet(kSrc, "e2"), 11u);
   EXPECT_EQ(RunAndGet(kSrc, "same0"), 1u);
-  EXPECT_EQ(RunAndGet(kSrc, "same"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "bs"), 40u);
 }
 
 // §6.6.7's Base#(32) structure reached through `typedef Base#(32) MyBaseT;`

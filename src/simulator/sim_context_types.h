@@ -87,6 +87,13 @@ struct StructFieldInfo {
   // "scope::name" spelling for a package's -- how an enum member is known to
   // print as the name of its value. Empty for a built-in type.
   std::string_view type_name = {};
+  // §7.2 with §7.4.2: for a member that is a one-dimensional unpacked array,
+  // how many elements it holds and the bounds of its dimension, left first;
+  // the field's width is every element's, the leftmost element in its most
+  // significant bits. 0 elements for a member that is no such array.
+  uint32_t elem_count = 0;
+  int64_t elem_left = 0;
+  int64_t elem_right = 0;
 };
 
 struct StructTypeInfo {

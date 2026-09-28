@@ -114,6 +114,12 @@ void TypeForeachIterVar(std::string_view iter_name, const AssocArrayObject* aa,
 const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
                                 std::string_view pname);
 
+// §6.18 with §8.25: the type parameter of `decl` the name `name` stands for:
+// the name itself where it is one, or the parameter a class typedef of that
+// name renames bare, `typedef T U;`, which follows the specialization as T
+// does. Empty where the name stands for no type parameter.
+std::string_view TypeParamNamedBy(const ClassDecl* decl, std::string_view name);
+
 // §8.25 with §8.7: the key the run holds the class the property `field` is a
 // handle of on `obj` under, the property's declaration looked for from the
 // class `from` up its base chain as MemberClassTypeName of

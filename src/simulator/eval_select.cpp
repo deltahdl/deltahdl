@@ -18,6 +18,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -763,8 +764,25 @@ static Logic4Vec SelectFromPackedValue(const Expr* expr,
   return ExtractBitField(arena, base_val, off, 1);
 }
 
+// §7.2 with §7.4.2: `m.v[1]` reads one element of an unpacked array member,
+// its window of the structure's bits; an index outside the member reads x.
+// Taken as a bit-select of the member's value, it read one bit.
+static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
+  StructArrayElementRef ref;
+  if (!ResolveStructArrayElement(expr, ctx, arena, ref)) return false;
+  if (!ref.in_range) {
+    out = MakeAllX(arena, ref.width);
+    return true;
+  }
+  out = ExtractBitField(arena, ref.var->value, ref.bit_offset, ref.width);
+  out.is_signed = ref.is_signed;
+  return true;
+}
+
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
+  if (TryStructArrayMemberSelect(expr, ctx, arena, result)) return result;
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);

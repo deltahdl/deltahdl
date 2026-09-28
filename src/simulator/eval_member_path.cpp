@@ -1,6 +1,7 @@
 #include "simulator/eval_member_path.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -173,6 +174,56 @@ bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
   if (obj == nullptr) return false;
   out = ResolveClassFieldChain(obj, ctx.FindClassType(declared_key), path, ctx,
                                arena);
+  return true;
+}
+
+// The root variable's name and the member path a chain of member accesses
+// names, `m` and `s.v` for `m.s.v`; false where the chain does not end at a
+// plain identifier.
+static bool MemberChainPath(const Expr* access, std::string_view& root,
+                            std::string& path) {
+  path.clear();
+  const Expr* e = access;
+  while (e != nullptr && e->kind == ExprKind::kMemberAccess &&
+         !e->is_scope_resolution && e->rhs != nullptr &&
+         e->rhs->kind == ExprKind::kIdentifier) {
+    path = path.empty() ? std::string(e->rhs->text)
+                        : std::string(e->rhs->text) + "." + path;
+    e = e->lhs;
+  }
+  if (e == access || e == nullptr || e->kind != ExprKind::kIdentifier)
+    return false;
+  root = e->text;
+  return true;
+}
+
+bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
+                               Arena& arena, StructArrayElementRef& out) {
+  if (select->kind != ExprKind::kSelect || select->index_end != nullptr ||
+      select->base == nullptr || select->base->kind != ExprKind::kMemberAccess)
+    return false;
+  std::string_view root;
+  std::string path;
+  if (!MemberChainPath(select->base, root, path)) return false;
+  const StructTypeInfo* info = StructLayoutOfName(root, ctx);
+  Variable* var = ctx.FindVariable(root);
+  if (info == nullptr || var == nullptr) return false;
+  uint32_t offset = 0;
+  const StructFieldInfo* field = ResolveStructField(info, path, &offset);
+  if (field == nullptr || field->elem_count == 0) return false;
+  out.var = var;
+  out.width = field->width / field->elem_count;
+  out.is_signed = field->is_signed;
+  Logic4Vec idx = EvalExpr(select->index, ctx, arena);
+  if (!idx.IsKnown()) return true;
+  auto i = static_cast<int64_t>(idx.ToUint64());
+  int64_t pos = field->elem_left <= field->elem_right ? i - field->elem_left
+                                                      : field->elem_left - i;
+  if (pos < 0 || pos >= static_cast<int64_t>(field->elem_count)) return true;
+  // The leftmost element stands in the member's most significant bits.
+  out.bit_offset =
+      offset + (field->elem_count - 1 - static_cast<uint32_t>(pos)) * out.width;
+  out.in_range = true;
   return true;
 }
 

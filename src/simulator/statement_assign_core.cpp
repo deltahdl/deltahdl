@@ -20,6 +20,7 @@
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_mailbox.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -245,8 +246,23 @@ static bool TryWriteStringVariableChar(Variable* var, const Expr* lhs,
   return true;
 }
 
+// §7.2 with §7.4.2: `m.v[1] = 20` writes one element of an unpacked array
+// member, its window of the structure's bits, leaving the rest; an index
+// outside the member writes nothing.
+static bool TryStructArrayMemberWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                                      SimContext& ctx, Arena& arena) {
+  StructArrayElementRef ref;
+  if (!ResolveStructArrayElement(lhs, ctx, arena, ref)) return false;
+  if (!ref.in_range || ref.var->is_forced) return true;
+  DepositBitField(ref.var->value, ref.bit_offset,
+                  ResizeToWidth(rhs_val, ref.width, arena), ref.width);
+  ref.var->NotifyWatchers();
+  return true;
+}
+
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena) {
+  if (TryStructArrayMemberWrite(lhs, rhs_val, ctx, arena)) return true;
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
     WriteVar(elem, rhs_val, arena);
     return true;

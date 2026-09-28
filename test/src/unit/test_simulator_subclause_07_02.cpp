@@ -202,4 +202,27 @@ TEST(StructType, AggregateLocalsOfAStaticBlockAndTaskHoldTheirValues) {
   EXPECT_EQ(out, "9 1 00001234 00001234 5 7\n");
 }
 
+// §7.2 with §7.4.2: an unpacked array member of an unpacked struct holds each
+// of its elements, so m.v[1] and m.v[3] keep 20 and 40 beside n's 5, the
+// struct is 32 + 4*32 = 160 bits, and a member after an array member keeps
+// its own value. Laid out as one element, the writes landed in n or nowhere.
+TEST(StructType, UnpackedArrayMemberHoldsEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int n; int v[4]; } rec_t;\n"
+      "  typedef struct { int v[2]; byte tail; } t_t;\n"
+      "  rec_t m;\n"
+      "  t_t t2;\n"
+      "  initial begin\n"
+      "    m.v[1] = 20; m.v[3] = 40; m.n = 5;\n"
+      "    t2.v[0] = 7; t2.v[1] = 9; t2.tail = 3;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", m.v[1], m.v[3], m.n,\n"
+      "             $bits(m), t2.v[0], t2.v[1], t2.tail);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "20 40 5 160 7 9 3\n");
+}
+
 }  // namespace

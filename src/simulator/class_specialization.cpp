@@ -599,11 +599,11 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
                              SimContext& ctx) {
   const ClassDecl* decl = spec->decl;
   for (auto& prop : spec->properties) {
-    if (prop.width_is_declared || prop.type_name.empty() ||
-        decl->type_param_names.count(prop.type_name) == 0) {
-      continue;
-    }
-    const DataType* actual = TypeParamActualIn(decl, actuals, prop.type_name);
+    std::string_view pname = prop.type_name.empty()
+                                 ? std::string_view{}
+                                 : TypeParamNamedBy(decl, prop.type_name);
+    if (prop.width_is_declared || pname.empty()) continue;
+    const DataType* actual = TypeParamActualIn(decl, actuals, pname);
     if (actual == nullptr || !ActualSizesIntegralProperty(*actual, ctx))
       continue;
     uint32_t width = DeclaredTypeWidth(*actual, ctx);

@@ -116,6 +116,42 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
   }
 }
 
+// One unpacked dimension's bounds, left first: `[l:r]` as written, and the
+// size form `[n]` as [0:n-1] (§7.4.2). False where a bound does not fold.
+static bool UnpackedDimBounds(const Expr* dim, int64_t* left, int64_t* right) {
+  if (dim == nullptr) return false;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto l = ConstEvalInt(dim->lhs);
+    auto r = ConstEvalInt(dim->rhs);
+    if (!l || !r) return false;
+    *left = *l;
+    *right = *r;
+    return true;
+  }
+  auto n = ConstEvalInt(dim);
+  if (!n || *n <= 0) return false;
+  *left = 0;
+  *right = *n - 1;
+  return true;
+}
+
+bool UnpackedMemberBounds(const StructMember& m, int64_t* left,
+                          int64_t* right) {
+  return m.unpacked_dims.size() == 1 &&
+         UnpackedDimBounds(m.unpacked_dims[0], left, right);
+}
+
+uint32_t UnpackedMemberCount(const StructMember& m) {
+  uint32_t count = 1;
+  for (const Expr* dim : m.unpacked_dims) {
+    int64_t left = 0;
+    int64_t right = 0;
+    if (!UnpackedDimBounds(dim, &left, &right)) return 1;
+    count *= static_cast<uint32_t>(std::abs(left - right) + 1);
+  }
+  return count;
+}
+
 static uint32_t TagBitWidth(uint32_t num_members) {
   uint32_t bits = 0;
   while ((1u << bits) < num_members) ++bits;
@@ -139,7 +175,8 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
     for (const auto& m : dtype.struct_members) {
-      max_w = std::max(max_w, EvalStructMemberWidth(m));
+      max_w =
+          std::max(max_w, EvalStructMemberWidth(m) * UnpackedMemberCount(m));
     }
 
     if (dtype.is_tagged && dtype.is_packed)
@@ -148,7 +185,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   }
   uint32_t total = 0;
   for (const auto& m : dtype.struct_members) {
-    total += EvalStructMemberWidth(m);
+    total += EvalStructMemberWidth(m) * UnpackedMemberCount(m);
   }
   return total;
 }
@@ -159,7 +196,8 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
     for (const auto& m : dtype.struct_members) {
-      max_w = std::max(max_w, EvalStructMemberWidth(m, typedefs));
+      max_w = std::max(
+          max_w, EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m));
     }
     if (dtype.is_tagged && dtype.is_packed)
       max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
@@ -167,7 +205,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
   }
   uint32_t total = 0;
   for (const auto& m : dtype.struct_members) {
-    total += EvalStructMemberWidth(m, typedefs);
+    total += EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m);
   }
   return total;
 }

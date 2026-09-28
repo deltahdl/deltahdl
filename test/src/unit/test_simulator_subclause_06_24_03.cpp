@@ -274,4 +274,30 @@ TEST(BitStreamCastSim, CastToAnUnpackedArrayTypedefFillsItsElements) {
             "1 1 0 a5 c3\n");
 }
 
+// §6.24.3's Control example: a bit-stream cast fills a 36-bit unpacked struct
+// member by member from the stream's most significant bits, the unpacked
+// array member `command` taking both of its bytes, and the reverse cast gives
+// the same 36 bits back. Laid out with one byte for `command`, the struct was
+// 28 bits and every field boundary moved.
+TEST(BitStreamCastSim, CastIntoAStructWithAnUnpackedArrayMember) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef struct {\n"
+                 "    shortint address; logic [3:0] code; byte command [2];\n"
+                 "  } Control;\n"
+                 "  Control q;\n"
+                 "  bit [35:0] v, back;\n"
+                 "  initial begin\n"
+                 "    v = 36'hFFFEA1122;\n"
+                 "    q = Control'(v);\n"
+                 "    back = 36'(q);\n"
+                 "    $display(\"%h %h %h %h %h\", q.address, q.code, "
+                 "q.command[0], q.command[1], back);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "fffe a 11 22 fffea1122\n");
+}
+
 }  // namespace

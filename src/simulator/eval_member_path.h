@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -12,6 +13,27 @@ struct Expr;
 struct Logic4Vec;
 class SimContext;
 struct StructTypeInfo;
+struct Variable;
+
+// §7.2 with §7.4.2: the element of an unpacked array member of a structure
+// variable that a select names, `m.v[1]`: the variable holding the structure
+// and the element's window of its bits. `in_range` is false for an index
+// outside the member's bounds or holding x or z, which reads x and writes
+// nothing.
+struct StructArrayElementRef {
+  Variable* var = nullptr;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  bool is_signed = false;
+  bool in_range = false;
+};
+
+// Resolves `select` when it indexes an unpacked array member of a structure
+// variable -- a module's, a block's or a subroutine's, bare or through a
+// nested member, `m.v[1]` or `m.s.v[1]`. False for any other select, which
+// the caller reads or writes as before.
+bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
+                               Arena& arena, StructArrayElementRef& out);
 
 // §7.3.2 (printed page 151): a tagged union holds the member's value beside a
 // tag naming the member, and §11.9 (printed 304) builds such a value with a

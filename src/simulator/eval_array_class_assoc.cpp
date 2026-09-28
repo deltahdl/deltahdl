@@ -66,6 +66,24 @@ PropertyDeclaration FindPropertyDeclaration(const ClassTypeInfo* from,
 
 }  // namespace
 
+std::string_view TypeParamNamedBy(const ClassDecl* decl,
+                                  std::string_view name) {
+  if (decl->type_param_names.count(name) != 0) return name;
+  for (const auto* m : decl->members) {
+    if (m->kind != ClassMemberKind::kTypedef || m->name != name ||
+        m->typedef_item == nullptr)
+      continue;
+    const DataType& t = m->typedef_item->typedef_type;
+    bool bare = t.kind == DataTypeKind::kNamed && t.scope_name.empty() &&
+                t.packed_dim_left == nullptr && t.extra_packed_dims.empty() &&
+                t.type_params.empty() && m->typedef_item->unpacked_dims.empty();
+    if (bare && decl->type_param_names.count(t.type_name) != 0)
+      return t.type_name;
+    return {};
+  }
+  return {};
+}
+
 // §8.25 with §8.7: the class the property `field` is a handle of on `obj`:
 // the class the declared type names as written in the declaring class, else
 // the class the type parameter the name stands for is bound to on `obj`. A

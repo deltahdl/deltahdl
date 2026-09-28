@@ -143,4 +143,29 @@ TEST(ClassParamsSim, BodyLocalparamFoldsInEachSpecialization) {
   EXPECT_EQ(out, "16 8 16 8 16 3\n");
 }
 
+// §6.18 with §8.25: a class typedef naming a type parameter names the type the
+// specialization binds it to, so in C #(byte) `typedef T U;` is byte: $bits(U)
+// in a method is 8, as $bits(T) is, and a property declared U holding 8'hFF
+// reads -1, as one declared T does. Sized under the declaration's default,
+// $bits(U) was int's 32 and the property 255.
+TEST(ClassParamsSim, TypedefOfATypeParameterFollowsTheSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = int);\n"
+      "  typedef T U;\n"
+      "  function int b(); return $bits(U); endfunction\n"
+      "  U q;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(byte) c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.q = 8'hFF;\n"
+      "    $display(\"%0d %0d\", c.b(), c.q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 -1\n");
+}
+
 }  // namespace
