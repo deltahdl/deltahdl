@@ -75,6 +75,10 @@ struct Net {
 
   bool is_user_nettype = false;
   std::string_view resolve_func;
+  // §6.6.7: the call of the resolution function, for the net's drivers
+  // (AttachNettypeResolution in nettype_resolution.cpp); empty where the
+  // nettype declares none.
+  std::function<Logic4Vec(const std::vector<Logic4Vec>&, Arena&)> resolve_hook;
 
   // §28.8: the bidirectional switches this net is a terminal of, and the
   // drivers of the nets they join it to, which it resolves with its own. The

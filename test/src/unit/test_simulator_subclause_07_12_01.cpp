@@ -688,4 +688,31 @@ TEST(ArrayLocator, AssocFindWithoutWithNames7_12_1) {
                             "7.12.1"));
 }
 
+// §7.12.1 with §6.16: the item of a string array is a string, so a relational
+// operator in the with clause compares it lexicographically against the
+// literal. Only "abc" and "zed" sort after "Z", so find_index answers indices
+// 2 and 4 and find_last_index 4, and four sort before it; compared as packed
+// integers, every string of two or more characters sorted after "Z".
+TEST(ArrayLocator, StringItemComparesLexicographicallyInWith) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string SA[6] = '{\"Bob\", \"Henry\", \"abc\", \"Bob\", \"zed\", "
+      "\"Al\"};\n"
+      "  string a = \"Al\";\n"
+      "  int qi[$];\n"
+      "  initial begin\n"
+      "    qi = SA.find_index with (item > \"Z\");\n"
+      "    $display(\"%0d %0d %0d\", qi.size(), qi[0], qi[1]);\n"
+      "    qi = SA.find_last_index(s) with (s > \"Z\");\n"
+      "    $display(\"%0d %0d\", qi.size(), qi[0]);\n"
+      "    qi = SA.find_index with (item < \"Z\");\n"
+      "    $display(\"%0d\", qi.size());\n"
+      "    $display(\"%0d\", a > \"Z\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2 4\n1 4\n4\n0\n");
+}
+
 }  // namespace

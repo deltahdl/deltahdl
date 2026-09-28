@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/net_bit_outcomes.h"
+#include "simulator/nettype_resolution.h"
 #include "simulator/scheduler.h"
 #include "simulator/switch_network.h"
 #include "simulator/variable.h"
@@ -771,6 +772,7 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   }
 
   if (ResolveSpecialNet(net, arena, sched)) return;
+  if (ResolveThroughNettypeFunction(net, arena)) return;
 
   if (!net.is_user_nettype &&
       (!net.driver_strengths.empty() || !net.switch_drivers.empty())) {

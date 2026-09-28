@@ -107,10 +107,12 @@ const StructFieldInfo* FindStructField(const StructTypeInfo* info,
 // nested struct/union fields. Returns false if any path segment is not a field.
 // When `out_kind` is non-null it receives the resolved member's declared type
 // kind, which the read path uses to apply §7.3.1's 4-state-to-2-state
-// conversion when a 2-state member of a packed union is read.
+// conversion when a 2-state member of a packed union is read, and
+// `out_signed`, when non-null, whether the member's type is signed (§7.2.1).
 bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
                             uint32_t* bit_offset, uint32_t* width,
-                            DataTypeKind* out_kind = nullptr);
+                            DataTypeKind* out_kind = nullptr,
+                            bool* out_signed = nullptr);
 
 // Annex D.13: the reg and net variables a module instance declares, which
 // $showvars reports the status of. `prefix` is what the instance's variables

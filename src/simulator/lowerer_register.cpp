@@ -29,6 +29,7 @@
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
+#include "simulator/nettype_resolution.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -188,6 +189,7 @@ static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
       NetSpec{net.charge_strength,
               NetDecayTicks(net, scale, ctx.GlobalPrecision()), net.decays,
               net.is_user_nettype, net.resolve_func, net.is_signed});
+  AttachNettypeResolution(*created, net.resolve_func, ctx);
   RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
   // w`, is laid out from the aggregate its declaration carries so a member
@@ -471,6 +473,15 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
         const ImportItem& imp = item->import_item;
         ctx.RegisterPackageImport(pkg->name, imp.package_name,
                                   imp.is_wildcard ? "*" : imp.item_name);
+        continue;
+      }
+      // §11.12 with §26.3: a package's let is a declaration of the package,
+      // named from any scope through the package, `pex::twice(7)`.
+      if (item->kind == ModuleItemKind::kLetDecl) {
+        ctx.RegisterLetDecl(
+            *arena.Create<std::string>(std::string(pkg->name) +
+                                       "::" + std::string(item->name)),
+            item);
         continue;
       }
       bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||

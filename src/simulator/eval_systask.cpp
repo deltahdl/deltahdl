@@ -106,6 +106,20 @@ static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx) {
   return count * info->elem_width;
 }
 
+// §8.23 and §26.3: the name a data type is written with through its class or
+// package, `C::T`, `p::T` or `C::N::T`, as the type tables key it; empty where
+// `arg` is not such a scope resolution of identifiers.
+static std::string ScopedTypeName(const Expr* arg) {
+  if (arg->kind == ExprKind::kIdentifier) return std::string(arg->text);
+  if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution ||
+      arg->lhs == nullptr || arg->rhs == nullptr ||
+      arg->rhs->kind != ExprKind::kIdentifier)
+    return {};
+  std::string scope = ScopedTypeName(arg->lhs);
+  if (scope.empty()) return {};
+  return scope + "::" + std::string(arg->rhs->text);
+}
+
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
@@ -121,6 +135,13 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
     uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
     if (tw == 0) tw = ctx.FindTypeWidth(arg->text);
+    if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
+  }
+  // §20.6.2 with §8.23 and §26.3: a type named through its class or package is
+  // sized as the type it stands for; read as an expression, `C::T` was 1 bit.
+  if (arg->kind == ExprKind::kMemberAccess && arg->is_scope_resolution) {
+    std::string name = ScopedTypeName(arg);
+    uint32_t tw = name.empty() ? 0 : ctx.FindTypeWidth(name);
     if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
   }
   // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream

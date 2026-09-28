@@ -234,6 +234,61 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
     obj->properties[scoped] = val;
   }
   MarkUnboundedBodyParams(obj, obj->type->decl);
+  // §6.20.4 with §8.25: a body parameter naming a header one takes the
+  // object's own values, `N = W * 2` 8 under `C #(4) c4`, where the class's
+  // copy was folded with the declaration's defaults.
+  std::string_view cls = obj->type->name;
+  FoldClassBodyParams(
+      obj->type->decl,
+      [obj](std::string_view name) -> const Logic4Vec* {
+        auto it = obj->properties.find(std::string(name));
+        return it != obj->properties.end() ? &it->second : nullptr;
+      },
+      [obj, cls](std::string_view name, const Logic4Vec& value) {
+        obj->properties[std::string(name)] = value;
+        obj->properties[std::string(cls) + "::" + std::string(name)] = value;
+      },
+      ctx, arena);
+}
+
+ParamValueLookup ClassStaticLookup(const ClassTypeInfo* info) {
+  return [info](std::string_view name) -> const Logic4Vec* {
+    auto it = info->static_properties.find(std::string(name));
+    return it != info->static_properties.end() ? &it->second : nullptr;
+  };
+}
+
+ParamValueStore ClassStaticStore(ClassTypeInfo* info) {
+  return [info](std::string_view name, const Logic4Vec& value) {
+    info->static_properties[std::string(name)] = value;
+  };
+}
+
+void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
+                         const ParamValueStore& store, SimContext& ctx,
+                         Arena& arena) {
+  ctx.PushScope();
+  for (const auto& [pname, pexpr] : decl->params) {
+    if (decl->type_param_names.count(pname) != 0) continue;
+    const Logic4Vec* value = header(pname);
+    if (value == nullptr) continue;
+    ctx.CreateLocalVariable(pname, value->width)->value = *value;
+  }
+  ClassParamSizer sizer(decl);
+  for (const auto* m : decl->members) {
+    // A type parameter, `localparam type U = T`, carries void as its data
+    // type and names a type rather than a value.
+    if (m->kind != ClassMemberKind::kProperty || !m->is_param ||
+        m->init_expr == nullptr || m->data_type.kind == DataTypeKind::kVoid)
+      continue;
+    Logic4Vec value = OwnRhsWords(
+        sizer.Value(m->name, &m->data_type, m->init_expr, ctx, arena), arena);
+    store(m->name, value);
+    // A later body parameter may name this one, §6.20.4's `localparam int
+    // M = N + 1`, so it stands in the scope for the rest.
+    ctx.CreateLocalVariable(m->name, value.width)->value = value;
+  }
+  ctx.PopScope();
 }
 
 std::vector<ClassParamBinding> CollectClassParamBindings(

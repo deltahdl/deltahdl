@@ -696,7 +696,11 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // the enclosing class and the classes it inherits from, ahead of the same
   // module-level names.
   if (TryEvalEnclosingInstanceCall(expr, ctx, arena, out)) return true;
-  auto* let_decl = ctx.FindLetDecl(expr->callee);
+  // §11.12 with §26.3: `pex::twice(7)` names the package's let by the
+  // "pex::twice" key it is registered under.
+  auto* let_decl = expr->callee.empty() && IsPackageScopedCall(expr)
+                       ? ctx.FindLetDecl(ScopedClassKey(expr->lhs, arena))
+                       : ctx.FindLetDecl(expr->callee);
   if (let_decl) {
     out = EvalLetExpansion(let_decl, expr, ctx, arena);
     return true;

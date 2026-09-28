@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -611,6 +612,40 @@ TEST(LetExpansionSimulation, RecursiveInstantiationMessageHoldsNoSubclause) {
   for (const auto& diag : f.diag.Diagnostics()) {
     EXPECT_EQ(diag.message.find("§"), std::string::npos);
   }
+}
+
+// §11.12 with §26.3: a let declared in a package is a declaration of the
+// package, so it is referenced by its bare name through a wildcard import --
+// with named and positional actuals, from the module and from a class method
+// -- and through the package scope from anywhere.
+TEST(LetDeclarationSim, PackageLetThroughImportScopeAndMethod) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pex;\n"
+      "  let valid_arb(request, valid, override) =\n"
+      "      |(request & valid) || override;\n"
+      "  let twice(a) = a * 2;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pex::*;\n"
+      "  logic [1:0] req = 2'b10, vld = 2'b10, vld2 = 2'b01;\n"
+      "  logic ovr = 0;\n"
+      "  class C;\n"
+      "    int n = 7;\n"
+      "    function int m(); return twice(n) + 1; endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\",\n"
+      "             valid_arb(.request(req), .valid(vld), .override(ovr)),\n"
+      "             valid_arb(req, vld2, ovr), pex::valid_arb(req, vld2, "
+      "1'b1),\n"
+      "             pex::twice(7), h.m());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1 14 15\n");
 }
 
 }  // namespace

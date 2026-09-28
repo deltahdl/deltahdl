@@ -75,6 +75,10 @@ void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
     if (!ctx_.FindFunction(item->name)) {
       ctx_.RegisterFunction(item->name, item);
     }
+  } else if (item->kind == ModuleItemKind::kLetDecl) {
+    // §11.12 with §26.3: an imported let is referenced by its bare name, as an
+    // imported function is; a declaration of the importing scope keeps it.
+    if (!ctx_.FindLetDecl(item->name)) ctx_.RegisterLetDecl(item->name, item);
   }
 }
 

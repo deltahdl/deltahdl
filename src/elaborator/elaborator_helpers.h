@@ -28,6 +28,7 @@ namespace delta {
 
 class Arena;
 class DiagEngine;
+struct ClassDecl;
 struct RtlirModule;
 struct RtlirParamDecl;
 
@@ -349,6 +350,15 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
 // still has the prefix to judge.
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit);
+
+// §8.23: records every typedef `cls` declares under its "scope::name" key, and
+// each typedef of a class nested in it, at any depth, under the nested class's
+// path, "C::N::T", so a type written through its class reaches the type the
+// typedef stands for. `scope` is the key's leading part, the class's own name
+// for a class at compilation-unit scope or in a module. Defined in
+// elaborator_resolve.cpp.
+void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
+                              TypedefMap& typedefs, Arena& arena);
 
 // §8.23: "When a type name is used, the name shall resolve to a type after
 // elaboration." Reports a declared type whose class scope prefix names a

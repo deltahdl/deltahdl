@@ -3,10 +3,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_switch_network.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -266,4 +268,50 @@ TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
   ResolveUserDefinedNet(net, nt, arena);
   EXPECT_EQ(driver_count, 3u);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
+}
+
+// §6.6.7: a net of a nettype declared with a resolution function takes the
+// value the function returns for its drivers, handed to it as a dynamic
+// array -- the sum 3 + 4 of an int nettype's two drivers, a struct nettype's
+// value built from the driver count, 40 + 2, and its first driver whole.
+// Resolved as a built-in net, each read x or its drivers' combined bits.
+TEST(UserNettypeSim, ResolutionFunctionGivesTheNetItsValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef struct { int f1; bit f2; } T;\n"
+                 "  function automatic int isum(input int driver[]);\n"
+                 "    isum = 0;\n"
+                 "    foreach (driver[i]) isum += driver[i];\n"
+                 "  endfunction\n"
+                 "  function automatic T Tk(input T driver[]);\n"
+                 "    Tk.f1 = 40 + driver.size();\n"
+                 "    Tk.f2 = 1;\n"
+                 "  endfunction\n"
+                 "  function automatic T Tfirst(input T driver[]);\n"
+                 "    Tfirst = driver[0];\n"
+                 "  endfunction\n"
+                 "  nettype int wisum with isum;\n"
+                 "  nettype T wk with Tk;\n"
+                 "  nettype T wf with Tfirst;\n"
+                 "  wisum w;\n"
+                 "  wk k;\n"
+                 "  wf fz;\n"
+                 "  T d1, d2;\n"
+                 "  int a = 3, b = 4;\n"
+                 "  assign w = a;\n"
+                 "  assign w = b;\n"
+                 "  assign k = d1;\n"
+                 "  assign k = d2;\n"
+                 "  assign fz = d1;\n"
+                 "  assign fz = d2;\n"
+                 "  initial begin\n"
+                 "    d1.f1 = 5;\n"
+                 "    d2.f1 = 9;\n"
+                 "    #1;\n"
+                 "    $display(\"%0d %0d %0d %0d\", w, k.f1, k.f2, fz.f1);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "7 42 1 5\n");
 }

@@ -249,4 +249,29 @@ TEST(PrimarySim, BitsOfClassArrayPropertiesCountEveryElement) {
             "24 24 64\n");
 }
 
+// §20.6.2 with §8.23 and §26.3: a data type named through its class or package
+// is sized as the type it stands for -- 8 for class C's `typedef byte T`, as a
+// variable of it and a module typedef renaming it are, 16 for package p's
+// `typedef shortint T`, and 4 for the typedef of a class nested in a class.
+TEST(PrimarySim, BitsOfClassAndPackageScopedTypedefs) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef shortint T;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  class C;\n"
+                       "    typedef byte T;\n"
+                       "    class N;\n"
+                       "      typedef bit [3:0] T;\n"
+                       "    endclass\n"
+                       "  endclass\n"
+                       "  typedef C::T U;\n"
+                       "  C::T x;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d\", $bits(x), "
+                       "$bits(U), $bits(C::T), $bits(p::T), $bits(C::N::T));\n"
+                       "endmodule\n",
+                       f),
+            "8 8 8 16 4\n");
+}
+
 }  // namespace

@@ -521,13 +521,8 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   // RegisterClassTypedefs in elaborator_resolve.cpp keys the compilation
   // unit's classes so, and a class of a module had no key at all, so a local
   // declared with the name was sized as a name nothing could resolve.
-  for (const auto* m : item->class_decl->members) {
-    if (m->kind != ClassMemberKind::kTypedef || m->typedef_item == nullptr)
-      continue;
-    auto* key = arena_.Create<std::string>(std::string(item->class_decl->name) +
-                                           "::" + std::string(m->name));
-    typedefs_[*key] = m->typedef_item->typedef_type;
-  }
+  RegisterClassTypedefKeys(item->class_decl, item->class_decl->name, typedefs_,
+                           arena_);
   // §13.3 with §7.2.1: the class's methods are reached by no item walk, so
   // their inline aggregate formals are resolved here, against the module's
   // typedefs as they stand at the declaration and the class's own (§8.23),

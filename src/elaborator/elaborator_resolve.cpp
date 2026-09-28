@@ -279,11 +279,7 @@ void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
 void RegisterClassTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
                            Arena& arena) {
   for (auto* cls : unit->classes) {
-    for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kTypedef || !m->typedef_item) continue;
-      RegisterScopedTypedef(cls->name, m->name, m->typedef_item->typedef_type,
-                            typedefs, arena);
-    }
+    RegisterClassTypedefKeys(cls, cls->name, typedefs, arena);
   }
 }
 
@@ -401,6 +397,21 @@ void RegisterAnonymousProgramNames(
 }
 
 }  // namespace
+
+void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
+                              TypedefMap& typedefs, Arena& arena) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
+      RegisterScopedTypedef(scope, m->name, m->typedef_item->typedef_type,
+                            typedefs, arena);
+    } else if (m->kind == ClassMemberKind::kClassDecl &&
+               m->nested_class != nullptr) {
+      auto* nested = arena.Create<std::string>(
+          std::string(scope) + "::" + std::string(m->nested_class->name));
+      RegisterClassTypedefKeys(m->nested_class, *nested, typedefs, arena);
+    }
+  }
+}
 
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
                           CompilationUnit* unit) {

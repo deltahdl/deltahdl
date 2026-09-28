@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -656,6 +658,28 @@ TEST(StaticClassPropertySim,
                 "endmodule\n",
                 "result"),
       4u);
+}
+
+// §8.9 with §6.8: a static property's initializer runs once, before any
+// initial procedure, so `static C inst = new;` already holds an object of C
+// -- the handle is not null and the constructor gave ci 5 -- when the
+// module's initial block reads C::inst.
+TEST(StaticPropertySim, StaticHandleInitializedWithNewHoldsAnObject) {
+  const std::string src =
+      "module t;\n"
+      "  class C;\n"
+      "    int ci;\n"
+      "    static C inst = new;\n"
+      "    function new(); ci = 5; endfunction\n"
+      "  endclass\n"
+      "  int hl, ci;\n"
+      "  initial begin\n"
+      "    hl = C::inst != null;\n"
+      "    ci = C::inst.ci;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "hl"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ci"), 5u);
 }
 
 }  // namespace

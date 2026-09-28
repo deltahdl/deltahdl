@@ -137,7 +137,9 @@ static Logic4Vec ExtractStructField(Variable* base_var,
   uint32_t bit_offset = 0;
   uint32_t width = 0;
   DataTypeKind kind = DataTypeKind::kLogic;
-  if (ResolveStructFieldPath(info, field, &bit_offset, &width, &kind)) {
+  bool is_signed = false;
+  if (ResolveStructFieldPath(info, field, &bit_offset, &width, &kind,
+                             &is_signed)) {
     Logic4Vec slice =
         ExtractBitField(arena, base_var->value, bit_offset, width);
     if (IsTwoStateScalarKind(kind)) {
@@ -147,6 +149,9 @@ static Logic4Vec ExtractStructField(Variable* base_var,
       }
     }
     slice.is_real = IsRealKind(kind);
+    // §7.2.1 with §6.11: a member reads as its own type, so `shortint address`
+    // holding -2 is -2 and not 65534.
+    slice.is_signed = is_signed && !slice.is_real;
     return slice;
   }
   return MakeLogic4Vec(arena, 1);

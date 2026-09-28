@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_internal.h"
@@ -21,6 +22,10 @@ namespace delta {
 
 static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
                           SimContext& ctx) {
+  // §7.12.1 with §6.16: an array declared of string elements holds strings,
+  // which its with clause compares lexicographically, whatever its first
+  // element's variable was registered as.
+  if (info.elem_type_kind == DataTypeKind::kString) return true;
   if (info.is_dynamic) return ctx.IsStringVariable(var_name);
   auto name = std::string(var_name) + "[" + std::to_string(info.lo) + "]";
   return ctx.IsStringVariable(name);

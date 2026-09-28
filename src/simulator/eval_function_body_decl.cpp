@@ -7,6 +7,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
@@ -331,8 +332,29 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
   RetainStaticAggregate(func_name, stmt->var_name, ctx, arena);
 }
 
+// §6.23 with §8.11: `var static type(this) m_inst;` in a method declares a
+// handle of the class the method belongs to, so the declaration is taken as
+// one naming that class. Left as written, its type was implicit and m_inst a
+// one-bit variable no `new` could store an object in. Any other declaration
+// is returned as it is.
+static const Stmt* DeclOfThisTypeRef(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  const Expr* ref = stmt->var_decl_type.type_ref_expr;
+  if (ref == nullptr || ref->kind != ExprKind::kIdentifier ||
+      ref->text != "this")
+    return stmt;
+  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+  if (cls == nullptr) return stmt;
+  auto* copy = arena.Create<Stmt>(*stmt);
+  copy->var_decl_type = DataType{};
+  copy->var_decl_type.kind = DataTypeKind::kNamed;
+  copy->var_decl_type.type_name = cls->name;
+  return copy;
+}
+
 void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
                      Arena& arena) {
+  stmt = DeclOfThisTypeRef(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
@@ -344,10 +366,12 @@ void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
   }
   // §13.4.2: a static subroutine's frame is pushed holding the variables the
   // last call left (SimContext::PushStaticScope), so its local is found here
-  // and its aggregate is referred to again.
-  if (ctx.FindLocalVariable(stmt->var_name)) {
-    if (frame.is_static_sub)
-      RestoreStaticAggregate(frame.name, stmt->var_name, ctx);
+  // and its aggregate is referred to again. §6.21 with §6.8: an automatic
+  // subroutine's local is created, and its initializer run, on every entry
+  // to the block declaring it, so a loop body's `int j = 0;` starts at 0 on
+  // each iteration; found and kept, it held the last iteration's j.
+  if (frame.is_static_sub && ctx.FindLocalVariable(stmt->var_name)) {
+    RestoreStaticAggregate(frame.name, stmt->var_name, ctx);
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,

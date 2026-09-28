@@ -718,4 +718,22 @@ TEST(AssignmentPatternFormat, DescendingDimensionPrintsFromItsLeftBound) {
   EXPECT_EQ(out, "'{1, 2, 3, 4} 1 '{'{1, 2}, '{3, 4}} 1\n");
 }
 
+// §21.2.1.6 with §6.19: an enumerated value prints as its member's name when
+// every bit matches a member, x and z included, so `XX='x` prints XX and
+// `Z='z` prints Z; a value holding x in an enumeration with no x member
+// prints as its base type does.
+TEST(AssignmentPatternFormat, EnumXAndZMembersPrintByName) {
+  auto out = RunSim(
+      "module top;\n"
+      "  enum integer {IDLE, XX='x, S1='b01, S2='b10} s;\n"
+      "  enum logic [1:0] {A, Z='z, B=2} lz;\n"
+      "  enum logic [1:0] {P, Q} nx;\n"
+      "  initial begin\n"
+      "    s = XX; lz = Z;\n"
+      "    $display(\"%p %p %p\", s, lz, nx);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "XX Z x\n");
+}
+
 }  // namespace

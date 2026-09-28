@@ -95,21 +95,6 @@ std::string InstanceOfKey(std::string_view key) {
                                        : std::string(key.substr(0, dot + 1));
 }
 
-// §26.3: a subroutine called through the package scope resolution operator,
-// `pk::f(x)`, parses as a call with no callee text and the scoped name as its
-// base; the lowerer registers every package subroutine under that "pk::f"
-// key (RegisterPackageScopedSubroutines), so the lookup goes by it. A class
-// scope never reaches this key: TryEvalClassScopeCall and the instance-task
-// path take those calls before the registry is asked.
-bool IsPackageScopedCall(const Expr* call) {
-  const Expr* scoped = call->lhs;
-  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution) {
-    return false;
-  }
-  return scoped->lhs != nullptr && scoped->lhs->elements.empty();
-}
-
 // §23.6: the complete path name to any object starts at a top-level module
 // and may be used from any level of the hierarchy or from a parallel one, so
 // "m.t1" written in the other top-level module n is m's t1, and "m.u1.tk" the
@@ -183,6 +168,21 @@ class CallerGenBlockScope {
 };
 
 }  // namespace
+
+// §26.3: a subroutine called through the package scope resolution operator,
+// `pk::f(x)`, parses as a call with no callee text and the scoped name as its
+// base; the lowerer registers every package subroutine under that "pk::f"
+// key (RegisterPackageScopedSubroutines), so the lookup goes by it. A class
+// scope never reaches this key: TryEvalClassScopeCall and the instance-task
+// path take those calls before the registry is asked.
+bool IsPackageScopedCall(const Expr* call) {
+  const Expr* scoped = call->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution) {
+    return false;
+  }
+  return scoped->lhs != nullptr && scoped->lhs->elements.empty();
+}
 
 SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
                                       Arena& arena) {

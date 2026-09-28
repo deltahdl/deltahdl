@@ -117,4 +117,30 @@ TEST(ClassSim, FunctionLocalInitializerNewBuildsTheSpecialization) {
   EXPECT_EQ(out, "1 0\n");
 }
 
+// §6.20.4 with §8.25: a localparam in a parameterized class body is a
+// constant of each specialization, so `N = W * 2` is 16 for C#(8) and for
+// the default specialization C#() and C, 8 for C#(4), and the same inside a
+// method run on an object of each; K, which names no parameter, is 3 in all.
+TEST(ClassParamsSim, BodyLocalparamFoldsInEachSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(int W = 8);\n"
+      "  localparam int N = W * 2;\n"
+      "  localparam int K = 3;\n"
+      "  function int n(); return N; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(4) c4;\n"
+      "  C c8;\n"
+      "  initial begin\n"
+      "    c4 = new;\n"
+      "    c8 = new;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", C#(8)::N, C#(4)::N, C#()::N,\n"
+      "             c4.n(), c8.n(), C#(4)::K);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "16 8 16 8 16 3\n");
+}
+
 }  // namespace

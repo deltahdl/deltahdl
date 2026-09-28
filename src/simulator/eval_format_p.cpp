@@ -76,10 +76,13 @@ static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
 // (decimal) form.
 static std::string FormatEnumValueForP(const EnumTypeInfo& et,
                                        const Logic4Vec& val) {
-  if (val.IsKnown()) {
-    uint64_t v = val.ToUint64();
+  // §21.2.1.6 with §6.19: a value is a member where every bit matches, x and
+  // z included, as the enum methods match it, so `XX='x` prints XX; read as
+  // a number, a value holding x or z matched no member.
+  if (val.nwords > 0) {
+    const Logic4Word& w = val.words[0];
     for (const auto& m : et.members) {
-      if (m.value == v) return std::string(m.name);
+      if (m.value == w.aval && m.xz == w.bval) return std::string(m.name);
     }
   }
   return FormatArg(val, 'd');

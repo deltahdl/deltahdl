@@ -144,6 +144,17 @@ static void InitStaticProperty(ClassTypeInfo* info,
                                SimContext& ctx, Arena& arena) {
   if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) return;
   if (p.init_expr == nullptr) return;
+  if (p.init_expr->kind == ExprKind::kCall && p.init_expr->text == "new") {
+    // §8.7: a bare `new` names no class of its own; the property's declared
+    // class is the one constructed, `static C inst = new;` an object of C.
+    // Evaluated as a value, it constructed nothing and left the handle null.
+    std::string_view cls = PropertyClassName(nullptr, info, p.name, ctx);
+    if (!cls.empty()) {
+      info->static_properties[std::string(p.name)] =
+          EvalClassNew(cls, p.init_expr, ctx, arena, p.init_expr->range.start);
+      return;
+    }
+  }
   info->static_properties[std::string(p.name)] = CoerceToPropertyType(
       info, p.name, EvalExpr(p.init_expr, ctx, arena), arena);
 }
@@ -431,6 +442,10 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                                       member->init_expr, ctx, arena)
                         : MakeLogic4VecVal(arena, w, 0));
   }
+  // §6.20.4: a body parameter naming a header one, `N = W * 2`, is folded
+  // with the defaults just stored, which the loop above had no name for.
+  FoldClassBodyParams(cls, ClassStaticLookup(info), ClassStaticStore(info), ctx,
+                      arena);
 }
 
 // §8.23 with §6.19: the literals of every enumeration a typedef of the class

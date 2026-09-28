@@ -249,4 +249,29 @@ TEST(BitStreamCastSim, BitStreamAssocSourcePacksInIndexSortedOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
+// §6.24.3: a bit-stream cast to an unpacked-array type fills its elements from
+// the operand's stream, left to right, most significant bits first: 8'h81
+// cast to `typedef bit B8 [8:1]` sets e[8] and e[1] and clears e[7], and
+// 16'hA5C3 cast to `typedef byte P [2]` splits into its two bytes, A5 first.
+TEST(BitStreamCastSim, CastToAnUnpackedArrayTypedefFillsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef bit B8 [8:1];\n"
+                       "  typedef byte P [2];\n"
+                       "  B8 e;\n"
+                       "  P p;\n"
+                       "  byte x;\n"
+                       "  shortint h = 16'hA5C3;\n"
+                       "  initial begin\n"
+                       "    x = 8'h81;\n"
+                       "    e = B8'(x);\n"
+                       "    p = P'(h);\n"
+                       "    $display(\"%0d %0d %0d %h %h\", e[8], e[1], e[7], "
+                       "p[0], p[1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1 0 a5 c3\n");
+}
+
 }  // namespace

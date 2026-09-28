@@ -214,6 +214,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/net.cpp
     simulator/net_bit_outcomes.cpp
     simulator/net_strength.cpp
+    simulator/nettype_resolution.cpp
     simulator/switch_network.cpp
     simulator/scheduler.cpp
     simulator/process.cpp

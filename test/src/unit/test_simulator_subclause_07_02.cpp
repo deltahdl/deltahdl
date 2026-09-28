@@ -145,4 +145,61 @@ TEST(StructType, MembersDeclaredThroughTypedefsHoldTheirWidth) {
   EXPECT_EQ(out, "2 2a 3 2 2a aa '{e:B, w:42, n:3}\n");
 }
 
+// §7.2.1 with §6.11: a member reads as the type it is declared with, so a
+// shortint and a byte member of an unpacked struct hold -2 and -3, a
+// `logic signed [3:0]` member -1, and a `bit [3:0]` member 15; each compares
+// below zero exactly when its type is signed.
+TEST(StructType, SignedMembersOfAnUnpackedStructReadSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    shortint address; byte c; logic signed [3:0] s; bit [3:0] u;\n"
+      "  } Plain;\n"
+      "  Plain pl;\n"
+      "  initial begin\n"
+      "    pl.address = -2;\n"
+      "    pl.c = -3;\n"
+      "    pl.s = -1;\n"
+      "    pl.u = -1;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", pl.address, pl.c, pl.s, "
+      "pl.u, pl.c < 0, pl.u < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-2 -3 -1 15 1 0\n");
+}
+
+// §7.2 and §7.3 with §6.21: a structure or union declared in an initial block
+// or a static task has storage like any variable, so a whole assignment, a
+// member write and a member read all reach it -- st holds 9 and 1, the union
+// reads 16'h1234 through either member, the inline packed struct's x holds 5,
+// and the task's local 7. Bound to no layout, each member read 0 or x.
+TEST(StructType, AggregateLocalsOfAStaticBlockAndTaskHoldTheirValues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int x; byte y;} s_t;\n"
+      "  typedef union packed {bit [15:0] w; bit [1:0][7:0] b;} u_t;\n"
+      "  int bx, by, uw, ub, px, tx;\n"
+      "  task tk; s_t ts; ts.x = 7; tx = ts.x; endtask\n"
+      "  initial begin\n"
+      "    s_t st;\n"
+      "    u_t u;\n"
+      "    struct packed {int x; byte y;} ps;\n"
+      "    st = '{8, 1};\n"
+      "    st.x = st.x + 1;\n"
+      "    bx = st.x; by = st.y;\n"
+      "    u.w = 16'h1234;\n"
+      "    uw = u.w; ub = u.b;\n"
+      "    ps.x = 5;\n"
+      "    px = ps.x;\n"
+      "    tk();\n"
+      "    $display(\"%0d %0d %h %h %0d %0d\", bx, by, uw, ub, px, tx);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 1 00001234 00001234 5 7\n");
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -77,5 +78,26 @@ std::vector<ClassParamBinding> CollectClassParamBindings(
     const ClassTypeInfo* cls, SimContext& ctx);
 void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,
                               SimContext& ctx);
+
+// Answers the value a header parameter of a class holds, or null where it
+// holds none; and stores a body parameter's folded value.
+using ParamValueLookup = std::function<const Logic4Vec*(std::string_view)>;
+using ParamValueStore = std::function<void(std::string_view, const Logic4Vec&)>;
+
+// §6.20.4 with §8.25: a parameter declared in a class's body, `localparam int
+// N = W * 2`, is a constant of each specialization, folded over that
+// specialization's header parameters. Each value parameter of `decl`'s
+// header that `header` answers is bound in a scope of its own, and each body
+// parameter with an initializer is folded there, in declaration order, and
+// handed to `store`. Folded with no header parameter bound, as the class was
+// lowered, the name read nothing and every specialization's N was 0.
+void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
+                         const ParamValueStore& store, SimContext& ctx,
+                         Arena& arena);
+
+// The lookup and store FoldClassBodyParams takes for a class's own copy of
+// its parameters, the static storage of the class or a specialization.
+ParamValueLookup ClassStaticLookup(const ClassTypeInfo* info);
+ParamValueStore ClassStaticStore(ClassTypeInfo* info);
 
 }  // namespace delta

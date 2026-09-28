@@ -34,6 +34,11 @@ struct SubroutineTarget {
   const GenBlockSubroutineScope* gen_block = nullptr;
 };
 
+// §26.3: whether `call` names a subroutine through the package scope
+// resolution operator, `pk::f(x)`, which parses as a call with no callee text
+// and the scoped name as its base. Defined in eval_function_hier.cpp.
+bool IsPackageScopedCall(const Expr* call);
+
 // The module subroutine `call` names: a bare identifier or a call with a
 // bare callee, one through the package scope resolution operator (§26.3), or
 // a call whose callee is a dotted path of identifiers, `u1.tk` or `x.u1.tk`,

@@ -23,6 +23,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -830,6 +831,23 @@ static const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
   return it == shaped.end() ? stmt : it->second;
 }
 
+// §7.2 and §7.3 with §6.21: a structure or union declared in a procedural
+// block or a static task is an object whose members are windows of its
+// layout, as a module's is (Lowerer::LowerVar) and a subroutine body's
+// (BindLocalAggregateLayout): a typedef name binds the layout registered
+// under it, and a type written inline registers one of its own under the
+// variable's name. Bound to none, `st.x = 9` wrote nothing and `st.x` read 0.
+static void BindBlockLocalLayout(const Stmt* stmt, uint32_t width,
+                                 SimContext& ctx, Arena& arena) {
+  const DataType& type = stmt->var_decl_type;
+  if (type.kind == DataTypeKind::kNamed) {
+    BindNamedLayout(stmt->var_name, type, ctx);
+  } else if (type.kind == DataTypeKind::kStruct ||
+             type.kind == DataTypeKind::kUnion) {
+    RegisterAggregateLayout(stmt->var_name, &type, width, ctx, arena);
+  }
+}
+
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
@@ -884,6 +902,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
+  BindBlockLocalLayout(stmt, width, ctx, arena);
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   if (is_class) ctx.SetVariableClassType(stmt->var_name, class_key);
   auto* var = ctx.FindVariable(stmt->var_name);

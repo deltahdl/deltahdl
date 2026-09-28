@@ -182,4 +182,55 @@ TEST(TypeOfExprBlockVarSim, TakesTheTypeOfAnEarlierBlockLocal) {
   EXPECT_EQ(RunAndGet(kSrc, "b"), 16u);
 }
 
+// §6.23 with §6.24.1: a type reference is a casting type, so `type(n)'(v)`
+// with `bit [3:0] n` keeps the low four bits of 16'hABCF, 15; `type(s)'`
+// with `byte s` makes 16'h00F0 the signed -16; and `type(bit [11:0])'` keeps
+// twelve bits, 12'hBCF.
+TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheReferencedType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  logic [15:0] v = 16'hABCF;\n"
+      "  int d, e, g;\n"
+      "  initial begin\n"
+      "    d = type(n)'(v);\n"
+      "    e = type(s)'(16'h00F0);\n"
+      "    g = type(bit [11:0])'(v);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 15u);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xFFFFFFF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "g"), 0xBCFu);
+}
+
+// §6.23 with §8.11: `var static type(this) m_inst;` in a static method is a
+// handle of the method's class, so the singleton get() stores the object new()
+// makes and hands the same one back on the next call, with its val of 9.
+TEST(TypeOfExprCastSim, TypeOfThisMethodLocalIsAHandleOfTheClass) {
+  const std::string kSrc =
+      "module t;\n"
+      "  class registry;\n"
+      "    int val = 9;\n"
+      "    static function registry get();\n"
+      "      var static type(this) m_inst;\n"
+      "      if (m_inst == null) m_inst = new();\n"
+      "      return m_inst;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  registry r, r2;\n"
+      "  int got, same, v;\n"
+      "  initial begin\n"
+      "    r = registry::get();\n"
+      "    r2 = registry::get();\n"
+      "    got = r != null;\n"
+      "    same = r == r2;\n"
+      "    v = r.val;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "got"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "same"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "v"), 9u);
+}
+
 }  // namespace

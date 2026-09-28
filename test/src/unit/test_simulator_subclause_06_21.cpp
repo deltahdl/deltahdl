@@ -187,4 +187,46 @@ TEST(ScopeAndLifetimeSimulation,
   EXPECT_EQ(val, 1u);
 }
 
+// §6.21 with §6.8: a variable of an automatic subroutine is created, and its
+// initializer run, on every entry to the block declaring it. In the class
+// method, `int j = 0;` starts each iteration at 0, so s sums i, 6; kept from
+// the iteration before, j accumulated to 0, 1, 3, 6 and s was 10. In the
+// automatic function, `int k = 1;` starts at 1, so s sums 1*i, 6 again,
+// where a kept k made 1, 2, 6 and 9.
+TEST(ScopeAndLifetimeSimulation, AutomaticLoopBodyLocalInitializedEachEntry) {
+  const char* src =
+      "class N;\n"
+      "  function int m();\n"
+      "    int s = 0;\n"
+      "    for (int i = 0; i < 4; i++) begin\n"
+      "      int j = 0;\n"
+      "      j += i;\n"
+      "      s += j;\n"
+      "    end\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  function automatic int f();\n"
+      "    int s = 0, i = 0;\n"
+      "    while (i < 3) begin\n"
+      "      int k = 1;\n"
+      "      i++;\n"
+      "      k *= i;\n"
+      "      s += k;\n"
+      "    end\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  N n;\n"
+      "  int rf, rm;\n"
+      "  initial begin\n"
+      "    rf = f();\n"
+      "    n = new;\n"
+      "    rm = n.m();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rf"), 6u);
+  EXPECT_EQ(RunAndGet(src, "rm"), 6u);
+}
+
 }  // namespace

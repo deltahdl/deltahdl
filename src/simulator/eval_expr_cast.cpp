@@ -21,6 +21,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sva_engine_sampling.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -267,6 +268,47 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
   return t;
 }
 
+// §6.11.3: the integer types signed unless declared unsigned.
+static bool IsSignedByDefault(DataTypeKind kind) {
+  return kind == DataTypeKind::kByte || kind == DataTypeKind::kShortint ||
+         kind == DataTypeKind::kInt || kind == DataTypeKind::kLongint ||
+         kind == DataTypeKind::kInteger;
+}
+
+// §6.23 with §6.24.1: the casting type a type reference stands for,
+// `type(bit [11:0])'(v)` the data type written, `type(n)'(v)` the type n was
+// declared with, and a typedef's name the type it names. False where `ref` is
+// no type reference or names nothing this resolves, the cast then read as
+// before.
+static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
+                              CastTarget& out) {
+  if (ref == nullptr || ref->kind != ExprKind::kTypeRef) return false;
+  const DataType* written = ref->type_value;
+  if (written != nullptr && written->kind != DataTypeKind::kNamed) {
+    out.width = DeclaredTypeWidth(*written, ctx);
+    out.is_4state = !IsTwoStateKind(written->kind);
+    out.is_signed = written->is_signed || IsSignedByDefault(written->kind);
+    return out.width > 0;
+  }
+  std::string_view name;
+  if (written != nullptr && written->scope_name.empty()) {
+    name = written->type_name;
+  } else if (ref->lhs != nullptr && ref->lhs->kind == ExprKind::kIdentifier) {
+    name = ref->lhs->text;
+  }
+  if (name.empty()) return false;
+  // The parser reads `type(n)` as a type named n; a variable so named is the
+  // expression whose type the reference takes.
+  if (const Variable* var = ctx.FindVariable(name)) {
+    out.width = var->value.width;
+    out.is_4state = var->is_4state;
+    out.is_signed = var->is_signed;
+    return out.width > 0;
+  }
+  out = ResolveCastTarget(name, ctx);
+  return true;
+}
+
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   uint32_t w = CastTargetWidth(type_name);
   if (w > 0) return w;
@@ -440,8 +482,9 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
 
-  std::string key = CastTypeKey(expr, ctx);
-  CastTarget target = ResolveCastTarget(key, ctx);
+  CastTarget target;
+  if (!TypeRefCastTarget(expr->rhs, ctx, target))
+    target = ResolveCastTarget(CastTypeKey(expr, ctx), ctx);
   uint32_t target_width = target.width;
 
   if (inner.is_real != IsRealCastTarget(type_name)) {
