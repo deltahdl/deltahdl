@@ -716,4 +716,56 @@ TEST(AlwaysCombSensitivitySim, WriteThroughAClassHandleDoesNotRetrigger) {
             "y@20=23\n");
 }
 
+// §9.2.2.2.1 with §11.5.3: `a[j]` with `j` a variable has the whole array `a`
+// as its longest static prefix, whose expansion is every element of `a`, so a
+// write to any element re-runs the block. Each element is a Variable of its own
+// and a write notifies the element alone, so watching `a` alone missed it.
+TEST(AlwaysCombSensitivitySim, VariableIndexReadWakesOnAnElementWrite) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a[3]; int n = 0; int j = 1;\n"
+                       "  always_comb n = a[j] + 5;\n"
+                       "  initial begin\n"
+                       "    #1 a[1] = 1;\n"
+                       "    #1 $display(\"n=%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=6\n");
+}
+
+// The same where the index is a for loop's variable and the write is an
+// assignment pattern, which writes every element.
+TEST(AlwaysCombSensitivitySim, LoopOverAnArrayWakesOnAPatternWrite) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a[3], not_a[3];\n"
+                       "  always_comb\n"
+                       "    for (int j = 0; j < 3; j++) not_a[j] = !a[j];\n"
+                       "  initial begin\n"
+                       "    #1 a = '{1, 0, 1};\n"
+                       "    #1 $display(\"%0d %0d %0d\", not_a[0], not_a[1],"
+                       " not_a[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 1 0\n");
+}
+
+// The expansion of a two-dimensional unpacked array is every element of each
+// of its rows.
+TEST(AlwaysCombSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a[2][3]; int n = 0; int i = 1, j = 2;\n"
+                       "  always_comb n = a[i][j] + 5;\n"
+                       "  initial begin\n"
+                       "    #1 a[1][2] = 1;\n"
+                       "    #1 $display(\"n=%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=6\n");
+}
+
 }  // namespace

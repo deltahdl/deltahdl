@@ -553,7 +553,15 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       break;
     case RtlirProcessKind::kAlways:
       p->kind = ProcessKind::kAlways;
-      if (!proc.sensitivity.empty() || proc.is_star_sensitivity) {
+      if (proc.is_star_sensitivity) {
+        // §9.4.2.2: an unpacked array the body reads is watched through each
+        // of its elements, which is what an element write notifies.
+        p->coro =
+            MakeAlwaysSensCoroutine(
+                proc.body, ImplicitListEvents(proc.sensitivity, ctx_, arena_),
+                ctx_, arena_)
+                .Release();
+      } else if (!proc.sensitivity.empty()) {
         p->coro =
             MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
                 .Release();

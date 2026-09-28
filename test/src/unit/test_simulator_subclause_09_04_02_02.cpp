@@ -282,4 +282,38 @@ TEST(ImplicitSensitivitySim, ParenFormWakesLikeStar) {
   EXPECT_EQ(y, 0xFFu);
 }
 
+// `a[j]` with `j` a variable reads the array `a`, whichever element `j`
+// selects, so a write to any element of `a` wakes the block. Each element is a
+// Variable of its own and a write notifies the element alone, so an event on
+// `a` alone never fired.
+TEST(ImplicitSensitivitySim, VariableIndexReadWakesOnAnElementWrite) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a[3]; int n = 0; int j = 1;\n"
+                       "  always @* n = a[j] + 5;\n"
+                       "  initial begin\n"
+                       "    #1 a[1] = 1;\n"
+                       "    #1 $display(\"n=%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=6\n");
+}
+
+// The same for a two-dimensional unpacked array: every element of each of
+// its rows is watched.
+TEST(ImplicitSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a[2][3]; int n = 0; int i = 1, j = 2;\n"
+                       "  always @* n = a[i][j] + 5;\n"
+                       "  initial begin\n"
+                       "    #1 a[1][2] = 1;\n"
+                       "    #1 $display(\"n=%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=6\n");
+}
+
 }  // namespace

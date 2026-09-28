@@ -2,17 +2,20 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
+#include "common/arena.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/awaiters.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 
@@ -74,6 +77,58 @@ static void CollectCallOutputActuals(const Stmt* stmt, SimContext& ctx,
     CollectCallOutputActuals(ci.body, ctx, out);
 }
 
+// The names of the elements of `info`'s unpacked dimensions from `d` on, each
+// `prefix` followed by one index per dimension, as the lowerer names the
+// element Variables: `a[0][2]`, counted from each dimension's lower address.
+static void AppendElementNames(const ArrayInfo& info, size_t d,
+                               const std::string& prefix, Arena& arena,
+                               std::vector<std::string_view>& out) {
+  bool single = info.dim_sizes.empty();
+  if (d == (single ? 1 : info.dim_sizes.size())) {
+    out.emplace_back(arena.AllocString(prefix.data(), prefix.size()),
+                     prefix.size());
+    return;
+  }
+  uint32_t lo = single ? info.lo : info.dim_los[d];
+  uint32_t size = single ? info.size : info.dim_sizes[d];
+  for (uint32_t i = 0; i < size; ++i) {
+    AppendElementNames(info, d + 1, prefix + "[" + std::to_string(lo + i) + "]",
+                       arena, out);
+  }
+}
+
+std::vector<std::string_view> UnpackedElementNames(std::string_view name,
+                                                   SimContext& ctx) {
+  std::vector<std::string_view> names;
+  const ArrayInfo* info = ctx.FindArrayInfo(name);
+  if (info == nullptr || info->is_dynamic || info->is_queue) return names;
+  AppendElementNames(*info, 0, std::string(name), ctx.GetArena(), names);
+  return names;
+}
+
+const std::vector<EventExpr>& ImplicitListEvents(
+    const std::vector<EventExpr>& sens, SimContext& ctx, Arena& arena) {
+  auto* events = arena.Create<std::vector<EventExpr>>(sens);
+  // A constant select, `a[2]`, is on the list already beside its array.
+  std::unordered_set<std::string_view> listed;
+  for (const auto& ev : sens) {
+    if (ev.signal != nullptr) listed.insert(ev.signal->text);
+  }
+  for (const auto& ev : sens) {
+    if (ev.edge != Edge::kNone || ev.signal == nullptr ||
+        ev.signal->kind != ExprKind::kIdentifier)
+      continue;
+    for (std::string_view name : UnpackedElementNames(ev.signal->text, ctx)) {
+      if (!listed.insert(name).second) continue;
+      auto* element = arena.Create<Expr>();
+      element->kind = ExprKind::kIdentifier;
+      element->text = name;
+      events->push_back({Edge::kNone, element});
+    }
+  }
+  return *events;
+}
+
 std::vector<std::string_view> AlwaysCombWatchedNames(
     const Stmt* body, const std::vector<EventExpr>& sens, SimContext& ctx) {
   std::unordered_set<std::string> call_outputs;
@@ -88,7 +143,13 @@ std::vector<std::string_view> AlwaysCombWatchedNames(
     // handle does not re-run the block.
     if (!ctx.GetVariableClassType(ev.signal->text).empty()) continue;
     read_vars.push_back(ev.signal->text);
+    std::vector<std::string_view> elements =
+        UnpackedElementNames(ev.signal->text, ctx);
+    read_vars.insert(read_vars.end(), elements.begin(), elements.end());
   }
+  // A constant select, `a[2]`, is on the list already beside its array.
+  std::ranges::sort(read_vars);
+  read_vars.erase(std::ranges::unique(read_vars).begin(), read_vars.end());
   DropUnwatchableNames(ctx, read_vars);
   return read_vars;
 }
