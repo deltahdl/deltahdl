@@ -230,6 +230,11 @@ class Lowerer {
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
+  // §6.19.5 with §6.20.2: records the enumeration each value parameter of
+  // `mod` was declared with, under the key its storage stands under, so an
+  // enum method on the parameter's name finds it. Called once the module's
+  // enumerations are registered.
+  void RegisterParamEnumTypes(const RtlirModule* mod);
   // Records that `mod` declares specify blocks or gate instances, under the
   // instance prefix in force when it is called, so that Lower can register them
   // once every module has been lowered. A module declaring neither is not

@@ -889,4 +889,17 @@ void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
   }
 }
 
+// A parameter is lowered to a variable ahead of the module's enumerations
+// (Lowerer::LowerParams), so the enumeration its declared type names is
+// looked up here, after them. A parameter declared with no type, or a type
+// parameter, has no decl_type. The key is arena-persisted, as LowerParams
+// persists the storage's, because SimContext keys the table by string_view.
+void Lowerer::RegisterParamEnumTypes(const RtlirModule* mod) {
+  for (const auto& p : mod->params) {
+    if (p.is_type_param || p.decl_type == nullptr) continue;
+    auto* key = arena_.Create<std::string>(inst_prefix_ + std::string(p.name));
+    RecordVariableEnumType(*key, *p.decl_type, ctx_);
+  }
+}
+
 }  // namespace delta

@@ -204,11 +204,28 @@ static bool ReturnsTheEnumType(std::string_view method) {
 // it, or null where none declares it. The declaration is asked because the
 // value held is not: a stored member is a packed value (§5.9) carrying no
 // type.
+// A value parameter of the class's parameter port list is declared in the
+// header rather than among the members, with its type in
+// ClassDecl::param_types; a type parameter holds no value.
+static const DataType* HeaderParamDeclaredType(const ClassDecl* decl,
+                                               std::string_view name) {
+  if (decl->type_param_names.count(name) != 0) return nullptr;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first != name) continue;
+    return i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
+  }
+  return nullptr;
+}
+
 static const DataType* ClassMemberDeclaredType(const ClassTypeInfo* cls,
                                                std::string_view name,
                                                const ClassTypeInfo*& declarer) {
   for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
     if (c->decl == nullptr) continue;
+    if (const DataType* type = HeaderParamDeclaredType(c->decl, name)) {
+      declarer = c;
+      return type;
+    }
     for (const ClassMember* m : c->decl->members) {
       if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
       // §7.4 and §7.8: a member declared with unpacked dimensions is an array

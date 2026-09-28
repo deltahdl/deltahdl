@@ -99,6 +99,7 @@ static void BindAssocArg(const AssocArrayObject* src, const FunctionArg& formal,
   dst->is_wildcard = src->is_wildcard;
   dst->is_4state = src->is_4state;
   dst->index_class = src->index_class;
+  dst->index_type_name = src->index_type_name;
 }
 
 // Binds a dynamic-array/queue actual to a fixed-size formal. §7.7 (printed

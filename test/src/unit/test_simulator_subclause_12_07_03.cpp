@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -797,6 +798,63 @@ TEST(LoopStatementSim, ForeachKeyOfAClassKeyedModuleArrayIsAHandle) {
                       "endmodule\n",
                       "result"),
             43u);
+}
+
+// §12.7.3 gives a foreach loop variable over an associative array the array's
+// index type, so over `int m[color_t]` the variable is a color_t and
+// §6.19.5.6's name() names the key's member, in the array's own order (§7.8.1,
+// RED before BLUE). This fails on a loop variable holding the key's bits with
+// no enumeration, where name() answered garbage and the accumulated string
+// lost the first key.
+TEST(ForeachEnumKeySim, LoopVariableOverAnEnumKeyedArrayIsOfTheEnum) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                       "  int m [color_t];\n"
+                       "  string acc;\n"
+                       "  initial begin\n"
+                       "    m[BLUE] = 7; m[RED] = 5;\n"
+                       "    acc = \"\";\n"
+                       "    foreach (m[c]) acc = {acc, c.name(), \"=\", "
+                       "$sformatf(\"%0d \", m[c])};\n"
+                       "    $display(\"%s\", acc);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "RED=5 BLUE=7 \n");
+}
+
+// A foreach inside a subroutine runs through its own executor, and the rule
+// holds there as well: over a class property in a method and over a local
+// array in a function. This fails on the subroutine path typing the loop
+// variable with a class index alone.
+TEST(ForeachEnumKeySim, LoopVariableInASubroutineIsOfTheEnum) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef enum {RED, GREEN, BLUE} color_t;\n"
+                       "class H;\n"
+                       "  int m [color_t];\n"
+                       "  function string walk();\n"
+                       "    string acc = \"\";\n"
+                       "    foreach (m[c]) acc = {acc, c.name(), \" \"};\n"
+                       "    return acc;\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  function string loc();\n"
+                       "    int n [color_t];\n"
+                       "    string acc = \"\";\n"
+                       "    n[GREEN] = 1; n[RED] = 2;\n"
+                       "    foreach (n[k]) acc = {acc, k.name(), \" \"};\n"
+                       "    return acc;\n"
+                       "  endfunction\n"
+                       "  H h;\n"
+                       "  initial begin\n"
+                       "    h = new; h.m[BLUE] = 1; h.m[GREEN] = 2;\n"
+                       "    $display(\"[%s] [%s]\", h.walk(), loc());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "[GREEN BLUE ] [RED GREEN ]\n");
 }
 
 }  // namespace

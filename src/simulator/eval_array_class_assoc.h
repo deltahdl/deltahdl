@@ -98,6 +98,14 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
                                        Arena& arena,
                                        ClassObject** owner = nullptr);
 
+// §12.7.3: a foreach loop variable over the associative array `aa` has the
+// array's index type. Records that type for the variable `iter_name`: a handle
+// of the index class for an array keyed by one (index_class), and a variable
+// of the enumeration for an array keyed by one (index_type_name), which
+// §6.19.5's methods then answer on. Does nothing where `aa` is null.
+void TypeForeachIterVar(std::string_view iter_name, const AssocArrayObject* aa,
+                        SimContext& ctx);
+
 // §8.25: the type the type parameter `pname` of `decl` stands for on `obj`:
 // the actual the object's specialization bound it to, else the default the
 // class declares for it (§8.25.1's default specialization), else null for a

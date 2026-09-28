@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 // §6.19.5.6 Name()
@@ -495,6 +496,55 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// §6.19.5.6 defines name() on any expression of an enumerated type, and §6.20.2
+// gives a parameter declared with a type that type, so a parameter declared
+// `color_t` names its value's member. Each case fails on a run that records no
+// enumeration for a parameter, where name() answered an empty string, num() 0
+// and next() 0. The module's own parameter and localparam, and a child
+// instance's parameter under an override and under its default, are four
+// different members.
+TEST(EnumMethodNameSim, EnumTypedModuleParameterNamesItsValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef enum {RED, GREEN, BLUE} color_t;\n"
+                 "module sub #(parameter color_t P = RED);\n"
+                 "  initial #1 $display(\"sub %s\", P.name());\n"
+                 "endmodule\n"
+                 "module t;\n"
+                 "  parameter color_t PE = GREEN;\n"
+                 "  localparam color_t LE = RED;\n"
+                 "  sub #(.P(BLUE)) u();\n"
+                 "  initial $display(\"%s %s %0d %s\", PE.name(), LE.name(),\n"
+                 "                   PE.num(), PE.next().name());\n"
+                 "endmodule\n",
+                 f),
+      "GREEN RED 3 BLUE\nsub BLUE\n");
+}
+
+// The same rule for a class's value parameter, whose declared type stands in
+// the class header rather than among its members. The default specialization
+// holds GREEN and `N #(RED)` holds RED, so the two objects name different
+// members and step to different ones.
+TEST(EnumMethodNameSim, EnumTypedClassParameterNamesItsValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef enum {RED, GREEN, BLUE} color_t;\n"
+          "module t;\n"
+          "  class N #(color_t EC = GREEN);\n"
+          "    function string ec(); return EC.name(); endfunction\n"
+          "    function string nx(); return EC.next().name(); endfunction\n"
+          "  endclass\n"
+          "  N n; N #(RED) r;\n"
+          "  initial begin\n"
+          "    n = new; r = new;\n"
+          "    $display(\"%s %s %s %s\", n.ec(), r.ec(), n.nx(), r.nx());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "GREEN RED BLUE GREEN\n");
 }
 
 }  // namespace

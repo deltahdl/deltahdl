@@ -320,6 +320,11 @@ struct RtlirVariable {
   bool is_index_signed = true;
   uint32_t assoc_index_width = 32;
   std::string_view assoc_index_class_name;
+  // §7.8 with §12.7.3: the typedef an associative array's index type names,
+  // `int m[color_t]`, empty for a built-in or class index. A foreach over the
+  // array gives its loop variable the index type, so where the typedef names
+  // an enumeration the variable is of it and §6.19.5's methods apply.
+  std::string_view assoc_index_type_name;
   std::string_view class_type_name;
   // §8.25: the declaration's own data type where it names a class, which is
   // where a specialization's parameter value assignment stands, `G #(5) b`

@@ -436,10 +436,8 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   if (!iter_name.empty()) {
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
     iter_var->is_string = aa != nullptr && aa->is_string_key;
-    // §12.7.3: the loop variable has the index type, a handle of the index
-    // class for an array keyed by one (AssocArrayObject::index_class).
-    if (aa != nullptr && !aa->index_class.empty())
-      exec.ctx.SetVariableClassType(iter_name, aa->index_class);
+    // §12.7.3: the loop variable has the index type of an associative array.
+    TypeForeachIterVar(iter_name, aa, exec.ctx);
   }
 
   FuncFlow flow = FuncFlow::kNext;

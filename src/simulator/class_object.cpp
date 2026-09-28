@@ -193,6 +193,7 @@ static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
   dst->is_4state = src->is_4state;
   dst->is_index_signed = src->is_index_signed;
   dst->index_class = src->index_class;
+  dst->index_type_name = src->index_type_name;
   dst->has_default = src->has_default;
   if (src->has_default)
     dst->default_value = OwnRhsWords(src->default_value, arena);

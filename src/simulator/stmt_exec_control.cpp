@@ -716,7 +716,7 @@ struct ForeachSetup {
   bool bail = false;
   std::vector<Logic4Vec> keys;
   bool string_keys = false;
-  std::string_view key_class;
+  const AssocArrayObject* aa = nullptr;
 };
 
 // §12.7.3: resolves the array being iterated and how many iterations it
@@ -743,7 +743,7 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
   if (aa != nullptr) {
     setup.keys = AssocIndexValues(aa, arena);
     setup.string_keys = aa->is_string_key;
-    setup.key_class = aa->index_class;
+    setup.aa = aa;
     setup.size = static_cast<uint32_t>(setup.keys.size());
   } else if (const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena)) {
     // §12.7.3 with §7.10: a queue's one dimension holds as many elements as
@@ -799,15 +799,13 @@ static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
 
 // Creates the loop variable `iter_name` names in the scope ExecForeach
 // pushed, or none where the dimension is unnamed. §12.7.3: the loop variable
-// has the index type, a handle of the index class for an array keyed by one
-// (AssocArrayObject::index_class).
+// has the index type of an associative array (TypeForeachIterVar).
 static Variable* CreateForeachIterVar(std::string_view iter_name,
                                       const ForeachSetup& setup,
                                       SimContext& ctx) {
   if (iter_name.empty()) return nullptr;
   Variable* iter_var = ctx.CreateLocalVariable(iter_name, 32);
-  if (!setup.key_class.empty())
-    ctx.SetVariableClassType(iter_name, setup.key_class);
+  TypeForeachIterVar(iter_name, setup.aa, ctx);
   return iter_var;
 }
 

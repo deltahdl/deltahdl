@@ -278,6 +278,11 @@ struct AssocArrayObject {
   // designates. Without the class the loop variable was a plain vector and
   // every method called through it ran nothing.
   std::string_view index_class;
+  // §7.8 with §12.7.3 and §6.19: the typedef the index type names, `color_t`
+  // for `int m[color_t]`, empty for a built-in or class index. A foreach over
+  // the array gives its loop variable the index type, so where the typedef is
+  // an enumeration, `c.name()` on the loop variable names the key's member.
+  std::string_view index_type_name;
   // §10.6: what a force or an assign standing on an element drives it from,
   // keyed the way the element itself is. An associative array's keys are its
   // elements' identities, so a record outlives every insertion and deletion of
@@ -409,6 +414,9 @@ struct AssocArraySpec {
   // §7.8.3: the class an index of a class type names; empty for any other
   // index type. See AssocArrayObject::index_class.
   std::string_view index_class = {};
+  // §7.8 with §12.7.3: the typedef the index type names. See
+  // AssocArrayObject::index_type_name.
+  std::string_view index_type_name = {};
 };
 
 }  // namespace delta

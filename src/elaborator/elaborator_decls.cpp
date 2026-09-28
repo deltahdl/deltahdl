@@ -160,6 +160,7 @@ static void ApplyUserDefinedAssocDim(
   }
   auto it = typedefs.find(dim->text);
   if (it != typedefs.end()) {
+    var.assoc_index_type_name = dim->text;
     var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
     // A typedef'd integral index follows the signedness of its underlying
     // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`

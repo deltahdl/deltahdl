@@ -255,6 +255,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   // of that module wherever it is instantiated, registered as LowerModule
   // registers the top's, so `name()` and `next()` answer on a variable of it.
   RegisterEnumTypes(child.resolved);
+  RegisterParamEnumTypes(child.resolved);
   // §8 with §23.3: a class the instance's module declares is a type of that
   // module wherever it is instantiated, registered as LowerModule registers
   // the top's -- before the variables, so a handle's `C h = new;` finds it

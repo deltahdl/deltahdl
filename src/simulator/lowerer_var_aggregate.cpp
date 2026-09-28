@@ -91,7 +91,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
         name, var.width, var.is_string_index,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
                        var.is_4state, var.is_index_signed,
-                       var.assoc_index_class_name});
+                       var.assoc_index_class_name, var.assoc_index_type_name});
     // §7.8 with §7.10: an array whose elements are queues keeps a queue under
     // each key (eval_array_element_queue.h), handles where the element type
     // is a class.

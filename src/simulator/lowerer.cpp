@@ -361,6 +361,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RecordSpecifyScope(mod);
   RegisterModuleNets(mod, ctx_, arena_);
   RegisterEnumTypes(mod);
+  RegisterParamEnumTypes(mod);
   // §8.7/§6.8: class types must be registered before module variables so a
   // class-handle declaration with a `new` static initializer (e.g.
   // `C h = new(42);`) can construct its object during static initialization.

@@ -86,9 +86,12 @@ AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
     // as the elaborator sizes a declared array's class index.
     spec.index_width = 64;
     spec.index_class = index_type.type_name;
-  } else if (uint32_t named = ctx.FindTypeWidth(index_type.type_name);
-             named != 0) {
-    spec.index_width = named;
+  } else {
+    // §12.7.3: a foreach over the array gives its loop variable the type the
+    // name stands for, an enumeration's included (index_type_name).
+    spec.index_type_name = index_type.type_name;
+    if (uint32_t named = ctx.FindTypeWidth(index_type.type_name); named != 0)
+      spec.index_width = named;
   }
   return spec;
 }

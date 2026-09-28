@@ -369,6 +369,7 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
   aa->is_4state = spec.is_4state;
   aa->is_index_signed = spec.is_index_signed;
   aa->index_class = spec.index_class;
+  aa->index_type_name = spec.index_type_name;
   // §8.4: the class the elements are handles of, resolved as any property's
   // declared class is (PropertyClassName), which HandleArrayOfSelect
   // (eval_assoc_class_handles.cpp) reads to construct into an entry and to
@@ -457,6 +458,16 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   if (obj == nullptr) return nullptr;
   return ResolveOn(obj, obj->type, base->rhs->text, ctx, owner);
+}
+
+void TypeForeachIterVar(std::string_view iter_name, const AssocArrayObject* aa,
+                        SimContext& ctx) {
+  if (aa == nullptr) return;
+  if (!aa->index_class.empty())
+    ctx.SetVariableClassType(iter_name, aa->index_class);
+  if (!aa->index_type_name.empty() &&
+      ctx.FindEnumType(aa->index_type_name) != nullptr)
+    ctx.SetVariableEnumType(iter_name, aa->index_type_name);
 }
 
 }  // namespace delta
