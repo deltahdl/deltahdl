@@ -142,18 +142,22 @@ TEST(StringConcatAndReplication, EndToEndNoTruncation) {
   EXPECT_EQ(VecToStr(var->value), "hi there everyone");
 }
 
+// The block's own s is out of reach of any name from outside it (§6.21), so
+// the block copies the replication into the module's r.
 TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module m;\n"
+      "  string r;\n"
       "  initial begin\n"
       "    int n;\n"
       "    string s;\n"
       "    n = 3;\n"
       "    s = {n{\"boo \"}};\n"
+      "    r = s;\n"
       "  end\n"
       "endmodule\n",
-      f, "s");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "boo boo boo ");
 }

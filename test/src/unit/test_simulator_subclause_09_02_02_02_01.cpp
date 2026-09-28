@@ -457,7 +457,10 @@ TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
 // neither is declared within the block, neither is written within it, and an
 // initializer is not a timing control expression. So the change to `a` at time
 // 1 re-evaluates the block: `y` is 13 after the time-zero evaluation and 23
-// after the second one, and a block that never woke leaves 13 behind.
+// after the second one, and a block that never woke leaves 13 behind. `tmp` is
+// declared automatic, so §6.21 runs its initializer on every evaluation; a
+// static one would be initialized once, and §6.21 requires the `static` to be
+// written where it has an initializer in a procedural block.
 TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -466,7 +469,7 @@ TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
       "  logic [7:0] b = 8'd3;\n"
       "  logic [7:0] y;\n"
       "  always_comb begin\n"
-      "    logic [7:0] tmp = a + b;\n"
+      "    automatic logic [7:0] tmp = a + b;\n"
       "    y = tmp;\n"
       "  end\n"
       "  initial begin\n"
@@ -530,7 +533,8 @@ TEST(AlwaysCombSensitivitySim, RandcaseWeightReadRetriggersProcess) {
 // `y` is 17 after the time-zero evaluation and 41 after the change to `a` at
 // time 1. The contrast is with
 // AlwaysCombSensitivitySim.FunctionCallBodyReadRetriggers above, where the same
-// shape of function is called from an assignment's right-hand side.
+// shape of function is called from an assignment's right-hand side. `tmp` is
+// automatic for the reason BlockLocalInitializerReadRetriggersProcess gives.
 TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -541,7 +545,7 @@ TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
       "    return x + a;\n"
       "  endfunction\n"
       "  always_comb begin\n"
-      "    logic [7:0] tmp = plus_a(8'd5);\n"
+      "    automatic logic [7:0] tmp = plus_a(8'd5);\n"
       "    y = tmp;\n"
       "  end\n"
       "  initial begin\n"

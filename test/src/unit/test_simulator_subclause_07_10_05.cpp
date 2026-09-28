@@ -709,30 +709,33 @@ TEST(BoundedQueue, StreamingUnpackWithRangeWithinBoundNoWarning) {
 // that variable has any elements beyond its bound, then all such out-of-bounds
 // elements shall be discarded". §7.10 declares a queue wherever the
 // declaration stands, so `[$:1]` inside a procedural block bounds that queue
-// at two elements and the third push_back leaves two behind.
+// at two elements and the third push_back leaves two behind. The queue is the
+// block's own, which §6.21 lets no name from outside the block reach, so the
+// block copies what it kept into the module's variables.
 TEST(BoundedQueue, BlockScopedBoundTruncatesPushBack) {
-  SimFixture f;
-  auto* q = RunAndFindQ(
+  const char* src =
       "module t;\n"
+      "  int n, e0, e1;\n"
       "  initial begin\n"
       "    int q[$:1];\n"
       "    q.push_back(10);\n"
       "    q.push_back(20);\n"
       "    q.push_back(30);\n"
+      "    n = q.size();\n"
+      "    e0 = q[0];\n"
+      "    e1 = q[1];\n"
       "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "n"), 2u);
+  EXPECT_EQ(RunAndGet(src, "e0"), 10u);
+  EXPECT_EQ(RunAndGet(src, "e1"), 20u);
 }
 
 // §7.10.5: the same discard "shall be issued" a warning, and the report the
 // push_back on line 6 raises names §7.10.5 as the rule it enforces.
 TEST(BoundedQueue, BlockScopedBoundWarningNames7_10_5) {
   SimFixture f;
-  auto* q = RunAndFindQ(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
       "    int q[$:1];\n"
@@ -742,7 +745,8 @@ TEST(BoundedQueue, BlockScopedBoundWarningNames7_10_5) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(q, nullptr);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "bounded queue overflow in push_back", 6,
                               "7.10.5"));
