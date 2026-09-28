@@ -121,6 +121,44 @@ static Logic4Vec EvalRhsForUnstructuredTarget(const Stmt* stmt,
   return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
 }
 
+// Whether any bit of the known value `v` is set.
+static bool AnyBitSet(const Logic4Vec& v) {
+  for (uint32_t w = 0; w < v.nwords; ++w) {
+    if (v.words[w].aval != 0) return true;
+  }
+  return false;
+}
+
+// §11.9: the value of a tagged union expression `expr` whose union type has
+// the layout `layout`, the member expression packed against the member it
+// names -- a structure pattern by that structure's layout, and a tagged
+// expression, `tagged Jmp (tagged JmpC '{2, 83})`, by the member's own union
+// layout in turn -- and §11.4.11: a conditional with a known predicate is the
+// arm it selects. None for any other expression, which is evaluated as it
+// stands. Evaluated as a value alone, a nested tagged expression concatenated
+// its pattern's items at their own widths and lost the structure's first
+// member.
+static std::optional<Logic4Vec> EvalTaggedForLayout(
+    const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
+    Arena& arena) {
+  if (expr == nullptr) return std::nullopt;
+  if (expr->kind == ExprKind::kTernary) {
+    Logic4Vec cond = EvalExpr(expr->condition, ctx, arena);
+    if (!cond.IsKnown()) return std::nullopt;
+    return EvalTaggedForLayout(
+        AnyBitSet(cond) ? expr->true_expr : expr->false_expr, layout, ctx,
+        arena);
+  }
+  if (expr->kind != ExprKind::kTagged || expr->rhs == nullptr ||
+      expr->lhs == nullptr)
+    return std::nullopt;
+  const StructTypeInfo* member = TaggedMemberLayout(layout, expr->rhs->text);
+  if (member == nullptr) return std::nullopt;
+  if (expr->lhs->kind == ExprKind::kAssignmentPattern)
+    return EvalStructPatternValue(expr->lhs, member, ctx, arena);
+  return EvalTaggedForLayout(expr->lhs, *member, ctx, arena);
+}
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);
@@ -137,16 +175,11 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }
   // §11.9: the member value of a tagged expression may be a §10.9.2 structure
-  // assignment pattern (e.g. `i1 = tagged Add '{e1, 4, ed}`). Pack that pattern
-  // against the union member's own struct layout, not the union as a whole, so
-  // each field expression is coerced to its member's width instead of being
-  // concatenated at its self-determined width.
-  if (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs &&
-      stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kAssignmentPattern) {
-    const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
-    if (const StructTypeInfo* member =
-            sinfo ? TaggedMemberLayout(*sinfo, stmt->rhs->rhs->text) : nullptr)
-      return EvalStructPatternValue(stmt->rhs->lhs, member, ctx, arena);
+  // assignment pattern (e.g. `i1 = tagged Add '{e1, 4, ed}`), packed against
+  // the union member's own layout (EvalTaggedForLayout).
+  if (const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx)) {
+    if (auto tagged = EvalTaggedForLayout(stmt->rhs, *sinfo, ctx, arena))
+      return *tagged;
   }
   auto* inner = UnwrapTypedPattern(stmt->rhs);
   // §10.9.2: both keyed and positional structure patterns are evaluated against

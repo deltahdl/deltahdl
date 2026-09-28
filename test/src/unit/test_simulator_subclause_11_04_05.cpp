@@ -610,4 +610,33 @@ TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
+// §11.4.5 compares unpacked arrays element by element, and §10.9 gives an
+// assignment pattern the value of an array of its type, typed or untyped,
+// positional or replicated. So `v == arr_t'{9, 9, 3}` is 0 for v = '{1, 2, 3}
+// and `v == '{1, 2, 3}` is 1, and the same holds through a subroutine formal
+// and through a class property handle. The array's name read as its last
+// element alone, and through a formal or a handle nothing matched.
+TEST(EqualityOperatorSim, AnUnpackedArrayEqualsAPatternElementByElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef int arr_t[3];\n"
+      "  arr_t v = '{1, 2, 3}, w = '{2, 2, 2}, u = '{2, 2, 3};\n"
+      "  function automatic bit alltwo(arr_t a);\n"
+      "    return a == arr_t'{3{2}};\n"
+      "  endfunction\n"
+      "  class C; int a[3] = '{1, 2, 3}; endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%0d %0d %0d %0d\", v == arr_t'{1, 2, 3},\n"
+      "             v == arr_t'{9, 9, 3}, v == '{1, 2, 3}, v != '{1, 2, 4});\n"
+      "    $display(\"%0d %0d %0d\", alltwo(w), alltwo(u),\n"
+      "             h.a == arr_t'{1, 2, 3});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1 1\n1 0 1\n");
+}
+
 }  // namespace

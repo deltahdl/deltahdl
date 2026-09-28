@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -685,6 +686,22 @@ TEST(EvalOp, WideUnaryMinusCarriesIntoTheHighWord) {
   ASSERT_GE(r->value.nwords, 2u);
   EXPECT_EQ(r->value.words[0].aval, 0u);
   EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
+}
+
+// §11.4.3's Table 11-5 gives `2.0 ** -3'sb1` the value 0.5, and §11.3.1 has
+// an integral operand of a real operator converted to real by its value, which
+// for the signed 3'sb111 is -1. Converted as the unsigned 7, the exponent made
+// the power 128.0. A signed operand of the other real operators is converted
+// the same way, so `2.5 + -3'sd1` is 1.5 and not 9.5.
+TEST(ArithmeticOperatorSim, RealPowerTakesASignedExponentBySign) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%.1f %.1f %0d\", 2.0 ** -3'sb1, 2.5 + -3'sd1,\n"
+      "                   2 ** -3'sb1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0.5 1.5 0\n");
 }
 
 }  // namespace

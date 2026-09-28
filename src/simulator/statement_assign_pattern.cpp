@@ -936,7 +936,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!FillQueueOfQueues(q, UnwrapTypedPattern(stmt->rhs), ctx, arena)) {
     std::vector<Logic4Vec> elems;
     CollectQueueElements(stmt->rhs, ctx, arena, elems);
-    OwnConcatElements(elems, arena);
+    SizeAndOwnQueueElements(*q, elems, arena);
     q->elements = std::move(elems);
     q->AssignFreshIds();
   }

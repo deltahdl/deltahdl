@@ -648,4 +648,43 @@ TEST(LetDeclarationSim, PackageLetThroughImportScopeAndMethod) {
   EXPECT_EQ(out, "1 0 1 14 15\n");
 }
 
+// §11.12 casts the actual of a typed formal to the formal's type, its own
+// example `let ones_match(bits x, y) = x == y;` naming the type through a
+// typedef, and `y` taking the type written before `x`. Cast to the two-state
+// `bit [15:0]`, 16'b1x is 16'b10, which differs from 16'b11, so the let is 0.
+// The typedef name was not followed to the type it stands for, the actuals
+// kept their x, and the equality was x.
+TEST(LetConstructSim, ATypedefNamedFormalCastsItsActual) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit [15:0] bits;\n"
+      "  logic [15:0] a, b;\n"
+      "  let ones_match(bits x, y) = x == y;\n"
+      "  initial begin\n"
+      "    a = 16'b11; b = 16'b1x;\n"
+      "    $display(\"%b %b\", ones_match(a, b), ones_match(b, 16'b10));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1\n");
+}
+
+// §11.12 lets a let be declared in a subroutine body and used there after its
+// declaration: `plus(7)` with the default `y = 4` is 11. The declaration was
+// never made known, and the call read 0.
+TEST(LetConstructSim, ALetDeclaredInATaskIsUsedThere) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  task automatic show();\n"
+      "    let plus(x, y = 4) = x + y;\n"
+      "    $display(\"%0d %0d\", plus(7), plus(7, 1));\n"
+      "  endtask\n"
+      "  initial show();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11 8\n");
+}
+
 }  // namespace

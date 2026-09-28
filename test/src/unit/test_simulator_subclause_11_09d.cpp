@@ -153,4 +153,37 @@ TEST(TaggedUnionEval, MemberTaggedUnionPrintsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:9}\n");
 }
 
+// §11.9 packs a tagged union expression's member expression against the
+// member's type wherever the expression stands, and §11.4.11 has a known
+// predicate of `?:` yield the arm it selects. So a tagged expression that is
+// an arm of `?:`, positional or by name, and one that is the member expression
+// of another tagged expression, keep the first member of their structure:
+// reg1 1 and 19, cc 2. Concatenated at the items' own widths and cut to the
+// member's, the first member was lost and read 0.
+TEST(TaggedUnionSim, ANestedTaggedExpressionKeepsItsStructsFirstMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef union tagged {\n"
+      "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+      "    union tagged { bit [9:0] JmpU;\n"
+      "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC; } Jmp;\n"
+      "  } Instr;\n"
+      "  Instr i1, i2, i3;\n"
+      "  bit [4:0] e1 = 1, e2 = 2, ed = 3;\n"
+      "  bit e = 1;\n"
+      "  initial begin\n"
+      "    i1 = e ? tagged Add '{e1, 4, ed}\n"
+      "           : tagged Add '{reg2: e2, regd: 3, reg1: 19};\n"
+      "    i3 = !e ? tagged Add '{e1, 4, ed}\n"
+      "            : tagged Add '{reg2: e2, regd: 3, reg1: 19};\n"
+      "    i2 = tagged Jmp (tagged JmpC '{2, 83});\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", i1.Add.reg1, i1.Add.reg2,\n"
+      "             i3.Add.reg1, i2.Jmp.JmpC.cc, i2.Jmp.JmpC.addr);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 19 2 83\n");
+}
+
 }  // namespace

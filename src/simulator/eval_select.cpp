@@ -12,7 +12,9 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -22,6 +24,7 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
@@ -110,7 +113,44 @@ static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
 // Reports whether the object a select reads from is four-state. An invalid
 // bit-select address yields x on a four-state object but 0 on a two-state one,
 // so the read result for an out-of-bounds or unknown index depends on this.
+//
+// A class property names no variable: `h.two[9]`, or `two[9]` by its bare name
+// in a method (§8.5, §8.11), reads from the object, so the property's own
+// declaration is asked, where it declared a type the collector could size.
+// The class property `root` names -- `h.two` through a handle, or `two` by its
+// bare name in a method (§8.5, §8.11) -- or a target of no kind where it names
+// none.
+static FieldTarget SelectedPropertyTarget(const Expr* root, SimContext& ctx) {
+  FieldTarget target;
+  if (root->kind == ExprKind::kMemberAccess) {
+    target = ResolveFieldTarget(root, ctx);
+  } else if (root->kind == ExprKind::kIdentifier &&
+             !NameDenotesVariable(root->text, ctx)) {
+    target = ResolveBarePropertyTarget(root->text, ctx);
+  }
+  if (target.kind != FieldTarget::Kind::kProperty || target.obj == nullptr)
+    return {};
+  return target;
+}
+
+static std::optional<bool> SelectedPropertyIs4State(const Expr* root,
+                                                    SimContext& ctx) {
+  FieldTarget target = SelectedPropertyTarget(root, ctx);
+  if (target.kind != FieldTarget::Kind::kProperty) return std::nullopt;
+  const ClassTypeInfo* type = target.type ? target.type : target.obj->type;
+  const ClassTypeInfo::PropertyInfo* prop =
+      type != nullptr ? type->FindProperty(target.field) : nullptr;
+  if (prop == nullptr || !prop->width_is_declared) return std::nullopt;
+  return prop->is_4state;
+}
+
 static bool SelectBaseIs4State(const Expr* expr, SimContext& ctx) {
+  const Expr* root = expr->base;
+  while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+  if (root != nullptr) {
+    if (std::optional<bool> prop = SelectedPropertyIs4State(root, ctx))
+      return *prop;
+  }
   std::string_view key = SelectRootKey(expr, ctx);
   if (key.empty()) return true;
   if (auto* info = ctx.FindArrayInfo(key)) return info->is_4state;
@@ -591,10 +631,60 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
 // declaration of its own and is addressed as [width-1:0]. A dimension whose
 // index selects elements rather than bits keeps the flat view too, as
 // Variable::BitSelectRange does for the outermost.
+//
+// A class property's value is held on the object without its declaration, so
+// the range its member declaration wrote -- `logic [0:31] bv` -- is read off
+// the class, where the member writes one packed dimension spanning the value.
+// The member declaration of the property `name` in `type` or a class it
+// extends, or null where none declares it.
+static const ClassMember* DeclaringMember(const ClassTypeInfo* type,
+                                          std::string_view name) {
+  for (const ClassTypeInfo* c = type; c != nullptr; c = c->parent) {
+    if (c->decl == nullptr) continue;
+    for (const ClassMember* m : c->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == name) return m;
+    }
+  }
+  return nullptr;
+}
+
+std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
+                                                 std::string_view field,
+                                                 uint32_t width,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  const ClassMember* m = DeclaringMember(type, field);
+  if (m == nullptr) return std::nullopt;
+  const DataType& dt = m->data_type;
+  if (dt.packed_dim_left == nullptr || dt.packed_dim_right == nullptr ||
+      !dt.extra_packed_dims.empty())
+    return std::nullopt;
+  PackedRange range{
+      SelectBoundValue(EvalExpr(dt.packed_dim_left, ctx, arena)),
+      SelectBoundValue(EvalExpr(dt.packed_dim_right, ctx, arena))};
+  if (range.HighIndex() - range.LowIndex() + 1 != width) return std::nullopt;
+  return range;
+}
+
+static std::optional<PackedRange> SelectedPropertyRange(const Expr* base,
+                                                        uint32_t width,
+                                                        SimContext& ctx,
+                                                        Arena& arena) {
+  FieldTarget target = SelectedPropertyTarget(base, ctx);
+  if (target.kind != FieldTarget::Kind::kProperty) return std::nullopt;
+  return PropertyDeclaredRange(target.type ? target.type : target.obj->type,
+                               target.field, width, ctx, arena);
+}
+
 static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
                                    SimContext& ctx, Arena& arena) {
   auto level = SelectBaseLevel(base, width, ctx, arena);
-  if (!level || level->elem_width > 1) return PackedRange::Implicit(width);
+  if (!level) {
+    if (auto range = SelectedPropertyRange(base, width, ctx, arena))
+      return *range;
+    return PackedRange::Implicit(width);
+  }
+  if (level->elem_width > 1) return PackedRange::Implicit(width);
   return level->range;
 }
 

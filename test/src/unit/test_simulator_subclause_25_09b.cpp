@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -388,6 +390,27 @@ TEST(VirtualInterfaceSim, ModuleTaskDirectLocalReadsInstanceComponent) {
                       "endmodule\n",
                       "top.x"),
             0x69u);
+}
+
+// §25.9 reads an interface variable through a virtual interface as through the
+// instance, and a `logic` declared without `signed` is unsigned (§6.11), so a
+// one-bit member holding 1 reads 1 through either, however it was written.
+// The read through the virtual interface took the signedness of the unsized
+// literal that set the member, and a one-bit signed 1 is -1.
+TEST(VirtualInterfaceSim, AMemberReadThroughTheHandleKeepsItsSignedness) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface SBus; logic a; endinterface\n"
+      "module top;\n"
+      "  SBus s();\n"
+      "  virtual SBus v;\n"
+      "  initial begin\n"
+      "    v = s; s.a = 1;\n"
+      "    #1 $display(\"%0d %0d %0d\", s.a, v.a, v.a + 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1\n");
 }
 
 }  // namespace

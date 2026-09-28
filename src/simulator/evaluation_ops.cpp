@@ -202,8 +202,14 @@ double RealVecToDouble(const Logic4Vec& v) {
   return d;
 }
 
+// §11.3.1: an integral operand of a real operator is converted to real by its
+// value, which for a signed operand is the value its sign gives: `-3'sb1` is
+// -1, and read as the unsigned 7 it made `2.0 ** -3'sb1` 128.0 where Table 11-5
+// gives 0.5.
 static double ToDouble(const Logic4Vec& v) {
   if (v.is_real) return RealVecToDouble(v);
+  if (v.is_signed && v.width <= 64)
+    return static_cast<double>(SignExtend(v.ToUint64(), v.width));
   return static_cast<double>(v.ToUint64());
 }
 

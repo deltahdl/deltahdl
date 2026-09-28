@@ -564,7 +564,8 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
       init->kind != ExprKind::kConcatenation)
     return;
   for (auto* elem : init->elements) {
-    q->elements.push_back(EvalExpr(elem, ctx, arena));
+    q->elements.push_back(
+        SizedForQueueElement(*q, EvalExpr(elem, ctx, arena), arena));
   }
   EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
   // Every element carries an id, and the two lists are indexed together, so

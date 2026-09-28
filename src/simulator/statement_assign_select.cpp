@@ -454,6 +454,12 @@ Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
   return ResizeToWidth(val, q.elem_width, arena);
 }
 
+void SizeAndOwnQueueElements(const QueueObject& q,
+                             std::vector<Logic4Vec>& elems, Arena& arena) {
+  for (Logic4Vec& elem : elems)
+    elem = OwnRhsWords(SizedForQueueElement(q, elem, arena), arena);
+}
+
 static void AppendLeafSuffixes(const ArrayInfo& info, size_t d,
                                const std::string& prefix,
                                std::vector<std::string>& out) {

@@ -820,6 +820,13 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
                            : target.obj->GetProperty(target.field, arena);
   elem.is_4state = prop->is_4state;
   elem.is_signed = prop->is_signed;
+  // §11.5.1: the property's declaration decides which bits an index names, so
+  // `h.bv[0:7]` on `logic [0:31] bv` writes its most significant byte.
+  if (auto range = PropertyDeclaredRange(start, target.field, elem.value.width,
+                                         ctx, arena)) {
+    elem.packed_range = *range;
+    elem.has_packed_range = true;
+  }
   WriteBitSelect(&elem, lhs, rhs_val, ctx, arena);
   SetClassField(target.obj, target.type, target.field, elem.value, arena);
   if (target.notify) target.notify->NotifyWatchers();

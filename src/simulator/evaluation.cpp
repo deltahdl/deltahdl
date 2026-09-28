@@ -14,6 +14,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_compare.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/evaluation_internal.h"
@@ -372,6 +373,7 @@ static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
 
 static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
+  if (TryArrayPatternEquality(expr, ctx, arena, out)) return true;
   if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq)
     return false;
   if (!expr->lhs || !expr->rhs) return false;
@@ -578,6 +580,15 @@ static bool IsLeftWidthBinaryOp(TokenKind op) {
   }
 }
 
+// §11.6.1 Table 11-21: the relational and equality operators, whose two
+// operands are sized to the larger of their lengths before they are compared.
+static bool IsSizedComparisonOp(TokenKind op) {
+  using enum TokenKind;
+  return op == kEqEq || op == kBangEq || op == kEqEqEq || op == kBangEqEq ||
+         op == kEqEqQuestion || op == kBangEqQuestion || op == kLt ||
+         op == kLtEq || op == kGt || op == kGtEq;
+}
+
 static bool IsUnaryReductionOp(TokenKind op) {
   switch (op) {
     case TokenKind::kAmp:
@@ -627,6 +638,26 @@ static uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
   }
 }
 
+// §11.6.1 with §11.8.2: both operands of a relational or equality operator are
+// evaluated at the larger of their two lengths and extended to it, by sign
+// where both are signed (§11.8.1) and by zero otherwise, so `a + b + c + d !=
+// 6` over two-bit operands adds at the literal's 32 bits and keeps its carry.
+// A real or string operand is compared as it stands.
+static Logic4Vec EvalSizedComparison(const Expr* expr, SimContext& ctx,
+                                     Arena& arena) {
+  uint32_t w =
+      std::max(SimSelfWidth(expr->lhs, ctx), SimSelfWidth(expr->rhs, ctx));
+  Logic4Vec l = EvalExpr(expr->lhs, ctx, arena, w);
+  Logic4Vec r = EvalExpr(expr->rhs, ctx, arena, w);
+  bool plain = !l.is_real && !r.is_real && !l.is_string && !r.is_string;
+  if (plain) {
+    bool sign = l.is_signed && r.is_signed;
+    if (l.width < w) l = ExtendVec(l, w, sign, arena);
+    if (r.width < w) r = ExtendVec(r, w, sign, arena);
+  }
+  return EvalBinaryOp(expr->op, l, r, arena, 0);
+}
+
 // §11.6.1: evaluate a binary operator's context-determined operands at the
 // context width before combining them, so a wide sibling (or assignment
 // context) keeps a narrow operand from truncating an intermediate carry --
@@ -644,9 +675,17 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
   }
   if (IsLeftWidthBinaryOp(expr->op)) {
     uint32_t w = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
-    return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena, w),
-                        EvalExpr(expr->rhs, ctx, arena), arena, context_width);
+    // §11.8.2: the left operand is extended to the size propagated down to it
+    // before the operator is applied, so `8'd1 << 8` into a 16-bit target
+    // keeps the bit the shift moves above the literal's own eight. A real
+    // base of `**` carries no bits to extend.
+    Logic4Vec lhs = EvalExpr(expr->lhs, ctx, arena, w);
+    if (!lhs.is_real && lhs.width < w) lhs = ResizeToWidth(lhs, w, arena);
+    return EvalBinaryOp(expr->op, lhs, EvalExpr(expr->rhs, ctx, arena), arena,
+                        context_width);
   }
+  if (IsSizedComparisonOp(expr->op))
+    return EvalSizedComparison(expr, ctx, arena);
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
 }

@@ -486,4 +486,44 @@ TEST(DeclaredRangeSelect, TypedefNameCarriesItsRangeToAProcedureLocal) {
   EXPECT_EQ(var->value.ToUint64(), 1311u);
 }
 
+// The same of a class property, whose declaration decides which bits an index
+// names as a variable's does (§8.3): on `logic [0:31] bv = 32'h89AB_CDEF`
+// through a handle, `h.bv[8:15]` and `h.bv[8 +: 8]` are the bits 8 through 15
+// counted from the left, 8'hab, and `h.bv[16 -: 8]` the bits 9 through 16,
+// 8'h57. Addressed as [31:0], the selects were mirrored to 8'hcd and 8'he6.
+TEST(DeclaredRangeSelect, AnAscendingPropertysSelectsFollowItsDeclaration) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C; logic [0:31] bv = 32'h89AB_CDEF; endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%h %h %h %b\", h.bv[8:15], h.bv[8 +: 8], h.bv[16 -: 8],\n"
+      "             h.bv[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ab ab 57 1\n");
+}
+
+// A select written to that property is addressed the same way, so
+// `h.bv[0:7] = 8'hFF` sets its eight most significant bits. Written through a
+// stand-in that carried no range, it set the low byte.
+TEST(DeclaredRangeSelect, AWriteToAnAscendingPropertysSelectFollowsIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C; logic [0:31] bv = 0; endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.bv[0:7] = 8'hFF; h.bv[31] = 1'b1;\n"
+      "    $display(\"%h\", h.bv);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ff000001\n");
+}
+
 }  // namespace

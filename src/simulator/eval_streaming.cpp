@@ -120,10 +120,13 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
     ExpandMultiDimArrayLeaves(std::string(name), info, 0, ctx, sink);
     return;
   }
+  // §11.4.14.1: the elements are streamed in the left-to-right order the
+  // declaration writes, so `up [3:0]` streams up[3] first.
   for (uint32_t i = 0; i < info->size; ++i) {
-    AppendElementValue(
-        std::string(name) + "[" + std::to_string(info->lo + i) + "]",
-        info->elem_width, ctx, sink);
+    uint32_t idx =
+        info->is_descending ? info->lo + info->size - 1 - i : info->lo + i;
+    AppendElementValue(std::string(name) + "[" + std::to_string(idx) + "]",
+                       info->elem_width, ctx, sink);
   }
 }
 
@@ -405,6 +408,23 @@ static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
   return result;
 }
 
+// §11.4.14.1 with §8.5: an array property of an object through a handle,
+// `p.payload`, streams its elements as a declared array does; evaluated as a
+// value it contributed one element.
+static bool TryExpandPropertyArray(const Expr* elem, SimContext& ctx,
+                                   Arena& arena, std::vector<Logic4Vec>& parts,
+                                   uint32_t& total_width) {
+  if (elem->kind != ExprKind::kMemberAccess || elem->with_expr != nullptr)
+    return false;
+  std::vector<Logic4Vec> elems;
+  if (!PropertyArrayElements(elem, ctx, arena, elems)) return false;
+  for (const Logic4Vec& e : elems) {
+    parts.push_back(e);
+    total_width += e.width;
+  }
+  return true;
+}
+
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
@@ -413,6 +433,7 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
         TryExpandAggregateElement(elem, ctx, arena, parts, total_width)) {
       continue;
     }
+    if (TryExpandPropertyArray(elem, ctx, arena, parts, total_width)) continue;
     parts.push_back(EvalExpr(elem, ctx, arena));
     total_width += parts.back().width;
   }

@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/packed_range.h"
 #include "common/types.h"
@@ -291,6 +293,16 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
 bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
                                SimContext& ctx, Arena& arena);
 
+// §11.5.1 with §8.3: the packed range the member declaration of the property
+// `field` of `type` (or of a class it extends) wrote, `logic [0:31] bv`, where
+// it wrote one packed dimension spanning `width` bits; none otherwise. The
+// value a property holds on its object carries no declaration, so a select of
+// one, read or written, asks here. Defined in eval_select.cpp.
+std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
+                                                 std::string_view field,
+                                                 uint32_t width,
+                                                 SimContext& ctx, Arena& arena);
+
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.
 // Writes `rhs_val` through the member access `lhs` names. `written_width`, when
@@ -353,6 +365,13 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
 // and a class handle keep their own. Defined in statement_assign_select.cpp.
 Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
                                Arena& arena);
+
+// §7.10 with §10.10: each of `elems`, about to become an element of the queue
+// or dynamic array `q`, converted to `q`'s element type as SizedForQueueElement
+// converts it and given words of its own (§6.8), so a `byte` queue assigned
+// `{1, 2, 3}` holds three eight-bit elements rather than three 32-bit ones.
+void SizeAndOwnQueueElements(const QueueObject& q,
+                             std::vector<Logic4Vec>& elems, Arena& arena);
 
 // §8.5 puts no restriction on a class property's data type, so a property is an
 // object of the type its declaration gave it, and §10.4 makes every write to

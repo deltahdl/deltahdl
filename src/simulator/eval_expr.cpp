@@ -555,6 +555,7 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   auto* tv =
       ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
   out = tv ? tv->value : MakeLogic4Vec(arena, 1);
+  if (tv != nullptr) out.is_signed = tv->is_signed;  // §25.9: as declared.
   return true;
 }
 
@@ -861,15 +862,14 @@ static void CollectMultiDimSetLeaves(const ArrayInfo& info, size_t d,
 // aggregate. Instead its elements are traversed down to singular values, so the
 // membership test sees each element as if it had been listed individually.
 // Returns true (filling `out`) when `elem` named an unpacked array, covering
-// queues/dynamic arrays, single-dimension fixed arrays, and (by full descent
-// through every dimension) multidimensional fixed arrays.
+// queues/dynamic arrays, associative arrays in index order, single-dimension
+// fixed arrays, and (by full descent through every dimension) multidimensional
+// fixed arrays. An associative array contributed no value, so `3 inside {m}`
+// with m["a"] = 3 answered 0.
 static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
                                       std::vector<Logic4Vec>& out) {
   if (elem->kind != ExprKind::kIdentifier) return false;
-  if (auto* q = ctx.FindQueue(elem->text)) {
-    for (auto& e : q->elements) out.push_back(e);
-    return true;
-  }
+  if (CollectQueueOrAssocValues(elem->text, ctx, out)) return true;
   if (auto* info = ctx.FindArrayInfo(elem->text)) {
     if (info->dim_sizes.size() >= 2) {
       CollectMultiDimSetLeaves(*info, 0, std::string(elem->text), ctx, out);

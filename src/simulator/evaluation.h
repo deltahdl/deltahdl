@@ -20,6 +20,7 @@ struct DataType;
 struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
+struct Stmt;
 struct StructFieldInfo;
 struct StructTypeInfo;
 struct TimeFormatSpec;
@@ -411,6 +412,11 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // §11.12 — expand a let into its body expression. `call` supplies the actual
 // arguments (it may be a bare identifier reference for a no-argument let, in
 // which case no actuals are bound).
+// §11.12: a let declared by the block item declaration `stmt` in a block or a
+// subroutine body is used after its declaration there, so it is made known as
+// the statement runs; a let of that name already known keeps its place.
+// Nothing for any other statement. Defined in eval_let.cpp.
+void RegisterBlockLet(const Stmt* stmt, SimContext& ctx);
 Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                            Arena& arena);
 

@@ -928,4 +928,17 @@ bool TryExecArrayPropertyStmt(std::string_view var_name, std::string_view prop,
   return false;
 }
 
+bool CollectQueueOrAssocValues(std::string_view name, SimContext& ctx,
+                               std::vector<Logic4Vec>& out) {
+  if (const QueueObject* q = ctx.FindQueue(name)) {
+    out.insert(out.end(), q->elements.begin(), q->elements.end());
+    return true;
+  }
+  const AssocArrayObject* aa = ctx.FindAssocArray(name);
+  if (aa == nullptr) return false;
+  for (const auto& entry : aa->int_data) out.push_back(entry.second);
+  for (const auto& entry : aa->str_data) out.push_back(entry.second);
+  return true;
+}
+
 }  // namespace delta

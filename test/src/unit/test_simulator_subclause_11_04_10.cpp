@@ -580,4 +580,26 @@ TEST(WideShiftSim, ACountAboveSixtyFourBitsIsBeyondTheWidth) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
+// §11.6.1 Table 11-21 makes a shift's left operand context-determined, and
+// §11.8.2 extends it to the size the context propagates down to it before the
+// shift is made, so a bit moved above the operand's own width is kept where
+// the context is wider: `8'd1 << 8` into a 16-bit target is 256 and a four-bit
+// `4'b1111 << 4` into an int is 240, alone or beside another operand. In a
+// concatenation the shift is self-determined (§11.4.12), so there the bits
+// are lost. Shifted at the operand's own width, every one of them was 0.
+TEST(ShiftOperatorSim, ShiftLeftOperandTakesTheContextsWidth) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [15:0] w, w2, w3; logic [3:0] a = 4'b1111; int r1, r2;\n"
+      "  initial begin\n"
+      "    w = 8'd1 << 8; r1 = a << 4; w3 = (8'd1 << 8) + 0;\n"
+      "    w2 = {8'd1 << 8}; r2 = {a << 4};\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", w, r1, w3, w2, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "256 240 256 0 0\n");
+}
+
 }  // namespace

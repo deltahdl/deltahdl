@@ -818,6 +818,7 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
 // block variable's declaration.
 StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
+  RegisterBlockLet(stmt, ctx);
   ForEachBlockEnumMember(
       stmt, ctx, [&](const EnumMemberInfo& m, const EnumTypeInfo& info) {
         bool is_signed = ctx.FindTypeSigned(info.type_name);

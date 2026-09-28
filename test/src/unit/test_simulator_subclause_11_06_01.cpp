@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -513,6 +515,26 @@ TEST(ExpressionBitLength, ArithmeticMaxWidthOverDifferingOperandsEndToEnd) {
                       "endmodule\n",
                       "r"),
             0x20u);
+}
+
+// §11.6.1's Table 11-21 sizes both operands of a relational or equality
+// operator to the larger of their two lengths, and §11.8.2 carries that size
+// down to their context-determined operands, so `a + b + c + d != 6` over
+// two-bit operands 3, 3, 0 and 0 adds at the 32 bits of the literal 6 and
+// finds the sum equal to it. Added at the operands' own two bits, the sum
+// wrapped to 2 and every comparison came out the other way. With both
+// operands signed the extension is by sign, so a four-bit -1 equals -1.
+TEST(ExpressionBitLengthSim, ComparisonSizesBothOperandsToTheWider) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [1:0] a = 3, b = 3, c = 0, d = 0;\n"
+      "  logic signed [3:0] s = -1;\n"
+      "  initial $display(\"%0d %0d %0d %0d\", a + b + c + d != 6,\n"
+      "                   a + b + c + d == 6, a + b > 5, s == -1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 1 1\n");
 }
 
 }  // namespace

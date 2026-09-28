@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
@@ -638,6 +640,61 @@ TEST(StreamingDynamicDataSim, UnpackFromAQueueSourceFillsADynamicArray) {
   EXPECT_EQ(f.ctx.FindVariable("o_crc")->value.ToUint64(), 42u);
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 5u);
+}
+
+// §11.4.14.4's Packet example: a dynamic array property packs as all its
+// elements, and unpacking the stream into another object with
+// `q.payload with [0 +: q.len]` sizes the payload by the length the same
+// unpack has just written to `q.len`, under `<<`'s byte re-ordering. The
+// payload packed as one element, the properties took no bits, and a `<<`
+// unpack whose range read an earlier target took its bits unordered. The
+// payload is filled element by element, the pattern assignment to a dynamic
+// array property being #4549's.
+TEST(StreamingWithSim, PacketExampleThroughClassProperties) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Packet;\n"
+      "    int header; int len; byte payload[]; int crc;\n"
+      "  endclass\n"
+      "  byte stream[$];\n"
+      "  initial begin\n"
+      "    Packet p, q;\n"
+      "    p = new; p.header = 32'h11223344; p.len = 3; p.crc = 6;\n"
+      "    p.payload = new[3];\n"
+      "    p.payload[0] = 1; p.payload[1] = 2; p.payload[2] = 3;\n"
+      "    stream = {<< byte{p.header, p.len, p.payload, p.crc}};\n"
+      "    q = new;\n"
+      "    {<< byte{q.header, q.len, q.payload with [0 +: q.len], q.crc}} =\n"
+      "        stream;\n"
+      "    $display(\"%0d %h %0d %0d %0d %0d %0d %0d\", stream.size(),\n"
+      "             q.header, q.len, q.payload[0], q.payload[1],\n"
+      "             q.payload[2], q.crc, q.payload.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "15 11223344 3 1 2 3 6 3\n");
+}
+
+// The same unpack into module variables: under `<<`, a range read from an
+// earlier target now sees its unpacked value, and a dynamic array takes the
+// range's size. The dynamic array was refused as a fixed-size one.
+TEST(StreamingWithSim, ReverseUnpackRangeReadsAnEarlierTarget) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int header, len, crc; byte payload[];\n"
+      "  byte stream[$];\n"
+      "  initial begin\n"
+      "    stream = {8'h06, 8'h00, 8'h00, 8'h00, 8'h03, 8'h02, 8'h01, 8'h03,\n"
+      "              8'h00, 8'h00, 8'h00, 8'h44, 8'h33, 8'h22, 8'h11};\n"
+      "    {<< byte{header, len, payload with [0 +: len], crc}} = stream;\n"
+      "    $display(\"%h %0d %0d %0d %0d %0d %0d\", header, len, payload[0],\n"
+      "             payload[1], payload[2], crc, payload.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11223344 3 1 2 3 6 3\n");
 }
 
 }  // namespace

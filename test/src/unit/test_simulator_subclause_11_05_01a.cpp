@@ -22,6 +22,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -885,4 +887,29 @@ TEST(SelectXZHandling, PartSelectXZIndexWriteNoEffect) {
 
   WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xF), f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+// §11.5.1 gives an out-of-range bit-select the value x on a four-state vector
+// and 0 on a two-state one, and a class property is declared four-state or
+// not as any variable is (§8.3). `h.two[9]` on the property `bit [7:0] two` is
+// therefore 0, by a constant index or a variable one, and so is `two[9]` by
+// its bare name in a method; the four-state property beside it reads x. The
+// property named no variable, so the select was taken for a four-state one.
+TEST(SelectSimulation, OutOfRangeSelectOfATwoStatePropertyIsZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    bit [7:0] two = 8'd13; logic [7:0] four = 8'd13;\n"
+      "    function bit own(); return two[9]; endfunction\n"
+      "  endclass\n"
+      "  C h; int idx = 9;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    $display(\"%b %b %b %b\", h.two[9], h.two[idx], h.own(), "
+      "h.four[9]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0 0 x\n");
 }

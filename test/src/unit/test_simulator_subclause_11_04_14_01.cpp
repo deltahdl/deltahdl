@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -504,6 +506,51 @@ TEST(StreamExpressionConcat, StructMemberXBitsStreamAsX) {
   EXPECT_EQ(var->value.words[0].bval & 0xFFFFu, 0x0F00u);
   EXPECT_EQ((var->value.words[0].aval >> 12) & 0xFu, 0xAu);
   EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0x5Au);
+}
+
+// §11.4.14.1 streams an unpacked array's elements in the left-to-right order
+// its declaration writes, so `logic [10:0] up [3:0]` streams up[3] first:
+// `{>>{up}}` is 44'h24715bc48ab and unpacking `up` into four vectors gives them
+// 123 456 789 0ab. Streamed from the low index up, both came out reversed.
+TEST(StreamingConcatSim, AnUnpackedArrayStreamsLeftToRight) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [10:0] up [3:0]; logic [43:0] w;\n"
+      "  logic [10:0] p1, p2, p3, p4;\n"
+      "  initial begin\n"
+      "    up[3] = 11'h123; up[2] = 11'h456; up[1] = 11'h789; up[0] = "
+      "11'h0AB;\n"
+      "    w = {>>{up}}; {>>{p1, p2, p3, p4}} = up;\n"
+      "    $display(\"%h %h %h %h %h\", w, p1, p2, p3, p4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "24715bc48ab 123 456 789 0ab\n");
+}
+
+// §7.10 gives each element of a queue the queue's element type and §10.10
+// assigns each item of an unpacked array concatenation to one element, so a
+// byte queue set from `{1, 2, 3}`, by its initializer or in a procedure, is a
+// 24-bit stream, and a twelve-element one unpacks into three ints. Kept at the
+// items' own 32 bits, the pack was refused as wider than its target and the
+// unpack read the first three items as whole ints.
+TEST(StreamingConcatSim, AByteQueueFromAConcatenationStreamsItsBytes) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte qb[$] = {1, 2, 3}; byte qp[$];\n"
+      "  byte q12[$] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};\n"
+      "  logic [23:0] w1, w2; int lh, ll, lc;\n"
+      "  initial begin\n"
+      "    qp = {1, 2, 3};\n"
+      "    w1 = {>>{qb}}; w2 = {>>{qp}};\n"
+      "    {<< byte{lh, ll, lc}} = q12;\n"
+      "    $display(\"%h %h %h %h %h\", w1, w2, lh, ll, lc);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "010203 010203 0c0b0a09 08070605 04030201\n");
 }
 
 }  // namespace

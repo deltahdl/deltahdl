@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -482,6 +484,29 @@ TEST(ConditionalRealResult, AmbiguousRealBranchesEquivalentReturnValue) {
       "endmodule\n",
       "r");
   EXPECT_DOUBLE_EQ(v, 4.5);
+}
+
+// §11.4.11 lets the conditional operator take unpacked arrays: a known
+// predicate yields the whole array it selects, and an unknown one yields an
+// array whose elements are the two arms' elements where they match and the
+// element type's default (Table 7-1: 0 for int, x for logic) where they do
+// not. Every one of these assignments copied nothing.
+TEST(ConditionalOperatorSim, UnpackedArrayOperandsYieldTheChosenArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a[2] = '{1, 2}, b[2] = '{9, 8}, c[2] = '{1, 3}, r[2];\n"
+      "  logic [3:0] la[2] = '{4'd1, 4'd2}, lb[2] = '{4'd1, 4'd3}, lr[2];\n"
+      "  logic x = 1'bx;\n"
+      "  initial begin\n"
+      "    r = 1 ? a : b; $write(\"%0d %0d \", r[0], r[1]);\n"
+      "    r = 0 ? a : b; $write(\"%0d %0d \", r[0], r[1]);\n"
+      "    r = x ? a : c; $write(\"%0d %0d \", r[0], r[1]);\n"
+      "    lr = x ? la : lb; $display(\"%b %b\", lr[0], lr[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 9 8 1 0 0001 xxxx\n");
 }
 
 }  // namespace

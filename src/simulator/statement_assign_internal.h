@@ -403,6 +403,15 @@ Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream, uint32_t stream_w,
                                 uint32_t total_w, Arena& arena);
 
 // Defined in statement_assign_stream.cpp.
+// §11.4.14.3 with §8.5: the unpack of `rhs_val` into the streaming target
+// `lhs` where some of its targets are class properties reached through a
+// handle -- a queue or dynamic array property resized to take the bits left
+// to it, any other property taking its declared width -- each stood in for by
+// a local while UnpackStreamingConcatLhs runs over the rest and handed its
+// bits afterwards. False, with nothing written, where `lhs` names no such
+// property. Defined in statement_assign_stream_property.cpp.
+bool TryUnpackStreamIntoProperties(const Expr* lhs, const Logic4Vec& rhs_val,
+                                   SimContext& ctx, Arena& arena);
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
 

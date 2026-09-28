@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_stream_unpack_ab.h"
@@ -624,6 +626,37 @@ TEST(StreamingUnpackSim,
                             "11.4.14.3"));
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0x3Cu);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0x2Bu);
+}
+
+// §11.4.14.3 unpacks a stream into its targets whatever holds them, and §8.5
+// lets a dynamic array, a queue or a structure be a class property: a dynamic
+// array or queue target through a handle is resized to take the bits left to
+// it, and a structure takes its members' bits in order. Each of these left the
+// property as it was. The queue element is printed in hex, since the sign an
+// unpacked element of a signed queue carries is #4548's.
+TEST(StreamingUnpackSim, PropertiesThroughAHandleAreUnpackedInto) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { byte x; byte y; } pair_t;\n"
+      "  class C; bit [7:0] d[]; int q[$]; pair_t s; endclass\n"
+      "  C h;\n"
+      "  logic [15:0] w;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    {>>{h.d}} = 32'h0A0B0C0D;\n"
+      "    $write(\"%0d %0d %0d \", h.d.size(), h.d[0], h.d[3]);\n"
+      "    {<< byte{h.d}} = 32'h0A0B0C0D;\n"
+      "    $write(\"%0d \", h.d[0]);\n"
+      "    {>>{h.q}} = 64'hDEADBEEF_00000007;\n"
+      "    $write(\"%0d %h \", h.q.size(), h.q[0]);\n"
+      "    {>>{h.s}} = 16'h0506;\n"
+      "    w = {>>{h.s}};\n"
+      "    $display(\"%0d %0d %h\", h.s.x, h.s.y, w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 10 13 13 2 deadbeef 5 6 0506\n");
 }
 
 }  // namespace

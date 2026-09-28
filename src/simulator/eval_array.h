@@ -83,4 +83,11 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out);
 
+// §11.4.13 with §7.10 and §7.8: the values of the queue or dynamic array, or
+// of the associative array in index order, that `name` names, appended to
+// `out`, each a member of an `inside` set. False, with `out` left alone, where
+// `name` names none of them.
+bool CollectQueueOrAssocValues(std::string_view name, SimContext& ctx,
+                               std::vector<Logic4Vec>& out);
+
 }  // namespace delta

@@ -516,11 +516,10 @@ static bool ExprRefsIdentifierIn(const Expr* e,
 // satisfies the complementary case — a reference to a field unpacked to the
 // right uses that field's previous value. This predicate detects the
 // left-reference case (a with-range naming an earlier scalar target) so it can
-// be routed to a forward, write-as-you-go unpack instead. It is limited to the
-// right-shift form with no greedy dynamic operand, where stream bits map
-// MSB-first onto elements in order and the forward pass is exact.
+// be routed to a forward, write-as-you-go unpack instead. It is limited to
+// forms with no greedy dynamic operand, where stream bits map MSB-first onto
+// elements in order once the forward pass has re-ordered a `<<` stream.
 static bool ShouldForwardResolveUnpack(const Expr* lhs, SimContext& ctx) {
-  if (lhs->op == TokenKind::kLtLt) return false;
   std::vector<std::string_view> earlier;
   bool dependency = false;
   for (auto* elem : lhs->elements) {
@@ -637,7 +636,10 @@ static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
   // §11.4.14.3: a null class handle target is skipped, consuming no bits.
   if (IsNullClassHandleTarget(elem, ctx)) return;
   if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
-    if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+    // §7.5: a dynamic array keeps its elements in a queue and is resized by
+    // the range like one; only a fixed-size array is bounded by it.
+    if (auto* ainfo = ctx.FindArrayInfo(elem->text);
+        ainfo != nullptr && !ainfo->is_dynamic) {
       ForwardUnpackArrayWithRange(elem, ainfo, StreamEnv{ctx, arena}, take,
                                   cursor);
       return;
@@ -659,10 +661,22 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
                                             const Logic4Vec& rhs_val,
                                             SimContext& ctx, Arena& arena) {
   uint32_t total = rhs_val.width;
+  // §11.4.14.2 with §11.4.14.3: `<<` re-orders the stream by its slices before
+  // the targets take their bits, as the collecting path below does over the
+  // bits it needs; a `with` range read from an earlier target decides how many
+  // bits that is only as the targets are reached, so the whole source is
+  // re-ordered, which is what the collecting path does where every bit is
+  // taken. Taken unordered, §11.4.14.4's Packet example unpacked its header's
+  // bytes backwards.
+  Logic4Vec stream = rhs_val;
+  if (lhs->op == TokenKind::kLtLt) {
+    uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
+    stream = ReverseStreamSlices(rhs_val, total, ss, arena);
+  }
   uint32_t cursor = 0;  // bits already consumed from the MSB end
   StreamTaker take = [&](uint32_t w) -> Logic4Vec {
     if (cursor + w <= total)
-      return ExtractStreamBits(rhs_val, total - cursor - w, w, total, arena);
+      return ExtractStreamBits(stream, total - cursor - w, w, total, arena);
     return MakeLogic4Vec(arena, w);
   };
   for (auto* elem : lhs->elements) {
@@ -777,6 +791,7 @@ static void EnforceQueueTargetBounds(const Expr* lhs, SimContext& ctx) {
 
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
+  if (TryUnpackStreamIntoProperties(lhs, rhs_val, ctx, arena)) return;
   if (ShouldForwardResolveUnpack(lhs, ctx)) {
     UnpackStreamingConcatLhsForward(lhs, rhs_val, ctx, arena);
     EnforceQueueTargetBounds(lhs, ctx);

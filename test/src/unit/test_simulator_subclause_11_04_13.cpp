@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -361,6 +362,26 @@ TEST(ExpressionSim, InsideLhsFromParameter) {
                          "endmodule\n",
                          "r");
   EXPECT_EQ(r, 1u);
+}
+
+// §11.4.13 has an unpacked array in the set contribute each of its elements
+// as a member, and an associative array is one (§7.8): `3 inside {m}` with
+// m["a"] = 3 is 1 and `4 inside {m}` 0. The array's indices are no members,
+// so `5 inside {mi}` with mi[5] = 7 is 0. The associative array contributed
+// nothing, and every such test answered 0.
+TEST(InsideOperatorSim, AnAssociativeArrayInTheSetContributesItsValues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int m[string]; int mi[int];\n"
+      "  initial begin\n"
+      "    m[\"a\"] = 3; m[\"b\"] = 9; mi[5] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d\", 3 inside {m}, 4 inside {m},\n"
+      "             7 inside {mi, 1}, 5 inside {mi});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1 0\n");
 }
 
 }  // namespace

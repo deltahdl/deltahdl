@@ -272,6 +272,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_enum.cpp
     simulator/block_enums.cpp
     simulator/eval_array.cpp
+    simulator/eval_array_compare.cpp
     simulator/eval_class_array.cpp
     simulator/eval_class_array_handles.cpp
     simulator/eval_assoc_class_handles.cpp
@@ -537,6 +538,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_select.cpp
     simulator/statement_assign_slice.cpp
     simulator/statement_assign_stream.cpp
+    simulator/statement_assign_stream_property.cpp
     simulator/statement_assign_stream_widen.cpp
     simulator/stmt_exec_case.cpp
     simulator/stmt_exec_control.cpp

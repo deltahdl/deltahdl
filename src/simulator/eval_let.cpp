@@ -10,6 +10,8 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -63,10 +65,14 @@ static bool IsLetFormalTwoState(DataTypeKind kind) {
   }
 }
 
+// §11.12 casts an actual to its formal's type, which a typedef name stands for
+// as written out: `bits x` under `typedef bit [15:0] bits` is a sixteen-bit
+// two-state formal (§6.18). The name alone gave neither a width nor a kind.
 static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
-                                         const FunctionArg& formal,
-                                         Arena& arena) {
-  const auto& dt = formal.data_type;
+                                         const DataType& formal_type,
+                                         SimContext& ctx, Arena& arena) {
+  const DataType* resolved = ctx.PackedTypeBehind(formal_type);
+  const auto& dt = resolved != nullptr ? *resolved : formal_type;
   if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
       dt.packed_dim_right) {
     uint32_t formal_width = EvalTypeWidth(dt);
@@ -96,9 +102,17 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   ActualBindingCtx binding{call, positional_count, ctx, arena};
   std::vector<Logic4Vec> vals;
   vals.reserve(formals.size());
+  // §11.12's example e expands `let ones_match(bits x, y)` with `bits'(b)` for
+  // `y`: a formal written with no type of its own takes the type written
+  // before it in the list.
+  const DataType* written = nullptr;
   for (size_t i = 0; i < formals.size(); ++i) {
+    const DataType& own = formals[i].data_type;
+    if (own.kind != DataTypeKind::kImplicit || own.packed_dim_left != nullptr)
+      written = &own;
     Logic4Vec val = EvalLetActualForFormal(formals[i], i, binding);
-    val = ResizeLetActualToFormal(val, formals[i], arena);
+    val = ResizeLetActualToFormal(val, written != nullptr ? *written : own, ctx,
+                                  arena);
     vals.push_back(val);
   }
   return vals;
@@ -139,6 +153,14 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
   ctx.SwapScopeStack(std::move(saved_scopes));
   expanding_lets.erase(decl->name);
   return result;
+}
+
+void RegisterBlockLet(const Stmt* stmt, SimContext& ctx) {
+  ModuleItem* let = stmt->decl_item;
+  if (let == nullptr || let->kind != ModuleItemKind::kLetDecl ||
+      ctx.FindLetDecl(let->name) != nullptr)
+    return;
+  ctx.RegisterLetDecl(let->name, let);
 }
 
 }  // namespace delta
