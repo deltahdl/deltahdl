@@ -247,4 +247,59 @@ TEST(EnumerationSimulation, MemberOfALogicBaseEnumPrintsUnsigned) {
   EXPECT_EQ(out, "U=15\n");
 }
 
+// §6.8 gives a variable declaration an initial value, and its data type may be
+// written as an inline enumeration (A.2.2.1), `var enum bit { clear, error }
+// status = error;` among §6.19's own examples. The declaration declares the
+// members with the type, so the initializer reads them; each variable starts
+// at its initializer, with or without `var`, as a variable of a typedef of the
+// enumeration does.
+TEST(EnumerationSimulation, InlineEnumVariableTakesItsInitializer) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  var enum bit { clear, error } s1 = error;\n"
+      "  enum bit { c2, e2 } s2 = e2;\n"
+      "  var enum { a3, b3, c3 } s3 = c3;\n"
+      "  typedef enum bit {x4, y4} t4;\n"
+      "  var t4 s4 = y4;\n"
+      "  initial $display(\"%s %s %s %s %0d %0d\", s1.name(), s2.name(),\n"
+      "                   s3.name(), s4.name(), s1, s3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "error e2 c3 y4 1 2\n");
+}
+
+// The initializer of a later declarator of the list reads the members too, and
+// one may name a member other than the first declarator's.
+TEST(EnumerationSimulation, EachDeclaratorOfAnInlineEnumTakesItsInitializer) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  enum {a, b, c} u = c, w = b;\n"
+      "  initial $display(\"%s %s %0d %0d\", u.name(), w.name(), u, w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "c b 2 1\n");
+}
+
+// §6.19 lets a member of a 4-state enumeration be assigned x or z, its own
+// example writing `XX='x` in an `integer` enumeration. The member constant
+// holds that value, and so does a variable assigned it, while the members
+// around it keep theirs; a z member of a `logic` enumeration holds z.
+TEST(EnumerationSimulation, XOrZMemberOfA4StateEnumHoldsItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  enum integer {IDLE, XX='x, S1='b01, S2='b10} state;\n"
+      "  enum logic [1:0] {A, Z='z, B=2} lz;\n"
+      "  initial begin\n"
+      "    state = XX; lz = Z;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %b %b\", $isunknown(XX), XX === 'x,\n"
+      "             state === 'x, S1, S2, Z, lz);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 1 2 zz zz\n");
+}
+
 }  // namespace

@@ -206,6 +206,16 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     var.width = width;
     var.is_4state = false;
     var.is_signed = ctx.is_signed;
+    if (member.xz_value != nullptr) {
+      // §6.19: a member assigned x or z holds that value, which only a
+      // 4-state constant can; the value is read as written, sized to the
+      // enumeration as an assignment sizes it. Its integer fold read `'x` as
+      // 0, and XX stood on IDLE's value.
+      var.is_4state = true;
+      var.init_expr = member.xz_value;
+      ctx.mod->variables.push_back(var);
+      continue;
+    }
     auto* init = ctx.arena.Create<Expr>();
     init->kind = ExprKind::kIntegerLiteral;
     init->int_val = static_cast<uint64_t>(member.value);

@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -36,6 +37,11 @@ void ForEachEnumTypeIn(const DataType& type, const EnumTypeVisitor& fn);
 // typedef names or in the type of a data declaration. Other items declare
 // none.
 void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn);
+
+// True when `e` writes an x or z digit in a literal anywhere within it, the
+// unbased unsized `'x` and `'z` included. §6.19 lets a member of a 4-state
+// enumeration take such a value, which no integer fold holds.
+bool ExprContainsXZ(const Expr* e);
 
 // §6.19: the named constants an enumeration declares, in declaration order,
 // each with the value it stands for. A member written with a value takes it,

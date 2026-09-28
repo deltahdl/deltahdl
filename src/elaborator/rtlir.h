@@ -702,6 +702,9 @@ struct RtlirImport {
 struct RtlirEnumMember {
   std::string_view name;
   int64_t value = 0;
+  // §6.19: the value expression of a member of a 4-state enumeration assigned
+  // an x or z value, which `value` cannot hold; null for any other member.
+  const Expr* xz_value = nullptr;
 };
 
 struct RtlirModule {

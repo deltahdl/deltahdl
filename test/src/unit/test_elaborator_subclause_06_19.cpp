@@ -3,6 +3,7 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 
@@ -483,6 +484,75 @@ TEST(EnumerationElaboration, MemberOfATypedefIntBaseEnumIsSigned) {
   const auto* m = FindVar(design, "t", "M");
   ASSERT_NE(m, nullptr);
   EXPECT_TRUE(m->is_signed);
+}
+
+// §6.19 declares an enumeration's members in the scope the enumeration is
+// written in, and A.2.8 lets a begin-end block declare a typedef among its
+// items, so the members of `typedef enum {p, q} e_t;` in an initial block are
+// constants of that block, which the statements after it read; §23.9 finds
+// them there. A `name[N]` member declares name0 through nameN-1 (§6.19.2),
+// and a task body's typedef declares its members in the task.
+TEST(EnumerationElaboration, MembersOfABlockTypedefEnumResolveInTheBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    typedef enum {p, q} e_t;\n"
+      "    typedef enum {V[2], w} f_t;\n"
+      "    e_t z;\n"
+      "    int k;\n"
+      "    z = q;\n"
+      "    k = V1 + w + p;\n"
+      "  end\n"
+      "  task automatic tk;\n"
+      "    typedef enum {a1, b1} g_t;\n"
+      "    int j;\n"
+      "    j = b1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A `name[N]` member's written name is no constant of the block, so a read
+// of it is still unresolved there.
+TEST(EnumerationElaboration, WrittenNameOfARangedBlockEnumMemberIsUnresolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    typedef enum {V[2]} f_t;\n"
+      "    int k;\n"
+      "    k = V;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'V'", 5,
+                            "23.9"));
+}
+
+// §6.19: a member of a 4-state enumeration assigned x keeps that value, so
+// its constant is a 4-state variable given the value as written, while a
+// member assigned a number is given the folded number.
+TEST(EnumerationElaboration, XMemberOfA4StateEnumIsGivenItsValueAsWritten) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  enum integer {IDLE, XX='x, S1='b01} s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* xx = FindVar(design, "t", "XX");
+  ASSERT_NE(xx, nullptr);
+  EXPECT_TRUE(xx->is_4state);
+  ASSERT_NE(xx->init_expr, nullptr);
+  EXPECT_EQ(xx->init_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
+  const auto* s1 = FindVar(design, "t", "S1");
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s1->init_expr, nullptr);
+  EXPECT_EQ(s1->init_expr->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(s1->init_expr->int_val, 1u);
 }
 
 }  // namespace

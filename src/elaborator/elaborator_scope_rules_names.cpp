@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "elaborator/const_eval.h"
@@ -444,10 +445,41 @@ static void CollectCaseMatchesBindings(
   }
 }
 
+// The generated names of a `name[N]` enumeration member are spelled by no
+// declaration (§6.19.2), so they are kept here, once each, for the
+// string_views a name set holds.
+static std::string_view PersistentName(std::string name) {
+  static std::unordered_set<std::string> pool;
+  return *pool.insert(std::move(name)).first;
+}
+
+// §6.19 declares an enumeration's members as constants of the scope the
+// enumeration is written in, and A.2.8 admits a type_declaration among a
+// block's items, so `typedef enum {p, q} e_t;` in a begin-end block declares
+// p and q in that block (§23.9), as it would in a module. Collects them, and
+// those of an enumeration written as a member's type of a structure or union
+// the typedef declares. Their bounds fold against no scope, as
+// AddEnumMemberNames' do.
+static void CollectBlockEnumMemberNames(
+    const Stmt* s, std::unordered_set<std::string_view>& names) {
+  if (s->kind != StmtKind::kBlockItemDecl || s->decl_item == nullptr ||
+      s->decl_item->kind != ModuleItemKind::kTypedef)
+    return;
+  const ScopeMap kNoScope;
+  ForEachEnumTypeOfItem(
+      s->decl_item, [&](std::string_view, const DataType& type) {
+        for (const auto& em : type.enum_members) {
+          for (auto& n : EnumMemberDeclaredNames(em, kNoScope))
+            names.insert(PersistentName(std::move(n)));
+        }
+      });
+}
+
 // Over-approximated set of names that are local to a procedural block: block
 // (begin/end) variable declarations, for-loop control variables, foreach index
 // variables, the two kinds of name §18.17.7 gives a randsequence statement,
-// and the variables §12.6's patterns bind. Collected flat across the whole
+// the variables §12.6's patterns bind, and the members of an enumeration a
+// block's typedef declares. Collected flat across the whole
 // block tree without tracking scope boundaries — that can only ever SUPPRESS a
 // diagnostic, never raise one, so a missed boundary is always safe.
 void CollectProcLocalNames(const Stmt* s,
@@ -478,6 +510,7 @@ void CollectProcLocalNames(const Stmt* s,
     }
   }
   CollectRandsequenceDeclaredNames(s, names);
+  CollectBlockEnumMemberNames(s, names);
   // §6.5 rules that "Data shall be declared before they are used, apart from
   // implicit nets", and puts no condition on the statement the declaration
   // stands in, so every position a statement holds a statement in is a

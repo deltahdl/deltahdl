@@ -885,12 +885,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 
   var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
+  // §6.8 with §6.19: `enum {a, b, c} s = c;` declares a, b and c with the
+  // type, ahead of s, whose initializer reads c. The simulator lowers
+  // mod->variables in order, so the constants go first; pushed after s, the
+  // initializer read a c not yet declared, and s started at a.
+  ValidateVarDeclTypes(item, BuildParamScope(mod));
+  EmitBareEnumMembers(item, mod);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
-
-  ValidateVarDeclTypes(item, BuildParamScope(mod));
-  EmitBareEnumMembers(item, mod);
   TrackEnumVariable(item);
 }
 

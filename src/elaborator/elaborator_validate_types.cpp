@@ -12,6 +12,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
@@ -33,32 +34,6 @@ static int64_t ParseLiteralWidth(std::string_view txt) {
     width = width * 10 + (txt[i] - '0');
   }
   return width;
-}
-
-static bool LiteralHasXZ(std::string_view txt) {
-  auto apos = txt.find('\'');
-  if (apos == std::string_view::npos) return false;
-  return txt.substr(apos + 1).find_first_of("xXzZ") != std::string_view::npos;
-}
-
-static bool ExprContainsXZ(const Expr* e) {
-  if (!e) return false;
-  // §6.19: a 4-state enum value may be x/z. The unbased unsized form ('x, 'z)
-  // lexes as its own kind, not kIntegerLiteral, so it must be matched here too;
-  // otherwise it is mistaken for an ordinary integer and folded into the
-  // auto-increment/duplicate-value machinery (e.g. {XX = 'x} colliding with a
-  // later explicit value).
-  if ((e->kind == ExprKind::kIntegerLiteral ||
-       e->kind == ExprKind::kUnbasedUnsizedLiteral) &&
-      LiteralHasXZ(e->text)) {
-    return true;
-  }
-  if (ExprContainsXZ(e->lhs)) return true;
-  if (ExprContainsXZ(e->rhs)) return true;
-  for (const auto* elem : e->elements) {
-    if (ExprContainsXZ(elem)) return true;
-  }
-  return ExprContainsXZ(e->repeat_count);
 }
 
 static bool ExprContainsHierarchicalRef(const Expr* e);

@@ -547,4 +547,23 @@ TEST(EnumMethodNameSim, EnumTypedClassParameterNamesItsValue) {
       "GREEN RED BLUE GREEN\n");
 }
 
+// A.2.1.3's data_declaration gives its one data type to every variable of its
+// list, so each variable of `enum {d, e, f} u, w, x;` is of the one
+// enumeration, and name(), next() and num() answer for the second and third
+// as for the first.
+TEST(EnumMethodNameSim, EveryVariableOfAnInlineEnumListIsOfTheEnum) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  enum {d, e, f} u, w, x;\n"
+                       "  initial begin\n"
+                       "    u = e; w = f; x = d;\n"
+                       "    $display(\"%s %s %s %s %s %0d %0d\", u.name(),\n"
+                       "             w.name(), x.name(), w.next().name(),\n"
+                       "             x.next().name(), w.num(), x.num());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "e f d d e 3 3\n");
+}
+
 }  // namespace

@@ -20,6 +20,7 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -29,6 +30,13 @@ namespace {
 // The block EnumMemberDeclaredNames's scratch arena is created with: the
 // names of one member's constants, each a few characters, and nothing else.
 constexpr size_t kScratchBlockSize = 256;
+
+// True when the literal `txt` writes an x or z digit after its base.
+bool LiteralHasXZ(std::string_view txt) {
+  auto apos = txt.find('\'');
+  if (apos == std::string_view::npos) return false;
+  return txt.substr(apos + 1).find_first_of("xXzZ") != std::string_view::npos;
+}
 
 // The running value §6.19 assigns: a member's explicit value replaces it, and
 // each member emitted advances it by one for the member after.
@@ -124,6 +132,25 @@ std::unordered_set<std::string> NamesDeclaredBefore(const PackageDecl* pkg,
 
 }  // namespace
 
+bool ExprContainsXZ(const Expr* e) {
+  if (!e) return false;
+  // The unbased unsized form ('x, 'z) lexes as its own kind, not
+  // kIntegerLiteral, so it is matched here too; otherwise it is mistaken for an
+  // ordinary integer and folded into the auto-increment/duplicate-value
+  // machinery (e.g. {XX = 'x} colliding with a later explicit value).
+  if ((e->kind == ExprKind::kIntegerLiteral ||
+       e->kind == ExprKind::kUnbasedUnsizedLiteral) &&
+      LiteralHasXZ(e->text)) {
+    return true;
+  }
+  if (ExprContainsXZ(e->lhs)) return true;
+  if (ExprContainsXZ(e->rhs)) return true;
+  for (const auto* elem : e->elements) {
+    if (ExprContainsXZ(elem)) return true;
+  }
+  return ExprContainsXZ(e->repeat_count);
+}
+
 void ForEachEnumTypeIn(const DataType& type, const EnumTypeVisitor& fn) {
   VisitEnumTypes(type, "", fn);
 }
@@ -144,6 +171,12 @@ std::vector<RtlirEnumMember> FoldEnumMembers(
           ConstEvalInt(member.value, scope).value_or(folder.next_val);
     }
     folder.EmitDeclared(member);
+    // §6.19 lets a member of a 4-state enumeration be assigned x or z, as its
+    // own `XX='x` example does. The integer fold reads such a value as a
+    // number, so the member keeps its expression, from which its constant is
+    // given the value as written.
+    if (ExprContainsXZ(member.value) && !member.range_start)
+      folder.members.back().xz_value = member.value;
   }
   return std::move(folder.members);
 }

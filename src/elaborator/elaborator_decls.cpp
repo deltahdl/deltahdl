@@ -832,10 +832,17 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   LowerNetDeclAssignment(item, net, {mod, arena_, cont_assign_targets_}, diag_);
 }
 
+// §6.19 with A.2.1.3: `enum {d, e} u, w;` gives its one enumeration to every
+// variable of the list. EmitBareEnumMembers declares it once, from the first
+// declarator, under that declarator's name, so `list_enum_key` carries the
+// first's name to the rest; keyed by its own name, `w` named no enumeration
+// and its name() answered an empty string.
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
-                            const TypedefMap& typedefs, Arena& arena) {
+                            const TypedefMap& typedefs, Arena& arena,
+                            std::string_view& list_enum_key) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
-    var.enum_type_name = item->name;
+    if (item->first_in_decl_list) list_enum_key = item->name;
+    var.enum_type_name = list_enum_key;
     var.dtype = &item->data_type;
     return;
   }
@@ -902,7 +909,7 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
     var.class_type_name = item->data_type.type_name;
     var.class_data_type = &item->data_type;
   }
-  SetEnumTypeInfo(item, var, typedefs_, arena_);
+  SetEnumTypeInfo(item, var, typedefs_, arena_, inline_enum_list_key_);
   SetPackedTypedefTypeInfo(item, var, typedefs_, arena_);
   if (!var.dtype && (item->data_type.packed_dim_left != nullptr ||
                      !item->data_type.extra_packed_dims.empty())) {
