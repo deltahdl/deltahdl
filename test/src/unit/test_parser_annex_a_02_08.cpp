@@ -5,6 +5,7 @@
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -300,6 +301,63 @@ TEST(BlockItemDeclParsing, ErrorNetDeclNotABlockItem) {
   // Parser::IsBlockVarDeclStartCore does not admit `wire`, so the block parses
   // it as a statement and §11.2 reports the primary that is not an expression.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+}
+
+// A.2.8 admits a data_declaration as a block item, and A.2.2.1 makes an inline
+// enum one of its data types, so `enum {p, q} z;` in a task body declares z of
+// that enumeration, members and all.
+TEST(BlockItemDeclParsing, InlineEnumVariableInATaskBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  task tk;\n"
+      "    enum {p, q} z;\n"
+      "    z = q;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* tk = r.cu->modules[0]->items[0];
+  ASSERT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
+  ASSERT_EQ(tk->func_body_stmts.size(), 2u);
+  auto* z = tk->func_body_stmts[0];
+  EXPECT_EQ(z->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(z->var_name, "z");
+  EXPECT_EQ(z->var_decl_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(z->var_decl_type.enum_members.size(), 2u);
+  EXPECT_EQ(z->var_decl_type.enum_members[1].name, "q");
+}
+
+// The struct_union alternative of A.2.2.1's data_type stands as a block item
+// as the enum one does: an inline struct with two declarators, a packed union
+// and an initialized inline enum at the head of an initial block are each a
+// variable declaration of their type, read once, with the statement after
+// them left a statement.
+TEST(BlockItemDeclParsing, InlineAggregateVariablesInAnInitialBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    struct {int x; byte y;} a, b;\n"
+      "    union packed {bit [15:0] w; bit [1:0][7:0] h;} u;\n"
+      "    enum {r, s} e = s;\n"
+      "    a.x = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& body = r.cu->modules[0]->items[0]->body->stmts;
+  ASSERT_EQ(body.size(), 5u);
+  EXPECT_EQ(body[0]->var_name, "a");
+  EXPECT_EQ(body[0]->var_decl_type.kind, DataTypeKind::kStruct);
+  EXPECT_EQ(body[1]->var_name, "b");
+  EXPECT_EQ(body[1]->var_decl_type.kind, DataTypeKind::kStruct);
+  EXPECT_EQ(body[2]->var_name, "u");
+  EXPECT_EQ(body[2]->var_decl_type.kind, DataTypeKind::kUnion);
+  EXPECT_TRUE(body[2]->var_decl_type.is_packed);
+  EXPECT_EQ(body[3]->var_name, "e");
+  EXPECT_EQ(body[3]->var_decl_type.kind, DataTypeKind::kEnum);
+  EXPECT_NE(body[3]->var_init, nullptr);
+  for (int i = 0; i < 4; ++i) EXPECT_EQ(body[i]->kind, StmtKind::kVarDecl);
+  EXPECT_NE(body[4]->kind, StmtKind::kVarDecl);
 }
 
 }  // namespace

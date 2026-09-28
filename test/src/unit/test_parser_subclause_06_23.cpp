@@ -1,10 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -526,6 +532,122 @@ TEST(TypeOperatorParsing, VarTypeRefWithoutVarKeywordRejected) {
                             "type_reference in a variable declaration must be "
                             "preceded by the 'var' keyword",
                             3, "6.8"));
+}
+
+// §6.23's first example declares two names of one type reference, `var
+// type(a+b) c, d;`, and A.2.1.3 follows the data_type with a whole
+// list_of_variable_decl_assignments, so each name, and an initializer, is read
+// with the type reference as its data type.
+TEST(TypeOperatorParsing, VarTypeRefDeclaresEveryNameOfItsList) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [31:0] a, b;\n"
+      "  var type(a+b) c, d;\n"
+      "  var type(a) e = 5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 5u);
+  for (size_t i = 2; i < 5; ++i) {
+    EXPECT_EQ(items[i]->kind, ModuleItemKind::kVarDecl);
+    ASSERT_NE(items[i]->data_type.type_ref_expr, nullptr);
+  }
+  EXPECT_EQ(items[2]->name, "c");
+  EXPECT_EQ(items[3]->name, "d");
+  EXPECT_EQ(items[3]->data_type.type_ref_expr->kind, ExprKind::kBinary);
+  EXPECT_EQ(items[4]->name, "e");
+  ASSERT_NE(items[4]->init_expr, nullptr);
+  EXPECT_EQ(items[4]->init_expr->kind, ExprKind::kIntegerLiteral);
+}
+
+// §6.23 lists casts among the uses of a type reference, `c = type(i+3)'(v);`,
+// so the `'(` after the reference opens a cast whose casting type is the
+// reference and whose operand is the parenthesized expression.
+TEST(TypeOperatorParsing, TypeRefCastTakesAParenthesizedOperand) {
+  auto r = Parse(
+      "module t;\n"
+      "  int i, c;\n"
+      "  logic [15:0] v;\n"
+      "  initial c = type(i+3)'(v[15:0]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* cast = stmt->rhs;
+  ASSERT_NE(cast, nullptr);
+  EXPECT_EQ(cast->kind, ExprKind::kCast);
+  ASSERT_NE(cast->rhs, nullptr);
+  EXPECT_EQ(cast->rhs->kind, ExprKind::kTypeRef);
+  ASSERT_NE(cast->rhs->lhs, nullptr);
+  EXPECT_EQ(cast->rhs->lhs->kind, ExprKind::kBinary);
+  ASSERT_NE(cast->lhs, nullptr);
+  EXPECT_EQ(cast->lhs->kind, ExprKind::kSelect);
+}
+
+// A.2.8 admits a data_declaration as a block item, and A.2.2.1 makes a
+// type_reference one of its data types, so `var type(a) v = 7;` in an initial
+// block and §6.23's `static type(this) m_inst;`, written with the `var` the
+// clause requires, each declare a variable whose type is the reference.
+TEST(TypeOperatorParsing, BlockItemVarTypeRefDeclarations) {
+  auto r = Parse(
+      "class registry;\n"
+      "  static function registry get();\n"
+      "    var static type(this) m_inst;\n"
+      "    return m_inst;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    var type(a) v = 7, w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* get = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(get, nullptr);
+  ASSERT_FALSE(get->func_body_stmts.empty());
+  auto* inst = get->func_body_stmts[0];
+  EXPECT_EQ(inst->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(inst->var_name, "m_inst");
+  EXPECT_TRUE(inst->var_is_static);
+  ASSERT_NE(inst->var_decl_type.type_ref_expr, nullptr);
+  EXPECT_EQ(inst->var_decl_type.type_ref_expr->text, "this");
+  auto& body = r.cu->modules[0]->items[1]->body->stmts;
+  ASSERT_EQ(body.size(), 2u);
+  EXPECT_EQ(body[0]->var_name, "v");
+  ASSERT_NE(body[0]->var_init, nullptr);
+  EXPECT_EQ(body[1]->var_name, "w");
+  for (auto* s : body) {
+    EXPECT_EQ(s->kind, StmtKind::kVarDecl);
+    ASSERT_NE(s->var_decl_type.type_ref_expr, nullptr);
+    EXPECT_EQ(s->var_decl_type.type_ref_expr->text, "a");
+  }
+}
+
+// The block-item counterpart of VarTypeRefWithoutVarKeywordRejected: a type
+// reference without `var`, as §6.23's registry example writes `static
+// type(this) m_inst;`, breaks footnote 18 of §6.8's Syntax 6-3, and the
+// declaration draws that one report and nothing else.
+TEST(TypeOperatorParsing, BlockItemTypeRefWithoutVarReportsOnce) {
+  auto r = Parse(
+      "class registry;\n"
+      "  static function registry get();\n"
+      "    static type(this) m_inst;\n"
+      "    return m_inst;\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
+  EXPECT_EQ(std::count_if(r.diags.begin(), r.diags.end(),
+                          [](const Diagnostic& d) {
+                            return d.severity == DiagSeverity::kError;
+                          }),
+            1);
 }
 
 }  // namespace

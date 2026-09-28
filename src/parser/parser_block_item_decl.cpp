@@ -38,8 +38,9 @@ bool Parser::IsBlockVarDeclStart() {
 
 // The keywords that open a block-item declaration outright, with nothing
 // after them to look at: a lifetime, a parameter, `const`, a typedef, an
-// import, a let, an aggregate or enum type, `var`, and `virtual` -- A.2.2.1
-// lists `virtual [interface] interface_identifier` among data_type's
+// import, a let, an aggregate or enum type, `var`, a type reference -- which
+// A.2.2.1 makes a data_type and no statement opens with -- and `virtual` --
+// A.2.2.1 lists `virtual [interface] interface_identifier` among data_type's
 // alternatives, so a block item opening with it is a §25.9 virtual interface
 // declaration wherever A.2.8 places one, the locals of a task or function body
 // and the head of a seq_block; no statement opens with the keyword, and
@@ -58,6 +59,7 @@ static bool OpensBlockDeclOutright(TokenKind tk) {
     case TokenKind::kKwUnion:
     case TokenKind::kKwEnum:
     case TokenKind::kKwVar:
+    case TokenKind::kKwType:
     case TokenKind::kKwVirtual:
       return true;
     default:
@@ -172,16 +174,39 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     is_automatic = Match(TokenKind::kKwAutomatic);
     is_static = !is_automatic && Match(TokenKind::kKwStatic);
   }
-  // The scoped form IsBlockVarDeclStartCore admitted is what
-  // ParseDeclaredDataType reads past known_types_, which never holds a
-  // package name.
-  DataType dtype = ParseDeclaredDataType();
+  // An inline enum, struct or union type is read here, as ParseDataType
+  // leaves its keyword unread and OpensBlockDeclOutright hands the block item
+  // back on that keyword. A type reference is read here as well (§6.23), which
+  // ParseDataType does not read either. The scoped form
+  // IsBlockVarDeclStartCore admitted is what ParseDeclaredDataType reads past
+  // known_types_, which never holds a package name.
+  DataType dtype;
+  bool is_type_ref = Check(TokenKind::kKwType);
+  if (is_type_ref) {
+    // Footnote 18 of §6.8's Syntax 6-3, which §6.23 repeats, has a type
+    // reference in a variable declaration preceded by `var`, and the report
+    // is the one Parser::ParseTypedItemOrInst files at module level. The
+    // declaration is read in full either way, so its declarators draw no
+    // report of their own.
+    if (!saw_var) {
+      diag_.Error(CurrentLoc(),
+                  "type_reference in a variable declaration must be "
+                  "preceded by the 'var' keyword",
+                  Subclause("6.8"));
+    }
+    Consume();
+    Expect(TokenKind::kLParen, Subclause("6.23"));
+    dtype.type_ref_expr = ParseExpr();
+    Expect(TokenKind::kRParen, Subclause("6.23"));
+  } else if (!TryParseInlineAggregateType(dtype)) {
+    dtype = ParseDeclaredDataType();
+  }
   if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
       Check(TokenKind::kLBracket)) {
     ParsePackedDims(dtype);
   }
 
-  if (!saw_var && dtype.kind == DataTypeKind::kImplicit) {
+  if (!saw_var && !is_type_ref && dtype.kind == DataTypeKind::kImplicit) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
                 "the 'var' keyword",

@@ -447,12 +447,19 @@ Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
 }  // namespace
 
 // type_reference primary ('type(...)' or the 'type' keyword), optionally used
-// as the casting_type of an assignment-pattern cast.
+// as the casting_type of an assignment-pattern cast or, §6.23 listing casts
+// among the uses of a type reference, of a `'(expression)` cast.
 Expr* Parser::ParseTypeRefPrimary() {
   auto* ref = ParseTypeRefExpr();
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
     return MakeNodeCast(arena_, ref, pat);
+  }
+  if (Match(TokenKind::kApostrophe)) {
+    Expect(TokenKind::kLParen, Subclause("6.24.1"));
+    auto* cast = MakeNodeCast(arena_, ref, ParseExpr());
+    Expect(TokenKind::kRParen, Subclause("6.24.1"));
+    return cast;
   }
   return ref;
 }

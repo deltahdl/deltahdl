@@ -866,16 +866,12 @@ bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   if (!Check(TokenKind::kKwType)) return false;
   Consume();
   Expect(TokenKind::kLParen, Subclause("6.23"));
-  auto* type_expr = ParseExpr();
+  DataType dtype;
+  dtype.type_ref_expr = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("6.23"));
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kVarDecl;
-  item->loc = CurrentLoc();
-  item->data_type.type_ref_expr = type_expr;
-  item->name = ExpectIdentifier(Subclause("6.8")).text;
-  ParseUnpackedDims(item->unpacked_dims);
-  Expect(TokenKind::kSemicolon, Subclause("6.8"));
-  items.push_back(item);
+  // A.2.1.3 follows the data_type with a list_of_variable_decl_assignments, so
+  // §6.23's `var type(a+b) c, d;` declares both names of the one type.
+  ParseVarDeclList(items, dtype);
   return true;
 }
 
