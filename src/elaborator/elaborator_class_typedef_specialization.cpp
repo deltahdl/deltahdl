@@ -225,7 +225,7 @@ struct SpecializationCtx {
 constexpr int kMaxTypedefHops = 8;
 
 std::optional<SpecializedClassType> SpecializeType(
-    DataType type, const std::vector<Expr*>& unpacked_dims,
+    const DataType& type, const std::vector<Expr*>& unpacked_dims,
     const SpecializationCtx& ctx, int hops);
 
 // A member's type, whole where the parser kept it, an inline aggregate or
@@ -300,7 +300,7 @@ std::optional<SpecializedClassType> FollowClassTypedef(
 // a typedef's unpacked dimensions and the declaration's own stand, which §7.4.4
 // stages one outside the other, a shape this does not carry.
 std::optional<SpecializedClassType> SpecializeType(
-    DataType type, const std::vector<Expr*>& unpacked_dims,
+    const DataType& type, const std::vector<Expr*>& unpacked_dims,
     const SpecializationCtx& ctx, int hops) {
   auto followed = FollowClassTypedef(type, ctx, hops);
   if (!followed) return std::nullopt;

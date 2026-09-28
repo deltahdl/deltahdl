@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -21,6 +22,23 @@ int CountVarsEndingWith(const RtlirModule* mod, char last) {
     if (!var.name.empty() && var.name.back() == last) ++count;
   }
   return count;
+}
+
+// Checks that `r` elaborated without an error or a warning into one top module
+// that instantiated the generate block declaring a variable ending in each
+// letter of `taken`, and none declaring one ending in a letter of `skipped`.
+void ExpectBranchesTaken(const GenerateElab& r, std::string_view taken,
+                         std::string_view skipped) {
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  EXPECT_EQ(r.f.diag.WarningCount(), 0u);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  for (char c : taken) {
+    EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], c), 1) << c;
+  }
+  for (char c : skipped) {
+    EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], c), 0) << c;
+  }
 }
 
 TEST(TypeOperatorElab, TypeOfThisInClassMethodAccepted) {
@@ -320,13 +338,7 @@ TEST(TypeOperatorGenerate, EqualVectorsWithOtherBoundsSelectElseBranch) {
       "    logic d;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_FALSE(r.f.has_errors);
-  ASSERT_EQ(r.design->top_modules.size(), 1u);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 0);
+  ExpectBranchesTaken(r, "bc", "ad");
 }
 
 // §6.22.1(d): a struct or enum typedef matches only itself, so §6.22.1's own
@@ -356,15 +368,7 @@ TEST(TypeOperatorGenerate, DistinctAggregateTypedefsSelectElseBranch) {
       "    logic f;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_FALSE(r.f.has_errors);
-  ASSERT_EQ(r.design->top_modules.size(), 1u);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 0);
+  ExpectBranchesTaken(r, "bde", "acf");
 }
 
 // §6.23 with §26.3 and §8.23: a type reference may name a typedef through its
@@ -395,16 +399,7 @@ TEST(TypeOperatorGenerate, ScopedTypedefsInTypeReferencesAreConstant) {
       "    logic f;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_FALSE(r.f.has_errors);
-  EXPECT_EQ(r.f.diag.WarningCount(), 0u);
-  ASSERT_EQ(r.design->top_modules.size(), 1u);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 1);
+  ExpectBranchesTaken(r, "acf", "bde");
 }
 
 // §6.25: a typedef of a parameterized class reached through a specialization is
@@ -439,18 +434,7 @@ TEST(TypeOperatorGenerate, SpecializedClassTypedefsInTypeReferences) {
       "    logic h;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_FALSE(r.f.has_errors);
-  EXPECT_EQ(r.f.diag.WarningCount(), 0u);
-  ASSERT_EQ(r.design->top_modules.size(), 1u);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'e'), 0);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'f'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'g'), 1);
-  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'h'), 0);
+  ExpectBranchesTaken(r, "adfg", "bceh");
 }
 
 // §6.23 — the inequality form negates the match result: nonmatching types make

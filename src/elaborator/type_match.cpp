@@ -1,11 +1,10 @@
-#include "elaborator/type_eval.h"
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
