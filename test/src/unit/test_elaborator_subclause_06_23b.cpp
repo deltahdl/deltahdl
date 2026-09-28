@@ -303,6 +303,32 @@ TEST(TypeOperatorGenerate, EqualNonMatchingTypesSelectsElseBranch) {
   EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
 }
 
+// §6.22.1(f): packed vectors of one kind match only with the same left and
+// right bounds, so `bit [7:0]` does not match `bit [0:7]` and the else-block
+// is instantiated, while `bit [7:0]` matches itself.
+TEST(TypeOperatorGenerate, EqualVectorsWithOtherBoundsSelectElseBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (type(bit [7:0]) == type(bit [0:7])) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "  if (type(bit [7:0]) == type(bit [7:0])) begin\n"
+      "    logic c;\n"
+      "  end else begin\n"
+      "    logic d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'c'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'd'), 0);
+}
+
 // §6.23 — the inequality form negates the match result: nonmatching types make
 // `!=` true, selecting the then-block.
 TEST(TypeOperatorGenerate, NotEqualNonMatchingTypesSelectsThenBranch) {

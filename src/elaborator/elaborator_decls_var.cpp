@@ -865,12 +865,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (!adopted_array_typedef.empty()) {
     var_named_types_[item->name] = adopted_array_typedef;
   }
-  const ModuleDecl* vi_iface_decl =
+  RegisterVirtualInterfaceVarDecl(
+      item,
       item->data_type.kind == DataTypeKind::kVirtualInterface
           ? FindModule(item->data_type.type_name)
-          : nullptr;
-  RegisterVirtualInterfaceVarDecl(
-      item, vi_iface_decl,
+          : nullptr,
       {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_},
       BuildParamScope(mod), diag_);
 

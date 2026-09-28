@@ -6,6 +6,7 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -89,13 +90,30 @@ DataType TypeParamActual(const ClassDecl* cls, size_t index,
   return {};
 }
 
+// Whether every named argument of `args` names a parameter `cls` declares, and
+// no name is given twice. A specialization that breaks either is §23.10.2.2's
+// to report, which ResolveParameterizedType does, so it is not bound here.
+bool NamesWellFormed(const ClassDecl* cls, const std::vector<DataType>& args) {
+  std::unordered_set<std::string_view> assigned;
+  for (const DataType& a : args) {
+    if (a.param_arg_name.empty()) continue;
+    bool declared = std::any_of(
+        cls->params.begin(), cls->params.end(),
+        [&a](const auto& param) { return param.first == a.param_arg_name; });
+    if (!declared || !assigned.insert(a.param_arg_name).second) return false;
+  }
+  return true;
+}
+
 // The bindings `args` make for `cls`'s parameters, each left out taking its
 // default; a value default is folded with the parameters before it bound, as
-// §6.20.1 lets it name them. Nothing where a value does not fold or a type
-// parameter has neither an argument nor a default.
+// §6.20.1 lets it name them. Nothing where the named arguments are malformed,
+// a value does not fold, or a type parameter has neither an argument nor a
+// default.
 std::optional<SpecializationBindings> BindSpecialization(
     const ClassDecl* cls, const std::vector<DataType>& args,
     const ScopeMap& module_scope, const TypedefMap& typedefs) {
+  if (!NamesWellFormed(cls, args)) return std::nullopt;
   SpecializationBindings bound;
   bound.scope = module_scope;
   for (size_t i = 0; i < cls->params.size(); ++i) {

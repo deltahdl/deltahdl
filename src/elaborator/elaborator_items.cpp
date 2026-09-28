@@ -460,6 +460,7 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
 void ResolveProceduralTypeRefs(
     ModuleItem* item, const ModuleTypeRefResolver& resolve_module_ref) {
   std::vector<ProceduralLocal> locals;
+  locals.reserve(item->func_args.size());
   for (const auto& arg : item->func_args) {
     locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
   }

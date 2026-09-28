@@ -1,6 +1,7 @@
 #include "elaborator/type_eval.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <string_view>
@@ -587,12 +588,41 @@ static bool VectorMatchesPredef(const DataType& vec, const DataType& predef) {
   return vec_width == EvalTypeWidth(predef);
 }
 
+// Whether two bounds of a packed dimension are the same: both absent, or both
+// present with equal values. A bound that does not fold without a scope, such
+// as `W-1`, is not told apart from the other.
+static bool SameBound(const Expr* a, const Expr* b) {
+  if ((a == nullptr) != (b == nullptr)) return false;
+  if (a == nullptr) return true;
+  auto va = ConstEvalInt(a);
+  auto vb = ConstEvalInt(b);
+  return !va || !vb || *va == *vb;
+}
+
+// §6.22.1(f): two fixed-size array types match only where they have the same
+// left and right bounds, dimension by dimension, so `bit [11:0]` does not
+// match `bit [12:0]`, nor `bit [7:0]` match `bit [0:7]`.
+static bool SamePackedBounds(const DataType& a, const DataType& b) {
+  if (!SameBound(a.packed_dim_left, b.packed_dim_left) ||
+      !SameBound(a.packed_dim_right, b.packed_dim_right))
+    return false;
+  if (a.extra_packed_dims.size() != b.extra_packed_dims.size()) return false;
+  for (size_t i = 0; i < a.extra_packed_dims.size(); ++i) {
+    if (!SameBound(a.extra_packed_dims[i].first,
+                   b.extra_packed_dims[i].first) ||
+        !SameBound(a.extra_packed_dims[i].second,
+                   b.extra_packed_dims[i].second))
+      return false;
+  }
+  return true;
+}
+
 bool TypesMatch(const DataType& a, const DataType& b) {
   if (a.is_signed != b.is_signed) return false;
 
   if (CanonKind(a.kind) == CanonKind(b.kind)) {
     if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
-    return true;
+    return SamePackedBounds(a, b);
   }
 
   if (IsSimpleBitVector(a.kind) && HasPredefinedWidth(b.kind)) {

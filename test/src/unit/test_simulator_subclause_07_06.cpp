@@ -337,7 +337,7 @@ TEST(ArrayAssignmentSimulation,
 // §6.22.2's example run: `C = A` copies A's elements left to right into C's,
 // so A[0] lands in C[6], and `A = C` copies them back, C[6] into A[0].
 TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
-  const char* kSrc =
+  const char* src =
       "module t;\n"
       "  typedef bit [10:1] uint10;\n"
       "  bit [9:0] A [0:5];\n"
@@ -352,8 +352,8 @@ TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
       "    a0 = A[0];\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_EQ(RunAndGet(kSrc, "c6"), 5u);
-  EXPECT_EQ(RunAndGet(kSrc, "a0"), 9u);
+  EXPECT_EQ(RunAndGet(src, "c6"), 5u);
+  EXPECT_EQ(RunAndGet(src, "a0"), 9u);
 }
 
 }  // namespace
