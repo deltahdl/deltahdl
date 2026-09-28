@@ -203,45 +203,51 @@ bool NamesOwnArrayProperty(const Expr* base, SimContext& ctx) {
          FindClassArrayProperty(self->type, base->text) != nullptr;
 }
 
+// §8.11 with §23.9: inside a method a bare name is the object's property
+// ahead of a variable of the module the class is declared in; only a local
+// of the method's own shadows it. Deferring to any variable of the name,
+// `d = new[2]` in a method sized the module's `d` and left the property
+// empty. §8.10: a static method has no object, and names its class's static
+// properties bare.
+static bool ResolveBareClassArray(const Expr* base, SimContext& ctx,
+                                  ClassArrayRef& out) {
+  if (ctx.FindLocalVariable(base->text) != nullptr) return false;
+  ClassObject* self = ctx.CurrentThis();
+  const ClassTypeInfo* type =
+      self != nullptr ? self->type : ctx.CurrentMethodClass();
+  if (type == nullptr) return false;
+  const auto* prop = FindClassArrayProperty(type, base->text);
+  if (prop == nullptr || (self == nullptr && !prop->is_static)) return false;
+  out = MakeRef(self, type, prop, /*bare=*/true);
+  // 18.5.7.1: a constraint's trial binds a dynamic array's size as it binds
+  // its elements, so the size is the local's where one is in scope.
+  if (auto* size = ctx.FindVariable(ClassArraySizeKey(base->text)))
+    out.size = static_cast<uint32_t>(size->value.ToUint64());
+  return true;
+}
+
+// §8.23: `C::sarr` names the static property of class C.
+static bool ResolveScopedClassArray(const Expr* base, SimContext& ctx,
+                                    ClassArrayRef& out) {
+  if (base->lhs->kind != ExprKind::kIdentifier) return false;
+  const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
+  if (cls == nullptr) return false;
+  const auto* prop = FindClassArrayProperty(cls, base->rhs->text);
+  if (prop == nullptr || !prop->is_static) return false;
+  out = MakeRef(nullptr, cls, prop, /*bare=*/false);
+  return true;
+}
+
 bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
                        ClassArrayRef& out) {
   if (base == nullptr) return false;
-  if (base->kind == ExprKind::kIdentifier) {
-    // §8.11 with §23.9: inside a method a bare name is the object's property
-    // ahead of a variable of the module the class is declared in; only a
-    // local of the method's own shadows it. Deferring to any variable of the
-    // name, `d = new[2]` in a method sized the module's `d` and left the
-    // property empty.
-    if (ctx.FindLocalVariable(base->text) != nullptr) return false;
-    ClassObject* self = ctx.CurrentThis();
-    // §8.10: a static method has no object, and names its class's static
-    // properties bare.
-    const ClassTypeInfo* type =
-        self != nullptr ? self->type : ctx.CurrentMethodClass();
-    if (type == nullptr) return false;
-    const auto* prop = FindClassArrayProperty(type, base->text);
-    if (prop == nullptr || (self == nullptr && !prop->is_static)) return false;
-    out = MakeRef(self, type, prop, /*bare=*/true);
-    // 18.5.7.1: a constraint's trial binds a dynamic array's size as it binds
-    // its elements, so the size is the local's where one is in scope.
-    if (auto* size = ctx.FindVariable(ClassArraySizeKey(base->text)))
-      out.size = static_cast<uint32_t>(size->value.ToUint64());
-    return true;
-  }
+  if (base->kind == ExprKind::kIdentifier)
+    return ResolveBareClassArray(base, ctx, out);
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  // §8.23: `C::sarr` names the static property of class C.
-  if (base->is_scope_resolution) {
-    if (base->lhs->kind != ExprKind::kIdentifier) return false;
-    const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
-    if (cls == nullptr) return false;
-    const auto* prop = FindClassArrayProperty(cls, base->rhs->text);
-    if (prop == nullptr || !prop->is_static) return false;
-    out = MakeRef(nullptr, cls, prop, /*bare=*/false);
-    return true;
-  }
+  if (base->is_scope_resolution) return ResolveScopedClassArray(base, ctx, out);
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   if (obj == nullptr) return false;
   const auto* prop = FindClassArrayProperty(obj->type, base->rhs->text);
