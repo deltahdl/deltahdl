@@ -233,4 +233,31 @@ TEST(TypeOfExprCastSim, TypeOfThisMethodLocalIsAHandleOfTheClass) {
   EXPECT_EQ(RunAndGet(kSrc, "v"), 9u);
 }
 
+// §6.23 with §6.22.1: a type-reference comparison in a procedure is true
+// exactly when the types match -- a typedef renaming a built-in, a typedef of
+// that typedef, `bit signed [7:0]` against byte (§6.22.1(e)), `byte signed`
+// against byte, and two unpacked arrays of matching elements and bounds all
+// match; `bit signed [0:7]` does not match byte, its range not being [7:0].
+// Compared by name alone, every pair was 0.
+TEST(TypeOfExprCastSim, TypeReferenceEqualityMatchesTypesInAProcedure) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef bit node;\n"
+      "  typedef node type2;\n"
+      "  typedef bit signed [7:0] BYTE;\n"
+      "  typedef byte signed MY_CHAR;\n"
+      "  typedef byte MEM_BYTES [256];\n"
+      "  typedef bit signed [7:0] MY_MEM_BYTES [256];\n"
+      "  typedef bit signed [0:7] ETYB;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    r = {type(node) == type(bit), type(type2) == type(node),\n"
+      "         type(BYTE) == type(byte), type(MY_CHAR) == type(byte),\n"
+      "         type(MEM_BYTES) == type(MY_MEM_BYTES),\n"
+      "         type(ETYB) == type(byte)};\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b111110u);
+}
+
 }  // namespace

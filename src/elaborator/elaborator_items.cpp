@@ -469,6 +469,45 @@ void ResolveProceduralTypeRefs(
   }
 }
 
+using TypeRefCompareFolder = std::function<std::optional<int64_t>(const Expr*)>;
+
+// §6.23: a comparison of two type references is a constant expression, true
+// exactly when the types match by §6.22.1, which only the elaborator's type
+// tables can judge. Each one a procedure writes is folded here to the one-bit
+// literal it stands for, so the procedure reads its value; compared at run
+// time by the names alone, `type(node) == type(bit)` under `typedef bit node`
+// was 0.
+void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kBinary && e->lhs != nullptr && e->rhs != nullptr &&
+      e->lhs->kind == ExprKind::kTypeRef &&
+      e->rhs->kind == ExprKind::kTypeRef) {
+    if (std::optional<int64_t> matched = fold(e)) {
+      e->kind = ExprKind::kIntegerLiteral;
+      e->int_val = static_cast<uint64_t>(*matched);
+      e->text = *matched != 0 ? "1'b1" : "1'b0";
+      e->lhs = nullptr;
+      e->rhs = nullptr;
+      return;
+    }
+  }
+  for (Expr* sub :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
+    FoldTypeRefComparesInExpr(sub, fold);
+  }
+  for (Expr* elem : e->elements) FoldTypeRefComparesInExpr(elem, fold);
+  for (Expr* arg : e->args) FoldTypeRefComparesInExpr(arg, fold);
+}
+
+void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
+  if (s == nullptr) return;
+  for (Expr* e : {s->rhs, s->lhs, s->expr, s->condition, s->assert_expr}) {
+    FoldTypeRefComparesInExpr(e, fold);
+  }
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
+}
+
 }  // namespace
 
 // The instance range is what makes §28.3.6's widths a question at all, so an
@@ -499,6 +538,11 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
+  TypeRefCompareFolder fold = [this](const Expr* e) {
+    return EvalConstTypeRefCompare(e);
+  };
+  FoldTypeRefComparesInStmt(item->body, fold);
+  for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
   ElaborateBehavioralItem(item, mod);
 }
 
