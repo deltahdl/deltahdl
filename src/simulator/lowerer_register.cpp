@@ -461,37 +461,41 @@ void RegisterGenBlockSubroutines(const RtlirModule* mod,
 // (FindSubroutineTarget in eval_function_hier.cpp). An import binds the bare
 // name as well, in LowerPackageItem. §8.24 keeps an out-of-block method body
 // out of the package's own subroutines.
+// One item of package `pkg` recorded as the package's: its subroutine under
+// "pkg::name" and as the package's, its let under "pkg::name", and its import
+// as one of the package's.
+static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
+                                      SimContext& ctx, Arena& arena) {
+  // §26.3 with §13.4: the package's subroutines read its variables, and
+  // through its imports another package's, by their bare names, so each
+  // subroutine is recorded as the package's and each import as one of the
+  // package's; SimContext::FindInPackageScope reads both back.
+  if (item->kind == ModuleItemKind::kImportDecl) {
+    const ImportItem& imp = item->import_item;
+    ctx.RegisterPackageImport(pkg->name, imp.package_name,
+                              imp.is_wildcard ? "*" : imp.item_name);
+    return;
+  }
+  auto* key = arena.Create<std::string>(std::string(pkg->name) +
+                                        "::" + std::string(item->name));
+  // §11.12 with §26.3: a package's let is a declaration of the package,
+  // named from any scope through the package, `pex::twice(7)`.
+  if (item->kind == ModuleItemKind::kLetDecl) {
+    ctx.RegisterLetDecl(*key, item);
+    return;
+  }
+  bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                       item->kind == ModuleItemKind::kTaskDecl;
+  if (!is_subroutine || !item->method_class.empty()) return;
+  ctx.RegisterSubroutinePackage(item, pkg->name);
+  ctx.RegisterFunction(*key, item);
+}
+
 void RegisterPackageScopedSubroutines(const RtlirDesign* design,
                                       SimContext& ctx, Arena& arena) {
   for (auto* pkg : design->packages) {
-    for (auto* item : pkg->items) {
-      // §26.3 with §13.4: the package's subroutines read its variables, and
-      // through its imports another package's, by their bare names, so each
-      // subroutine is recorded as the package's and each import as one of
-      // the package's; SimContext::FindInPackageScope reads both back.
-      if (item->kind == ModuleItemKind::kImportDecl) {
-        const ImportItem& imp = item->import_item;
-        ctx.RegisterPackageImport(pkg->name, imp.package_name,
-                                  imp.is_wildcard ? "*" : imp.item_name);
-        continue;
-      }
-      // §11.12 with §26.3: a package's let is a declaration of the package,
-      // named from any scope through the package, `pex::twice(7)`.
-      if (item->kind == ModuleItemKind::kLetDecl) {
-        ctx.RegisterLetDecl(
-            *arena.Create<std::string>(std::string(pkg->name) +
-                                       "::" + std::string(item->name)),
-            item);
-        continue;
-      }
-      bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
-                           item->kind == ModuleItemKind::kTaskDecl;
-      if (!is_subroutine || !item->method_class.empty()) continue;
-      ctx.RegisterSubroutinePackage(item, pkg->name);
-      auto* key = arena.Create<std::string>(std::string(pkg->name) +
-                                            "::" + std::string(item->name));
-      ctx.RegisterFunction(*key, item);
-    }
+    for (auto* item : pkg->items)
+      RegisterPackageScopedItem(pkg, item, ctx, arena);
   }
 }
 

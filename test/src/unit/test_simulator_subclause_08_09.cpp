@@ -665,7 +665,7 @@ TEST(StaticClassPropertySim,
 // -- the handle is not null and the constructor gave ci 5 -- when the
 // module's initial block reads C::inst.
 TEST(StaticPropertySim, StaticHandleInitializedWithNewHoldsAnObject) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  class C;\n"
       "    int ci;\n"
@@ -678,8 +678,8 @@ TEST(StaticPropertySim, StaticHandleInitializedWithNewHoldsAnObject) {
       "    ci = C::inst.ci;\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_EQ(RunAndGet(src, "hl"), 1u);
-  EXPECT_EQ(RunAndGet(src, "ci"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "hl"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "ci"), 5u);
 }
 
 }  // namespace

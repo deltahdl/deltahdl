@@ -55,6 +55,15 @@ void Lowerer::LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls) {
   AliasExportedClassKeys(pkg, cls);
 }
 
+// A function or task of the package itself. §8.24: an out-of-block method
+// body is the class's, not a subroutine of the package; LowerPackageClass
+// attaches it to the class.
+static bool IsPackageSubroutine(const ModuleItem* item) {
+  return (item->kind == ModuleItemKind::kFunctionDecl ||
+          item->kind == ModuleItemKind::kTaskDecl) &&
+         item->method_class.empty();
+}
+
 void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
     // §26.5: a declaration of the importing scope, or an earlier import, has
@@ -67,11 +76,7 @@ void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
     } else {
       LowerPackageClass(pkg, item->class_decl);
     }
-  } else if (item->kind == ModuleItemKind::kFunctionDecl ||
-             item->kind == ModuleItemKind::kTaskDecl) {
-    // §8.24: an out-of-block method body is the class's, not a subroutine of
-    // the package; LowerPackageClass attaches it to the class.
-    if (!item->method_class.empty()) return;
+  } else if (IsPackageSubroutine(item)) {
     if (!ctx_.FindFunction(item->name)) {
       ctx_.RegisterFunction(item->name, item);
     }

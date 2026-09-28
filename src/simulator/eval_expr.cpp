@@ -135,26 +135,21 @@ static Logic4Vec ExtractStructField(Variable* base_var,
                                     const StructTypeInfo* info,
                                     std::string_view field, Arena& arena) {
   uint32_t bit_offset = 0;
-  uint32_t width = 0;
-  DataTypeKind kind = DataTypeKind::kLogic;
-  bool is_signed = false;
-  if (ResolveStructFieldPath(info, field, &bit_offset, &width, &kind,
-                             &is_signed)) {
-    Logic4Vec slice =
-        ExtractBitField(arena, base_var->value, bit_offset, width);
-    if (IsTwoStateScalarKind(kind)) {
-      for (uint32_t i = 0; i < slice.nwords; ++i) {
-        slice.words[i].aval &= ~slice.words[i].bval;
-        slice.words[i].bval = 0;
-      }
+  const StructFieldInfo* f = ResolveStructField(info, field, &bit_offset);
+  if (f == nullptr) return MakeLogic4Vec(arena, 1);
+  Logic4Vec slice =
+      ExtractBitField(arena, base_var->value, bit_offset, f->width);
+  if (IsTwoStateScalarKind(f->type_kind)) {
+    for (uint32_t i = 0; i < slice.nwords; ++i) {
+      slice.words[i].aval &= ~slice.words[i].bval;
+      slice.words[i].bval = 0;
     }
-    slice.is_real = IsRealKind(kind);
-    // §7.2.1 with §6.11: a member reads as its own type, so `shortint address`
-    // holding -2 is -2 and not 65534.
-    slice.is_signed = is_signed && !slice.is_real;
-    return slice;
   }
-  return MakeLogic4Vec(arena, 1);
+  slice.is_real = IsRealKind(f->type_kind);
+  // §7.2.1 with §6.11: a member reads as its own type, so `shortint address`
+  // holding -2 is -2 and not 65534.
+  slice.is_signed = f->is_signed && !slice.is_real;
+  return slice;
 }
 
 static bool TryCollectionAccess(std::string_view base, std::string_view field,

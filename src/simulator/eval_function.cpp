@@ -668,6 +668,16 @@ static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
   return TryEvalObjectRandMode(expr, ctx, arena, out);
 }
 
+// §11.12: the let a call names, by its callee, or, with §26.3, the
+// package's let `pex::twice(7)` names by the "pex::twice" key it is
+// registered under; null where it names none.
+static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  if (expr->callee.empty() && IsPackageScopedCall(expr))
+    return ctx.FindLetDecl(ScopedClassKey(expr->lhs, arena));
+  return ctx.FindLetDecl(expr->callee);
+}
+
 static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
@@ -696,12 +706,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // the enclosing class and the classes it inherits from, ahead of the same
   // module-level names.
   if (TryEvalEnclosingInstanceCall(expr, ctx, arena, out)) return true;
-  // §11.12 with §26.3: `pex::twice(7)` names the package's let by the
-  // "pex::twice" key it is registered under.
-  auto* let_decl = expr->callee.empty() && IsPackageScopedCall(expr)
-                       ? ctx.FindLetDecl(ScopedClassKey(expr->lhs, arena))
-                       : ctx.FindLetDecl(expr->callee);
-  if (let_decl) {
+  if (auto* let_decl = FindCalledLet(expr, ctx, arena)) {
     out = EvalLetExpansion(let_decl, expr, ctx, arena);
     return true;
   }

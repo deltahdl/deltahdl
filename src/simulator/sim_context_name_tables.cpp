@@ -242,27 +242,34 @@ const StructFieldInfo* FindStructField(const StructTypeInfo* info,
   return nullptr;
 }
 
-bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
-                            uint32_t* bit_offset, uint32_t* width,
-                            DataTypeKind* out_kind, bool* out_signed) {
+const StructFieldInfo* ResolveStructField(const StructTypeInfo* info,
+                                          std::string_view path,
+                                          uint32_t* bit_offset) {
   uint32_t acc = 0;
   while (info) {
     auto dot = path.find('.');
     auto seg = dot == std::string_view::npos ? path : path.substr(0, dot);
     const StructFieldInfo* f = FindStructField(info, seg);
-    if (!f) return false;
+    if (!f) return nullptr;
     acc += f->bit_offset;
     if (dot == std::string_view::npos) {
       *bit_offset = acc;
-      *width = f->width;
-      if (out_kind) *out_kind = f->type_kind;
-      if (out_signed) *out_signed = f->is_signed;
-      return true;
+      return f;
     }
     info = f->nested;
     path = path.substr(dot + 1);
   }
-  return false;
+  return nullptr;
+}
+
+bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
+                            uint32_t* bit_offset, uint32_t* width,
+                            DataTypeKind* out_kind) {
+  const StructFieldInfo* f = ResolveStructField(info, path, bit_offset);
+  if (f == nullptr) return false;
+  *width = f->width;
+  if (out_kind) *out_kind = f->type_kind;
+  return true;
 }
 
 void DeclaredNameTables::RegisterStructType(std::string_view name,

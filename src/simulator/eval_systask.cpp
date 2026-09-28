@@ -120,6 +120,21 @@ static std::string ScopedTypeName(const Expr* arg) {
   return scope + "::" + std::string(arg->rhs->text);
 }
 
+// §20.6.2: the width of the data type `arg` names -- a type parameter bound
+// on the running specialization, or a typedef by its bare name -- and, with
+// §8.23 and §26.3, one named through its class or package, which read as an
+// expression, `C::T`, was 1 bit. 0 where `arg` names no type.
+static uint32_t NamedTypeBits(const Expr* arg, SimContext& ctx) {
+  if (arg->kind == ExprKind::kIdentifier) {
+    uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
+    return tw > 0 ? tw : ctx.FindTypeWidth(arg->text);
+  }
+  if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution)
+    return 0;
+  std::string name = ScopedTypeName(arg);
+  return name.empty() ? 0 : ctx.FindTypeWidth(name);
+}
+
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
@@ -132,17 +147,8 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (uint64_t bits = FixedArrayBits(arg, ctx); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
-  if (arg->kind == ExprKind::kIdentifier) {
-    uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
-    if (tw == 0) tw = ctx.FindTypeWidth(arg->text);
-    if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
-  }
-  // §20.6.2 with §8.23 and §26.3: a type named through its class or package is
-  // sized as the type it stands for; read as an expression, `C::T` was 1 bit.
-  if (arg->kind == ExprKind::kMemberAccess && arg->is_scope_resolution) {
-    std::string name = ScopedTypeName(arg);
-    uint32_t tw = name.empty() ? 0 : ctx.FindTypeWidth(name);
-    if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
+  if (uint32_t tw = NamedTypeBits(arg, ctx); tw > 0) {
+    return MakeLogic4VecVal(arena, 32, tw);
   }
   // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
   // expression. Its current bit-stream size is the live element count times
