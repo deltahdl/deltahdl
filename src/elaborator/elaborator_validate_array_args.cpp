@@ -155,13 +155,15 @@ static bool ReportArrayArgShapeMismatch(
     return true;
   }
   for (size_t i = 0; i < actual_shape.size(); ++i) {
-    if (!actual_shape[i] || !formal_shape[i]) continue;
-    if (*actual_shape[i] == *formal_shape[i]) continue;
+    const std::optional<uint32_t> kActualSize = actual_shape[i];
+    const std::optional<uint32_t> kFormalSize = formal_shape[i];
+    if (!kActualSize || !kFormalSize) continue;
+    if (*kActualSize == *kFormalSize) continue;
     diag.Error(actual->range.start,
                std::format("unpacked dimension {} of array argument '{}' has "
                            "size {} but formal '{}' has size {}",
-                           i + 1, actual->text, *actual_shape[i], formal_name,
-                           *formal_shape[i]),
+                           i + 1, actual->text, *kActualSize, formal_name,
+                           *kFormalSize),
                Subclause("7.7"));
     return true;
   }
