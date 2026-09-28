@@ -452,11 +452,32 @@ static bool AssignQueueProperty(const Expr* lhs,
   return true;
 }
 
-bool StoreClassArrayPattern(const ClassArrayRef& dst, const Expr* rhs,
+// §10.9.1 with §7.5: the element count the positional pattern `rhs` gives a
+// dynamic array assigned it -- its items, a replication `'{3{7, 8}}` counted
+// as many times as it says -- into `out`; false for a keyed pattern, which
+// names no count, and for a replication whose count is unknown.
+static bool PatternItemCount(const Expr* rhs, SimContext& ctx, Arena& arena,
+                             uint32_t& out) {
+  if (!rhs->pattern_keys.empty()) return false;
+  out = static_cast<uint32_t>(rhs->elements.size());
+  if (out != 1 || rhs->elements[0]->kind != ExprKind::kReplicate) return true;
+  const Expr* rep = rhs->elements[0];
+  Logic4Vec count = EvalExpr(rep->repeat_count, ctx, arena);
+  if (!count.IsKnown()) return false;
+  out = static_cast<uint32_t>(count.ToUint64() * rep->elements.size());
+  return true;
+}
+
+bool StoreClassArrayPattern(const ClassArrayRef& dst_ref, const Expr* rhs,
                             SimContext& ctx, Arena& arena) {
   if (rhs == nullptr || rhs->kind != ExprKind::kAssignmentPattern ||
-      dst.prop->is_dynamic || ClassArrayHoldsSubarrays(dst)) {
+      ClassArrayHoldsSubarrays(dst_ref)) {
     return false;
+  }
+  ClassArrayRef dst = dst_ref;
+  if (dst.prop->is_dynamic) {
+    if (!PatternItemCount(rhs, ctx, arena, dst.size)) return false;
+    ResizeClassArray(dst, dst.size, nullptr, ctx, arena);
   }
   ArrayInfo shape;
   shape.lo = static_cast<uint32_t>(dst.lo);

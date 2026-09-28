@@ -228,12 +228,16 @@ static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
 // Evaluated as one value, the pattern answered its last item, which every
 // element was given. The elements are first made at their type's default, as
 // for a property with no initializer, so an element the pattern leaves
-// uncovered still exists. False for any other property or initializer.
+// uncovered still exists. §7.5: a dynamic array property, `byte i[] = '{9,
+// 8, 7};`, is made empty and then takes as many elements as the pattern has
+// items (StoreClassArrayPattern); declined here, the object's array stayed
+// empty. False for any other property or initializer.
 static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
                                      Construction& c) {
   if (prop.init_expr == nullptr ||
       prop.init_expr->kind != ExprKind::kAssignmentPattern ||
-      prop.array_size == 0 || prop.is_dynamic || prop.dim_sizes.size() >= 2) {
+      (prop.array_size == 0 && !prop.is_dynamic) ||
+      prop.dim_sizes.size() >= 2) {
     return false;
   }
   uint32_t width = BoundPropertyWidth(prop, c);
