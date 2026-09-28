@@ -106,14 +106,18 @@ static uint32_t AggregateTypeWidth(const DataType* dtype) {
   return total;
 }
 
+void RegisterTypeLayout(std::string_view name, const DataType* dtype,
+                        SimContext& ctx, Arena& arena) {
+  if (dtype == nullptr || dtype->struct_members.empty()) return;
+  auto* info =
+      BuildStructTypeInfo(dtype, AggregateTypeWidth(dtype), name, arena);
+  ctx.RegisterStructType(name, *info);
+}
+
 void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena) {
-  for (const auto& [name, dtype] : design->type_layouts) {
-    if (dtype == nullptr || dtype->struct_members.empty()) continue;
-    auto* info =
-        BuildStructTypeInfo(dtype, AggregateTypeWidth(dtype), name, arena);
-    ctx.RegisterStructType(name, *info);
-  }
+  for (const auto& [name, dtype] : design->type_layouts)
+    RegisterTypeLayout(name, dtype, ctx, arena);
   // §26.3 with §8.4: the class a package variable is declared with is the
   // other declared-type fact no module's lowering records, so it is recorded
   // beside the layouts.

@@ -10,6 +10,7 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/rtlir_element_shape.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -307,9 +308,11 @@ struct RtlirVariable {
   int32_t queue_max_size = -1;
   // §7.4 with §7.10: whether each element of the queue, dynamic array or
   // associative array the first dimension declares is itself a queue -- a
-  // second dimension `[$]`, `int aq[string][$]`, or a type naming a queue
-  // typedef, `q_t d[]` under `typedef int q_t[$];`.
+  // second dimension `[$]` or `[]`, `int aq[string][$]`, or a type naming a
+  // queue typedef, `q_t d[]` under `typedef int q_t[$];`.
   bool elements_are_queues = false;
+  // §7.4: the shape of an element that is itself an array.
+  RtlirElementShape element;
   bool is_assoc = false;
   bool is_string_index = false;
   bool is_wildcard_index = false;

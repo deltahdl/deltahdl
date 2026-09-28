@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_assoc.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
@@ -478,7 +479,8 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return true;
   }
   if (ainfo && stmt->rhs->kind == ExprKind::kSelect &&
-      TryArraySliceCopy(stmt, stmt->lhs->text, *ainfo, ctx, arena)) {
+      (TryCopyElementQueueToArray(stmt, *ainfo, ctx, arena) ||
+       TryArraySliceCopy(stmt, stmt->lhs->text, *ainfo, ctx, arena))) {
     return true;
   }
   if (ainfo && TryBitStreamCastToArray(stmt, *ainfo, ctx, arena)) return true;
@@ -534,11 +536,16 @@ static void AnnounceAssocElementWrite(const Expr* base, ClassObject* owner,
 // TrySelectBlockingAssign declined it and the value went nowhere, so UVM's
 // severity counts, `m_severity_count[s] = 0` in a method of
 // uvm_report_server, left the array at size 0.
+//
+// §7.8 with §7.4: where the array is an element of an associative array whose
+// elements are associative arrays, `m["a"][1] = 41`, the write is a write of
+// that element too, and allocates it as well (ElementAssocOfSelect).
 bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena) {
   if (!lhs->base || !lhs->index) return false;
   ClassObject* owner = nullptr;
-  auto* aa = FindAssocArrayOfBase(lhs->base, ctx, arena, &owner);
+  auto* aa = ElementAssocOfSelect(lhs->base, ctx, arena, /*allocate=*/true);
+  if (aa == nullptr) aa = FindAssocArrayOfBase(lhs->base, ctx, arena, &owner);
   if (!aa) return false;
   Logic4Vec stored = SizedAssocElementValue(lhs->base, aa, rhs_val, ctx, arena);
   if (aa->is_string_key) {

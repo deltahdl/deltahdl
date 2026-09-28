@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_element_shape.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -199,15 +200,40 @@ static bool TryParseUserDefinedAssocDim(
   return true;
 }
 
+// §7.8 with §7.4 (printed pages 162 and 153): whether `dim` is an associative
+// dimension, parsed onto `var` where it is.
+static bool TryParseAnyAssocDim(const Expr* dim, RtlirVariable& var,
+                                const UnpackedDimContext& ctx) {
+  return TryParseAssocDim(dim, var, ctx.scope) ||
+         TryParseUserDefinedAssocDim(dim, var, ctx.types.typedefs,
+                                     ctx.types.class_names);
+}
+
+// §7.8 with §7.4: an associative array's element type may be an associative
+// array, `int m[string][int]`, the second of two dimensions being an
+// associative one; `var` then records that dimension's index type, the one
+// its elements have.
+static void RecordElementAssoc(const std::vector<Expr*>& dims,
+                               RtlirVariable& var,
+                               const UnpackedDimContext& ctx) {
+  if (dims.size() != 2 || dims[1] == nullptr) return;
+  RtlirVariable inner;
+  if (!TryParseAnyAssocDim(dims[1], inner, ctx)) return;
+  var.element.assoc_index = RtlirAssocIndex{
+      inner.is_string_index,        inner.is_wildcard_index,
+      inner.is_index_signed,        inner.assoc_index_width,
+      inner.assoc_index_class_name, inner.assoc_index_type_name};
+}
+
 void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
                          const UnpackedDimContext& ctx) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, ctx.diag, ctx.loc, ctx.scope)) return;
-  if (TryParseAssocDim(dim, var, ctx.scope)) return;
-  if (TryParseUserDefinedAssocDim(dim, var, ctx.types.typedefs,
-                                  ctx.types.class_names))
+  if (TryParseAnyAssocDim(dim, var, ctx)) {
+    RecordElementAssoc(dims, var, ctx);
     return;
+  }
   if (TryParseRangeDim(dim, var, ctx.scope)) return;
 
   ApplyConstSizedUnpackedDim(dim, var, ctx.diag, ctx.loc, ctx.scope);

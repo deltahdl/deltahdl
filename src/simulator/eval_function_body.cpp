@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -462,9 +463,59 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   return LoopExitFlow(flow);
 }
 
+// Sets the loop variables `vars` to the combination `n` of the dimensions
+// `ref`'s property declares from the first, counted as nested loops count them
+// with the last dimension varying fastest (§12.7.3).
+static void SetForeachCombination(const ClassArrayRef& ref,
+                                  const std::vector<Variable*>& vars,
+                                  uint64_t n, Arena& arena) {
+  for (size_t k = vars.size(); k-- > 0;) {
+    uint32_t size = ref.prop->dim_sizes[k];
+    uint64_t idx = n % size;
+    n /= size;
+    if (vars[k] != nullptr)
+      vars[k]->value = MakeLogic4VecVal(arena, 32, ref.prop->dim_los[k] + idx);
+  }
+}
+
+// §12.7.3 with §7.4.2 and §8.5: a foreach naming a loop variable for more
+// than one dimension of a property with more than one unpacked dimension,
+// `foreach (g[i, j])` over `int g[2][3]`, runs as nested loops over them, one
+// variable per dimension. Nothing where `stmt` is no such loop.
+static std::optional<FuncFlow> TryExecFuncForeachMultiDim(
+    const Stmt* stmt, const FuncExecCtx& exec) {
+  ClassArrayRef ref;
+  if (stmt->foreach_vars.size() < 2 ||
+      !ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref) ||
+      ref.dim != 0 || !ClassArrayHoldsSubarrays(ref)) {
+    return std::nullopt;
+  }
+  size_t dims = std::min(stmt->foreach_vars.size(), ref.prop->dim_sizes.size());
+  exec.ctx.PushScope();
+  std::vector<Variable*> vars(dims, nullptr);
+  uint64_t total = 1;
+  for (size_t k = 0; k < dims; ++k) {
+    if (!stmt->foreach_vars[k].empty())
+      vars[k] = exec.ctx.CreateLocalVariable(stmt->foreach_vars[k], 32);
+    total *= ref.prop->dim_sizes[k];
+  }
+  FuncFlow flow = FuncFlow::kNext;
+  for (uint64_t n = 0; n < total; ++n) {
+    SetForeachCombination(ref, vars, n, exec.arena);
+    flow = ExecFuncStmt(stmt->body, exec);
+    if (!LoopGoesOn(flow)) break;
+  }
+  exec.ctx.PopScope();
+  return LoopExitFlow(flow);
+}
+
 static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (std::optional<FuncFlow> flow = TryExecFuncForeachMultiDim(stmt, exec)) {
+    if (labeled) exec.ctx.PopStaticScope(stmt->label);
+    return *flow;
+  }
   auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
   std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
   FuncFlow flow = FuncFlow::kNext;

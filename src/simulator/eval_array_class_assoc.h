@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 
 namespace delta {
@@ -156,5 +157,11 @@ bool IsHandlePath(const Expr* expr);
 // for `this` (§8.11), else the object the handle the side evaluates to refers
 // to; null for a side that is no handle path or a null handle.
 ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena);
+
+// §23.6 with §25.3: the key a member of an instance, `i.q` or `top.i.q`, is
+// held under, the path's names joined by dots as the instance's prefix and
+// the member's name are (CreateChildModuleVariables in lowerer_child.cpp);
+// empty where `access` is no path of names.
+std::string InstanceMemberKey(const Expr* access);
 
 }  // namespace delta

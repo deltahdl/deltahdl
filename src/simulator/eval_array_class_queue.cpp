@@ -354,7 +354,9 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
   }
   if (base->is_scope_resolution) return ScopeResolvedQueueProperty(base, ctx);
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
-  if (obj == nullptr) return nullptr;
+  // §25.3 with §23.6: `i.q` names the queue the instance i, of an interface
+  // or a module, declares, held under the instance's prefix.
+  if (obj == nullptr) return ctx.FindQueue(InstanceMemberKey(base));
   return ResolveOn(obj, obj->type, base->rhs->text, ctx, owner);
 }
 

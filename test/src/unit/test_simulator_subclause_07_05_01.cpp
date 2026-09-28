@@ -534,4 +534,53 @@ TEST(DynamicArrayNewSimulation, NewFillsA4StateArrayWithX) {
   EXPECT_EQ(out, "xxxx 1 0 xxxx 1 0\n");
 }
 
+// §7.5.1 with §7.4: new[] sizes a dynamic dimension that an array select
+// names, at any depth, and the elements it makes are variables. In a fixed
+// array of dynamic arrays of dynamic arrays, `arr[0] = new[4]` gives arr[0]
+// four elements and `arr[0][0] = new[2]` gives arr[0][0] two, while arr[1],
+// never sized, stays empty.
+TEST(DynamicArrayNewSimulation, NewSizesADynamicSubarrayOfAFixedArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int arr[2][][];\n"
+      "  initial begin\n"
+      "    arr[0] = new[4];\n"
+      "    arr[0][0] = new[2];\n"
+      "    arr[0][0][1] = 77;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", arr[0].size(), arr[0][0].size(),\n"
+      "             arr[0][0][1], arr[0][1].size(), arr[1].size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 2 77 0 0\n");
+}
+
+// §7.5.1 with §7.4: a dynamic array of dynamic arrays and a fixed array of
+// dynamic arrays size each element by new[] on its select, declared among a
+// module's items and among a block's statements alike, and each element keeps
+// its own size and values.
+TEST(DynamicArrayNewSimulation, NewSizesEachElementOfAnArrayOfDynamicArrays) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int d[][];\n"
+      "  int fx[2][];\n"
+      "  initial begin\n"
+      "    int l[][];\n"
+      "    d = new[3]; d[1] = new[2]; d[2] = new[5]; d[1][1] = 9;\n"
+      "    fx[1] = new[3]; fx[1][2] = 6;\n"
+      "    l = new[2]; l[0] = new[4]; l[0][3] = 8;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", d.size(), d[0].size(), "
+      "d[1].size(),\n"
+      "             d[2].size(), d[1][1]);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", fx[0].size(), fx[1].size(), "
+      "fx[1][2],\n"
+      "             l[0].size(), l[0][3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 0 2 5 9\n0 3 6 4 8\n");
+}
+
 }  // namespace

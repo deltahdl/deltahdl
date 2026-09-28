@@ -132,6 +132,13 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
 // has this to ask instead.
 void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena);
+
+// §7.2.1: register the layout of the structure or union `dtype` under `name`,
+// as bits wide as its members make it, as RegisterDesignTypeLayouts registers
+// a typedef's. Nothing for a type with no members. Defined in
+// src/simulator/lowerer_var_layout.cpp.
+void RegisterTypeLayout(std::string_view name, const DataType* dtype,
+                        SimContext& ctx, Arena& arena);
 // §6.19: the record the enum methods walk of the member `m` of an enumeration
 // `width` bits wide. A member assigned x or z (RtlirEnumMember::xz_value) is
 // given its value as written at that width, x and z bits included; any other

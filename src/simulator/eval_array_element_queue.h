@@ -2,8 +2,10 @@
 
 namespace delta {
 
+struct ArrayInfo;
 struct Expr;
 struct QueueObject;
+struct Stmt;
 class SimContext;
 class Arena;
 
@@ -37,5 +39,15 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
 // elements and any other one value.
 QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
                                   SimContext& ctx, Arena& arena);
+
+// §7.6 with §7.4 and §7.10 (printed pages 159, 153 and 169): `stmt`, whose
+// target is the fixed-size array `dst` describes, as an assignment from one
+// element of an array whose elements are queues, `row = q[0]` on `int
+// q[$][3]` (ElementQueueOfSelect): the element's values are copied into the
+// target from the left, and where their count differs from the target's size
+// the assignment is the §7.6 error and writes nothing. False where the source
+// is no such element.
+bool TryCopyElementQueueToArray(const Stmt* stmt, const ArrayInfo& dst,
+                                SimContext& ctx, Arena& arena);
 
 }  // namespace delta

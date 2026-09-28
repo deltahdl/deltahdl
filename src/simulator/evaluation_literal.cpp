@@ -17,10 +17,12 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_typedef_layout.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -110,8 +112,16 @@ static uint32_t SpecializedTypedefWidth(const DataType& type, SimContext& ctx) {
 // specialization's own typedef folds with its values, which that entry does
 // not hold, so the walk stops at one. 0 outside a method or where no class of
 // the chain declares the name.
+//
+// §8.25: a class with a value parameter has its aggregate typedef folded with
+// the running specialization's values (MethodClassTypedefLayout), whatever
+// the specialization.
 static uint32_t MethodClassTypedefWidth(std::string_view name,
                                         SimContext& ctx) {
+  if (const StructTypeInfo* layout =
+          MethodClassTypedefLayout(name, ctx, nullptr)) {
+    return layout->total_width;
+  }
   for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
        c = c->parent) {
     if (c->param_actuals != nullptr) return 0;

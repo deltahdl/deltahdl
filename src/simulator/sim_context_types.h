@@ -232,6 +232,16 @@ struct QueueObject {
   // array's element type says: elem_width and is_4state describe the element
   // type at the bottom of the dimensions, and holds_class_handles the same.
   bool elements_are_queues = false;
+  // §7.4 with §7.5: how many levels of queues each element's queue holds
+  // below it, one for the elements of `int arr[2][][]`'s arr[0], whose own
+  // elements are queues too; each element's queue is made with one level
+  // fewer.
+  uint32_t nested_queue_levels = 0;
+  // §7.10 and §7.5 with §7.4: where each element is a fixed-size array,
+  // `int q[$][3]`, the number of elements it holds; its queue is made with
+  // that many, each the element type's default, and keeps that many. 0 where
+  // the elements are queues of their own size or no queues.
+  uint32_t element_array_size = 0;
   std::map<uint64_t, QueueObject*> element_queues;
 
  private:
@@ -331,8 +341,20 @@ struct AssocArrayObject {
   // `element_queue_handles` says the type is a class.
   bool elements_are_queues = false;
   bool element_queue_handles = false;
+  // §7.4 with §7.5: how many levels of queues each element's queue holds
+  // below it (QueueObject::nested_queue_levels).
+  uint32_t nested_queue_levels = 0;
   std::map<int64_t, QueueObject*> int_element_queues;
   std::map<std::string, QueueObject*> str_element_queues;
+  // §7.8 with §7.4 (printed pages 162 and 153): for an array whose element
+  // type is an associative array, `int m[string][int]`, the empty array each
+  // element starts as, keyed and valued as the elements are; null for any
+  // other array. As with elements that are queues, the entry in int_data or
+  // str_data marks the key present and the element's own array is kept under
+  // the same key below (ElementAssocOfSelect in eval_array_element_assoc.h).
+  const AssocArrayObject* element_assoc = nullptr;
+  std::map<int64_t, AssocArrayObject*> int_element_assocs;
+  std::map<std::string, AssocArrayObject*> str_element_assocs;
   uint32_t Size() const;
 };
 

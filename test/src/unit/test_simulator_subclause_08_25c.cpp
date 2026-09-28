@@ -215,4 +215,33 @@ TEST(ClassParamsSim, ModuleLevelSpecializationKeysATypeIndexedProperty) {
   EXPECT_EQ(out, "2 77 5 9\n");
 }
 
+// §8.25 with §8.23 and §13.4: a structure typedef a parameterized class
+// declares is of the widths each specialization binds, inside its methods as
+// well as outside. A function's return variable and a local of the typedef
+// have a 32-bit `data` under `B#(32)` and an 8-bit one under the default,
+// `p = 8`, so 200 survives under the default, and 300 is cut to 44 there.
+TEST(ClassParamsSim, SubroutineVariableOfAParameterizedStructTypedef) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class B #(parameter p = 8);\n"
+      "    typedef struct { real r; bit [p-1:0] data; } S;\n"
+      "    static function S One(int v); One.data = v; endfunction\n"
+      "    static function S Two(); Two.data = 7; Two.r = 1.5; endfunction\n"
+      "    static function S Three(); S v; v.data = 300; return v; "
+      "endfunction\n"
+      "  endclass\n"
+      "  B#()::S u, x;\n"
+      "  B#(32)::S z, w;\n"
+      "  initial begin\n"
+      "    u = B#()::One(200); x = B#()::Three();\n"
+      "    z = B#(32)::Two(); w = B#(32)::Three();\n"
+      "    $display(\"%0d %0d | %0d %f | %0d\", u.data, x.data, z.data, z.r,\n"
+      "             w.data);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "200 44 | 7 1.500000 | 300\n");
+}
+
 }  // namespace

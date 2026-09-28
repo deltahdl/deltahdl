@@ -9,6 +9,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_typedef_layout.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
@@ -56,7 +57,9 @@ bool DeclaredTypeIs4State(const DataType& type) {
 // bare name alone, neither was bound, and every member written to it was
 // lost. A specialization's methods read the class's typedef as the
 // specialization binds it, which the declaration's own layout does not hold,
-// so only the class itself, its default specialization, is asked.
+// so only the class itself, its default specialization, is asked. A class
+// with a value parameter has its typedef folded with the running
+// specialization's values instead (MethodClassTypedefLayout).
 static std::string_view NamedLayoutKey(const DataType& type, SimContext& ctx) {
   std::string_view name = type.type_name;
   if (name.empty()) return {};
@@ -70,6 +73,9 @@ static std::string_view NamedLayoutKey(const DataType& type, SimContext& ctx) {
     return type.type_params.empty() ? key_in(type.scope_name)
                                     : std::string_view{};
   if (ctx.FindStructType(name) != nullptr) return name;
+  std::string_view specialized;
+  if (MethodClassTypedefLayout(name, ctx, &specialized) != nullptr)
+    return specialized;
   for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
        c = c->parent) {
     if (c->param_actuals != nullptr) return {};

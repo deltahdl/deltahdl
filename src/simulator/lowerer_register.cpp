@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -64,11 +65,25 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
     inner.push_back({eval(l), eval(r)});
     stride *= span(inner.back().left, inner.back().right);
   }
+  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
+  // §7.4.4: packed dimensions "can also be defined in stages with typedef",
+  // and those the name stands for vary most rapidly, inside the ones written
+  // where it is used: `bsix [1:10] v5` under `typedef bit [1:5] bsix` is ten
+  // elements of the five bits [1:5].
+  uint64_t outer = span(range.left, range.right) * stride;
+  if (dt->kind == DataTypeKind::kNamed && outer > 0 && v->value.width > outer &&
+      v->value.width % outer == 0) {
+    auto named = static_cast<uint32_t>(v->value.width / outer);
+    std::optional<PackedRange> declared = ctx.FindTypeRange(dt->type_name);
+    inner.push_back(declared && span(declared->left, declared->right) == named
+                        ? *declared
+                        : PackedRange::Implicit(named));
+    stride *= named;
+  }
   if (stride > 1) {
     v->packed_elem_width = static_cast<uint32_t>(stride);
     v->inner_packed_dims = std::move(inner);
   }
-  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
   // The elaborator sized this storage from the same dimensions. Bounds that do
   // not account for its width came from an expression this scope cannot fold,
   // and a range read off them would misaddress every bit, so leave the storage

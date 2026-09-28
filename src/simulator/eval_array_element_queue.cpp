@@ -5,8 +5,10 @@
 #include <string>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/assoc_element.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -14,20 +16,62 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
 
 namespace {
 
-// An empty queue whose elements are `width` bits, four-state where
-// `is_4state` says so and class handles where `handles` does.
-QueueObject* NewElementQueue(uint32_t width, bool is_4state, bool handles,
-                             Arena& arena) {
+// What each element's queue of an array whose elements are queues is made
+// of: elements of `width` bits, four-state where `is_4state` says so, class
+// handles where `handles` does, `levels` further levels of queues below it
+// (QueueObject::nested_queue_levels), and, where the element is a fixed-size
+// array, `fixed_size` elements (QueueObject::element_array_size).
+struct ElementQueueShape {
+  uint32_t width;
+  bool is_4state;
+  bool handles;
+  uint32_t levels;
+  uint32_t fixed_size = 0;
+};
+
+ElementQueueShape ShapeOf(const QueueObject& outer) {
+  return {outer.elem_width, outer.is_4state, outer.holds_class_handles,
+          outer.nested_queue_levels, outer.element_array_size};
+}
+
+ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
+  return {aa.elem_width, aa.is_4state, aa.element_queue_handles,
+          aa.nested_queue_levels};
+}
+
+// §7.4 with Table 7-1: brings `q`, the queue of an element that is a
+// fixed-size array of `size` elements, to that many, dropping any past the
+// last and filling any missing with the element type's default, x for a
+// 4-state element and 0 for a 2-state one.
+void FitToFixedSize(QueueObject* q, uint32_t size, Arena& arena) {
+  if (size == 0) return;
+  if (q->elements.size() > size) q->elements.resize(size);
+  while (q->elements.size() < size) {
+    q->elements.push_back(q->is_4state
+                              ? MakeAllX(arena, q->elem_width)
+                              : MakeLogic4VecVal(arena, q->elem_width, 0));
+  }
+}
+
+// The queue of the shape `shape` gives an element's queue, empty or, for a
+// fixed-size array, holding its defaults; where it has levels below it, its
+// own elements are queues of one level fewer.
+QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   auto* q = arena.Create<QueueObject>();
-  q->elem_width = width;
-  q->is_4state = is_4state;
-  q->holds_class_handles = handles;
+  q->elem_width = shape.width;
+  q->is_4state = shape.is_4state;
+  q->holds_class_handles = shape.handles;
+  q->elements_are_queues = shape.levels > 0;
+  q->nested_queue_levels = shape.levels > 0 ? shape.levels - 1 : 0;
+  FitToFixedSize(q, shape.fixed_size, arena);
+  q->AllocateIdsForAppended();
   return q;
 }
 
@@ -48,18 +92,12 @@ template <typename Key>
 QueueObject* AssocElementQueue(AssocArrayObject* aa, KeyedEntries<Key> entries,
                                const Key& key, bool allocate, Arena& arena) {
   if (entries.data.count(key) == 0) {
-    if (!allocate) {
-      return NewElementQueue(aa->elem_width, aa->is_4state,
-                             aa->element_queue_handles, arena);
-    }
+    if (!allocate) return NewElementQueue(ShapeOf(*aa), arena);
     entries.data.emplace(key, AssocAllocValue(aa, arena));
     entries.queues.erase(key);
   }
   QueueObject*& q = entries.queues[key];
-  if (q == nullptr) {
-    q = NewElementQueue(aa->elem_width, aa->is_4state,
-                        aa->element_queue_handles, arena);
-  }
+  if (q == nullptr) q = NewElementQueue(ShapeOf(*aa), arena);
   return q;
 }
 
@@ -101,10 +139,7 @@ QueueObject* OfQueueElement(QueueObject* outer, const Expr* sel,
                      ? outer->element_ids[pos]
                      : pos;
   QueueObject*& q = outer->element_queues[key];
-  if (q == nullptr) {
-    q = NewElementQueue(outer->elem_width, outer->is_4state,
-                        outer->holds_class_handles, arena);
-  }
+  if (q == nullptr) q = NewElementQueue(ShapeOf(*outer), arena);
   return q;
 }
 
@@ -137,8 +172,9 @@ QueueObject* OfFixedElement(const Expr* sel, SimContext& ctx, Arena& arena) {
 
 QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
                                   SimContext& ctx, Arena& arena) {
-  QueueObject* q = NewElementQueue(outer->elem_width, outer->is_4state,
-                                   outer->holds_class_handles, arena);
+  ElementQueueShape empty = ShapeOf(*outer);
+  empty.fixed_size = 0;
+  QueueObject* q = NewElementQueue(empty, arena);
   bool listed = item->kind == ExprKind::kConcatenation ||
                 (item->kind == ExprKind::kAssignmentPattern &&
                  item->pattern_keys.empty());
@@ -148,6 +184,7 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   } else {
     AppendItem(q, item, ctx, arena);
   }
+  FitToFixedSize(q, outer->element_array_size, arena);
   q->AllocateIdsForAppended();
   return q;
 }
@@ -171,6 +208,28 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
   QueueObject* outer = FindQueueOfBase(sel->base, ctx, arena);
   if (outer == nullptr || !outer->elements_are_queues) return nullptr;
   return OfQueueElement(outer, sel, ctx, arena);
+}
+
+bool TryCopyElementQueueToArray(const Stmt* stmt, const ArrayInfo& dst,
+                                SimContext& ctx, Arena& arena) {
+  const QueueObject* src =
+      ElementQueueOfSelect(stmt->rhs, ctx, arena, /*allocate=*/false);
+  if (src == nullptr || dst.is_dynamic || dst.is_queue) return false;
+  if (src->elements.size() != dst.size) {
+    ctx.GetDiag().Error(stmt->range.start,
+                        "array size mismatch in assignment to fixed-size array",
+                        Subclause("7.6"));
+    return true;
+  }
+  for (uint32_t i = 0; i < dst.size; ++i) {
+    uint32_t index = dst.is_descending ? dst.lo + dst.size - 1 - i : dst.lo + i;
+    Variable* element = ctx.FindVariable(std::string(stmt->lhs->text) + "[" +
+                                         std::to_string(index) + "]");
+    if (element == nullptr) continue;
+    element->value = OwnRhsWords(src->elements[i], arena);
+    element->NotifyWatchers();
+  }
+  return true;
 }
 
 }  // namespace delta

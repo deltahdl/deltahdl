@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -17,6 +19,15 @@ struct Stmt;
 // whichever form, so that every site deciding whether a declaration declares a
 // queue decides it the same way wherever the declaration stands.
 bool IsQueueDim(const Expr* dim);
+
+// §7.4 with §7.5 and §7.10 (printed pages 153, 157 and 169): the number of
+// unpacked dimensions from `dims[first]` on when every one of them is a queue
+// dimension or a dynamic array's `[]`, which the parser records as a null
+// dimension, and 0 when any is not or there is none. An element of an array
+// whose dimensions after its first are all of that kind is itself a queue,
+// and so, one level down, is each element of that queue: `int arr[2][][]`
+// has two such levels below its first dimension, `int qq[$][$]` one.
+uint32_t QueueLevelsFrom(const std::vector<Expr*>& dims, size_t first);
 
 // §7.10: N in `[$:N]` is the highest index the queue may hold, and Syntax 7-4
 // requires it to "evaluate to a positive integer value". Returns the number of

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -808,6 +810,55 @@ TEST(MultidimensionalArraySimulation, PropertyTakesAPackageTypedefsQueueDim) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 25u);
+}
+
+// §7.4.4 with §7.4.5: a packed array of packed arrays is indexed one packed
+// dimension at a time, the leftmost first, so `joe[7][3:2]` of `bit [3:0][7:0]
+// joe [1:10]` is two bytes and `joe[6][1:0]` the low two. A packed array of a
+// packed typedef, `bsix [1:10] v5` under `typedef bit [1:5] bsix;`, selects a
+// whole bsix with `v5[1]` and a bit of it, numbered [1:5] from the left, with
+// `v5[1][5]`.
+TEST(MultidimensionalArraySimulation, PackedArrayOfPackedArraysIndexedPerDim) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [3:0][7:0] joe [1:10];\n"
+      "  typedef bit [1:5] bsix;\n"
+      "  bsix [1:10] v5;\n"
+      "  initial begin\n"
+      "    joe[6] = 32'h00001234;\n"
+      "    joe[7] = 0;\n"
+      "    joe[7][3:2] = joe[6][1:0];\n"
+      "    joe[7][0] = joe[6][1] + 1;\n"
+      "    $display(\"%h %0d %0d\", joe[7], joe[7][3:2], joe[7][2]);\n"
+      "    v5 = 0; v5[1] = 5'b10101; v5[1][5] = 1'b0; v5[2][2] = 1'b1;\n"
+      "    $display(\"%0d %0d %0d\", v5[1], v5[2], v5[10]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12340013 4660 52\n20 8 0\n");
+}
+
+// §7.4.4 with §20.7: each packed dimension of a packed array of packed arrays
+// is a dimension of its own to the array query functions, numbered after the
+// unpacked ones from the left: `bit [3:0][7:0] joe [1:10]` has three
+// dimensions, the second [3:0] and the third [7:0].
+TEST(MultidimensionalArraySimulation, QueriesNumberEachPackedDimension) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [3:0][7:0] joe [1:10];\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", $dimensions(joe), "
+      "$unpacked_dimensions(joe));\n"
+      "    $display(\"%0d %0d %0d %0d\", $size(joe, 2), $left(joe, 2),\n"
+      "             $right(joe, 2), $increment(joe, 2));\n"
+      "    $display(\"%0d %0d %0d\", $size(joe, 3), $left(joe, 3), $right(joe, "
+      "3));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1\n4 3 0 1\n8 7 0\n");
 }
 
 }  // namespace

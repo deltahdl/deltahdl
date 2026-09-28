@@ -151,6 +151,15 @@ static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
   // of this call, in ReportZeroWidthPartSelect below; every caller reads the
   // zero this returns as the absence it is.
   if (target.declared_width == 0) return {0, 0};
+  // §7.4.4 with §7.4.5: a part-select of a packed array of packed arrays
+  // addresses whole elements of the dimension it indexes, `joe[7][3:2]` the
+  // two bytes 3 and 2 of a `bit [3:0][7:0]` element.
+  if (at.elem_width > 1) {
+    PartSelectBits elems =
+        PartSelectStorageBits(at.elems, target.first, target.second);
+    return {elems.lo * at.elem_width, elems.width * at.elem_width,
+            elems.src_lo * at.elem_width};
+  }
   return PartSelectStorageBits(at.bits, target.first, target.second);
 }
 

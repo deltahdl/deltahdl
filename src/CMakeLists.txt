@@ -278,6 +278,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_assoc.cpp
     simulator/eval_array_class_assoc.cpp
     simulator/eval_array_class_queue.cpp
+    simulator/eval_array_element_assoc.cpp
     simulator/eval_array_element_queue.cpp
     simulator/eval_string.cpp
     simulator/eval_struct_property.cpp
@@ -507,6 +508,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/evaluation_ops.cpp
     simulator/wide_arith.cpp
     simulator/class_specialization.cpp
+    simulator/class_typedef_layout.cpp
     simulator/lowerer_class.cpp
     simulator/lowerer_data_init.cpp
     simulator/lowerer_var.cpp

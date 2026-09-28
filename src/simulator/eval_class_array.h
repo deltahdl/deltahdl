@@ -49,6 +49,12 @@ const ClassTypeInfo::PropertyInfo* FindClassArrayProperty(
 // class's static_properties, `static_owner`, under the same keys; `obj` is
 // then the object it was reached through, or null where it was reached
 // through `C::` or from a static method.
+//
+// §7.4.2 with §7.4.4: a property with more than one unpacked dimension, `int
+// g[2][3]`, is an array of its first dimension, and a select of it, `g[1]`,
+// the subarray of the next: `dim` says which dimension the reference's
+// elements index, and `path` spells the subarray as its elements' keys
+// extend it, `g[1]` for `g[1][2]`; empty for the property itself.
 struct ClassArrayRef {
   ClassObject* obj = nullptr;
   const ClassTypeInfo::PropertyInfo* prop = nullptr;
@@ -56,7 +62,18 @@ struct ClassArrayRef {
   uint32_t size = 0;
   int64_t lo = 0;
   const ClassTypeInfo* static_owner = nullptr;
+  std::string path = {};
+  uint32_t dim = 0;
 };
+
+// The key the element at declared index `index` of `ref` is held under: the
+// property's own ClassArrayElementKey, or the subarray's path extended by the
+// index.
+std::string ClassArrayRefElementKey(const ClassArrayRef& ref, int64_t index);
+
+// §7.4.2 with §7.4.4: whether the elements of `ref` are subarrays rather than
+// values, as those of `g` and not of `g[1]` are for `int g[2][3]`.
+bool ClassArrayHoldsSubarrays(const ClassArrayRef& ref);
 
 // §7.5: the element count a dynamic array property holds on `obj`, 0 where
 // none has been set.

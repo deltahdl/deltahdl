@@ -514,4 +514,26 @@ TEST(AssocArraySimulation, MethodLocalThroughAUnitAssocTypedefIsAnAssocArray) {
   EXPECT_EQ(out, "num=2\n");
 }
 
+// §7.8 with §7.4: an associative array whose element type is an associative
+// array keeps an inner array under each outer key. A write with two indices
+// allocates the entry at both levels (§7.8.7), and num(), exists() and an
+// element select on `m["a"]` answer for that key's inner array alone.
+TEST(AssocArraySimulation, AssocOfAssocKeepsAnInnerArrayPerKey) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int m[string][int];\n"
+      "  initial begin\n"
+      "    m[\"a\"][1] = 41; m[\"a\"][2] = 42; m[\"b\"][9] = 9;\n"
+      "    $display(\"%0d %0d %0d %0d\", m.num(), m[\"a\"].num(), "
+      "m[\"b\"].num(),\n"
+      "             m[\"a\"][2]);\n"
+      "    $display(\"%0d %0d %0d\", m[\"a\"].exists(2), m[\"b\"].exists(2),\n"
+      "             m[\"b\"][9]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2 1 42\n1 0 9\n");
+}
+
 }  // namespace

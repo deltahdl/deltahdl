@@ -29,11 +29,21 @@ std::string ClassArraySizeKey(std::string_view name) {
   return std::string(name) + ".size";
 }
 
+std::string ClassArrayRefElementKey(const ClassArrayRef& ref, int64_t index) {
+  return ClassArrayElementKey(ref.path.empty() ? ref.prop->name : ref.path,
+                              index);
+}
+
+bool ClassArrayHoldsSubarrays(const ClassArrayRef& ref) {
+  return ref.dim + 1 < ref.prop->dim_sizes.size();
+}
+
 const ClassTypeInfo::PropertyInfo* FindClassArrayProperty(
     const ClassTypeInfo* type, std::string_view name) {
   for (const auto* t = type; t != nullptr; t = t->parent) {
     for (const auto& prop : t->properties) {
-      if (prop.name == name) return prop.IsArray() ? &prop : nullptr;
+      if (prop.name != name) continue;
+      return prop.IsArray() || prop.dim_sizes.size() >= 2 ? &prop : nullptr;
     }
   }
   return nullptr;
@@ -111,6 +121,10 @@ ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo* type,
   if (prop->is_dynamic) {
     const Logic4Vec* count = FindSlot(ref, ClassArraySizeKey(prop->name));
     ref.size = count != nullptr ? static_cast<uint32_t>(count->ToUint64()) : 0;
+  }
+  if (prop->dim_sizes.size() >= 2) {
+    ref.size = prop->dim_sizes[0];
+    ref.lo = prop->dim_los[0];
   }
   return ref;
 }
@@ -238,11 +252,35 @@ static bool ResolveScopedClassArray(const Expr* base, SimContext& ctx,
   return true;
 }
 
+// §7.4.2 with §7.4.4 and §8.5: `g[1]` of a property with more than one
+// unpacked dimension, `int g[2][3]`, is a subarray, an array of the next
+// dimension whose elements are held under keys extending its own, `g[1][2]`.
+static bool ResolveClassSubarray(const Expr* sel, SimContext& ctx, Arena& arena,
+                                 ClassArrayRef& out) {
+  if (sel->index == nullptr || sel->index_end != nullptr) return false;
+  ClassArrayRef outer;
+  if (!ResolveClassArray(sel->base, ctx, arena, outer) ||
+      !ClassArrayHoldsSubarrays(outer)) {
+    return false;
+  }
+  Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
+  if (HasUnknownBits(idx)) return false;
+  out = outer;
+  out.path =
+      ClassArrayRefElementKey(outer, static_cast<int64_t>(idx.ToUint64()));
+  out.dim = outer.dim + 1;
+  out.lo = outer.prop->dim_los[out.dim];
+  out.size = outer.prop->dim_sizes[out.dim];
+  return true;
+}
+
 bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
                        ClassArrayRef& out) {
   if (base == nullptr) return false;
   if (base->kind == ExprKind::kIdentifier)
     return ResolveBareClassArray(base, ctx, out);
+  if (base->kind == ExprKind::kSelect)
+    return ResolveClassSubarray(base, ctx, arena, out);
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return false;
@@ -264,7 +302,7 @@ void ResizeClassArray(const ClassArrayRef& ref, uint32_t size,
         init != nullptr && i < init->size
             ? OwnRhsWords(ReadClassArrayElement(*init, i, ctx, arena), arena)
             : ElementDefault(*ref.prop, arena);
-    SetSlot(ref, ClassArrayElementKey(ref.prop->name, i), val, ctx);
+    SetSlot(ref, ClassArrayRefElementKey(ref, i), val, ctx);
   }
   SetSlot(ref, ClassArraySizeKey(ref.prop->name),
           MakeLogic4VecVal(arena, 32, size), ctx);
@@ -273,7 +311,7 @@ void ResizeClassArray(const ClassArrayRef& ref, uint32_t size,
 Logic4Vec ReadClassArrayElement(const ClassArrayRef& ref, int64_t index,
                                 SimContext& ctx, Arena& arena) {
   if (!IndexInRange(ref, index)) return ElementDefault(*ref.prop, arena);
-  std::string key = ClassArrayElementKey(ref.prop->name, index);
+  std::string key = ClassArrayRefElementKey(ref, index);
   if (ref.bare) {
     if (auto* local = ctx.FindVariable(key)) return local->value;
   }
@@ -337,7 +375,7 @@ void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
   Logic4Vec stored = CoerceToPropertyType(
       ref.static_owner != nullptr ? ref.static_owner : ref.obj->type,
       ref.prop->name, value, arena);
-  SetSlot(ref, ClassArrayElementKey(ref.prop->name, index), stored, ctx);
+  SetSlot(ref, ClassArrayRefElementKey(ref, index), stored, ctx);
 }
 
 bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -381,6 +419,7 @@ bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,
   }
   ClassArrayRef ref;
   if (ResolveClassArray(src, ctx, arena, ref)) {
+    if (ClassArrayHoldsSubarrays(ref)) return false;
     for (uint32_t i = 0; i < ref.size; ++i)
       out.push_back(
           ReadClassArrayElement(ref, IndexFromLeft(ref, i), ctx, arena));
@@ -424,6 +463,7 @@ bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   ClassArrayRef dst;
   if (!ResolveClassArray(lhs, ctx, arena, dst))
     return AssignQueueProperty(lhs, elems, ctx, arena);
+  if (ClassArrayHoldsSubarrays(dst)) return false;
   if (dst.prop->is_dynamic) {
     dst.size = static_cast<uint32_t>(elems.size());
     ResizeClassArray(dst, dst.size, nullptr, ctx, arena);

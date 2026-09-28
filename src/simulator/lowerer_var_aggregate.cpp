@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_element_shape.h"
 #include "parser/ast_type.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -57,7 +58,31 @@ static void CreateFixedElementQueues(std::string_view name,
     QueueObject* q =
         ctx.CreateQueue(*key, var.width, /*max_size=*/-1, var.is_4state);
     q->holds_class_handles = !var.class_type_name.empty();
+    // §7.4 with §7.5: in `int arr[2][][]` the element's queue, arr[0], holds
+    // queues itself.
+    q->elements_are_queues = var.element.nested_queue_levels > 0;
+    q->nested_queue_levels = var.element.nested_queue_levels > 0
+                                 ? var.element.nested_queue_levels - 1
+                                 : 0;
   }
+}
+
+// §7.8 with §7.4 (printed pages 162 and 153): the empty array each element
+// of `outer`, an associative array whose element type is an associative array
+// indexed by `index`, starts as: of the elements `outer` declares, under that
+// index.
+static const AssocArrayObject* ElementAssocTemplate(
+    const AssocArrayObject* outer, const RtlirAssocIndex& index, Arena& arena) {
+  auto* inner = arena.Create<AssocArrayObject>();
+  inner->elem_width = outer->elem_width;
+  inner->is_4state = outer->is_4state;
+  inner->is_string_key = index.is_string;
+  inner->is_wildcard = index.is_wildcard;
+  inner->is_index_signed = index.is_signed;
+  inner->index_width = index.width;
+  inner->index_class = index.class_name;
+  inner->index_type_name = index.type_name;
+  return inner;
 }
 
 void Lowerer::LowerVarAggregate(std::string_view name,
@@ -70,6 +95,8 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // in eval_array_class_queue.h).
     q->holds_class_handles = !var.class_type_name.empty();
     q->elements_are_queues = var.elements_are_queues;
+    q->nested_queue_levels = var.element.nested_queue_levels;
+    q->element_array_size = var.element.array_size;
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
@@ -79,6 +106,8 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
     auto* q = ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
     q->elements_are_queues = var.elements_are_queues;
+    q->nested_queue_levels = var.element.nested_queue_levels;
+    q->element_array_size = var.element.array_size;
     LowerDynArrayInit(q, var);
 
     ArrayInfo info;
@@ -96,6 +125,11 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // each key (eval_array_element_queue.h), handles where the element type
     // is a class.
     aa->elements_are_queues = var.elements_are_queues;
+    aa->nested_queue_levels = var.element.nested_queue_levels;
+    if (var.element.assoc_index) {
+      aa->element_assoc =
+          ElementAssocTemplate(aa, *var.element.assoc_index, arena_);
+    }
     aa->element_queue_handles =
         var.elements_are_queues && !var.class_type_name.empty();
     InitAssocDefault(var.init_expr, aa);

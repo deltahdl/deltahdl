@@ -17,6 +17,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
+#include "simulator/eval_array_element_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -139,6 +140,18 @@ ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
   if (side->kind == ExprKind::kIdentifier && side->text == "this")
     return ctx.CurrentThis();
   return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
+}
+
+std::string InstanceMemberKey(const Expr* access) {
+  if (access == nullptr) return {};
+  if (access->kind == ExprKind::kIdentifier) return std::string(access->text);
+  if (access->kind != ExprKind::kMemberAccess || access->is_scope_resolution ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  std::string prefix = InstanceMemberKey(access->lhs);
+  if (prefix.empty()) return {};
+  return prefix + "." + std::string(access->rhs->text);
 }
 
 // The typedef item the class `t` itself declares under `name`; null where it
@@ -479,6 +492,11 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
   if (base == nullptr) return nullptr;
   if (base->kind == ExprKind::kIdentifier)
     return FindAssocArrayOfName(base->text, ctx, owner);
+  // §7.8 with §7.4: an element of an associative array whose elements are
+  // associative arrays, `m["a"]`, is one itself; read here, as by `m["a"][2]`
+  // or `m["a"].num()`, a missing entry is allocated by nothing.
+  if (base->kind == ExprKind::kSelect)
+    return ElementAssocOfSelect(base, ctx, arena, /*allocate=*/false);
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
@@ -495,7 +513,9 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
                      owner);
   }
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
-  if (obj == nullptr) return nullptr;
+  // §25.3 with §23.6: `i.m` names the associative array the instance i, of
+  // an interface or a module, declares, held under the instance's prefix.
+  if (obj == nullptr) return ctx.FindAssocArray(InstanceMemberKey(base));
   return ResolveOn(obj, obj->type, base->rhs->text, ctx, owner);
 }
 

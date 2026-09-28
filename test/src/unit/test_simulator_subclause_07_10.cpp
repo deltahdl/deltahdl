@@ -436,4 +436,54 @@ TEST(QueueSim, ElementsOfAQueueOfHandlesReachTheirObjects) {
   EXPECT_EQ(out, "8 16\n1 16 4\n1 2\n");
 }
 
+// §7.10 with §7.4 and §20.7: a queue's element type may be a fixed-size
+// array, `int q[$][3]`. Each element pushed is a whole three-element array,
+// so the queue's second dimension and the size of one element are 3, and
+// `q[1][2]` is the third element of the second array pushed.
+TEST(QueueSim, QueueOfFixedArraysHoldsWholeArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$][3];\n"
+      "  int row[3];\n"
+      "  initial begin\n"
+      "    q.push_back('{1, 2, 3});\n"
+      "    q.push_back('{4, 5, 6});\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", $size(q), $size(q, 2), "
+      "$size(q[1]),\n"
+      "             q[1][2], q[0][0]);\n"
+      "    q[0][1] = 9; row = q[0];\n"
+      "    $display(\"%0d %0d %0d %0d\", row[0], row[1], row[2], q[1][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 3 3 6 1\n1 9 3 4\n");
+}
+
+// §7.10 and §7.8 with §25.3: a queue and an associative array declared in an
+// interface are members of the instance, reached from the instantiating
+// module through the instance's name like any other member: a push, an entry
+// write, size(), num() and an element read through `i.` all act on the
+// instance's own arrays.
+TEST(QueueSim, QueueAndAssocArrayOfAnInterfaceInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "interface ifc;\n"
+      "  int q[$];\n"
+      "  int m[string];\n"
+      "endinterface\n"
+      "module t;\n"
+      "  ifc i();\n"
+      "  initial begin\n"
+      "    i.q.push_back(5); i.q.push_back(8); i.m[\"a\"] = 1; i.m[\"b\"] = "
+      "2;\n"
+      "    #1 $display(\"%0d %0d %0d %0d %0d\", i.q.size(), i.m.num(), "
+      "i.q[1],\n"
+      "                i.m[\"b\"], i.m.exists(\"c\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2 8 2 0\n");
+}
+
 }  // namespace

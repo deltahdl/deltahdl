@@ -270,37 +270,47 @@ static bool DeclaresQueue(const Stmt* stmt) {
          IsQueueDim(stmt->var_unpacked_dims[0]);
 }
 
-// §7.4 with §7.10 (printed pages 153 and 169): the type the elements of the
-// array `stmt` declares have where each of them is itself a queue -- a second
-// dimension `[$]`, `int aq[string][$]`, or, the declaration writing a single
-// dimension, a type naming a typedef whose own one unpacked dimension is `[$]`,
-// UVM's `rsrc_sv_q_t all[int]` under `typedef uvm_resource_base
-// rsrc_sv_q_t[$];` (§6.18 making the typedef's dimensions part of the type).
-// Null where the elements are no queues. The typedef is looked for from the
-// running method's class, where a class-scope one is declared.
-static const DataType* ElementQueueType(const Stmt* stmt, SimContext& ctx) {
+// §7.4 with §7.10 (printed pages 153 and 169): where each element of the
+// array `stmt` declares is itself a queue, the type those queues' own elements
+// have and how many levels of queues each element holds, counting itself --
+// its dimensions after the first each `[$]` or `[]`, `int aq[string][$]` or
+// `int d[][]`, or, the declaration writing a single dimension, a type naming
+// a typedef whose own unpacked dimensions are, UVM's `rsrc_sv_q_t all[int]`
+// under `typedef uvm_resource_base rsrc_sv_q_t[$];` (§6.18 making the
+// typedef's dimensions part of the type). A null type where the elements are
+// no queues. The typedef is looked for from the running method's class,
+// where a class-scope one is declared.
+struct ElementQueues {
+  const DataType* type = nullptr;
+  uint32_t levels = 0;
+};
+
+static ElementQueues ElementQueuesOf(const Stmt* stmt, SimContext& ctx) {
   const std::vector<Expr*>& dims = stmt->var_unpacked_dims;
-  if (dims.size() == 2 && dims[1] != nullptr && IsQueueDim(dims[1]))
-    return &stmt->var_decl_type;
-  if (dims.size() != 1) return nullptr;
+  if (dims.size() >= 2) {
+    uint32_t levels = QueueLevelsFrom(dims, 1);
+    if (levels == 0) return {};
+    return {&stmt->var_decl_type, levels};
+  }
+  if (dims.size() != 1) return {};
   const ModuleItem* item =
       TypedefItemSeenFrom(stmt->var_decl_type, ctx.CurrentMethodClass(), ctx);
-  if (item == nullptr || item->unpacked_dims.size() != 1 ||
-      !IsQueueDim(item->unpacked_dims[0])) {
-    return nullptr;
-  }
-  return &item->typedef_type;
+  if (item == nullptr) return {};
+  uint32_t levels = QueueLevelsFrom(item->unpacked_dims, 0);
+  if (levels == 0) return {};
+  return {&item->typedef_type, levels};
 }
 
 // §7.10: marks the queue or dynamic array `q` that `stmt` declares as one
-// whose elements are queues, where they are (ElementQueueType), with those
+// whose elements are queues, where they are (ElementQueuesOf), with those
 // queues' elements handles where their type is a class (§8.4).
 static void MarkElementQueues(const Stmt* stmt, QueueObject* q, SimContext& ctx,
                               Arena& arena) {
-  const DataType* type = ElementQueueType(stmt, ctx);
-  if (type == nullptr) return;
+  ElementQueues queues = ElementQueuesOf(stmt, ctx);
+  if (queues.type == nullptr) return;
   q->elements_are_queues = true;
-  q->holds_class_handles = !DeclaredClassKey(*type, ctx, arena).empty();
+  q->nested_queue_levels = queues.levels - 1;
+  q->holds_class_handles = !DeclaredClassKey(*queues.type, ctx, arena).empty();
 }
 
 // §7.10: a declaration whose first unpacked dimension is `[$]` or `[$:N]`
@@ -347,13 +357,14 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
 // declined, storing nothing and reporting nothing (#3614).
 //
 // §7.8 with §7.10: the elements may themselves be queues, `int aq[string][$]`
-// or a queue typedef's `q_t all[int]` (ElementQueueType), and the array then
+// or a queue typedef's `q_t all[int]` (ElementQueuesOf), and the array then
 // keeps a queue under each key it holds (eval_array_element_queue.h).
 static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
                                   SimContext& ctx, Arena& arena) {
-  const DataType* queue_type = ElementQueueType(stmt, ctx);
-  if (stmt->var_unpacked_dims.size() !=
-      (queue_type == &stmt->var_decl_type ? 2u : 1u)) {
+  ElementQueues queues = ElementQueuesOf(stmt, ctx);
+  const DataType* queue_type = queues.type;
+  if (queue_type != &stmt->var_decl_type &&
+      stmt->var_unpacked_dims.size() != 1) {
     return false;
   }
   const Expr* dim = stmt->var_unpacked_dims.front();
@@ -363,6 +374,7 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
       AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type), ctx));
   if (queue_type != nullptr) {
     aa->elements_are_queues = true;
+    aa->nested_queue_levels = queues.levels - 1;
     aa->element_queue_handles =
         !DeclaredClassKey(*queue_type, ctx, arena).empty();
   }

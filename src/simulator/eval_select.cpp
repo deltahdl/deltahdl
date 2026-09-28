@@ -510,14 +510,23 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
 // method of UVM's uvm_report_server fell to a bit-select of the property's
 // scalar carrier and read 0 whatever the entry held. The name a §7.8.6 report
 // gives is the property's own for a property.
+//
+// §7.8 with §7.4: the array may be an element of an associative array whose
+// elements are associative arrays, `m["a"][2]`, and the report then names the
+// array it is an element of.
+static std::string_view AssocReportName(const Expr* base) {
+  while (base->kind == ExprKind::kSelect && base->base != nullptr)
+    base = base->base;
+  if (base->kind == ExprKind::kIdentifier) return base->text;
+  return base->rhs != nullptr ? base->rhs->text : std::string_view{};
+}
+
 static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   if (!expr->base || expr->index_end) return false;
   auto* aa = FindAssocArrayOfBase(expr->base, ctx, arena);
   if (!aa) return false;
-  std::string_view name = expr->base->kind == ExprKind::kIdentifier
-                              ? expr->base->text
-                              : expr->base->rhs->text;
+  std::string_view name = AssocReportName(expr->base);
   out = aa->is_string_key ? AssocReadStr(aa, expr->index, name, ctx, arena)
                           : AssocReadInt(aa, expr->index, name, ctx, arena);
   return true;
@@ -637,6 +646,17 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
   auto target = PartSelectTargetIndices(idx, SelectBoundValue(end),
                                         expr->is_part_select_plus,
                                         expr->is_part_select_minus);
+  // §7.4.4 with §7.4.5: a part-select of a packed array of packed arrays
+  // selects whole elements of the dimension it indexes, `joe[7][3:2]` the two
+  // bytes 3 and 2 of a `bit [3:0][7:0]` element, rather than bits.
+  auto level = SelectBaseLevel(expr->base, base.width, ctx, arena);
+  if (level && level->elem_width > 1) {
+    int64_t w = level->elem_width;
+    int64_t first = level->range.OffsetOf(target.first);
+    int64_t second = level->range.OffsetOf(target.second);
+    return EvalPartSelect(base, std::min(first, second) * w,
+                          std::max(first, second) * w + w - 1, arena);
+  }
   return EvalPartSelect(base, range.OffsetOf(target.first),
                         range.OffsetOf(target.second), arena);
 }

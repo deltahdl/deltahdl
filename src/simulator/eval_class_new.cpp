@@ -45,6 +45,17 @@ static void StoreClassPropertyDefault(const ClassTypeInfo* info,
         MakeLogic4VecVal(arena, 32, 0);
     return;
   }
+  // §7.4.2 with §7.4.4: a property of more than one unpacked dimension, `int
+  // g[2][3]`, holds each of its elements under the key the selects down to
+  // it spell, `g[1][2]` (ClassArrayRefElementKey).
+  if (prop.dim_sizes.size() >= 2) {
+    ArrayInfo shape;
+    shape.dim_los = prop.dim_los;
+    shape.dim_sizes = prop.dim_sizes;
+    for (const std::string& leaf : MultiDimLeafSuffixes(shape))
+      obj->properties[std::string(prop.name) + leaf] = OwnRhsWords(val, arena);
+    return;
+  }
   if (prop.array_size > 0) {
     for (uint32_t i = 0; i < prop.array_size; ++i) {
       obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =

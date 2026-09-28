@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -288,6 +290,40 @@ TEST(UnpackedArraySim, StructElementsInitializedWrittenAndRead) {
   EXPECT_EQ(RunAndGet(src, "g1"), 7u);
   EXPECT_EQ(RunAndGet(src, "b2"), 7u);
   EXPECT_EQ(RunAndGet(src, "sum"), 13u);
+}
+
+// §7.4.2 with §8.5: a class property may be a multidimensional unpacked
+// array, and each element `g[i][j]` is a variable of its own, written and
+// read in a method, through a handle, and by a foreach with a loop variable
+// per dimension.
+TEST(UnpackedArraySim, MultidimensionalClassPropertyElementsAreVariables) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int g[2][3];\n"
+      "    function void set(); g[1][2] = 5; g[0][1] = 3; endfunction\n"
+      "    function int get(); return g[1][2] * 10 + g[0][1]; endfunction\n"
+      "    function int total();\n"
+      "      int s = 0;\n"
+      "      foreach (g[i, j]) s += g[i][j];\n"
+      "      return s;\n"
+      "    endfunction\n"
+      "    function void fill(); foreach (g[i, j]) g[i][j] = i * 3 + j; "
+      "endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new; h.set();\n"
+      "    h.g[1][0] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", h.get(), h.g[1][2], h.g[0][1],\n"
+      "             h.g[1][0], h.total());\n"
+      "    h.fill();\n"
+      "    $display(\"%0d %0d %0d\", h.g[0][2], h.g[1][1], h.total());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "53 5 3 7 15\n2 4 15\n");
 }
 
 }  // namespace

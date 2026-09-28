@@ -1,7 +1,9 @@
 #include "elaborator/queue_dim.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -13,6 +15,14 @@ namespace delta {
 
 bool IsQueueDim(const Expr* dim) {
   return dim && dim->kind == ExprKind::kIdentifier && dim->text == "$";
+}
+
+uint32_t QueueLevelsFrom(const std::vector<Expr*>& dims, size_t first) {
+  if (first >= dims.size()) return 0;
+  for (size_t i = first; i < dims.size(); ++i) {
+    if (dims[i] != nullptr && !IsQueueDim(dims[i])) return 0;
+  }
+  return static_cast<uint32_t>(dims.size() - first);
 }
 
 std::optional<int32_t> QueueBoundMaxSize(int64_t bound) {

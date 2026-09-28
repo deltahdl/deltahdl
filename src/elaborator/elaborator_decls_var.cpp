@@ -719,24 +719,44 @@ static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                  diag);
 }
 
-// §7.4 with §7.10 (printed pages 153 and 169): whether each element of the
-// array `item` declares is itself a queue -- its second of two dimensions is
-// `[$]`, `int aq[string][$]`, or its one dimension's element type names a
-// typedef whose own one unpacked dimension is `[$]`, `q_t d[]` under `typedef
-// int q_t[$];`, the typedef's dimensions being part of the type it names
-// (§6.18).
-static bool DeclaresElementQueues(
+// §7.4 with §7.5 and §7.10 (printed pages 153, 157 and 169): how many levels
+// of queues each element of the array `item` declares holds, counting the
+// element itself, 0 where the element is no queue -- its dimensions after the
+// first are each `[$]` or `[]`, `int aq[string][$]` or `int arr[2][][]`, or
+// its one dimension's element type names a typedef whose own unpacked
+// dimensions are, `q_t d[]` under `typedef int q_t[$];`, the typedef's
+// dimensions being part of the type it names (§6.18).
+static uint32_t ElementQueueLevels(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
         td_array_dims) {
   const std::vector<Expr*>& dims = item->unpacked_dims;
-  if (dims.size() == 2 && dims[1] != nullptr && IsQueueDim(dims[1]))
-    return true;
+  if (dims.size() >= 2) return QueueLevelsFrom(dims, 1);
   if (dims.size() != 1 || item->data_type.kind != DataTypeKind::kNamed)
-    return false;
+    return 0;
   auto it = td_array_dims.find(item->data_type.type_name);
-  return it != td_array_dims.end() && it->second.size() == 1 &&
-         it->second[0] != nullptr && IsQueueDim(it->second[0]);
+  return it == td_array_dims.end() ? 0 : QueueLevelsFrom(it->second, 0);
+}
+
+// §7.10 and §7.5 with §7.4 (printed pages 169, 157 and 153): the number of
+// elements each element of the queue or dynamic array `item` declares holds
+// where that element is a fixed-size array numbered from 0, `int q[$][3]` or
+// `int d[][0:2]`, and 0 for any other declaration. Each such element is kept
+// as a queue of that many elements (RtlirElementShape::array_size).
+static uint32_t FixedElementArraySize(const ModuleItem* item,
+                                      const ScopeMap& scope) {
+  const std::vector<Expr*>& dims = item->unpacked_dims;
+  if (dims.size() != 2 || dims[1] == nullptr || IsQueueDim(dims[1])) return 0;
+  if (dims[0] != nullptr && !IsQueueDim(dims[0])) return 0;
+  const Expr* dim = dims[1];
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto lv = ConstEvalInt(dim->lhs, scope);
+    auto rv = ConstEvalInt(dim->rhs, scope);
+    if (!lv || !rv || *lv != 0 || *rv < 0) return 0;
+    return static_cast<uint32_t>(*rv + 1);
+  }
+  auto size = ConstEvalInt(dim, scope);
+  return size && *size > 0 ? static_cast<uint32_t>(*size) : 0;
 }
 
 // §6.18 / §7.4 / §10.10.1: when a variable's named type is a fixed unpacked-
@@ -902,7 +922,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
-  var.elements_are_queues = DeclaresElementQueues(item, td_array_dims_);
+  const uint32_t kQueueLevels = ElementQueueLevels(item, td_array_dims_);
+  var.elements_are_queues = kQueueLevels > 0;
+  var.element.nested_queue_levels = kQueueLevels > 0 ? kQueueLevels - 1 : 0;
+  var.element.array_size = FixedElementArraySize(item, BuildParamScope(mod));
+  if (var.element.array_size > 0) var.elements_are_queues = true;
 
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 

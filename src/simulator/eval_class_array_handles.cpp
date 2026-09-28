@@ -156,7 +156,7 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
   if (index < ref.lo || index >= ref.lo + static_cast<int64_t>(ref.size))
     return true;
   Logic4Vec handle = ConstructElementObject(rhs, class_key, ctx, arena);
-  ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), handle);
+  ref.obj->SetProperty(ClassArrayRefElementKey(ref, index), handle);
   // §9.4.2: a change to an object's data member wakes a process waiting on
   // the object, as every other write to an element of the property tells it.
   ctx.NotifyClassHandleWatchers(ref.obj->handle);
