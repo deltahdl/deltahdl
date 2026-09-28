@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_array_shape.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_decls_internal.h"
@@ -230,25 +231,6 @@ static void CollectUnpackedDimSizes(
   }
 }
 
-// §6.22.2 a) makes a typedef name equivalent to the type it names, so an
-// element type written through one is recorded as the kind its chain of
-// typedef names ends at, `bit` for `uint10` of `typedef bit [10:1] uint10;`,
-// and §7.6's element comparison reaches item d)'s test of width, state and
-// signedness. A name with no definition is kept, and so is one naming an
-// enumeration, which item d) does not reach and which the integral comparison
-// would take for its base type; the hop limit keeps a cyclic typedef from
-// looping.
-static DataTypeKind ElementKindThroughTypedefs(const DataType& dtype,
-                                               const TypedefMap& typedefs) {
-  const DataType* type = &dtype;
-  for (int hops = 0; hops < 8 && type->kind == DataTypeKind::kNamed; ++hops) {
-    auto td = typedefs.find(type->type_name);
-    if (td == typedefs.end()) break;
-    type = &td->second;
-  }
-  return type->kind == DataTypeKind::kEnum ? dtype.kind : type->kind;
-}
-
 void Elaborator::TrackVarArrayInfo(
     const ModuleItem* item, RtlirVariable& var, const ScopeMap& scope,
     std::unordered_map<std::string_view, VarArrayInfo>& out) {
@@ -272,6 +254,8 @@ void Elaborator::TrackVarArrayInfo(
   }
   CollectUnpackedDimSizes(item->unpacked_dims, info.declared_dims,
                           info.dim_sizes, scope);
+  info.unpacked_shape = UnpackedShapeOf(item->data_type, item->unpacked_dims,
+                                        aggregate_typedef_names_, scope);
   out[item->name] = info;
   // §11.5.2 resolves an address against "the address bounds given in the
   // declaration", so both bounds of every dimension that folded are carried

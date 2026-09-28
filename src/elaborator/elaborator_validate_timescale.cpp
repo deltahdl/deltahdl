@@ -66,6 +66,9 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // expose the same resolved parameter scope to the variable-sized-dimension
   // check for const-folding a parameter/localparam/genvar-valued n.
   array_query_dim_scope_ = scope;
+  // §7.7: the array-argument check folds a formal's dimension bounds, which may
+  // be parameter-valued, in the same scope.
+  array_arg_dim_scope_ = scope;
   // §20.16.3: the PLA ascending-order check folds declaration range bounds,
   // which may be parameter- or localparam-valued, so give it the same resolved
   // scope.

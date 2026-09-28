@@ -411,6 +411,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_enum_constants.cpp
     elaborator/elaborator_typedef.cpp
     elaborator/elaborator_validate_class_array_assign.cpp
+    elaborator/elaborator_validate_array_args.cpp
+    elaborator/elaborator_array_shape.cpp
     elaborator/elaborator_validate_class_array_index.cpp
     elaborator/elaborator_validate_class_constraints.cpp
     elaborator/elaborator_validate_class_constraint_methods.cpp

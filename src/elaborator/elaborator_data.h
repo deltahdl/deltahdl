@@ -130,6 +130,10 @@ class ElaboratorData {
     // §7.4 with §7.10: each element is itself a queue, `int qq[$][$]` or
     // `q_t fx[2]` under `typedef int q_t[$];` (RtlirVariable's own flag).
     bool elements_are_queues = false;
+    // §7.7: every unpacked dimension as UnpackedShapeOf gives it, its size or
+    // nullopt where it has none of its own, so that each dimension lines up
+    // with the declaration's; empty where the shape is not known.
+    std::vector<std::optional<uint32_t>> unpacked_shape = {};
   };
 
   // §23.9 (printed page 761) with §27.4 (printed 820): a module's
@@ -736,6 +740,10 @@ class ElaboratorData {
   // is. Holds the parameter scope of the module currently under constraint
   // validation.
   ScopeMap array_query_dim_scope_;
+  // §7.7: a formal's unpacked dimensions are compared with its actual's by
+  // size, and their bounds may be parameters, so the argument check folds them
+  // in the parameter scope of the module currently under constraint validation.
+  ScopeMap array_arg_dim_scope_;
 
   // §20.16.3: the ascending-order requirement on a PLA memory or term is tested
   // against its declared packed and unpacked ranges. Those range bounds are
