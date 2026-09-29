@@ -97,6 +97,15 @@ class SynthLower {
   uint32_t LowerInsideRangeMatch(const Expr* sel_expr, const Expr* range,
                                  AigGraph& aig, uint32_t width);
 
+  // §11.8.2: bit `bit` of a context-determined operand, a signed identifier
+  // extended by its sign where the propagated type is signed. That is an
+  // operand of a binary arithmetic or bitwise operator, and the case expression
+  // §12.5 and the left operand of `==?` §11.4.6 compare over a common length.
+  // Defined in synth_lower.cpp. Public because BuildPatternMatch reaches it
+  // through LowerCtx::synth.
+  uint32_t LowerContextOperandBit(const Expr* operand, AigGraph& aig,
+                                  uint32_t bit);
+
   bool CheckStmtSynthesizable(const Stmt* stmt, const RtlirModule* mod);
   bool CheckExprSynthesizable(const Expr* expr);
 
@@ -160,11 +169,6 @@ class SynthLower {
   void MapPortBits(const RtlirPort& port, uint32_t width, AigGraph& aig);
 
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
-  // §11.8.2: bit `bit` of a context-determined operand of a binary arithmetic
-  // or bitwise operator, a signed identifier extended by its sign where the
-  // propagated type is signed. Defined in synth_lower.cpp.
-  uint32_t LowerContextOperandBit(const Expr* operand, AigGraph& aig,
-                                  uint32_t bit);
 
   // §5.7.1: lower one bit of an integer literal. The literal's own digits are
   // what answers it, because §5.7.1 sizes a literal by its size constant and

@@ -118,6 +118,39 @@ TEST(CaseStatementSynth, AnUnsignedItemMakesTheComparisonUnsigned) {
       16, [](uint64_t) -> uint64_t { return 0; });
 }
 
+// A signed name standing as the whole case expression is extended by its sign
+// to the length §12.5 gives the comparison, as a shift standing there is. The
+// signed `a` of 4'b1111 is -1, which is the five-bit -1 the item writes. The
+// test fails on a lowering that reads the name's bits above its own width as
+// zero, which never matches.
+TEST(CaseStatementSynth, ASignedNameSelectorIsExtendedBySign) {
+  ExpectInputSweep(
+      "module m(input logic signed [3:0] a, output logic y);\n"
+      "  always_comb begin\n"
+      "    case (a)\n"
+      "      5'sb11111: y = 1'b1;\n"
+      "      default: y = 1'b0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      16, [](uint64_t a) -> uint64_t { return a == 15 ? 1 : 0; });
+}
+
+// With one unsigned item the same signed name is zero-extended (§12.5), so
+// 4'b1111 reads as 5'b01111 and never reaches 5'b11111.
+TEST(CaseStatementSynth, AnUnsignedItemZeroExtendsASignedNameSelector) {
+  ExpectInputSweep(
+      "module m(input logic signed [3:0] a, output logic y);\n"
+      "  always_comb begin\n"
+      "    case (a)\n"
+      "      5'b11111: y = 1'b1;\n"
+      "      default: y = 1'b0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      16, [](uint64_t) -> uint64_t { return 0; });
+}
+
 // A case expression whose length the synthesizer cannot answer is one it
 // cannot compare bit for bit. `SynthLower::ExprWidth` reads no function's
 // declaration, so a call is such a selector.

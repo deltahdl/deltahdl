@@ -296,10 +296,14 @@ uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
                         (pat->kind == ExprKind::kIntegerLiteral)};
   if (dp.has_dc) dp.bits = ParsePatternLiteral(pat->text, case_kind);
 
+  // §12.5 compares the case expression over the length and type it shares
+  // with every item, and §11.4.6 does the same for the two operands of `==?`,
+  // so a signed name selector is extended by its sign above its own width
+  // where the propagated type the caller set is signed.
   uint32_t eq = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < sel_width; ++b) {
     if (dp.has_dc && PatternBitIsDontCare(dp.bits, b)) continue;
-    uint32_t sb = ctx.synth.LowerExprBit(sel_expr, ctx.aig, b);
+    uint32_t sb = ctx.synth.LowerContextOperandBit(sel_expr, ctx.aig, b);
     uint32_t pb = PatternBitLit(ctx, dp, b);
     eq = ctx.aig.AddAnd(eq, ctx.aig.AddNot(ctx.aig.AddXor(sb, pb)));
   }
