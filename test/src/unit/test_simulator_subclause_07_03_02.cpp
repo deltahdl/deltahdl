@@ -124,6 +124,25 @@ TEST(TaggedUnionSimulation, PackedTaggedUnionBitsIsTagPlusMaxMember) {
   EXPECT_EQ(v, 33u);
 }
 
+// §7.3.2 puts a packed tagged union's tag in the value's most significant bits,
+// so a write naming another member rewrites the tag as well as the member:
+// after `tagged v2` sets the tag bit to 1, `tagged v1 (85)` reads 0 followed by
+// 1010101. Kept at 1, the stale tag read 11010101.
+TEST(TaggedUnionSimulation, PackedTaggedUnionRetagRewritesTagBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  union tagged packed { bit [6:0] v1; bit [6:0] v2; } "
+                       "un;\n"
+                       "  initial begin\n"
+                       "    un = tagged v2 (10);\n"
+                       "    un = tagged v1 (85);\n"
+                       "    $display(\"%b\", un);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "01010101\n");
+}
+
 // Without the packed qualifier the tag is not part of the in-vector layout, so
 // the same tagged union reports only its widest member's width at run time.
 TEST(TaggedUnionSimulation, UnpackedTaggedUnionBitsHasNoTagBits) {

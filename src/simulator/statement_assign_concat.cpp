@@ -140,10 +140,13 @@ static bool IsTwoStateIntegerKind(DataTypeKind kind) {
 // in the union layout `layout` is a scalar of a 2-state type, at the member's
 // width with every x and z bit 0, as a write into that member stores it. The
 // union's storage keeps x and z for a 4-state member beside it, so the
-// conversion is the member's own. None for any other member.
+// conversion is the member's own. None for any other member, and none for a
+// packed union, whose value also carries the tag in its most significant bits
+// (§7.3.2) and is built with them where it is evaluated as it stands.
 static std::optional<Logic4Vec> TwoStateMemberValue(
     const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
     Arena& arena) {
+  if (layout.is_packed) return std::nullopt;
   const StructFieldInfo* field = FindStructField(&layout, expr->rhs->text);
   if (field == nullptr || field->nested != nullptr || field->elem_count != 0 ||
       !IsTwoStateIntegerKind(field->type_kind))
