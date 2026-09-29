@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -63,6 +62,18 @@ struct ClockingValue {
   // The value's low 64 bits with an unknown bit read as 0, as
   // Logic4Vec::ToUint64 reads one.
   uint64_t Low() const;
+};
+
+// §14.16 (printed pages 368-369): one synchronous drive -- the block and the
+// clockvar it drives, the value its right-hand side evaluated to where it ran,
+// its cycle delay, and, for a bit-select or slice of the clockvar, the select
+// of the signal it assigns in place of the whole signal (null otherwise).
+struct ClockvarDrive {
+  std::string_view block_name;
+  std::string_view signal_name;
+  ClockingValue value;
+  uint32_t cycles = 0;
+  const Expr* target = nullptr;
 };
 
 enum class ClockingDir : uint8_t {
@@ -176,23 +187,27 @@ class ClockingManager {
   void ScheduleOutputDrive(std::string_view block_name,
                            std::string_view signal_name, uint64_t value,
                            SimContext& ctx, Scheduler& sched);
-  // `target`, where given, is what the drive assigns in place of the whole
-  // signal: §14.16's bit-select or slice of the clockvar, `cb.q[7:4]`, as a
-  // select of the signal with its indices already evaluated.
-  void ScheduleOutputDrive(std::string_view block_name,
-                           std::string_view signal_name,
-                           const ClockingValue& value, SimContext& ctx,
-                           Scheduler& sched, const Expr* target = nullptr);
+  // §14.16: a drive the manager places, as ClockvarDrive describes it.
+  void ScheduleOutputDrive(const ClockvarDrive& drive, SimContext& ctx,
+                           Scheduler& sched);
   // §14.16 (printed pages 368-369): a synchronous drive `cb.v <= ##N r`
   // carries `value`, evaluated where the drive ran, and updates its signal N
   // cycles of the block after the drive's governing event -- the event it
   // runs coincident with, or else the next one -- plus the output skew. A
   // count of 0 is no delay, the drive ScheduleOutputDrive places.
-  void ScheduleCycleDelayedDrive(std::string_view block_name,
-                                 std::string_view signal_name,
-                                 const ClockingValue& value, uint32_t cycles,
-                                 SimContext& ctx, Scheduler& sched,
-                                 const Expr* target = nullptr);
+  void ScheduleCycleDelayedDrive(const ClockvarDrive& drive, SimContext& ctx,
+                                 Scheduler& sched);
+  // §14.15: the name the sample variable of clockvar `signal_name` of the
+  // block registered as `block_name` is created under, `$clockvar.b1.sb.gnt`.
+  // No source spells it, so a reference to the clockvar is never read through
+  // it -- an assertion's clockvar, already a sampled value, would read its own
+  // snapshot of the variable a cycle late -- and a wait on the clockvar
+  // watches it by this name (ExecWait).
+  static std::string SampleVariableName(std::string_view block_name,
+                                        std::string_view signal_name) {
+    return "$clockvar." + std::string(block_name) + "." +
+           std::string(signal_name);
+  }
   void SampleInput(std::string_view block_name, std::string_view signal_name,
                    uint64_t value);
   // §14.13: the whole value an input clockvar sampled, or null before its
@@ -307,9 +322,15 @@ class ClockingManager {
   };
 
   void CreateSampleVariables(SimContext& ctx);
-  void ScheduleDriveEvent(const ClockingBlock& block, const ClockingSignal* sig,
-                          Event* ev, SimTime drive_time, SimContext& ctx,
-                          Scheduler& sched) const;
+  // When a drive lands: at the next `edge` of `clock` for an output skewed by
+  // an edge, else in the Re-NBA region of `drive_time`.
+  struct DriveEdge {
+    Variable* clock = nullptr;
+    Edge edge = Edge::kNone;
+    SimTime drive_time{0};
+  };
+  static void ScheduleDriveEvent(const DriveEdge& when, Event* ev,
+                                 Scheduler& sched);
   static void RecordHistory(
       std::vector<std::pair<SimTime, ClockingValue>>& history, SimTime now,
       ClockingValue value, SimTime reach);

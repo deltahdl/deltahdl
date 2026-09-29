@@ -639,8 +639,9 @@ static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
   const ClockingSignal* sig = FindClockvarSignal(lhs, ctx, &block_name);
   if (sig == nullptr) return false;
   ctx.GetClockingManager()->ScheduleCycleDelayedDrive(
-      block_name, sig->signal_name, ClockingValue::Of(rhs_val), cycles, ctx,
-      ctx.GetScheduler());
+      ClockvarDrive{block_name, sig->signal_name, ClockingValue::Of(rhs_val),
+                    cycles},
+      ctx, ctx.GetScheduler());
   return true;
 }
 
@@ -686,9 +687,29 @@ static bool TryScheduleClockvarSelectDrive(const Expr* lhs,
         lhs->index_end, EvalExpr(lhs->index_end, ctx, arena), arena);
   }
   ctx.GetClockingManager()->ScheduleCycleDelayedDrive(
-      block_name, sig->signal_name, ClockingValue::Of(rhs_val), cycles, ctx,
-      ctx.GetScheduler(), target);
+      ClockvarDrive{block_name, sig->signal_name, ClockingValue::Of(rhs_val),
+                    cycles, target},
+      ctx, ctx.GetScheduler());
   return true;
+}
+
+// §14.16: a synchronous drive, `cb.v <= ##N r` or `cb.q[7:4] <= r`, whose
+// cycle delay is read off the statement where it executes; dropped, `cb.v <=
+// ##2 r` updated v in the current cycle. True where the statement was one.
+static bool TryScheduleSynchronousDrive(const Stmt* stmt,
+                                        const Logic4Vec& rhs_val,
+                                        SimContext& ctx, Arena& arena) {
+  uint32_t cycles =
+      stmt->cycle_delay != nullptr
+          ? static_cast<uint32_t>(
+                EvalExpr(stmt->cycle_delay, ctx, arena).ToUint64())
+          : 0;
+  if (stmt->cycle_delay != nullptr &&
+      stmt->lhs->kind == ExprKind::kMemberAccess &&
+      TryScheduleClockvarDrive(stmt->lhs, rhs_val, ctx, cycles)) {
+    return true;
+  }
+  return TryScheduleClockvarSelectDrive(stmt->lhs, rhs_val, cycles, ctx, arena);
 }
 
 static void ScheduleResolvedFieldNba(const FieldTarget& target,
@@ -750,21 +771,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   LhsIndexPin pin(stmt->lhs, ctx, arena);
 
   const Logic4Vec& rhs_val = sample.value;
-  // §14.16: a synchronous drive's cycle delay is read off the statement here,
-  // where it executes; dropped, `cb.v <= ##2 r` updated v in the current
-  // cycle.
-  uint32_t cycles =
-      stmt->cycle_delay != nullptr
-          ? static_cast<uint32_t>(
-                EvalExpr(stmt->cycle_delay, ctx, arena).ToUint64())
-          : 0;
-  if (stmt->cycle_delay != nullptr &&
-      stmt->lhs->kind == ExprKind::kMemberAccess &&
-      TryScheduleClockvarDrive(stmt->lhs, rhs_val, ctx, cycles)) {
-    return;
-  }
-  if (TryScheduleClockvarSelectDrive(stmt->lhs, rhs_val, cycles, ctx, arena))
-    return;
+  if (TryScheduleSynchronousDrive(stmt, rhs_val, ctx, arena)) return;
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;

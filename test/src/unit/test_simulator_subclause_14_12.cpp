@@ -4,7 +4,6 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_scheduler.h"
 #include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 

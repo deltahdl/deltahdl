@@ -229,7 +229,7 @@ static void CollectClockvarReads(const Expr* cond, SimContext& ctx,
             ? e->rhs->text
             : e->text;
     if (mgr->FindBlockSignal(*block, field) == nullptr) return;
-    reads.insert(std::string(block->name) + "." + std::string(field));
+    reads.insert(ClockingManager::SampleVariableName(block->name, field));
   });
 }
 

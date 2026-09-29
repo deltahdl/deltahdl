@@ -387,8 +387,10 @@ void ClockingManager::RecordHistory(
          history[keep_from + 1].first.ticks <= cutoff) {
     ++keep_from;
   }
-  if (keep_from > 0)
-    history.erase(history.begin(), history.begin() + keep_from);
+  if (keep_from > 0) {
+    history.erase(history.begin(),
+                  history.begin() + static_cast<std::ptrdiff_t>(keep_from));
+  }
 }
 
 const ClockingValue* ClockingManager::ValueAtTime(std::string_view signal_name,
@@ -512,15 +514,17 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
                                           std::string_view signal_name,
                                           uint64_t value, SimContext& ctx,
                                           Scheduler& sched) {
-  ScheduleOutputDrive(block_name, signal_name, ClockingValue::Known(value), ctx,
-                      sched);
+  ScheduleOutputDrive(
+      ClockvarDrive{block_name, signal_name, ClockingValue::Known(value)}, ctx,
+      sched);
 }
 
-void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
-                                          std::string_view signal_name,
-                                          const ClockingValue& value,
-                                          SimContext& ctx, Scheduler& sched,
-                                          const Expr* target) {
+void ClockingManager::ScheduleOutputDrive(const ClockvarDrive& drive,
+                                          SimContext& ctx, Scheduler& sched) {
+  std::string_view block_name = drive.block_name;
+  std::string_view signal_name = drive.signal_name;
+  const ClockingValue& value = drive.value;
+  const Expr* target = drive.target;
   const ClockingBlock* block = Find(block_name);
   if (block == nullptr) return;
   auto skew = GetOutputSkew(block_name, signal_name);
@@ -536,6 +540,14 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
   // declared, or the one its `= expression` names from there, so the drive is
   // placed on that variable.
   const ClockingSignal* sig = FindSignal(*block, signal_name);
+  // §14.3 (printed pages 355-356): an output skewed by an edge of the clock is
+  // driven at that edge following the drive's clocking event.
+  Variable* edge_clock =
+      sig != nullptr && sig->drive_edge != Edge::kNone
+          ? FindInBlockInstance(block->inst_prefix, block->clock_signal, ctx)
+          : nullptr;
+  DriveEdge when{edge_clock, sig != nullptr ? sig->drive_edge : Edge::kNone,
+                 drive_time};
   // §14.5 (printed pages 357-358): an output bound to an expression, `output
   // nib = q[3:0]`, drives that expression, as an assignment to it from the
   // block's instance writes the slice alone. With no variable of its name,
@@ -550,7 +562,7 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
       Arena& arena = ctx.GetArena();
       PerformBlockingAssign(target, value.ToVec(arena), ctx, arena);
     };
-    ScheduleDriveEvent(*block, sig, ev, drive_time, ctx, sched);
+    ScheduleDriveEvent(when, ev, sched);
     return;
   }
   auto* var = FindInBlockInstance(
@@ -565,7 +577,7 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
     // the value landed and the process slept on.
     if (WriteDrivenValue(var, value)) var->NotifyWatchers();
   };
-  ScheduleDriveEvent(*block, sig, ev, drive_time, ctx, sched);
+  ScheduleDriveEvent(when, ev, sched);
 }
 
 // §14.3 (printed pages 355-356): an output skewed by an edge of the clock is
@@ -574,20 +586,15 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
 // was driven at the posedge. §14.16: any other drive is scheduled in the
 // Re-NBA region of `drive_time`, a nonzero skew only shifting it into a future
 // time step.
-void ClockingManager::ScheduleDriveEvent(const ClockingBlock& block,
-                                         const ClockingSignal* sig, Event* ev,
-                                         SimTime drive_time, SimContext& ctx,
-                                         Scheduler& sched) const {
-  auto* clk =
-      sig != nullptr && sig->drive_edge != Edge::kNone
-          ? FindInBlockInstance(block.inst_prefix, block.clock_signal, ctx)
-          : nullptr;
+void ClockingManager::ScheduleDriveEvent(const DriveEdge& when, Event* ev,
+                                         Scheduler& sched) {
+  Variable* clk = when.clock;
   if (clk == nullptr) {
-    sched.ScheduleEvent(drive_time, SynchronousDriveRegion(), ev);
+    sched.ScheduleEvent(when.drive_time, SynchronousDriveRegion(), ev);
     return;
   }
   auto last = std::make_shared<uint64_t>(clk->value.ToUint64() & 1);
-  clk->AddWatcher([clk, last, edge = sig->drive_edge, ev, &sched]() {
+  clk->AddWatcher([clk, last, edge = when.edge, ev, &sched]() {
     uint64_t cur = clk->value.ToUint64() & 1;
     bool hit = CheckClockEdge(*last, cur, edge);
     *last = cur;
@@ -597,10 +604,11 @@ void ClockingManager::ScheduleDriveEvent(const ClockingBlock& block,
   });
 }
 
-void ClockingManager::ScheduleCycleDelayedDrive(
-    std::string_view block_name, std::string_view signal_name,
-    const ClockingValue& value, uint32_t cycles, SimContext& ctx,
-    Scheduler& sched, const Expr* target) {
+void ClockingManager::ScheduleCycleDelayedDrive(const ClockvarDrive& drive,
+                                                SimContext& ctx,
+                                                Scheduler& sched) {
+  std::string_view block_name = drive.block_name;
+  uint32_t cycles = drive.cycles;
   // The governing event is this step's where it has occurred, and an event of
   // this step is then not one of the N; otherwise it is the next event, which
   // the wait counts before the N. §14.16 (printed page 369): a drive with no
@@ -610,19 +618,17 @@ void ClockingManager::ScheduleCycleDelayedDrive(
   SimTime start = sched.CurrentTime();
   bool event_now = DidBlockEventOccurAt(block_name, start);
   if (cycles == 0 && event_now) {
-    ScheduleOutputDrive(block_name, signal_name, value, ctx, sched, target);
+    ScheduleOutputDrive(drive, ctx, sched);
     return;
   }
   uint32_t remaining = event_now ? cycles : cycles + 1;
-  RegisterEdgeWait(
-      block_name,
-      [this, block = std::string(block_name), sig = std::string(signal_name),
-       value, remaining, start, event_now, target, &ctx, &sched]() mutable {
-        if (event_now && sched.CurrentTime() == start) return true;
-        if (--remaining > 0) return true;
-        ScheduleOutputDrive(block, sig, value, ctx, sched, target);
-        return false;
-      });
+  RegisterEdgeWait(block_name, [this, drive, remaining, start, event_now, &ctx,
+                                &sched]() mutable {
+    if (event_now && sched.CurrentTime() == start) return true;
+    if (--remaining > 0) return true;
+    ScheduleOutputDrive(drive, ctx, sched);
+    return false;
+  });
 }
 
 void ClockingManager::SetBlockEventVar(std::string_view block_name,
@@ -786,7 +792,7 @@ void ClockingManager::CreateSampleVariables(SimContext& ctx) {
       // Created under the clockvar's full name, `b1.sb.gnt`, so a wait on a
       // condition reading it finds it by name (ExecWait).
       auto* key = ctx.GetArena().Create<std::string>(
-          std::string(block.name) + "." + std::string(sig.signal_name));
+          SampleVariableName(block.name, sig.signal_name));
       auto* held = ctx.CreateVariable(*key, now.width);
       if (held == nullptr) held = ctx.GetArena().Create<Variable>();
       held->value = MakeLogic4Vec(ctx.GetArena(), now.width);
