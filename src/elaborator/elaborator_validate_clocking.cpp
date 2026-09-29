@@ -703,21 +703,34 @@ void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
   }
 }
 
+// §14.16 (printed page 369): it is an error to write a clockvar except by a
+// synchronous drive, and the clause names a continuous assignment to one,
+// `assign cb.q = 3`, as such an error; it was accepted silently. The check of
+// the clockvar's underlying signal below reads an identifier target alone, so
+// the two never report one assignment twice.
+static void ReportContAssignsToClockvars(
+    const ModuleDecl* decl, const ClockvarPredicate& targets_writable,
+    DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign || !item->assign_lhs ||
+        !targets_writable(item->assign_lhs)) {
+      continue;
+    }
+    diag.Error(item->loc,
+               "continuous assignment to a clockvar; a clockvar is written "
+               "only by a synchronous drive",
+               Subclause("14.16"));
+  }
+}
+
 void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
+  ReportContAssignsToClockvars(
+      decl, [this](const Expr* e) { return ExprTargetsWritableClockvar(e); },
+      diag_);
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
     if (!item->assign_lhs) continue;
-    // §14.16 (printed page 369): it is an error to write a clockvar except by
-    // a synchronous drive, and the clause names a continuous assignment to one,
-    // `assign cb.q = 3`, as such an error; it was accepted silently.
-    if (ExprTargetsWritableClockvar(item->assign_lhs)) {
-      diag_.Error(item->loc,
-                  "continuous assignment to a clockvar; a clockvar is written "
-                  "only by a synchronous drive",
-                  Subclause("14.16"));
-      continue;
-    }
     // §14.16.2: a continuous assignment to a variable that is associated with
     // an output (or inout) clockvar is illegal. The target may be the whole
     // variable or a bit-/part-select of it, so resolve through any selects to

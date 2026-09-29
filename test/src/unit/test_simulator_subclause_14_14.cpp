@@ -455,14 +455,15 @@ TEST(GlobalClockingSim,
 // reported $global_clock as no system function it implements.
 TEST(GlobalClockingSim, GlobalClockInATaskBodyNamesTheDeclaringScopesEvent) {
   SimFixture f;
-  std::string out = RunCapture(
+  auto* design = ElaborateSrcAllTops(
       "module another_module;\n"
       "  logic another_clk = 0;\n"
+      "  int t_at, tk_at;\n"
       "  global clocking another_clocking @(posedge another_clk);\n"
       "  endclocking\n"
       "  initial #6 another_clk = 1;\n"
-      "  task t(); @($global_clock); $display(\"t %0t\", $time); endtask\n"
-      "  task tk(); @($global_clock); $display(\"tk %0t\", $time); endtask\n"
+      "  task t(); @($global_clock); t_at = $time; endtask\n"
+      "  task tk(); @($global_clock); tk_at = $time; endtask\n"
       "  initial tk();\n"
       "endmodule\n"
       "module subsystem1;\n"
@@ -474,8 +475,8 @@ TEST(GlobalClockingSim, GlobalClockInATaskBodyNamesTheDeclaringScopesEvent) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("tk 6\n"), std::string::npos);
-  EXPECT_NE(out.find("t 6\n"), std::string::npos);
+  LowerRunAndCheck(f, design,
+                   {{"another_module.tk_at", 6u}, {"another_module.t_at", 6u}});
 }
 
 }  // namespace

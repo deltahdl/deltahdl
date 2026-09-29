@@ -89,7 +89,7 @@ TEST(ClockingBlockElab, InoutClockvarWriteOk) {
              "    inout bidir;\n"
              "  endclocking\n"
              "  initial begin\n"
-             "    cb.bidir = 8'hFF;\n"
+             "    cb.bidir <= 8'hFF;\n"
              "  end\n"
              "endmodule\n"));
 }
