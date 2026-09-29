@@ -211,4 +211,89 @@ TEST(TypedefSim, FunctionLocalOfTwoStateTypedefClearsXAndZ) {
             "0000 xxxx 0 0000\n1001 1z01\n");
 }
 
+// §6.18 with §12.3: a typedef among a procedural block's declarations names
+// its type for the declarations after it, so `PP pp` and `UP up` are a packed
+// and an unpacked structure whose members keep what is written to them. The
+// block's structure typedef stood for no layout, and every member read 0.
+TEST(TypedefSim, BlockStructTypedefVariableKeepsMemberWrites) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    typedef struct packed { logic [7:0] a, b; } PP;\n"
+                       "    typedef struct { int a; int b; } UP;\n"
+                       "    PP pp;\n"
+                       "    UP up;\n"
+                       "    pp.a = 3; pp.b = 4; up.a = 5; up.b = 6;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", pp.a, pp.b,\n"
+                       "             up.a, up.b, $bits(pp));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 4 5 6 16\n");
+}
+
+// The same rule in a subroutine: a structure typedef written at the top of a
+// function's body, or in a begin-end within it, is the type of the locals
+// declared by its name, in a module's function and in a class method alike.
+// Each product read 0.
+TEST(TypedefSim, SubroutineBlockStructTypedefLocalKeepsMemberWrites) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  function int f();\n"
+                       "    typedef struct { int a; int b; } P;\n"
+                       "    P p;\n"
+                       "    p.a = 3; p.b = 4;\n"
+                       "    return p.a * p.b;\n"
+                       "  endfunction\n"
+                       "  function int g();\n"
+                       "    begin\n"
+                       "      typedef struct packed { byte a, b; } Q;\n"
+                       "      Q q;\n"
+                       "      q.a = 5; q.b = 6;\n"
+                       "      return q.a * q.b;\n"
+                       "    end\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  function automatic int m();\n"
+                       "    begin\n"
+                       "      typedef struct { int a; int b; } P;\n"
+                       "      P p;\n"
+                       "      p.a = 7; p.b = 8;\n"
+                       "      return p.a * p.b;\n"
+                       "    end\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    automatic C c = new;\n"
+                       "    $display(\"%0d %0d %0d\", c.f(), c.g(), m());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "12 30 56\n");
+}
+
+// §6.18 with §6.19.5: an enumeration a class method's typedef declares is
+// the type of the local declared by its name, so name() answers the member
+// the local holds. The method's typedef was registered by no walk, and name()
+// answered the empty string.
+TEST(TypedefSim, MethodEnumTypedefLocalAnswersName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  function string f();\n"
+                       "    typedef enum { A, B, K } e_t;\n"
+                       "    e_t v;\n"
+                       "    v = K;\n"
+                       "    return v.name();\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    automatic C c = new;\n"
+                       "    $display(\"%s\", c.f());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "K\n");
+}
+
 }  // namespace

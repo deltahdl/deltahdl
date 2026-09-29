@@ -26,6 +26,12 @@ class SimContext;
 // variable is of the block's enumeration, as wide and as signed as it.
 // Member values fold against the compilation unit's constants, `mod`'s
 // parameters and its enumeration constants.
+//
+// §6.18 with §7.2 and §7.3: a structure or union such a typedef declares is
+// registered the same way, as a layout under the typedef's key, and the
+// declarations by its name are reshaped to name that key alike. The
+// blocks walked are those of `mod`'s processes, its subroutines and the
+// methods of its classes and of the compilation unit's (§8.3).
 void RegisterBlockEnumTypes(const RtlirModule* mod, const RtlirDesign* design,
                             SimContext& ctx, Arena& arena);
 

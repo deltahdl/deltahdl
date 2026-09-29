@@ -13,6 +13,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -68,6 +69,33 @@ struct BlockEnumWalk {
     });
   }
 
+  // §6.18 with §7.2 and §7.3: a structure or union the typedef `td`
+  // declares at its top is registered as a layout under the typedef's key,
+  // with the width, kind and signedness a declaration by that key reads, and
+  // its name is made to stand for that key in `aliases`, so a variable the
+  // block declares by the name is an object of the layout and a member write
+  // lands in its window. With no layout, `p.a = 3` wrote nothing and `p.a`
+  // read 0.
+  void RegisterAggregateTypedef(const ModuleItem* td,
+                                BlockEnumAliases& aliases) {
+    const DataType& type = td->typedef_type;
+    if ((type.kind != DataTypeKind::kStruct &&
+         type.kind != DataTypeKind::kUnion) ||
+        !td->unpacked_dims.empty()) {
+      return;
+    }
+    auto* key = arena.Create<std::string>(BlockEnumKey(td, {}));
+    if (ctx.FindStructType(*key) == nullptr) {
+      RegisterTypeLayout(*key, &type, ctx, arena);
+      const StructTypeInfo* info = ctx.FindStructType(*key);
+      if (info == nullptr) return;
+      ctx.RegisterTypeWidth(*key, info->total_width);
+      ctx.RegisterTypeKind(*key, type.kind);
+      ctx.RegisterTypeSigned(*key, IsSignedType(type, TypedefMap{}));
+    }
+    aliases[td->name] = *key;
+  }
+
   void Register(std::string_view key, const DataType& type) {
     EnumTypeInfo info;
     info.type_name = key;
@@ -117,6 +145,7 @@ struct BlockEnumWalk {
     for (const Stmt* s : stmts) {
       if (const ModuleItem* td = BlockTypedefOf(s)) {
         RegisterTypedef(td, aliases);
+        RegisterAggregateTypedef(td, aliases);
         continue;
       }
       Walk(s, aliases);
@@ -161,6 +190,17 @@ void RegisterBlockEnumTypes(const RtlirModule* mod, const RtlirDesign* design,
   for (const ModuleItem* func : mod->function_decls) {
     walk.WalkList(func->func_body_stmts, {});
   }
+  // §8.3: a class's methods are subroutines whose bodies are blocks too, of
+  // a class the module declares or of the compilation unit's.
+  auto walk_methods = [&](const ClassDecl* cls) {
+    for (const ClassMember* m : cls->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->method != nullptr)
+        walk.WalkList(m->method->func_body_stmts, {});
+    }
+  };
+  for (const ClassDecl* cls : mod->class_decls) walk_methods(cls);
+  if (design == nullptr) return;
+  for (const ClassDecl* cls : design->cu_class_decls) walk_methods(cls);
 }
 
 void ForEachBlockEnumMember(
