@@ -34,10 +34,13 @@ struct PatternSubject {
 };
 
 // A pattern identifier and the value of what it matched, with that value's
-// signedness, which the pattern's scope reads the identifier as.
+// signedness, which the pattern's scope reads the identifier as, and the
+// layout of what it matched where that is a structure or union (§12.6 gives
+// the identifier the type of the part it matches).
 struct PatternBinding {
   std::string_view name;
   Logic4Vec value;
+  const StructTypeInfo* layout = nullptr;
 };
 
 // How a constant pattern's value `constant` is compared with the value

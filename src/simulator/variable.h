@@ -14,6 +14,7 @@
 namespace delta {
 
 struct Expr;
+struct StructTypeInfo;
 
 // §10.6.1/§11.4.12: which bits of a procedural continuous assignment's
 // right-hand value a variable owns, and where in the variable they land. A
@@ -107,6 +108,14 @@ struct Variable {
   // formal alike carry it; a class property declared so is marked on its
   // ClassTypeInfo::PropertyInfo, since an object holds no Variable.
   bool is_virtual_interface = false;
+
+  // §12.6 with §7.2: the structure layout a pattern identifier bound to a
+  // structure member has, the member's own (StructFieldInfo::nested), which
+  // no type name registers; a member select of the identifier reads through
+  // it (StructLayoutOfName). Kept on the variable, so it ends with the scope
+  // the binding is declared in. Null for every other variable, whose layout
+  // the name table gives.
+  const StructTypeInfo* local_layout = nullptr;
 
   // §30.5.3: the simulation time this variable's value last changed, in ticks.
   // "Active specify paths are those whose input has transitioned most recently

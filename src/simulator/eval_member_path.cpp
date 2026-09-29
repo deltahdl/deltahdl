@@ -45,7 +45,10 @@ size_t MemberPathSplit(const std::string& path, SimContext& ctx) {
 
 static const StructTypeInfo* StructLayoutOfWholeName(std::string_view name,
                                                      SimContext& ctx) {
-  if (ctx.FindLocalVariable(name) != nullptr) {
+  if (const Variable* local = ctx.FindLocalVariable(name)) {
+    // §12.6: a pattern identifier bound to a structure member carries the
+    // member's layout itself, which no type name registers.
+    if (local->local_layout != nullptr) return local->local_layout;
     return ctx.GetVariableStructType(name);
   }
   std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);

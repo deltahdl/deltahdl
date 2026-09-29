@@ -121,7 +121,7 @@ bool MatchPattern(const Expr* pat, const PatternSubject& subject,
                   const PatternMatchEnv& env) {
   if (pat->kind == ExprKind::kIdentifier && pat->text == ".*") return true;
   if (pat->kind == ExprKind::kIdentifier && pat->is_pattern_binding) {
-    env.bindings.push_back({pat->text, subject.value});
+    env.bindings.push_back({pat->text, subject.value, subject.layout});
     return true;
   }
   if (pat->kind == ExprKind::kTagged) return MatchTagged(pat, subject, env);
@@ -139,6 +139,7 @@ void InstallPatternBindings(const std::vector<PatternBinding>& bindings,
     Variable* var = ctx.CreateLocalVariable(binding.name, binding.value.width,
                                             binding.value.is_signed);
     var->value = binding.value;
+    var->local_layout = binding.layout;
   }
 }
 

@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -227,6 +228,37 @@ TEST(Matches, TripleAmpSecondFalse) {
   ASSERT_NE(expr, nullptr);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §12.6 gives a pattern identifier the type of the part of the value it
+// matches, so `.s` bound to the anonymous structure member `Add` is that
+// structure, and §7.2 selects its members by name: s.reg1 and s.regd read the
+// 1 and 6 the value holds, in a process and in a function body alike. The
+// binding carried the member's bits without its layout, and each select read 0.
+TEST(PatternMatchSim, IdentifierBoundToStructureMemberSelectsItsMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module t;\n"
+                "  typedef union tagged {\n"
+                "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                "    bit [9:0] JmpU;\n"
+                "  } Instr;\n"
+                "  Instr instr;\n"
+                "  function automatic void f(Instr x);\n"
+                "    case (x) matches\n"
+                "      tagged Add .s : $display(\"%0d %0d\", s.reg1, s.regd);\n"
+                "    endcase\n"
+                "  endfunction\n"
+                "  initial begin\n"
+                "    instr = tagged Add '{1, 2, 6};\n"
+                "    case (instr) matches\n"
+                "      tagged Add .s : $display(\"%0d %0d\", s.reg1, s.regd);\n"
+                "    endcase\n"
+                "    f(instr);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "1 6\n1 6\n");
 }
 
 }  // namespace
