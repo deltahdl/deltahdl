@@ -416,6 +416,19 @@ static bool DispatchMutatingMethod(std::string_view method,
   return false;
 }
 
+// §26.3: the key a package's variable named through the package scope
+// resolution operator, `P::ps`, is held under, "P.ps", the one the lowerer
+// creates it with (InitPackageDataVariables); empty for any other expression.
+static std::string PackageScopedKey(const Expr* scoped) {
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  return std::string(scoped->lhs->text) + "." + std::string(scoped->rhs->text);
+}
+
 // §26.3: a package's string variable named through the package scope
 // resolution operator, `P::ps.len()`, is a method call whose receiver is the
 // scoped name rather than an identifier, which ExtractMethodCallParts reads
@@ -440,13 +453,8 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
     method = access->rhs->text;
     return true;
   }
-  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
-      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
-      scoped->rhs->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  key = std::string(scoped->lhs->text) + "." + std::string(scoped->rhs->text);
+  key = PackageScopedKey(scoped);
+  if (key.empty()) return false;
   method = access->rhs->text;
   return true;
 }
@@ -549,32 +557,41 @@ static bool NamesArrayFormal(std::string_view name, SimContext& ctx) {
                                std::to_string(info->lo) + "]") != nullptr;
 }
 
+// Whether the declared array held under `name` -- a queue, an associative, a
+// dynamic or a fixed-size one -- says by its declaration that it holds strings.
+static bool DeclaredArrayHoldsStrings(std::string_view name, SimContext& ctx) {
+  const ArrayInfo* info = ctx.FindArrayInfo(name);
+  if (info == nullptr)
+    return (ctx.FindQueue(name) != nullptr ||
+            ctx.FindAssocArray(name) != nullptr) &&
+           ctx.IsStringVariable(name);
+  return info->elem_type_kind == DataTypeKind::kString ||
+         ctx.IsStringVariable(name) ||
+         ctx.IsStringVariable(std::string(name) + "[" +
+                              std::to_string(info->lo) + "]");
+}
+
 // §6.16 with §7.4, §7.5 and §7.10: whether `receiver` selects one element of
 // an array of strings -- a queue, a dynamic or a fixed one, declared or a
 // class property, `h.names[0]` -- whose declaration, and not the value read,
 // says that it holds strings. A fixed-size array formal, `a[4]` of `string
 // a[4:1]` (§7.7), is one too: its name was taken for no variable's, so
-// `a[4].len()` read an empty string.
+// `a[4].len()` read an empty string. So is a package's array named through
+// the package scope (§26.3), `p::pq[0]`, held under the key `p.pq` as a
+// scoped string variable is (PackageScopedKey).
 static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
   if (receiver->kind != ExprKind::kSelect || receiver->index_end != nullptr ||
       receiver->base == nullptr) {
     return false;
   }
-  if (receiver->base->kind == ExprKind::kIdentifier &&
-      (NameDenotesVariable(receiver->base->text, ctx) ||
-       NamesArrayFormal(receiver->base->text, ctx))) {
-    std::string_view name = receiver->base->text;
-    const ArrayInfo* info = ctx.FindArrayInfo(name);
-    if (info == nullptr)
-      return (ctx.FindQueue(name) != nullptr ||
-              ctx.FindAssocArray(name) != nullptr) &&
-             ctx.IsStringVariable(name);
-    return info->elem_type_kind == DataTypeKind::kString ||
-           ctx.IsStringVariable(name) ||
-           ctx.IsStringVariable(std::string(name) + "[" +
-                                std::to_string(info->lo) + "]");
+  const Expr* base = receiver->base;
+  if (base->kind == ExprKind::kIdentifier &&
+      (NameDenotesVariable(base->text, ctx) ||
+       NamesArrayFormal(base->text, ctx))) {
+    return DeclaredArrayHoldsStrings(base->text, ctx);
   }
-  return NamesStringProperty(receiver->base, ctx);
+  if (NamesStringProperty(base, ctx)) return true;
+  return DeclaredArrayHoldsStrings(PackageScopedKey(base), ctx);
 }
 
 static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,

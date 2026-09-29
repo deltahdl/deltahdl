@@ -375,4 +375,30 @@ TEST(UnpackedArraySim, AStringElementHoldsTheWholeTextOfEachWrite) {
   EXPECT_EQ(out, "longer longer longer g 1\n");
 }
 
+// §7.4, §7.8 and §7.10 with §26.3 and §6.16: an element of a package's array
+// of strings named through the package scope is a string, so a string method
+// reads its text and one that writes its object writes it, for a queue, a
+// fixed-size and an associative array alike.
+TEST(UnpackedArraySim, AStringMethodActsOnAPackageScopedElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package p;\n"
+      "  string pq[$];\n"
+      "  string pf[2];\n"
+      "  string ps[int];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    p::pq.push_back(\"ab\"); p::pf[1] = \"abc\"; p::ps[0] = \"abcd\";\n"
+      "    $display(\"%0d %0d %0d\", p::pq[0].len(), p::pf[1].len(),\n"
+      "             p::ps[0].len());\n"
+      "    p::pq[0].putc(0, \"Q\"); p::pf[1].putc(0, \"Q\");\n"
+      "    p::ps[0].putc(0, \"Q\");\n"
+      "    $display(\"%s %s %s\", p::pq[0], p::pf[1], p::ps[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 3 4\nQb Qbc Qbcd\n");
+}
+
 }  // namespace
