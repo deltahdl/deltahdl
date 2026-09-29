@@ -667,6 +667,29 @@ ScopeMap SpecializationParamScope(const ClassTypeInfo* spec,
   return scope;
 }
 
+// §8.23: a property declared by `type`, the bare name of a structure or union
+// typedef the class declares, holds the layout that typedef has under the
+// specialization `spec`, folded with its values `scope` and registered under
+// its own key, `Box#(16)::S`, which `prop` takes with the layout's width.
+// False for a property declared by any other type.
+bool SizeClassTypedefProperty(ClassTypeInfo::PropertyInfo& prop,
+                              const DataType& type, const ClassTypeInfo* spec,
+                              const ScopeMap& scope, SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return false;
+  const DataType* aggregate =
+      ClassAggregateTypedef(*spec->decl, type.type_name);
+  if (aggregate == nullptr) return false;
+  std::string_view key = RegisterSpecializationTypedefLayout(
+      spec->name, type.type_name, *aggregate, scope, ctx);
+  if (const StructTypeInfo* layout = ctx.FindStructType(key)) {
+    prop.type_name = key;
+    prop.width = layout->total_width;
+    prop.width_is_declared = true;
+  }
+  return true;
+}
+
 // §8.25 (printed page 203): a property whose packed dimension names a value
 // parameter, the clause's `bit [size-1:0] a`, is as wide as the
 // specialization binds the parameter, ten bits in `vector #(10)`. The table a
@@ -692,24 +715,9 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
           FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
       if (dim.size > 0) prop.array_size = dim.size;
     }
-    // §8.23: a property declared by a structure or union typedef the class
-    // declares holds the layout that typedef has under this specialization,
-    // folded with its values and registered under its own key, `Box#(16)::S`.
-    const DataType& type = member->data_type;
-    if (const DataType* aggregate =
-            type.kind == DataTypeKind::kNamed && type.scope_name.empty()
-                ? ClassAggregateTypedef(*spec->decl, type.type_name)
-                : nullptr) {
-      std::string_view key = RegisterSpecializationTypedefLayout(
-          spec->name, type.type_name, *aggregate, scope, ctx);
-      if (const StructTypeInfo* layout = ctx.FindStructType(key)) {
-        prop.type_name = key;
-        prop.width = layout->total_width;
-        prop.width_is_declared = true;
-      }
+    if (SizeClassTypedefProperty(prop, member->data_type, spec, scope, ctx))
       continue;
-    }
-    uint32_t width = EvalTypeWidth(type, {}, scope);
+    uint32_t width = EvalTypeWidth(member->data_type, {}, scope);
     if (width == 0) continue;
     prop.width = width;
     prop.width_is_declared = true;
