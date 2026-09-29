@@ -17,6 +17,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/vcd_dump_state.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {
