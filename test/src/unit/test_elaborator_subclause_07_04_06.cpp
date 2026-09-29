@@ -200,6 +200,38 @@ TEST(UnpackedArrayOperandElaboration, AnUnpackedArrayIsNoIntegralOperand) {
                             8, "7.4.6"));
 }
 
+// §7.4.6: an unpacked array compared with any plainly integral or real value is
+// reported -- an unbased unsized literal, a real literal, the result of a
+// binary arithmetic operator and that of a unary one -- and a unary operator
+// that takes integral operands is no more applied to an array than a binary
+// one.
+TEST(UnpackedArrayOperandElaboration, EveryIntegralOperandKindIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[3];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (a == '1) x = 1;\n"
+      "    if (a != 1.5) x = 2;\n"
+      "    if (a == x + 1) x = 3;\n"
+      "    if (-x != a) x = 4;\n"
+      "    x = -a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 5, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 8, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an unpacked array is not an operand of this "
+                            "operator",
+                            9, "7.4.6"));
+}
+
 // §7.4.6: equality between two unpacked arrays, between slices of them and
 // between rows of a two-dimensional one, and between an element and a number,
 // are all allowed and elaborate clean.
