@@ -325,7 +325,7 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
       // converted to zeros" -- and the flag defaults to true, so an `int`
       // counter kept the x and z its initializer read. CreateFuncLocalVar sets
       // the same flag for an ordinary body local from the same answer.
-      v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i]);
+      v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], exec.ctx);
       // §10.7 sizes the right-hand side to the left-hand side, and the width
       // the type declares reached the cell CreateLocalVariable made and was
       // then thrown away by the store: a Logic4Vec carries its own width, so

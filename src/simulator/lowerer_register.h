@@ -75,6 +75,11 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
                              uint32_t width, SimContext& ctx, Arena& arena);
 
+// §7.2 with §6.8: whether any member of the structure `info` lays out, a
+// nested structure's members among them, is of a 4-state type. Defined in
+// src/simulator/lowerer_var_layout.cpp.
+bool HasFourStateMember(const StructTypeInfo& info);
+
 // §7.2 with §6.8: where the variable `v`, named `name`, holds an unpacked
 // structure with a member of a 4-state type, marks it 4-state, so the x and z
 // bits written to the structure are kept, and where `fill_defaults` says it

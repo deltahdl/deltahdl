@@ -626,7 +626,7 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
     prop.width_is_declared = true;
     prop.is_signed = DeclaredTypeIsSigned(*actual, ctx);
     if (actual->kind != DataTypeKind::kNamed)
-      prop.is_4state = DeclaredTypeIs4State(*actual);
+      prop.is_4state = DeclaredTypeIs4State(*actual, ctx);
   }
 }
 

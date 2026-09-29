@@ -153,7 +153,7 @@ void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   // Both are per-declaration facts the module path already records and this one
   // left at their defaults, so an `int` array declared in a block answered
   // 4-state and answered its element type as implicit.
-  info.is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
+  info.is_4state = DeclaredTypeIs4State(stmt->var_decl_type, ctx);
   info.elem_type_kind = stmt->var_decl_type.kind;
   if (dims.size() > 1) {
     for (const auto& dim : dims) {

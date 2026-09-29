@@ -186,4 +186,29 @@ TEST(TypedefSim, BlockVariableOfFourStateTypedefKeepsXAndZ) {
             "xxxx 0000\n1z01 1001\n");
 }
 
+// The same rule for a function's locals: §6.18 has `B y` declare the 2-state
+// `bit [3:0]` that B names, so it starts at 0 (§6.8, Table 6-7) and clears a
+// written z (§6.11.2), and so do an enumeration whose base is `int` (§6.19) and
+// a packed structure of `bit` members (§7.2.1) declared by name. The `logic`
+// typedef beside them keeps x and z. Every local declared by a name was made
+// 4-state and read xxxx, x, xxxx and then 1z01 for B.
+TEST(TypedefSim, FunctionLocalOfTwoStateTypedefClearsXAndZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef bit [3:0] B;\n"
+                       "  typedef logic [3:0] L;\n"
+                       "  typedef enum {P0, P1} E;\n"
+                       "  typedef struct packed { bit [1:0] a, b; } S;\n"
+                       "  function automatic void f();\n"
+                       "    B y; L x; E e; S s;\n"
+                       "    $display(\"%b %b %0d %b\", y, x, e, s);\n"
+                       "    y = 4'b1z01; x = 4'b1z01;\n"
+                       "    $display(\"%b %b\", y, x);\n"
+                       "  endfunction\n"
+                       "  initial f();\n"
+                       "endmodule\n",
+                       f),
+            "0000 xxxx 0 0000\n1001 1z01\n");
+}
+
 }  // namespace

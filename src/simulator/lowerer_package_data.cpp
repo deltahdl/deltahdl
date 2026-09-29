@@ -88,7 +88,7 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
                                  Arena& arena) {
   const DataType& type = item->data_type;
   var->is_4state =
-      DeclaredTypeIs4State(type) && !PackageItemIsHandle(item, qname, ctx);
+      DeclaredTypeIs4State(type, ctx) && !PackageItemIsHandle(item, qname, ctx);
   var->is_signed = DeclaredTypeIsSigned(type, ctx);
   var->value.is_signed = var->is_signed;
   var->is_event = type.kind == DataTypeKind::kEvent;
@@ -289,7 +289,7 @@ static std::optional<RtlirVariable> PackageArrayShape(const ModuleItem* item,
   RtlirVariable var;
   var.name = item->name;
   var.width = PackageDataWidth(item, PackageDataKey(item, pkg), ctx);
-  var.is_4state = DeclaredTypeIs4State(type);
+  var.is_4state = DeclaredTypeIs4State(type, ctx);
   var.is_signed = DeclaredTypeIsSigned(type, ctx);
   var.is_string = DeclaredTypeIsString(type, ctx);
   var.is_real = type.kind == DataTypeKind::kReal ||
@@ -378,7 +378,7 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   if (item->unpacked_dims.empty()) return;
   const Expr* dim = item->unpacked_dims.front();
   uint32_t width = PackageDataWidth(item, qname, ctx);
-  bool is_4state = DeclaredTypeIs4State(item->data_type);
+  bool is_4state = DeclaredTypeIs4State(item->data_type, ctx);
   // §6.11 with §7.5 and §7.10: an element reads with the element type's
   // signedness (TakeElementSignedness in evaluation.h).
   bool is_signed = DeclaredTypeIsSigned(item->data_type, ctx);

@@ -218,6 +218,30 @@ DataTypeKind DeclaredTypeKind(const DataType& type, const SimContext& ctx) {
   return ctx.FindTypeKind(TypeTableKey(type));
 }
 
+// §6.11.2's 2-state integer types, the kinds of value that hold no x or z.
+static bool IsTwoStateIntegerKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kBit || kind == DataTypeKind::kByte ||
+         kind == DataTypeKind::kShortint || kind == DataTypeKind::kInt ||
+         kind == DataTypeKind::kLongint;
+}
+
+// §6.18: a name is known to stand for a 2-state type where the design
+// registered it as an enumeration with a 2-state base (§6.19), a packed
+// structure or union with no 4-state member (§7.2.1, §7.3.1), or a kind among
+// §6.11.2's 2-state integer types. Any other name -- one the tables do not
+// hold, or one standing for a class, a string or an unpacked aggregate --
+// answers 4-state: keeping a bit §6.11.2 would have cleared is the smaller
+// error than clearing one it would have kept.
+bool DeclaredTypeIs4State(const DataType& type, const SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed) return Is4stateType(type.kind);
+  std::string key = TypeTableKey(type);
+  if (const EnumTypeInfo* e = ctx.FindEnumType(key)) return e->is_4state;
+  if (const StructTypeInfo* s = ctx.FindStructType(key);
+      s != nullptr && s->is_packed)
+    return HasFourStateMember(*s);
+  return !IsTwoStateIntegerKind(ctx.FindTypeKind(key));
+}
+
 // §11.5.1 with §6.18: the packed range the declared type was written with,
 // for a type reached through a name. The name is looked up under the same key
 // the width is, so a class-scoped `Node::value_t` (§8.23) finds the entry

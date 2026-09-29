@@ -487,7 +487,7 @@ static bool TryBindPatternArrayArg(const Expr* call_arg,
   auto shape =
       FixedFormalShape(formal, elem_width == 0 ? 32 : elem_width, ctx, arena);
   if (!shape || !shape->dim_sizes.empty()) return false;
-  shape->is_4state = DeclaredTypeIs4State(formal.data_type);
+  shape->is_4state = DeclaredTypeIs4State(formal.data_type, ctx);
   std::vector<Logic4Vec> values;
   values.reserve(shape->size);
   {

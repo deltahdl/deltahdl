@@ -164,9 +164,7 @@ void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
   }
 }
 
-// §7.2 with §6.8: whether any member of the structure `info` lays out, a
-// nested structure's members among them, is of a 4-state type.
-static bool HasFourStateMember(const StructTypeInfo& info) {
+bool HasFourStateMember(const StructTypeInfo& info) {
   return std::any_of(
       info.fields.begin(), info.fields.end(), [](const StructFieldInfo& f) {
         return f.nested != nullptr ? HasFourStateMember(*f.nested)

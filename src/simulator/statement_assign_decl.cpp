@@ -264,7 +264,7 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   if (!IsAssocIndexDim(dim, ctx)) return false;
   AssocArrayObject* aa = ctx.CreateAssocArray(
       stmt->var_name, elem_width, dim->text == "string",
-      AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type), ctx));
+      AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type, ctx), ctx));
   aa->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   if (queue_type != nullptr) {
     aa->elements_are_queues = true;
@@ -291,7 +291,7 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
                                 SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
     return false;
-  bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
+  bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type, ctx);
   QueueObject* q =
       ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
   q->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);

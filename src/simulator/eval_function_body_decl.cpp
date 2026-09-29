@@ -34,11 +34,6 @@ namespace delta {
 // Moved out of eval_function_body.cpp, which stood at the size the
 // assert-no-oversized-source-files job fails at.
 
-bool DeclaredTypeIs4State(const DataType& type) {
-  if (type.kind == DataTypeKind::kNamed) return true;
-  return Is4stateType(type.kind);
-}
-
 // §6.18 with §7.2.1: a variable declared by a typedef name is an object of
 // the type the name stands for, and a member read or write of it is a window
 // of that type's layout, which SimContext resolves through the layout bound
@@ -226,7 +221,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
-  v->is_4state = DeclaredTypeIs4State(type);
+  v->is_4state = DeclaredTypeIs4State(type, ctx);
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
   // §6.12: a local declared real, shortreal or realtime, by the keyword or by

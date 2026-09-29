@@ -273,7 +273,7 @@ static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
     // unknown bits the clause converts. The width needs no such repair here:
     // the assignment goes through WriteVar, which applies §10.7 to the cell
     // this created.
-    v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i]);
+    v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], ctx);
   }
 }
 
