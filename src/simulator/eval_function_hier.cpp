@@ -169,6 +169,13 @@ class CallerGenBlockScope {
 
 }  // namespace
 
+std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
+                                      Arena& arena) {
+  std::string path;
+  if (!AppendHierarchicalPath(e, path, ctx, arena)) return std::string();
+  return path;
+}
+
 // §26.3: a subroutine called through the package scope resolution operator,
 // `pk::f(x)`, parses as a call with no callee text and the scoped name as its
 // base; the lowerer registers every package subroutine under that "pk::f"

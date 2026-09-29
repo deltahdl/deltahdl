@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
@@ -179,6 +181,133 @@ TEST(LoopGenerateIndexSim, SiblingBlocksOverOneGenvarKeepSeparateVariables) {
                  "  endgenerate\n"
                  "endmodule\n",
                  "out", {10u, 10u, 20u, 20u});
+}
+
+// §27.4 with §23.6: each instance of a loop generate block is a scope named by
+// the block and the genvar value, `g[1]`, and what it declares is reached from
+// outside through that name. A write from the module lands in the instance's
+// own variable, which the instance then reads by its simple name.
+TEST(LoopGenerateHierarchicalNameSim, WriteThroughTheInstanceNameReachesIt) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:1];\n"
+                 "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                 "    logic [7:0] v;\n"
+                 "    initial #1 out[i] = v;\n"
+                 "  end\n"
+                 "  initial begin g[0].v = 8'd80; g[1].v = 8'd81; end\n"
+                 "endmodule\n",
+                 "out", {80u, 81u});
+}
+
+// §27.4: what an instance of a loop block nested in another declares is read
+// through both instance names, as §27.4's Example 5 names them: a localparam
+// of the inner block and the implicit localparam of each loop index.
+TEST(LoopGenerateHierarchicalNameSim, NestedInstanceDeclarationsAreRead) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 1; i < 3; i++) begin : B1\n"
+                       "    for (genvar j = 0; j < 2; j++) begin : B2\n"
+                       "      localparam int K = 7;\n"
+                       "    end\n"
+                       "  end\n"
+                       "  initial $display(\"n %0d %0d %0d\", B1[1].B2[0].K, "
+                       "B1[2].B2[1].j, B1[2].i);\n"
+                       "endmodule\n",
+                       f),
+            "n 7 1 2\n");
+}
+
+// §27.4: the implicit localparam named as the loop index is a declaration of
+// each instance, holding the index the instance was elaborated with, so it is
+// read through the instance name like any other. The indices step by two so no
+// instance's value is its position in the loop.
+TEST(LoopGenerateHierarchicalNameSim, ImplicitIndexLocalparamIsRead) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 4; i < 8; i += 2) begin : g\n"
+                       "  end\n"
+                       "  initial $display(\"gv %0d %0d\", g[4].i, g[6].i);\n"
+                       "endmodule\n",
+                       f),
+            "gv 4 6\n");
+}
+
+// §27.4 Example 4 declares a net in each instance of a loop block and names
+// it `bitnum[k].t1`; the value its continuous assignment drives is read there.
+TEST(LoopGenerateHierarchicalNameSim, InstanceNetIsRead) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a = 12;\n"
+                       "  for (genvar k = 0; k < 2; k++) begin : bitnum\n"
+                       "    wire [31:0] t1;\n"
+                       "    assign t1 = a + k;\n"
+                       "  end\n"
+                       "  initial #1 $display(\"t %0d %0d\", bitnum[0].t1, "
+                       "bitnum[1].t1);\n"
+                       "endmodule\n",
+                       f),
+            "t 12 13\n");
+}
+
+// §23.6: a path is usable from any scope, another generate block among them,
+// and written inside a loop block its instance select may be the block's own
+// loop index, which §27.4 makes a constant of the instance.
+TEST(LoopGenerateHierarchicalNameSim, AnotherBlockSelectsByItsIndex) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:1];\n"
+                 "  for (genvar i = 0; i < 2; i++) begin : a\n"
+                 "    logic [7:0] v;\n"
+                 "    initial v = 8'd12 + i;\n"
+                 "  end\n"
+                 "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                 "    initial #1 out[i] = a[1 - i].v;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "out", {13u, 12u});
+}
+
+// §23.6: an instance select that is no constant, a variable of the module,
+// selects the instance its value names when the read runs.
+TEST(LoopGenerateHierarchicalNameSim, RunTimeIndexSelectsTheInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                       "    int v;\n"
+                       "    initial v = 36 + i;\n"
+                       "  end\n"
+                       "  int k;\n"
+                       "  initial begin\n"
+                       "    #1 k = 1;\n"
+                       "    $write(\"vidx %0d\", g[k].v);\n"
+                       "    k = 0;\n"
+                       "    $display(\" %0d\", g[k].v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "vidx 37 36\n");
+}
+
+// §27.4 with §23.6: a loop block declared in an interface is a scope of the
+// interface instance, reached through the instance name and then the block's.
+TEST(LoopGenerateHierarchicalNameSim, InterfaceInstanceBlockIsReached) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  for (genvar k = 0; k < 2; k++) begin : g\n"
+                       "    int v;\n"
+                       "    initial v = 100 + k;\n"
+                       "  end\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  ifc u();\n"
+                       "  initial #1 $display(\"if %0d %0d\", u.g[0].v, "
+                       "u.g[1].v);\n"
+                       "endmodule\n",
+                       f),
+            "if 100 101\n");
 }
 
 }  // namespace

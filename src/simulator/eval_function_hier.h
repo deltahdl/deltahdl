@@ -39,6 +39,15 @@ struct SubroutineTarget {
 // and the scoped name as its base. Defined in eval_function_hier.cpp.
 bool IsPackageScopedCall(const Expr* call);
 
+// §23.6: the key a dotted path of identifiers is read by, each instance select
+// in it evaluated where the path is read, so `g[k].v` while k holds 1 is read
+// as "g[1].v", as is `g[1 - i].v` in the instance of a loop generate block
+// whose implicit localparam i is 0 (§27.4). Empty for any other shape, and for
+// a select holding an x or z bit, which selects no instance. Defined in
+// eval_function_hier.cpp.
+std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
+                                      Arena& arena);
+
 // The module subroutine `call` names: a bare identifier or a call with a
 // bare callee, one through the package scope resolution operator (§26.3), or
 // a call whose callee is a dotted path of identifiers, `u1.tk` or `x.u1.tk`,

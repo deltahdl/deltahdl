@@ -357,6 +357,60 @@ static bool CollectGenerateBlockFunctions(
   return true;
 }
 
+// §27.4 and §27.5 with §23.6: how far `mod`'s variables, nets and parameters
+// reached before one item of a generate block instance was elaborated, so
+// what the item declared is what lies past it.
+namespace {
+struct DeclarationCounts {
+  size_t variables = 0;
+  size_t nets = 0;
+  size_t params = 0;
+};
+}  // namespace
+
+static DeclarationCounts CountDeclarations(const RtlirModule* mod) {
+  return {mod->variables.size(), mod->nets.size(), mod->params.size()};
+}
+
+// Lists what one item of the generate block instance `path` declared, past
+// `before`, as members of that instance (RtlirGenBlockMember). The instance's
+// variables and nets are stored under its prefix `prefix` and its parameters
+// under their simple names; a declaration stored under no such key belongs to
+// no member and is left out.
+static void RecordBlockItemMembers(RtlirModule* mod, const HierPath& path,
+                                   std::string_view prefix,
+                                   const DeclarationCounts& before) {
+  auto record_storage = [&](std::string_view stored) {
+    if (!stored.starts_with(prefix)) return;
+    RecordGenBlockMember(
+        mod->gen_block_members, path,
+        {.name = stored.substr(prefix.size()), .storage = stored});
+  };
+  for (size_t i = before.variables; i < mod->variables.size(); ++i)
+    record_storage(mod->variables[i].name);
+  for (size_t i = before.nets; i < mod->nets.size(); ++i)
+    record_storage(mod->nets[i].name);
+  for (size_t i = before.params; i < mod->params.size(); ++i) {
+    RecordGenBlockMember(mod->gen_block_members, path,
+                         {.kind = RtlirGenBlockMember::Kind::kParam,
+                          .name = mod->params[i].name,
+                          .param_index = i});
+  }
+}
+
+// Runs `elaborate`, which elaborates one item of the generate block instance
+// `path` into `mod`, and records what the item declared as members of that
+// instance. Kept apart from ElaborateGenerateItems, which stands near the
+// statement threshold.
+template <typename Elaborate>
+static void ElaborateRecordingMembers(RtlirModule* mod, const HierPath& path,
+                                      std::string_view prefix,
+                                      const Elaborate& elaborate) {
+  DeclarationCounts before = CountDeclarations(mod);
+  elaborate();
+  RecordBlockItemMembers(mod, path, prefix, before);
+}
+
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
@@ -429,7 +483,9 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         ElaborateGenerateBlockImport(item, mod);
         break;
       default:
-        ElaborateGenerateBlockItem(item, mod);
+        ElaborateRecordingMembers(mod, gen_block_path_, gen_prefix_, [&] {
+          ElaborateGenerateBlockItem(item, mod);
+        });
         break;
     }
   }
@@ -835,6 +891,11 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_prefix_scopes_.back() = InternedGenPrefix();
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     gen_block_path_.back().index = loop_scope[genvar_name];
+    // §27.4: the instance's implicit localparam, named as the loop index.
+    RecordGenBlockMember(mod->gen_block_members, gen_block_path_,
+                         {.kind = RtlirGenBlockMember::Kind::kIndex,
+                          .name = genvar_name,
+                          .index_value = loop_scope[genvar_name]});
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
     // Stop the loop when the genvar cannot advance, which

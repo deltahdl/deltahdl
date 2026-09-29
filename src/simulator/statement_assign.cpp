@@ -574,6 +574,11 @@ static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
   }
   VirtualInterfaceBase base =
       ResolveVirtualInterfaceBaseExpr(lhs->lhs, ctx, ctx.GetArena());
+  // §27.5 with §23.6: `vif.g.v`, through a named generate block of it.
+  std::string field(lhs->rhs->text);
+  if (!base.is_virtual_interface) {
+    base = ResolveVirtualInterfaceInnerPath(lhs, ctx, ctx.GetArena(), field);
+  }
   if (!base.is_virtual_interface) return {};
   *handled = true;
   if (base.handle == kNullVirtualInterface) {
@@ -584,8 +589,8 @@ static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
     target.kind = FieldTarget::Kind::kNoOp;
     return target;
   }
-  auto* component = ctx.FindVariable(
-      VirtualInterfaceComponentName(base.handle, lhs->rhs->text, ctx));
+  auto* component =
+      ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
   if (!component) return {};
   FieldTarget target;
   target.kind = FieldTarget::Kind::kVariable;

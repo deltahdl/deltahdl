@@ -9,6 +9,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -171,6 +172,26 @@ VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
   const ClassTypeInfo* scope =
       method_cls != nullptr ? method_cls : holder->type;
   return PropertyBase(scope, holder, method_cls, base->rhs->text, arena);
+}
+
+VirtualInterfaceBase ResolveVirtualInterfaceInnerPath(const Expr* expr,
+                                                      SimContext& ctx,
+                                                      Arena& arena,
+                                                      std::string& field) {
+  for (const Expr* node = expr->lhs;
+       node != nullptr && node->kind == ExprKind::kMemberAccess &&
+       !node->is_scope_resolution;
+       node = node->lhs) {
+    VirtualInterfaceBase base =
+        ResolveVirtualInterfaceBaseExpr(node->lhs, ctx, arena);
+    if (!base.is_virtual_interface) continue;
+    std::string full = HierarchicalReferenceName(expr);
+    std::string head = HierarchicalReferenceName(node->lhs) + ".";
+    if (!full.starts_with(head)) return {};
+    field = full.substr(head.size());
+    return base;
+  }
+  return {};
 }
 
 std::string VirtualInterfaceComponentName(uint64_t handle,

@@ -390,6 +390,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   for (const ClassDecl* cls : fresh_classes) InitClassStaticProperties(cls);
   CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
   CreateChildModuleNets(inst_prefix_, child, ctx_, arena_);
+  RegisterGenBlockMembers(child.resolved);
   // 21.2.1.5: register the child instance's tasks/functions so a call within
   // its own body resolves (and %m composes the instance + subroutine path);
   // LowerModule registers these for the top only.

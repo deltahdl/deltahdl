@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace delta {
+
+struct ModuleItem;
 
 // The scopes a generate construct opens (§27.4) and the hierarchical path
 // names that reach into them (§23.6), as the elaborated design carries them
@@ -94,5 +97,65 @@ struct HierStep {
 // module-level instance named `g_u` are spelled as, and §23.6 makes them
 // different scopes.
 using HierPath = std::vector<HierStep>;
+
+// §27.4 with §13.4 and §23.6: one subroutine declared in a generate block
+// instance. The block "comprises a separate scope and a new level of
+// hierarchy", so the subroutine is a member of the block instance's scope,
+// which §23.6 names through the block, `blk[1].triple` for the instance of
+// loop generate block blk at index 1, and its body reads the block's own
+// declarations and the implicit localparam of each loop it is inside by their
+// simple names. Every iteration of a loop generate block elaborates the one
+// declaration, so RtlirModule::function_decls holds it once per instance and
+// says nothing about which; this entry is what does. `gen_block_path` is the
+// path §23.6 names the instance by, and the other two members are what an
+// RtlirProcess of the same block carries, for the same reason: the body the
+// instances share names the block's declarations plainly, and the process
+// that calls the subroutine from outside the block stands in no such scope.
+struct RtlirGenBlockSubroutine {
+  ModuleItem* decl = nullptr;
+  HierPath gen_block_path;
+  GenBlockConsts gen_block_consts;
+  GenBlockPrefixes gen_block_prefixes;
+};
+
+// §27.4 and §27.5 with §23.6: one declaration of a named generate block
+// instance, reached from any scope by the path that names the instance and
+// then the declaration, `g.v` or `u.g[1].v`. The elaborator stores what the
+// block declares under a key that flattens the path into the name, `g_1_v`,
+// which a reference inside the block finds through GenBlockPrefixes and a
+// hierarchical path cannot spell, so each declaration is listed here with its
+// path for the run to register under the key the path spells.
+//
+// `kStorage` is a variable or net, stored under `storage`. `kParam` is a
+// parameter, which RtlirModule::params holds at `param_index` under its simple
+// name alone, so no stored key tells one instance's apart from another's.
+// `kIndex` is the implicit localparam §27.4 gives a loop block's instance,
+// named as the loop index and holding `index_value`, which the run otherwise
+// keeps only as a constant of the block's processes. A declaration of an
+// unnamed block has no entry: §27.6 leaves such a block no name a hierarchical
+// path can use.
+struct RtlirGenBlockMember {
+  enum class Kind { kStorage, kParam, kIndex };
+  Kind kind = Kind::kStorage;
+  std::string_view name;
+  std::string_view storage;
+  size_t param_index = 0;
+  int64_t index_value = 0;
+  HierPath gen_block_path;
+};
+
+// Appends `member` to `members` as a declaration of the generate block instance
+// `path`, the steps from the module to it; nothing for a declaration of the
+// module itself or of a block with an unnamed step (§27.6).
+inline void RecordGenBlockMember(std::vector<RtlirGenBlockMember>& members,
+                                 const HierPath& path,
+                                 RtlirGenBlockMember member) {
+  if (path.empty()) return;
+  for (const HierStep& step : path) {
+    if (step.name.empty()) return;
+  }
+  member.gen_block_path = path;
+  members.push_back(std::move(member));
+}
 
 }  // namespace delta

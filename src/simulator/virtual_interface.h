@@ -70,6 +70,18 @@ VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
                                                      SimContext& ctx,
                                                      Arena& arena);
 
+// §25.9 with §27.5 and §23.6: a member access whose path passes through a
+// virtual interface before its last step, `vif.g.v` for the variable v of the
+// named generate block g of the instance `vif` represents. Answers that
+// virtual interface and puts in `field` the path after it, "g.v", which
+// VirtualInterfaceComponentName joins to the instance. Answers no virtual
+// interface for a path through none, and where the base of the last step is
+// the virtual interface itself, `vif.v`, which the caller resolves.
+VirtualInterfaceBase ResolveVirtualInterfaceInnerPath(const Expr* expr,
+                                                      SimContext& ctx,
+                                                      Arena& arena,
+                                                      std::string& field);
+
 // §25.9: the full name of component `field` of the instance `handle`
 // represents, `top.dif.clk` for `clk` of the instance at `top.dif`, which is
 // the variable a read, a write or an event control through the virtual

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -208,6 +210,123 @@ TEST(GenerateSimulation, GenerateIfElseIfChainSelectsFinalElse) {
       f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 64u);
+}
+
+// §27.5 with §23.6: a named conditional generate block is a scope, and what it
+// declares is read from the module through the block's name. A 4-state value
+// carrying an x bit keeps it through a part-select of the path.
+TEST(ConditionalGenerateHierarchicalNameSim, BlockVariableIsReadWhole) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : g\n"
+                       "    logic [3:0] v;\n"
+                       "    string s;\n"
+                       "    initial begin v = 4'b001x; s = \"hello\"; end\n"
+                       "  end\n"
+                       "  initial #1 $display(\"lg %b %b %s\", g.v, "
+                       "g.v[1:0], g.s);\n"
+                       "endmodule\n",
+                       f),
+            "lg 001x 1x hello\n");
+}
+
+// §27.5 with §23.6: a write from the module through the block's name lands in
+// the variable the block's own process reads by its simple name.
+TEST(ConditionalGenerateHierarchicalNameSim, WriteFromTheModuleReachesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : g\n"
+                       "    int v;\n"
+                       "    initial #1 $display(\"wr %0d\", v);\n"
+                       "  end\n"
+                       "  initial g.v = 78;\n"
+                       "endmodule\n",
+                       f),
+            "wr 78\n");
+}
+
+// §27.5: the one block an if-else-if chain or a case generate selects is
+// instantiated under the name its alternatives share, and a localparam it
+// declares is read through that name. Each unselected alternative declares a
+// different value, so reading one of them gives a different answer.
+TEST(ConditionalGenerateHierarchicalNameSim, SelectedBlockLocalparamIsRead) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  localparam int P = 2;\n"
+                 "  if (P == 1) begin : u localparam int R = 1; end\n"
+                 "  else if (P == 2) begin : u localparam int R = 3; end\n"
+                 "  else begin : u localparam int R = 5; end\n"
+                 "  case (P)\n"
+                 "    1: begin : adder localparam int K = 7; end\n"
+                 "    2, 3: begin : adder localparam int K = 8; end\n"
+                 "    default: begin : adder localparam int K = 9; end\n"
+                 "  endcase\n"
+                 "  initial $display(\"sel %0d %0d\", u.R, adder.K);\n"
+                 "endmodule\n",
+                 f),
+      "sel 3 8\n");
+}
+
+// §23.6: a path is usable from any scope, the method of a class the module
+// declares among them.
+TEST(ConditionalGenerateHierarchicalNameSim, ClassMethodReadsThroughIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : g\n"
+                       "    int v;\n"
+                       "    initial v = 33;\n"
+                       "  end\n"
+                       "  class C;\n"
+                       "    function int get(); return g.v; endfunction\n"
+                       "  endclass\n"
+                       "  initial begin\n"
+                       "    automatic C c = new;\n"
+                       "    #1 $display(\"meth %0d\", c.get());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "meth 33\n");
+}
+
+// §23.6: the path may start at a submodule instance and pass through a block
+// of that instance's module.
+TEST(ConditionalGenerateHierarchicalNameSim, SubmoduleBlockIsReached) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  if (1) begin : g\n"
+                       "    int v;\n"
+                       "    initial v = 29;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub u();\n"
+                       "  initial #1 $display(\"hi %0d\", u.g.v);\n"
+                       "endmodule\n",
+                       f),
+            "hi 29\n");
+}
+
+// §25.9 with §27.5: a virtual interface reaches what its interface instance
+// declares, a named generate block's variable among it.
+TEST(ConditionalGenerateHierarchicalNameSim, VirtualInterfaceReachesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  if (1) begin : g\n"
+                       "    int v;\n"
+                       "  end\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  ifc u();\n"
+                       "  virtual ifc vi;\n"
+                       "  initial begin\n"
+                       "    vi = u;\n"
+                       "    vi.g.v = 55;\n"
+                       "    #1 $display(\"vif %0d %0d\", u.g.v, vi.g.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "vif 55 55\n");
 }
 
 }  // namespace

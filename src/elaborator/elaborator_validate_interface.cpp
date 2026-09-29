@@ -110,8 +110,23 @@ const ModportDecl* FindVifModportDecl(const ModuleDecl* iface,
   return nullptr;
 }
 
+// §27.5 with §23.6: whether the generate construct `it` has a block the source
+// named `name`, among its else alternatives and its case items, and so a scope
+// a hierarchical name, `vif.g.v` included, reaches through. A block §27.6
+// named is no such scope.
+bool GenerateConstructNamesBlock(const ModuleItem* it, std::string_view name) {
+  if (it == nullptr) return false;
+  if (!it->name_is_generated && it->name == name) return true;
+  for (const auto& case_item : it->gen_case_items) {
+    if (!case_item.name_is_generated && case_item.label == name) return true;
+  }
+  return it->kind == ModuleItemKind::kGenerateIf &&
+         GenerateConstructNamesBlock(it->gen_else, name);
+}
+
 // Locates the clocking-block item named `block_name` on `iface`, setting
-// `member_exists` when a var/net member of that name is found instead.
+// `member_exists` when a var/net member or a named generate block of that name
+// is found instead.
 const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
                                            std::string_view block_name,
                                            bool& member_exists) {
@@ -123,6 +138,12 @@ const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
     if ((it->kind == ModuleItemKind::kVarDecl ||
          it->kind == ModuleItemKind::kNetDecl) &&
         it->name == block_name) {
+      member_exists = true;
+    }
+    if ((it->kind == ModuleItemKind::kGenerateIf ||
+         it->kind == ModuleItemKind::kGenerateFor ||
+         it->kind == ModuleItemKind::kGenerateCase) &&
+        GenerateConstructNamesBlock(it, block_name)) {
       member_exists = true;
     }
   }

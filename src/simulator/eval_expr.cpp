@@ -505,6 +505,11 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   VirtualInterfaceBase base =
       ResolveVirtualInterfaceBaseExpr(expr->lhs, ctx, arena);
+  // §27.5 with §23.6: `vif.g.v`, through a named generate block of it.
+  std::string inner;
+  if (!base.is_virtual_interface) {
+    base = ResolveVirtualInterfaceInnerPath(expr, ctx, arena, inner);
+  }
   if (!base.is_virtual_interface) return false;
   if (base.handle == kNullVirtualInterface) {
     ctx.GetDiag().Error(expr->range.start,
@@ -517,6 +522,7 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
       (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
           ? expr->rhs->text
           : std::string_view(expr->text);
+  if (!inner.empty()) field = inner;
   auto* tv =
       ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
   out = tv ? tv->value : MakeLogic4Vec(arena, 1);
@@ -689,6 +695,21 @@ static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
   return val;
 }
 
+// Whether the leftmost name of the path `expr` is no variable or array, so a
+// select after it selects an instance rather than an element, whose index
+// EvaluatedHierarchicalPath would evaluate a second time.
+static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
+  const Expr* head = expr;
+  while (head->kind == ExprKind::kMemberAccess ||
+         head->kind == ExprKind::kSelect) {
+    head = head->kind == ExprKind::kSelect ? head->base : head->lhs;
+    if (head == nullptr) return false;
+  }
+  return head->kind == ExprKind::kIdentifier &&
+         ctx.FindVariable(head->text) == nullptr &&
+         ctx.FindArrayInfo(head->text) == nullptr;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
   if (TryContainerElementMember(expr, ctx, arena, out)) return out;
@@ -706,6 +727,11 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string rooted = RootedReferenceKey(expr);
   auto* var = rooted.empty() ? nullptr : ctx.FindVariable(rooted);
   if (var == nullptr) var = ctx.FindVariable(resolved);
+  // §23.6: an instance select that is no literal, `g[k].v`, names the
+  // instance its value selects where the read runs.
+  if (var == nullptr && HeadNamesAnInstance(expr, ctx)) {
+    var = ctx.FindVariable(EvaluatedHierarchicalPath(expr, ctx, arena));
+  }
   if (var) return ReadReferencedVariable(*var, ctx);
 
   auto dot = MemberPathSplit(resolved, ctx);
