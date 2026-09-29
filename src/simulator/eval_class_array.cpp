@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
@@ -240,11 +241,17 @@ static bool ResolveBareClassArray(const Expr* base, SimContext& ctx,
   return true;
 }
 
-// §8.23: `C::sarr` names the static property of class C.
+// §8.23: `C::sarr` names the static property of class C. §8.25 gives each
+// specialization its own static properties, so `P#(5)::sarr` names the copy
+// of the specialization the prefix names (ScopeNamedSpecialization), as a
+// scalar static read through the same prefix does; looked up by the bare
+// name, every specialization's scope form reached the generic class's one
+// set of elements.
 static bool ResolveScopedClassArray(const Expr* base, SimContext& ctx,
-                                    ClassArrayRef& out) {
+                                    Arena& arena, ClassArrayRef& out) {
   if (base->lhs->kind != ExprKind::kIdentifier) return false;
-  const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
+  const ClassTypeInfo* cls = ScopeNamedSpecialization(base->lhs, ctx, arena);
+  if (cls == nullptr) cls = ctx.FindClassType(base->lhs->text);
   if (cls == nullptr) return false;
   const auto* prop = FindClassArrayProperty(cls, base->rhs->text);
   if (prop == nullptr || !prop->is_static) return false;
@@ -285,7 +292,8 @@ bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  if (base->is_scope_resolution) return ResolveScopedClassArray(base, ctx, out);
+  if (base->is_scope_resolution)
+    return ResolveScopedClassArray(base, ctx, arena, out);
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   if (obj == nullptr) return false;
   const auto* prop = FindClassArrayProperty(obj->type, base->rhs->text);

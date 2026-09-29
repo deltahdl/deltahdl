@@ -691,4 +691,30 @@ TEST(ParameterizedScopeResolutionSim,
             4u * 100u + 7u);
 }
 
+// §8.25.1 (printed page 205) with §8.9 (printed 186): the class used with no
+// actuals, `P#()`, or with its defaults, `P #(3)`, is the default
+// specialization, whose value parameter holds the declaration's default, so
+// a static initializer naming it reads 3 -- through the scope form, a handle
+// and a method alike. Run with no parameter bound, every read was 0.
+TEST(ParameterizedScopeResolutionSim,
+     DefaultSpecializationStaticInitializerReadsTheDefault) {
+  EXPECT_EQ(RunAndGet("class P #(int N = 3);\n"
+                      "  static int s = N;\n"
+                      "  static int k = N * 10;\n"
+                      "  function int ird(); return s; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  P p;\n"
+                      "  P #(3) q;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    p = new; q = new;\n"
+                      "    out = P#()::s * 1000 + p.ird() * 100 + q.s * 10 +\n"
+                      "          P#()::k / 10;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3333u);
+}
+
 }  // namespace

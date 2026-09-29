@@ -710,4 +710,37 @@ TEST(StaticClassPropertySim, StaticArrayPropertiesAreShared) {
   EXPECT_EQ(out, "7 7 75 3 5 4\n");
 }
 
+// §8.9 with §7.4 and §7.5: a static array property takes its declaration's
+// assignment-pattern initializer, element by element, as an instance one
+// does -- a fixed one `'{1, 2, 3, 4}` read through `C::`, from a static
+// method's foreach and from an instance method, and a dynamic one given as
+// many elements as the pattern has items. The pattern was evaluated as one
+// value and stored under the property's name, which holds no element, so
+// every element read 0 and the dynamic array stayed empty.
+TEST(StaticClassPropertySim, StaticArrayPropertyTakesPatternInitializer) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  static int t[4] = '{1, 2, 3, 4};\n"
+      "  static byte r[2:0] = '{7, 8, 9};\n"
+      "  static int d[] = '{5, 6};\n"
+      "  static function int sum();\n"
+      "    int s;\n"
+      "    s = 0;\n"
+      "    foreach (t[i]) s += t[i];\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  function int last(); return d[d.size() - 1]; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", C::t[2], C::sum(), C::r[2],\n"
+      "             C::d.size(), c.last(), C::t[0] + C::r[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 10 7 2 6 10\n");
+}
+
 }  // namespace

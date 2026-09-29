@@ -382,4 +382,32 @@ TEST(ClassSim, PropertyOfParameterizedBaseTypedefHasBaseSpecializationLayout) {
   EXPECT_EQ(out, "3 5 32\n3 5 8\n");
 }
 
+// §8.25 with §8.9: each specialization has its own copy of a static array
+// property, initialized with its own value parameter, and the scope form
+// `P#(5)::a` names that copy -- written through it, it reads back through it
+// and from the specialization's static method, and not through `P#(9)::`.
+// The scope form named the generic class's elements, one storage for every
+// specialization, and the static method read a third copy that held 0.
+TEST(ParameterizedClassSim, SpecializationStaticArrayIsItsOwn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class P #(int N = 2);\n"
+      "  static int a[2] = '{N, N + 1};\n"
+      "  static int d[];\n"
+      "  static function int rd(); return a[0]; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", P#(5)::a[1], P#(9)::a[0]);\n"
+      "    P#(5)::a[0] = 11;\n"
+      "    P#(9)::a[0] = 22;\n"
+      "    P#(5)::d = new[3];\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", P#(5)::a[0], P#(9)::a[0],\n"
+      "             P#(5)::rd(), P#(5)::d.size(), P#(9)::d.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 9\n11 22 11 3 0\n");
+}
+
 }  // namespace

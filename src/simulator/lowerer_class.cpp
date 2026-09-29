@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -18,6 +19,7 @@
 #include "simulator/class_specialization.h"
 #include "simulator/class_typedef_layout.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_class_sync.h"
@@ -100,6 +102,20 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
+// §8.25 with §7.4 and §7.5: the elements of the static array property
+// `name` and a dynamic one's count, held under keys of their own beside the
+// property's name (ClassArrayElementKey, ClassArraySizeKey), are dropped, so
+// a specialization copied from the generic class starts with none of the
+// generic's elements; an element not yet written reads its default.
+static void ClearStaticArrayElements(ClassTypeInfo* info,
+                                     std::string_view name) {
+  std::string element_prefix = std::string(name) + "[";
+  std::string size_key = ClassArraySizeKey(name);
+  std::erase_if(info->static_properties, [&](const auto& entry) {
+    return entry.first == size_key || entry.first.starts_with(element_prefix);
+  });
+}
+
 // §8.9 (printed page 186 of IEEE 1800-2023): each static property's one
 // copy is created as the class is built, at its zero default, so that an object
 // constructed by a declaration of the same scope before the initializers run
@@ -119,7 +135,31 @@ static void CreateStaticProperties(ClassTypeInfo* info, Arena& arena) {
     info->static_properties[std::string(p.name)] =
         p.is_4state ? MakeAllX(arena, p.width)
                     : MakeLogic4VecVal(arena, p.width, 0);
+    if (p.IsArray() || !p.dim_sizes.empty())
+      ClearStaticArrayElements(info, p.name);
   }
+}
+
+// §8.9 with §7.4 and §7.5: a static fixed-size or dynamic array property holds
+// its elements in the class's static map under their element keys, so an
+// assignment-pattern initializer is stored item by item there
+// (StoreClassArrayPattern), as an instance property's is on the object
+// (TryInitClassArrayPattern in eval_class_new.cpp). Evaluated as one value
+// and stored under the property's name, which holds no element, the pattern
+// left every element 0 and a dynamic one empty.
+static bool TryInitStaticArrayPattern(ClassTypeInfo* info,
+                                      const ClassTypeInfo::PropertyInfo& p,
+                                      SimContext& ctx, Arena& arena) {
+  if (p.init_expr->kind != ExprKind::kAssignmentPattern || !p.IsArray() ||
+      p.dim_sizes.size() >= 2) {
+    return false;
+  }
+  ClassArrayRef ref;
+  ref.prop = &p;
+  ref.static_owner = info;
+  ref.size = p.array_size;
+  ref.lo = p.is_dynamic ? 0 : p.array_lo;
+  return StoreClassArrayPattern(ref, p.init_expr, ctx, arena);
 }
 
 // §8.9 (printed page 186) with §6.21 (printed 132-133): each static
@@ -144,6 +184,7 @@ static void InitStaticProperty(ClassTypeInfo* info,
                                SimContext& ctx, Arena& arena) {
   if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) return;
   if (p.init_expr == nullptr) return;
+  if (TryInitStaticArrayPattern(info, p, ctx, arena)) return;
   if (p.init_expr->kind == ExprKind::kCall && p.init_expr->text == "new") {
     // §8.7: a bare `new` names no class of its own; the property's declared
     // class is the one constructed, `static C inst = new;` an object of C.
@@ -177,6 +218,23 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
+// §8.25 with §8.9: each value parameter of the class `info` bound, in the
+// frame its static initializers run in, to the value `info` holds for it --
+// a specialization's actual, or the declaration's default for the class
+// itself, which §8.25.1 makes the default specialization. Bound for a
+// specialization alone, `static int s = N;` under `class P #(int N = 2)`
+// held 0 in P#() where it holds 2.
+static void BindStaticInitValueParams(const ClassTypeInfo* info,
+                                      SimContext& ctx) {
+  for (const auto& [pname, pexpr] : info->decl->params) {
+    if (info->decl->type_param_names.count(pname) != 0) continue;
+    auto entry = info->static_properties.find(std::string(pname));
+    if (entry == info->static_properties.end()) continue;
+    auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
+    v->value = entry->second;
+  }
+}
+
 // §8.25 (printed page 204) with §8.9 (printed 186): a specialization's static
 // properties take their initializers in a frame where that specialization's
 // value parameters are bound, so `static const int W = size` holds 4 under
@@ -203,13 +261,7 @@ void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
   if (!spec->package.empty()) ctx.PushScope(spec->package);
   ctx.PushScope();
   BindStaticInitTypeActuals(spec, ctx);
-  for (const auto& [pname, pexpr] : spec->decl->params) {
-    if (spec->decl->type_param_names.count(pname) != 0) continue;
-    auto entry = spec->static_properties.find(std::string(pname));
-    if (entry == spec->static_properties.end()) continue;
-    auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
-    v->value = entry->second;
-  }
+  BindStaticInitValueParams(spec, ctx);
   InitStaticProperties(spec, ctx, arena);
   ctx.PopScope();
   if (!spec->package.empty()) ctx.PopScope();
@@ -806,6 +858,7 @@ void Lowerer::InitClassStaticProperties(const ClassDecl* cls) {
   if (!info->package.empty()) ctx_.PushScope(info->package);
   ctx_.PushScope();
   BindStaticInitTypeActuals(info, ctx_);
+  BindStaticInitValueParams(info, ctx_);
   InitStaticProperties(info, ctx_, arena_);
   ctx_.PopScope();
   if (!info->package.empty()) ctx_.PopScope();
