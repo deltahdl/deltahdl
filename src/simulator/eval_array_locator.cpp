@@ -63,13 +63,15 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
 }
 
 // Pushes a fresh scope and binds the per-iteration locator iterators: the
-// element iterator (item_val, optionally registered as a string) and the index
-// iterator (item_index, 32-bit). The caller is responsible for evaluating the
-// with expression in this scope and calling PopScope afterwards.
+// element iterator (item_val, optionally registered as a string, and signed
+// where the element type is, §7.12 with §6.11) and the index iterator
+// (item_index, 32-bit). The caller is responsible for evaluating the with
+// expression in this scope and calling PopScope afterwards.
 static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
                               size_t item_index) {
   lc.ctx.PushScope();
-  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width);
+  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width,
+                                              item_val.is_signed);
   item_var->value = item_val;
   if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
   auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
@@ -137,8 +139,8 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
 static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     lc.ctx.PushScope();
-    auto* item_var =
-        lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width);
+    auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width,
+                                                lc.elems[i].is_signed);
     item_var->value = lc.elems[i];
     if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
     auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
@@ -186,19 +188,20 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
   }
 }
 
+// §7.12.1 with §6.11: the element whose value, or whose with expression's
+// value, is least for min() and greatest for max(), the first of several equal
+// ones, ordered by the signedness of the element type or of the expression.
 static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
                           std::vector<Logic4Vec>& out) {
   if (lc.elems.empty()) return;
   size_t best_idx = 0;
-  uint64_t best_val = lc.with_expr
-                          ? EvalLocatorWithExpr(lc, lc.elems[0], 0).ToUint64()
-                          : lc.elems[0].ToUint64();
+  Logic4Vec best_val =
+      lc.with_expr ? EvalLocatorWithExpr(lc, lc.elems[0], 0) : lc.elems[0];
   for (size_t i = 1; i < lc.elems.size(); ++i) {
-    uint64_t val = lc.with_expr
-                       ? EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64()
-                       : lc.elems[i].ToUint64();
-    if ((method == "min" && val < best_val) ||
-        (method == "max" && val > best_val)) {
+    Logic4Vec val =
+        lc.with_expr ? EvalLocatorWithExpr(lc, lc.elems[i], i) : lc.elems[i];
+    if (method == "min" ? OrdersBefore(val, best_val, val.is_signed)
+                        : OrdersBefore(best_val, val, val.is_signed)) {
       best_val = val;
       best_idx = i;
     }
@@ -301,7 +304,8 @@ struct AssocLocatorState {
   // the value and the index iterator to the key, a string for a string index.
   Logic4Vec EvalWith(size_t i) const {
     ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
+    auto* item_var =
+        ctx.CreateLocalVariable(lc.iter_name, vals[i].width, vals[i].is_signed);
     item_var->value = vals[i];
     auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, keys[i].width);
     idx_var->value = KeyVec(i);
@@ -311,9 +315,12 @@ struct AssocLocatorState {
     return r;
   }
   bool Matches(size_t i) const { return EvalWith(i).ToUint64() != 0; }
-  uint64_t SortKey(size_t i) const {
-    return lc.with_expr ? EvalWith(i).ToUint64() : vals[i].ToUint64();
+  // The value min() and max() order entry i by: its with expression's where
+  // there is one, and its own where there is not.
+  Logic4Vec OrderValue(size_t i) const {
+    return lc.with_expr ? EvalWith(i) : vals[i];
   }
+  uint64_t SortKey(size_t i) const { return OrderValue(i).ToUint64(); }
 };
 
 // Forward scan over every entry, pushing the projection of each matching entry.
@@ -379,12 +386,13 @@ static void AssocLocatorMinMax(std::string_view method,
                                std::vector<Logic4Vec>& out) {
   const auto& vals = st.vals;
   if (vals.empty()) return;
+  // §7.12.1 with §6.11: ordered as LocatorMinMax orders an indexed array's.
   size_t best = 0;
-  uint64_t best_key = st.SortKey(0);
+  Logic4Vec best_key = st.OrderValue(0);
   for (size_t i = 1; i < vals.size(); ++i) {
-    uint64_t k = st.SortKey(i);
-    if ((method == "min" && k < best_key) ||
-        (method == "max" && k > best_key)) {
+    Logic4Vec k = st.OrderValue(i);
+    if (method == "min" ? OrdersBefore(k, best_key, k.is_signed)
+                        : OrdersBefore(best_key, k, k.is_signed)) {
       best_key = k;
       best = i;
     }
@@ -461,7 +469,8 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
 // Flattens the associative array into parallel key/value vectors in
 // ascending-key order, the first()/last() ordering of §7.9: an integral key
 // at the index width with the index type's signedness, a string key as its
-// text (§7.8.1), which std::map orders lexicographically as §7.9 does.
+// text (§7.8.1), which std::map orders lexicographically as §7.9 does. Each
+// value reads with the element type's signedness (§6.11).
 static void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
                                 std::vector<Logic4Vec>& keys,
                                 std::vector<Logic4Vec>& vals) {
@@ -469,6 +478,7 @@ static void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
     for (const auto& [k, v] : aa.str_data) {
       keys.push_back(StringToLogic4Vec(arena, k));
       vals.push_back(v);
+      TakeElementSignedness(aa, vals.back());
     }
     return;
   }
@@ -478,6 +488,7 @@ static void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
     key.is_signed = aa.is_index_signed;
     keys.push_back(key);
     vals.push_back(v);
+    TakeElementSignedness(aa, vals.back());
   }
 }
 
@@ -717,7 +728,8 @@ static void MapStringKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
   SimContext& ctx = env.ctx;
   for (const auto& [key, val] : aa.str_data) {
     ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, val.width);
+    auto* item_var =
+        ctx.CreateLocalVariable(lc.iter_name, val.width, aa.is_signed);
     item_var->value = val;
     Logic4Vec key_vec = StringToLogic4Vec(env.arena, key);
     auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, key_vec.width);
@@ -739,7 +751,8 @@ static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
   const uint32_t kIw = aa.index_width;
   for (const auto& [key, val] : aa.int_data) {
     ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, val.width);
+    auto* item_var =
+        ctx.CreateLocalVariable(lc.iter_name, val.width, aa.is_signed);
     item_var->value = val;
     auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
     idx_var->value =

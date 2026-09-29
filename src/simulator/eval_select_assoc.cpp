@@ -15,6 +15,11 @@
 
 namespace delta {
 
+void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val) {
+  if (val.is_string || val.is_real || !aa.elem_class.empty()) return;
+  val.is_signed = aa.is_signed;
+}
+
 static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
   if (aa->has_default) return aa->default_value;
   return aa->is_4state ? MakeAllX(arena, aa->elem_width)
@@ -92,6 +97,7 @@ bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   std::string_view name = AssocReportName(expr->base);
   out = aa->is_string_key ? AssocReadStr(aa, expr->index, name, ctx, arena)
                           : AssocReadInt(aa, expr->index, name, ctx, arena);
+  TakeElementSignedness(*aa, out);
   return true;
 }
 

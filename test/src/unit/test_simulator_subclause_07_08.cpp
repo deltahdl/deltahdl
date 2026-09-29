@@ -536,4 +536,99 @@ TEST(AssocArraySimulation, AssocOfAssocKeepsAnInnerArrayPerKey) {
   EXPECT_EQ(out, "2 2 1 42\n1 0 9\n");
 }
 
+// §7.8 with §6.11: an element of an associative array is a variable of the
+// element type, so it reads with that type's signedness whatever the value
+// written into it was: the unsigned 32'hFFFFFFFD in an `int` element is -3,
+// less than 0, and the signed -3 in a `bit [31:0]` element is 4294967293. An
+// array declared in a procedural block, one with a string index and the inner
+// array of an associative array of associative arrays read alike.
+TEST(AssocArraySimulation, AnElementReadsWithTheElementTypesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int as[string];\n"
+      "  bit [31:0] ua[int];\n"
+      "  int mm[string][int];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    int ba[int];\n"
+      "    bit [31:0] bu[int];\n"
+      "    u = 32'hFFFFFFFD;\n"
+      "    aa[0] = u; as[\"k\"] = u; ua[0] = -3; mm[\"k\"][0] = u;\n"
+      "    ba[0] = u; bu[0] = -3;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", aa[0] < 0, as[\"k\"] < 0,\n"
+      "             ua[0] < 0, mm[\"k\"][0] < 0, ba[0] < 0, bu[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 0 1 1 0\n");
+}
+
+// §7.8 with §6.11 and §26.2: an associative array a package declares has
+// elements of its own element type too.
+TEST(AssocArraySimulation, AnElementOfAPackageAssociativeArrayReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  int aa[int];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hFFFFFFFD;\n"
+      "    p::aa[0] = u;\n"
+      "    $display(\"%0d\", p::aa[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.8 with §6.11 and §13.5: an associative array formal, `int a[int]`, has
+// elements of its own element type, so the unsigned value the actual's entry
+// was written with reads in the body as a signed int, less than 0.
+TEST(AssocArraySimulation, AnElementOfAnAssociativeArrayFormalReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int x[int];\n"
+      "  bit [31:0] u;\n"
+      "  function int negative(int a[int]);\n"
+      "    return a[0] < 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = 32'hFFFFFFFD;\n"
+      "    x[0] = u;\n"
+      "    $display(\"%0d\", negative(x));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.8 with §6.11, §8.5 and §8.12: an associative array property has elements
+// of its declared element type, and so does the array a shallow copy of the
+// object gives the copy.
+TEST(AssocArraySimulation, AnElementOfAnAssociativeArrayPropertyReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int m[int];\n"
+      "  endclass\n"
+      "  C c, d;\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hFFFFFFFD;\n"
+      "    c = new;\n"
+      "    c.m[0] = u;\n"
+      "    d = new c;\n"
+      "    $display(\"%0d %0d\", c.m[0] < 0, d.m[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
 }  // namespace

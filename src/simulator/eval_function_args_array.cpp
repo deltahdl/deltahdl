@@ -157,6 +157,7 @@ static void BindAssocArg(const AssocArrayObject* src, const FunctionArg& formal,
   dst->index_width = src->index_width;
   dst->is_wildcard = src->is_wildcard;
   dst->is_4state = src->is_4state;
+  dst->is_signed = DeclaredTypeIsSigned(formal.data_type, ctx);
   dst->index_class = src->index_class;
   dst->index_type_name = src->index_type_name;
 }

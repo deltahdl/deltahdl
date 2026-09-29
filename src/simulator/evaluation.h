@@ -16,6 +16,7 @@
 
 namespace delta {
 
+struct AssocArrayObject;
 struct DataType;
 struct EnumTypeInfo;
 struct Expr;
@@ -146,6 +147,10 @@ Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena);
 // (QueueObject::is_signed), whichever the value written into the element had.
 // A string, a real and a class handle are left as they are.
 void TakeElementSignedness(const QueueObject& q, Logic4Vec& val);
+
+// §6.11 with §7.8: the same for an element of the associative array `aa`
+// (AssocArrayObject::is_signed). Defined in eval_select_assoc.cpp.
+void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val);
 
 // §6.12: a shortreal is a C float and a real is a C double, so the width of a
 // real vector says which pattern it carries — 32 bits a float, any other width

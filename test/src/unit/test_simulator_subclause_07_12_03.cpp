@@ -534,4 +534,25 @@ TEST(ArrayReductionSim, NestedReductionOverTheRowsOfA2DArray) {
   EXPECT_EQ(out, "50 2350\n");
 }
 
+// §7.12 with §6.11: the iterator of a reduction's with clause is a variable of
+// the element type, so over `int` elements `item < 0` holds for -3 and over
+// `bit [31:0]` ones it holds for none. The rows of a two-dimensional array are
+// iterated over the same way, each row's elements keeping their type.
+TEST(ArrayReductionSim, TheIteratorReadsWithTheElementTypesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$] = '{5, -3};\n"
+      "  int d[] = '{-1, -3};\n"
+      "  bit [31:0] u[$] = '{5, -3};\n"
+      "  int m [2][2] = '{ '{-3, 5}, '{-1, 2} };\n"
+      "  initial\n"
+      "    $display(\"%0d %0d %0d %0d\", q.sum with (int'(item < 0)),\n"
+      "             d.sum with (int'(item < 0)), u.sum with (int'(item < 0)),\n"
+      "             m.sum with (item.sum with (int'(item < 0))));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 0 2\n");
+}
+
 }  // namespace

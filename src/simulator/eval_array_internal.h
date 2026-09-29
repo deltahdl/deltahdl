@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -73,5 +74,16 @@ std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
                                            std::string_view method,
                                            const Expr* expr, SimContext& ctx,
                                            Arena& arena);
+
+// §7.12.3: `vals` folded by the reduction `method` names -- sum, product, and,
+// or or xor -- and 0 for any other name. Defined in eval_array_value_ops.cpp.
+uint64_t ApplyReduction(std::string_view method,
+                        const std::vector<uint64_t>& vals);
+
+// §7.12.1 and §7.12.2 with §6.11: whether `a` comes before `b` in the order
+// min(), max(), sort() and rsort() put two values of one integral type in --
+// as two's-complement numbers where `is_signed` says that type is signed, and
+// as unsigned ones where it is not. Defined in eval_array_value_ops.cpp.
+bool OrdersBefore(const Logic4Vec& a, const Logic4Vec& b, bool is_signed);
 
 }  // namespace delta

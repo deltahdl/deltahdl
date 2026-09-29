@@ -129,13 +129,19 @@ static void ApplyDynArrayIdPermutation(std::string_view var_name,
   ids = std::move(reordered);
 }
 
+// §6.11 with §7.12: each element as it reads, with the element type's
+// signedness rather than that of the value written into it -- a queue's or a
+// dynamic array's by TakeElementSignedness, and a fixed-size array's element
+// variable's own, as ReadReferencedVariable (eval_expr.cpp) reads a variable.
 std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                           const ArrayInfo& info,
                                           SimContext& ctx, Arena& arena) {
   if (info.is_dynamic) {
     auto* q = ctx.FindQueue(var_name);
     if (!q) return {};
-    return q->elements;
+    std::vector<Logic4Vec> vals = q->elements;
+    for (auto& v : vals) TakeElementSignedness(*q, v);
+    return vals;
   }
   std::vector<Logic4Vec> vals;
   vals.reserve(info.size);
@@ -143,7 +149,12 @@ std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
     uint32_t idx = info.lo + i;
     auto name = std::string(var_name) + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(name);
-    vals.push_back(v ? v->value : MakeLogic4VecVal(arena, info.elem_width, 0));
+    if (v == nullptr) {
+      vals.push_back(MakeLogic4VecVal(arena, info.elem_width, 0));
+      continue;
+    }
+    vals.push_back(v->value);
+    vals.back().is_signed = v->is_signed;
   }
   return vals;
 }
@@ -222,7 +233,10 @@ static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
                                         const WithIterEnv& env,
                                         const Logic4Vec& elem, size_t index) {
   env.ctx.PushScope();
-  auto* item_var = env.ctx.CreateLocalVariable(env.iter_name, elem.width);
+  // §7.12 with §6.11: the iterator is a variable of the element type, whose
+  // signedness `elem` carries (CollectVecElements).
+  auto* item_var =
+      env.ctx.CreateLocalVariable(env.iter_name, elem.width, elem.is_signed);
   item_var->value = elem;
   auto* idx_var = env.ctx.CreateLocalVariable(env.idx_var_name, 32);
   idx_var->value =
@@ -244,46 +258,6 @@ static std::vector<uint64_t> EvalReduceWithValues(
     if (i == 0) result_width = ev.width;
   }
   return vals;
-}
-
-static uint64_t ReduceSumVals(const std::vector<uint64_t>& vals) {
-  uint64_t result = 0;
-  for (auto v : vals) result += v;
-  return result;
-}
-
-static uint64_t ReduceProductVals(const std::vector<uint64_t>& vals) {
-  uint64_t result = 1;
-  for (auto v : vals) result *= v;
-  return result;
-}
-
-static uint64_t ReduceAndVals(const std::vector<uint64_t>& vals) {
-  uint64_t result = vals.empty() ? 0 : vals[0];
-  for (size_t i = 1; i < vals.size(); ++i) result &= vals[i];
-  return result;
-}
-
-static uint64_t ReduceOrVals(const std::vector<uint64_t>& vals) {
-  uint64_t result = 0;
-  for (auto v : vals) result |= v;
-  return result;
-}
-
-static uint64_t ReduceXorVals(const std::vector<uint64_t>& vals) {
-  uint64_t result = 0;
-  for (auto v : vals) result ^= v;
-  return result;
-}
-
-static uint64_t ApplyReduction(std::string_view method,
-                               const std::vector<uint64_t>& vals) {
-  if (method == "sum") return ReduceSumVals(vals);
-  if (method == "product") return ReduceProductVals(vals);
-  if (method == "and") return ReduceAndVals(vals);
-  if (method == "or") return ReduceOrVals(vals);
-  if (method == "xor") return ReduceXorVals(vals);
-  return 0;
 }
 
 struct ArrayCtx {
@@ -318,9 +292,14 @@ static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
     const Variable* leaf = ctx.FindVariable(prefix + index);
     auto* name =
         ac.arena.Create<std::string>(std::string(names.iter_name) + index);
-    ctx.CreateLocalVariable(*name, info.elem_width)->value =
-        leaf != nullptr ? leaf->value
-                        : MakeLogic4VecVal(ac.arena, info.elem_width, 0);
+    Variable* elem = ctx.CreateLocalVariable(*name, info.elem_width);
+    if (leaf == nullptr) {
+      elem->value = MakeLogic4VecVal(ac.arena, info.elem_width, 0);
+      continue;
+    }
+    // §7.12 with §6.11: each element of the row keeps its type's signedness.
+    elem->value = leaf->value;
+    elem->is_signed = leaf->is_signed;
   }
   ctx.RegisterArrayInScope(names.iter_name, row_info);
   ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
@@ -375,20 +354,21 @@ static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
   return MakeLogic4VecVal(arena, 32, info.size);
 }
 
-static Logic4Vec ArrayMin(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
+// §7.12.1 with §6.11: the element max() selects where `want_max` is set and
+// the one min() selects where it is not, the first of several equal ones, the
+// elements ordered by their type's signedness, which CollectVecElements gives
+// each of them.
+static Logic4Vec ArrayExtreme(std::string_view var_name, const ArrayInfo& info,
+                              bool want_max, SimContext& ctx, Arena& arena) {
+  auto vals = CollectVecElements(var_name, info, ctx, arena);
   if (vals.empty()) return MakeLogic4VecVal(arena, info.elem_width, 0);
-  uint64_t result = *std::min_element(vals.begin(), vals.end());
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
-static Logic4Vec ArrayMax(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  if (vals.empty()) return MakeLogic4VecVal(arena, info.elem_width, 0);
-  uint64_t result = *std::max_element(vals.begin(), vals.end());
-  return MakeLogic4VecVal(arena, info.elem_width, result);
+  size_t best = 0;
+  for (size_t i = 1; i < vals.size(); ++i) {
+    const Logic4Vec& lower = want_max ? vals[best] : vals[i];
+    const Logic4Vec& higher = want_max ? vals[i] : vals[best];
+    if (OrdersBefore(lower, higher, vals[i].is_signed)) best = i;
+  }
+  return vals[best];
 }
 
 static bool IsReductionMethod(std::string_view method) {
@@ -506,12 +486,8 @@ static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
     out = ArraySize(ac.var_name, ac.info, ac.ctx, ac.arena);
     return true;
   }
-  if (method == "min") {
-    out = ArrayMin(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  if (method == "max") {
-    out = ArrayMax(ac.var_name, ac.info, ac.ctx, ac.arena);
+  if (method == "min" || method == "max") {
+    out = ArrayExtreme(ac.var_name, ac.info, method == "max", ac.ctx, ac.arena);
     return true;
   }
   return false;
@@ -618,34 +594,31 @@ bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-static uint64_t EvalSortKey(const Expr* with_expr, const WithIterEnv& env,
-                            const Logic4Vec& elem, size_t index) {
-  return EvalWithExprForElement(with_expr, env, elem, index).ToUint64();
-}
+// §7.12.2: each element's with-clause value, the key sort() and rsort() order
+// by, paired with the index of the element it was computed for.
+using SortKeys = std::vector<std::pair<Logic4Vec, size_t>>;
 
-static std::vector<std::pair<uint64_t, size_t>> BuildSortKeys(
-    const std::vector<Logic4Vec>& vals, const Expr* expr,
-    const WithIterEnv& env) {
-  std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
+static SortKeys BuildSortKeys(const std::vector<Logic4Vec>& vals,
+                              const Expr* expr, const WithIterEnv& env) {
+  SortKeys keys(vals.size());
   for (size_t i = 0; i < vals.size(); ++i) {
-    keys[i] = {EvalSortKey(expr->with_expr, env, vals[i], i), i};
+    keys[i] = {EvalWithExprForElement(expr->with_expr, env, vals[i], i), i};
   }
   return keys;
 }
 
-static void SortKeysByValue(std::vector<std::pair<uint64_t, size_t>>& keys,
-                            bool ascending) {
-  if (ascending) {
-    std::sort(keys.begin(), keys.end());
-  } else {
-    std::sort(keys.begin(), keys.end(),
-              [](const auto& a, const auto& b) { return a.first > b.first; });
-  }
+// §7.12.2 with §6.11: the keys in ascending order for sort() and descending
+// for rsort(), ordered by the with expression's signedness, which every key
+// carries alike; equal keys keep the order of their elements.
+static void SortKeysByValue(SortKeys& keys, bool ascending) {
+  std::stable_sort(keys.begin(), keys.end(), [&](const auto& a, const auto& b) {
+    return ascending ? OrdersBefore(a.first, b.first, a.first.is_signed)
+                     : OrdersBefore(b.first, a.first, a.first.is_signed);
+  });
 }
 
-static std::vector<Logic4Vec> ReorderByKeys(
-    const std::vector<Logic4Vec>& vals,
-    const std::vector<std::pair<uint64_t, size_t>>& keys) {
+static std::vector<Logic4Vec> ReorderByKeys(const std::vector<Logic4Vec>& vals,
+                                            const SortKeys& keys) {
   std::vector<Logic4Vec> sorted(vals.size());
   for (size_t i = 0; i < keys.size(); ++i) sorted[i] = vals[keys[i].second];
   return sorted;
@@ -681,9 +654,10 @@ static void SortQueueByWithExpr(QueueObject* q, const Expr* expr,
                                 bool ascending, SimContext& ctx, Arena& arena) {
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
-  std::vector<std::pair<uint64_t, size_t>> keys(q->elements.size());
-  for (size_t i = 0; i < q->elements.size(); ++i)
-    keys[i] = {EvalSortKey(expr->with_expr, env, q->elements[i], i), i};
+  // §6.11 with §7.12: each element as it reads, the iterator taking its type.
+  std::vector<Logic4Vec> vals = q->elements;
+  for (auto& v : vals) TakeElementSignedness(*q, v);
+  SortKeys keys = BuildSortKeys(vals, expr, env);
   SortKeysByValue(keys, ascending);
   std::vector<Logic4Vec> new_elems(q->elements.size());
   std::vector<uint64_t> new_ids(q->element_ids.size());
@@ -751,12 +725,15 @@ static void ArraySortByValue(std::string_view var_name, const ArrayInfo& info,
     ApplyDynArrayIdPermutation(var_name, info, order, ctx);
     return;
   }
-  auto vals = CollectElements(var_name, info, ctx);
+  // §7.12.2 with §6.11: other elements are ordered by their type's
+  // signedness, which CollectVecElements gives each of them.
+  auto vals = CollectVecElements(var_name, info, ctx, arena);
   auto order = IdentityOrder(vals.size());
   std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-    return ascending ? vals[a] < vals[b] : vals[a] > vals[b];
+    return ascending ? OrdersBefore(vals[a], vals[b], vals[a].is_signed)
+                     : OrdersBefore(vals[b], vals[a], vals[a].is_signed);
   });
-  WriteElements(var_name, info, GatherByOrder(vals, order), ctx, arena);
+  WriteVecElements(var_name, info, GatherByOrder(vals, order), ctx);
   ApplyDynArrayIdPermutation(var_name, info, order, ctx);
 }
 

@@ -191,6 +191,7 @@ static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
   dst->is_string_key = src->is_string_key;
   dst->is_wildcard = src->is_wildcard;
   dst->is_4state = src->is_4state;
+  dst->is_signed = src->is_signed;
   dst->is_index_signed = src->is_index_signed;
   dst->index_class = src->index_class;
   dst->index_type_name = src->index_type_name;

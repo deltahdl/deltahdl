@@ -310,6 +310,11 @@ struct AssocArrayObject {
   bool is_string_key = false;
   bool is_wildcard = false;
   bool is_4state = false;
+  // §6.11 with §7.8: whether the element type is signed, so that an element
+  // reads signed however the value written into it was typed: `aa[0] = u` of
+  // an unsigned u into `int aa[int]` stores an int (TakeElementSignedness in
+  // evaluation.h).
+  bool is_signed = false;
   // Signedness of an integral index type: controls whether an index expression
   // is sign- or zero-extended to the index width before becoming a key, which
   // in turn fixes the iteration ordering (§7.8.4).
@@ -362,11 +367,9 @@ struct AssocArrayObject {
   // str_data marks the key present, so num(), exists() and foreach see it,
   // and the element's queue is kept under the same key below
   // (ElementQueueOfSelect in eval_array_element_queue.h), its elements as
-  // wide and as four-state as this array's element type, signed where
-  // `element_queue_signed` says that type is (§6.11), and handles where
-  // `element_queue_handles` says the type is a class.
+  // wide, as four-state and as signed as this array's element type, and
+  // handles where `element_queue_handles` says the type is a class.
   bool elements_are_queues = false;
-  bool element_queue_signed = false;
   bool element_queue_handles = false;
   // §7.4 with §7.5: how many levels of queues each element's queue holds
   // below it (QueueObject::nested_queue_levels).

@@ -77,6 +77,7 @@ static const AssocArrayObject* ElementAssocTemplate(
   auto* inner = arena.Create<AssocArrayObject>();
   inner->elem_width = outer->elem_width;
   inner->is_4state = outer->is_4state;
+  inner->is_signed = outer->is_signed;
   inner->is_string_key = index.is_string;
   inner->is_wildcard = index.is_wildcard;
   inner->is_index_signed = index.is_signed;
@@ -128,6 +129,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
                        var.is_4state, var.is_index_signed,
                        var.assoc_index_class_name, var.assoc_index_type_name});
+    aa->is_signed = var.is_signed;
     // §7.8 with §7.10: an array whose elements are queues keeps a queue under
     // each key (eval_array_element_queue.h), handles where the element type
     // is a class.
@@ -139,7 +141,6 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     }
     aa->element_queue_handles =
         var.elements_are_queues && !var.class_type_name.empty();
-    aa->element_queue_signed = var.elements_are_queues && var.is_signed;
     InitAssocDefault(var.init_expr, aa);
     RecordAssocElemInit(name, var, aa, ctx_, arena_);
   } else {

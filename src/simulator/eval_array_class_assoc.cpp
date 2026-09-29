@@ -398,6 +398,7 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
   aa->is_wildcard = spec.is_wildcard;
   aa->index_width = spec.index_width;
   aa->is_4state = spec.is_4state;
+  aa->is_signed = prop != nullptr && prop->is_signed;
   aa->is_index_signed = spec.is_index_signed;
   aa->index_class = spec.index_class;
   aa->index_type_name = spec.index_type_name;

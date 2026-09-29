@@ -13,6 +13,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_queue.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -325,9 +326,10 @@ static std::vector<size_t> QueueSortOrder(const QueueObject& q,
     });
     return order;
   }
+  // §6.11: other elements are ordered by the element type's signedness.
   std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-    return ascending ? elems[a].ToUint64() < elems[b].ToUint64()
-                     : elems[a].ToUint64() > elems[b].ToUint64();
+    return ascending ? OrdersBefore(elems[a], elems[b], q.is_signed)
+                     : OrdersBefore(elems[b], elems[a], q.is_signed);
   });
   return order;
 }

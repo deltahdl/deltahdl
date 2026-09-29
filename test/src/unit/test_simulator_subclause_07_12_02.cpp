@@ -607,4 +607,50 @@ TEST(ArrayOrderingSim, SortKeepsTheStringsOfAnArray) {
   EXPECT_EQ(out, "apple fig pear pear fig apple\n");
 }
 
+// §7.12.2 with §6.11: sort() and rsort() order the elements of a signed type
+// as signed numbers, -3 below 5, in a queue, a dynamic array and a fixed-size
+// array alike, and the elements of an unsigned type as unsigned ones, -3
+// written into a `bit [31:0]` element then being 4294967293, above 5.
+TEST(ArrayOrderingSim, SortAndRsortOrderByTheElementTypesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$] = '{5, -3};\n"
+      "  int d[] = '{5, -3};\n"
+      "  int f[2] = '{5, -3};\n"
+      "  bit [31:0] u[$] = '{-3, 5};\n"
+      "  initial begin\n"
+      "    q.sort(); d.sort(); f.sort(); u.sort();\n"
+      "    $display(\"%0d %0d %0d %0d\", q[0], d[0], f[0], u[0]);\n"
+      "    q.rsort(); d.rsort(); f.rsort(); u.rsort();\n"
+      "    $display(\"%0d %0d %0d %0d\", q[0], d[0], f[0], u[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 -3 -3 5\n5 5 5 4294967293\n");
+}
+
+// §7.12.2: with a with clause, sort() and rsort() order by the clause's value,
+// as signed where the expression is signed -- the iterator reading as the
+// element type -- and as unsigned where it is not.
+TEST(ArrayOrderingSim, SortWithAClauseOrdersByTheClausesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$] = '{5, -3};\n"
+      "  int d[] = '{5, -3};\n"
+      "  int p[$] = '{-3, 5};\n"
+      "  int e[] = '{-3, 5};\n"
+      "  initial begin\n"
+      "    q.sort with (item);\n"
+      "    d.sort(x) with (x);\n"
+      "    p.rsort with (item);\n"
+      "    e.sort(x) with (unsigned'(x));\n"
+      "    $display(\"%0d %0d %0d %0d\", q[0], d[0], p[0], e[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 -3 5 5\n");
+}
+
 }  // namespace

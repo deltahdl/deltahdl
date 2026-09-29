@@ -760,4 +760,102 @@ TEST(ArrayLocator, LocatorsOnAStringKeyedAssociativeArray) {
   EXPECT_EQ(out, "2 apple pear pear 2 5 2\n");
 }
 
+// §7.12.1 with §6.11: min() and max() order the elements of a signed type as
+// signed numbers, -3 below 5, whichever kind of unpacked array holds them, and
+// the elements of an unsigned type as unsigned ones, -3 written into a
+// `bit [31:0]` element then being 4294967293, above 5.
+TEST(ArrayLocator, MinAndMaxOrderTheElementsByTheElementTypesSignedness) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int d[] = '{5, -3};\n"
+      "  int f[2] = '{5, -3};\n"
+      "  int q[$] = '{5, -3};\n"
+      "  bit [31:0] u[$] = '{-3, 5};\n"
+      "  int aa[int];\n"
+      "  int r1[$], r2[$], r3[$], r4[$], r5[$];\n"
+      "  int s1, s2;\n"
+      "  initial begin\n"
+      "    aa[0] = 5; aa[1] = -3;\n"
+      "    s1 = d.min; s2 = f.max;\n"
+      "    r1 = q.min; r2 = q.max; r3 = aa.min; r4 = aa.max; r5 = u.min;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", s1, s2, r1[0], r2[0],\n"
+      "             r3[0], r4[0], r5[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 5 -3 5 -3 5 5\n");
+}
+
+// §7.12.1: with a with clause, min() and max() order the elements by the
+// clause's value, as signed where the expression is signed and as unsigned
+// where it is not: `unsigned'(item)` puts -3 above 5.
+TEST(ArrayLocator, MinAndMaxWithAClauseOrderByTheClausesSignedness) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int q[$] = '{5, -3};\n"
+      "  int aa[int];\n"
+      "  int r1[$], r2[$], r3[$], r4[$];\n"
+      "  initial begin\n"
+      "    aa[0] = 5; aa[1] = -3;\n"
+      "    r1 = q.max with (item - 1);\n"
+      "    r2 = q.min with (unsigned'(item));\n"
+      "    r3 = aa.min with (item * 2);\n"
+      "    r4 = aa.max with (unsigned'(item));\n"
+      "    $display(\"%0d %0d %0d %0d\", r1[0], r2[0], r3[0], r4[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 5 -3 -3\n");
+}
+
+// §7.12 with §6.11: the iterator of a with clause is a variable of the element
+// type, so over the elements of a signed type `item < 0` holds for -3, and
+// over those of an unsigned type it holds for none.
+TEST(ArrayLocator, TheIteratorReadsWithTheElementTypesSignedness) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int d[] = '{5, -3};\n"
+      "  int f[2] = '{5, -3};\n"
+      "  int q[$] = '{5, -3};\n"
+      "  bit [31:0] u[$] = '{5, -3};\n"
+      "  int aa[int], as[string];\n"
+      "  int r1[$], r2[$], r3[$], r4[$], r5[$], r6[$];\n"
+      "  initial begin\n"
+      "    aa[0] = 5; aa[1] = -3; as[\"a\"] = 5; as[\"b\"] = -3;\n"
+      "    r1 = d.find with (item < 0);\n"
+      "    r2 = f.find_index with (item < 0);\n"
+      "    r3 = q.map() with (int'(item < 0));\n"
+      "    r4 = u.find with (item < 0);\n"
+      "    r5 = aa.find with (item < 0);\n"
+      "    r6 = as.find_first with (item < 0);\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", r1[0], r2[0], r3[1],\n"
+      "             r4.size(), r5[0], r6[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 1 1 0 -3 -3\n");
+}
+
+// §7.12.5 with §7.12: map() over an associative array binds the iterator as a
+// variable of the element type too, for an integral and a string index alike.
+TEST(ArrayLocator, TheIteratorOfAnAssociativeMapReadsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int aa[int], ma[int];\n"
+      "  int as[string], ms[string];\n"
+      "  initial begin\n"
+      "    aa[0] = -3; as[\"a\"] = -3;\n"
+      "    ma = aa.map() with (int'(item < 0));\n"
+      "    ms = as.map() with (int'(item < 0));\n"
+      "    $display(\"%0d %0d\", ma[0], ms[\"a\"]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
 }  // namespace

@@ -651,4 +651,24 @@ TEST(QueueSim, AnElementOfAnAssociativeArrayOfUnsignedQueuesReadsUnsigned) {
   EXPECT_EQ(out, "0 0\n");
 }
 
+// §7.8 with §7.10 and §6.18: an associative array declared in a procedural
+// block with a queue typedef as its element type, `q_t all[string]` under
+// `typedef int q_t[$];`, keeps queues of ints, whose elements read signed.
+TEST(QueueSim, AnElementOfABlockAssociativeArrayOfTypedefQueuesReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef int q_t[$];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    q_t all[string];\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    all[\"k\"].push_back(u);\n"
+      "    $display(\"%0d\", all[\"k\"][0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace

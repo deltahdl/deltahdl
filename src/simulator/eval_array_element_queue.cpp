@@ -50,8 +50,8 @@ ElementQueueShape ShapeOf(const QueueObject& outer) {
 }
 
 ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
-  return {aa.elem_width, aa.is_4state, aa.element_queue_signed,
-          aa.element_queue_handles, aa.nested_queue_levels};
+  return {aa.elem_width, aa.is_4state, aa.is_signed, aa.element_queue_handles,
+          aa.nested_queue_levels};
 }
 
 // §7.4 with Table 7-1: brings `q`, the queue of an element that is a

@@ -373,10 +373,10 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   AssocArrayObject* aa = ctx.CreateAssocArray(
       stmt->var_name, elem_width, dim->text == "string",
       AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type), ctx));
+  aa->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   if (queue_type != nullptr) {
     aa->elements_are_queues = true;
     aa->nested_queue_levels = queues.levels - 1;
-    aa->element_queue_signed = DeclaredTypeIsSigned(*queue_type, ctx);
     aa->element_queue_handles =
         !DeclaredClassKey(*queue_type, ctx, arena).empty();
   }
