@@ -346,20 +346,24 @@ static void AssignInCallerScope(const CallerWrites& writes, SimContext& ctx,
 // copy-out has run, each actual read in the caller's scope as at the bind.
 static void ReleaseRefPropertyCells(const ModuleItem* func, const Expr* expr,
                                     SimContext& ctx, Arena& arena) {
+  std::vector<const Expr*> actuals;
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    const FunctionArg& formal = func->func_args[i];
+    int ai = ResolveArgIndex(func, expr, i);
+    if (formal.direction == Direction::kRef && !formal.is_const && ai >= 0 &&
+        formal.unpacked_dims.empty()) {
+      actuals.push_back(expr->args[static_cast<size_t>(ai)]);
+    }
+  }
+  // A call with no such formal leaves the scope stack alone, which may hold
+  // no callee scope to set aside.
+  if (actuals.empty()) return;
   WithCalleeScopeOff(ctx, [&] {
-    for (size_t i = 0; i < func->func_args.size(); ++i) {
-      const FunctionArg& formal = func->func_args[i];
-      int ai = ResolveArgIndex(func, expr, i);
-      if (formal.direction != Direction::kRef || formal.is_const || ai < 0 ||
-          !formal.unpacked_dims.empty()) {
-        continue;
-      }
+    for (const Expr* actual : actuals) {
       ClassObject* obj = nullptr;
       std::string key;
-      if (RefPropertyTarget(expr->args[static_cast<size_t>(ai)], ctx, arena,
-                            obj, key)) {
+      if (RefPropertyTarget(actual, ctx, arena, obj, key))
         obj->ReleaseRefCell(key);
-      }
     }
   });
 }

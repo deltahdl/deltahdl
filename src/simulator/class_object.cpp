@@ -76,13 +76,16 @@ const Logic4Vec* ClassObject::FindPropertyValue(std::string_view name) const {
 }
 
 Variable* ClassObject::AcquireRefCell(std::string_view name, Arena& arena) {
-  RefCell& cell = ref_cells[std::string(name)];
-  if (cell.var == nullptr) {
-    cell.var = arena.Create<Variable>();
-    cell.var->value = GetProperty(name, arena);
+  std::string key(name);
+  auto it = ref_cells.find(key);
+  if (it == ref_cells.end()) {
+    // Read before the entry exists: GetProperty reads a standing cell first.
+    auto* var = arena.Create<Variable>();
+    var->value = GetProperty(name, arena);
+    it = ref_cells.emplace(key, RefCell{var, 0}).first;
   }
-  ++cell.holders;
-  return cell.var;
+  ++it->second.holders;
+  return it->second.var;
 }
 
 void ClassObject::ReleaseRefCell(std::string_view name) {
