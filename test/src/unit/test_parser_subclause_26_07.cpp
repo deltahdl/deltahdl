@@ -4,6 +4,7 @@
 #include "helpers_parser_verify.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -101,6 +102,28 @@ TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "std");
+}
+
+// A.2.2.1 with A.9.3 and §26.7: a data type may be a type name behind a class
+// scope that is itself named through a package, so `std::process::state ms;`
+// is a module-level variable of the enumeration the std package's process
+// class declares, its scope the class and its type the nested name. Read one
+// scope deep, the declaration expected its variable at the second `::`.
+TEST(StdBuiltinPackageParsing, ModuleItemOfATypeBehindTwoScopes) {
+  auto r = Parse(
+      "module m;\n"
+      "  std::process::state ms;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  const auto* decl =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kVarDecl);
+  ASSERT_NE(decl, nullptr);
+  EXPECT_EQ(decl->name, "ms");
+  EXPECT_EQ(decl->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(decl->data_type.scope_name, "process");
+  EXPECT_EQ(decl->data_type.type_name, "state");
 }
 
 }  // namespace

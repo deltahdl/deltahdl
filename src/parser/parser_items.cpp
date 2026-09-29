@@ -781,6 +781,26 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
+  // A.2.2.1 with A.9.3: a class scope may itself be named through a package,
+  // `std::process::state` (§26.7 with §G.6), so each further `:: name` makes
+  // the name before it the scope, as ParseNamedType reads the same type in a
+  // procedure. Read one scope deep, the declaration expected its variable at
+  // the second `::`.
+  while (Check(TokenKind::kColonColon)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    if (!CheckIdentifier()) {
+      lexer_.RestorePos(saved);
+      break;
+    }
+    dtype.scope_name = dtype.type_name;
+    dtype.type_name = Consume().text;
+    dtype.type_params.clear();
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      dtype.type_params = ParseTypeParamList();
+    }
+  }
   ParseVarDeclList(items, dtype);
 }
 

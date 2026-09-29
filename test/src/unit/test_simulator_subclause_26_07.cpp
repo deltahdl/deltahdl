@@ -78,4 +78,22 @@ TEST(StdBuiltInPackageSim, StdQualifiedProcessSelfHandleKillsTheChild) {
   LowerRunAndCheck(f, design, {{"x", 7u}});
 }
 
+// A.2.2.1 with §26.7: a module-level variable declared `std::process::state`
+// is of the enumeration §9.7 declares, so it holds a member and name()
+// answers it, as a procedural one does.
+TEST(StdBuiltInPackageSim, ModuleLevelStdProcessStateVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  std::process::state ms;\n"
+                       "  initial begin\n"
+                       "    std::process::state ls;\n"
+                       "    ms = std::process::FINISHED; "
+                       "ls = std::process::RUNNING;\n"
+                       "    $display(\"%s %s\", ms.name(), ls.name());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "FINISHED RUNNING\n");
+}
+
 }  // namespace
