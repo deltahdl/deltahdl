@@ -442,24 +442,57 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// The level of the running object's class chain that declares `method`, the
+// class an instance method's constants are those of; null where none does.
+static const ClassTypeInfo* MethodDeclaringClass(const ModuleItem* method,
+                                                 SimContext& ctx) {
+  const ClassObject* self = ctx.CurrentThis();
+  for (const ClassTypeInfo* t = self ? self->type : nullptr; t; t = t->parent) {
+    for (const auto& [name, m] : t->methods) {
+      if (m == method) return t;
+    }
+  }
+  return nullptr;
+}
+
 // Computes the width of a class method's return variable, evaluating the
-// declared return type with the parameterized class's bound parameters in scope
-// when available. Falls back to 32 bits when the width is indeterminate.
+// declared return type with the class's constants in scope: §8.25's value
+// parameters and §6.20's localparams, as the class or specialization holds
+// them. The class is the one a static call names or, §13.4.1 with §8.25, the
+// level declaring an instance method, which was given none, so a range naming
+// one folded to a single bit. Falls back to 32 bits when the width is
+// indeterminate.
 static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
                                          const ClassTypeInfo* param_cls) {
+  if (param_cls == nullptr) param_cls = MethodDeclaringClass(method, ctx);
   if (param_cls && param_cls->decl) {
     ScopeMap scope;
-    for (const auto& [pname, pexpr] : param_cls->decl->params) {
+    auto bind = [&](std::string_view pname) {
+      auto held = param_cls->static_properties.find(std::string(pname));
       auto* var = ctx.FindVariable(pname);
-      if (var) scope[pname] = static_cast<int64_t>(var->value.ToUint64());
+      if (held != param_cls->static_properties.end()) {
+        scope[pname] = static_cast<int64_t>(held->second.ToUint64());
+      } else if (var) {
+        scope[pname] = static_cast<int64_t>(var->value.ToUint64());
+      }
+    };
+    for (const auto& [pname, pexpr] : param_cls->decl->params) bind(pname);
+    for (const auto* m : param_cls->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->is_param) bind(m->name);
     }
-    uint32_t width = EvalTypeWidth(method->return_type, {}, scope);
+    // A range the class's constants leave unfolded names something of the
+    // running scope, a parameter of the module the class is declared in,
+    // which DeclaredTypeWidth below reads; folded here it was one bit.
+    const DataType& type = method->return_type;
+    bool unfolded =
+        type.packed_dim_left != nullptr && PackedDimProduct(type, scope) == 0;
+    uint32_t width = unfolded ? 0 : EvalTypeWidth(type, {}, scope);
     // Not DeclaredTypeWidth here: that asks the one-argument EvalTypeWidth,
     // which would drop the bound parameters `scope` carries and so mis-size a
     // return type whose dimensions name one. Resolve a typedef name against the
     // same table DeclaredTypeWidth uses, but only once the scope-aware overload
     // has had its say.
-    if (width == 0) width = ctx.FindTypeWidth(method->return_type.type_name);
+    if (width == 0 && !unfolded) width = ctx.FindTypeWidth(type.type_name);
     if (width != 0) return width;
   }
   uint32_t width = DeclaredTypeWidth(method->return_type, ctx);

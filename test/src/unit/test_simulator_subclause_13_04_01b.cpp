@@ -388,4 +388,36 @@ TEST(FunctionReturnSim, ImplicitVariableOfAnArrayReturnTypeIsAnArray) {
   EXPECT_EQ(out, "8 9 2 5 '{7, 8, 9} '{4, 5} '{2, 2, 2} '{3, 1, 1} 50\n");
 }
 
+// §13.4.1 (printed page 342) with §8.25 and §6.20: an instance method's
+// implicit variable has the method's return type, whose packed range may name
+// a parameter or localparam of the class -- 6 bits under C #(6), 3 in the
+// default specialization C, 5 through D's localparam -- and `logic` keeps it
+// unsigned. The range was folded with none of the class's constants, so each
+// call answered one bit and `g2 = 5` read -1.
+TEST(FunctionReturnSim, InstanceMethodReturnRangeNamesClassConstants) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C #(int N = 3);\n"
+      "  localparam int M = N + 1;\n"
+      "  function logic [N-1:0] g(); return '1; endfunction\n"
+      "  function logic [N-1:0] g2(); g2 = 5; endfunction\n"
+      "  function logic [M-1:0] gm(); return '1; endfunction\n"
+      "endclass\n"
+      "class D;\n"
+      "  localparam int K = 5;\n"
+      "  function logic [K-1:0] d(); return '1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic C #(6) c = new;\n"
+      "    automatic C c3 = new;\n"
+      "    automatic D d = new;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", c.g(), c.g2(), c.gm(), c3.g(),\n"
+      "             d.d());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "63 5 127 7 31\n");
+}
+
 }  // namespace
