@@ -172,4 +172,53 @@ TEST(AssocArrayOperandElaboration, AssocOperandInAForLoopStepNames7_4_6) {
                             "7.4.6"));
 }
 
+// §7.4.6 allows equality on an unpacked array only against another array and
+// keeps an unpacked array from being treated as an integer: comparing a whole
+// array or a row of a two-dimensional one with a number, and adding to one, are
+// each reported on the array operand's line.
+TEST(UnpackedArrayOperandElaboration, AnUnpackedArrayIsNoIntegralOperand) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[3];\n"
+      "  int m[2][3];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (a == 4) x = 1;\n"
+      "    if (m[1] != 4) x = 2;\n"
+      "    x = a + 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an unpacked array is not an operand of this "
+                            "operator",
+                            8, "7.4.6"));
+}
+
+// §7.4.6: equality between two unpacked arrays, between slices of them and
+// between rows of a two-dimensional one, and between an element and a number,
+// are all allowed and elaborate clean.
+TEST(UnpackedArrayOperandElaboration, ArraysComparedWithArraysAreAllowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[3], b[3];\n"
+      "  int m[2][3];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (a == b) x = 1;\n"
+      "    if (a[0:1] != b[1:2]) x = 2;\n"
+      "    if (m[1] == m[0]) x = 3;\n"
+      "    if (a[2] == 4) x = x + a[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

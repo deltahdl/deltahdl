@@ -633,18 +633,24 @@ static bool OrderingMethodRejectsWith(std::string_view name) {
   return name == "reverse" || name == "shuffle";
 }
 
+// §7.12.3: the array reduction methods.
+static bool IsArrayReductionMethod(std::string_view name) {
+  return name == "sum" || name == "product" || name == "and" || name == "or" ||
+         name == "xor";
+}
+
 // Recognize an array-method invocation, in either the call form `arr.m()` or
 // the property form `arr.m`. On success, `base` is the receiver expression,
 // `method` is the method name, and `has_with` records whether a with clause
 // was attached (the parser hangs it on the outermost expression in both
 // forms).
-struct OrderingMethodSite {
+struct ArrayMethodSite {
   const Expr* base = nullptr;
   std::string_view method;
   bool has_with = false;
 };
 
-static bool MatchOrderingMethodSite(const Expr* e, OrderingMethodSite& out) {
+static bool MatchArrayMethodSite(const Expr* e, ArrayMethodSite& out) {
   if (!e) return false;
   const Expr* access = nullptr;
   if (e->kind == ExprKind::kCall && e->lhs &&
@@ -659,7 +665,9 @@ static bool MatchOrderingMethodSite(const Expr* e, OrderingMethodSite& out) {
       access->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  if (!IsArrayOrderingMethod(access->rhs->text)) return false;
+  if (!IsArrayOrderingMethod(access->rhs->text) &&
+      !IsArrayReductionMethod(access->rhs->text))
+    return false;
   out.base = access->lhs;
   out.method = access->rhs->text;
   out.has_with = e->with_expr != nullptr;
@@ -668,21 +676,33 @@ static bool MatchOrderingMethodSite(const Expr* e, OrderingMethodSite& out) {
 
 // §7.12.2: ordering methods reorder any fixed or dynamically sized unpacked
 // array but are not defined on associative arrays, and reverse()/shuffle()
-// reject a with clause. Each is reported as a compile-time error. The
-// receiver is only checked against the array tracking map when it is a plain
-// identifier, which is enough to recognize a declared associative array.
+// reject a with clause. §7.12.3: a reduction leaves its with clause off only
+// where the reduction is defined for the element type, which it is not for an
+// element that is itself an unpacked array, as each element of an array of
+// more than one unpacked dimension is. Each is reported as a compile-time
+// error. The receiver is only checked against the array tracking map when it
+// is a plain identifier, which is enough to recognize a declared array.
 static void CheckArrayOrderingExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
     DiagEngine& diag) {
   if (!e) return;
-  OrderingMethodSite site;
-  if (MatchOrderingMethodSite(e, site) && site.base &&
-      site.base->kind == ExprKind::kIdentifier) {
+  ArrayMethodSite site;
+  bool matched = MatchArrayMethodSite(e, site);
+  if (matched && site.base && site.base->kind == ExprKind::kIdentifier) {
     auto it = var_array_info.find(site.base->text);
     if (it != var_array_info.end()) {
-      if (it->second.is_assoc) {
+      if (IsArrayReductionMethod(site.method)) {
+        if (!site.has_with && it->second.num_unpacked_dims >= 2) {
+          diag.Error(e->range.start,
+                     std::format("array reduction method '{}' requires a "
+                                 "'with' clause over an array whose elements "
+                                 "are arrays",
+                                 site.method),
+                     Subclause("7.12.3"));
+        }
+      } else if (it->second.is_assoc) {
         diag.Error(e->range.start,
                    std::format("array ordering method '{}' cannot be applied "
                                "to associative array '{}'",
@@ -697,7 +717,11 @@ static void CheckArrayOrderingExpr(
       }
     }
   }
-  CheckArrayOrderingExpr(e->lhs, var_array_info, diag);
+  // The method access under a call is the site itself, already checked, so
+  // only its receiver is walked below it.
+  CheckArrayOrderingExpr(
+      matched && e->kind == ExprKind::kCall ? site.base : e->lhs,
+      var_array_info, diag);
   CheckArrayOrderingExpr(e->rhs, var_array_info, diag);
   CheckArrayOrderingExpr(e->base, var_array_info, diag);
   CheckArrayOrderingExpr(e->index, var_array_info, diag);
