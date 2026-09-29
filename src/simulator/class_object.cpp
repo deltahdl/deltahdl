@@ -265,6 +265,10 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // synchronization object (§6.17), so the copy names the same event.
   copy->event_properties = event_properties;
   copy->mailbox_properties = mailbox_properties;
+  // §8.12 with §7.3.2: a tagged-union property's value carries its tag, so
+  // the copy's property holds the same tag as the source's until either is
+  // assigned again.
+  copy->property_tags = property_tags;
   // §8.12 has the copy be of the same class, which for a parameterized class
   // is the same specialization (§8.25), so it is bound to the same types.
   copy->type_param_actuals = type_param_actuals;

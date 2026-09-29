@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 namespace {
@@ -387,6 +391,126 @@ TEST(ObjectPropertySim, StringArrayPropertyElementsWrittenFromOutside) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 21111u);
+}
+
+// §8.5 lets a property be of a structure type, and §21.2.1.6 has %p print an
+// aggregate as an assignment pattern of its members wherever the argument
+// names one, a property named bare in a method or through a handle alike.
+// The property is no variable, so no layout was found for it and it printed
+// as the one number its bits make, 12884901893.
+TEST(ObjectPropertySim, StructurePropertyPrintsAsPatternWithP) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { int a; int b; } GS;\n"
+                       "class Box;\n"
+                       "  GS s;\n"
+                       "  function void set(); s.b = 5; s.a = 3; endfunction\n"
+                       "  function void show(); $display(\"m=%p\", s); "
+                       "endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box b;\n"
+                       "  initial begin\n"
+                       "    b = new; b.set(); b.show();\n"
+                       "    $display(\"h=%p\", b.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "m='{a:3, b:5}\nh='{a:3, b:5}\n");
+}
+
+// The tagged union a property's type names in the tests below: §8.5 lets a
+// property be of it, and §7.3.2 has the value the property holds carry its tag
+// beside the member, whichever object holds it and however it is named.
+constexpr const char* kOptBox =
+    "typedef union tagged { void None; int Some; } Opt;\n"
+    "class Box;\n"
+    "  Opt o;\n"
+    "  function void set(int v); o = tagged Some (v); endfunction\n"
+    "  function void clear(); o = tagged None; endfunction\n"
+    "  function string describe();\n"
+    "    case (o) matches\n"
+    "      tagged Some .v : return $sformatf(\"some %0d\", v);\n"
+    "      tagged None : return \"none\";\n"
+    "    endcase\n"
+    "    return \"?\";\n"
+    "  endfunction\n"
+    "  function void show(); $display(\"%p\", o); endfunction\n"
+    "  function int bad(); return o.None; endfunction\n"
+    "endclass\n";
+
+// §21.2.1.6 prints a tagged union as its tag and the member the tag names, so
+// the property prints '{Some:9} in a method and through a handle, and each of
+// two objects prints its own tag. Carrying no tag, the property printed 9.
+TEST(ObjectPropertySim, TaggedUnionPropertyPrintsItsTagWithP) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kOptBox) +
+                           "module t;\n"
+                           "  Box b, c;\n"
+                           "  initial begin\n"
+                           "    b = new; c = new; b.set(9); c.set(4);\n"
+                           "    b.show(); $display(\"%p\", c.o);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "'{Some:9}\n'{Some:4}\n");
+}
+
+// §8.12 copies every property of an object into its shallow copy, and the
+// value a tagged-union property holds carries its tag (§7.3.2), so the copy's
+// property prints with the same tag, and each object's tag is its own after.
+TEST(ObjectPropertySim, ShallowCopyKeepsTaggedUnionPropertyTag) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(std::string(kOptBox) + "module t;\n"
+                                        "  Box b, c;\n"
+                                        "  initial begin\n"
+                                        "    b = new; b.set(9);\n"
+                                        "    c = new b;\n"
+                                        "    $display(\"%p %p\", b.o, c.o);\n"
+                                        "    c.clear();\n"
+                                        "    $display(\"%s %s\", b.describe(), "
+                                        "c.describe());\n"
+                                        "  end\n"
+                                        "endmodule\n",
+                 f),
+      "'{Some:9} '{Some:9}\nsome 9 none\n");
+}
+
+// §12.6 matches `tagged Some .v` against the tag the property holds, binding v
+// to its member, and `tagged None` against the void member's tag, so the case
+// in the method selects by what was last assigned. With no tag carried, neither
+// pattern matched and the method fell through to "?".
+TEST(ObjectPropertySim, TaggedUnionPropertyMatchesItsTagInMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kOptBox) +
+                           "module t;\n"
+                           "  Box b;\n"
+                           "  initial begin\n"
+                           "    b = new; b.set(9); $display(\"%s\", "
+                           "b.describe());\n"
+                           "    b.clear(); $display(\"%s\", b.describe());\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "some 9\nnone\n");
+}
+
+// §11.9 makes a read of a tagged union through a member other than the one
+// its tag names a run-time error, a property's as a variable's: `o.None` in a
+// method after `o = tagged Some (9)`. It read 0 and reported nothing.
+TEST(ObjectPropertySim, TaggedUnionPropertyMismatchedReadIsReported) {
+  SimFixture f;
+  RunCapture(std::string(kOptBox) +
+                 "module t;\n"
+                 "  Box b;\n"
+                 "  int r;\n"
+                 "  initial begin b = new; b.set(9); r = b.bad(); end\n"
+                 "endmodule\n",
+             f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member 'None' of "
+                            "tagged union 'o' which currently has tag 'Some'",
+                            14, "11.9"));
 }
 
 }  // namespace

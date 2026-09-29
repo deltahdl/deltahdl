@@ -1,9 +1,12 @@
 #include <cerrno>
+#include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -252,12 +255,39 @@ Net* SimContext::FindNet(std::string_view name) {
   return (it != nets_.end()) ? it->second : nullptr;
 }
 
+// §8.5 with §7.3.2: the object and the property path a tag key names where
+// the key is a class property's, "@<handle>.<path>" as PropertyAggregateLayout
+// forms it; null for a variable's key, and for a handle naming no object.
+static ClassObject* PropertyTagOwner(std::string_view key,
+                                     const SimContext& ctx,
+                                     std::string_view& path) {
+  if (key.empty() || key.front() != '@') return nullptr;
+  size_t dot = key.find('.');
+  if (dot == std::string_view::npos) return nullptr;
+  uint64_t handle = 0;
+  auto [end, ec] = std::from_chars(key.data() + 1, key.data() + dot, handle);
+  if (ec != std::errc() || end != key.data() + dot) return nullptr;
+  path = key.substr(dot + 1);
+  return ctx.GetClassObject(handle);
+}
+
 void SimContext::SetVariableTag(std::string_view var_name,
                                 std::string_view tag) {
+  std::string_view path;
+  if (ClassObject* obj = PropertyTagOwner(var_name, *this, path)) {
+    obj->property_tags[std::string(path)] = std::string(tag);
+    return;
+  }
   var_tags_[var_name] = std::string(tag);
 }
 
 std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
+  std::string_view path;
+  if (const ClassObject* obj = PropertyTagOwner(var_name, *this, path)) {
+    auto it = obj->property_tags.find(std::string(path));
+    if (it == obj->property_tags.end()) return {};
+    return it->second;
+  }
   auto it = var_tags_.find(var_name);
   if (it == var_tags_.end()) return {};
   return it->second;

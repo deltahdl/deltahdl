@@ -18,6 +18,7 @@
 #include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -26,6 +27,22 @@ PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   PatternSubject subject;
   subject.value = EvalExpr(expr, ctx, arena);
+  // §8.5 with §12.6: a class property of a tagged union type is matched against
+  // the tag its own object holds, under the property's key.
+  std::string name;
+  if (expr->kind == ExprKind::kIdentifier) {
+    name = std::string(expr->text);
+  } else if (expr->kind == ExprKind::kMemberAccess &&
+             !expr->is_scope_resolution) {
+    BuildLhsName(expr, name);
+  }
+  std::string key;
+  if (const StructTypeInfo* layout =
+          name.empty() ? nullptr : PropertyAggregateLayout(name, ctx, key)) {
+    subject.layout = layout;
+    subject.tag_key = std::move(key);
+    return subject;
+  }
   if (expr->kind == ExprKind::kIdentifier) {
     subject.layout = StructLayoutOfName(expr->text, ctx);
     subject.tag_key = TagKeyOfName(expr->text, ctx);

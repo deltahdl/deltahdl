@@ -330,6 +330,35 @@ static bool TryUnionTagMismatch(const MemberAccess& ma,
   return true;
 }
 
+// §11.9 with §8.5: the same run-time error for a class property of a tagged
+// union type, `o.None` in a method or `b.o.None` through a handle, read against
+// the tag the property's own object holds (PropertyAggregateLayout). Reports
+// the error and fills `out` with all-X; true when it fired.
+static bool TryPropertyTagMismatch(const MemberAccess& ma, Logic4Vec& out) {
+  std::string name(ma.base_name);
+  std::string_view member = ma.field_name;
+  if (ma.base_var != nullptr) {
+    size_t dot = member.find('.');
+    if (dot == std::string_view::npos) return false;
+    name += '.';
+    name += member.substr(0, dot);
+    member = member.substr(dot + 1);
+  }
+  std::string key;
+  const StructTypeInfo* layout = PropertyAggregateLayout(name, ma.ctx, key);
+  if (layout == nullptr || !layout->is_union) return false;
+  std::string_view tag = ma.ctx.GetVariableTag(key);
+  if (tag.empty() || tag == member.substr(0, member.find('.'))) return false;
+  ma.ctx.GetDiag().Error(ma.loc,
+                         "run-time error: accessing member '" +
+                             std::string(member) + "' of tagged union '" +
+                             name + "' which currently has tag '" +
+                             std::string(tag) + "'",
+                         Subclause("11.9"));
+  out = MakeAllX(ma.arena, layout->total_width);
+  return true;
+}
+
 // Handles the named-event `.triggered` and named-sequence `.triggered`/`.ended`
 // §16.13.5: whether the end point named `ep_name` is matched as read now,
 // its match stored until the first tick of the reading clock after it.
@@ -463,6 +492,7 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }
+  if (TryPropertyTagMismatch(ma, out)) return out;
 
   if (TryEventSequenceMethod(ma, out)) {
     return out;

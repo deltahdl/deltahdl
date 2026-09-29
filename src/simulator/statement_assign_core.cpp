@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -508,6 +509,24 @@ static void RecordTaggedValueTags(const Expr* rhs, std::string key,
   }
 }
 
+void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->rhs == nullptr || stmt->rhs->kind != ExprKind::kTagged ||
+      stmt->rhs->rhs == nullptr)
+    return;
+  std::string name;
+  if (stmt->lhs->kind == ExprKind::kIdentifier) {
+    name = std::string(stmt->lhs->text);
+  } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+    BuildLhsName(stmt->lhs, name);
+  } else {
+    return;
+  }
+  std::string key;
+  const StructTypeInfo* layout = PropertyAggregateLayout(name, ctx, key);
+  if (layout == nullptr || !layout->is_union) return;
+  RecordTaggedValueTags(stmt->rhs, std::move(key), layout, ctx, arena);
+}
+
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                        Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
@@ -533,7 +552,8 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                             arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(stmt->lhs, rhs_val, ctx);
+    if (WriteStructField(stmt->lhs, rhs_val, ctx))
+      RecordPropertyTags(stmt, ctx, arena);
   }
 }
 

@@ -32,6 +32,13 @@ enum class DataTypeKind : uint8_t;
 void CoerceTo2State(Logic4Vec& v);
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
+// statement executor in eval_function_body_assign.cpp. §8.5 with §7.3.2: where
+// the blocking assignment `stmt` writes a `tagged` value into a class property
+// of a tagged union type, named bare in a method or through a handle, records
+// the value's tags under the property's own key (PropertyAggregateLayout).
+void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp, which evaluates its own
 // right-hand side and so reaches none of the copies this file's own path takes.
 // Answers a value that owns its words, for a store to keep; the definition's

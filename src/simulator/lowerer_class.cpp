@@ -317,15 +317,61 @@ static ScopeMap ClassParamScope(const ClassDecl* cls,
 }
 
 // §7.2 with §8.5: the layout of the structure a property's declared type
-// names by its typedef name; null for any other type. Sized against no
-// typedef table, the name had no width and the property took the 32-bit
-// carrier, which cut an element of an array of such structures to 32 bits.
+// names by its typedef name, registered under `key`; null for any other type.
+// Sized against no typedef table, the name had no width and the property took
+// the 32-bit carrier, which cut an element of an array of such structures to
+// 32 bits.
 static const StructTypeInfo* StructPropertyLayout(const DataType& type,
+                                                  std::string_view key,
                                                   SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
       type.packed_dim_left != nullptr)
     return nullptr;
-  return ctx.FindStructType(type.type_name);
+  return ctx.FindStructType(key);
+}
+
+// Whether the class declaration `cls` has a value parameter, in its header or
+// its body, which makes the widths of its typedefs the specialization's.
+static bool DeclaresValueParams(const ClassDecl& cls) {
+  if (!cls.params.empty()) return true;
+  for (const auto* member : cls.members) {
+    if (member->kind == ClassMemberKind::kProperty && member->is_param)
+      return true;
+  }
+  return false;
+}
+
+// §8.23 with §6.18: the key the type a property's declaration names is looked
+// up by. A bare name of a structure or union typedef the class `cls` declares
+// is a name of the class scope, whose layout the design registers under
+// "Class::name", as the elaborator's typedef table keys it; it is registered
+// there here where the design gave it none. Asked by the bare name, such a
+// property had no layout, so a member select of it in a method read 0. Any
+// other name, and a class with value parameters, whose typedef widths are its
+// specialization's, keep the name as written.
+static std::string_view PropertyTypeKey(const DataType& type,
+                                        const ClassTypeInfo& info,
+                                        const ClassDecl& cls, SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
+      DeclaresValueParams(cls))
+    return type.type_name;
+  for (const auto* member : cls.members) {
+    if (member->kind != ClassMemberKind::kTypedef ||
+        member->typedef_item == nullptr || member->name != type.type_name)
+      continue;
+    const DataType& decl = member->typedef_item->typedef_type;
+    if ((decl.kind != DataTypeKind::kStruct &&
+         decl.kind != DataTypeKind::kUnion) ||
+        decl.struct_members.empty())
+      return type.type_name;
+    Arena& arena = ctx.GetArena();
+    const auto* key = arena.Create<std::string>(
+        std::string(info.name) + "::" + std::string(type.type_name));
+    if (ctx.FindStructType(*key) == nullptr)
+      RegisterTypeLayout(*key, &decl, ctx, arena);
+    return *key;
+  }
+  return type.type_name;
 }
 
 // §6.11 with §7.2: whether a member of the structure `layout` lays out is of
@@ -347,11 +393,12 @@ static bool LayoutHas4StateMember(const StructTypeInfo& layout) {
 // and the facts of its declaration a write and a read consult.
 static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
                                                   const ScopeMap& params,
+                                                  std::string_view type_key,
                                                   SimContext& ctx) {
   const DataType& type = member->data_type;
   uint32_t w = EvalTypeWidth(type, {}, params);
   const StructTypeInfo* layout =
-      w == 0 ? StructPropertyLayout(type, ctx) : nullptr;
+      w == 0 ? StructPropertyLayout(type, type_key, ctx) : nullptr;
   if (layout != nullptr) w = layout->total_width;
   bool sized = w != 0;
   bool four_state = layout != nullptr ? LayoutHas4StateMember(*layout)
@@ -368,7 +415,7 @@ static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
           IsRealKind(type.kind),
           type.kind == DataTypeKind::kString,
           IsSignedType(type, {}),
-          type.type_name,
+          type_key,
           type.kind == DataTypeKind::kVirtualInterface};
 }
 
@@ -377,7 +424,9 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   ScopeMap params = ClassParamScope(cls, constants);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
-      info->properties.push_back(PropertyRecord(member, params, ctx));
+      info->properties.push_back(PropertyRecord(
+          member, params, PropertyTypeKey(member->data_type, *info, *cls, ctx),
+          ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

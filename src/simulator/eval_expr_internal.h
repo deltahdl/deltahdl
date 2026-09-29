@@ -69,6 +69,20 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
 // Defined in eval_member_path.cpp.
 std::string TagKeyOfName(std::string_view name, SimContext& ctx);
 
+// §8.5 with §7.2 and §7.3.2: the layout of the structure or union a class
+// property's declared type names, where `name` denotes such a property -- bare
+// in a method of the object it belongs to, `o`, or through a handle variable,
+// `b.o` -- and `key` the key the property's tag is recorded under in the tag
+// table (SimContext::SetVariableTag). A property is no variable, so its key is
+// its object's handle and its name, "@7.o", which no variable's key can spell;
+// every object thus holds its own tag, and a member's tag stands under the key
+// followed by the member's name, as TaggedUnionMemberKey forms a variable's.
+// Null where `name` denotes a variable, no such property, or a property of no
+// registered structure or union layout. Defined in eval_member_path.cpp.
+const StructTypeInfo* PropertyAggregateLayout(std::string_view name,
+                                              SimContext& ctx,
+                                              std::string& key);
+
 // Strips a leading "$root.<top>." prefix from a hierarchical name, returning
 // the remainder; names without the prefix are returned unchanged. Defined in
 // eval_hierarchical_name.cpp; also used by statement_assign_lhs.cpp.

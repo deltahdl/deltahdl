@@ -740,4 +740,34 @@ TEST(ClassScopeResolutionSim, InheritedStaticMethodThroughTheDerivedScope) {
   EXPECT_EQ(v, 54u);
 }
 
+// §8.23 makes a typedef a class declares a name of the class scope, usable
+// bare in the class, and §6.18 makes a property declared by it an object of
+// the type it names, so a method selects the members of an unpacked or a packed
+// structure property by name (§7.2.1) and $bits counts both int members. The
+// layout was asked for under the bare name, which the class's typedef is not
+// registered by, so the members read 0 and the property was the 32-bit
+// carrier.
+TEST(ClassScopeTypedefSim, PropertyOfOwnStructureTypedefSelectsMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Box;\n"
+                       "  typedef struct { int a; int b; } S;\n"
+                       "  typedef struct packed { bit [7:0] a; bit [7:0] b; } "
+                       "P;\n"
+                       "  S s; P p;\n"
+                       "  function void set();\n"
+                       "    s.b = 5; s.a = 3; p.b = 8'd7; p.a = 8'd2;\n"
+                       "  endfunction\n"
+                       "  function void show();\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", s.a, s.b, p.a, "
+                       "p.b, $bits(s));\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box b;\n"
+                       "  initial begin b = new; b.set(); b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "3 5 2 7 64\n");
+}
+
 }  // namespace

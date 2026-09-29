@@ -637,6 +637,33 @@ static std::optional<std::string> BuildFormatPPackageItem(const Expr* arg,
   return BuildFormatPNamed(key, val, ctx, arena);
 }
 
+// §21.2.1.6 with §8.5: a class property of a structure or union type, named
+// bare in a method or through a handle, prints as the pattern its layout gives
+// -- a tagged union's as its tag and the member the tag names, read under the
+// property's own key (PropertyAggregateLayout). A property is no variable, so
+// none of the named forms found a layout for it and it printed as one number.
+static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
+                                                       const Logic4Vec& val,
+                                                       SimContext& ctx) {
+  std::string name;
+  if (arg->kind == ExprKind::kIdentifier) {
+    name = std::string(arg->text);
+  } else if (arg->kind == ExprKind::kMemberAccess &&
+             !arg->is_scope_resolution) {
+    BuildLhsName(arg, name);
+  } else {
+    return std::nullopt;
+  }
+  std::string key;
+  const StructTypeInfo* layout = PropertyAggregateLayout(name, ctx, key);
+  if (layout == nullptr) return std::nullopt;
+  if (layout->is_union) {
+    std::string_view tag = ctx.GetVariableTag(key);
+    if (!tag.empty()) return FormatTaggedUnionForP(tag, layout, val, key, ctx);
+  }
+  return FormatStructValueForP(*layout, val, ctx);
+}
+
 std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                          SimContext& ctx) {
   Arena& arena = ctx.GetArena();
@@ -646,6 +673,7 @@ std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   std::string name = arg->kind == ExprKind::kIdentifier ? DeclaredKindsKey(arg)
                                                         : std::string();
 
+  if (auto prop = BuildFormatPProperty(arg, val, ctx)) return *prop;
   if (auto named = BuildFormatPNamed(name, val, ctx, arena)) return *named;
   if (auto scoped = BuildFormatPPackageItem(arg, val, ctx, arena))
     return *scoped;

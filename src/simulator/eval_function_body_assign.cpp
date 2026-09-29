@@ -416,7 +416,10 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // know.
   Logic4Vec val =
       OwnRhsWords(EvalRhsCarryingReturnedTag(stmt, ctx, arena), arena);
-  if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) return;
+  if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) {
+    RecordPropertyTags(stmt, ctx, arena);
+    return;
+  }
   ApplyGenericBlockingAssign(stmt, val, ctx, arena);
 }
 

@@ -470,6 +470,15 @@ struct ClassObject {
   std::unordered_map<std::string, std::shared_ptr<std::unordered_set<int64_t>>>
       randc_history;
 
+  // §7.3.2 with §8.5: the tag each property of a tagged union type holds,
+  // keyed by the property's name, and the tag of a member that is itself a
+  // tagged union by the property's name followed by the member path, "o.Jmp".
+  // The simulator's tag table reaches it through the key "@<handle>.<name>"
+  // (PropertyAggregateLayout, SimContext::SetVariableTag). Kept on the object
+  // rather than in that table, so §8.12's shallow copy carries it with the
+  // values it tags.
+  std::unordered_map<std::string, std::string> property_tags;
+
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 
   void SetProperty(std::string_view name, const Logic4Vec& raw);

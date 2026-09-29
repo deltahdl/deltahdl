@@ -100,6 +100,33 @@ std::string TagKeyOfName(std::string_view name, SimContext& ctx) {
   return std::string(name);
 }
 
+const StructTypeInfo* PropertyAggregateLayout(std::string_view name,
+                                              SimContext& ctx,
+                                              std::string& key) {
+  ClassObject* obj = nullptr;
+  std::string_view prop = name;
+  size_t dot = name.find('.');
+  if (dot == std::string_view::npos) {
+    if (NameDenotesVariable(name, ctx)) return nullptr;
+    obj = ctx.CurrentThis();
+  } else {
+    std::string_view base = name.substr(0, dot);
+    prop = name.substr(dot + 1);
+    if (prop.find('.') != std::string_view::npos) return nullptr;
+    const Variable* handle = ctx.FindVariable(base);
+    if (handle == nullptr || StructLayoutOfName(base, ctx) != nullptr)
+      return nullptr;
+    obj = ctx.GetClassObject(handle->value.ToUint64());
+  }
+  if (obj == nullptr || obj->type == nullptr) return nullptr;
+  const ClassTypeInfo::PropertyInfo* info = obj->type->FindProperty(prop);
+  if (info == nullptr || info->type_name.empty()) return nullptr;
+  const StructTypeInfo* layout = ctx.FindStructType(info->type_name);
+  if (layout == nullptr) return nullptr;
+  key = "@" + std::to_string(obj->handle) + "." + std::string(prop);
+  return layout;
+}
+
 const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
                                          std::string_view member) {
   for (const auto& field : sinfo.fields) {
