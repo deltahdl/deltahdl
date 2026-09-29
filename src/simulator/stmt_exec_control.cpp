@@ -763,6 +763,25 @@ static int64_t ElementIndexAt(const QueueObject& q, uint32_t p) {
   return q.index_descending ? q.index_lo + size - 1 - p : q.index_lo + p;
 }
 
+// The body of the foreach `stmt` run once per index of `element`, the
+// second loop variable `var` taking each: answers what the outer loop is to
+// do next, as one run of the body would -- kBreak where the body broke out,
+// kDone where every index ran or the body continued, and any other result as
+// the body gave it.
+static ExecTask ExecForeachElement(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena, Variable* var,
+                                   const QueueObject* element) {
+  for (uint32_t p = 0; p < element->elements.size() && !ctx.StopRequested();
+       ++p) {
+    var->value = MakeLogic4VecVal(
+        arena, 32, static_cast<uint64_t>(ElementIndexAt(*element, p)));
+    auto result = co_await ExecStmt(stmt->body, ctx, arena);
+    if (ClassifyLoopBodyResult(result) != LoopAction::kKeepLooping)
+      co_return result;
+  }
+  co_return StmtResult::kDone;
+}
+
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   EnterLoopLabelScope(stmt, ctx, labeled);
@@ -795,34 +814,19 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   Variable* iter_var = CreateForeachIterVar(iter_name, setup, ctx);
   ForeachElementDim inner = ForeachElementDimOf(stmt, setup, ctx, arena);
 
-  bool stop = false;
-  for (uint32_t i = 0; i < size && !stop && !ctx.StopRequested(); ++i) {
+  for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
     SetForeachIterVar(iter_var, info, setup, i, arena);
-    const QueueObject* element =
-        inner.var != nullptr ? ForeachElementQueue(inner, setup, i, arena)
-                             : nullptr;
-    auto count = element != nullptr
-                     ? static_cast<uint32_t>(element->elements.size())
-                     : 1U;
-    for (uint32_t p = 0; p < count && !ctx.StopRequested(); ++p) {
-      if (element != nullptr) {
-        inner.var->value = MakeLogic4VecVal(
-            arena, 32, static_cast<uint64_t>(ElementIndexAt(*element, p)));
-      }
-      auto result = co_await ExecStmt(stmt->body, ctx, arena);
-      auto action = ClassifyLoopBodyResult(result);
-      if (action == LoopAction::kBreakLoop) {
-        stop = true;
-        break;
-      }
-      if (action == LoopAction::kPropagate) {
-        if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) {
-          stop = true;
-          break;
-        }
-        TeardownForeachScopes(stmt, ctx, labeled);
-        co_return result;
-      }
+    auto result = inner.var == nullptr
+                      ? co_await ExecStmt(stmt->body, ctx, arena)
+                      : co_await ExecForeachElement(
+                            stmt, ctx, arena, inner.var,
+                            ForeachElementQueue(inner, setup, i, arena));
+    auto action = ClassifyLoopBodyResult(result);
+    if (action == LoopAction::kBreakLoop) break;
+    if (action == LoopAction::kPropagate) {
+      if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) break;
+      TeardownForeachScopes(stmt, ctx, labeled);
+      co_return result;
     }
   }
 
