@@ -98,4 +98,27 @@ TEST(PassByValueSim, ClassFormalBoundFromNullHoldsTheObjectTheBodyAssigns) {
             909u);
 }
 
+// §13.5 with §10.8 and §10.9.1: an assignment pattern written as the actual of
+// an unpacked-array input formal is assigned to the formal, so each element
+// takes the value the pattern gives its position -- positional, replicated by
+// default or keyed, on an ascending or a descending formal -- evaluated in the
+// caller. Bound as a value, the pattern's concatenated bits reached the formal
+// as one vector, and f('{1, 2, 3}) read 110.
+TEST(PassByValueSim, AssignmentPatternActualFillsAnArrayFormal) {
+  EXPECT_EQ(
+      RunAndGet(
+          "module t;\n"
+          "  function automatic int f(int a[3]); "
+          "return a[0] * 100 + a[1] * 10 + a[2]; endfunction\n"
+          "  function automatic int g(int a[2:0]); "
+          "return a[2] * 100 + a[1] * 10 + a[0]; endfunction\n"
+          "  int x = 5;\n"
+          "  int r;\n"
+          "  initial r = f('{1, 2, 3}) + 1000 * f('{default: 2}) +\n"
+          "             1000000 * g('{1, 2, 3}) - f('{0: x, default: 1});\n"
+          "endmodule\n",
+          "r"),
+      123u + 222000u + 123000000u - 511u);
+}
+
 }  // namespace

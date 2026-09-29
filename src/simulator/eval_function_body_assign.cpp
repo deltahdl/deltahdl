@@ -376,6 +376,9 @@ static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
 // the return override the assigned value.
 void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs) return;
+  // §13.4.1 with §7.6 and §7.10: `hold = get()` copies the array the call
+  // returned, ahead of the queue path below, which reads the call as a value.
+  if (TryCallResultArrayAssign(stmt, ctx, arena)) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
       stmt->lhs->text == ctx.CurrentFuncName()) {

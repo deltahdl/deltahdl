@@ -288,4 +288,65 @@ TEST(FunctionReturnSim, ReturnVariableClassOutlivesANestedSameNamedCall) {
   EXPECT_EQ(out, "0 1\n");
 }
 
+// §13.4.1 with §7.6 and §7.10: a call of a function returning an unpacked
+// array, assigned to an array variable or a queue, copies every element it
+// returned -- a module function's, a method's through a handle and a
+// method's called bare in another method -- and the call runs once. Read as
+// the one value the call yields, each target received zeros or a single zero.
+TEST(FunctionReturnSim, ArrayReturnedByACallIsAssignedElementForElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class K;\n"
+      "  typedef int q_t[$];\n"
+      "  q_t hold;\n"
+      "  function q_t get(); q_t v; v.push_back(11); v.push_back(12); "
+      "return v; endfunction\n"
+      "  function void keep(); hold = get(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  typedef int a_t[3];\n"
+      "  typedef int q_t[$];\n"
+      "  int n;\n"
+      "  function automatic a_t fa(); a_t v; n++; v[0] = 7; v[1] = 8; "
+      "v[2] = 9; return v; endfunction\n"
+      "  function automatic q_t fq(); q_t v; v.push_back(4); v.push_back(5); "
+      "return v; endfunction\n"
+      "  a_t av; int r[2:0]; q_t qv; int kq[$];\n"
+      "  K k;\n"
+      "  initial begin\n"
+      "    av = fa(); r = fa(); qv = fq(); k = new; kq = k.get(); k.keep();\n"
+      "    $display(\"%p %p %p %p %0d n=%0d\", av, r, qv, kq, k.hold[1], n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{7, 8, 9} '{7, 8, 9} '{4, 5} '{11, 12} 12 n=2\n");
+}
+
+// §7.2 with §7.4.5, §7.12.1 and §13.4.1: a member select on the element an
+// array-valued call yields reads that member of the element -- of a queue
+// and of a fixed-size array of structures a function returns, and of the
+// queue a locator returns. The element select alone read right, `e =
+// mk()[1]`, and its member read 0.
+TEST(FunctionReturnSim, MemberOfAnElementOfAnArrayValuedCall) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int x; int y;} s_t;\n"
+      "  typedef s_t q_t[$];\n"
+      "  typedef s_t a_t[2];\n"
+      "  function automatic q_t mk(); q_t v; v.push_back('{4, 40}); "
+      "v.push_back('{5, 50}); return v; endfunction\n"
+      "  function automatic a_t mka(); a_t v; v[0] = '{4, 40}; "
+      "v[1] = '{5, 50}; return v; endfunction\n"
+      "  s_t sq[$];\n"
+      "  initial begin\n"
+      "    sq = '{'{1, 10}, '{3, 30}};\n"
+      "    $display(\"%0d %0d %0d %0d\", mk()[1].y, mka()[0].x, mka()[1].y,\n"
+      "             sq.find(i) with (i.x == 3) [0].y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "50 4 50 30\n");
+}
+
 }  // namespace

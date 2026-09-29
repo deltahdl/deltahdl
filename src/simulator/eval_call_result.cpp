@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -136,6 +137,8 @@ std::optional<ReturnedAggregate> CaptureAggregate(const Expr* returned,
   }
   CollectQueueElements(returned, ctx, arena, agg.elements);
   for (auto& elem : agg.elements) elem = OwnRhsWords(elem, arena);
+  if (returned->kind == ExprKind::kIdentifier)
+    agg.elem_layout = StructLayoutOfName(returned->text, ctx);
   return agg;
 }
 
@@ -150,14 +153,12 @@ const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
   return ctx.FindStructType(func->return_type.type_name);
 }
 
-// §7.2: the member `expr->rhs` of the structure `value` the call `expr->lhs`
-// returned, its window read off the layout, and §6.11.2 converting the
+// §7.2: the member `expr->rhs` of the structure `value` laid out by
+// `layout`, its window read off the layout, and §6.11.2 converting the
 // unknowns of a 2-state member's window to zeros as a read of the member of a
-// variable does. False where the call returns no named structure or the
-// layout has no such member.
-bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
-                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
-  const StructTypeInfo* layout = CallResultStructLayout(expr->lhs, ctx, arena);
+// variable does. False where there is no layout or it has no such member.
+bool ReadLayoutMember(const StructTypeInfo* layout, const Expr* expr,
+                      const Logic4Vec& value, Arena& arena, Logic4Vec& out) {
   if (layout == nullptr) return false;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
@@ -173,6 +174,105 @@ bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
     return true;
   }
   if (!Is4stateType(kind)) CoerceTo2State(out);
+  return true;
+}
+
+// §7.2: the member `expr->rhs` of the structure `value` the call `expr->lhs`
+// returned. False where the call returns no named structure or the layout
+// has no such member.
+bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
+                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  return ReadLayoutMember(CallResultStructLayout(expr->lhs, ctx, arena), expr,
+                          value, arena, out);
+}
+
+// Whether `e` is a name or a chain of member selects of names, `h` or `d.c`,
+// which evaluates to the object it names and runs nothing.
+bool IsHandleNamePath(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier) return true;
+  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution &&
+         e->rhs != nullptr && e->rhs->kind == ExprKind::kIdentifier &&
+         IsHandleNamePath(e->lhs);
+}
+
+// Whether the call `call` runs the body of a declared subroutine: a module's
+// (FindSubroutineTarget), a method called through a handle a name path holds,
+// `k.get()`, or one of the running method's object called bare, `get()` --
+// and not an array method, `q.find(x) with (x > 1)`, or a built-in one.
+bool CallsDeclaredSubroutine(const Expr* call, SimContext& ctx, Arena& arena) {
+  if (FindSubroutineTarget(call, ctx, arena).func != nullptr) return true;
+  const ClassTypeInfo* owner = nullptr;
+  const Expr* access = call->lhs;
+  if (access != nullptr && access->kind == ExprKind::kMemberAccess &&
+      !access->is_scope_resolution && access->rhs != nullptr &&
+      access->rhs->kind == ExprKind::kIdentifier &&
+      IsHandleNamePath(access->lhs)) {
+    const ClassObject* obj =
+        ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
+    return obj != nullptr &&
+           ResolveMethodOnObject(obj, access->rhs->text, &owner) != nullptr;
+  }
+  // A bare call names its callee by its own text or by an identifier callee.
+  std::string_view bare = access == nullptr ? std::string_view(call->text)
+                          : access->kind == ExprKind::kIdentifier
+                              ? std::string_view(access->text)
+                              : std::string_view{};
+  const ClassObject* self = ctx.CurrentThis();
+  return self != nullptr && !bare.empty() &&
+         ResolveMethodOnObject(self, bare, &owner) != nullptr;
+}
+
+// §7.2 with §7.4.5, §7.12.1 and §13.4.1: the layout of an element of the
+// array the call `call` returns -- a declared function's, registered under
+// its return type's name, or an array method's, `sq.find(i) with (...)`,
+// whose result holds the elements of the array it is called on, laid out by
+// that array's element type. Null where neither answers.
+const StructTypeInfo* ElementLayoutOfCall(const Expr* call, SimContext& ctx,
+                                          Arena& arena) {
+  if (const StructTypeInfo* layout = CallResultStructLayout(call, ctx, arena))
+    return layout;
+  const Expr* access = call->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->lhs == nullptr ||
+      access->lhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return StructLayoutOfName(access->lhs->text, ctx);
+}
+
+// §7.2 with §7.4.5: `mk()[1].y` and `sq.find(i) with (i.x == 3) [0].y` read
+// the member of the structure the element select of an array-valued call
+// yields. The select on the call is evaluated as it is alone, `e = mk()[1]`,
+// and its member read off the element type's layout; left to the paths that
+// read a member through a named array's layout, it read 0.
+bool TryElementOfCallResultMember(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  const Expr* sel = expr->lhs;
+  if (expr->is_scope_resolution || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier || sel == nullptr ||
+      sel->kind != ExprKind::kSelect || sel->index_end != nullptr ||
+      sel->base == nullptr || sel->base->kind != ExprKind::kCall)
+    return false;
+  if (const StructTypeInfo* layout = ElementLayoutOfCall(sel->base, ctx, arena))
+    return ReadLayoutMember(layout, expr, EvalExpr(sel, ctx, arena), arena,
+                            out);
+  // §13.4.1: a declared function's return type named by a typedef the run
+  // records no layout under -- a module's `typedef s_t q_t[$]` -- lays its
+  // elements out as the variable the body returned does. The call runs once
+  // here, and a result with no such layout reads as the element of no layout
+  // read 0 before.
+  if (!CallsDeclaredSubroutine(sel->base, ctx, arena)) return false;
+  std::optional<ReturnedAggregate> returned;
+  EvalWithReturnedAggregate(sel->base, ctx, arena, returned);
+  Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
+  if (!returned || returned->elem_layout == nullptr || HasUnknownBits(idx)) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
+  }
+  Logic4Vec elem = ElementOfReturnedAggregate(
+      *returned, static_cast<int64_t>(idx.ToUint64()), arena);
+  if (!ReadLayoutMember(returned->elem_layout, expr, elem, arena, out))
+    out = MakeLogic4VecVal(arena, 32, 0);
   return true;
 }
 
@@ -383,6 +483,79 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
   return value;
 }
 
+// Copies `returned` into the queue or dynamic array `q` named by `lhs`, as an
+// assignment to it rebuilds its elements: each at the element width, fresh
+// element identities, and the change announced (§9.4.2).
+static void CopyReturnedToQueue(const ReturnedAggregate& returned,
+                                QueueObject* q, const Expr* lhs,
+                                ClassObject* owner, SimContext& ctx,
+                                Arena& arena) {
+  q->elements.clear();
+  for (const Logic4Vec& e : returned.elements)
+    q->elements.push_back(
+        OwnRhsWords(ResizeToWidth(e, q->elem_width, arena), arena));
+  q->AssignFreshIds();
+  ++q->generation;
+  AnnounceQueueChange(lhs, owner, ctx);
+}
+
+// Copies `returned` into the fixed-size array `dst` under `name`, element for
+// element from the left of each (§7.6); a different number of elements is
+// the §7.6 error, and nothing is written.
+static void CopyReturnedToArray(const ReturnedAggregate& returned,
+                                std::string_view name, const ArrayInfo& dst,
+                                const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  if (returned.elements.size() != dst.size) {
+    ctx.GetDiag().Error(stmt->range.start,
+                        "array size mismatch in assignment to fixed-size array",
+                        Subclause("7.6"));
+    return;
+  }
+  for (uint32_t i = 0; i < dst.size; ++i) {
+    uint32_t idx = dst.is_descending ? dst.lo + dst.size - 1 - i : dst.lo + i;
+    Variable* elem =
+        ctx.FindVariable(std::string(name) + "[" + std::to_string(idx) + "]");
+    if (elem == nullptr) continue;
+    elem->value = OwnRhsWords(
+        ResizeToWidth(returned.elements[i], dst.elem_width, arena), arena);
+    elem->NotifyWatchers();
+  }
+}
+
+bool TryCallResultArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->lhs == nullptr || stmt->rhs == nullptr ||
+      stmt->lhs->kind != ExprKind::kIdentifier ||
+      stmt->rhs->kind != ExprKind::kCall ||
+      !CallsDeclaredSubroutine(stmt->rhs, ctx, arena))
+    return false;
+  ClassObject* owner = nullptr;
+  QueueObject* q = FindQueueOfBase(stmt->lhs, ctx, arena, &owner);
+  const ArrayInfo* dst =
+      q == nullptr ? ctx.FindArrayInfo(stmt->lhs->text) : nullptr;
+  if (q == nullptr && (dst == nullptr || dst->is_dynamic || dst->is_queue ||
+                       dst->dim_sizes.size() > 1))
+    return false;
+  std::optional<ReturnedAggregate> returned;
+  Logic4Vec value = EvalWithReturnedAggregate(stmt->rhs, ctx, arena, returned);
+  // A body that returned no aggregate hands out the one value, which a queue
+  // holds as its one element, as the queue assignment path makes it.
+  if (!returned && q != nullptr) {
+    returned.emplace();
+    returned->elements.push_back(value);
+  }
+  if (!returned) {
+    ApplyGenericBlockingAssign(stmt, value, ctx, arena);
+    return true;
+  }
+  if (q != nullptr) {
+    CopyReturnedToQueue(*returned, q, stmt->lhs, owner, ctx, arena);
+  } else {
+    CopyReturnedToArray(*returned, stmt->lhs->text, *dst, stmt, ctx, arena);
+  }
+  return true;
+}
+
 Logic4Vec ElementOfReturnedAggregate(const ReturnedAggregate& returned,
                                      int64_t idx, Arena& arena) {
   auto size = static_cast<int64_t>(returned.elements.size());
@@ -397,6 +570,9 @@ Logic4Vec ElementOfReturnedAggregate(const ReturnedAggregate& returned,
 
 bool TryEvalCallResultMember(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
+  if (expr != nullptr && expr->kind == ExprKind::kMemberAccess &&
+      TryElementOfCallResultMember(expr, ctx, arena, out))
+    return true;
   if (!SelectsMemberOfCallResult(expr)) return false;
   // The base side is evaluated once, running the call it starts at, and read
   // as the structure the call's return type names ahead of the handle read: a

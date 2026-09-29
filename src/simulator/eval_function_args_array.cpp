@@ -28,6 +28,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/static_aggregate.h"
 #include "simulator/variable.h"
@@ -467,9 +468,56 @@ static bool TryBindPropertyArrayArg(const Expr* call_arg,
   return TryBindQueueArg(queue, formal, ctx, arena, call_arg->range.start);
 }
 
+// §13.5 with §10.8 and §10.9.1: an actual bound to an input formal is
+// assigned to it, which makes an assignment pattern written as the actual,
+// `f('{1, 2, 3})`, `f(arr_t'{1, 2, 3})` or `f('{default: 2})`, a pattern of
+// the formal's type: each element of a one-dimensional fixed-size formal takes
+// the value the pattern gives its position, from the left (PatternItemAt),
+// evaluated in the caller's scope as every actual is. Bound as a value, the
+// pattern's concatenated bits reached the formal as one vector, whose bits the
+// element selects then read.
+static bool TryBindPatternArrayArg(const Expr* call_arg,
+                                   const FunctionArg& formal, SimContext& ctx,
+                                   Arena& arena) {
+  const Expr* pattern = UnwrapTypedPattern(call_arg);
+  if (pattern == nullptr || pattern->kind != ExprKind::kAssignmentPattern ||
+      formal.direction != Direction::kInput)
+    return false;
+  uint32_t elem_width = DeclaredTypeWidth(formal.data_type, ctx);
+  auto shape =
+      FixedFormalShape(formal, elem_width == 0 ? 32 : elem_width, ctx, arena);
+  if (!shape || !shape->dim_sizes.empty()) return false;
+  shape->is_4state = DeclaredTypeIs4State(formal.data_type);
+  std::vector<Logic4Vec> values;
+  values.reserve(shape->size);
+  {
+    CalleeScopeAside aside(ctx);
+    for (uint32_t k = 0; k < shape->size; ++k) {
+      values.push_back(PatternItemAt(
+          pattern, ArrayPatternTarget{*shape, nullptr}, k, ctx, arena));
+    }
+  }
+  // §13.4: the shape lives as long as the call does.
+  ctx.RegisterArrayInScope(formal.name, *shape);
+  for (uint32_t k = 0; k < shape->size; ++k) {
+    auto* var = ctx.CreateLocalVariable(
+        *arena.Create<std::string>(std::string(formal.name) + "[" +
+                                   std::to_string(ElementIndexAt(*shape, k)) +
+                                   "]"),
+        shape->elem_width, DeclaredTypeIsSigned(formal.data_type, ctx));
+    var->is_4state = shape->is_4state;
+    var->value =
+        OwnRhsWords(ResizeToWidth(values[k], shape->elem_width, arena), arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
+    var->value.is_signed = var->is_signed;
+  }
+  return true;
+}
+
 bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                      SimContext& ctx, Arena& arena) {
   if (!call_arg) return false;
+  if (TryBindPatternArrayArg(call_arg, formal, ctx, arena)) return true;
   if (call_arg->kind == ExprKind::kMemberAccess &&
       !formal.unpacked_dims.empty()) {
     return TryBindPropertyArrayArg(call_arg, formal, ctx, arena);

@@ -34,12 +34,17 @@ class Arena;
 // gave it (§7.4.5), which `lo` and `is_descending` carry in the way
 // ArrayInfo's do. The width and state of an element decide what an index the
 // aggregate has no element at reads (Table 7-1 in §7.4.5).
+// `elem_layout` is the structure layout of an element where the elements are
+// structures (§7.2), taken from the variable the body returned, and null
+// otherwise.
+struct StructTypeInfo;
 struct ReturnedAggregate {
   std::vector<Logic4Vec> elements;
   uint32_t elem_width = 32;
   uint32_t lo = 0;
   bool is_descending = false;
   bool is_4state = true;
+  const StructTypeInfo* elem_layout = nullptr;
 };
 
 // A function body's registration for the aggregate it returns and for the tag
@@ -129,6 +134,18 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
 // above and the nonblocking one (statement_assign_nonblocking.cpp), which
 // sets the same key when its update lands.
 bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key);
+
+// §13.4.1 with §7.6 and §7.10: the blocking assignment `stmt` of a call of a
+// declared function to a queue, a dynamic array or a one-dimensional
+// fixed-size unpacked array named by a bare identifier, `av = fa()` or `qv =
+// fq()`: the call is run once and the elements its body returned
+// (EvalWithReturnedAggregate) are copied into the target as an array
+// assignment copies them -- a queue or dynamic array taking their number, a
+// fixed-size array reporting a different number under §7.6 and writing
+// nothing. Where the body returned no aggregate, the value the call gave is
+// stored as the assignment stores a value, a queue's one element. False, with
+// nothing evaluated, for any other statement.
+bool TryCallResultArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // The element at the declared index `idx` of `returned`, or what §7.4.5's
 // Table 7-1 gives a read of a nonexistent element -- x for a 4-state element

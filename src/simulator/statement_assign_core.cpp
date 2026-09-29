@@ -713,6 +713,9 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryDeconstructingPatternAssign(stmt, ctx, arena)) return true;
   if (TryConditionalArrayAssign(stmt, ctx, arena)) return true;
+  // §13.4.1 with §7.6 and §7.10: `av = fa()` copies the array the call
+  // returned into the array or queue it is assigned to.
+  if (TryCallResultArrayAssign(stmt, ctx, arena)) return true;
   if (TryDispatchSyncAssign(stmt, ctx, arena)) return true;
   if (TryDispatchNewAssign(stmt, ctx, arena)) return true;
   if (TryAssocMapAssign(stmt, ctx, arena)) return true;
