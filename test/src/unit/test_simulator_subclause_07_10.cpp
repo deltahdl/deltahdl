@@ -711,4 +711,25 @@ TEST(QueueSim, AssigningAQueueOfArraysCopiesEveryElement) {
   EXPECT_EQ(out, "2 4 5 3 9\n");
 }
 
+// §7.10 with §10.9.1: a queue nested three deep takes each level of a nested
+// assignment pattern as its elements: a[0][0] is {1, 2}, a[1][0] is {4}, and
+// a[0][0][1] can be written like any queue element. A copy of the whole queue
+// keeps the values the copied queue held before the write.
+TEST(QueueSim, AQueueNestedThreeDeepHoldsANestedPattern) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a[$][$][$], b[$][$][$];\n"
+      "  initial begin\n"
+      "    a = '{'{'{1, 2}, '{3}}, '{'{4}}};\n"
+      "    b = a;\n"
+      "    a[0][0][1] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", a.size(), a[0].size(),\n"
+      "             a[0][0][1], a[1][0][0], b[0][0][1], b[0][1][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 2 7 4 2 3\n");
+}
+
 }  // namespace

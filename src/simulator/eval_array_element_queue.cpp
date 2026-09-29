@@ -200,6 +200,9 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   // §10.9: a pattern typed with the element's queue type, `T_QI'{2, 3}`,
   // lists the element's items as the bare pattern does.
   item = UnwrapTypedPattern(item);
+  // §7.10 with §10.9.1: where the element's own elements are queues, `a[0]`
+  // of `int a[$][$][$]`, each of its items makes one of those queues in turn.
+  if (FillQueueOfQueues(q, item, ctx, arena)) return q;
   bool listed = item->kind == ExprKind::kConcatenation ||
                 (item->kind == ExprKind::kAssignmentPattern &&
                  item->pattern_keys.empty());
@@ -234,9 +237,10 @@ static const QueueObject* ElementQueueAt(const QueueObject& outer, size_t pos) {
 
 // A copy of `src`, the queue of one element of an array whose elements are
 // queues, made in the shape `shape` gives the target's elements: each value
-// owning its words and the element type's fixed size kept. A null `src`, an
-// element whose queue was never made, copies as the shape's default. Queues
-// nested a level further down hold no values yet (#4587), so none are copied.
+// owning its words, the element type's fixed size kept, and where the values
+// stand for queues of their own, each of those copied one level down. A null
+// `src`, an element whose queue was never made, copies as the shape's
+// default.
 static QueueObject* CopyElementQueue(const QueueObject* src,
                                      const ElementQueueShape& shape,
                                      Arena& arena) {
@@ -248,6 +252,11 @@ static QueueObject* CopyElementQueue(const QueueObject* src,
     copy->elements.push_back(OwnRhsWords(value, arena));
   FitToFixedSize(copy, shape.fixed_size, arena);
   copy->AllocateIdsForAppended();
+  for (size_t i = 0; copy->elements_are_queues && i < copy->elements.size();
+       ++i) {
+    copy->element_queues[copy->ElementQueueKeyAt(i)] =
+        CopyElementQueue(ElementQueueAt(*src, i), ShapeOf(*copy), arena);
+  }
   return copy;
 }
 
