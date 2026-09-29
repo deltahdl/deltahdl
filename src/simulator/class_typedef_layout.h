@@ -7,6 +7,7 @@
 namespace delta {
 
 struct ClassDecl;
+struct ClassTypeInfo;
 struct DataType;
 struct StructTypeInfo;
 class SimContext;
@@ -33,6 +34,24 @@ std::string_view RegisterSpecializationTypedefLayout(std::string_view spelled,
                                                      const DataType& type,
                                                      const ScopeMap& scope,
                                                      SimContext& ctx);
+
+// §8.13 with §8.23: the class declaring the typedef named `name` that a
+// member of the class `info`, declared by `cls`, reaches bare -- `info` itself
+// or the nearest class of its extends chain declaring it -- with that class's
+// declaration in `decl`; null where none declares it.
+const ClassTypeInfo* ClassTypedefDeclarer(std::string_view name,
+                                          const ClassTypeInfo& info,
+                                          const ClassDecl& cls,
+                                          const ClassDecl*& decl);
+
+// §8.25 with §8.23: the key of the layout the aggregate typedef `type`, which
+// the class `cls` declares under `name`, has under the specialization `cls`
+// is -- `Box#(16)::S`, or `Box#()::S` for the default one -- folded with that
+// specialization's parameter values and registered by
+// RegisterSpecializationTypedefLayout where none stands yet.
+std::string_view ClassTypedefLayoutKey(const ClassTypeInfo& cls,
+                                       std::string_view name,
+                                       const DataType& type, SimContext& ctx);
 
 // §8.25 with §8.23 and §7.2 (printed pages 203, 200 and 146): a structure or
 // union typedef a parameterized class declares, `typedef struct { bit [p-1:0]

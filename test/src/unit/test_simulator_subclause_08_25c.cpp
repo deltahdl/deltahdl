@@ -348,4 +348,38 @@ TEST(ClassSim, PropertyOfParameterizedClassTypedefHasSpecializationLayout) {
   EXPECT_EQ(out, "3 5 32\n3 5 16\n");
 }
 
+// §8.13 with §8.23 and §8.25: a class extending a specialization of a
+// parameterized base reaches the base's structure typedef bare, with the widths
+// that base specialization binds, so Der's `S s` under `Base #(16)` has two
+// 16-bit members, and D #(4)'s under the `Base #(N)` it extends has two 4-bit
+// ones. The typedef of a base with value parameters was left unresolved, and
+// the members read 0 in a 32-bit carrier.
+TEST(ClassSim, PropertyOfParameterizedBaseTypedefHasBaseSpecializationLayout) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Base #(int W = 8);\n"
+      "  typedef struct { bit [W-1:0] a; bit [W-1:0] b; } S;\n"
+      "endclass\n"
+      "class Der extends Base #(16);\n"
+      "  S s;\n"
+      "  function void show();\n"
+      "    s.b = 5; s.a = 3;\n"
+      "    $display(\"%0d %0d %0d\", s.a, s.b, $bits(s));\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class D #(int N = 2) extends Base #(N);\n"
+      "  S s;\n"
+      "  function void show();\n"
+      "    s.b = 5; s.a = 3;\n"
+      "    $display(\"%0d %0d %0d\", s.a, s.b, $bits(s));\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Der d; D #(4) e;\n"
+      "  initial begin d = new; d.show(); e = new; e.show(); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 5 32\n3 5 8\n");
+}
+
 }  // namespace

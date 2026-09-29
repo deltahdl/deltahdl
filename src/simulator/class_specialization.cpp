@@ -690,6 +690,41 @@ bool SizeClassTypedefProperty(ClassTypeInfo::PropertyInfo& prop,
   return true;
 }
 
+// §8.13 with §8.23 and §8.25: the key of the layout a property of the
+// specialization `spec`, declared by `type`, holds where `type` is the bare
+// name of a structure or union typedef a base class with value parameters
+// declares: the layout under the base specialization `spec` extends,
+// `Base#(4)::S` for `D #(4)` extending `Base #(N)`. Empty for any other type.
+std::string_view BaseTypedefKey(const DataType& type, const ClassTypeInfo& spec,
+                                SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) return {};
+  const ClassDecl* decl = nullptr;
+  const ClassTypeInfo* owner =
+      ClassTypedefDeclarer(type.type_name, spec, *spec.decl, decl);
+  if (owner == nullptr || owner == &spec || !ClassHasValueParams(*decl))
+    return {};
+  const DataType* aggregate = ClassAggregateTypedef(*decl, type.type_name);
+  if (aggregate == nullptr) return {};
+  return ClassTypedefLayoutKey(*owner, type.type_name, *aggregate, ctx);
+}
+
+// A property of `spec` declared by a parameterized base's typedef takes the
+// layout that typedef has under the base `spec` extends (BaseTypedefKey),
+// which is known only once the base is bound, and that layout's width.
+void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
+  for (auto& prop : spec->properties) {
+    const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
+    if (member == nullptr) continue;
+    std::string_view key = BaseTypedefKey(member->data_type, *spec, ctx);
+    const StructTypeInfo* layout =
+        key.empty() ? nullptr : ctx.FindStructType(key);
+    if (layout == nullptr) continue;
+    prop.type_name = key;
+    prop.width = layout->total_width;
+    prop.width_is_declared = true;
+  }
+}
+
 // §8.25 (printed page 203): a property whose packed dimension names a value
 // parameter, the clause's `bit [size-1:0] a`, is as wide as the
 // specialization binds the parameter, ten bits in `vector #(10)`. The table a
@@ -803,6 +838,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   BindSpecializationBase(spec, spelled, ctx, arena);
+  SizeBaseTypedefProperties(spec, ctx);
   OwnVTableEntries(spec);
   // §6.20.4 with §8.25: the body's parameters are the specialization's too,
   // `C#(4)::N` 8 where the declaration's copy, folded with W's default, is 16.
@@ -839,6 +875,9 @@ void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena) {
   // declares is re-owned by the specialization, whose statics its body then
   // reads.
   OwnVTableEntries(info);
+  // §8.25: so were the properties the base's typedefs declare, which take the
+  // widths of the specialization the class extends, `Base#(16)::S`.
+  SizeBaseTypedefProperties(info, ctx);
 }
 
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,

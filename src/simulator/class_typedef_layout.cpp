@@ -116,6 +116,31 @@ std::string_view RegisterSpecializationTypedefLayout(std::string_view spelled,
   return *key;
 }
 
+const ClassTypeInfo* ClassTypedefDeclarer(std::string_view name,
+                                          const ClassTypeInfo& info,
+                                          const ClassDecl& cls,
+                                          const ClassDecl*& decl) {
+  decl = &cls;
+  for (const ClassTypeInfo* c = &info; c != nullptr && decl != nullptr;) {
+    for (const auto* member : decl->members) {
+      if (member->kind == ClassMemberKind::kTypedef && member->name == name)
+        return c;
+    }
+    c = c->parent;
+    decl = c != nullptr ? c->decl : nullptr;
+  }
+  return nullptr;
+}
+
+std::string_view ClassTypedefLayoutKey(const ClassTypeInfo& cls,
+                                       std::string_view name,
+                                       const DataType& type, SimContext& ctx) {
+  std::string spelled = std::string(cls.name);
+  if (cls.param_actuals == nullptr) spelled += "#()";
+  return RegisterSpecializationTypedefLayout(spelled, name, type,
+                                             ParamValuesOf(cls), ctx);
+}
+
 const StructTypeInfo* MethodClassTypedefLayout(std::string_view name,
                                                SimContext& ctx,
                                                std::string_view* key) {
@@ -125,10 +150,7 @@ const StructTypeInfo* MethodClassTypedefLayout(std::string_view name,
     const DataType* type = ClassAggregateTypedef(*c->decl, name);
     if (type == nullptr) continue;
     if (!ClassHasValueParams(*c->decl)) return nullptr;
-    std::string spelled = std::string(c->name);
-    if (c->param_actuals == nullptr) spelled += "#()";
-    std::string_view registered = RegisterSpecializationTypedefLayout(
-        spelled, name, *type, ParamValuesOf(*c), ctx);
+    std::string_view registered = ClassTypedefLayoutKey(*c, name, *type, ctx);
     if (key != nullptr) *key = registered;
     return ctx.FindStructType(registered);
   }
