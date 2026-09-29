@@ -177,6 +177,8 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     // visible to that instance's processes. The name is arena-persisted because
     // SimContext keys variables by string_view.
     auto* full = arena_.Create<std::string>(inst_prefix_ + std::string(p.name));
+    // §21.7.2.1: dumped, the parameter is declared with the parameter var_type.
+    ctx_.Vcd().MarkVcdParameter(*full);
     if (p.is_unbounded) {
       ctx_.RegisterUnboundedParam(*full);
       ctx_.CreateVariable(*full, 32);

@@ -229,7 +229,6 @@ std::string VcdWriter::SelectedDeclarations(const std::string& text) const {
 // renders every other binary-valued net as wire as well.
 static const char* VcdVarTypeKeyword(const VcdSignal& sig) {
   if (sig.var && sig.var->value.is_real) return "real";
-  if (sig.net_type == NetType::kUwire) return "wire";
   return "wire";
 }
 
@@ -266,6 +265,8 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
     // named event carries its own rather than masquerading as anything.
     case VcdDataType::kEvent:
       return "event";
+    case VcdDataType::kParameter:
+      return "parameter";
     case VcdDataType::kNet:
       break;
   }
@@ -302,6 +303,7 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
     // width it was declared with, as bit and logic do.
     case VcdDataType::kReg:
     case VcdDataType::kReal:
+    case VcdDataType::kParameter:
     case VcdDataType::kNet:
       break;
   }

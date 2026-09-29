@@ -249,6 +249,12 @@ static const QueueObject* ElementQueueAt(const QueueObject& outer, size_t pos) {
   return it == outer.element_queues.end() ? nullptr : it->second;
 }
 
+const QueueObject* ElementQueueOrDefault(const QueueObject& outer, size_t pos,
+                                         Arena& arena) {
+  if (const QueueObject* q = ElementQueueAt(outer, pos)) return q;
+  return NewElementQueue(ShapeOf(outer), arena);
+}
+
 // A copy of `src`, the queue of one element of an array whose elements are
 // queues, made in the shape `shape` gives the target's elements: each value
 // owning its words, the element type's fixed size kept, and where the values

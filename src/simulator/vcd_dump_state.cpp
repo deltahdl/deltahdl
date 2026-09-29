@@ -126,4 +126,15 @@ Direction VcdDumpState::GetVcdPortDirection(std::string_view name) const {
   return it != port_dirs_.end() ? it->second : Direction::kNone;
 }
 
+// §21.7.2.1: a parameter is a constant, which Syntax 21-20 gives the
+// parameter var_type; the lowerer marks each by the key its storage stands
+// under.
+void VcdDumpState::MarkVcdParameter(std::string_view name) {
+  parameters_.insert(name);
+}
+
+bool VcdDumpState::IsVcdParameter(std::string_view name) const {
+  return parameters_.count(name) != 0;
+}
+
 }  // namespace delta

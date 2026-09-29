@@ -155,10 +155,16 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // (Table 21-11) lends its declared SystemVerilog type, or, where Syntax
     // 21-20 already lists that type as a var_type keyword, the keyword itself.
     // An unmapped kind yields kNet, leaving the §21.7.2.3 net var_type default
-    // intact.
-    spec.data_type = IsRealVariable(name)
-                         ? VcdDataType::kReal
-                         : VcdDataTypeForDeclKind(vcd_.GetVcdVarKind(name));
+    // intact. A parameter, real or not, is declared parameter, the var_type
+    // Syntax 21-20 has for it; declared by its value's type, a localparam was
+    // a wire, which a reader takes for a net.
+    if (vcd_.IsVcdParameter(name)) {
+      spec.data_type = VcdDataType::kParameter;
+    } else {
+      spec.data_type = IsRealVariable(name)
+                           ? VcdDataType::kReal
+                           : VcdDataTypeForDeclKind(vcd_.GetVcdVarKind(name));
+    }
     // §21.7.4.3.1: which of the three state-character lists this object's port
     // records are written from.
     spec.direction = vcd_.GetVcdPortDirection(name);

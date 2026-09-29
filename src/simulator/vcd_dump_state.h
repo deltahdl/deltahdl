@@ -127,6 +127,11 @@ struct VcdDumpState {
   // declaration covers answers kNone, the unknown-direction list.
   void SetVcdPortDirection(std::string_view name, Direction direction);
   Direction GetVcdPortDirection(std::string_view name) const;
+  // §21.7.2.1 (Syntax 21-20): the dumped names that are parameters, whose
+  // $var declarations carry the parameter var_type rather than the one their
+  // stored value's type would give them.
+  void MarkVcdParameter(std::string_view name);
+  bool IsVcdParameter(std::string_view name) const;
 
  private:
   // §21.7.3.1: the one simulation time at which every $dumpports call must
@@ -145,6 +150,8 @@ struct VcdDumpState {
   // §21.7.4.3.1: declared direction of each dumped port. See
   // GetVcdPortDirection.
   std::unordered_map<std::string_view, Direction> port_dirs_;
+  // §21.7.2.1: the dumped parameters. See IsVcdParameter.
+  std::unordered_set<std::string_view> parameters_;
 };
 
 }  // namespace delta

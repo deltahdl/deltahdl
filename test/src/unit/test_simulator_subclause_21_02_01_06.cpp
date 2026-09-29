@@ -293,6 +293,28 @@ TEST(AssignmentPatternFormat, ArrayOfStringsQuotesEachElement) {
   EXPECT_EQ(out, "'{\"ab\", \"cd\"}\n");
 }
 
+// §21.2.1.6 (C5 x C7c): the string elements of a queue, of a queue a locator
+// filled, of a dynamic array and of an associative array print quoted, as those
+// of a fixed-size array do. The elements themselves carry no string mark, so
+// read as numbers they printed the codes of their characters.
+TEST(AssignmentPatternFormat, VariableSizeArraysOfStringsQuoteEachElement) {
+  auto out = RunSim(
+      "module t;\n"
+      "  string a[$] = '{\"b\", \"c\"};\n"
+      "  string o[$];\n"
+      "  string s[2] = '{\"b\", \"c\"};\n"
+      "  string d[] = '{\"x\", \"yz\"};\n"
+      "  string aa[int];\n"
+      "  initial begin\n"
+      "    o = s.find with (1);\n"
+      "    aa[1] = \"p\";\n"
+      "    $display(\"%p %p %p %p\", a, o, d, aa);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out,
+            "'{\"b\", \"c\"} '{\"b\", \"c\"} '{\"x\", \"yz\"} '{1:\"p\"}\n");
+}
+
 // §21.2.1.6 (C5): a queue is an unpacked array data type, so its current
 // elements print as an assignment pattern in index order.
 TEST(AssignmentPatternFormat, QueuePrintsElementsAsPattern) {
@@ -734,6 +756,102 @@ TEST(AssignmentPatternFormat, EnumXAndZMembersPrintByName) {
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(out, "XX Z x\n");
+}
+
+// §21.2.1.6 with §7.12 and §7.10.1: the result of a locator or map method is a
+// queue, and a slice of a queue or of a fixed-size array is an unpacked array,
+// so each passed straight to %p prints as a pattern of its elements, of the
+// type the method or slice gives them: a found string quoted, an index a
+// number, a string key quoted. Read as the value the expression evaluates to,
+// each printed as one packed number.
+TEST(AssignmentPatternFormat, ArrayMethodResultsAndSlicesPrintAsPatterns) {
+  auto out = RunSim(
+      "module t;\n"
+      "  int iq[$] = '{3, 1, 2};\n"
+      "  string sq[$] = '{\"b\", \"a\"};\n"
+      "  int fa[3] = '{7, 5, 6};\n"
+      "  int ia[int];\n"
+      "  int sa[string];\n"
+      "  initial begin\n"
+      "    ia[4] = 40; ia[9] = 90; sa[\"k\"] = 1;\n"
+      "    $display(\"%p %p %p\", iq.find(x) with (x > 1), iq.min(),\n"
+      "             iq.map(x) with (x + 1));\n"
+      "    $display(\"%p %p %p\", iq[0:1], iq[1:$], fa[1:2]);\n"
+      "    $display(\"%p %p\", sq.find(x) with (x != \"\"),\n"
+      "             sq.find_index(x) with (x == \"a\"));\n"
+      "    $display(\"%p %p\", ia.max(), sa.find_index(x) with (x > 0));\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out,
+            "'{3, 2} '{1} '{4, 2, 3}\n"
+            "'{3, 1} '{1, 2} '{5, 6}\n"
+            "'{\"b\", \"a\"} '{1}\n"
+            "'{90} '{\"k\"}\n");
+}
+
+// §21.2.1.6 with §7.4 and §7.10: an array whose elements are queues or
+// fixed-size arrays prints each element as a nested pattern of its values --
+// a queue of queues, a queue and a dynamic array of fixed-size arrays, an
+// associative array of queues -- and an element never written as its type's
+// default, 0 for int and x for logic. Read from the element's placeholder,
+// each element printed as 0.
+TEST(AssignmentPatternFormat, ArraysOfArraysPrintNestedPatterns) {
+  auto out = RunSim(
+      "module t;\n"
+      "  int qq[$][$];\n"
+      "  int r[$][3];\n"
+      "  int d[][2];\n"
+      "  logic [3:0] ld[][2];\n"
+      "  int aq[string][$];\n"
+      "  initial begin\n"
+      "    qq.push_back('{1, 2}); qq.push_back('{3});\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    d = new[2]; d[0] = '{7, 8};\n"
+      "    ld = new[1];\n"
+      "    aq[\"k\"] = '{9};\n"
+      "    $display(\"%p %p %p %p %p\", qq, r, d, ld, aq);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out,
+            "'{'{1, 2}, '{3}} '{'{4, 5, 6}} '{'{7, 8}, '{0, 0}} '{'{x, x}} "
+            "'{\"k\":'{9}}\n");
+}
+
+// §21.2.1.6 with §7.12.1 and §7.4.4: a locator over an array whose elements
+// are arrays returns a queue of those elements, the subarrays of a
+// multidimensional array or the element queues of a queue, so %p prints a
+// pattern of their patterns. Declined as no locator result, each printed 0.
+TEST(AssignmentPatternFormat, LocatorRowsPrintNestedPatterns) {
+  auto out = RunSim(
+      "module t;\n"
+      "  int m[3][2] = '{'{1, 2}, '{3, 4}, '{5, 0}};\n"
+      "  int qq[$][$];\n"
+      "  initial begin\n"
+      "    qq.push_back('{5}); qq.push_back('{6, 7});\n"
+      "    $display(\"%p %p\", m.find with (item[0] > 2),\n"
+      "             qq.find with (item.size() > 1));\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{'{3, 4}, '{5, 0}} '{'{6, 7}}\n");
+}
+
+// §21.2.1.6 with §26.3 and §3.12.1: an array named through a scope prefix is
+// the array the prefix's scope declares -- a package's through `pk::`, printed
+// as through an import, and the compilation unit's through `$unit::`, past a
+// module's own of the same name. Looked up by no name or by the text alone,
+// the package's printed 0 and the unit's printed the module's.
+TEST(AssignmentPatternFormat, ArraysNamedThroughAScopePrefixPrintTheirOwn) {
+  auto out = RunSim(
+      "int uq[$] = '{8, 9};\n"
+      "package pk;\n"
+      "  int pq[$] = '{1, 2};\n"
+      "  int pa[2] = '{3, 4};\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int uq[$] = '{0};\n"
+      "  initial $display(\"%p %p %p %p\", pk::pq, pk::pa, $unit::uq, uq);\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{1, 2} '{3, 4} '{8, 9} '{0}\n");
 }
 
 }  // namespace

@@ -7,17 +7,22 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/eval_array.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
@@ -256,48 +261,104 @@ static std::optional<std::string> BuildFormatPArray(std::string_view name,
   return out;
 }
 
+// §21.2.1.6 (C5 with C7c): what %p prints each element of an unpacked array
+// by -- its type, as far as %p tells elements apart, and its structure layout
+// and enumeration.
+struct ElementTypeForP {
+  DataTypeKind kind = DataTypeKind::kImplicit;
+  AggElemTypes types{nullptr, nullptr};
+};
+
+// The element type the array `name` declares. A fixed-size array records it;
+// the elements of a queue, dynamic array or associative array carry no mark
+// of their own, so a string array's elements read as numbers, the codes of
+// their characters, unless the declaration's type reaches them from here: the
+// lowerer marks such an array's own name a string variable when its elements
+// are strings.
+static ElementTypeForP ElementTypeOfName(std::string_view name,
+                                         SimContext& ctx) {
+  ElementTypeForP type;
+  if (ctx.FindQueue(name) != nullptr || ctx.FindAssocArray(name) != nullptr) {
+    if (ctx.IsStringVariable(name)) type.kind = DataTypeKind::kString;
+  } else if (const ArrayInfo* ai = ctx.FindArrayInfo(name)) {
+    type.kind = ai->elem_type_kind;
+  }
+  type.types = {StructLayoutOfName(name, ctx), ctx.GetVariableEnumType(name)};
+  return type;
+}
+
+static std::string FormatQueueForP(const QueueObject* q,
+                                   const ElementTypeForP& type,
+                                   SimContext& ctx);
+
+// §21.2.1.6 with §7.4 and §7.10: element `pos` of `q`. Where the elements are
+// queues or fixed-size arrays (QueueObject::elements_are_queues) the value in
+// `elements` only holds the element's place, and the element is its own
+// queue, printed as a nested pattern; one never written holds its type's
+// default (ElementQueueOrDefault).
+static std::string FormatQueueElementForP(const QueueObject& q, size_t pos,
+                                          const ElementTypeForP& type,
+                                          SimContext& ctx) {
+  if (!q.elements_are_queues)
+    return FormatAggElemForP(q.elements[pos], type.kind, type.types.st,
+                             type.types.et, ctx);
+  return FormatQueueForP(ElementQueueOrDefault(q, pos, ctx.GetArena()), type,
+                         ctx);
+}
+
 // §21.2.1.6 (C5): a queue or dynamic array (both stored as a QueueObject)
 // prints its current elements as an assignment pattern in index order; an
-// empty one prints the empty pattern. Returns no value when the name is not a
-// queue or dynamic array.
+// empty one prints the empty pattern, and so does a null one, the queue of an
+// associative array's element never made.
+static std::string FormatQueueForP(const QueueObject* q,
+                                   const ElementTypeForP& type,
+                                   SimContext& ctx) {
+  std::string out = "'{";
+  for (size_t i = 0; q != nullptr && i < q->elements.size(); ++i) {
+    if (i) out += ", ";
+    out += FormatQueueElementForP(*q, i, type, ctx);
+  }
+  return out + "}";
+}
+
+// §21.2.1.6 (C5): the queue or dynamic array `name` names, or no value when
+// it names neither.
 static std::optional<std::string> BuildFormatPQueue(std::string_view name,
                                                     SimContext& ctx) {
   QueueObject* q = ctx.FindQueue(name);
   if (q == nullptr) return std::nullopt;
-  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
-  const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
-  std::string out = "'{";
-  for (size_t i = 0; i < q->elements.size(); ++i) {
-    if (i) out += ", ";
-    out +=
-        FormatAggElemForP(q->elements[i], DataTypeKind::kImplicit, st, et, ctx);
-  }
-  out += "}";
-  return out;
+  return FormatQueueForP(q, ElementTypeOfName(name, ctx), ctx);
 }
 
 // §21.2.1.6 (C5): an associative array prints as an assignment pattern with
 // index labels, one "key:value" item per populated element in key order (a
-// string key is quoted). Returns no value when the name is not an associative
-// array.
+// string key is quoted), an element that is a queue as a nested pattern.
+// Returns no value when the name is not an associative array.
 static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
                                                     SimContext& ctx) {
   AssocArrayObject* aa = ctx.FindAssocArray(name);
   if (aa == nullptr) return std::nullopt;
-  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
-  const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
+  ElementTypeForP type = ElementTypeOfName(name, ctx);
+  auto value_of = [&](const auto& queues, const auto& key, const Logic4Vec& v) {
+    if (!aa->elements_are_queues)
+      return FormatAggElemForP(v, type.kind, type.types.st, type.types.et, ctx);
+    auto it = queues.find(key);
+    return FormatQueueForP(it == queues.end() ? nullptr : it->second, type,
+                           ctx);
+  };
   std::string out = "'{";
   bool first = true;
-  auto add_item = [&](const std::string& key, const Logic4Vec& v) {
+  auto add_item = [&](const std::string& key, const std::string& value) {
     if (!first) out += ", ";
     first = false;
-    out +=
-        key + ":" + FormatAggElemForP(v, DataTypeKind::kImplicit, st, et, ctx);
+    out += key + ":" + value;
   };
   if (aa->is_string_key) {
-    for (const auto& [k, v] : aa->str_data) add_item("\"" + k + "\"", v);
+    for (const auto& [k, v] : aa->str_data)
+      add_item("\"" + k + "\"", value_of(aa->str_element_queues, k, v));
   } else {
-    for (const auto& [k, v] : aa->int_data) add_item(std::to_string(k), v);
+    for (const auto& [k, v] : aa->int_data)
+      add_item(std::to_string(k), value_of(aa->int_element_queues, k, v));
   }
   out += "}";
   return out;
@@ -436,16 +497,145 @@ static std::optional<std::string> BuildFormatPElement(const Expr* arg,
   return FormatAggElemForP(val, kind, st, et, ctx);
 }
 
+// §21.2.1.6 (C5): the pattern of `elems`, the elements of an unpacked array
+// value that names no variable of its own, each printed by `type`.
+static std::string FormatValuesForP(const std::vector<Logic4Vec>& elems,
+                                    const ElementTypeForP& type,
+                                    SimContext& ctx) {
+  std::string out = "'{";
+  for (size_t i = 0; i < elems.size(); ++i) {
+    if (i) out += ", ";
+    out += FormatAggElemForP(elems[i], type.kind, type.types.st, type.types.et,
+                             ctx);
+  }
+  return out + "}";
+}
+
+// Whether the array `name` names holds arrays in its elements -- a
+// multidimensional fixed-size array, or a queue or dynamic array whose
+// elements are queues or fixed-size arrays -- whose values its element
+// storage does not hold.
+static bool ElementsAreArrays(std::string_view name, SimContext& ctx) {
+  if (const QueueObject* q = ctx.FindQueue(name)) return q->elements_are_queues;
+  const ArrayInfo* ai = ctx.FindArrayInfo(name);
+  return ai != nullptr && ai->dim_sizes.size() >= 2;
+}
+
+// §21.2.1.6 with §7.10.1 and §7.4.5: a slice of a queue, `q[0:1]`, is a queue
+// and a slice of a fixed-size array an unpacked array, so %p prints its run of
+// elements, each as the whole array prints it. No value for any other
+// argument.
+static std::optional<std::string> BuildFormatPSlice(const Expr* arg,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  if (arg->kind != ExprKind::kSelect || arg->index_end == nullptr ||
+      arg->base == nullptr || arg->base->kind != ExprKind::kIdentifier)
+    return std::nullopt;
+  std::string_view name = arg->base->text;
+  if ((ctx.FindQueue(name) == nullptr && ctx.FindArrayInfo(name) == nullptr) ||
+      ElementsAreArrays(name, ctx))
+    return std::nullopt;
+  std::vector<Logic4Vec> elems;
+  CollectQueueElements(arg, ctx, arena, elems);
+  return FormatValuesForP(elems, ElementTypeOfName(name, ctx), ctx);
+}
+
+// §7.12.1: the locators returning indices rather than elements.
+static bool ReturnsIndices(std::string_view method) {
+  return method == "find_index" || method == "find_first_index" ||
+         method == "find_last_index" || method == "unique_index";
+}
+
+// §21.2.1.6 with §7.12.1 and §7.4.4: the elements a locator selects of an
+// array whose elements are arrays -- the subarrays of a multidimensional
+// fixed-size array, or the element queues of a queue -- print as the whole
+// array prints them, each a nested pattern. No value for a call selecting no
+// such elements.
+static std::optional<std::string> BuildFormatPLocatorRows(const Expr* arg,
+                                                          SimContext& ctx,
+                                                          Arena& arena) {
+  LocatorRows rows;
+  if (!TryCollectLocatorRows(arg, ctx, arena, rows)) return std::nullopt;
+  ElementTypeForP type = ElementTypeOfName(rows.array_name, ctx);
+  std::string out = "'{";
+  for (size_t i = 0; i < rows.offsets.size(); ++i) {
+    if (i) out += ", ";
+    if (rows.queue != nullptr) {
+      out += FormatQueueElementForP(*rows.queue, rows.offsets[i], type, ctx);
+      continue;
+    }
+    std::string row = std::string(rows.array_name) + "[" +
+                      std::to_string(rows.info->dim_los[0] + rows.offsets[i]) +
+                      "]";
+    out += FormatArrayDimForP(row, *rows.info, 1, type.types, ctx);
+  }
+  return out + "}";
+}
+
+// §21.2.1.6 with §7.12: a locator method returns a queue and so does map(), so
+// %p prints the queue a call of one returns. The elements a locator finds are
+// the array's, printed as the array prints them; the indices it finds are the
+// array's index type, so a string key prints quoted; map()'s are the values
+// its with clause gives, each printed as it is. No value for an argument that
+// is no such call.
+static std::optional<std::string> BuildFormatPLocator(const Expr* arg,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  const Expr* access = arg->kind == ExprKind::kCall ? arg->lhs : arg;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->rhs == nullptr ||
+      access->lhs == nullptr)
+    return std::nullopt;
+  if (auto rows = BuildFormatPLocatorRows(arg, ctx, arena)) return rows;
+  std::string_view method = access->rhs->text;
+  std::string_view recv = access->lhs->kind == ExprKind::kIdentifier
+                              ? std::string_view(access->lhs->text)
+                              : std::string_view{};
+  ElementTypeForP type;
+  if (ReturnsIndices(method)) {
+    const AssocArrayObject* aa = ctx.FindAssocArray(recv);
+    if (aa != nullptr && aa->is_string_key) type.kind = DataTypeKind::kString;
+  } else if (method != "map" && !recv.empty()) {
+    if (ElementsAreArrays(recv, ctx)) return std::nullopt;
+    type = ElementTypeOfName(recv, ctx);
+  }
+  std::vector<Logic4Vec> elems;
+  if (!TryCollectLocatorResult(arg, ctx, arena, elems)) return std::nullopt;
+  return FormatValuesForP(elems, type, ctx);
+}
+
+// §21.2.1.6 with §26.3: `pk::pq`, a package's item named through its
+// package, is the item the lowerer keeps under "pk.pq" (BuildLhsName), and
+// prints as it does by the name an import gives it. Asked by no name, a
+// package's queue or array printed as one number. No value for an argument
+// that names no package item with a rendering of its own.
+static std::optional<std::string> BuildFormatPPackageItem(const Expr* arg,
+                                                          const Logic4Vec& val,
+                                                          SimContext& ctx,
+                                                          Arena& arena) {
+  if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution)
+    return std::nullopt;
+  std::string key;
+  BuildLhsName(arg, key);
+  return BuildFormatPNamed(key, val, ctx, arena);
+}
+
 std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                          SimContext& ctx) {
   Arena& arena = ctx.GetArena();
-  std::string_view name = (arg->kind == ExprKind::kIdentifier)
-                              ? std::string_view(arg->text)
-                              : std::string_view{};
+  // §3.12.1: `$unit::uq` names the compilation unit's uq, kept under
+  // "$unit.uq" past a module's own uq (DeclaredKindsKey); read by its text, it
+  // printed the module's.
+  std::string name = arg->kind == ExprKind::kIdentifier ? DeclaredKindsKey(arg)
+                                                        : std::string();
 
   if (auto named = BuildFormatPNamed(name, val, ctx, arena)) return *named;
+  if (auto scoped = BuildFormatPPackageItem(arg, val, ctx, arena))
+    return *scoped;
   if (auto elem = BuildFormatPElement(arg, val, ctx)) return *elem;
   if (auto member = BuildFormatPMember(arg, val, ctx, arena)) return *member;
+  if (auto slice = BuildFormatPSlice(arg, ctx, arena)) return *slice;
+  if (auto found = BuildFormatPLocator(arg, ctx, arena)) return *found;
 
   // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
   // an aggregate would be formatted.

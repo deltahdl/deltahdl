@@ -99,6 +99,70 @@ TEST_F(VcdLogicTypeMapping, ANetKeepsTheWireVarType) {
   EXPECT_EQ(d[1], "reg") << content;
 }
 
+// §21.7.2.1 (Syntax 21-20) lists parameter among the var_types, and §6.20
+// makes a parameter a constant, so a dumped parameter or localparam -- of a
+// module, of a child instance and of a package -- is declared parameter at the
+// width its value is stored in, a real one among them. Declared by its value's
+// type, each was a wire, the var_type of a net.
+TEST_F(VcdLogicTypeMapping, ParametersAreDeclaredWithTheParameterVarType) {
+  auto content = RunVcd(
+      "package p;\n"
+      "  parameter int PP = 5;\n"
+      "  int pv;\n"
+      "endpackage\n"
+      "module c #(parameter W = 3) ();\n"
+      "  logic [W-1:0] x;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam bit [7:0] L = 8'hA5;\n"
+      "  parameter real RP = 1.5;\n"
+      "  c #(.W(4)) u();\n"
+      "  initial begin $dumpvars; #1 p::pv = 1; end\n"
+      "endmodule\n");
+  for (const char* name : {"L", "RP", "W", "PP"}) {
+    auto decl = VarDecl(content, name);
+    ASSERT_EQ(decl.size(), 6u) << name << "\n" << content;
+    EXPECT_EQ(decl[1], "parameter") << name << "\n" << content;
+  }
+  EXPECT_EQ(VarDecl(content, "L")[2], "8") << content;
+  EXPECT_EQ(VarDecl(content, "RP")[2], "64") << content;
+}
+
+// §21.7.5 (Table 21-11) with §26.2: a package's variable is declared with the
+// var_type the same variable gets when a module declares it -- an int as
+// integer, a logic vector as reg, an enumeration by its base type, a packed
+// structure as the reg its members collapse to. Never given its declared
+// type, every package variable but a real was declared wire.
+TEST_F(VcdLogicTypeMapping, PackageVariablesTakeTheirDeclaredTypesVarType) {
+  auto content = RunVcd(
+      "typedef struct packed { bit [2:0] x; } ps_t;\n"
+      "typedef enum bit [1:0] {C, D} eb_t;\n"
+      "package p;\n"
+      "  int pi;\n"
+      "  logic [3:0] pl;\n"
+      "  time pt;\n"
+      "  eb_t pe;\n"
+      "  ps_t pp;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  initial begin $dumpvars; #1 p::pi = 1; end\n"
+      "endmodule\n");
+  struct Expected {
+    const char* name;
+    const char* var_type;
+    const char* size;
+  };
+  for (const Expected& e :
+       {Expected{"pi", "integer", "32"}, Expected{"pl", "reg", "4"},
+        Expected{"pt", "time", "64"}, Expected{"pe", "reg", "2"},
+        Expected{"pp", "reg", "3"}}) {
+    auto decl = VarDecl(content, e.name);
+    ASSERT_EQ(decl.size(), 6u) << e.name << "\n" << content;
+    EXPECT_EQ(decl[1], e.var_type) << e.name << "\n" << content;
+    EXPECT_EQ(decl[2], e.size) << e.name << "\n" << content;
+  }
+}
+
 Variable* MakeVar(Arena& arena, uint32_t width) {
   auto* v = arena.Create<Variable>();
   v->value = MakeLogic4VecVal(arena, width, 0);

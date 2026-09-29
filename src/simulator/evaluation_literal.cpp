@@ -171,6 +171,11 @@ bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx) {
   return IsSignedType(type, {});
 }
 
+DataTypeKind DeclaredTypeKind(const DataType& type, const SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed) return type.kind;
+  return ctx.FindTypeKind(TypeTableKey(type));
+}
+
 // §11.5.1 with §6.18: the packed range the declared type was written with,
 // for a type reached through a name. The name is looked up under the same key
 // the width is, so a class-scoped `Node::value_t` (§8.23) finds the entry

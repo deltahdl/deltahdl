@@ -43,6 +43,16 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
 QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
                                   SimContext& ctx, Arena& arena);
 
+// §7.4 with §7.10: the queue of the element at position `pos` of `outer`, a
+// queue or dynamic array whose elements are queues or fixed-size arrays, to be
+// read. Where that element's queue was never made, the element holds what an
+// element of its type starts as, and the answer is a new queue holding that:
+// empty for an element that is a queue, and the element type's default in
+// each place for one that is a fixed-size array, as `d = new[2]` on `int
+// d[][2]` leaves both elements.
+const QueueObject* ElementQueueOrDefault(const QueueObject& outer, size_t pos,
+                                         Arena& arena);
+
 // §7.12 with §7.10: binds the iterator `iter_name` of a with clause, in the
 // current scope, to the element at position `pos` of `outer`, a queue or
 // dynamic array whose elements are queues or fixed-size arrays: a local

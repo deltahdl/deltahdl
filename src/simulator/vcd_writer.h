@@ -54,6 +54,10 @@ enum class VcdDataType : uint8_t {
   // §6.17 makes an event a handle to a synchronization object rather than a
   // number of bits, so its §21.7.2.3 size is 0.
   kEvent,  // -> event, size 0
+  // §6.20 makes a parameter a constant rather than a variable or a net, and
+  // Syntax 21-20 lists parameter among the var_type keywords, so a dumped
+  // parameter is declared as one, at the width its value is stored in.
+  kParameter,  // -> parameter, size = stored width
 };
 
 // §21.7.5 (Table 21-11): map a declared SystemVerilog type keyword to the

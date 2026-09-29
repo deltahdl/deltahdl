@@ -18,6 +18,7 @@ namespace delta {
 
 struct AssocArrayObject;
 struct DataType;
+enum class DataTypeKind : uint8_t;
 struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
@@ -77,6 +78,12 @@ bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx);
 // DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration
 // reads off a name.
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx);
+
+// §6.18: the kind the declared type stands for, a keyword's own or, for a
+// typedef name, the kind the elaborated table resolves it to; kNamed for a
+// name the table does not hold. Defined in evaluation_literal.cpp beside
+// DeclaredTypeIsSigned, which reads the same table for the sign.
+DataTypeKind DeclaredTypeKind(const DataType& type, const SimContext& ctx);
 
 // §11.5.1: records on `v` the packed range its declaration `type` addresses
 // its bits by -- the dimension the declaration writes, through

@@ -538,6 +538,39 @@ static void RegisterPackageDataEnumType(const ModuleItem* item,
   if (info != nullptr) ctx.SetVariableEnumType(qname, info->type_name);
 }
 
+// §21.7.5 (Table 21-11) with §26.2: the declared type a dump declares a
+// package's variable by, recorded as LowerVar records a module's
+// (VcdEffectiveDeclKind in lowerer_var.cpp): a typedef name by the kind it
+// stands for, the package's own typedef under its "pk::name" key first, an
+// enumeration by the base type it writes -- or, through a typedef, as the
+// integer its default int base makes it where its storage is int's 32 signed
+// bits, and as a vector of its width otherwise -- and a packed structure as
+// the bit vector it collapses to.
+// Unrecorded, every package variable but a real was declared wire, the
+// var_type of a net.
+static void RecordPackageVcdKind(const ModuleItem* item, const Variable& var,
+                                 std::string_view pkg, std::string_view qname,
+                                 SimContext& ctx) {
+  const DataType& type = item->data_type;
+  DataTypeKind kind = DeclaredTypeKind(type, ctx);
+  if (type.kind == DataTypeKind::kNamed && type.scope_name.empty()) {
+    DataTypeKind own =
+        ctx.FindTypeKind(std::string(pkg) + "::" + std::string(type.type_name));
+    if (own != DataTypeKind::kNamed) kind = own;
+  }
+  if (kind == DataTypeKind::kEnum &&
+      type.enum_base_kind != DataTypeKind::kImplicit) {
+    kind = type.enum_base_kind;
+  } else if (kind == DataTypeKind::kEnum &&
+             (var.value.width != 32 || !var.is_signed)) {
+    kind = DataTypeKind::kBit;
+  }
+  const StructTypeInfo* st = ctx.GetVariableStructType(qname);
+  if (kind == DataTypeKind::kStruct && st != nullptr && st->is_packed)
+    kind = DataTypeKind::kBit;
+  ctx.Vcd().SetVcdVarKind(qname, kind);
+}
+
 static std::string_view CreatePackageDataItem(const ModuleItem* item,
                                               std::string_view pkg,
                                               SimContext& ctx, Arena& arena) {
@@ -546,9 +579,15 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   RegisterPackageDataEnumType(item, pkg, *qname, ctx);
-  if (item->kind != ModuleItemKind::kVarDecl) return *qname;
+  // §21.7.2.1: a package's parameter, dumped, is declared parameter as a
+  // module's is (Lowerer::LowerParams).
+  if (item->kind != ModuleItemKind::kVarDecl) {
+    ctx.Vcd().MarkVcdParameter(*qname);
+    return *qname;
+  }
   ShapePackageVariable(item, var, *qname, ctx, arena);
   RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
+  RecordPackageVcdKind(item, *var, pkg, *qname, ctx);
   // §7.2.2 with §26.3: a package's structure variable with no initializer
   // takes the default each member's declaration writes.
   if (item->init_expr == nullptr)
