@@ -15,6 +15,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -161,6 +162,40 @@ void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
     }
     ctx.RegisterEnumType(name, info);
   }
+}
+
+// §7.2 with §6.8: whether any member of the structure `info` lays out, a
+// nested structure's members among them, is of a 4-state type.
+static bool HasFourStateMember(const StructTypeInfo& info) {
+  return std::any_of(
+      info.fields.begin(), info.fields.end(), [](const StructFieldInfo& f) {
+        return f.nested != nullptr ? HasFourStateMember(*f.nested)
+                                   : Is4stateType(f.type_kind);
+      });
+}
+
+// §6.8, Table 6-7: each 4-state member's window of `value`, the structure
+// `info` lays out from bit `base`, set to x.
+static void SetFourStateMembersToX(Logic4Vec& value, const StructTypeInfo& info,
+                                   uint32_t base, Arena& arena) {
+  for (const auto& f : info.fields) {
+    if (f.nested != nullptr) {
+      SetFourStateMembersToX(value, *f.nested, base + f.bit_offset, arena);
+    } else if (Is4stateType(f.type_kind)) {
+      DepositBitField(value, base + f.bit_offset, MakeAllX(arena, f.width),
+                      f.width);
+    }
+  }
+}
+
+void MarkUnpackedStructStorage(std::string_view name, Variable* v,
+                               bool fill_defaults, SimContext& ctx) {
+  const StructTypeInfo* info = ctx.GetVariableStructType(name);
+  if (info == nullptr || info->is_packed || info->is_union ||
+      !HasFourStateMember(*info))
+    return;
+  v->is_4state = true;
+  if (fill_defaults) SetFourStateMembersToX(v->value, *info, 0, ctx.GetArena());
 }
 
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,

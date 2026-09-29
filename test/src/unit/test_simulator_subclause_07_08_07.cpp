@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -675,6 +676,30 @@ TEST(AssocArrayAllocation, ClassPropertyCompoundAddAssignedInAMethod) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 3u);
+}
+
+// §7.8.7 with §7.2: a write to a member of a member of a structure an
+// associative array element holds, `va[1].in.k = 4`, allocates the element
+// as a write to a direct member does, and the nested member holds the value
+// written to it, a string member (§6.16) among them.
+TEST(AssocArrayAllocation, NestedMemberWriteAllocatesTheElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int k; string s;} in_t;\n"
+      "  typedef struct {int n; in_t in;} out_t;\n"
+      "  out_t va[int];\n"
+      "  out_t tmp;\n"
+      "  initial begin\n"
+      "    va[1].in.k = 4;\n"
+      "    va[1].in.s = \"nested member\";\n"
+      "    tmp = va[1];\n"
+      "    $display(\"%0d %0d [%s] [%s] %0d\", va.num(), tmp.in.k, tmp.in.s,\n"
+      "             va[1].in.s, va[1].in.k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 [nested member] [nested member] 4\n");
 }
 
 }  // namespace

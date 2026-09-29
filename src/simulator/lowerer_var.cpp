@@ -29,8 +29,9 @@ namespace delta {
 
 // The layout itself is built and registered in lowerer_var_layout.cpp.
 static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
-                               SimContext& ctx, Arena& arena) {
+                               Variable* v, SimContext& ctx, Arena& arena) {
   RegisterAggregateLayout(name, var.dtype, var.width, ctx, arena);
+  MarkUnpackedStructStorage(name, v, var.init_expr == nullptr, ctx);
 }
 
 static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
@@ -717,7 +718,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
   // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);
-  RegisterStructInfo(name, var, ctx_, arena_);
+  RegisterStructInfo(name, var, v, ctx_, arena_);
   // §6.19.5.7 with §6.21: the enumeration a variable is declared with is a
   // fact of the declaration, and its initializer may call a method of it on
   // the variable itself, `Colors c = c.first;` as the subclause's own example

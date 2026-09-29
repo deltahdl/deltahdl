@@ -74,6 +74,15 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
                              uint32_t width, SimContext& ctx, Arena& arena);
 
+// §7.2 with §6.8: where the variable `v`, named `name`, holds an unpacked
+// structure with a member of a 4-state type, marks it 4-state, so the x and z
+// bits written to the structure are kept, and where `fill_defaults` says it
+// has no initializer, starts each 4-state member at x, its type's default
+// (Table 6-7), the 2-state members and a string member's handle at 0. Defined
+// in src/simulator/lowerer_var_layout.cpp.
+void MarkUnpackedStructStorage(std::string_view name, Variable* v,
+                               bool fill_defaults, SimContext& ctx);
+
 // §7.4.2 with §7.4.4: the elements of the fixed-size unpacked array `var`
 // declares, each a variable of its own under `name` with its index in
 // brackets, `name[i]` or `name[i][j]`, with the ArrayInfo under `name` that

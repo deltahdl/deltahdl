@@ -482,4 +482,26 @@ TEST(StructType, AStringMemberHoldsItsStringWhereverTheStructureIsKept) {
             "[copied in whole]\n[from a function]\n");
 }
 
+// §7.2 with §6.8: each member of an unpacked structure is a variable of its
+// type, so one declared without an initializer starts with its 4-state
+// members at x, its 2-state members at 0 and its string member empty, and an
+// assignment to the whole structure keeps a 4-state member's x and z bits.
+TEST(StructType, UnpackedMembersStartAtTheirTypesDefaults) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {logic [3:0] l; int i; string s;} lis_t;\n"
+      "  typedef struct {logic [3:0] l; logic k;} ll_t;\n"
+      "  lis_t a, b;\n"
+      "  ll_t c;\n"
+      "  initial begin\n"
+      "    $display(\"%b %0d [%s] %b %b\", a.l, a.i, a.s, c.l, c.k);\n"
+      "    b = '{4'bz01x, 5, \"s\"};\n"
+      "    $display(\"%b %0d [%s]\", b.l, b.i, b.s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xxxx 0 [] xxxx x\nz01x 5 [s]\n");
+}
+
 }  // namespace

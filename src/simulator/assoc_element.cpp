@@ -123,51 +123,71 @@ static void BuildFieldPath(const Expr* expr, std::string& out) {
   }
 }
 
-// The layout of an associative array's element type, together with the offset,
-// width and declared type of the member `expr` names within it. `expr` is a
-// member access whose left operand selects the element. Returns false unless
-// every part of that shape holds and the member resolves.
+// The member of an associative array's element a member path names: the
+// select of the element, `va[1]` of `va[1].in.k`, and the offset, width and
+// declared type of the member within the element's structure.
+struct AssocMemberWindow {
+  const Expr* select = nullptr;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  DataTypeKind kind = DataTypeKind::kImplicit;
+};
+
+// The select a member path `expr` starts at, `va[1]` of `va[1].in.k`, with
+// the members after it appended to `path` as ResolveStructFieldPath reads
+// them, `in.k`; null where `expr` is no member path rooted in a select.
+static const Expr* MemberPathRoot(const Expr* expr, std::string& path) {
+  if (expr->kind == ExprKind::kSelect) return expr;
+  if (expr->kind != ExprKind::kMemberAccess || expr->lhs == nullptr)
+    return nullptr;
+  const Expr* root = MemberPathRoot(expr->lhs, path);
+  if (root == nullptr) return nullptr;
+  if (!path.empty()) path += ".";
+  BuildFieldPath(expr->rhs, path);
+  return root;
+}
+
+// §7.2 with §7.8: the member of an associative array's element the member
+// path `expr` names, however deeply nested, as its element's layout lays it
+// out. False unless `expr` is such a path and the member resolves.
 static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
-                               uint32_t* bit_offset, uint32_t* width,
-                               DataTypeKind* kind) {
+                               AssocMemberWindow& out) {
   if (!expr || expr->kind != ExprKind::kMemberAccess) return false;
-  auto* sel = expr->lhs;
-  if (!AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
+  std::string path;
+  const Expr* sel = MemberPathRoot(expr, path);
+  if (sel == nullptr || !AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
   if (sel->base->kind != ExprKind::kIdentifier) return false;
   // §23.9: the array resolves within the running instance, so its element
   // layout is asked for by the key that instance's storage was created under.
   const StructTypeInfo* info = StructLayoutOfName(sel->base->text, ctx);
   if (!info) return false;
-  std::string path;
-  BuildFieldPath(expr->rhs, path);
-  return ResolveStructFieldPath(info, path, bit_offset, width, kind);
+  out.select = sel;
+  return ResolveStructFieldPath(info, path, &out.bit_offset, &out.width,
+                                &out.kind);
 }
 
 bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
-  uint32_t bit_offset = 0;
-  uint32_t width = 0;
-  DataTypeKind kind = DataTypeKind::kImplicit;
-  if (!ResolveAssocMember(lhs, ctx, &bit_offset, &width, &kind)) return false;
-  auto* entry = AssocEntryForWrite(lhs->lhs, ctx, arena);
+  AssocMemberWindow member;
+  if (!ResolveAssocMember(lhs, ctx, member)) return false;
+  auto* entry = AssocEntryForWrite(member.select, ctx, arena);
   // A declined entry is §7.8.6's invalid index, which allocates nothing and
   // writes nothing, so there is no change for §9.4.2 to announce.
   if (!entry) return true;
-  DepositBitField(*entry, bit_offset, MemberBitsOf(rhs_val, kind, arena),
-                  width);
-  NotifyOwningVar(ctx, lhs->lhs->base->text);
+  DepositBitField(*entry, member.bit_offset,
+                  MemberBitsOf(rhs_val, member.kind, arena), member.width);
+  NotifyOwningVar(ctx, member.select->base->text);
   return true;
 }
 
 bool TryEvalAssocMemberField(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
-  uint32_t bit_offset = 0;
-  uint32_t width = 0;
-  DataTypeKind kind = DataTypeKind::kImplicit;
-  if (!ResolveAssocMember(expr, ctx, &bit_offset, &width, &kind)) return false;
-  auto elem = EvalExpr(expr->lhs, ctx, arena);
-  out = MemberValueOf(ExtractBitField(arena, elem, bit_offset, width), kind,
-                      arena);
+  AssocMemberWindow member;
+  if (!ResolveAssocMember(expr, ctx, member)) return false;
+  auto elem = EvalExpr(member.select, ctx, arena);
+  out = MemberValueOf(
+      ExtractBitField(arena, elem, member.bit_offset, member.width),
+      member.kind, arena);
   return true;
 }
 
