@@ -80,9 +80,9 @@ static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
                               size_t item_index) {
   lc.ctx.PushScope();
   if (lc.subarray_info != nullptr) {
-    BindSubarrayIterator(lc.subarray_owner, *lc.subarray_info,
-                         static_cast<uint32_t>(item_index), lc.iter_name,
-                         lc.ctx, lc.arena);
+    BindSubarrayIterator(SubarrayElement{lc.subarray_owner, *lc.subarray_info,
+                                         static_cast<uint32_t>(item_index)},
+                         lc.iter_name, lc.ctx, lc.arena);
   } else {
     auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width,
                                                 item_val.is_signed);

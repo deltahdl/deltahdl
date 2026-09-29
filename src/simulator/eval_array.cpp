@@ -291,8 +291,8 @@ static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
                                 const IterNames& names, uint32_t row) {
   SimContext& ctx = ac.ctx;
   ctx.PushScope();
-  BindSubarrayIterator(ac.var_name, ac.info, row, names.iter_name, ctx,
-                       ac.arena);
+  BindSubarrayIterator(SubarrayElement{ac.var_name, ac.info, row},
+                       names.iter_name, ctx, ac.arena);
   ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
       MakeLogic4VecVal(ac.arena, 32, ac.info.dim_los[0] + row);
   Logic4Vec value = EvalExpr(expr->with_expr, ctx, ac.arena);

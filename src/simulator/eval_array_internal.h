@@ -79,15 +79,22 @@ class IteratorLayout {
 // Defined in eval_array_subarray.cpp, as is BindSubarrayIterator.
 bool HasSubarrayElements(const ArrayInfo& info);
 
+// §7.4.4: one element of a multidimensional array, a subarray: the element
+// `offset` places into the first dimension of the array `array_name` that
+// `info` describes.
+struct SubarrayElement {
+  std::string_view array_name;
+  const ArrayInfo& info;
+  uint32_t offset;
+};
+
 // §7.12 with §7.4.4: binds the iterator `iter_name` of a with clause, in the
-// current scope, to the element `offset` places into the first dimension of
-// the multidimensional array `var_name` that `info` describes, as the
-// subarray it is: registered as an array of the remaining dimensions, its
-// elements local copies of that element's own, so that `item.sum with (item)`
-// and `item[1]` read it.
-void BindSubarrayIterator(std::string_view var_name, const ArrayInfo& info,
-                          uint32_t offset, std::string_view iter_name,
-                          SimContext& ctx, Arena& arena);
+// current scope, to `element` as the subarray it is: registered as an array
+// of the remaining dimensions, its elements local copies of that element's
+// own, so that `item.sum with (item)` and `item[1]` read it.
+void BindSubarrayIterator(const SubarrayElement& element,
+                          std::string_view iter_name, SimContext& ctx,
+                          Arena& arena);
 
 // §7.12.3: the array reduction methods over an associative array, which reach
 // its elements by a route of their own rather than through ArrayInfo. Empty

@@ -15,8 +15,7 @@
 namespace delta {
 
 bool HasSubarrayElements(const ArrayInfo& info) {
-  return info.dim_sizes.size() >= 2 &&
-         info.dim_los.size() == info.dim_sizes.size();
+  return info.dim_sizes.size() >= 2;
 }
 
 // The entries of `v` after its first, which describe the dimensions of one of
@@ -46,20 +45,28 @@ static ArrayInfo SubarrayInfo(const ArrayInfo& info) {
   return sub;
 }
 
-// The leaves of subarray `sub` from dimension `dim` inward: each leaf of the
-// array under `src`, `src[j]...`, copied into a local variable of the current
-// scope under `dst`, `dst[j]...`, with the element type's signedness
-// (CollectVecElements).
-static void BindSubarrayLeaves(const std::string& src, const std::string& dst,
-                               const ArrayInfo& sub, size_t dim,
-                               SimContext& ctx, Arena& arena) {
+// The subarray whose leaves are being copied, `sub`, and the context and arena
+// the local copies are made in.
+struct LeafBinding {
+  const ArrayInfo& sub;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// The leaves of the subarray `lb` describes, from dimension `dim` inward: each
+// leaf of the array under `src`, `src[j]...`, copied into a local variable of
+// the current scope under `dst`, `dst[j]...`, with the element type's
+// signedness (CollectVecElements).
+static void BindSubarrayLeaves(const LeafBinding& lb, const std::string& src,
+                               const std::string& dst, size_t dim) {
+  const ArrayInfo& sub = lb.sub;
   bool is_multi = !sub.dim_sizes.empty();
   uint32_t lo = is_multi ? sub.dim_los[dim] : sub.lo;
   uint32_t size = is_multi ? sub.dim_sizes[dim] : sub.size;
   if (is_multi && dim + 1 < sub.dim_sizes.size()) {
     for (uint32_t j = 0; j < size; ++j) {
       std::string index = "[" + std::to_string(lo + j) + "]";
-      BindSubarrayLeaves(src + index, dst + index, sub, dim + 1, ctx, arena);
+      BindSubarrayLeaves(lb, src + index, dst + index, dim + 1);
     }
     return;
   }
@@ -68,22 +75,25 @@ static void BindSubarrayLeaves(const std::string& src, const std::string& dst,
   row.size = size;
   row.elem_width = sub.elem_width;
   row.is_4state = sub.is_4state;
-  std::vector<Logic4Vec> leaves = CollectVecElements(src, row, ctx, arena);
+  std::vector<Logic4Vec> leaves =
+      CollectVecElements(src, row, lb.ctx, lb.arena);
   for (uint32_t j = 0; j < size; ++j) {
     auto* name =
-        arena.Create<std::string>(dst + "[" + std::to_string(lo + j) + "]");
-    ctx.CreateLocalVariable(*name, sub.elem_width, leaves[j].is_signed)->value =
-        leaves[j];
+        lb.arena.Create<std::string>(dst + "[" + std::to_string(lo + j) + "]");
+    lb.ctx.CreateLocalVariable(*name, sub.elem_width, leaves[j].is_signed)
+        ->value = leaves[j];
   }
 }
 
-void BindSubarrayIterator(std::string_view var_name, const ArrayInfo& info,
-                          uint32_t offset, std::string_view iter_name,
-                          SimContext& ctx, Arena& arena) {
-  ArrayInfo sub = SubarrayInfo(info);
-  std::string src = std::string(var_name) + "[" +
-                    std::to_string(info.dim_los[0] + offset) + "]";
-  BindSubarrayLeaves(src, std::string(iter_name), sub, 0, ctx, arena);
+void BindSubarrayIterator(const SubarrayElement& element,
+                          std::string_view iter_name, SimContext& ctx,
+                          Arena& arena) {
+  ArrayInfo sub = SubarrayInfo(element.info);
+  std::string src = std::string(element.array_name) + "[" +
+                    std::to_string(element.info.dim_los[0] + element.offset) +
+                    "]";
+  BindSubarrayLeaves(LeafBinding{sub, ctx, arena}, src, std::string(iter_name),
+                     0);
   ctx.RegisterArrayInScope(iter_name, sub);
 }
 
