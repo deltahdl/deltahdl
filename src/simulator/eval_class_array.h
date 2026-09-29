@@ -163,6 +163,13 @@ void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
 bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
                                    SimContext& ctx, Arena& arena);
 
+// §11.5.1 with §7.4 and §8.5: `lhs` as a bit-select or part-select of an
+// element of an integral array property, `h.ia[1][3] = 1` on `int ia[2]`,
+// writing those bits of the element and leaving the rest; nothing for an
+// unknown or out-of-range element index. False where `lhs` is of no such shape.
+bool TryWriteClassArrayElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
+                                   SimContext& ctx, Arena& arena);
+
 // §7.4.6: `lhs` as a single-index select of an array property, written with
 // `rhs_val` coerced as a write to the property is; false where its base names
 // no array property. An index that addresses no element writes nothing.

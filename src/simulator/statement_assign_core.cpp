@@ -236,6 +236,7 @@ static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 static bool TryWriteClassPropertyPart(const Expr* lhs, Logic4Vec& rhs_val,
                                       SimContext& ctx, Arena& arena) {
   return TryWriteClassArrayElementChar(lhs, rhs_val, ctx, arena) ||
+         TryWriteClassArrayElementBits(lhs, rhs_val, ctx, arena) ||
          TryWriteClassArrayElement(lhs, rhs_val, ctx, arena) ||
          TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena);
 }

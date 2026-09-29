@@ -396,6 +396,40 @@ bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
+// The element is read into a variable of the element's state set,
+// signedness and declared packed range, so that WriteBitSelect addresses its
+// bits as a variable of the element type's; left to the other writers, the
+// select named no storage and the write went nowhere.
+bool TryWriteClassArrayElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
+                                   SimContext& ctx, Arena& arena) {
+  if (lhs == nullptr || lhs->kind != ExprKind::kSelect ||
+      lhs->base == nullptr || lhs->base->kind != ExprKind::kSelect ||
+      lhs->base->index_end != nullptr)
+    return false;
+  ClassArrayRef ref;
+  if (!ResolveClassArray(lhs->base->base, ctx, arena, ref) ||
+      ref.prop->is_string || ref.prop->is_real || ClassArrayHoldsSubarrays(ref))
+    return false;
+  Logic4Vec at = EvalExpr(lhs->base->index, ctx, arena);
+  auto index = static_cast<int64_t>(at.ToUint64());
+  if (HasUnknownBits(at) || !IndexInRange(ref, index)) return true;
+  Variable element;
+  element.value =
+      OwnRhsWords(ReadClassArrayElement(ref, index, ctx, arena), arena);
+  element.is_4state = ref.prop->is_4state;
+  element.is_signed = ref.prop->is_signed;
+  const ClassTypeInfo* type =
+      ref.static_owner != nullptr ? ref.static_owner : ref.obj->type;
+  if (auto range = PropertyDeclaredRange(type, ref.prop->name,
+                                         element.value.width, ctx, arena)) {
+    element.packed_range = *range;
+    element.has_packed_range = true;
+  }
+  WriteBitSelect(&element, lhs, rhs_val, ctx, arena);
+  StoreClassArrayElement(ref, index, element.value, ctx, arena);
+  return true;
+}
+
 void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
                             const Logic4Vec& value, SimContext& ctx,
                             Arena& arena) {

@@ -526,4 +526,37 @@ TEST(DeclaredRangeSelect, AWriteToAnAscendingPropertysSelectFollowsIt) {
   EXPECT_EQ(out, "ff000001\n");
 }
 
+// §11.5.1 with §7.4 and §8.5: an element of an integral array property is a
+// vector of the element type, so a bit-select or part-select of it writes
+// those bits and leaves the rest -- named bare in a method, through a handle,
+// through the class scope and in a dynamic array -- and an ascending
+// element's select follows its declaration, bit 0 of a `logic [0:7]` element
+// being its most significant. Reached by no writer, each write changed
+// nothing.
+TEST(DeclaredRangeSelect, BitsOfAnElementOfAnArrayPropertyAreWritten) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C;\n"
+      "  int ia[2];\n"
+      "  logic [0:7] la[2];\n"
+      "  static bit [7:0] sb[2];\n"
+      "  int da[];\n"
+      "  function void m(); ia[0] = 0; ia[0][1] = 1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new; h.m();\n"
+      "    h.ia[1] = 0; h.ia[1][3] = 1; h.ia[1][15:8] = 8'hAB;\n"
+      "    h.la[0] = 8'h00; h.la[0][0] = 1;\n"
+      "    C::sb[1] = 0; C::sb[1][7:4] = 4'hF;\n"
+      "    h.da = new[1]; h.da[0] = 0; h.da[0][2] = 1;\n"
+      "    $display(\"%0d %h %h %h %h\", h.ia[0], h.ia[1], h.la[0], C::sb[1],\n"
+      "             h.da[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0000ab08 80 f0 00000004\n");
+}
+
 }  // namespace
