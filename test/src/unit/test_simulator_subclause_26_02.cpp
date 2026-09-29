@@ -317,4 +317,62 @@ TEST(PackageDeclarationSim, PackageSyncVariableBuiltByItsDeclarationIsNotNull) {
       1111u);
 }
 
+// §26.2 with §6.18: a package's variable written with a typedef the package
+// itself declares has the type that typedef stands for -- a three-bit packed
+// structure three bits wide, keeping 7 of 7'h7f, a byte typedef signed, a
+// string typedef a string. Looked up by its bare name, the typedef was
+// found nowhere: the structure was 32 bits and kept 127, the byte read 200
+// for 200, and the string's len() answered 0.
+TEST(PackageDeclarationSim, VariableOfThePackagesOwnTypedefHasItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef struct packed { bit [2:0] x; } ps_t;\n"
+                       "  typedef byte sb_t;\n"
+                       "  typedef string str_t;\n"
+                       "  ps_t pp;\n"
+                       "  sb_t sb;\n"
+                       "  str_t s = \"hi\";\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    p::pp = 7'h7f; p::sb = 200;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", $bits(p::pp), "
+                       "p::pp, p::sb,\n"
+                       "             $bits(p::sb), p::s.len());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 7 -56 8 2\n");
+}
+
+// §26.2 with §6.8 and §10.7: a package variable's initializer is assigned to
+// it, so the value takes the variable's type -- a byte's eight bits, a
+// shortint's sixteen, a real rounded into an int, an unbased unsized literal
+// filling the width, a bit's x bits made 0. Stored as it evaluated, `byte b =
+// -1` held 32 bits and then kept 200 for 200, `int i = 3.7` read 3, and `'1`
+// made a one-bit vector.
+TEST(PackageDeclarationSim, InitializerIsConvertedToTheVariablesType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  byte b = -1;\n"
+                       "  shortint si = 70000;\n"
+                       "  int i = 3.7;\n"
+                       "  logic [99:0] wide = '1;\n"
+                       "  bit [3:0] b4 = 4'bx1x1;\n"
+                       "  real r = 2.5;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %b %0d %f\", "
+                       "$bits(p::b), p::b, p::si,\n"
+                       "             p::i, $bits(p::wide), p::b4, &p::wide, "
+                       "p::r);\n"
+                       "    p::b = 200;\n"
+                       "    $display(\"%0d\", p::b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "8 -1 4464 4 100 0101 1 2.500000\n-56\n");
+}
+
 }  // namespace

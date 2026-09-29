@@ -17,6 +17,7 @@ struct AssocArrayObject;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
+struct ModuleItem;
 struct QueueObject;
 struct RtlirDesign;
 struct RtlirModule;
@@ -231,6 +232,20 @@ void RegisterGenBlockSubroutines(const RtlirModule* mod,
 // generate block's instance with its index in brackets, `g[0].h`; empty for
 // an empty path.
 std::string GenBlockName(const HierPath& path);
+
+// §26.2 with §6.18: `item` itself where its declared type is no typedef the
+// package `pkg` declares, and otherwise a copy of it whose type is scoped to
+// the package, so that the type tables find the typedef under its "pk::name"
+// key. Defined in src/simulator/lowerer_package_type.cpp.
+const ModuleItem* WithPackageOwnType(const ModuleItem* item,
+                                     std::string_view pkg,
+                                     const SimContext& ctx, Arena& arena);
+
+// §21.7.5 (Table 21-11): records the kind a dump declares the package
+// variable `var`, of the data item `item` under the key `qname`, by, as
+// LowerVar records a module variable's. Defined beside WithPackageOwnType.
+void RecordPackageVcdKind(const ModuleItem* item, const Variable& var,
+                          std::string_view qname, SimContext& ctx);
 
 // §35.5.4: put this module's imported subroutine declarations in the run's DPI
 // registry, which is what a call to one reaches its declaration through. The

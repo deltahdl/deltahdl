@@ -95,9 +95,7 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   if (!var->is_4state)
     var->value = MakeLogic4VecVal(arena, var->value.width, 0);
   if (DeclaredTypeIsString(type, ctx)) ctx.RegisterStringVariable(qname);
-  bool is_real = type.kind == DataTypeKind::kReal ||
-                 type.kind == DataTypeKind::kShortreal ||
-                 type.kind == DataTypeKind::kRealtime;
+  bool is_real = DeclaredTypeIsReal(type, ctx);
   var->is_real = is_real;
   if (is_real) ctx.RegisterRealVariable(qname);
 }
@@ -538,43 +536,11 @@ static void RegisterPackageDataEnumType(const ModuleItem* item,
   if (info != nullptr) ctx.SetVariableEnumType(qname, info->type_name);
 }
 
-// §21.7.5 (Table 21-11) with §26.2: the declared type a dump declares a
-// package's variable by, recorded as LowerVar records a module's
-// (VcdEffectiveDeclKind in lowerer_var.cpp): a typedef name by the kind it
-// stands for, the package's own typedef under its "pk::name" key first, an
-// enumeration by the base type it writes -- or, through a typedef, as the
-// integer its default int base makes it where its storage is int's 32 signed
-// bits, and as a vector of its width otherwise -- and a packed structure as
-// the bit vector it collapses to.
-// Unrecorded, every package variable but a real was declared wire, the
-// var_type of a net.
-static void RecordPackageVcdKind(const ModuleItem* item, const Variable& var,
-                                 std::string_view pkg, std::string_view qname,
-                                 SimContext& ctx) {
-  const DataType& type = item->data_type;
-  DataTypeKind kind = DeclaredTypeKind(type, ctx);
-  if (type.kind == DataTypeKind::kNamed && type.scope_name.empty()) {
-    DataTypeKind own =
-        ctx.FindTypeKind(std::string(pkg) + "::" + std::string(type.type_name));
-    if (own != DataTypeKind::kNamed) kind = own;
-  }
-  if (kind == DataTypeKind::kEnum &&
-      type.enum_base_kind != DataTypeKind::kImplicit) {
-    kind = type.enum_base_kind;
-  } else if (kind == DataTypeKind::kEnum &&
-             (var.value.width != 32 || !var.is_signed)) {
-    kind = DataTypeKind::kBit;
-  }
-  const StructTypeInfo* st = ctx.GetVariableStructType(qname);
-  if (kind == DataTypeKind::kStruct && st != nullptr && st->is_packed)
-    kind = DataTypeKind::kBit;
-  ctx.Vcd().SetVcdVarKind(qname, kind);
-}
-
 static std::string_view CreatePackageDataItem(const ModuleItem* item,
                                               std::string_view pkg,
                                               SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item)) return {};
+  item = WithPackageOwnType(item, pkg, ctx, arena);
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
   if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
@@ -587,7 +553,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   }
   ShapePackageVariable(item, var, *qname, ctx, arena);
   RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
-  RecordPackageVcdKind(item, *var, pkg, *qname, ctx);
+  RecordPackageVcdKind(item, *var, *qname, ctx);
   // §7.2.2 with §26.3: a package's structure variable with no initializer
   // takes the default each member's declaration writes.
   if (item->init_expr == nullptr)
@@ -750,8 +716,15 @@ static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
 // procedural assignment's since SimContext::var_tags_ keeps the view it is
 // given. No tag was recorded, so `$unit::u.Other` and `a.Other` through a
 // formal bound from `f($unit::u)` were checked against nothing and read
-// the 9 unreported. Every other initializer is the carrier's value as it
-// was.
+// the 9 unreported. Every other initializer is the carrier's value.
+//
+// §6.8 with §10.7 (printed page 262): an initializer is assigned to the
+// variable, so a value of fixed width is evaluated at the variable's width and
+// cut or extended to it, a real converted to it, and signed or 2-state as the
+// variable is, as Lowerer::CoerceVarInitValue treats a module's. Stored whole,
+// `byte b = -1` held the literal's 32 bits, `$bits(p::b)` read 32, and the
+// storage kept them, so `p::b = 200` read back 200. A real, a string and an
+// event keep the value as it evaluates.
 static void InitPackageCarrier(const Expr* init, std::string_view key,
                                Variable* var, SimContext& ctx, Arena& arena) {
   const StructTypeInfo* sinfo = ctx.GetVariableStructType(key);
@@ -760,7 +733,17 @@ static void InitPackageCarrier(const Expr* init, std::string_view key,
     var->value = EvalStructPatternValue(pattern, sinfo, ctx, arena);
     return;
   }
-  var->value = EvalExpr(init, ctx, arena);
+  const uint32_t kWidth = var->value.width;
+  bool sized = !var->is_real && !var->is_event && !ctx.IsStringVariable(key);
+  Logic4Vec value = EvalExpr(init, ctx, arena, sized ? kWidth : 0);
+  if (sized) {
+    if (value.is_real)
+      value = ConvertRealForKnownLhs(value, false, kWidth, arena);
+    value = OwnRhsWords(ResizeToWidth(value, kWidth, arena), arena);
+    if (!var->is_4state) CoerceTo2State(value);
+    value.is_signed = var->is_signed;
+  }
+  var->value = value;
   if (init->kind != ExprKind::kTagged || init->rhs == nullptr) return;
   ctx.SetVariableTag(*arena.Create<std::string>(std::string(key)),
                      init->rhs->text);
