@@ -292,4 +292,20 @@ TEST(StringMethods, CompareOnLiteralWithNullEscapeStripped) {
   EXPECT_EQ(AsInt(v), 0);
 }
 
+// §6.16.6 with §6.11: compare() returns an int, which is signed, so a string
+// ordering first compares below 0 wherever the result is used, and one
+// ordering after above it. Built unsigned, `s.compare("abd") < 0` never held.
+TEST(StringMethods, CompareResultIsSignedWhereverItIsUsed) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string s = \"abc\";\n"
+      "  int n;\n"
+      "  initial n = (s.compare(\"abd\") < 0) + 2 * (s.compare(\"abb\") > 0) "
+      "+\n"
+      "              4 * (s.compare(\"abc\") == 0);\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 7u);
+}
+
 }  // namespace

@@ -193,4 +193,19 @@ TEST(StringMethods, HextoaResultUsedInConcatenation) {
   EXPECT_EQ(v, 1u);
 }
 
+// §6.16.12: hextoa()'s argument is an integer, so a 64-bit value is cut to its
+// low 32 bits before its text is taken. Read whole, 64'h1_0000_0005 stored
+// "100000005".
+TEST(StringMethods, HextoaConvertsItsArgumentToInteger) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string h;\n"
+      "  longint w = 64'h1_0000_0005;\n"
+      "  int n;\n"
+      "  initial begin h.hextoa(w); n = (h == \"5\"); end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 1u);
+}
+
 }  // namespace

@@ -368,6 +368,34 @@ bool TryWriteClassArrayElement(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
+// Selected as the property's own element, `h.inst[0]`, the select named no
+// array property and the write went nowhere.
+bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
+                                   SimContext& ctx, Arena& arena) {
+  if (lhs == nullptr || lhs->kind != ExprKind::kSelect ||
+      lhs->index_end != nullptr || lhs->base == nullptr ||
+      lhs->base->kind != ExprKind::kSelect || lhs->base->index_end != nullptr)
+    return false;
+  ClassArrayRef ref;
+  if (!ResolveClassArray(lhs->base->base, ctx, arena, ref) ||
+      !ref.prop->is_string || ClassArrayHoldsSubarrays(ref))
+    return false;
+  Logic4Vec at = EvalExpr(lhs->base->index, ctx, arena);
+  Logic4Vec pos = EvalExpr(lhs->index, ctx, arena);
+  auto index = static_cast<int64_t>(at.ToUint64());
+  if (HasUnknownBits(at) || HasUnknownBits(pos) || !IndexInRange(ref, index))
+    return true;
+  std::string text =
+      Logic4VecToString(ReadClassArrayElement(ref, index, ctx, arena));
+  uint64_t i = pos.ToUint64();
+  auto byte = static_cast<char>(rhs_val.ToUint64() & 0xFF);
+  if (i >= text.size() || byte == 0) return true;
+  text[i] = byte;
+  StoreClassArrayElement(ref, index, StringToLogic4Vec(arena, text), ctx,
+                         arena);
+  return true;
+}
+
 void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
                             const Logic4Vec& value, SimContext& ctx,
                             Arena& arena) {

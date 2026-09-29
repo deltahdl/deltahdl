@@ -688,4 +688,41 @@ TEST(StringSim, AStringProductionNameDoesNotMarkALaterVariable) {
             "         67\n");
 }
 
+// §6.16 with §7.4: an element of an array of strings is a string, so
+// `sa[0][1] = "X"` replaces one of its characters, and one past its end
+// changes nothing. Taken as a select of the element's bits, it wrote bit 1 of
+// the text, "ab" becoming "a`".
+TEST(StringSim, CharacterWriteIntoAnElementOfAnArrayOfStrings) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string sa[2];\n"
+                       "  initial begin\n"
+                       "    sa[0] = \"ab\"; sa[0][1] = \"X\";\n"
+                       "    sa[1] = \"cd\"; sa[1][5] = \"Z\";\n"
+                       "    $display(\"%s %s\", sa[0], sa[1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "aX cd\n");
+}
+
+// §6.16 with §7.4.4: a leaf of a multidimensional array of strings is a
+// string, so its methods read its text and a character write replaces one
+// character. Recognized by neither path, m[1][0].len() read 0 and
+// `m[1][0][0] = "P"` wrote a bit of "pq", leaving "pp".
+TEST(StringSim, LeafOfAMultidimensionalArrayOfStringsIsAString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string m[2][2];\n"
+                       "  initial begin\n"
+                       "    m[1][0] = \"pq\";\n"
+                       "    $write(\"%0d \", m[1][0].len());\n"
+                       "    m[1][0][0] = \"P\";\n"
+                       "    $display(\"%s\", m[1][0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 Pq\n");
+}
+
 }  // namespace

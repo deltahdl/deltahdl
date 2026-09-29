@@ -214,4 +214,24 @@ TEST(StringMethods, ItoaStoresIntoAnElementOfAnArrayOfStrings) {
   EXPECT_EQ(v, 15u);
 }
 
+// §6.16.11 with §6.11: itoa()'s argument is an integer, 32 signed bits, so
+// -7 stores "-7" and a 64-bit value its low 32 bits' text, "5" for
+// 64'h1_0000_0005. Read as the argument's whole bits unsigned, they stored
+// "4294967289" and "4294967301".
+TEST(StringMethods, ItoaConvertsItsArgumentToInteger) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string a, b, c;\n"
+      "  int i = -7;\n"
+      "  longint w = 64'h1_0000_0005;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    a.itoa(-7); b.itoa(i); c.itoa(w);\n"
+      "    n = (a == \"-7\") + 2 * (b == \"-7\") + 4 * (c == \"5\");\n"
+      "  end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 7u);
+}
+
 }  // namespace

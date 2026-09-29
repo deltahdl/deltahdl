@@ -193,24 +193,31 @@ static std::string EvalArgAsString(const Expr* arg, SimContext& ctx,
   return Logic4VecToString(val);
 }
 
+// §6.16.6 and §6.16.7: compare() and icompare() return an `int`, which §6.11
+// makes signed, so a string ordering first reads negative wherever the result
+// is used. Built unsigned, `s.compare("abd") < 0` never held.
+static Logic4Vec CompareResult(int cmp, Arena& arena) {
+  Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
+  out.is_signed = true;
+  return out;
+}
+
 static Logic4Vec StringCompare(const std::string& str, const Expr* call_expr,
                                SimContext& ctx, Arena& arena) {
-  if (call_expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  if (call_expr->args.empty()) return CompareResult(0, arena);
   auto other = EvalArgAsString(call_expr->args[0], ctx, arena);
-  int cmp = str.compare(other);
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
+  return CompareResult(str.compare(other), arena);
 }
 
 static Logic4Vec StringIcompare(const std::string& str, const Expr* call_expr,
                                 SimContext& ctx, Arena& arena) {
-  if (call_expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  if (call_expr->args.empty()) return CompareResult(0, arena);
   auto other = EvalArgAsString(call_expr->args[0], ctx, arena);
   std::string a = str;
   std::string b = other;
   for (auto& c : a) c = static_cast<char>(std::tolower(c));
   for (auto& c : b) c = static_cast<char>(std::tolower(c));
-  int cmp = a.compare(b);
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
+  return CompareResult(a.compare(b), arena);
 }
 
 static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
@@ -289,12 +296,18 @@ static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   return result;
 }
 
+// §6.16.11 to §6.16.14: the argument of itoa(), hextoa(), octtoa() and
+// bintoa() is an `integer`, so it is converted to that type's 32 bits first,
+// and itoa() reads them signed (§6.11): `s.itoa(-7)` stores "-7" and
+// `s.itoa(64'h1_0000_0005)` stores "5". Read as the argument's whole bits,
+// unsigned, they stored "4294967289" and "4294967301".
 static void StringXtoa(const StringMethodArgs& a, int base) {
   if (a.call_expr->args.empty()) return;
-  auto val = EvalExpr(a.call_expr->args[0], a.ctx, a.arena).ToUint64();
+  uint64_t val =
+      EvalExpr(a.call_expr->args[0], a.ctx, a.arena).ToUint64() & 0xFFFFFFFFULL;
   std::string result;
   if (base == 10) {
-    result = std::to_string(val);
+    result = std::to_string(static_cast<int32_t>(static_cast<uint32_t>(val)));
   } else if (base == 16) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%llx",
@@ -462,23 +475,36 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
   return true;
 }
 
-// §7.4 with §8.5: whether the nearest declaration of the property `name` on
-// the class chain from `type` writes an unpacked dimension -- fixed-size,
-// dynamic, queue or associative -- on itself or on the typedef its type names
-// (PropertyTypedefItem), which makes it an array rather than one value.
-static bool PropertyIsUnpackedArray(const ClassTypeInfo* type,
-                                    std::string_view name, SimContext& ctx) {
+// §7.4 with §8.5: what the nearest declaration of the property `name` on the
+// class chain from `type` writes of its shape: whether an unpacked dimension
+// -- fixed-size, dynamic, queue or associative -- on itself or on the typedef
+// its type names (PropertyTypedefItem), which makes it an array rather than
+// one value, and, §6.18, whether that typedef's element type is string,
+// `typedef string sq_t[$]` for a property `sq_t tq`, whose own type is the
+// typedef's name.
+struct PropertyShape {
+  bool is_array = false;
+  bool typedef_holds_strings = false;
+};
+
+static PropertyShape PropertyShapeOf(const ClassTypeInfo* type,
+                                     std::string_view name, SimContext& ctx) {
   for (const ClassTypeInfo* t = type; t != nullptr; t = t->parent) {
     if (t->decl == nullptr) continue;
     for (const ClassMember* member : t->decl->members) {
       if (member->kind != ClassMemberKind::kProperty || member->name != name)
         continue;
       const ModuleItem* item = PropertyTypedefItem(member, t, ctx);
-      return !(item != nullptr ? item->unpacked_dims : member->unpacked_dims)
-                  .empty();
+      PropertyShape shape;
+      shape.is_array =
+          !(item != nullptr ? item->unpacked_dims : member->unpacked_dims)
+               .empty();
+      shape.typedef_holds_strings =
+          item != nullptr && item->typedef_type.kind == DataTypeKind::kString;
+      return shape;
     }
   }
-  return false;
+  return {};
 }
 
 // §6.16 with §8.7: whether `type`, or a class it extends, declares the
@@ -493,8 +519,10 @@ static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
                              SimContext& ctx, bool elements = false) {
   const ClassTypeInfo::PropertyInfo* prop =
       type != nullptr ? type->FindProperty(name) : nullptr;
-  return prop != nullptr && prop->is_string &&
-         PropertyIsUnpackedArray(type, name, ctx) == elements;
+  if (prop == nullptr) return false;
+  PropertyShape shape = PropertyShapeOf(type, name, ctx);
+  return (prop->is_string || shape.typedef_holds_strings) &&
+         shape.is_array == elements;
 }
 
 // Whether `e` is a name or a chain of member selects down from one, `h` or
@@ -613,6 +641,27 @@ static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
                                         FieldTarget& target,
                                         bool elements = false);
 
+// §6.16 with §7.4.4: whether `receiver`, `m[1][0]`, selects one leaf of a
+// declared multidimensional array of strings: a select for every one of its
+// unpacked dimensions down from its name, no fewer, which would name a
+// subarray, and no more, which would name a character.
+static bool SelectsMultiDimStringLeaf(const Expr* receiver, SimContext& ctx) {
+  size_t selects = 0;
+  const Expr* root = receiver;
+  while (root != nullptr && root->kind == ExprKind::kSelect &&
+         root->index_end == nullptr) {
+    ++selects;
+    root = root->base;
+  }
+  if (root == nullptr || root->kind != ExprKind::kIdentifier ||
+      !NameDenotesVariable(root->text, ctx))
+    return false;
+  const ArrayInfo* info = ctx.FindArrayInfo(root->text);
+  return info != nullptr && info->dim_sizes.size() >= 2 &&
+         selects == info->dim_sizes.size() &&
+         DeclaredArrayHoldsStrings(root->text, ctx);
+}
+
 static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
   if (receiver->kind != ExprKind::kSelect || receiver->index_end != nullptr ||
       receiver->base == nullptr) {
@@ -624,6 +673,7 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
        NamesArrayFormal(base->text, ctx))) {
     return DeclaredArrayHoldsStrings(base->text, ctx);
   }
+  if (SelectsMultiDimStringLeaf(receiver, ctx)) return true;
   FieldTarget target;
   if (ResolveStringPropertyTarget(base, ctx, target, /*elements=*/true))
     return true;

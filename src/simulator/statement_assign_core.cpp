@@ -235,7 +235,8 @@ static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 // object one by one.
 static bool TryWriteClassPropertyPart(const Expr* lhs, Logic4Vec& rhs_val,
                                       SimContext& ctx, Arena& arena) {
-  return TryWriteClassArrayElement(lhs, rhs_val, ctx, arena) ||
+  return TryWriteClassArrayElementChar(lhs, rhs_val, ctx, arena) ||
+         TryWriteClassArrayElement(lhs, rhs_val, ctx, arena) ||
          TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena);
 }
 
@@ -253,6 +254,30 @@ static bool TryWriteStringVariableChar(Variable* var, const Expr* lhs,
     StringWriteByte(var, static_cast<uint32_t>(idx_val.ToUint64()),
                     static_cast<uint8_t>(rhs_val.ToUint64() & 0xFF), arena);
     var->NotifyWatchers();
+  }
+  return true;
+}
+
+// §6.16 with §7.4: an element of an array of strings is a string, so `sa[0][1]
+// = "X"` replaces character 1 of the element `sa[0]`, or nothing for an
+// unknown index, and is done either way. Taken as a select of the element's
+// bits (TryCompoundElementWrite), it wrote bit 1 of the text. §7.4.4: an
+// element of a multidimensional array, `m[1][0]` in `m[1][0][0] = "P"`, is
+// its own leaf variable (TryResolveCompoundElement).
+static bool TryWriteStringElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
+                                      SimContext& ctx, Arena& arena) {
+  if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr ||
+      lhs->index_end != nullptr || lhs->base->kind != ExprKind::kSelect)
+    return false;
+  Variable* element = TryResolveArrayElement(lhs->base, ctx);
+  if (element == nullptr)
+    element = TryResolveCompoundElement(lhs->base, ctx, arena, nullptr);
+  if (element == nullptr || !element->is_string) return false;
+  Logic4Vec idx_val = EvalExpr(lhs->index, ctx, arena);
+  if (!HasUnknownBits(idx_val)) {
+    StringWriteByte(element, static_cast<uint32_t>(idx_val.ToUint64()),
+                    static_cast<uint8_t>(rhs_val.ToUint64() & 0xFF), arena);
+    element->NotifyWatchers();
   }
   return true;
 }
@@ -353,6 +378,7 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // was dropped with `true` returned, as a bit-select of a property once was.
   if (TryWriteStringPropertyChar(lhs, rhs_val, ctx, arena)) return true;
   if (TryWriteClassPropertyPart(lhs, rhs_val, ctx, arena)) return true;
+  if (TryWriteStringElementChar(lhs, rhs_val, ctx, arena)) return true;
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (TryWriteStringVariableChar(var, lhs, rhs_val, ctx, arena)) return true;

@@ -339,4 +339,20 @@ TEST(StringMethods, IcompareOnLiteralWithNullEscapeStripped) {
   EXPECT_EQ(AsInt(v), 0);
 }
 
+// §6.16.7 with §6.11: icompare() returns an int, which is signed, so a string
+// ordering first compares below 0 wherever the result is used. Built
+// unsigned, `s.icompare("ABD") < 0` never held.
+TEST(StringMethods, IcompareResultIsSignedWhereverItIsUsed) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string s = \"abc\";\n"
+      "  int n;\n"
+      "  initial n = (s.icompare(\"ABD\") < 0) + 2 * (s.icompare(\"ABB\") > 0) "
+      "+\n"
+      "              4 * (s.icompare(\"ABC\") == 0);\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 7u);
+}
+
 }  // namespace

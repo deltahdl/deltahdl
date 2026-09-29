@@ -155,6 +155,14 @@ void StoreClassArrayElement(const ClassArrayRef& ref, int64_t index,
                             const Logic4Vec& value, SimContext& ctx,
                             Arena& arena);
 
+// §6.16 with §7.4 and §8.5: `lhs` as a character select of an element of an
+// array property of strings, `h.inst[0][1] = "X"` or `inst[1][0] = "Y"` in a
+// method, replacing that character of the element, or nothing for an unknown
+// or out-of-range index or a null character, as a string variable's
+// character write does; false where `lhs` is of no such shape.
+bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
+                                   SimContext& ctx, Arena& arena);
+
 // §7.4.6: `lhs` as a single-index select of an array property, written with
 // `rhs_val` coerced as a write to the property is; false where its base names
 // no array property. An index that addresses no element writes nothing.

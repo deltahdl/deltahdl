@@ -473,4 +473,56 @@ TEST(StringMethodReceivers, ElementOfAStringQueueProperty) {
       "5 5 WORLD\n");
 }
 
+// §6.16 with §7.4 and §8.5: an element of a class property that is an array
+// of strings is a string, so a character write into it replaces that
+// character -- named bare in a method, through a handle, through the class
+// scope, and in a dynamic array. Reached by no writer, each write changed
+// nothing.
+TEST(StringMethodReceivers, CharacterWriteIntoAnElementOfAStringArrayProperty) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C;\n"
+                 "  string inst[2];\n"
+                 "  static string names[1];\n"
+                 "  string sd[];\n"
+                 "  function void m(); inst[1] = \"cd\"; inst[1][0] = \"Y\"; "
+                 "endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  C h;\n"
+                 "  initial begin\n"
+                 "    h = new; h.m();\n"
+                 "    h.inst[0] = \"ab\"; h.inst[0][1] = \"X\";\n"
+                 "    C::names[0] = \"st\"; C::names[0][1] = \"T\";\n"
+                 "    h.sd = new[1]; h.sd[0] = \"dy\"; h.sd[0][0] = \"D\";\n"
+                 "    $display(\"%s %s %s %s\", h.inst[1], h.inst[0], "
+                 "C::names[0], h.sd[0]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "Yd aX sT Dy\n");
+}
+
+// §6.16 with §6.18 and §8.5: a property declared through a typedef of a queue
+// of strings, `sq_t tq` under `typedef string sq_t[$]`, holds strings, so the
+// string methods read its elements. Taken for no string, `h.tq[0].len()`
+// read 0.
+TEST(StringMethodReceivers, ElementOfATypedefStringQueueProperty) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef string sq_t[$];\n"
+                 "class C;\n"
+                 "  sq_t tq;\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  C h;\n"
+                 "  initial begin\n"
+                 "    h = new; h.tq.push_back(\"t0\");\n"
+                 "    $display(\"%0d %s\", h.tq[0].len(), h.tq[0].toupper());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "2 T0\n");
+}
+
 }  // namespace
