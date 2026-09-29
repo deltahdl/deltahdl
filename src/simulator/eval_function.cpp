@@ -455,31 +455,37 @@ static const ClassTypeInfo* MethodDeclaringClass(const ModuleItem* method,
   return nullptr;
 }
 
+// §8.25 and §6.20: the value parameters and localparams of the class `cls`
+// by name, as the class or specialization holds them, or as the running frame
+// binds one the class holds no value for.
+static ScopeMap ClassConstantScope(const ClassTypeInfo* cls, SimContext& ctx) {
+  ScopeMap scope;
+  auto bind = [&](std::string_view pname) {
+    auto held = cls->static_properties.find(std::string(pname));
+    if (held != cls->static_properties.end()) {
+      scope[pname] = static_cast<int64_t>(held->second.ToUint64());
+    } else if (auto* var = ctx.FindVariable(pname)) {
+      scope[pname] = static_cast<int64_t>(var->value.ToUint64());
+    }
+  };
+  for (const auto& [pname, pexpr] : cls->decl->params) bind(pname);
+  for (const auto* m : cls->decl->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param) bind(m->name);
+  }
+  return scope;
+}
+
 // Computes the width of a class method's return variable, evaluating the
-// declared return type with the class's constants in scope: §8.25's value
-// parameters and §6.20's localparams, as the class or specialization holds
-// them. The class is the one a static call names or, §13.4.1 with §8.25, the
-// level declaring an instance method, which was given none, so a range naming
-// one folded to a single bit. Falls back to 32 bits when the width is
-// indeterminate.
+// declared return type with the class's constants in scope
+// (ClassConstantScope). The class is the one a static call names or, §13.4.1
+// with §8.25, the level declaring an instance method, which was given none,
+// so a range naming one folded to a single bit. Falls back to 32 bits when
+// the width is indeterminate.
 static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
                                          const ClassTypeInfo* param_cls) {
   if (param_cls == nullptr) param_cls = MethodDeclaringClass(method, ctx);
   if (param_cls && param_cls->decl) {
-    ScopeMap scope;
-    auto bind = [&](std::string_view pname) {
-      auto held = param_cls->static_properties.find(std::string(pname));
-      auto* var = ctx.FindVariable(pname);
-      if (held != param_cls->static_properties.end()) {
-        scope[pname] = static_cast<int64_t>(held->second.ToUint64());
-      } else if (var) {
-        scope[pname] = static_cast<int64_t>(var->value.ToUint64());
-      }
-    };
-    for (const auto& [pname, pexpr] : param_cls->decl->params) bind(pname);
-    for (const auto* m : param_cls->decl->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->is_param) bind(m->name);
-    }
+    ScopeMap scope = ClassConstantScope(param_cls, ctx);
     // A range the class's constants leave unfolded names something of the
     // running scope, a parameter of the module the class is declared in,
     // which DeclaredTypeWidth below reads; folded here it was one bit.
