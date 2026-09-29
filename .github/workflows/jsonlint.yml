@@ -1,0 +1,76 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: jsonlint-${{ github.ref }}
+jobs:
+  jsonlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install tools
+        run: npm install -g @prantlf/jsonlint
+      # git ls-files names every tracked *.json file at any depth, those under
+      # dot-prefixed directories such as .claude/ included. --no-config keeps
+      # a configuration file from loosening the check, --no-duplicate-keys
+      # reports a key an object repeats, and --continue reports every file
+      # that fails rather than stopping at the first.
+      - name: Lint JSON
+        run: >-
+          git ls-files -z '*.json'
+          | xargs -0 -r jsonlint
+          --no-config
+          --no-duplicate-keys
+          --continue
+          --quiet
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/jsonlint.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: >-
+          pip install
+          assert-no-inline-directives
+          yamllint
+      # Reports whatever the steps ahead of it did, for the reason set out on
+      # markdownlint in markdownlint.yml.
+      - if: ${{ !cancelled() }}
+        name: Assert no inline yamllint disables
+        run: >-
+          assert-no-inline-directives
+          --tools yamllint
+          --verbose
+          .github/workflows/jsonlint.yml
+      - if: ${{ !cancelled() }}
+        name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          LL='line-length: disable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/jsonlint.yml
+name: jsonlint
+on:
+  push:
+    branches: [main]
+    paths:
+      # A path filter matches a dot-prefixed directory only where the pattern
+      # spells the dot out, so '**/*.json' passes over .claude/ and the entry
+      # below is what starts this workflow on a change to .claude/settings.json.
+      - '**/*.json'
+      - .claude/**/*.json
+      - .github/workflows/jsonlint.yml
+  workflow_dispatch: {}
