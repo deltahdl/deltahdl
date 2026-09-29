@@ -12,13 +12,13 @@ using namespace delta;
 // requires the array to be selected down to an element first, and the clause
 // names no statement in which the requirement is suspended.
 //
-// The seven cases here are the seven statement positions
-// ElaboratorOperationRules::WalkStmtsForAssocOperand in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached only once it
-// took its list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Each of the seven elaborated
-// clean beforehand, with the whole array left standing as an arithmetic
-// operand.
+// The seven cases here are seven statement positions a walk has to take its
+// list of nested statements from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h to reach, as
+// WalkStmtForAggregateOperands in
+// src/elaborator/elaborator_validate_operations_aggregate.cpp does. A walk
+// that named its own list left each of the seven elaborating clean, with the
+// whole array left standing as an arithmetic operand.
 
 namespace {
 
@@ -28,12 +28,10 @@ namespace {
 // requirement is suspended in. The rule is therefore owed wherever an
 // expression can be written, which is wherever a statement can be written.
 //
-// ElaboratorOperationRules::WalkStmtsForAssocOperand in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `x = aa + 1` in one of the seven positions it did not read, where
-// the operand was never looked at rather than looked at and allowed.
+// A walk naming six of the thirteen statement links ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h states would miss the rest. The
+// seven cases here each put `x = aa + 1` in one of those seven positions, where
+// such a walk never looks at the operand rather than looking and allowing it.
 //
 // A.6.3 gives `par_block ::= fork [ : block_identifier ] {
 // block_item_declaration } { statement_or_null } join_keyword [ :
@@ -251,6 +249,192 @@ TEST(UnpackedArrayOperandElaboration, ArraysComparedWithArraysAreAllowed) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.4.6: a variable of an integral type is no more an array than a number is,
+// whether the module declares it, through a typedef or not, a block declares
+// it, or a for loop's initialization does, so comparing an unpacked array with
+// one is reported.
+TEST(UnpackedArrayOperandElaboration, IntegralVariablesAreNoArrays) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  int a[3];\n"
+      "  int x;\n"
+      "  byte_t v;\n"
+      "  logic [3:0] w;\n"
+      "  initial begin\n"
+      "    int y;\n"
+      "    if (a == x) x = 1;\n"
+      "    if (v != a) x = 2;\n"
+      "    if (a === w) x = 3;\n"
+      "    if (a == y) x = 4;\n"
+      "    for (int i = 0; i < 3; i++) if (a == i) x = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  for (int line = 9; line <= 13; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, line, "7.4.6"))
+        << "line " << line;
+  }
+}
+
+// §11.4.5 and §11.4.6 give every equality, case equality and wildcard equality
+// operator a 1-bit result, so §7.4.6 reports an unpacked array compared with
+// one, from either side.
+TEST(UnpackedArrayOperandElaboration, AnEqualityResultIsNoArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[3];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (a == (x == 1)) x = 1;\n"
+      "    if ((x !== 1) != a) x = 2;\n"
+      "    if (a == (x ==? 1)) x = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 5, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
+}
+
+// A name a block declares stands for the block's declaration inside it: a
+// block's `int a` hides the module's array `a`, and a block's array `x` the
+// module's `int x`, so neither comparison here sets an array against an
+// integral value. A variable of a typedef naming an unpacked array is no
+// integral value either.
+TEST(UnpackedArrayOperandElaboration, BlockDeclarationsHideTheModules) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef int row_t[3];\n"
+      "  int a[3];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    if (a == 4) x = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    int x[3];\n"
+      "    row_t r;\n"
+      "    if (a == x) x[0] = 1;\n"
+      "    if (a == r) x[0] = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.4.6 holds for an unpacked array a block declares as for one the module
+// declares: a fixed-size array and a queue compared with an integral value,
+// and a fixed-size array under an integral operator, are each reported, while
+// an element compared with a number is not.
+TEST(UnpackedArrayOperandElaboration, BlockArraysAreNoIntegralOperands) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    int b[3];\n"
+      "    int q[$];\n"
+      "    if (b == 4) x = 1;\n"
+      "    x = b + 1;\n"
+      "    if (q != x) x = 2;\n"
+      "    if (b[1] == 4) x = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an unpacked array is not an operand of this "
+                            "operator",
+                            7, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 8, "7.4.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kCompared, 9, "7.4.6"));
+}
+
+// An associative array is an unpacked array, which §7.4.6 lets take part in an
+// equality as a whole only against another array: one the module declares and
+// one a block declares are each reported compared with an integral value, and
+// two compared with each other are not.
+TEST(UnpackedArrayOperandElaboration, AssociativeArraysAreNoIntegralOperands) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    int ab[int];\n"
+      "    if (aa == 4) x = 1;\n"
+      "    if (x != ab) x = 2;\n"
+      "    if (aa == ab) x = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kCompared, 8, "7.4.6"));
+}
+
+// §7.4.6 keeps an associative array a block declares from being treated as an
+// integer, as it does one the module declares, and a block's `int aa` hides
+// the module's associative array `aa`, so adding to it is an integer's sum.
+TEST(AssocArrayOperandElaboration, BlockDeclarationsAreSeenInScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    int ab[string];\n"
+      "    x = ab + 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    int aa;\n"
+      "    x = aa + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array operand requires an element", 6,
+                            "7.4.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "associative array operand requires an element",
+                             10, "7.4.6"));
+}
+
+// §6.7.1 gives a net declared with a net type alone the implicit logic data
+// type, so §7.4.6 reports an unpacked array compared with one as with any
+// integral value.
+TEST(UnpackedArrayOperandElaboration, NetsAreNoArrays) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[3];\n"
+      "  wire [3:0] w;\n"
+      "  wire logic v;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (a == w) x = 1;\n"
+      "    if (v != a) x = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kCompared =
+      "an unpacked array is compared only with another unpacked array";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 8, "7.4.6"));
 }
 
 }  // namespace

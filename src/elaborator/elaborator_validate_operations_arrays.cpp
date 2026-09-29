@@ -9,72 +9,12 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
-
-static bool IsEqualityOp(TokenKind op) {
-  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
-         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
-         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
-}
-
-void ElaboratorOperationRules::CheckAssocOperandInBinaryExpr(const Expr* e) {
-  if (!e) return;
-  if (e->kind == ExprKind::kBinary && !IsEqualityOp(e->op)) {
-    for (const Expr* side : {e->lhs, e->rhs}) {
-      if (!side || side->kind != ExprKind::kIdentifier) continue;
-      auto it = var_array_info_.find(side->text);
-      if (it == var_array_info_.end() || !it->second.is_assoc) continue;
-      diag_.Error(side->range.start,
-                  "associative array operand requires an element "
-                  "selection before use in this expression",
-                  Subclause("7.4.6"));
-    }
-  }
-  CheckAssocOperandInBinaryExpr(e->lhs);
-  CheckAssocOperandInBinaryExpr(e->rhs);
-  CheckAssocOperandInBinaryExpr(e->condition);
-  CheckAssocOperandInBinaryExpr(e->true_expr);
-  CheckAssocOperandInBinaryExpr(e->false_expr);
-  CheckAssocOperandInBinaryExpr(e->base);
-  CheckAssocOperandInBinaryExpr(e->index);
-  CheckAssocOperandInBinaryExpr(e->index_end);
-  for (const auto* a : e->args) CheckAssocOperandInBinaryExpr(a);
-  for (const auto* el : e->elements) CheckAssocOperandInBinaryExpr(el);
-}
-
-void ElaboratorOperationRules::WalkStmtsForAssocOperand(const Stmt* s) {
-  if (!s) return;
-  CheckAssocOperandInBinaryExpr(s->rhs);
-  CheckAssocOperandInBinaryExpr(s->expr);
-  CheckAssocOperandInBinaryExpr(s->condition);
-  CheckAssocOperandInBinaryExpr(s->for_cond);
-  // §7.4.6 requires an associative array to be selected down to an element
-  // before an operator other than equality takes it, and names no statement the
-  // requirement is suspended in, so this descends every link ForEachChildStmt
-  // in elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `x = aa + 1` written in a fork arm or in a
-  // randcase item was never looked at rather than looked at and allowed.
-  ForEachChildStmt(s,
-                   [this](Stmt* const& sub) { WalkStmtsForAssocOperand(sub); });
-}
-
-void ElaboratorOperationRules::ValidateAssocOperandInExpr(
-    const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
-      WalkStmtsForAssocOperand(item->body);
-    }
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CheckAssocOperandInBinaryExpr(item->assign_rhs);
-    }
-  }
-}
 
 namespace {
 // Flags a single assignment-pattern item that names an array-typed identifier,

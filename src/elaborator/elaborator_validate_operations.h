@@ -54,13 +54,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkStmtsForAssocConcatTarget(const Stmt* s);
   void CheckAssocConcatTargetInAssign(const Stmt* s);
 
-  void ValidateAssocOperandInExpr(const ModuleDecl* decl);
-  void WalkStmtsForAssocOperand(const Stmt* s);
-  void CheckAssocOperandInBinaryExpr(const Expr* e);
-
   // §11.3 and §11.4.13: an unpacked structure or union as an operand of an
   // operator that takes no aggregate, and an unpacked array or structure as
-  // the left operand of `inside`.
+  // the left operand of `inside`; §7.4.6: an unpacked array, an associative
+  // one among them, treated as an integer.
   void ValidateAggregateOperands(const ModuleDecl* decl);
 
   void ValidateArrayPatternElemType(const ModuleDecl* decl);
