@@ -129,15 +129,43 @@ static bool AnyBitSet(const Logic4Vec& v) {
   return false;
 }
 
+// Whether `kind` is one of §6.11's 2-state integer types.
+static bool IsTwoStateIntegerKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kBit || kind == DataTypeKind::kByte ||
+         kind == DataTypeKind::kShortint || kind == DataTypeKind::kInt ||
+         kind == DataTypeKind::kLongint;
+}
+
+// §7.3.2 with §6.11.2: the value of the tagged expression `expr` whose member
+// in the union layout `layout` is a scalar of a 2-state type, at the member's
+// width with every x and z bit 0, as a write into that member stores it. The
+// union's storage keeps x and z for a 4-state member beside it, so the
+// conversion is the member's own. None for any other member.
+static std::optional<Logic4Vec> TwoStateMemberValue(
+    const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
+    Arena& arena) {
+  const StructFieldInfo* field = FindStructField(&layout, expr->rhs->text);
+  if (field == nullptr || field->nested != nullptr || field->elem_count != 0 ||
+      !IsTwoStateIntegerKind(field->type_kind))
+    return std::nullopt;
+  Logic4Vec value =
+      OwnRhsWords(ResizeToWidth(EvalExpr(expr->lhs, ctx, arena, field->width),
+                                field->width, arena),
+                  arena);
+  CoerceTo2State(value);
+  return value;
+}
+
 // §11.9: the value of a tagged union expression `expr` whose union type has
 // the layout `layout`, the member expression packed against the member it
 // names -- a structure pattern by that structure's layout, and a tagged
 // expression, `tagged Jmp (tagged JmpC '{2, 83})`, by the member's own union
-// layout in turn -- and §11.4.11: a conditional with a known predicate is the
-// arm it selects. None for any other expression, which is evaluated as it
-// stands. Evaluated as a value alone, a nested tagged expression concatenated
-// its pattern's items at their own widths and lost the structure's first
-// member.
+// layout in turn, and a scalar of a 2-state type by that type
+// (TwoStateMemberValue) -- and §11.4.11: a conditional with a known predicate
+// is the arm it selects. None for any other expression, which is evaluated as
+// it stands. Evaluated as a value alone, a nested tagged expression
+// concatenated its pattern's items at their own widths and lost the structure's
+// first member.
 static std::optional<Logic4Vec> EvalTaggedForLayout(
     const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
     Arena& arena) {
@@ -153,7 +181,7 @@ static std::optional<Logic4Vec> EvalTaggedForLayout(
       expr->lhs == nullptr)
     return std::nullopt;
   const StructTypeInfo* member = TaggedMemberLayout(layout, expr->rhs->text);
-  if (member == nullptr) return std::nullopt;
+  if (member == nullptr) return TwoStateMemberValue(expr, layout, ctx, arena);
   if (expr->lhs->kind == ExprKind::kAssignmentPattern)
     return EvalStructPatternValue(expr->lhs, member, ctx, arena);
   return EvalTaggedForLayout(expr->lhs, *member, ctx, arena);

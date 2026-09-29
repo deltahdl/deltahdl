@@ -79,8 +79,10 @@ void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
 // structure with a member of a 4-state type, marks it 4-state, so the x and z
 // bits written to the structure are kept, and where `fill_defaults` says it
 // has no initializer, starts each 4-state member at x, its type's default
-// (Table 6-7), the 2-state members and a string member's handle at 0. Defined
-// in src/simulator/lowerer_var_layout.cpp.
+// (Table 6-7), the 2-state members and a string member's handle at 0. An
+// unpacked union with a 4-state member is marked the same way (§7.3.2) but
+// keeps the value it holds, its first member's default (§7.3). Defined in
+// src/simulator/lowerer_var_layout.cpp.
 void MarkUnpackedStructStorage(std::string_view name, Variable* v,
                                bool fill_defaults, SimContext& ctx);
 

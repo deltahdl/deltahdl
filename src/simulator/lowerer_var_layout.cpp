@@ -191,10 +191,12 @@ static void SetFourStateMembersToX(Logic4Vec& value, const StructTypeInfo& info,
 void MarkUnpackedStructStorage(std::string_view name, Variable* v,
                                bool fill_defaults, SimContext& ctx) {
   const StructTypeInfo* info = ctx.GetVariableStructType(name);
-  if (info == nullptr || info->is_packed || info->is_union ||
-      !HasFourStateMember(*info))
-    return;
+  if (info == nullptr || info->is_packed || !HasFourStateMember(*info)) return;
   v->is_4state = true;
+  // §7.3: an unpacked union starts at its first member's default, which the
+  // variable was already given by that member's type; only its storage keeps
+  // x and z for the 4-state members a later write names (§7.3.2).
+  if (info->is_union) return;
   if (fill_defaults) SetFourStateMembersToX(v->value, *info, 0, ctx.GetArena());
 }
 

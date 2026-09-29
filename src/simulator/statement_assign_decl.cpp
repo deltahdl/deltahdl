@@ -675,6 +675,13 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     var->value = MakeAllX(arena, var->value.width);
     var->value.is_signed = var->is_signed;
   }
+  // §7.3.2: an unpacked union keeps x and z for a 4-state member however its
+  // first member is typed, and starts at that first member's default (§7.3),
+  // which the value above already is, as a module's union does
+  // (MarkUnpackedStructStorage).
+  if (const StructTypeInfo* info = ctx.GetVariableStructType(stmt->var_name);
+      info != nullptr && info->is_union)
+    MarkUnpackedStructStorage(stmt->var_name, var, false, ctx);
   if (stmt->var_init && stmt->var_unpacked_dims.empty()) {
     Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
     // §11.4.14 (printed page 291): a streaming concatenation initializing a

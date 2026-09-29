@@ -158,9 +158,14 @@ static std::string FormatAggElemForP(const Logic4Vec& val, DataTypeKind kind,
 // §21.2.1.6 (C4, printed page 662): a tagged union prints its currently valid
 // member as "tag:value". The active member's width and type come from the
 // union's layout `st`, or the value's own width where none is registered.
+// §7.3.2 has a member that is itself a tagged union carry a tag of its own,
+// kept under the union's tag key `key` followed by the member's name, so such
+// a member prints in the same tagged form, '{Jmp:'{JmpV:10}}.
 static std::string FormatTaggedUnionForP(std::string_view tag,
                                          const StructTypeInfo* st,
-                                         const Logic4Vec& val, Arena& arena) {
+                                         const Logic4Vec& val,
+                                         const std::string& key,
+                                         SimContext& ctx) {
   DataTypeKind kind = DataTypeKind::kImplicit;
   uint32_t width = val.width;
   const StructFieldInfo* f = st ? FindStructField(st, tag) : nullptr;
@@ -168,8 +173,16 @@ static std::string FormatTaggedUnionForP(std::string_view tag,
     kind = f->type_kind;
     width = f->width;
   }
-  Logic4Vec slice = SliceField(val, 0, width, kind, arena);
-  return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) + "}";
+  Logic4Vec slice = SliceField(val, 0, width, kind, ctx.GetArena());
+  std::string member_key = key + "." + std::string(tag);
+  std::string_view inner;
+  if (f != nullptr && f->nested != nullptr && f->nested->is_union)
+    inner = ctx.GetVariableTag(member_key);
+  std::string member =
+      inner.empty()
+          ? FormatSingularForP(slice, kind)
+          : FormatTaggedUnionForP(inner, f->nested, slice, member_key, ctx);
+  return "'{" + std::string(tag) + ":" + member + "}";
 }
 
 // §21.2.1.6 (C4): the tagged form of the variable `name`. Returns no value
@@ -177,11 +190,12 @@ static std::string FormatTaggedUnionForP(std::string_view tag,
 // through to the next aggregate form).
 static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
                                                           const Logic4Vec& val,
-                                                          SimContext& ctx,
-                                                          Arena& arena) {
-  auto tag = ctx.GetVariableTag(TagKeyOfName(name, ctx));
+                                                          SimContext& ctx) {
+  std::string key = TagKeyOfName(name, ctx);
+  auto tag = ctx.GetVariableTag(key);
   if (tag.empty()) return std::nullopt;
-  return FormatTaggedUnionForP(tag, StructLayoutOfName(name, ctx), val, arena);
+  return FormatTaggedUnionForP(tag, StructLayoutOfName(name, ctx), val, key,
+                               ctx);
 }
 
 // §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
@@ -431,7 +445,7 @@ static std::optional<std::string> BuildFormatPNamed(std::string_view name,
                                                     SimContext& ctx,
                                                     Arena& arena) {
   if (name.empty()) return std::nullopt;
-  if (auto r = BuildFormatPTaggedUnion(name, val, ctx, arena)) return r;
+  if (auto r = BuildFormatPTaggedUnion(name, val, ctx)) return r;
   if (auto r = BuildFormatPQueue(name, ctx)) return r;
   if (auto r = BuildFormatPAssoc(name, ctx)) return r;
   if (auto r = BuildFormatPArray(name, ctx, arena)) return r;
@@ -452,8 +466,7 @@ static std::optional<std::string> BuildFormatPNamed(std::string_view name,
 // Returns no value for an argument that is no member of a variable's layout.
 static std::optional<std::string> BuildFormatPMember(const Expr* arg,
                                                      const Logic4Vec& val,
-                                                     SimContext& ctx,
-                                                     Arena& arena) {
+                                                     SimContext& ctx) {
   if (arg->kind != ExprKind::kMemberAccess || arg->is_scope_resolution)
     return std::nullopt;
   std::string name;
@@ -466,8 +479,12 @@ static std::optional<std::string> BuildFormatPMember(const Expr* arg,
   MemberLayout member = ResolveMemberLayout(
       base, info, std::string_view(name).substr(dot + 1), ctx);
   if (member.layout == nullptr) return std::nullopt;
-  if (!member.tag.empty())
-    return FormatTaggedUnionForP(member.tag, member.layout, val, arena);
+  if (!member.tag.empty()) {
+    // The member's tag key, as ResolveMemberLayout walked to it.
+    std::string key = TagKeyOfName(base, ctx) + "." +
+                      std::string(std::string_view(name).substr(dot + 1));
+    return FormatTaggedUnionForP(member.tag, member.layout, val, key, ctx);
+  }
   return FormatStructValueForP(*member.layout, val, ctx);
 }
 
@@ -633,7 +650,7 @@ std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   if (auto scoped = BuildFormatPPackageItem(arg, val, ctx, arena))
     return *scoped;
   if (auto elem = BuildFormatPElement(arg, val, ctx)) return *elem;
-  if (auto member = BuildFormatPMember(arg, val, ctx, arena)) return *member;
+  if (auto member = BuildFormatPMember(arg, val, ctx)) return *member;
   if (auto slice = BuildFormatPSlice(arg, ctx, arena)) return *slice;
   if (auto found = BuildFormatPLocator(arg, ctx, arena)) return *found;
 

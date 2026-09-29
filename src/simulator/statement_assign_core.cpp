@@ -484,6 +484,30 @@ static bool IsStringTarget(const Expr* lhs, SimContext& ctx) {
                               std::string(lhs->rhs->text));
 }
 
+// §7.3.2 has every tagged union value carry its tag, a member that is itself
+// a tagged union included, and §11.9 builds `tagged Jmp (tagged JmpV 10)` from
+// the inner tagged value, tag and all. Records the tag of the tagged
+// expression `rhs` under `key`, and each tag nested inside it under the key of
+// the member it is written into, `key` followed by the member path as
+// TaggedUnionMemberKey forms it, while `layout` gives that member a union
+// layout of its own. The tag table keeps the view it is given, so each key is
+// interned in the arena rather than left in a string that ends with this
+// statement.
+static void RecordTaggedValueTags(const Expr* rhs, std::string key,
+                                  const StructTypeInfo* layout, SimContext& ctx,
+                                  Arena& arena) {
+  while (rhs != nullptr && rhs->kind == ExprKind::kTagged &&
+         rhs->rhs != nullptr) {
+    ctx.SetVariableTag(*arena.Create<std::string>(key), rhs->rhs->text);
+    layout = layout != nullptr ? TaggedMemberLayout(*layout, rhs->rhs->text)
+                               : nullptr;
+    if (layout == nullptr || !layout->is_union) return;
+    key += '.';
+    key += rhs->rhs->text;
+    rhs = rhs->lhs;
+  }
+}
+
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                        Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
@@ -502,13 +526,11 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
 
     // §11.9 with §23.9: the tag is recorded under the key the target's
     // storage was created by (TagKeyOfName), the one a declaration
-    // initializer's tag already stands under, so both forms name one tag. The
-    // tag table keeps the view it is given, so the key is interned in the
-    // arena rather than left in a string that ends with this statement.
+    // initializer's tag already stands under, so both forms name one tag.
     if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs) {
-      ctx.SetVariableTag(
-          *arena.Create<std::string>(TagKeyOfName(stmt->lhs->text, ctx)),
-          stmt->rhs->rhs->text);
+      RecordTaggedValueTags(stmt->rhs, TagKeyOfName(stmt->lhs->text, ctx),
+                            StructLayoutOfName(stmt->lhs->text, ctx), ctx,
+                            arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(stmt->lhs, rhs_val, ctx);
