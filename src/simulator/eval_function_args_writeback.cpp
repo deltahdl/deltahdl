@@ -406,6 +406,19 @@ static bool TryWritebackEventFormal(const FunctionArg& formal,
   return true;
 }
 
+// The value `value` a formal's local holds on return, collected for the
+// actual it was bound from, or, where the call passed none, for the target the
+// formal's default names (§13.5.3), which is written in the callee's scope.
+static void CollectValueWriteback(const FunctionArg& formal, const Expr* actual,
+                                  const Logic4Vec& value, CallerWrites& writes,
+                                  CallerWrites& default_writes) {
+  if (actual != nullptr) {
+    writes.values.emplace_back(actual, value);
+  } else if (formal.default_value != nullptr) {
+    default_writes.values.emplace_back(formal.default_value, value);
+  }
+}
+
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   CallerWrites writes;
@@ -425,11 +438,7 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
       continue;
     }
     if (TryWritebackEventFormal(formal, actual, local, ctx)) continue;
-    if (actual != nullptr) {
-      writes.values.emplace_back(actual, local->value);
-    } else if (formal.default_value != nullptr) {
-      default_writes.values.emplace_back(formal.default_value, local->value);
-    }
+    CollectValueWriteback(formal, actual, local->value, writes, default_writes);
   }
   if (!writes.Empty()) AssignInCallerScope(writes, ctx, arena);
   ReleaseRefPropertyCells(func, expr, ctx, arena);
