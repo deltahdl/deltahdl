@@ -343,4 +343,31 @@ TEST(UnpackedArrayConcatSim, BracesAssignedToAQueueElementFillItsQueue) {
   EXPECT_EQ(out, "2 2 1 5 2 5 6\n");
 }
 
+// §10.10 with §7.4 and §7.10: assigned to a queue whose elements are arrays,
+// an item of that element type is one element of the concatenation, where an
+// item that is an array of the element type contributes each of its elements.
+// `a`, an `int [3]`, is one row of `int r[$][3]`, as the selected row `r[0]`
+// is, and `b`, an `int [$]`, one element of `int s[$][$]`; `r` itself
+// contributes its rows as they stood before the assignment.
+TEST(UnpackedArrayConcatSim, ItemOfTheQueuesElementTypeIsOneElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][3];\n"
+      "  int a[3] = '{1, 2, 3};\n"
+      "  int s[$][$];\n"
+      "  int b[$] = '{7, 8};\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r = {r, a};\n"
+      "    r = {r, r[0]};\n"
+      "    s = {b, b};\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", r.size(), r[0][2],\n"
+      "             r[1][0], r[1][2], r[2][1], s.size(), s[1][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 6 1 3 5 2 8\n");
+}
+
 }  // namespace

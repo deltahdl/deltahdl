@@ -367,6 +367,47 @@ static bool FillQueueFromQueueOfQueues(QueueObject* q, const Expr* rhs,
   return true;
 }
 
+// §10.10 with §7.4 and §7.10: `q`, a queue whose elements are queues, assigned
+// the unpacked array concatenation `rhs`, holds what each item contributes in
+// turn. An item naming an array of `q`'s own type, a queue of the same levels
+// and element size, contributes a copy of each of its elements' queues; a
+// select of one element of such an array, `r[0]`, a copy of that element's
+// queue; and any other item, being of `q`'s element type, one element made as
+// a pushed argument makes it (ElementQueueFromItem), so `a` of `int a[3]` is
+// one row of `int r[$][3]`. The copies are made before `q` is emptied, so that
+// `r = {r, a}` keeps r's rows. False, with `q` left alone, where `rhs` is no
+// concatenation.
+static bool FillQueueFromConcatenation(QueueObject* q, const Expr* rhs,
+                                       SimContext& ctx, Arena& arena) {
+  if (rhs->kind != ExprKind::kConcatenation) return false;
+  ElementQueueShape shape = ShapeOf(*q);
+  std::vector<QueueObject*> copies;
+  for (const Expr* item : rhs->elements) {
+    if (const QueueObject* element =
+            ElementQueueOfSelect(item, ctx, arena, /*allocate=*/false)) {
+      copies.push_back(CopyElementQueue(element, shape, arena));
+      continue;
+    }
+    const QueueObject* src = item->kind == ExprKind::kIdentifier ||
+                                     item->kind == ExprKind::kMemberAccess
+                                 ? FindQueueOfBase(item, ctx, arena)
+                                 : nullptr;
+    if (src != nullptr && src->elements_are_queues &&
+        src->nested_queue_levels == q->nested_queue_levels &&
+        src->element_array_size == q->element_array_size) {
+      for (size_t i = 0; i < src->elements.size(); ++i)
+        copies.push_back(
+            CopyElementQueue(ElementQueueAt(*src, i), shape, arena));
+      continue;
+    }
+    copies.push_back(ElementQueueFromItem(q, item, ctx, arena));
+  }
+  ResetToPlaceholders(q, copies.size(), arena);
+  for (size_t i = 0; i < copies.size(); ++i)
+    q->element_queues[q->ElementQueueKeyAt(i)] = copies[i];
+  return true;
+}
+
 void BindElementQueueIterator(const QueueObject& outer, size_t pos,
                               std::string_view iter_name, SimContext& ctx,
                               Arena& arena) {
@@ -386,6 +427,7 @@ bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
   if (!q->elements_are_queues) return false;
   if (FillQueueFromLocatorRows(q, pattern, ctx, arena)) return true;
   if (FillQueueFromQueueOfQueues(q, pattern, ctx, arena)) return true;
+  if (FillQueueFromConcatenation(q, pattern, ctx, arena)) return true;
   if (pattern->kind != ExprKind::kAssignmentPattern ||
       !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
     return false;

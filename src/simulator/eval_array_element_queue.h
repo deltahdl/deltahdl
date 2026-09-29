@@ -59,9 +59,12 @@ void BindElementQueueIterator(const QueueObject& outer, size_t pos,
 // `'{ {1}, T_QI'{2,3,4}, {5,6} }` is three elements of one, three and two
 // values. §7.12.1 with §7.4.4: `pattern` may instead be a locator selecting
 // rows of a two-dimensional array, `m.find with (item.sum() > 5)`, and each
-// selected row becomes an element holding a copy of the row's elements. What
+// selected row becomes an element holding a copy of the row's elements. §10.10:
+// `pattern` may also be an unpacked array concatenation, each item of the
+// element type one element and each array of that type its elements. What
 // `q` held before, the queues of its elements with it, is gone. False, with
-// `q` left alone, where its elements are no queues or `pattern` is neither.
+// `q` left alone, where its elements are no queues or `pattern` is none of
+// these.
 bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
                        Arena& arena);
 
