@@ -398,4 +398,47 @@ TEST(EventControlSim, StaticPropertyWrittenFromAStaticMethodWakesBothForms) {
   EXPECT_EQ(result->value.ToUint64(), 3503u);
 }
 
+// §9.4 Syntax 9-4: `always @e n++;` is the unparenthesized clocking event
+// guarding the procedure's statement, so each trigger of `e` runs `n++` once,
+// exactly as `always @(e) n++;` would. The procedure used to stop parsing at
+// the `@`, reading `e` as its statement and `n` as a stray name.
+TEST(EventControlSim, AlwaysAtBareEventNameCountsEachTrigger) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event e;\n"
+      "  int n;\n"
+      "  always @e n++;\n"
+      "  initial begin\n"
+      "    #2 -> e;\n"
+      "    #2 -> e;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// `@e -> f;` waits on `e` and then triggers `f`, which wakes the process
+// waiting on `f`. Read as `@(e -> f);`, it waited on an implication that
+// never changed and triggered nothing, so `got` stayed 0.
+TEST(EventControlSim, BareEventNameGuardsATrigger) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event e, f;\n"
+      "  int got;\n"
+      "  initial @e -> f;\n"
+      "  initial @f got = 7;\n"
+      "  initial begin\n"
+      "    #2 -> e;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
 }  // namespace

@@ -152,6 +152,29 @@ struct ParserStmtHelpers {
     }
     return step;
   }
+
+  // §9.4 Syntax 9-4: a clocking_event written without parentheses is `@` and
+  // a ps_identifier or hierarchical_identifier -- a name whose parts are joined
+  // by periods, with a bit-select allowed ahead of each period -- and not an
+  // expression. Read as an expression, it took in what the controlled statement
+  // opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
+  // guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
+  static Expr* ParseClockingEventName(Parser& p) {
+    Token first = p.CurrentToken();
+    if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$root") {
+      p.Consume();
+    } else {
+      first = p.ExpectIdentifier(Subclause("9.4.2"));
+    }
+    Expr* name = p.ParseMemberAccessChain(first);
+    while (p.AtSelectBracket()) {
+      name = p.ParseSelectExpr(name);
+      while (p.Check(TokenKind::kDot) || p.Check(TokenKind::kColonColon)) {
+        name = p.MakeMemberAccess(name);
+      }
+    }
+    return name;
+  }
 };
 
 static CaseQualifier TokenToCaseQualifier(TokenKind tk) {
@@ -679,7 +702,7 @@ Stmt* Parser::ParseEventControlStmt() {
     Expect(TokenKind::kRParen, Subclause("9.4.2"));
   } else {
     EventExpr ev;
-    ev.signal = ParseExpr();
+    ev.signal = ParserStmtHelpers::ParseClockingEventName(*this);
     stmt->events.push_back(ev);
   }
   stmt->body = ParseStmt();

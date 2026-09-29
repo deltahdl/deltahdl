@@ -13,6 +13,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 #include "parser/parser_token_skips.h"
@@ -427,7 +428,19 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   }
 
   if (Check(TokenKind::kAt)) {
+    auto saved = lexer_.SavePos();
     Consume();
+    // §9.4 Syntax 9-4 also writes the clocking event as `@` and a bare name,
+    // which the procedural event control statement reads. That statement's
+    // events become the procedure's sensitivity, as `@(e)`'s would, and the
+    // statement it guards the procedure's body.
+    if (!Check(TokenKind::kStar) && !Check(TokenKind::kLParen)) {
+      lexer_.RestorePos(saved);
+      Stmt* control = ParseEventControlStmt();
+      item->sensitivity = std::move(control->events);
+      item->body = control->body;
+      return item;
+    }
     if (Match(TokenKind::kStar)) {
       item->is_star_sensitivity = true;
     } else if (Check(TokenKind::kLParen)) {

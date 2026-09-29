@@ -233,4 +233,98 @@ TEST(EventControlParsing, MemberAccessInEventExpression) {
       ExprKind::kMemberAccess);
 }
 
+// §9.4 Syntax 9-4 gives a clocking_event without parentheses, `@` and a name,
+// so an always procedure opens with one as readily as with `@(e)`: the name
+// becomes the procedure's sensitivity and the statement after it its body.
+TEST(EventControlParsing, AlwaysAtBareEventName) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  int n;\n"
+      "  always @e n++;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  ASSERT_NE(item->sensitivity[0].signal, nullptr);
+  EXPECT_EQ(item->sensitivity[0].signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->sensitivity[0].signal->text, "e");
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kExprStmt);
+}
+
+TEST(EventControlParsing, AlwaysAtBareHierarchicalEventName) {
+  auto r = Parse(
+      "module m;\n"
+      "  int n;\n"
+      "  always @g[1].e n++;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  ASSERT_NE(item->sensitivity[0].signal, nullptr);
+  EXPECT_EQ(item->sensitivity[0].signal->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kExprStmt);
+}
+
+TEST(EventControlParsing, AlwaysFFAtBareClockName) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @clk q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].signal->text, "clk");
+}
+
+// The name after a bare `@` is a name and no more: the `->` that follows it
+// opens the event trigger the control guards, and is not §11.4.7's
+// implication joining `e` to `f`.
+TEST(EventControlParsing, BareEventNameStopsBeforeTrigger) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e, f;\n"
+      "  initial @e -> f;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(stmt->events[0].signal->text, "e");
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kEventTrigger);
+}
+
+// Nor is a `++` after the name its postfix increment: it is the prefix
+// increment the controlled statement opens with.
+TEST(EventControlParsing, BareEventNameStopsBeforePrefixIncrement) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  int n;\n"
+      "  initial @e ++n;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(stmt->events[0].signal->text, "e");
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kExprStmt);
+}
+
 }  // namespace
