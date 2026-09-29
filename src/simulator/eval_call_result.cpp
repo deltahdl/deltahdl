@@ -483,29 +483,41 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
   return value;
 }
 
-// Copies `returned` into the queue or dynamic array `q` named by `lhs`, as an
-// assignment to it rebuilds its elements: each at the element width, fresh
-// element identities, and the change announced (§9.4.2).
+// The assignment `stmt` of a call's result, and the context and arena it
+// is carried out in.
+struct CallResultAssign {
+  const Stmt* stmt;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// Copies `returned` into the queue or dynamic array `q` the statement's
+// target names, as an assignment to it rebuilds its elements: each at the
+// element width, fresh element identities, and the change announced to the
+// watchers of `owner`, the object whose property it is, or of the name
+// (§9.4.2).
 static void CopyReturnedToQueue(const ReturnedAggregate& returned,
-                                QueueObject* q, const Expr* lhs,
-                                ClassObject* owner, SimContext& ctx,
-                                Arena& arena) {
+                                QueueObject* q, ClassObject* owner,
+                                const CallResultAssign& a) {
   q->elements.clear();
   for (const Logic4Vec& e : returned.elements)
     q->elements.push_back(
-        OwnRhsWords(ResizeToWidth(e, q->elem_width, arena), arena));
+        OwnRhsWords(ResizeToWidth(e, q->elem_width, a.arena), a.arena));
   q->AssignFreshIds();
   ++q->generation;
-  AnnounceQueueChange(lhs, owner, ctx);
+  AnnounceQueueChange(a.stmt->lhs, owner, a.ctx);
 }
 
-// Copies `returned` into the fixed-size array `dst` under `name`, element for
-// element from the left of each (§7.6); a different number of elements is
-// the §7.6 error, and nothing is written.
+// Copies `returned` into the fixed-size array `dst` the statement's target
+// names, element for element from the left of each (§7.6); a different
+// number of elements is the §7.6 error, and nothing is written.
 static void CopyReturnedToArray(const ReturnedAggregate& returned,
-                                std::string_view name, const ArrayInfo& dst,
-                                const Stmt* stmt, SimContext& ctx,
-                                Arena& arena) {
+                                const ArrayInfo& dst,
+                                const CallResultAssign& a) {
+  const Stmt* stmt = a.stmt;
+  SimContext& ctx = a.ctx;
+  Arena& arena = a.arena;
+  std::string_view name = stmt->lhs->text;
   if (returned.elements.size() != dst.size) {
     ctx.GetDiag().Error(stmt->range.start,
                         "array size mismatch in assignment to fixed-size array",
@@ -548,10 +560,11 @@ bool TryCallResultArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     ApplyGenericBlockingAssign(stmt, value, ctx, arena);
     return true;
   }
+  CallResultAssign target{stmt, ctx, arena};
   if (q != nullptr) {
-    CopyReturnedToQueue(*returned, q, stmt->lhs, owner, ctx, arena);
+    CopyReturnedToQueue(*returned, q, owner, target);
   } else {
-    CopyReturnedToArray(*returned, stmt->lhs->text, *dst, stmt, ctx, arena);
+    CopyReturnedToArray(*returned, *dst, target);
   }
   return true;
 }
