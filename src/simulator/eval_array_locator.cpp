@@ -47,6 +47,14 @@ struct LocatorCtx {
   Arena& arena;
   std::string_view iter_name = "item";
   std::string idx_var_name = "item.index";
+  // §7.4.4: the multidimensional fixed-size array whose elements are the
+  // subarrays the iterator is bound to, and its shape; null for an array
+  // whose elements are values.
+  std::string_view subarray_owner = {};
+  const ArrayInfo* subarray_info = nullptr;
+  // §7.12.4 with §7.4.2: the index of the first element, a fixed-size array's
+  // low bound, which every reported index and the index iterator count from.
+  uint32_t index_base = 0;
 };
 
 static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
@@ -64,19 +72,25 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
 
 // Pushes a fresh scope and binds the per-iteration locator iterators: the
 // element iterator (item_val, optionally registered as a string, and signed
-// where the element type is, §7.12 with §6.11) and the index iterator
-// (item_index, 32-bit). The caller is responsible for evaluating the with
-// expression in this scope and calling PopScope afterwards.
+// where the element type is, §7.12 with §6.11, or the subarray at item_index
+// of a multidimensional array, §7.4.4) and the index iterator (item_index,
+// 32-bit). The caller is responsible for evaluating the with expression in
+// this scope and calling PopScope afterwards.
 static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
                               size_t item_index) {
   lc.ctx.PushScope();
-  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width,
-                                              item_val.is_signed);
-  item_var->value = item_val;
-  if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
+  if (lc.subarray_info != nullptr) {
+    BindSubarrayIterator(lc.subarray_owner, *lc.subarray_info,
+                         static_cast<uint32_t>(item_index), lc.iter_name,
+                         lc.ctx, lc.arena);
+  } else {
+    auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width,
+                                                item_val.is_signed);
+    item_var->value = item_val;
+    if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
+  }
   auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
-  idx_var->value =
-      MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
+  idx_var->value = MakeLogic4VecVal(lc.arena, 32, lc.index_base + item_index);
 }
 
 static bool EvalLocatorPredicate(const LocatorCtx& lc,
@@ -123,31 +137,21 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
   if (method == "find_last_index") {
     for (size_t i = lc.elems.size(); i > 0; --i) {
       if (!EvalLocatorPredicate(lc, lc.elems[i - 1], i - 1)) continue;
-      out.push_back(
-          MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i - 1)));
+      out.push_back(MakeLogic4VecVal(lc.arena, 32, lc.index_base + i - 1));
       break;
     }
     return;
   }
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
-    out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
+    out.push_back(MakeLogic4VecVal(lc.arena, 32, lc.index_base + i));
     if (method == "find_first_index") break;
   }
 }
 
 static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
-  for (size_t i = 0; i < lc.elems.size(); ++i) {
-    lc.ctx.PushScope();
-    auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width,
-                                                lc.elems[i].is_signed);
-    item_var->value = lc.elems[i];
-    if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
-    auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
-    idx_var->value = MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i));
-    out.push_back(EvalExpr(lc.with_expr, lc.ctx, lc.arena));
-    lc.ctx.PopScope();
-  }
+  for (size_t i = 0; i < lc.elems.size(); ++i)
+    out.push_back(EvalLocatorWithExpr(lc, lc.elems[i], i));
 }
 
 static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena&,
@@ -169,8 +173,11 @@ static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena&,
   }
 }
 
+// unique_index without a with clause: the index of the first element of each
+// distinct value, counted from `index_base` (§7.12.4 with §7.4.2).
 static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
-                               Arena& arena, std::vector<Logic4Vec>& out) {
+                               uint32_t index_base, Arena& arena,
+                               std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
   for (size_t i = 0; i < elems.size(); ++i) {
     uint64_t v = elems[i].ToUint64();
@@ -183,7 +190,7 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
     }
     if (!dup) {
       seen.push_back(v);
-      out.push_back(MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i)));
+      out.push_back(MakeLogic4VecVal(arena, 32, index_base + i));
     }
   }
 }
@@ -211,7 +218,7 @@ static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
 
 // De-duplicates by the value of the with expression. For each first-seen
 // distinct with-value, pushes either the matching element (use_index=false) or
-// its 0-based position as a 32-bit value (use_index=true).
+// its index as a 32-bit value (use_index=true).
 static void DedupeLocatorResults(const LocatorCtx& lc, bool use_index,
                                  std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
@@ -226,9 +233,9 @@ static void DedupeLocatorResults(const LocatorCtx& lc, bool use_index,
     }
     if (!dup) {
       seen.push_back(v);
-      out.push_back(
-          use_index ? MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i))
-                    : lc.elems[i]);
+      out.push_back(use_index
+                        ? MakeLogic4VecVal(lc.arena, 32, lc.index_base + i)
+                        : lc.elems[i]);
     }
   }
 }
@@ -465,14 +472,9 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
   return true;
 }
 
-// Flattens the associative array into parallel key/value vectors in
-// ascending-key order, the first()/last() ordering of §7.9: an integral key
-// at the index width with the index type's signedness, a string key as its
-// text (§7.8.1), which std::map orders lexicographically as §7.9 does. Each
-// value reads with the element type's signedness (§6.11).
-static void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
-                                std::vector<Logic4Vec>& keys,
-                                std::vector<Logic4Vec>& vals) {
+void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
+                         std::vector<Logic4Vec>& keys,
+                         std::vector<Logic4Vec>& vals) {
   if (aa.is_string_key) {
     for (const auto& [k, v] : aa.str_data) {
       keys.push_back(StringToLogic4Vec(arena, k));
@@ -505,12 +507,31 @@ struct LocatorEnv {
 // §7.12.1 — the indexed-array subject of a locator query: the collapsed element
 // vector and whether those elements are strings, evaluated inside a LocatorEnv.
 // The indexed locator family (unique/unique_index/min/max and find*) all act on
-// exactly this object, so they share one struct.
+// exactly this object, so they share one struct. `var_name` and `info` name
+// the array and its shape, which a multidimensional array's subarray
+// elements are bound from (§7.4.4).
 struct IndexedLocatorInput {
   LocatorEnv env;
   const std::vector<Logic4Vec>& elems;
   bool is_str;
+  std::string_view var_name;
+  const ArrayInfo& info;
 };
+
+// The iterator context of the indexed locator `in`, its indices counted from
+// the array's low bound and its iterator bound to each subarray where the
+// array's elements are subarrays.
+static LocatorCtx MakeIndexedLocatorCtx(const IndexedLocatorInput& in) {
+  const LocatorEnv& env = in.env;
+  LocatorCtx lc =
+      MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
+  lc.index_base = in.info.lo;
+  if (HasSubarrayElements(in.info)) {
+    lc.subarray_owner = in.var_name;
+    lc.subarray_info = &in.info;
+  }
+  return lc;
+}
 
 static bool TryCollectAssocLocatorResult(const LocatorEnv& env,
                                          const MethodCallParts& parts,
@@ -541,33 +562,29 @@ static void RunIndexedUnique(const IndexedLocatorInput& in,
                              std::vector<Logic4Vec>& out) {
   const LocatorEnv& env = in.env;
   if (env.expr->with_expr) {
-    LocatorCtx lc =
-        MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
+    LocatorCtx lc = MakeIndexedLocatorCtx(in);
     LocatorUniqueWith(lc, out);
   } else {
     LocatorUnique(in.elems, env.arena, out);
   }
 }
 
-// unique_index: same dedupe rule as unique, but emits 0-based positions.
+// unique_index: same dedupe rule as unique, but emits indices.
 static void RunIndexedUniqueIndex(const IndexedLocatorInput& in,
                                   std::vector<Logic4Vec>& out) {
   const LocatorEnv& env = in.env;
   if (env.expr->with_expr) {
-    LocatorCtx lc =
-        MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
+    LocatorCtx lc = MakeIndexedLocatorCtx(in);
     LocatorUniqueIndexWith(lc, out);
   } else {
-    LocatorUniqueIndex(in.elems, env.arena, out);
+    LocatorUniqueIndex(in.elems, in.info.lo, env.arena, out);
   }
 }
 
 static void RunIndexedMinMax(std::string_view method,
                              const IndexedLocatorInput& in,
                              std::vector<Logic4Vec>& out) {
-  const LocatorEnv& env = in.env;
-  LocatorCtx lc =
-      MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
+  LocatorCtx lc = MakeIndexedLocatorCtx(in);
   LocatorMinMax(method, lc, out);
 }
 
@@ -691,7 +708,8 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
-  IndexedLocatorInput in{LocatorEnv{expr, ctx, arena}, elems, is_str};
+  IndexedLocatorInput in{LocatorEnv{expr, ctx, arena}, elems, is_str,
+                         parts.var_name, *info};
   bool handled = false;
   bool optional_result =
       TryIndexedOptionalWithLocator(parts.method_name, in, out, handled);
@@ -700,7 +718,7 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
   if (!CheckIndexedWithClauseRequired(parts.method_name, expr, ctx))
     return false;
 
-  LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  LocatorCtx lc = MakeIndexedLocatorCtx(in);
   DispatchIndexedLocator(parts.method_name, lc, out);
   return true;
 }

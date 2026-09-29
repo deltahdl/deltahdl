@@ -31,12 +31,18 @@ static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
 // The 'with'-clause iteration binding for array reduction/ordering methods
 // (§7.12). Each element is evaluated with the iterator variable (named by
 // iter_name) and its index variable (idx_var_name) bound in a fresh scope.
-// ctx/arena are the evaluation environment those bindings live in.
+// ctx/arena are the evaluation environment those bindings live in, and
+// index_base is the index of the first element, a fixed-size array's low
+// bound (§7.12.4 with §7.4.2). An associative array's elements are indexed
+// by `keys` instead, one per element, strings where `string_keys` says so.
 struct WithIterEnv {
   std::string_view iter_name;
   const std::string& idx_var_name;
   SimContext& ctx;
   Arena& arena;
+  uint32_t index_base = 0;
+  const std::vector<Logic4Vec>* keys = nullptr;
+  bool string_keys = false;
 };
 
 static std::vector<uint64_t> CollectElements(std::string_view var_name,
@@ -242,9 +248,15 @@ static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
   auto* item_var =
       env.ctx.CreateLocalVariable(env.iter_name, elem.width, elem.is_signed);
   item_var->value = elem;
-  auto* idx_var = env.ctx.CreateLocalVariable(env.idx_var_name, 32);
-  idx_var->value =
-      MakeLogic4VecVal(env.arena, 32, static_cast<uint64_t>(index));
+  // §7.12.4: the index iterator is an associative element's key, of the
+  // index type, and any other element's index, an int.
+  Logic4Vec index_val =
+      env.keys != nullptr
+          ? (*env.keys)[index]
+          : MakeLogic4VecVal(env.arena, 32, env.index_base + index);
+  env.ctx.CreateLocalVariable(env.idx_var_name, index_val.width)->value =
+      index_val;
+  if (env.string_keys) env.ctx.RegisterStringVariable(env.idx_var_name);
   Logic4Vec ev = EvalExpr(with_expr, env.ctx, env.arena);
   env.ctx.PopScope();
   return ev;
@@ -271,46 +283,25 @@ struct ArrayCtx {
   Arena& arena;
 };
 
-// Reduces the values produced by the with-clause expression of `expr` for each
-// element of the named array (§7.12.3). `method` selects the fold and is passed
-// explicitly so this serves both the parenthesized call form (method name on
-// expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
-// name on expr->rhs). The result takes the width of the with expression.
-// §7.12.3: the with clause's value for row `row` of the two-dimensional array
-// of `ac`, the iterator bound to the row as the one-dimensional array it is,
-// its elements the row's, so that `item.sum with (item)` reduces the row.
+// §7.12.3 with §7.4.4: the with clause's value for element `row` of the
+// first dimension of the multidimensional array of `ac`, the iterator bound
+// to the subarray it is, so that `item.sum with (item)` reduces it, and the
+// index iterator to its index in that dimension.
 static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
                                 const IterNames& names, uint32_t row) {
   SimContext& ctx = ac.ctx;
-  const ArrayInfo& info = ac.info;
-  ArrayInfo row_info;
-  row_info.lo = info.dim_los[1];
-  row_info.size = info.dim_sizes[1];
-  row_info.elem_width = info.elem_width;
-  row_info.is_4state = info.is_4state;
-  std::string prefix = std::string(ac.var_name) + "[" +
-                       std::to_string(info.dim_los[0] + row) + "]";
-  // §7.12 with §6.11: each element of the row keeps its type's signedness.
-  std::vector<Logic4Vec> leaves =
-      CollectVecElements(prefix, row_info, ctx, ac.arena);
   ctx.PushScope();
-  for (uint32_t j = 0; j < row_info.size; ++j) {
-    std::string index = "[" + std::to_string(row_info.lo + j) + "]";
-    auto* name =
-        ac.arena.Create<std::string>(std::string(names.iter_name) + index);
-    ctx.CreateLocalVariable(*name, info.elem_width, leaves[j].is_signed)
-        ->value = leaves[j];
-  }
-  ctx.RegisterArrayInScope(names.iter_name, row_info);
+  BindSubarrayIterator(ac.var_name, ac.info, row, names.iter_name, ctx,
+                       ac.arena);
   ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
-      MakeLogic4VecVal(ac.arena, 32, info.dim_los[0] + row);
+      MakeLogic4VecVal(ac.arena, 32, ac.info.dim_los[0] + row);
   Logic4Vec value = EvalExpr(expr->with_expr, ctx, ac.arena);
   ctx.PopScope();
   return value;
 }
 
-// §7.12.3: a two-dimensional fixed-size array reduced through a with clause
-// is reduced over the elements of its first dimension, each a row, which
+// §7.12.3: a multidimensional fixed-size array reduced through a with clause
+// is reduced over the elements of its first dimension, each a subarray, which
 // §7.12.3's own `m.sum with (item.sum with (item))` example relies on.
 static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
                                     std::string_view method) {
@@ -326,15 +317,20 @@ static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
   return MakeLogic4VecVal(ac.arena, width, ApplyReduction(method, vals));
 }
 
+// Reduces the values produced by the with-clause expression of `expr` for each
+// element of the named array (§7.12.3). `method` selects the fold and is passed
+// explicitly so this serves both the parenthesized call form (method name on
+// expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
+// name on expr->rhs). The result takes the width of the with expression.
 static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
                                 std::string_view method) {
-  if (ac.info.dim_sizes.size() == 2 && ac.info.dim_los.size() == 2 &&
-      expr->with_expr != nullptr) {
+  if (HasSubarrayElements(ac.info) && expr->with_expr != nullptr) {
     return ReduceRowsWithExpr(ac, expr, method);
   }
   auto elems = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
-  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
+  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena,
+                  ac.info.lo};
   IteratorLayout layout(names.iter_name, ac.var_name, ac.ctx);
 
   uint32_t result_width = 0;
@@ -398,20 +394,6 @@ static const ArrayInfo* ArrayInfoForReduction(std::string_view var_name,
   return nullptr;
 }
 
-// §7.12.3: an associative array is an unpacked array of integral values, so the
-// reduction methods apply to its stored elements. Collect them in key order
-// (int- or string-keyed); the supported operators are commutative, so the
-// unspecified iteration order does not affect the result.
-static std::vector<Logic4Vec> CollectAssocElements(const AssocArrayObject* aa) {
-  std::vector<Logic4Vec> vals;
-  if (aa->is_string_key) {
-    for (const auto& [key, val] : aa->str_data) vals.push_back(val);
-  } else {
-    for (const auto& [key, val] : aa->int_data) vals.push_back(val);
-  }
-  return vals;
-}
-
 // Folds an associative array's elements with the named reduction, optionally
 // transforming each through the with clause carried by `expr` (null for the
 // bare property form). Returns nullopt for non-reduction methods so the caller
@@ -421,10 +403,17 @@ std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
                                            const Expr* expr, SimContext& ctx,
                                            Arena& arena) {
   if (!IsReductionMethod(method)) return std::nullopt;
-  auto elems = CollectAssocElements(aa);
+  // §7.12.3: an associative array is an unpacked array of integral values, so
+  // the reduction methods apply to its stored elements, in key order; the
+  // folds are commutative, so the order does not affect the result.
+  std::vector<Logic4Vec> keys;
+  std::vector<Logic4Vec> elems;
+  CollectAssocKeyVals(*aa, arena, keys, elems);
   if (expr != nullptr && expr->with_expr != nullptr) {
     auto names = ExtractIterNames(expr);
     WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
+    env.keys = &keys;
+    env.string_keys = aa->is_string_key;
     uint32_t result_width = 0;
     auto vals = EvalReduceWithValues(elems, expr, env, result_width);
     if (result_width == 0) result_width = aa->elem_width;
@@ -628,7 +617,8 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
                               bool ascending) {
   auto vals = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
-  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
+  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena,
+                  ac.info.lo};
   IteratorLayout layout(names.iter_name, ac.var_name, ac.ctx);
   auto keys = BuildSortKeys(vals, expr, env);
   SortKeysByValue(keys, ascending);

@@ -22,6 +22,16 @@ std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                           const ArrayInfo& info,
                                           SimContext& ctx, Arena& arena);
 
+// Flattens the associative array into parallel key/value vectors in
+// ascending-key order, the first()/last() ordering of §7.9: an integral key
+// at the index width with the index type's signedness, a string key as its
+// text (§7.8.1), which std::map orders lexicographically as §7.9 does. Each
+// value reads with the element type's signedness (§6.11). Defined in
+// eval_array_locator.cpp; also used by the reductions in eval_array.cpp.
+void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
+                         std::vector<Logic4Vec>& keys,
+                         std::vector<Logic4Vec>& vals);
+
 // §7.12 with §6.16: whether the fixed-size or dynamic array `var_name`
 // describes by `info` holds strings, by its declared element type or, where
 // that was not recorded, by the string registration of the array or its first
@@ -63,6 +73,21 @@ class IteratorLayout {
   std::string_view previous_;
   bool bound_ = false;
 };
+
+// §7.4.4 with §7.12: whether `info` describes a fixed-size array of more than
+// one unpacked dimension, whose elements are subarrays rather than values.
+// Defined in eval_array_subarray.cpp, as is BindSubarrayIterator.
+bool HasSubarrayElements(const ArrayInfo& info);
+
+// §7.12 with §7.4.4: binds the iterator `iter_name` of a with clause, in the
+// current scope, to the element `offset` places into the first dimension of
+// the multidimensional array `var_name` that `info` describes, as the
+// subarray it is: registered as an array of the remaining dimensions, its
+// elements local copies of that element's own, so that `item.sum with (item)`
+// and `item[1]` read it.
+void BindSubarrayIterator(std::string_view var_name, const ArrayInfo& info,
+                          uint32_t offset, std::string_view iter_name,
+                          SimContext& ctx, Arena& arena);
 
 // §7.12.3: the array reduction methods over an associative array, which reach
 // its elements by a route of their own rather than through ArrayInfo. Empty

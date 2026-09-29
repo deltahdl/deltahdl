@@ -15,7 +15,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -305,6 +307,78 @@ TEST(ArrayIteratorIndex, IndexInReductionMethod) {
       "endmodule\n",
       "r");
   EXPECT_EQ(r, 3u);
+}
+
+// §7.12.4 with §7.4.2 -- over a fixed-size array declared [1:3] the index of
+// each element is its declared index, 1 to 3, in every array method: the index
+// locators report a[2] for 20 and a[3] as the last element above 15, the index
+// method selects a[2] and maps each element to 1, 2 and 3, unique_index keeps
+// a[1] for the with value of 10, the rows of m[1:2][3] are rows 1 and 2, and
+// the indices sum to 6. Counted from 0, every one of these would be one less.
+TEST(ArrayIteratorIndex, IndexOfAFixedArrayNotStartingAtZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a[1:3] = '{10, 20, 30};\n"
+      "  int m[1:2][3];\n"
+      "  int b[$], c[$], d[$], e[$], g[$], h[$], k[$];\n"
+      "  initial begin\n"
+      "    foreach (m[i, j]) m[i][j] = (i - 1) * 3 + j;\n"
+      "    b = a.find_index with (item == 20);\n"
+      "    c = a.find_index with (item.index == 2);\n"
+      "    d = a.find_last_index with (item > 15);\n"
+      "    e = a.map with (item.index);\n"
+      "    g = a.unique_index;\n"
+      "    g.sort();\n"
+      "    h = a.unique_index with (item > 15);\n"
+      "    h.sort();\n"
+      "    k = m.find_index with (item.sum() > 5);\n"
+      "    $display(\"%p %p %p %p %p %0d %p %0d\", b, c, d, e, g, h[0], k,\n"
+      "             a.sum with (item.index));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{2} '{2} '{3} '{1, 2, 3} '{1, 2, 3} 1 '{2} 6\n");
+}
+
+// §7.12.4 with §7.12.2 -- rsort() ordering a fixed-size array declared [1:3]
+// by whether each element's index is 1 puts a[1] first and keeps the rest in
+// order; counted from 0 the key would pick a[2] instead.
+TEST(ArrayIteratorIndex, SortKeyReadsTheDeclaredIndex) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int s[1:3] = '{10, 20, 30};\n"
+      "  initial begin\n"
+      "    s.rsort with (int'(item.index == 1));\n"
+      "    $display(\"%p\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{10, 20, 30}\n");
+}
+
+// §7.12.4 with §7.12.3 -- a reduction's with clause over an associative array
+// binds the index method to each element's key, as the locators do: the keys 5
+// and 9 sum to 14, and a string key compares as the string it is, so only the
+// element under "a" counts 10. Bound to positions, the sums would be 1 and 2.
+TEST(ArrayIteratorIndex, AssociativeReductionIndexIsTheKey) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int sa[string];\n"
+      "  initial begin\n"
+      "    aa[5] = 1;\n"
+      "    aa[9] = 2;\n"
+      "    sa[\"b\"] = 1;\n"
+      "    sa[\"a\"] = 2;\n"
+      "    $display(\"%0d %0d\", aa.sum with (item.index),\n"
+      "             sa.sum with (item.index == \"a\" ? 10 : 1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "14 11\n");
 }
 
 }  // namespace

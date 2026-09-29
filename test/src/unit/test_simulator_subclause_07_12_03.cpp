@@ -555,4 +555,24 @@ TEST(ArrayReductionSim, TheIteratorReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "1 2 0 2\n");
 }
 
+// §7.12.3 with §7.4.4: over a three-dimensional array each element of the
+// first dimension is a two-dimensional subarray, which a with clause can
+// reduce in turn (0 + 1 + ... + 7), select from (m[1][1][0] + m[2][1][0], 2 +
+// 6) and ask the index of, the first dimension's own indices 1 and 2.
+TEST(ArrayReductionSim, NestedReductionOverTheSubarraysOfA3DArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int m [1:2][2][2];\n"
+      "  initial begin\n"
+      "    foreach (m[i, j, k]) m[i][j][k] = (i - 1) * 4 + j * 2 + k;\n"
+      "    $display(\"%0d %0d %0d\",\n"
+      "             m.sum with (item.sum with (item.sum with (item))),\n"
+      "             m.sum with (item[1][0]), m.sum with (item.index));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "28 8 3\n");
+}
+
 }  // namespace

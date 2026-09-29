@@ -423,4 +423,23 @@ TEST(ArrayMap, AssociativeSourceMissingWithNames7_12_5) {
                             "7.12.5"));
 }
 
+// §7.12.5 with §7.4.4: map() over a two-dimensional array visits each row,
+// the iterator bound to the row, so the with clause can reduce it and select
+// from it: 3 + 0 for row 0 and 12 + 3 for row 1.
+TEST(ArrayMap, MapOverTheRowsOfA2DArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int m[2][3];\n"
+      "  int s[$];\n"
+      "  initial begin\n"
+      "    foreach (m[i, j]) m[i][j] = i * 3 + j;\n"
+      "    s = m.map with (item.sum() + item[0]);\n"
+      "    $display(\"%p\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{3, 15}\n");
+}
+
 }  // namespace
