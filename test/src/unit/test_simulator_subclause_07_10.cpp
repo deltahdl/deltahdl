@@ -636,4 +636,19 @@ TEST(QueueSim, AnElementOfAnAssociativeArrayOfQueuesReadsSigned) {
   EXPECT_EQ(out, "1 1\n");
 }
 
+TEST(QueueSim, AnElementOfAnAssociativeArrayOfUnsignedQueuesReadsUnsigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  bit [31:0] aq[string][$];\n"
+      "  initial begin\n"
+      "    bit [31:0] bq[string][$];\n"
+      "    aq[\"k\"].push_back(-5); bq[\"k\"].push_back(-5);\n"
+      "    $display(\"%0d %0d\", aq[\"k\"][0] < 0, bq[\"k\"][0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0\n");
+}
+
 }  // namespace

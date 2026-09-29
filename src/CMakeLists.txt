@@ -497,6 +497,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_function_dpi.cpp
     simulator/eval_let.cpp
     simulator/eval_select.cpp
+    simulator/eval_select_assoc.cpp
     simulator/eval_streaming.cpp
     simulator/eval_systask_io.cpp
     simulator/eval_systask_scanf.cpp
