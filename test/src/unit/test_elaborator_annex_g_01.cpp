@@ -71,7 +71,7 @@ TEST(StdPackageContents, EveryMemberIsProvidedWithoutAUserDefinition) {
              "  int v;\n"
              "  int q;\n"
              "  initial begin\n"
-             "    process p = process::self();\n"
+             "    static process p = process::self();\n"
              "    weak_reference #(my_obj) wr;\n"
              "    q = std::randomize(v);\n"
              "  end\n"

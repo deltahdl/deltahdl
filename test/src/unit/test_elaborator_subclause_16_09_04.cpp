@@ -414,7 +414,7 @@ TEST(GlobalClockingElab,
       "module m;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
-      "    int i = $past_gclk(x);\n"
+      "    static int i = $past_gclk(x);\n"
       "    x = i;\n"
       "  end\n"
       "endmodule\n",

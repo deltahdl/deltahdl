@@ -23,7 +23,7 @@ TEST(InterfaceClassMethodConflict, SingleImplCalledViaObject) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C obj = new;\n"
+                      "    static C obj = new;\n"
                       "    result = obj.f();\n"
                       "  end\n"
                       "endmodule\n",
@@ -49,7 +49,7 @@ TEST(InterfaceClassMethodConflict, ExtendsAndImplementsCallsResolvedMethod) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C obj = new;\n"
+                      "    static C obj = new;\n"
                       "    result = obj.f();\n"
                       "  end\n"
                       "endmodule\n",
@@ -74,7 +74,7 @@ TEST(InterfaceClassMethodConflict, InterfaceExtendsConflictResolvesAtRuntime) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    D obj = new;\n"
+                      "    static D obj = new;\n"
                       "    result = obj.f();\n"
                       "  end\n"
                       "endmodule\n",
@@ -104,7 +104,7 @@ TEST(InterfaceClassMethodConflict, VirtualClassPrototypeResolvedMethodCalled) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C obj = new;\n"
+                      "    static C obj = new;\n"
                       "    result = obj.f();\n"
                       "  end\n"
                       "endmodule\n",
@@ -133,7 +133,7 @@ TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesAtRuntime) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived obj = new;\n"
+                      "    static Derived obj = new;\n"
                       "    result = obj.f();\n"
                       "  end\n"
                       "endmodule\n",

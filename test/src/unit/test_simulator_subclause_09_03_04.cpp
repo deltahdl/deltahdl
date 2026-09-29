@@ -94,24 +94,25 @@ TEST(BlockNameSimulation, NamedBlockVarsAreStatic) {
 // module's, and through a task for a block nested in the task.
 TEST(BlockNameSimulation, NamedBlockVariableReadByHierarchicalName) {
   SimFixture f;
-  EXPECT_EQ(RunCapture("module t;\n"
-                       "  initial begin : b1\n"
-                       "    int cnt = 7;\n"
-                       "    #10 cnt = 8;\n"
-                       "    #10;\n"
-                       "  end\n"
-                       "  task tk; begin : inner int w = 5; #8; end endtask\n"
-                       "  initial tk();\n"
-                       "  initial begin\n"
-                       "    #5 $display(\"%0d %0d\", b1.cnt, t.b1.cnt);\n"
-                       "    #1 $display(\"%0d\", tk.inner.w);\n"
-                       "    #6 $display(\"%0d\", b1.cnt);\n"
-                       "  end\n"
-                       "endmodule\n",
-                       f),
-            "7 7\n"
-            "5\n"
-            "8\n");
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  initial begin : b1\n"
+                 "    static int cnt = 7;\n"
+                 "    #10 cnt = 8;\n"
+                 "    #10;\n"
+                 "  end\n"
+                 "  task tk; begin : inner static int w = 5; #8; end endtask\n"
+                 "  initial tk();\n"
+                 "  initial begin\n"
+                 "    #5 $display(\"%0d %0d\", b1.cnt, t.b1.cnt);\n"
+                 "    #1 $display(\"%0d\", tk.inner.w);\n"
+                 "    #6 $display(\"%0d\", b1.cnt);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "7 7\n"
+      "5\n"
+      "8\n");
 }
 
 }  // namespace

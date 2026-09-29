@@ -247,7 +247,7 @@ TEST(AssocArrayExistsMethod, ReportsTheKeyAClassMethodWroteAndNotAnother) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    srv o = new;\n"
+      "    static srv o = new;\n"
       "    result = o.probe();\n"
       "  end\n"
       "endmodule\n",
@@ -268,7 +268,7 @@ TEST(AssocArrayExistsMethod, ReportsThroughAHandleTheKeysAClassPropertyHolds) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    c.fill();\n"
       "    c.aa[\"world\"] = 2;\n"
       "    result = c.aa.exists(\"hello\") * 100 + c.aa.exists(\"world\") * 10 "

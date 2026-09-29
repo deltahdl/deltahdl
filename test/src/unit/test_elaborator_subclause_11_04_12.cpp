@@ -392,7 +392,7 @@ TEST(ConcatenationElaboration, UnsizedInBlockScalarDeclInitError) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    int x = {1, 2};\n"
+      "    static int x = {1, 2};\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -409,8 +409,8 @@ TEST(ConcatenationElaboration, UnsizedInBlockArrayDeclInitAllowed) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    int q[$] = {1, 2};\n"
-      "    int a[2] = {3, 4};\n"
+      "    static int q[$] = {1, 2};\n"
+      "    static int a[2] = {3, 4};\n"
       "  end\n"
       "endmodule\n",
       f);

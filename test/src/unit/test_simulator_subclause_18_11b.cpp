@@ -111,7 +111,7 @@ TEST(InlineRandomVariableControlRun, ALocalMemberIsNamedWithinItsClass) {
       "module t;\n"
       "  int ok = 0, above = 0;\n"
       "  initial begin\n"
-      "    Vault vault = new;\n"
+      "    static Vault vault = new;\n"
       "    vault.lid = 100;\n"
       "    repeat (32) begin\n"
       "      ok += vault.draw_secret();\n"

@@ -75,11 +75,11 @@ module random_stability;
 
     fork
       begin
-        process quiet = process::self();
+        static process quiet = process::self();
         quiet.srandom(5);
       end
       begin
-        process m = process::self();
+        static process m = process::self();
         m.srandom(3);
         draw_five();
         u1 = u; r1 = r; f1 = f; c1 = c; q1 = q;
@@ -88,13 +88,13 @@ module random_stability;
     join
     fork
       begin
-        process noisy = process::self();
+        static process noisy = process::self();
         noisy.srandom(5);
         for (int j = 0; j < 100; j++) busy[j] = $urandom;
         draw_five();
       end
       begin
-        process m = process::self();
+        static process m = process::self();
         m.srandom(3);
         draw_five();
         u2 = u; r2 = r; f2 = f; c2 = c; q2 = q;

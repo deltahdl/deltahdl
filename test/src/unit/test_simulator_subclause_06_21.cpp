@@ -146,7 +146,7 @@ TEST(ScopeAndLifetimeSimulation, UnnamedBlockVarVisibleToNestedBlock) {
       "module t;\n"
       "  int observed;\n"
       "  initial begin\n"
-      "    int outer = 5;\n"
+      "    static int outer = 5;\n"
       "    begin\n"
       "      outer = outer + 10;\n"
       "    end\n"

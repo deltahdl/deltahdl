@@ -490,4 +490,11 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
 bool IsArrayQueryFunc(std::string_view callee);
 bool TypedefHasDynamicDim(const std::vector<Expr*>& dims);
 
+// Defined in elaborator_validate_funcbody.cpp.
+//
+// §6.21's rule that a static variable declared with an initializer says
+// `static` or `automatic`, over the tasks and functions of one package.
+void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
+                                        DiagEngine& diag);
+
 }  // namespace delta

@@ -152,7 +152,7 @@ TEST(TypedConstructorCallElaboration, BlockLocalDeclInitElaborates) {
              "class D extends C; endclass\n"
              "module m;\n"
              "  initial begin\n"
-             "    C c = D::new;\n"
+             "    static C c = D::new;\n"
              "  end\n"
              "endmodule\n"));
 }
@@ -167,7 +167,7 @@ TEST(TypedConstructorCallElaboration, IncompatibleBlockLocalDeclInitRejected) {
       "class U; endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    C c = U::new;\n"
+      "    static C c = U::new;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -185,7 +185,7 @@ TEST(TypedConstructorCallElaboration, BaseToDerivedBlockLocalDeclInitRejected) {
       "class D extends C; endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    D d = C::new;\n"
+      "    static D d = C::new;\n"
       "  end\n"
       "endmodule\n",
       f);

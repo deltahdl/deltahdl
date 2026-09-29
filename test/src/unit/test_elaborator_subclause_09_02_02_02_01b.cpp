@@ -212,7 +212,7 @@ TEST(AlwaysCombSensitivityInference, VarInitFunctionCallReadInSensitivity) {
       "    return x + a;\n"
       "  endfunction\n"
       "  always_comb begin\n"
-      "    logic [7:0] tv = read_a(8'd0);\n"
+      "    static logic [7:0] tv = read_a(8'd0);\n"
       "    result = tv;\n"
       "  end\n"
       "endmodule\n",

@@ -49,7 +49,7 @@ module urandom_range_function;
     // whether the thread beside it draws eight numbers or a hundred more.
     fork
       begin
-        process p = process::self();
+        static process p = process::self();
         p.srandom(9);
         for (k = 0; k < 8; k++) first_a[k] = $urandom_range(1000);
       end
@@ -59,7 +59,7 @@ module urandom_range_function;
     join
     fork
       begin
-        process q = process::self();
+        static process q = process::self();
         q.srandom(9);
         for (k = 0; k < 8; k++) first_c[k] = $urandom_range(1000);
       end

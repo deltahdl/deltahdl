@@ -285,8 +285,8 @@ module m;
   typedef enum { LOW = 1, MID, HIGH } level_t;
   int r;
   initial begin
-    level_t a = MID;
-    level_t b = a.next();
+    static level_t a = MID;
+    static level_t b = a.next();
     r = b;
   end
 endmodule
@@ -305,8 +305,8 @@ module m;
   typedef enum { LOW = 1, MID, HIGH } level_t;
   int r;
   function int step();
-    level_t a = MID;
-    level_t b = a.next();
+    static level_t a = MID;
+    static level_t b = a.next();
     return b;
   endfunction
   initial r = step();

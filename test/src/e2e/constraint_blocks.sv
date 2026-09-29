@@ -31,8 +31,8 @@ module constraint_blocks;
   int in_range = 0, ordered = 0, spaced = 0, under_limit = 0;
   int escaped = 0, still_ordered = 0, still_spaced = 0, other_in_range = 0;
   initial begin
-    Item it = new;
-    Other ot = new;
+    static Item it = new;
+    static Other ot = new;
     repeat (64) begin
       void'(it.randomize());
       if (it.lo >= 10 && it.lo <= 20) in_range++;

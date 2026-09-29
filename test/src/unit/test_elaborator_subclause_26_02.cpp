@@ -486,7 +486,7 @@ TEST(PackageDeclarationElaboration,
       ElabOk("package p;\n"
              "  function void f();\n"
              "    process h;\n"
-             "    semaphore s = new(1);\n"
+             "    static semaphore s = new(1);\n"
              "    h = process::self();\n"
              "    h = std::process::self();\n"
              "    s.put(1);\n"

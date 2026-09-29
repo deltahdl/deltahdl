@@ -303,7 +303,7 @@ TEST(RealConversion, BlockDeclInitIntToReal) {
       "module t;\n"
       "  real out;\n"
       "  initial begin\n"
-      "    real r = 5;\n"
+      "    static real r = 5;\n"
       "    out = r;\n"
       "  end\n"
       "endmodule\n",
@@ -400,7 +400,7 @@ TEST(RealConversion, RealActualRoundsIntoAConstructorIntFormal) {
       "  endclass\n"
       "  int a;\n"
       "  initial begin\n"
-      "    C c = new(6.5);\n"
+      "    static C c = new(6.5);\n"
       "    a = c.r;\n"
       "  end\n"
       "endmodule\n",
@@ -419,7 +419,7 @@ TEST(RealConversion, RealActualRoundsIntoAClassMethodIntFormal) {
       "  endclass\n"
       "  int a;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    a = c.m(12.5);\n"
       "  end\n"
       "endmodule\n",

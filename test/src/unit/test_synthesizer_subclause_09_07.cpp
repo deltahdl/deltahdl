@@ -22,7 +22,7 @@ TEST(FineGrainProcessControlSynthesis,
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
                            "  initial begin\n"
-                           "    process p = process::self();\n"
+                           "    static process p = process::self();\n"
                            "  end\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
@@ -47,7 +47,7 @@ TEST(FineGrainProcessControlSynthesis,
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
                            "  always_comb begin\n"
-                           "    process p = process::self();\n"
+                           "    static process p = process::self();\n"
                            "  end\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
@@ -69,7 +69,7 @@ TEST(FineGrainProcessControlSynthesis,
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
                            "  always_comb begin\n"
-                           "    process p = process::self();\n"
+                           "    static process p = process::self();\n"
                            "  end\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);

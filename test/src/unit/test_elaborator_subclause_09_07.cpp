@@ -13,7 +13,7 @@ TEST(FineGrainProcessControlElaboration, ProcessSelfElaborates) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -124,7 +124,7 @@ TEST(FineGrainProcessControlElaboration, ProcessPassedToTaskElaborates) {
       "    p.kill();\n"
       "  endtask\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    do_work(p);\n"
       "  end\n"
       "endmodule\n",
@@ -158,7 +158,7 @@ TEST(FineGrainProcessControlElaboration, AllStateEnumMembersElaborate) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    if (p.status() == process::FINISHED) ;\n"
       "    if (p.status() == process::RUNNING) ;\n"
       "    if (p.status() == process::WAITING) ;\n"

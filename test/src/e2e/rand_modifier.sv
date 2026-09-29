@@ -19,8 +19,8 @@ endclass
 module rand_modifier;
   int counts[256];
   initial begin
-    Uniform u = new;
-    int repeats = 0, lower = 0, upper = 0, most = 0, drawn = 0;
+    static Uniform u = new;
+    static int repeats = 0, lower = 0, upper = 0, most = 0, drawn = 0;
     bit [7:0] last;
     for (int i = 0; i < 8192; i++) begin
       void'(u.randomize());

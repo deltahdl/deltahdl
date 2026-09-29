@@ -21,7 +21,7 @@ TEST(SuperSimulation, SuperPropertyReturnsBaseValue) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    LinkedPacket lp = new;\n"
+                      "    static LinkedPacket lp = new;\n"
                       "    result = lp.get_base_value();\n"
                       "  end\n"
                       "endmodule\n",
@@ -47,7 +47,7 @@ TEST(SuperSimulation, SuperMethodCallDispatchesToBase) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    LinkedPacket lp = new;\n"
+                      "    static LinkedPacket lp = new;\n"
                       "    result = lp.delay();\n"
                       "  end\n"
                       "endmodule\n",
@@ -69,7 +69,7 @@ TEST(SuperSimulation, SuperAccessesInheritedMember) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.get();\n"
                       "  end\n"
                       "endmodule\n",
@@ -95,7 +95,7 @@ TEST(SuperSimulation, SuperPropertyWriteUpdatesBase) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    d.set_base(55);\n"
                       "    result = d.get_base();\n"
                       "  end\n"
@@ -121,7 +121,7 @@ TEST(SuperSimulation, SuperReachesInheritedGrandparentMember) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    result = c.get();\n"
                       "  end\n"
                       "endmodule\n",
@@ -144,7 +144,7 @@ TEST(SuperSimulation, SuperInitializationOrder) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.y;\n"
                       "  end\n"
                       "endmodule\n",
@@ -172,7 +172,7 @@ TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.get_base();\n"
                       "  end\n"
                       "endmodule\n",

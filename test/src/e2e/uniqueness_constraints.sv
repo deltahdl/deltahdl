@@ -53,11 +53,11 @@ endclass
 module uniqueness_constraints;
   int distinct = 0, split = 0, fixed = 0, apart = 0, refused = 0;
   initial begin
-    Trio tr = new;
-    Excluding ex = new;
-    Lone lo = new;
-    Reals rl = new;
-    Cyclic cy = new;
+    static Trio tr = new;
+    static Excluding ex = new;
+    static Lone lo = new;
+    static Reals rl = new;
+    static Cyclic cy = new;
     repeat (64) begin
       void'(tr.randomize());
       if (tr.a != tr.b && tr.b != tr.c && tr.a != tr.c &&

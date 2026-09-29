@@ -149,7 +149,7 @@ TEST(Elaboration, EnumLocalVarInitInt_Error) {
       "module top();\n"
       "  typedef enum {a, b, c, d} e;\n"
       "  initial begin\n"
-      "    e val = 1;\n"
+      "    static e val = 1;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -694,7 +694,7 @@ TEST(Elaboration, ScopedPackageEnumLiteralAssignedToItsTypeIsAccepted) {
       "  import p::*;\n"
       "  color_t c = p::GREEN;\n"
       "  initial begin\n"
-      "    color_t d = p::RED;\n"
+      "    static color_t d = p::RED;\n"
       "    c = p::BLUE;\n"
       "  end\n"
       "endmodule\n",

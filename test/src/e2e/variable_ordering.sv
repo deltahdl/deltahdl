@@ -49,10 +49,10 @@ module variable_ordering;
   int unordered_set = 0, ordered_set = 0, zero_when_set = 0, free = 0;
   int ordered_ok = 0, chained_set = 0, chained_ok = 0, fixed_ok = 0;
   initial begin
-    Unordered u = new;
-    Ordered o = new;
-    Chained h = new;
-    Fixed f = new;
+    static Unordered u = new;
+    static Ordered o = new;
+    static Chained h = new;
+    static Fixed f = new;
     repeat (1024) begin
       void'(u.randomize());
       if (u.s) unordered_set++;

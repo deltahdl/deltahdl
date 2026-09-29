@@ -194,7 +194,7 @@ TEST(WeakReferenceStdPackageElaborator,
       "  my_obj result;\n"
       "  weak_reference #(my_obj) wr;\n"
       "  initial begin\n"
-      "    weak_reference #(my_obj) local_wr = new;\n"
+      "    static weak_reference #(my_obj) local_wr = new;\n"
       "    strong_obj = new();\n"
       "    wr = new;\n"
       "    wr = new(strong_obj);\n"

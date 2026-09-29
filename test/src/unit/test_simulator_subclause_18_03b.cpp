@@ -141,7 +141,7 @@ TEST(ConstrainedRandomConcepts, TheExerciseBusTaskMeetsItsConstraints) {
       "    met += res && (bus.data & (bus.data - 1)) == 0;\n"
       "  endtask\n"
       "  initial begin\n"
-      "    MyBus mybus = new;\n"
+      "    static MyBus mybus = new;\n"
       "    int met;\n"
       "    exercise_bus(mybus, met);\n"
       "    $display(\"met %0d\", met);\n"

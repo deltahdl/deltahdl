@@ -64,9 +64,9 @@ module constrained_random_concepts;
   endtask
 
   initial begin
-    Bus bus = new;
-    MyBus mybus = new;
-    PowerOfTwo p2 = new;
+    static Bus bus = new;
+    static MyBus mybus = new;
+    static PowerOfTwo p2 = new;
     int ok, aligned, ranged, met;
     ok = 0; aligned = 0;
     repeat (50) begin

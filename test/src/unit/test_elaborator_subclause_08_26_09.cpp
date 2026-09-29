@@ -96,8 +96,8 @@ TEST(InterfaceClassRandomize, RandomizeOnInterfaceHandleOk) {
              "endclass\n"
              "module m;\n"
              "  initial begin\n"
-             "    C obj = new;\n"
-             "    IC iref = obj;\n"
+             "    static C obj = new;\n"
+             "    static IC iref = obj;\n"
              "    void'(iref.randomize());\n"
              "  end\n"
              "endmodule\n"));
@@ -116,8 +116,8 @@ TEST(InterfaceClassRandomize,
              "endclass\n"
              "module m;\n"
              "  initial begin\n"
-             "    C obj = new;\n"
-             "    IC iref = obj;\n"
+             "    static C obj = new;\n"
+             "    static IC iref = obj;\n"
              "    void'(iref.randomize() with { });\n"
              "  end\n"
              "endmodule\n"));
@@ -136,8 +136,8 @@ TEST(InterfaceClassRandomize, RandModeOnInterfaceHandleError) {
       "endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    C obj = new;\n"
-      "    IC iref = obj;\n"
+      "    static C obj = new;\n"
+      "    static IC iref = obj;\n"
       "    iref.rand_mode(0);\n"
       "  end\n"
       "endmodule\n",
@@ -161,8 +161,8 @@ TEST(InterfaceClassRandomize, ConstraintModeOnInterfaceHandleError) {
       "endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    C obj = new;\n"
-      "    IC iref = obj;\n"
+      "    static C obj = new;\n"
+      "    static IC iref = obj;\n"
       "    iref.constraint_mode(0);\n"
       "  end\n"
       "endmodule\n",

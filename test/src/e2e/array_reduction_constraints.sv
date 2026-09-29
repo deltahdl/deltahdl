@@ -47,10 +47,10 @@ module array_reduction_constraints;
   int below = 0, above = 0, wrapped = 0, sized = 0, smallest = 7, largest = 0;
   int multiplied = 0, total = 0;
   initial begin
-    Summed s = new;
-    Wrapped w = new;
-    Sized z = new;
-    Multiplied m = new;
+    static Summed s = new;
+    static Wrapped w = new;
+    static Sized z = new;
+    static Multiplied m = new;
     repeat (256) begin
       void'(s.randomize());
       total = s.A[0] + s.A[1] + s.A[2] + s.A[3] + s.A[4];

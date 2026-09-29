@@ -10,7 +10,7 @@ TEST(BlockItemDeclElaboration, DataDeclInInitialBlock) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  initial begin\n"
-             "    int x = 42;\n"
+             "    static int x = 42;\n"
              "    x = x + 1;\n"
              "  end\n"
              "endmodule\n"));

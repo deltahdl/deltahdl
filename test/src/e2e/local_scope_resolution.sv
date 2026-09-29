@@ -46,7 +46,7 @@ module local_scope_resolution;
 
     // A local variable named as the object's property, reached by local::.
     begin
-      integer x = 20;
+      static integer x = 20;
       success = 0;
       below = 0;
       for (i = 0; i < 64; i++) begin

@@ -83,7 +83,7 @@ TEST(DeclarationAssignmentSim, VarDeclClassNewInitializerConstructsObject) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    result = c.v;\n"
       "  end\n"
       "endmodule\n",
@@ -102,7 +102,7 @@ TEST(DeclarationAssignmentSim, VarDeclClassNewWithArgsInitializer) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C c = new(21);\n"
+      "    static C c = new(21);\n"
       "    result = c.v;\n"
       "  end\n"
       "endmodule\n",

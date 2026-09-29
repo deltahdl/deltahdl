@@ -64,7 +64,7 @@ TEST(ClassAssignRenameElaboration, ShallowCopyInDeclarationOk) {
              "  initial begin\n"
              "    C c1;\n"
              "    c1 = new;\n"
-             "    C c2 = new c1;\n"
+             "    static C c2 = new c1;\n"
              "  end\n"
              "endmodule\n"));
 }

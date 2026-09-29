@@ -148,7 +148,7 @@ TEST(CycleDelaySim, ClassTaskResumedFromACycleDelayWritesItsObject) {
       "  endclass\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    #4 h.run();\n"
       "    result = h.v * 100 + $time;\n"
       "    $finish;\n"

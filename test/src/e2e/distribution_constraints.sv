@@ -95,17 +95,17 @@ module distribution_constraints;
   endtask
 
   initial begin
-    Weighted w = new;
-    Divided d = new;
-    Excluded e = new;
-    PerElement pe = new;
-    Whole wh = new;
-    Narrowed nr = new;
-    Additive ad = new;
-    ZeroAdded za = new;
-    ZeroAlone zo = new;
-    Defaulted df = new;
-    Mixed m = new;
+    static Weighted w = new;
+    static Divided d = new;
+    static Excluded e = new;
+    static PerElement pe = new;
+    static Whole wh = new;
+    static Narrowed nr = new;
+    static Additive ad = new;
+    static ZeroAdded za = new;
+    static ZeroAlone zo = new;
+    static Defaulted df = new;
+    static Mixed m = new;
     int stated, near, rest;
 
     reset();

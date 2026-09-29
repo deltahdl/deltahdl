@@ -85,7 +85,7 @@ TEST(DisablingSoftConstraintsRun, TheClausesADrawsTheLaterMembership) {
       "module t;\n"
       "  int held = 0, ones = 0, twos = 0;\n"
       "  initial begin\n"
-      "    A a = new;\n"
+      "    static A a = new;\n"
       "    repeat (32) begin\n"
       "      void'(a.randomize());\n"
       "      if (a.x == 1 || a.x == 2) held++;\n"

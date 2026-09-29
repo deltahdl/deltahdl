@@ -17,7 +17,7 @@ TEST(ChainedConstructorSimulation, SuperNewWithArgsInitializesBase) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new(42);\n"
+                      "    static Derived d = new(42);\n"
                       "    result = d.x;\n"
                       "  end\n"
                       "endmodule\n",
@@ -35,7 +35,7 @@ TEST(ChainedConstructorSimulation, ImplicitSuperNewInitializesBase) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.x;\n"
                       "  end\n"
                       "endmodule\n",
@@ -59,7 +59,7 @@ TEST(ChainedConstructorSimulation, ThreeLevelChainingEndToEnd) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    result = c.a_val + c.b_val * 10 + c.c_val * 100;\n"
                       "  end\n"
                       "endmodule\n",
@@ -82,7 +82,7 @@ TEST(ChainedConstructorSimulation, BaseConstructorRunsBeforeDerived) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.y;\n"
                       "  end\n"
                       "endmodule\n",
@@ -102,7 +102,7 @@ TEST(ChainedConstructorSimulation, ImplicitSuperNewWithDerivedConstructor) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.x + d.y;\n"
                       "  end\n"
                       "endmodule\n",
@@ -122,7 +122,7 @@ TEST(ChainedConstructorSimulation, PropertyDefaultsInitializedDuringChaining) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Derived d = new;\n"
+                      "    static Derived d = new;\n"
                       "    result = d.x + d.y;\n"
                       "  end\n"
                       "endmodule\n",
@@ -145,7 +145,7 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultForwardsToBaseConstructor) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new(55);\n"
+                      "    static Der d = new(55);\n"
                       "    result = d.bx;\n"
                       "  end\n"
                       "endmodule\n",
@@ -173,7 +173,7 @@ TEST(ChainedConstructorSimulation, SuperNewDefaultForwardsExpandedArgs) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new(7, 42);\n"
+                      "    static Der d = new(7, 42);\n"
                       "    result = d.bx + d.sz * 100;\n"
                       "  end\n"
                       "endmodule\n",
@@ -199,7 +199,7 @@ TEST(ChainedConstructorSimulation,
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new(3, 99);\n"
+                      "    static Der d = new(3, 99);\n"
                       "    result = d.bx + d.sz * 100;\n"
                       "  end\n"
                       "endmodule\n",
@@ -224,7 +224,7 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultWithUserConstructorForwards) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new(4, 88);\n"
+                      "    static Der d = new(4, 88);\n"
                       "    result = d.bx + d.sz * 100;\n"
                       "  end\n"
                       "endmodule\n",
@@ -252,7 +252,7 @@ TEST(ChainedConstructorSimulation, DefaultForwardsMultipleArgsInOrder) {
                 "module t;\n"
                 "  int result;\n"
                 "  initial begin\n"
-                "    Der d = new(1, 30, 4);\n"
+                "    static Der d = new(1, 30, 4);\n"
                 "    result = d.ba + d.bb * 10 + d.sz * 100;\n"
                 "  end\n"
                 "endmodule\n",
@@ -275,7 +275,7 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultAppliesBaseArgDefault) {
                 "module t;\n"
                 "  int result;\n"
                 "  initial begin\n"
-                "    Der d = new(7);\n"
+                "    static Der d = new(7);\n"
                 "    result = d.bx;\n"
                 "  end\n"
                 "endmodule\n",
@@ -297,7 +297,7 @@ TEST(ChainedConstructorSimulation, ExtendsArgsForwardToBaseConstructor) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new;\n"
+                      "    static Der d = new;\n"
                       "    result = d.bx;\n"
                       "  end\n"
                       "endmodule\n",
@@ -324,7 +324,7 @@ TEST(ChainedConstructorSimulation, DefaultBeforeOwnArgForwards) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Der d = new(20, 1);\n"
+                      "    static Der d = new(20, 1);\n"
                       "    result = d.bx + d.en * 1000;\n"
                       "  end\n"
                       "endmodule\n",

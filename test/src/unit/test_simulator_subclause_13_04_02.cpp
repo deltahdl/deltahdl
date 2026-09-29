@@ -185,7 +185,7 @@ TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAndBareName) {
       "  endclass\n"
       "  logic [31:0] result;\n"
       "  initial begin\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    result = h.fib(10);\n"
       "  end\n"
       "endmodule\n",
@@ -207,7 +207,7 @@ TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAlone) {
       "  endclass\n"
       "  logic [31:0] result;\n"
       "  initial begin\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    result = h.fact(5);\n"
       "  end\n"
       "endmodule\n",
@@ -233,7 +233,7 @@ TEST(FunctionLifetimeSim, ThisQualifiedCallStatementWritesOwnProperty) {
       "  endclass\n"
       "  logic [31:0] result;\n"
       "  initial begin\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    h.twice();\n"
       "    result = h.count;\n"
       "  end\n"

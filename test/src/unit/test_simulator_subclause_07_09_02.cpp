@@ -366,8 +366,8 @@ TEST(AssocArrayDeleteMethod,
       "endclass\n"
       "module t;\n"
       "  initial begin\n"
-      "    O o = new;\n"
-      "    K k = new;\n"
+      "    static O o = new;\n"
+      "    static K k = new;\n"
       "    o.drop(k);\n"
       "  end\n"
       "endmodule\n",

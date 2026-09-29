@@ -33,7 +33,7 @@ TEST(InlineRandomControlRuntime, ArgListDesignatesRandomSetUnnamedHeld) {
       "  int rx;\n"
       "  int ry;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.y = 200;\n"
       "    okv = a.randomize(x);\n"  // only x is random; y is a state variable
       "    rx = a.x;\n"
@@ -66,7 +66,7 @@ TEST(InlineRandomControlRuntime, MultipleNamedVariablesRandomizedRestHeld) {
       "  int rb;\n"
       "  int rc;\n"
       "  initial begin\n"
-      "    CA o = new;\n"
+      "    static CA o = new;\n"
       "    o.c = 30;\n"
       "    okv = o.randomize(a, b);\n"  // a and b random; c is a state variable
       "    ra = o.a;\n"
@@ -101,7 +101,7 @@ TEST(InlineRandomControlRuntime, NamingEnablesVariableDisabledByRandMode) {
       "  int rx;\n"
       "  int ry;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.x = 5;\n"
       "    a.y = 200;\n"
       "    a.x.rand_mode(0);\n"      // 18.8: disable x persistently
@@ -132,7 +132,7 @@ TEST(InlineRandomControlRuntime, NamedNonRandPropertyIsRandomized) {
       "  int rs;\n"
       "  int rr;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.r = 9;\n"
       "    okv = a.randomize(s);\n"  // promote the non-rand property s
       "    rs = a.s;\n"
@@ -162,7 +162,7 @@ TEST(InlineRandomControlRuntime, NamedRandcRetainsCyclicalMode) {
       "  int v3;\n"
       "  int all_distinct;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.randomize(c); v0 = a.c;\n"
       "    a.randomize(c); v1 = a.c;\n"
       "    a.randomize(c); v2 = a.c;\n"
@@ -191,7 +191,7 @@ TEST(InlineRandomControlRuntime, NamedNonRandNotPromotedToCyclical) {
       "  bit have_prev;\n"
       "  bit prev;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    repeated = 0;\n"
       "    have_prev = 0;\n"
       "    for (int i = 0; i < 40; i = i + 1) begin\n"

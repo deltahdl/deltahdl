@@ -338,7 +338,7 @@ TEST(ArrayOfVirtualInterfaceInit, IncompatibleElementInForkArm_Error) {
       "  bus_b u();\n"
       "  typedef virtual bus_a vbus;\n"
       "  initial fork\n"
-      "    vbus v[1] = '{u};\n"
+      "    static vbus v[1] = '{u};\n"
       "  join\n"
       "endmodule\n",
       f);

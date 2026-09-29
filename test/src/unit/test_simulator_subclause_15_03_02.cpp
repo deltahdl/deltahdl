@@ -205,7 +205,7 @@ TEST(SemaphoreSim, PropertyGetInsideAMethodTakesTheObjectsKey) {
                       "module top;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    c.take();\n"
                       "    y = c.s.try_get(1) * 10 + 5;\n"
                       "  end\n"

@@ -45,7 +45,7 @@ TEST(ProcessStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -61,7 +61,7 @@ TEST(ProcessStdPackageElaborator, PrototypeMethodsElaborate) {
       "module m;\n"
       "  string st;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.status();\n"
       "    p.kill();\n"
       "    p.await();\n"
@@ -84,7 +84,7 @@ TEST(ProcessStdPackageElaborator, StateEnumMembersElaborate) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    if (p.status() == process::FINISHED) ;\n"
       "    if (p.status() == process::RUNNING) ;\n"
       "    if (p.status() == process::WAITING) ;\n"
@@ -144,7 +144,7 @@ TEST(ProcessStdPackageElaborator, HandlePassedToSubroutine) {
       "    p.kill();\n"
       "  endtask\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    do_work(p);\n"
       "  end\n"
       "endmodule\n",
@@ -201,7 +201,7 @@ TEST(ProcessStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
       "module m;\n"
       "  string st;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.kill(1);\n"
       "    p.srandom();\n"
       "    p.restart();\n"

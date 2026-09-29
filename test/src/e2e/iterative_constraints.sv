@@ -27,8 +27,8 @@ module iterative_constraints;
   int in_set = 0, above = 0, first_at_two = 0, last_at_sixteen = 0;
   int totals = 0, bounded = 0;
   initial begin
-    Indexed x = new;
-    Summed s = new;
+    static Indexed x = new;
+    static Summed s = new;
     repeat (128) begin
       void'(x.randomize());
       if (x.A[0] inside {2, 4, 8, 16} && x.A[1] inside {2, 4, 8, 16} &&

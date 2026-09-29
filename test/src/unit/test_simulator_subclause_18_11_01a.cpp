@@ -37,7 +37,7 @@ TEST(InlineConstraintChecker,
       "  int rx;\n"
       "  int ry;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.x = 1; a.y = 9; a.v = 5; a.w = 3;\n"
       "    okv = a.randomize(null);\n"  // checker: all members are state
       "    rx = a.x;\n"
@@ -68,7 +68,7 @@ TEST(InlineConstraintChecker, NullReturnsZeroWhenConstraintViolatedHoldsState) {
       "  int rx;\n"
       "  int ry;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.x = 5; a.y = 9; a.v = 3; a.w = 3;\n"
       "    okv = a.randomize(null);\n"  // 5 < 3 is false
       "    rx = a.x;\n"
@@ -101,8 +101,8 @@ TEST(InlineConstraintChecker,
       "  int chk1;\n"
       "  int rx1;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
-      "    CA b = new;\n"
+      "    static CA a = new;\n"
+      "    static CA b = new;\n"
       "    a.x = 7;\n"
       "    chk0 = a.randomize(null);\n"  // checker: cannot move x to 100
       "    rx0 = a.x;\n"
@@ -131,7 +131,7 @@ TEST(InlineConstraintChecker, NullHoldsRandcVariableAsState) {
       "  int okv;\n"
       "  int rc;\n"
       "  initial begin\n"
-      "    CA a = new;\n"
+      "    static CA a = new;\n"
       "    a.c = 2;\n"
       "    okv = a.randomize(null);\n"  // checker: c is a state variable
       "    rc = a.c;\n"
@@ -159,8 +159,8 @@ TEST(InlineConstraintChecker, NoRandomVariablesActsAsChecker) {
       "  int okb;\n"
       "  int rvb;\n"
       "  initial begin\n"
-      "    CB a = new;\n"
-      "    CB b = new;\n"
+      "    static CB a = new;\n"
+      "    static CB b = new;\n"
       "    a.v = 4;\n"
       "    oka = a.randomize();\n"  // no random variables -> pure checker
       "    rva = a.v;\n"
@@ -203,8 +203,8 @@ TEST(InlineConstraintChecker, NullHoldsRandObjectHandleMemberWithoutRecursing) {
       "  Sub sa;\n"
       "  Sub sb;\n"
       "  initial begin\n"
-      "    Top a = new;\n"
-      "    Top b = new;\n"
+      "    static Top a = new;\n"
+      "    static Top b = new;\n"
       "    sa = a.s;\n"  // alias the sub-object handle
       "    sa.v = 7;\n"
       "    chk0 = a.randomize(null);\n"  // checker: s is state, no descent

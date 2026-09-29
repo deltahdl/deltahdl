@@ -25,7 +25,7 @@ TEST(JumpStatementElaboration, ContinueInsideWhileLoopOk) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
-      "    int i = 0;\n"
+      "    static int i = 0;\n"
       "    while (i < 10) begin\n"
       "      i = i + 1;\n"
       "      if (i == 5) continue;\n"

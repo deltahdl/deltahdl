@@ -186,7 +186,7 @@ TEST(AssocArrayFirstMethod, IntKeyAssignsSmallestIndexOfAClassProperty) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    result = c.smallest();\n"
       "  end\n"
       "endmodule\n",

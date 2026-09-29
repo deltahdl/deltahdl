@@ -123,7 +123,7 @@ TEST(VariableInitSim, BlockLevelVarInit) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    int local_var = 77;\n"
+      "    static int local_var = 77;\n"
       "    result = local_var;\n"
       "  end\n"
       "endmodule\n",
@@ -254,7 +254,7 @@ TEST(VariableInitSim, BlockFixedArrayInitFromPattern) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    int a[3] = '{7, 8, 9};\n"
+                      "    static int a[3] = '{7, 8, 9};\n"
                       "    r = a[0] * 100 + a[1] * 10 + a[2];\n"
                       "  end\n"
                       "endmodule\n",
@@ -266,7 +266,7 @@ TEST(VariableInitSim, BlockFixedArrayInitFromDefaultPattern) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    int a[2] = '{default: 5};\n"
+                      "    static int a[2] = '{default: 5};\n"
                       "    r = a[0] + a[1];\n"
                       "  end\n"
                       "endmodule\n",
@@ -278,7 +278,7 @@ TEST(VariableInitSim, BlockQueueInitFromConcatenation) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    int q[$] = {1, 2};\n"
+                      "    static int q[$] = {1, 2};\n"
                       "    q.push_back(3);\n"
                       "    r = q.size() * 10 + q[1];\n"
                       "  end\n"
@@ -291,7 +291,7 @@ TEST(VariableInitSim, BlockDynamicArrayInitFromPattern) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    int d[] = '{4, 5, 6};\n"
+                      "    static int d[] = '{4, 5, 6};\n"
                       "    r = d.size() * 10 + d[2];\n"
                       "  end\n"
                       "endmodule\n",
@@ -303,7 +303,7 @@ TEST(VariableInitSim, BlockAssocArrayInitFromPattern) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    int m[string] = '{\"x\": 1, \"y\": 2};\n"
+                      "    static int m[string] = '{\"x\": 1, \"y\": 2};\n"
                       "    r = m.num() * 10 + m[\"y\"];\n"
                       "  end\n"
                       "endmodule\n",
@@ -318,7 +318,7 @@ TEST(VariableInitSim, BlockStringQueueInitAndAssign) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    string p[$] = '{\"a\", \"b\"};\n"
+                      "    static string p[$] = '{\"a\", \"b\"};\n"
                       "    string s[$];\n"
                       "    s = {\"c\", \"d\", \"e\"};\n"
                       "    r = p.size() * 10 + s.size();\n"
@@ -350,7 +350,7 @@ TEST(VariableInitSim, BlockArrayInitEvaluatedOnce) {
                       "  int cnt = 0;\n"
                       "  function int bump(); cnt++; return 7; endfunction\n"
                       "  initial begin\n"
-                      "    int q[$] = {bump()};\n"
+                      "    static int q[$] = {bump()};\n"
                       "  end\n"
                       "endmodule\n",
                       "cnt"),
@@ -382,7 +382,7 @@ TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
                       "  function int f();\n"
-                      "    int q[$] = {1, 2};\n"
+                      "    static int q[$] = {1, 2};\n"
                       "    q.push_back(3);\n"
                       "    return q.size();\n"
                       "  endfunction\n"

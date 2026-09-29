@@ -49,7 +49,7 @@ TEST(CompilationUnitSim, CuScopeEnumLiteralsResolveInModulesAndClasses) {
       "module t;\n"
       "  int r;\n"
       "  initial begin\n"
-      "    Reader o = new;\n"
+      "    static Reader o = new;\n"
       "    r = MID + 10 * o.is_high(HIGH);\n"
       "  end\n"
       "endmodule\n",

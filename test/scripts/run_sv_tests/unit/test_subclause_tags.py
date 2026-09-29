@@ -83,7 +83,7 @@ def test_a_file_of_the_same_tag_outside_the_table_keeps_its_tag(
 @pytest.mark.parametrize("name, tag, rule", [
     ("variable-slice-zero.sv", "7.4.3", "11.5.1"),
     ("14.3--clocking-block-signals-error.sv", "14.3", "10.4"),
-    ("11.4.14.3--unpack_stream_inv.sv", "11.4.14.3", "11.4.14"),
+    ("11.4.14.3--unpack_stream_inv.sv", "11.4.14.3", "6.21"),
 ])
 def test_a_file_tagged_by_the_feature_it_uses_is_judged_by_the_rule_it_breaks(
     rst: ModuleType, name: str, tag: str, rule: str,
@@ -95,6 +95,60 @@ def test_a_file_the_suite_expects_accepted_is_judged_by_the_rule_it_breaks(
     rst: ModuleType,
 ) -> None:
     assert rst.tagged_clause({"tags": "20.4"}, "20.4--timeformat.sv") == "20.4.3"
+
+
+_FILES_DECLARING_AN_IMPLICITLY_STATIC_VARIABLE_WITH_AN_INITIALIZER = [
+    "6.19.5.1--enum_first.sv",
+    "6.19.5.2--enum_last.sv",
+    "6.19.5.3--enum_next.sv",
+    "6.19.5.4--enum_prev.sv",
+    "6.19.5.5--enum_num.sv",
+    "6.19.5.6--enum_name.sv",
+    "8.7--constructor.sv",
+    "8.7--constructor_param.sv",
+    "11.4.14.3--unpack_stream-sim.sv",
+    "11.4.14.3--unpack_stream.sv",
+    "11.4.14.3--unpack_stream_pad-sim.sv",
+    "11.4.14.3--unpack_stream_pad.sv",
+    "12.7.4--while.sv",
+    "12.7.5--dowhile.sv",
+    "13.3.1--task-static.sv",
+    "13.4.2--function-static.sv",
+    "15.4--mailbox-blocking.sv",
+    "15.4--mailbox-non-blocking.sv",
+    "20.9--countbits.sv",
+    "20.9--onehot0.sv",
+    "20.9--onehot.sv",
+    "20.15--dist_chi_square.sv",
+    "20.15--dist_erlang.sv",
+    "20.15--dist_exponential.sv",
+    "20.15--dist_normal.sv",
+    "20.15--dist_poisson.sv",
+    "20.15--dist_t.sv",
+    "20.15--dist_uniform.sv",
+    "21.2--display-boh.sv",
+    "21.2--display.sv",
+    "21.2--write-boh.sv",
+    "21.2--write.sv",
+]
+
+
+@pytest.mark.parametrize(
+    "name", _FILES_DECLARING_AN_IMPLICITLY_STATIC_VARIABLE_WITH_AN_INITIALIZER,
+)
+def test_a_file_declaring_an_implicitly_static_variable_with_an_initializer_is_judged_by_6_21(
+    rst: ModuleType, name: str,
+) -> None:
+    assert rst.tagged_clause({"tags": name.split("--")[0]}, name) == "6.21"
+
+
+@pytest.mark.parametrize(
+    "name", _FILES_DECLARING_AN_IMPLICITLY_STATIC_VARIABLE_WITH_AN_INITIALIZER,
+)
+def test_a_file_declaring_an_implicitly_static_variable_with_an_initializer_is_expected_rejected(
+    rst: ModuleType, name: str,
+) -> None:
+    assert rst.expects_rejection({"tags": name.split("--")[0]}, name)
 
 
 def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_tests(

@@ -44,9 +44,9 @@ module foreach_iterative_constraints;
   int sized = 0, ascending = 0, sizes_seen = 0, stepped = 0, ok = 0;
   bit seen[11];
   initial begin
-    Sorted s = new;
-    Fixed f = new;
-    Stepped p = new;
+    static Sorted s = new;
+    static Fixed f = new;
+    static Stepped p = new;
     repeat (256) begin
       void'(s.randomize());
       if (s.A.size() >= 1 && s.A.size() <= 10) begin

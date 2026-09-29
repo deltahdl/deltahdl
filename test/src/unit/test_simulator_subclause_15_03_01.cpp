@@ -120,7 +120,7 @@ TEST(SemaphoreSim, ClassPropertySemaphoreHoldsItsKeys) {
                       "module top;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    c.probe(y);\n"
                       "  end\n"
                       "endmodule\n",
@@ -143,8 +143,8 @@ TEST(SemaphoreSim, TwoObjectsHoldSeparateSemaphores) {
                       "module top;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    C c1 = new;\n"
-                      "    C c2 = new;\n"
+                      "    static C c1 = new;\n"
+                      "    static C c2 = new;\n"
                       "    y = c1.take() * 10 + c2.take();\n"
                       "  end\n"
                       "endmodule\n",
@@ -169,7 +169,7 @@ TEST(SemaphoreSim, ThisAndHandleQualifiedPropertySemaphoreReceivers) {
                       "module top;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    c.give();\n"
                       "    y = c.s.try_get(2) * 10 + c.s.try_get(1);\n"
                       "  end\n"
@@ -224,7 +224,7 @@ TEST(SemaphoreSim, PutThroughANullPropertySemaphoreIsReported) {
       "endclass\n"
       "module top;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    c.give();\n"
       "  end\n"
       "endmodule\n",

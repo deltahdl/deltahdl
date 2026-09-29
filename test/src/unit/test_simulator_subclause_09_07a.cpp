@@ -14,7 +14,7 @@ TEST(FineGrainProcessControlSimulation, SelfReturnsHandle) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] x;\n"
                       "  initial begin\n"
-                      "    process p = process::self();\n"
+                      "    static process p = process::self();\n"
                       "    x = (p != null) ? 1 : 0;\n"
                       "  end\n"
                       "endmodule\n",
@@ -26,7 +26,7 @@ TEST(FineGrainProcessControlSimulation, StatusRunningForCurrentProcess) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] x;\n"
                       "  initial begin\n"
-                      "    process p = process::self();\n"
+                      "    static process p = process::self();\n"
                       "    x = (p.status() == process::RUNNING) ? 1 : 0;\n"
                       "  end\n"
                       "endmodule\n",
@@ -257,7 +257,7 @@ TEST(FineGrainProcessControlSimulation, SrandomMethodOnProcessHandle) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.srandom(99);\n"
       "  end\n"
       "endmodule\n",
@@ -285,7 +285,7 @@ TEST(FineGrainProcessControlSimulation, RandStateMethodsOnProcessHandle) {
       "  string s;\n"
       "  int len_ok;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    s = p.get_randstate();\n"
       "    p.set_randstate(s);\n"
       "    len_ok = (s.len() > 0) ? 1 : 0;\n"
@@ -324,7 +324,7 @@ TEST(FineGrainProcessControlSimulation, AwaitOnCurrentProcessIsError) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.await();\n"
       "  end\n"
       "endmodule\n",
@@ -342,7 +342,7 @@ TEST(FineGrainProcessControlSimulation, FunctionCannotSuspendItself) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function void self_suspend();\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.suspend();\n"
       "  endfunction\n"
       "  initial begin\n"
@@ -365,7 +365,7 @@ TEST(FineGrainProcessControlSimulation, TaskCanSuspendItself) {
       "module t;\n"
       "  logic [31:0] x;\n"
       "  task self_suspend_task();\n"
-      "    process p = process::self();\n"
+      "    static process p = process::self();\n"
       "    p.suspend();\n"
       "  endtask\n"
       "  initial begin\n"
@@ -649,7 +649,7 @@ TEST(FineGrainProcessControlSimulation, AwaitOnSelfNames9_7) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    process me = process::self();\n"
+      "    static process me = process::self();\n"
       "    me.await();\n"
       "  end\n"
       "endmodule\n",
@@ -667,7 +667,7 @@ TEST(FineGrainProcessControlSimulation, FunctionSuspendingItselfNames9_7) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  function void stop_me();\n"
-      "    process me = process::self();\n"
+      "    static process me = process::self();\n"
       "    me.suspend();\n"
       "  endfunction\n"
       "  initial stop_me();\n"

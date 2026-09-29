@@ -50,11 +50,11 @@ module constraint_inheritance;
   int base_wide = 0, base_over = 0, derived_narrow = 0, fixed_42 = 0;
   int through_base = 0, range_ok = 0, sealed_ok = 0;
   initial begin
-    Base b = new;
-    Derived d = new;
-    Fixed f = new;
-    Range r = new;
-    Sealed s = new;
+    static Base b = new;
+    static Derived d = new;
+    static Fixed f = new;
+    static Range r = new;
+    static Sealed s = new;
     Base h;
     repeat (32) begin
       void'(b.randomize());

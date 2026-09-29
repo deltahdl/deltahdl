@@ -190,7 +190,7 @@ TEST(TypedConstructorCallSim, TypedConstructorAsBlockLocalDeclInit) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C c = D::new;\n"
+                      "    static C c = D::new;\n"
                       "    result = c.x;\n"
                       "  end\n"
                       "endmodule\n",

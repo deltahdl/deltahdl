@@ -37,9 +37,9 @@ endclass
 
 module constraint_driven_generation;
   initial begin
-    Packet p = new;
-    int legal = 0, solved = 0;
-    bit jumbo_seen = 0;
+    static Packet p = new;
+    static int legal = 0, solved = 0;
+    static bit jumbo_seen = 0;
     repeat (24) begin
       if (p.randomize()) solved++;
       if (p.meets_constraints()) legal++;

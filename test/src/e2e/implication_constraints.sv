@@ -60,11 +60,11 @@ module implication_constraints;
   int left_other = 0, consistent = 0, zeros = 0, guarded = 0, halves = 0;
   int braced = 0, highs = 0;
   initial begin
-    Sized sz = new;
-    Fixed fx = new;
-    Pair pr = new;
-    Guarded gd = new;
-    Braced br = new;
+    static Sized sz = new;
+    static Fixed fx = new;
+    static Pair pr = new;
+    static Guarded gd = new;
+    static Braced br = new;
     repeat (256) begin
       void'(sz.randomize());
       case (sz.mode)

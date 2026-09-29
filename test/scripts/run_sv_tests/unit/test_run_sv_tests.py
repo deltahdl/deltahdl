@@ -726,8 +726,9 @@ def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(
     (
         "11.4.14.3",
         "11.4.14.3--unpack_stream_inv.sv",
-        "11.4.14.3--unpack_stream_inv.sv:25:11: error: streaming concatenation"
-        " source is wider than the fixed-size target (§11.4.14)\n",
+        "11.4.14.3--unpack_stream_inv.sv:25:6: error: variable 'd' declared"
+        " with an initializer in a static block, task or function must be"
+        " declared static or automatic (§6.21)\n",
     ),
 ])
 def test_rejection_under_the_rule_broken_by_a_file_tagged_by_its_feature_evaluates_as_a_pass(

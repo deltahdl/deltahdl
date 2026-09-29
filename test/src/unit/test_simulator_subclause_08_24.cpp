@@ -215,7 +215,7 @@ TEST(ClassSim, PackageOutOfBlockInstanceMethodReadsProperty) {
                       "module t;\n"
                       "  int b;\n"
                       "  initial begin\n"
-                      "    root r = new;\n"
+                      "    static root r = new;\n"
                       "    b = r.iget();\n"
                       "  end\n"
                       "endmodule\n",
@@ -280,7 +280,7 @@ TEST(ClassSim, ModuleClassOutOfBlockInstanceMethodReadsProperty) {
                       "  endfunction\n"
                       "  int b;\n"
                       "  initial begin\n"
-                      "    root r = new;\n"
+                      "    static root r = new;\n"
                       "    b = r.iget();\n"
                       "  end\n"
                       "endmodule\n",
@@ -318,7 +318,7 @@ TEST(ClassSim, OutOfBlockVirtualMethodTakesPrototypeDefault) {
                       "module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    r = c.g();\n"
                       "  end\n"
                       "endmodule\n",
@@ -340,7 +340,7 @@ TEST(ClassSim, OutOfBlockConstructorTakesPrototypeDefault) {
                       "module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    C c = new(7);\n"
+                      "    static C c = new(7);\n"
                       "    r = c.v * 100 + c.w;\n"
                       "  end\n"
                       "endmodule\n",
@@ -362,7 +362,7 @@ TEST(ClassSim, OutOfBlockMethodTakesPrototypeDefaultsAfterFirstGiven) {
                       "module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    r = c.sum(5);\n"
                       "  end\n"
                       "endmodule\n",
@@ -399,7 +399,7 @@ TEST(ClassSim, OutOfBlockBodiesAmongModuleItemsAreTheClassMethods) {
                        "    return w * h;\n"
                        "  endfunction\n"
                        "  initial begin\n"
-                       "    Rect a = new(4, 6), b = new(1, 1);\n"
+                       "    static Rect a = new(4, 6), b = new(1, 1);\n"
                        "    seen = Rect::count;\n"
                        "    $display(\"area %0d count %0d static %0d\",\n"
                        "             a.area(), seen, b.count);\n"
@@ -430,7 +430,7 @@ TEST(ClassSim, OutOfBlockVoidMethodAmongModuleItemsWritesThroughThis) {
                        "    this.w = w;\n"
                        "  endfunction\n"
                        "  initial begin\n"
-                       "    Rect a = new(4, 6);\n"
+                       "    static Rect a = new(4, 6);\n"
                        "    a.setw(5);\n"
                        "    $display(\"area %0d\", a.area());\n"
                        "  end\n"

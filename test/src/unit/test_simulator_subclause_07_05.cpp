@@ -128,7 +128,7 @@ TEST(DynamicArraySimulation,
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    int d[] = new[3];\n"
+                      "    static int d[] = new[3];\n"
                       "    y = d.size();\n"
                       "  end\n"
                       "endmodule\n",
@@ -143,7 +143,7 @@ TEST(DynamicArraySimulation,
 TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByItsNewInitializer) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  function int f();\n"
-                      "    int d[] = new[3];\n"
+                      "    static int d[] = new[3];\n"
                       "    int e[];\n"
                       "    d[1] = 5;\n"
                       "    e = new[4](d);\n"

@@ -33,11 +33,11 @@ module randc_modifier;
   bit [255:0] visited;
   int groups = 0, distinct = 0, confined = 0;
   initial begin
-    Cyclic cy = new;
-    Wide w = new;
-    Changing ch = new;
-    Shared s1 = new;
-    Shared s2 = new;
+    static Cyclic cy = new;
+    static Wide w = new;
+    static Changing ch = new;
+    static Shared s1 = new;
+    static Shared s2 = new;
     repeat (3) begin
       seen = 0;
       repeat (4) begin

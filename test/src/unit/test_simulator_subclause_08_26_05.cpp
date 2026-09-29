@@ -116,8 +116,8 @@ TEST(InterfaceClassCastingAndRefAssignment,
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C c_obj = new;\n"
-                      "    IC ic_ref = c_obj;\n"
+                      "    static C c_obj = new;\n"
+                      "    static IC ic_ref = c_obj;\n"
                       "    result = (ic_ref != null);\n"
                       "  end\n"
                       "endmodule\n",

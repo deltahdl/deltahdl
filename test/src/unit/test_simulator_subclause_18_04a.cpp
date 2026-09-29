@@ -151,7 +151,7 @@ TEST(RandomVariableTypes, RandomizeLeavesObjectHandleUnmodified) {
       "  int ok;\n"
       "  int seen;\n"
       "  initial begin\n"
-      "    Outer o = new;\n"
+      "    static Outer o = new;\n"
       "    ok = o.randomize();\n"
       "    seen = (o.child == null) ? 1 : 0;\n"
       "  end\n"

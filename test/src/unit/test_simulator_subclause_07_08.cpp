@@ -508,7 +508,7 @@ TEST(AssocArraySimulation, MethodLocalThroughAUnitAssocTypedefIsAnAssocArray) {
       "  endfunction\n"
       "endclass\n"
       "module t;\n"
-      "  initial begin K k = new; $display(\"num=%0d\", k.f()); end\n"
+      "  initial begin static K k = new; $display(\"num=%0d\", k.f()); end\n"
       "endmodule\n",
       f);
   EXPECT_EQ(out, "num=2\n");

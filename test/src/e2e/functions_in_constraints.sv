@@ -52,9 +52,9 @@ module functions_in_constraints;
   int counted = 0, ones = 0, bounded = 0, twos = 0, fours = 0, eights = 0;
   int seen = 0, followed = 0;
   initial begin
-    Counted c = new;
-    Prioritized p = new;
-    Cycled y = new;
+    static Counted c = new;
+    static Prioritized p = new;
+    static Cycled y = new;
     repeat (128) begin
       void'(c.randomize());
       ones = 0;

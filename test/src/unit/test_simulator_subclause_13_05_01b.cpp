@@ -90,7 +90,7 @@ TEST(PassByValueSim, ClassFormalBoundFromNullHoldsTheObjectTheBodyAssigns) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    C first = new;\n"
+                      "    static C first = new;\n"
                       "    result = init(null) * 100 + init();\n"
                       "  end\n"
                       "endmodule\n",

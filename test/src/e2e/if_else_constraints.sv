@@ -77,11 +77,11 @@ module if_else_constraints;
   int left_other = 0, nested = 0, n_littles = 0, n_bigs = 0, n_others = 0;
   int n_bigs_low = 0, realed = 0, halves = 0, braced = 0, highs = 0;
   initial begin
-    Sized sz = new;
-    Fixed fx = new;
-    Nested ns = new;
-    Realed rl = new;
-    Braced br = new;
+    static Sized sz = new;
+    static Fixed fx = new;
+    static Nested ns = new;
+    static Realed rl = new;
+    static Braced br = new;
     repeat (256) begin
       void'(sz.randomize());
       case (sz.mode)

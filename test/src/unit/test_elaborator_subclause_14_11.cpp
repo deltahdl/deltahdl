@@ -692,7 +692,7 @@ TEST(CycleDelayElab, PackageClassMethodErrors) {
              "  default clocking cb @(posedge clk);\n"
              "  endclocking\n"
              "  initial begin\n"
-             "    C h = new;\n"
+             "    static C h = new;\n"
              "    h.run();\n"
              "  end\n"
              "endmodule\n",

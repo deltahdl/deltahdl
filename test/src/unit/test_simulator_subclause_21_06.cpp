@@ -106,7 +106,7 @@ TEST(TestPlusargsSim, PatternFromStringVariable) {
   std::string out = RunCapture(
       "module t;\n"
       "  initial begin\n"
-      "    string s = \"HEL\";\n"
+      "    static string s = \"HEL\";\n"
       "    if ($test$plusargs(s)) $display(\"string pattern found\");\n"
       "  end\n"
       "endmodule\n",
@@ -589,7 +589,7 @@ TEST(ValuePlusargsSim, UserStringFromStringVariable) {
       "module t;\n"
       "  int mode;\n"
       "  initial begin\n"
-      "    string us = \"MODE=%d\";\n"
+      "    static string us = \"MODE=%d\";\n"
       "    if ($value$plusargs(us, mode)) $display(\"mode=%0d\", mode);\n"
       "  end\n"
       "endmodule\n",

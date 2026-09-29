@@ -765,7 +765,7 @@ TEST(BoundedQueue, BoundedQueuePropertyDiscardsBeyondItsBound) {
                       "module t;\n"
                       "  int out;\n"
                       "  initial begin\n"
-                      "    C c = new;\n"
+                      "    static C c = new;\n"
                       "    c.push(1);\n"
                       "    c.push(2);\n"
                       "    c.push(3);\n"

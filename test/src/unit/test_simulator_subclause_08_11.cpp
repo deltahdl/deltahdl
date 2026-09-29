@@ -340,7 +340,7 @@ TEST(ClassSim, TaskLocalHandleHidesTheSameNamedProperty) {
       "  endclass\n"
       "  int r;\n"
       "  initial begin\n"
-      "    P p = new;\n"
+      "    static P p = new;\n"
       "    p.run(r);\n"
       "  end\n"
       "endmodule\n",

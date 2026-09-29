@@ -39,12 +39,12 @@ module static_constraint_blocks;
   int both = 0, freed = 0, still_even = 0, back = 0, own_kept = 0;
   int completed = 0;
   initial begin
-    Shared s1 = new;
-    Shared s2 = new;
-    Own o1 = new;
-    Own o2 = new;
-    Completed c1 = new;
-    Completed c2 = new;
+    static Shared s1 = new;
+    static Shared s2 = new;
+    static Own o1 = new;
+    static Own o2 = new;
+    static Completed c1 = new;
+    static Completed c2 = new;
     repeat (64) begin
       void'(s1.randomize());
       void'(s2.randomize());

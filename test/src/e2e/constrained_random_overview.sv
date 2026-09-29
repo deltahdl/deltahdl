@@ -22,8 +22,8 @@ endclass
 
 module constrained_random_overview;
   initial begin
-    Bus bus = new;
-    Bus other = new;
+    static Bus bus = new;
+    static Bus other = new;
     int v;
     int taken;
     bit ok;

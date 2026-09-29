@@ -36,10 +36,10 @@ module global_constraints;
   int ordered = 0, nested = 0, held = 0, first_left = -1, first_right = -1;
   int left_varies = 0, right_varies = 0;
   initial begin
-    Heap h = new;
-    Heap outer = new;
-    Heap inner = new;
-    Heap fixed = new;
+    static Heap h = new;
+    static Heap outer = new;
+    static Heap inner = new;
+    static Heap fixed = new;
     Leaf keep;
     repeat (128) begin
       void'(h.randomize());

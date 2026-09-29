@@ -49,7 +49,7 @@ TEST(InterfaceClassParamTypeConflict, LrmExampleResolvedTypeUsableAtRuntime) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Fifo f = new;\n"
+                      "    static Fifo f = new;\n"
                       "    f.put(77);\n"
                       "    result = f.get();\n"
                       "  end\n"

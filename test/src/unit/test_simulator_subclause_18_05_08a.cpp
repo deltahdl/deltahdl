@@ -45,7 +45,7 @@ TEST(GlobalConstraint, ActiveSubtreeValuesSolvedSimultaneously) {
       "  int rv;\n"
       "  int good;\n"
       "  initial begin\n"
-      "    B b = new;\n"
+      "    static B b = new;\n"
       "    ok = b.randomize();\n"
       "    lv = b.left.v;\n"
       "    vv = b.v;\n"
@@ -98,7 +98,7 @@ TEST(GlobalConstraint,
       "  int topv;\n"
       "  int good;\n"
       "  initial begin\n"
-      "    Top top = new;\n"
+      "    static Top top = new;\n"
       "    ok = top.randomize();\n"
       "    leafv = top.mid.leaf.v;\n"
       "    midv = top.mid.v;\n"
@@ -138,8 +138,8 @@ TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
       "  int chv;\n"
       "  int good;\n"
       "  initial begin\n"
-      "    Node n = new;\n"
-      "    Leaf lc = n.child;\n"  // alias the leaf handle
+      "    static Node n = new;\n"
+      "    static Leaf lc = n.child;\n"  // alias the leaf handle
       "    lc.v = 8;\n"
       "    lc.v.rand_mode(0);\n"  // child.v held as a state constant
       "    ok = n.randomize();\n"
@@ -176,8 +176,8 @@ TEST(GlobalConstraint,
       "  int ok;\n"
       "  int chv;\n"
       "  initial begin\n"
-      "    Node n = new;\n"
-      "    Leaf lc = n.child;\n"  // alias the leaf handle
+      "    static Node n = new;\n"
+      "    static Leaf lc = n.child;\n"  // alias the leaf handle
       "    lc.v = 0;\n"
       "    lc.v.rand_mode(0);\n"   // held at 0
       "    ok = n.randomize();\n"  // child.v(0) > c is impossible for c in
@@ -219,8 +219,8 @@ TEST(GlobalConstraint, InactiveObjectHandleExcludesItsObjectFromActiveSet) {
       "  int bv;\n"
       "  int good;\n"
       "  initial begin\n"
-      "    Node n = new;\n"
-      "    Leaf lb = n.b;\n"
+      "    static Node n = new;\n"
+      "    static Leaf lb = n.b;\n"
       "    lb.v = 240;\n"
       "    n.b.rand_mode(0);\n"  // remove object b from the active set
       "    ok = n.randomize();\n"
@@ -260,8 +260,8 @@ TEST(GlobalConstraint, NonRandMemberIsStateVariableInGlobalConstraint) {
       "  int sv;\n"
       "  int good;\n"
       "  initial begin\n"
-      "    Node n = new;\n"
-      "    Leaf lc = n.child;\n"
+      "    static Node n = new;\n"
+      "    static Leaf lc = n.child;\n"
       "    lc.s = 250;\n"
       "    ok = n.randomize();\n"
       "    cv = n.c;\n"
@@ -297,8 +297,8 @@ TEST(GlobalConstraint, DisabledConstraintIsExcludedFromActiveConstraints) {
       "  int ok0;\n"
       "  int ok1;\n"
       "  initial begin\n"
-      "    Node n0 = new;\n"
-      "    Node n1 = new;\n"
+      "    static Node n0 = new;\n"
+      "    static Node n1 = new;\n"
       "    ok0 = n0.randomize();\n"     // k active -> contradictory -> fails
       "    n1.k.constraint_mode(0);\n"  // disable the global constraint
       "    ok1 = n1.randomize();\n"     // k excluded -> succeeds

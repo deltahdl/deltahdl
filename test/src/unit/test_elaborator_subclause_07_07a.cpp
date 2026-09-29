@@ -435,7 +435,7 @@ TEST(ArraySubroutineArgValidation,
       "  import \"DPI-C\" function int f(output int a[]);\n"
       "  int dyn[];\n"
       "  initial begin\n"
-      "    int r = f(dyn);\n"
+      "    static int r = f(dyn);\n"
       "  end\n"
       "endmodule\n",
       f);

@@ -100,8 +100,8 @@ TEST(InterfaceClassCastingAndRefAssignment,
              "endclass\n"
              "module m;\n"
              "  initial begin\n"
-             "    Fifo fifo_obj = new;\n"
-             "    PutImp put_ref = fifo_obj;\n"
+             "    static Fifo fifo_obj = new;\n"
+             "    static PutImp put_ref = fifo_obj;\n"
              "  end\n"
              "endmodule\n"));
 }
@@ -155,7 +155,7 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewDeclInitError) {
       "endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    IC ic = new;\n"
+      "    static IC ic = new;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -198,7 +198,7 @@ TEST(InterfaceClassCastingAndRefAssignment, ConcreteClassNewDeclInitOk) {
              "endclass\n"
              "module m;\n"
              "  initial begin\n"
-             "    C c = new;\n"
+             "    static C c = new;\n"
              "  end\n"
              "endmodule\n"));
 }
@@ -430,7 +430,7 @@ TEST(InterfaceClassCastingAndRefAssignment,
       "module m;\n"
       "  initial begin\n"
       "    fork\n"
-      "      IC ic2 = new;\n"
+      "      static IC ic2 = new;\n"
       "    join\n"
       "  end\n"
       "endmodule\n",

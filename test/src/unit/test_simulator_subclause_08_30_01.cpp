@@ -128,7 +128,7 @@ TEST(ClassSim, WeakRefE2eStdScopedBlockDeclarationIsTheBuiltinClass) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    obj strong_obj = new;\n"
+                      "    static obj strong_obj = new;\n"
                       "    obj got;\n"
                       "    std::weak_reference#(obj) wref1;\n"
                       "    wref1 = new(strong_obj);\n"

@@ -40,11 +40,11 @@ endclass
 
 module random_variables;
   initial begin
-    Vars vars = new;
-    Inner held = vars.in;
-    int solved = 0, y_in_range = 0, r_in_range = 0, e_named = 0;
-    int s_unnamed = 0, in_solved = 0, w_above = 0, handle_kept = 0;
-    int cycles = 0;
+    static Vars vars = new;
+    static Inner held = vars.in;
+    static int solved = 0, y_in_range = 0, r_in_range = 0, e_named = 0;
+    static int s_unnamed = 0, in_solved = 0, w_above = 0, handle_kept = 0;
+    static int cycles = 0;
     bit [3:0] seen;
     repeat (10) begin
       seen = 0;

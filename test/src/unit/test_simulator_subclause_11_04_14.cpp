@@ -279,7 +279,7 @@ TEST(StreamingOperatorSim,
       "  int a = 1, b = 2, c = 3;\n"
       "  bit [127:0] out;\n"
       "  initial begin\n"
-      "    bit [127:0] d = {<< 32 {a, b, c}};\n"
+      "    static bit [127:0] d = {<< 32 {a, b, c}};\n"
       "    out = d;\n"
       "  end\n"
       "endmodule\n",
@@ -302,7 +302,7 @@ TEST(StreamingOperatorSim,
       "module t;\n"
       "  int a = 1, b = 2, c = 3;\n"
       "  initial begin\n"
-      "    int d = {<<{a, b, c}};\n"
+      "    static int d = {<<{a, b, c}};\n"
       "  end\n"
       "endmodule\n",
       f);

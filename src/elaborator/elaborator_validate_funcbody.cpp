@@ -738,81 +738,6 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
-namespace {
-
-void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
-  if (!e) return;
-  switch (e->kind) {
-    case ExprKind::kIdentifier:
-      if (!e->text.empty() && e->text.front() != '$') out.push_back(e);
-      return;
-    case ExprKind::kCall:
-    case ExprKind::kSystemCall:
-      for (auto* a : e->args) CollectIdentLeaves(a, out);
-      return;
-    case ExprKind::kMemberAccess:
-      CollectIdentLeaves(e->lhs, out);
-      return;
-    case ExprKind::kTypeRef:
-      return;
-    default:
-      break;
-  }
-  CollectIdentLeaves(e->lhs, out);
-  CollectIdentLeaves(e->rhs, out);
-  CollectIdentLeaves(e->base, out);
-  CollectIdentLeaves(e->index, out);
-  CollectIdentLeaves(e->index_end, out);
-  CollectIdentLeaves(e->condition, out);
-  CollectIdentLeaves(e->true_expr, out);
-  CollectIdentLeaves(e->false_expr, out);
-  CollectIdentLeaves(e->repeat_count, out);
-  CollectIdentLeaves(e->with_expr, out);
-  for (auto* a : e->args) CollectIdentLeaves(a, out);
-  for (auto* el : e->elements) CollectIdentLeaves(el, out);
-}
-
-// Reports each identifier leaf of a default-value expression that is neither a
-// previously declared argument nor visible in the subroutine's declaring scope.
-template <typename InModuleScopeFn>
-void CheckOneArgDefaultScope(
-    const FunctionArg& arg,
-    const std::unordered_set<std::string_view>& prior_args,
-    const InModuleScopeFn& in_module_scope, DiagEngine& diag) {
-  std::vector<const Expr*> idents;
-  CollectIdentLeaves(arg.default_value, idents);
-  for (const auto* e : idents) {
-    auto name = e->text;
-    if (name.empty()) continue;
-    if (prior_args.count(name)) continue;
-    if (in_module_scope(name)) continue;
-    diag.Error(e->range.start,
-               std::format("default value for '{}' references '{}' "
-                           "which is not declared in the subroutine's "
-                           "declaring scope",
-                           arg.name, name),
-               Subclause("13.5.3"));
-  }
-}
-
-}  // namespace
-
-void Elaborator::ValidateFunctionArgDefaultsScope(const ModuleItem* item) {
-  if (!item) return;
-  if (!item->is_ansi_ports) return;
-  if (!item->method_class.empty()) return;
-  auto in_module_scope = [this](std::string_view name) {
-    return IsNameInModuleScope(name);
-  };
-  std::unordered_set<std::string_view> prior_args;
-  for (const auto& arg : item->func_args) {
-    if (arg.default_value) {
-      CheckOneArgDefaultScope(arg, prior_args, in_module_scope, diag_);
-    }
-    if (!arg.name.empty()) prior_args.insert(arg.name);
-  }
-}
-
 static void CheckAutoVarWritesInProc(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
@@ -850,74 +775,115 @@ static void CheckAutoVarWritesInProc(
   });
 }
 
-static bool IsLoopStmtKind(StmtKind kind) {
-  switch (kind) {
-    case StmtKind::kFor:
-    case StmtKind::kForeach:
-    case StmtKind::kWhile:
-    case StmtKind::kForever:
-    case StmtKind::kRepeat:
-    case StmtKind::kDoWhile:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // §6.21 (printed pages 133 and 134): a variable of a static task, function or
 // procedural block is static by default, and a declaration of one that gives
 // an initialization value shall say `static`, stating that the initialization
 // runs once, or `automatic`, making it run on each entry to its block. The
-// clause's top_illegal example is a loop body's `int loop3 = 0;`, which reads
-// as run on every iteration and as a static runs once. `in_loop` says whether
-// `s` stands in a loop body. The rule reaches the declarations outside a loop
-// too, which #4482 holds.
-static void ReportImplicitlyStaticInitInLoop(const Stmt* s, bool in_loop,
-                                             DiagEngine& diag) {
-  if (s == nullptr) return;
-  if (in_loop && s->kind == StmtKind::kVarDecl && s->var_init != nullptr &&
-      !s->var_is_static && !s->var_is_automatic) {
+// clause's top_illegal example marks both `int svar2 = 2;` at the top of an
+// initial block and `int loop3 = 0;` in a loop body, so the rule reaches every
+// position a statement holds a declaration in. A block parameter is read into
+// the same kVarDecl and is not a variable, so it is passed by. §18.17 (printed
+// page 567) makes a randsequence statement an automatic scope and each of its
+// code blocks another, so nothing declared within one is static by default and
+// the walk stops there.
+static void ReportImplicitlyStaticInit(const Stmt* s, DiagEngine& diag) {
+  if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
+  if (s->kind == StmtKind::kVarDecl && s->var_init != nullptr &&
+      !s->var_is_static && !s->var_is_automatic && !s->var_is_param) {
     diag.Error(s->range.start,
                std::format("variable '{}' declared with an initializer in a "
-                           "loop of a static block, task or function must be "
-                           "declared static or automatic",
+                           "static block, task or function must be declared "
+                           "static or automatic",
                            s->var_name),
                Subclause("6.21"));
   }
-  const bool kBodyInLoop = in_loop || IsLoopStmtKind(s->kind);
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    ReportImplicitlyStaticInitInLoop(sub, kBodyInLoop, diag);
-  });
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { ReportImplicitlyStaticInit(sub, diag); });
 }
 
 // §6.21: a module's procedural blocks are static unless the module is declared
 // `automatic`, and so are its tasks and functions unless the subroutine or the
 // module says automatic, a subroutine's own `static` outranking the module's.
+// §13.3.1 and §13.4.2 give a package's subroutines the same default from the
+// package, and make a class method automatic always, which an out-of-block
+// method definition standing among the scope's items is.
 static void ReportImplicitlyStaticInitsOfItem(const ModuleItem* item,
-                                              bool module_is_automatic,
+                                              bool scope_is_automatic,
                                               DiagEngine& diag) {
   if (IsProceduralItemKind(item->kind)) {
-    if (!module_is_automatic)
-      ReportImplicitlyStaticInitInLoop(item->body, false, diag);
+    if (!scope_is_automatic) ReportImplicitlyStaticInit(item->body, diag);
     return;
   }
   if (item->kind != ModuleItemKind::kTaskDecl &&
       item->kind != ModuleItemKind::kFunctionDecl)
     return;
-  if (item->is_automatic || (module_is_automatic && !item->is_static)) return;
+  if (!item->method_class.empty()) return;
+  if (item->is_automatic || (scope_is_automatic && !item->is_static)) return;
   for (const auto* s : item->func_body_stmts)
-    ReportImplicitlyStaticInitInLoop(s, false, diag);
+    ReportImplicitlyStaticInit(s, diag);
 }
 
-void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    ReportImplicitlyStaticInitsOfItem(item, decl->is_automatic, diag_);
+static void ValidateAutomaticVarRulesOfItems(
+    const std::vector<ModuleItem*>& items, bool module_is_automatic,
+    DiagEngine& diag);
+
+// §27.3 (printed page 818): the procedural blocks and subroutines a generate
+// block brings into existence act as they would in a module, so §6.21's rules
+// reach them with the enclosing module's lifetime. A conditional generate's
+// else branch is a kGenerateIf of its own, reached through gen_else, and each
+// case generate arm holds its block in its own body.
+static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
+                                                bool module_is_automatic,
+                                                DiagEngine& diag) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      ValidateAutomaticVarRulesOfItems(item->gen_body, module_is_automatic,
+                                       diag);
+      if (item->gen_else != nullptr)
+        ValidateAutomaticVarRulesOfGenerate(item->gen_else, module_is_automatic,
+                                            diag);
+      return;
+    case ModuleItemKind::kGenerateFor:
+      ValidateAutomaticVarRulesOfItems(item->gen_body, module_is_automatic,
+                                       diag);
+      return;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items)
+        ValidateAutomaticVarRulesOfItems(ci.body, module_is_automatic, diag);
+      return;
+    default:
+      return;
+  }
+}
+
+static void ValidateAutomaticVarRulesOfItems(
+    const std::vector<ModuleItem*>& items, bool module_is_automatic,
+    DiagEngine& diag) {
+  for (const auto* item : items) {
+    ReportImplicitlyStaticInitsOfItem(item, module_is_automatic, diag);
+    ValidateAutomaticVarRulesOfGenerate(item, module_is_automatic, diag);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     std::unordered_set<std::string_view> auto_vars;
     CollectAutoVarNames(item->body, false, auto_vars);
     if (auto_vars.empty()) continue;
-    CheckAutoVarWritesInProc(item->body, auto_vars, diag_);
+    CheckAutoVarWritesInProc(item->body, auto_vars, diag);
+  }
+}
+
+void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
+  ValidateAutomaticVarRulesOfItems(decl->items, decl->is_automatic, diag_);
+}
+
+// §6.21's initializer rule over a package's tasks and functions, which §13.3.1
+// and §13.4.2 make static unless the subroutine or the package says automatic.
+// A process in a package is reported under §26.2 by
+// Elaborator::ValidatePackageItems, so only the subroutines are walked here.
+void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
+                                        DiagEngine& diag) {
+  for (const auto* item : pkg->items) {
+    if (IsProceduralItemKind(item->kind)) continue;
+    ReportImplicitlyStaticInitsOfItem(item, pkg->is_automatic, diag);
   }
 }
 

@@ -274,8 +274,8 @@ TEST(StaticClassPropertySim, StaticQueuePropertyPushedFromConstructors) {
                       "module t;\n"
                       "  int out;\n"
                       "  initial begin\n"
-                      "    Reg a = new(3);\n"
-                      "    Reg b = new(5);\n"
+                      "    static Reg a = new(3);\n"
+                      "    static Reg b = new(5);\n"
                       "    out = Reg::all.size() * 10 + Reg::all[1].id;\n"
                       "  end\n"
                       "endmodule\n",
@@ -652,7 +652,7 @@ TEST(StaticClassPropertySim,
                 "module t;\n"
                 "  int result;\n"
                 "  initial begin\n"
-                "    Other o = new;\n"
+                "    static Other o = new;\n"
                 "    result = o.go();\n"
                 "  end\n"
                 "endmodule\n",

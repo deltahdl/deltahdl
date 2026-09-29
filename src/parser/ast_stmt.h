@@ -318,6 +318,10 @@ struct Stmt {
   bool var_is_automatic = false;
   bool var_is_static = false;
   bool var_is_const = false;
+  // A block parameter_declaration or local_parameter_declaration (A.2.8's
+  // block_item_declaration) read into this kVarDecl rather than a variable, so
+  // §6.21's lifetime rules on block variables pass it by.
+  bool var_is_param = false;
 
   ModuleItem* decl_item = nullptr;
 };

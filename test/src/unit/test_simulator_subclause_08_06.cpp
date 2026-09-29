@@ -380,7 +380,7 @@ TEST(ObjectMethodSim,
                       "module t;\n"
                       "  int r;\n"
                       "  initial begin\n"
-                      "    Geo q = new;\n"
+                      "    static Geo q = new;\n"
                       "    r = q.sum(tagged Pt '{5, 6});\n"
                       "  end\n"
                       "endmodule\n",

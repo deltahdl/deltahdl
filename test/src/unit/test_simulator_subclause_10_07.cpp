@@ -663,7 +663,7 @@ TEST(AssignmentExtensionTruncationSim, BlockDeclarationInitializerTruncates) {
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
-      "    logic [3:0] v = 8'hAB;\n"
+      "    static logic [3:0] v = 8'hAB;\n"
       "    x = v;\n"
       "  end\n"
       "endmodule\n",
@@ -685,7 +685,7 @@ TEST(AssignmentExtensionTruncationSim,
       "module t;\n"
       "  logic [63:0] x;\n"
       "  initial begin\n"
-      "    logic [39:0] w = 48'hFFFF00000001;\n"
+      "    static logic [39:0] w = 48'hFFFF00000001;\n"
       "    x = w;\n"
       "  end\n"
       "endmodule\n",
@@ -708,7 +708,7 @@ TEST(AssignmentExtensionTruncationSim,
       "module t;\n"
       "  int x;\n"
       "  initial begin\n"
-      "    string s = \"hello world\";\n"
+      "    static string s = \"hello world\";\n"
       "    x = s.len();\n"
       "  end\n"
       "endmodule\n",

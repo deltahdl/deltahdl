@@ -88,7 +88,7 @@ TEST(VariableDeclarationSynthesis,
                    "    return v;\n"
                    "  endfunction\n"
                    "  always_comb begin\n"
-                   "    logic [7:0] t = identity(d);\n"
+                   "    static logic [7:0] t = identity(d);\n"
                    "    q = t;\n"
                    "  end\n"
                    "endmodule\n");

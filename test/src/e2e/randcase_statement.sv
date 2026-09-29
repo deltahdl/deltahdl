@@ -109,19 +109,19 @@ module randcase_statement;
 
     fork
       begin
-        process p = process::self();
+        static process p = process::self();
         p.srandom(3);
         for (int j = 0; j < 8; j++) f1[j] = pick();
       end
     join
     fork
       begin
-        process q = process::self();
+        static process q = process::self();
         q.srandom(5);
         for (int j = 0; j < 100; j++) busy = pick();
       end
       begin
-        process p = process::self();
+        static process p = process::self();
         p.srandom(3);
         for (int j = 0; j < 8; j++) f2[j] = pick();
       end

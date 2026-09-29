@@ -26,8 +26,8 @@ TEST(BehaviorOfRandomizationMethods, StaticRandSharedAcrossInstances) {
       "  int good;\n"
       "  initial begin\n"
       "    int va, vb, ok;\n"
-      "    C a = new;\n"
-      "    C b = new;\n"
+      "    static C a = new;\n"
+      "    static C b = new;\n"
       "    a.x = 200;\n"           // sentinel outside the constraint domain
       "    ok = a.randomize();\n"  // draws x in (0,50), writes the shared cell
       "    va = a.x;\n"
@@ -55,8 +55,8 @@ TEST(BehaviorOfRandomizationMethods, StaticRandcSharedAcrossInstances) {
       "  int good;\n"
       "  initial begin\n"
       "    int va0, vb0, va1, vb1, ok;\n"
-      "    C a = new;\n"
-      "    C b = new;\n"
+      "    static C a = new;\n"
+      "    static C b = new;\n"
       "    ok = a.randomize();\n"  // draw #1, written to the shared cell
       "    va0 = a.x;\n"
       "    vb0 = b.x;\n"           // the other instance sees draw #1 too
@@ -85,7 +85,7 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsPreviousValue) {
       "  int ok;\n"
       "  int val;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    c.x = 42;\n"            // previous value
       "    ok = c.randomize();\n"  // fails: constraints infeasible
       "    val = c.x;\n"           // must still be 42
@@ -113,7 +113,7 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsAllPreviousValues) {
       "  int va;\n"
       "  int vb;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    c.a = 11;\n"
       "    c.b = 22;\n"
       "    ok = c.randomize();\n"  // fails on 'a'
@@ -143,8 +143,8 @@ TEST(BehaviorOfRandomizationMethods,
       "  int va;\n"
       "  int vb;\n"
       "  initial begin\n"
-      "    C a = new;\n"
-      "    C b = new;\n"
+      "    static C a = new;\n"
+      "    static C b = new;\n"
       "    a.x = 7;\n"             // shared cell = 7 for every instance
       "    ok = b.randomize();\n"  // fails: constraints infeasible
       "    va = a.x;\n"            // both still read 7
@@ -172,7 +172,7 @@ TEST(BehaviorOfRandomizationMethods, PostRandomizeNotCalledOnFailure) {
       "  int ok;\n"
       "  int posts_after;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    ok = c.randomize();\n"  // fails
       "    posts_after = c.posts;\n"
       "  end\n"
@@ -197,7 +197,7 @@ TEST(BehaviorOfRandomizationMethods, PostRandomizeCalledOnSuccess) {
       "  int ok;\n"
       "  int posts_after;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    ok = c.randomize();\n"  // succeeds
       "    posts_after = c.posts;\n"
       "  end\n"
@@ -221,8 +221,8 @@ TEST(BehaviorOfRandomizationMethods,
       "  int same;\n"
       "  initial begin\n"
       "    int oka, okb;\n"
-      "    C a = new;\n"
-      "    C b = new;\n"
+      "    static C a = new;\n"
+      "    static C b = new;\n"
       "    a.srandom(100);\n"
       "    oka = a.randomize();\n"
       "    b.srandom(100);\n"

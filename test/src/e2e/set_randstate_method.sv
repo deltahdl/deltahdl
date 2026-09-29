@@ -62,7 +62,7 @@ module set_randstate_method;
     t = p.get_randstate();
     fork
       begin
-        process q = process::self();
+        static process q = process::self();
         q.set_randstate(s);
         for (int j = 0; j < 4; j++) u_c[j] = $urandom;
       end

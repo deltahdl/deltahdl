@@ -30,8 +30,8 @@ module external_constraint_blocks;
   bit [255:0] seen = 0;
   int distinct = 0;
   initial begin
-    C c = new;
-    E e = new;
+    static C c = new;
+    static E e = new;
     repeat (32) begin
       void'(c.randomize());
       if (c.x == 5 || c.x == 7) both++;

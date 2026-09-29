@@ -621,7 +621,7 @@ TEST(PassByValueSim, TypedefSignedBodyLocalSignExtends) {
       "  typedef byte b_t;\n"
       "  int r;\n"
       "  function int widen();\n"
-      "    b_t p = -1;\n"
+      "    static b_t p = -1;\n"
       "    return p;\n"
       "  endfunction\n"
       "  initial r = widen();\n"

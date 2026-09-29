@@ -137,7 +137,7 @@ TEST(PrePostRandomizeRun, AValuePostRandomizeAssignsIsWhatTheCallerReads) {
       "module t;\n"
       "  int ok;\n"
       "  initial begin\n"
-      "    Fixer fx = new;\n"
+      "    static Fixer fx = new;\n"
       "    ok = fx.randomize() with { x > 100; };\n"
       "    $display(\"%0d %0d\", ok, fx.x);\n"
       "  end\n"

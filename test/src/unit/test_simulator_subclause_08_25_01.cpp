@@ -456,7 +456,7 @@ TEST(ParameterizedScopeResolutionSim,
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    Iter#(int) it = new;\n"
+                      "    static Iter#(int) it = new;\n"
                       "    result = it.first();\n"
                       "  end\n"
                       "endmodule\n",

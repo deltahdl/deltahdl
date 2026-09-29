@@ -295,7 +295,7 @@ TEST(StaticMethodSimulation, ForkOfAStaticMethodCalledFromAnObjectHasNoThis) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    R r = new;\n"
+      "    static R r = new;\n"
       "    r.start();\n"
       "    r.begin_hold();\n"
       "    #2 result = C::n();\n"

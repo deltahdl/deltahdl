@@ -387,7 +387,7 @@ TEST(RandcaseWeightedCase, SelectionDrawsFromSeedableUrandomStream) {
       "  int sig_a, sig_b, sig_c;\n"
       "  int i, sel;\n"
       "  initial begin\n"
-      "    process pr = process::self();\n"
+      "    static process pr = process::self();\n"
       "    pr.srandom(555);\n"
       "    sig_a = 0;\n"
       "    for (i = 0; i < 40; i = i + 1) begin\n"

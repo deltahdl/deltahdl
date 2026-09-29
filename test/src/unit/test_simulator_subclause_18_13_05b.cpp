@@ -81,7 +81,7 @@ TEST(SetRandstateRun, TheStateInstalledOnTheProcessOrAThreadSetsWhatItDraws) {
       "    t = p.get_randstate();\n"
       "    fork\n"
       "      begin\n"
-      "        process q = process::self();\n"
+      "        static process q = process::self();\n"
       "        q.set_randstate(s);\n"
       "        for (int j = 0; j < 4; j++) uc[j] = $urandom;\n"
       "      end\n"

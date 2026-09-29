@@ -612,7 +612,7 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignThroughHandleError) {
       "endclass\n"
       "module m;\n"
       "  initial begin\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    h.id = 2;\n"
       "  end\n"
       "endmodule\n",
@@ -792,7 +792,7 @@ TEST(ConstantClassPropertyElaboration,
       "endclass\n"
       "module m;\n"
       "  function void f();\n"
-      "    C h = new;\n"
+      "    static C h = new;\n"
       "    h.id = 2;\n"
       "  endfunction\n"
       "endmodule\n",

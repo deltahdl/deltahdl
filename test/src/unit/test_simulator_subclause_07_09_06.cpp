@@ -332,7 +332,7 @@ TEST(AssocArrayNextMethod, DoWhileTraversalVisitsEveryEntryOfAClassProperty) {
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
-      "    C c = new;\n"
+      "    static C c = new;\n"
       "    result = c.total();\n"
       "  end\n"
       "endmodule\n",

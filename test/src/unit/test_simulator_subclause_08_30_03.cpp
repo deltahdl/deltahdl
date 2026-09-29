@@ -53,8 +53,8 @@ TEST(ClassSim, WeakRefE2eGetQueriesReferentBuiltInDeclInit) {
                       "module t;\n"
                       "  int result;\n"
                       "  initial begin\n"
-                      "    obj strong_obj = new();\n"
-                      "    weak_reference #(obj) wr = new(strong_obj);\n"
+                      "    static obj strong_obj = new();\n"
+                      "    static weak_reference #(obj) wr = new(strong_obj);\n"
                       "    result = (wr.get() == strong_obj);\n"
                       "  end\n"
                       "endmodule\n",

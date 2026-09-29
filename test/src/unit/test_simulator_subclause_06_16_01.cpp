@@ -179,7 +179,7 @@ TEST(StringMethods, LenCountsCharactersOfATypedefStringInABlock) {
       "  typedef string s_t;\n"
       "  int n;\n"
       "  initial begin\n"
-      "    s_t s = \"hello world\";\n"
+      "    static s_t s = \"hello world\";\n"
       "    n = s.len();\n"
       "  end\n"
       "endmodule\n",
@@ -194,7 +194,7 @@ TEST(StringMethods, LenCountsCharactersOfATypedefStringInASubroutine) {
       "  typedef string s_t;\n"
       "  int n;\n"
       "  function int measure();\n"
-      "    s_t s = \"hello world\";\n"
+      "    static s_t s = \"hello world\";\n"
       "    return s.len();\n"
       "  endfunction\n"
       "  initial n = measure();\n"

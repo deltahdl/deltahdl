@@ -154,7 +154,7 @@ TEST(EnumNumericalExpr, EnumExprInitializersAreClause6194Reports) {
       "  typedef enum {Red, Green, Blue} Colors;\n"
       "  Colors M = Green + 1;\n"
       "  initial begin\n"
-      "    Colors P = Blue * 2;\n"
+      "    static Colors P = Blue * 2;\n"
       "  end\n"
       "endmodule\n",
       f);

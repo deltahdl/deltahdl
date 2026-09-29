@@ -77,7 +77,7 @@ TEST(PackageDeclarationSim, PackageClassInstanceMethodReadsPackageNamesBare) {
       "module top;\n"
       "  int k, a, fv, v;\n"
       "  initial begin\n"
-      "    p::Helper h = new;\n"
+      "    static p::Helper h = new;\n"
       "    k = h.k(); a = h.a(); fv = h.f(); v = h.v();\n"
       "  end\n"
       "endmodule\n",
@@ -104,7 +104,7 @@ TEST(PackageDeclarationSim, PackageClassStaticMethodReadsPackageParameterBare) {
       "module top;\n"
       "  int inst, quals, stat;\n"
       "  initial begin\n"
-      "    p::Helper h = new;\n"
+      "    static p::Helper h = new;\n"
       "    inst = h.k(); quals = h.kq(); stat = p::Helper::ks();\n"
       "  end\n"
       "endmodule\n",
@@ -133,7 +133,7 @@ TEST(PackageDeclarationSim, PackageClassOutOfBlockBodyReadsPackageNamesBare) {
       "module top;\n"
       "  int s;\n"
       "  initial begin\n"
-      "    p::C c = new;\n"
+      "    static p::C c = new;\n"
       "    s = c.sum();\n"
       "  end\n"
       "endmodule\n",
@@ -164,7 +164,7 @@ TEST(PackageDeclarationSim,
       "module top;\n"
       "  int e, m, k;\n"
       "  initial begin\n"
-      "    p::Holder h = new;\n"
+      "    static p::Holder h = new;\n"
       "    e = h.e; m = h.m; k = h.k;\n"
       "  end\n"
       "endmodule\n",
@@ -191,7 +191,7 @@ TEST(PackageDeclarationSim, PackageClassMethodWritesPackageVariableBare) {
       "module top;\n"
       "  int ret, after;\n"
       "  initial begin\n"
-      "    p::Helper h = new;\n"
+      "    static p::Helper h = new;\n"
       "    ret = h.bump();\n"
       "    after = p::pv;\n"
       "  end\n"
@@ -226,7 +226,7 @@ TEST(PackageDeclarationSim,
       "module top;\n"
       "  int r, k;\n"
       "  initial begin\n"
-      "    User u = new;\n"
+      "    static User u = new;\n"
       "    r = u.run(); k = u.k();\n"
       "  end\n"
       "endmodule\n",
