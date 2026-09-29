@@ -10,7 +10,6 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/eval_array.h"
@@ -258,7 +257,7 @@ static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
     if (stmt->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
     auto* init = stmt->for_inits[i];
     if (!init || !init->lhs) continue;
-    uint32_t w = EvalTypeWidth(stmt->for_init_types[i]);
+    uint32_t w = DeclaredTypeWidth(stmt->for_init_types[i], ctx);
     if (w == 0) w = 32;
     // §6.11.3: byte, shortint, int, integer and longint default to signed, so
     // the declared type decides the loop variable's signedness as it decides

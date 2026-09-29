@@ -358,4 +358,98 @@ TEST(ValueParameterSim, IntegerClassParamFromRealConstantRounds) {
       "3\n");
 }
 
+// §6.20.2 makes a value parameter a constant, and §7.4.1 lets a packed
+// dimension's bound be any constant expression, so a variable declared in a
+// named block with `[W-1:0]` is W bits wide there as it is at module scope.
+// All ones is the discriminating value: a variable sized at the one bit of its
+// base type reads 1, one at the 32-bit carrier 4294967295.
+TEST(ValueParameterSim, NamedBlockVariableSizedByParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter W = 16;\n"
+                       "  localparam int L = 12;\n"
+                       "  initial begin : blk\n"
+                       "    logic [W-1:0] b;\n"
+                       "    logic [L-1:0] c;\n"
+                       "    b = '1; c = '1;\n"
+                       "    $display(\"%0d %0d %0d\", b, c, $bits(b));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "65535 4095 16\n");
+}
+
+// The same declaration in a subroutine body, static and automatic function and
+// a task, which a body's own declaration path sizes.
+TEST(ValueParameterSim, SubroutineLocalSizedByParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter W = 16;\n"
+                       "  function int fs();\n"
+                       "    logic [W-1:0] r; r = '1; return r;\n"
+                       "  endfunction\n"
+                       "  function automatic int fa();\n"
+                       "    logic [W-1:0] r; r = '1; return r;\n"
+                       "  endfunction\n"
+                       "  task tk(output int o);\n"
+                       "    logic [W-1:0] q; q = '1; o = q;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    int o;\n"
+                       "    tk(o);\n"
+                       "    $display(\"%0d %0d %0d\", fs(), fa(), o);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "65535 65535 65535\n");
+}
+
+// A for-loop initialization declares its variable with the same data type, in
+// a process and in a function body alike. Starting at all ones, a 16-bit
+// counter wraps to 0 on its first increment, so the two values it takes sum to
+// 65535; the count bounds the loop whatever width the variable was given.
+TEST(ValueParameterSim, ForInitVariableSizedByParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter W = 16;\n"
+                       "  function automatic int last();\n"
+                       "    int n = 0; int s = 0;\n"
+                       "    for (logic [W-1:0] i = '1; n < 2; i++) begin\n"
+                       "      s += i; n++;\n"
+                       "    end\n"
+                       "    return s;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    int n;\n"
+                       "    n = 0;\n"
+                       "    for (logic [W-1:0] i = '1; n < 2; i++) begin\n"
+                       "      $display(\"%0d\", i); n++;\n"
+                       "    end\n"
+                       "    $display(\"%0d\", last());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "65535\n0\n65535\n");
+}
+
+// A parameter is a constant of the instance that declares it (§23.10), so two
+// instances given different widths declare their block variables at their own
+// widths rather than at one fold made for the module.
+TEST(ValueParameterSim, BlockVariableSizedByEachInstancesParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter W = 4, parameter D = 1);\n"
+                       "  initial begin : b\n"
+                       "    logic [W-1:0] v;\n"
+                       "    #D v = '1;\n"
+                       "    $display(\"%0d\", v);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(.W(8), .D(1)) a();\n"
+                       "  m #(.W(3), .D(2)) c();\n"
+                       "endmodule\n",
+                       f),
+            "255\n7\n");
+}
+
 }  // namespace

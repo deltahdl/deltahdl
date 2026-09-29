@@ -55,10 +55,9 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 // never declared -- which leaves each caller's own fallback in charge of the
 // answer.
 //
-// A packed dimension written where the name is used is not stacked onto the
-// width the name carries, though §7.4.4 says it should be; EvalTypeWidth
-// answers such a type from that dimension alone and this helper does not reach
-// it. See #3471.
+// A packed dimension whose bounds name a parameter (§6.20.2, §7.4.1) is folded
+// against the values the running instance holds, so a declaration made while
+// the design runs is as wide in a block or a subroutine as at module scope.
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 
 // §6.18/§6.16: whether the declared type is a string, whether written as the

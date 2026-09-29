@@ -11,6 +11,8 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -132,7 +134,47 @@ static uint32_t MethodClassTypedefWidth(std::string_view name,
   return 0;
 }
 
+// §7.4.1 with §6.20.2: a packed dimension's bounds are constant expressions,
+// and a value parameter's name is one. EvalTypeWidth folds a bound with no
+// scope, so a range naming a parameter does not fold there, and a variable
+// declared while the design runs -- in a named block, a subroutine body or a
+// for-loop initialization -- fell to the width of its base type, one bit for
+// `logic [W-1:0]`. The simulator holds each parameter as a variable of the
+// instance declaring it, so each name a bound reads is looked up in the
+// running scope and the range folded against those values, which gives every
+// instance its own width. 0 where a name resolves to no variable or to an
+// unknown value, which leaves the fold without a scope in charge.
+static uint32_t RunningPackedDimProduct(const DataType& type, SimContext& ctx) {
+  if (!type.packed_dim_left || !type.packed_dim_right) return 0;
+  std::vector<const Expr*> names;
+  CollectBareIdents(type.packed_dim_left, names);
+  CollectBareIdents(type.packed_dim_right, names);
+  for (const auto& [left, right] : type.extra_packed_dims) {
+    CollectBareIdents(left, names);
+    CollectBareIdents(right, names);
+  }
+  if (names.empty()) return 0;
+  ScopeMap scope;
+  for (const Expr* name : names) {
+    const Variable* var = ctx.FindVariable(name->text);
+    if (var == nullptr || !var->value.IsKnown()) return 0;
+    scope[name->text] = SelectBoundValue(var->value);
+  }
+  return PackedDimProduct(type, scope);
+}
+
+// The element count of the packed dimensions `type` writes, folded without a
+// scope where that is enough and against the running one otherwise.
+static uint32_t DeclaredPackedDimProduct(const DataType& type,
+                                         SimContext& ctx) {
+  uint32_t folded = PackedDimProduct(type);
+  return folded != 0 ? folded : RunningPackedDimProduct(type, ctx);
+}
+
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed && PackedDimProduct(type) == 0) {
+    if (uint32_t running = RunningPackedDimProduct(type, ctx)) return running;
+  }
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
@@ -145,7 +187,7 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   // the typedef itself carries -- `bsix [1:10] v5` on a `typedef bit [1:5]
   // bsix` is 50 bits. The table holds what the name stands for; the use-site
   // range is how many of those the declaration asks for.
-  uint32_t outer = PackedDimProduct(type);
+  uint32_t outer = DeclaredPackedDimProduct(type, ctx);
   return outer > 0 ? base * outer : base;
 }
 
