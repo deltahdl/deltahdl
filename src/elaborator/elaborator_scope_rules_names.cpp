@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_set>
