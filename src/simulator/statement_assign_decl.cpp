@@ -661,7 +661,10 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
   Variable* var = obj.var;
-  var->is_4state = Is4stateType(stmt->var_decl_type.kind);
+  // §6.18: a typedef name stands for the type it names, so the 4-state
+  // question is asked of the kind the name resolves to (DeclaredTypeKind);
+  // asked of DataTypeKind::kNamed, a `typedef logic` local was made 2-state.
+  var->is_4state = Is4stateType(DeclaredTypeKind(stmt->var_decl_type, ctx));
   if (!var->is_4state) CoerceTo2State(var->value);
   // §6.8 (Table 6-7): a 4-state local starts as 'x whatever the scope's
   // lifetime, as a module's does (§13.3, §13.4). A local of an automatic

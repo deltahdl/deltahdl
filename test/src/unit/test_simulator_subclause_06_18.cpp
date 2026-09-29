@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -157,6 +160,30 @@ TEST(ClassScopeTypedefSim, MethodLocalDeclaredByAnAssociativeArrayTypedef) {
                       "endmodule\n",
                       "result"),
             205u);
+}
+
+// §6.18 makes a typedef name stand for the type it names, so `L x` in a
+// procedural block declares a `logic [3:0]`: it starts at x (§6.8, Table 6-7)
+// and keeps a z written to it, where §6.11.2 clears x and z only on the way
+// into a 2-state type. The `bit` typedef beside it is that 2-state type and
+// clears both. The block's variable was made 2-state by the name alone and
+// read 0000 and 1001.
+TEST(TypedefSim, BlockVariableOfFourStateTypedefKeepsXAndZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef logic [3:0] L;\n"
+                       "  typedef bit [3:0] B;\n"
+                       "  initial begin : blk\n"
+                       "    L x;\n"
+                       "    B y;\n"
+                       "    $display(\"%b %b\", x, y);\n"
+                       "    x = 4'b1z01;\n"
+                       "    y = 4'b1z01;\n"
+                       "    $display(\"%b %b\", x, y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "xxxx 0000\n1z01 1001\n");
 }
 
 }  // namespace
