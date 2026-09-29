@@ -13,9 +13,12 @@
 #include "common/arena.h"
 #include "common/string_methods.h"
 #include "common/types.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -459,19 +462,39 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
   return true;
 }
 
+// §7.4 with §8.5: whether the nearest declaration of the property `name` on
+// the class chain from `type` writes an unpacked dimension -- fixed-size,
+// dynamic, queue or associative -- on itself or on the typedef its type names
+// (PropertyTypedefItem), which makes it an array rather than one value.
+static bool PropertyIsUnpackedArray(const ClassTypeInfo* type,
+                                    std::string_view name, SimContext& ctx) {
+  for (const ClassTypeInfo* t = type; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const ClassMember* member : t->decl->members) {
+      if (member->kind != ClassMemberKind::kProperty || member->name != name)
+        continue;
+      const ModuleItem* item = PropertyTypedefItem(member, t, ctx);
+      return !(item != nullptr ? item->unpacked_dims : member->unpacked_dims)
+                  .empty();
+    }
+  }
+  return false;
+}
+
 // §6.16 with §8.7: whether `type`, or a class it extends, declares the
 // property `name` with the string type -- a string itself, or, where
-// `elements` says so, an array whose elements are strings. §7.4 and §7.5 with
-// §8.5: a property declared as a fixed-size or dynamic array of strings,
-// `string inst[2]`, is no string itself, and a select of it, `h.inst[1] =
-// "ab"`, writes an element rather than a character. Taken for a string, that
-// write set character 1 of the property's empty text, which changed nothing,
-// and the element read back empty.
+// `elements` says so, an array whose elements are strings. §7.4, §7.5 and
+// §7.10 with §8.5: a property declared as an array of strings, `string
+// inst[2]`, is no string itself, and a select of it, `h.inst[1] = "ab"`,
+// writes an element rather than a character. Taken for a string, that write
+// set character 1 of the property's empty text, which changed nothing, and the
+// element read back empty.
 static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
-                             bool elements = false) {
+                             SimContext& ctx, bool elements = false) {
   const ClassTypeInfo::PropertyInfo* prop =
       type != nullptr ? type->FindProperty(name) : nullptr;
-  return prop != nullptr && prop->is_string && prop->IsArray() == elements;
+  return prop != nullptr && prop->is_string &&
+         PropertyIsUnpackedArray(type, name, ctx) == elements;
 }
 
 // Whether `e` is a name or a chain of member selects down from one, `h` or
@@ -509,7 +532,7 @@ static bool ReadBareStringProperty(const Expr* name, SimContext& ctx,
                                    Arena& arena, std::string& str) {
   if (name->text == "this" || NameDenotesVariable(name->text, ctx))
     return false;
-  if (!PropertyIsString(BareNameClassScope(name->text, ctx), name->text))
+  if (!PropertyIsString(BareNameClassScope(name->text, ctx), name->text, ctx))
     return false;
   str = Logic4VecToString(EvalExpr(name, ctx, arena));
   return true;
@@ -520,8 +543,8 @@ static bool ReadBareStringProperty(const Expr* name, SimContext& ctx,
 static bool ReadScopedStringProperty(const Expr* access, SimContext& ctx,
                                      Arena& arena, std::string& str) {
   if (access->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!PropertyIsString(ctx.FindClassType(access->lhs->text),
-                        access->rhs->text)) {
+  if (!PropertyIsString(ctx.FindClassType(access->lhs->text), access->rhs->text,
+                        ctx)) {
     return false;
   }
   str = Logic4VecToString(EvalExpr(access, ctx, arena));
@@ -536,7 +559,7 @@ static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
   if (!IsNamePath(access->lhs)) return false;
   const ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
-  if (obj == nullptr || !PropertyIsString(obj->type, access->rhs->text))
+  if (obj == nullptr || !PropertyIsString(obj->type, access->rhs->text, ctx))
     return false;
   str = Logic4VecToString(obj->GetProperty(access->rhs->text, arena));
   return true;
@@ -667,7 +690,7 @@ static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
   } else {
     return false;
   }
-  return PropertyIsString(TargetClassType(target), target.field, elements);
+  return PropertyIsString(TargetClassType(target), target.field, ctx, elements);
 }
 
 // The text the resolved string property holds.
