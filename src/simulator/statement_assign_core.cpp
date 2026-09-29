@@ -264,10 +264,33 @@ static bool TryWriteStringVariableChar(Variable* var, const Expr* lhs,
 // bits (TryCompoundElementWrite), it wrote bit 1 of the text. §7.4.4: an
 // element of a multidimensional array, `m[1][0]` in `m[1][0][0] = "P"`, is
 // its own leaf variable (TryResolveCompoundElement).
+//
+// Only a declared array of strings is looked into, known by its name before
+// any element is resolved: TryResolveCompoundElement makes the variable a
+// chain names where it finds none, so asked of `y[0][3]` on a `logic
+// [3:0][7:0] y[1:0]`, whose third index is a packed one, it made one, and the
+// bit-select that followed wrote that instead of the element.
+static bool DeclaredArrayOfStrings(const Expr* sel, SimContext& ctx) {
+  const Expr* root = sel;
+  while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+  if (root == nullptr || root->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* info = ctx.FindArrayInfo(root->text);
+  if (info == nullptr) return false;
+  if (info->elem_type_kind == DataTypeKind::kString) return true;
+  std::string first(root->text);
+  if (info->dim_los.empty()) {
+    first += "[" + std::to_string(info->lo) + "]";
+  } else {
+    for (uint32_t lo : info->dim_los) first += "[" + std::to_string(lo) + "]";
+  }
+  return ctx.IsStringVariable(first);
+}
+
 static bool TryWriteStringElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
                                       SimContext& ctx, Arena& arena) {
   if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr ||
-      lhs->index_end != nullptr || lhs->base->kind != ExprKind::kSelect)
+      lhs->index_end != nullptr || lhs->base->kind != ExprKind::kSelect ||
+      !DeclaredArrayOfStrings(lhs->base, ctx))
     return false;
   Variable* element = TryResolveArrayElement(lhs->base, ctx);
   if (element == nullptr)
