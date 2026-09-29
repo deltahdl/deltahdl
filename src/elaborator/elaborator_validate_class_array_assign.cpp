@@ -682,6 +682,40 @@ static bool MatchArrayMethodSite(const Expr* e, ArrayMethodSite& out) {
 // more than one unpacked dimension is. Each is reported as a compile-time
 // error. The receiver is only checked against the array tracking map when it
 // is a plain identifier, which is enough to recognize a declared array.
+// The errors the array method `site` names over the array `info` describes
+// owes at the call `e`: a reduction left without a with clause over an array
+// whose elements are arrays (§7.12.3), and an ordering method on an
+// associative array or one that rejects its with clause (§7.12.2).
+static void CheckArrayMethodSite(const Expr* e, const ArrayMethodSite& site,
+                                 const Elaborator::VarArrayInfo& info,
+                                 DiagEngine& diag) {
+  if (IsArrayReductionMethod(site.method)) {
+    if (!site.has_with && info.num_unpacked_dims >= 2) {
+      diag.Error(e->range.start,
+                 std::format("array reduction method '{}' requires a 'with' "
+                             "clause over an array whose elements are arrays",
+                             site.method),
+                 Subclause("7.12.3"));
+    }
+    return;
+  }
+  if (info.is_assoc) {
+    diag.Error(e->range.start,
+               std::format("array ordering method '{}' cannot be applied to "
+                           "associative array '{}'",
+                           site.method, site.base->text),
+               Subclause("7.12.2"));
+    return;
+  }
+  if (site.has_with && OrderingMethodRejectsWith(site.method)) {
+    diag.Error(e->range.start,
+               std::format("array ordering method '{}' does not accept a "
+                           "'with' clause",
+                           site.method),
+               Subclause("7.12.2"));
+  }
+}
+
 static void CheckArrayOrderingExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -692,30 +726,8 @@ static void CheckArrayOrderingExpr(
   bool matched = MatchArrayMethodSite(e, site);
   if (matched && site.base && site.base->kind == ExprKind::kIdentifier) {
     auto it = var_array_info.find(site.base->text);
-    if (it != var_array_info.end()) {
-      if (IsArrayReductionMethod(site.method)) {
-        if (!site.has_with && it->second.num_unpacked_dims >= 2) {
-          diag.Error(e->range.start,
-                     std::format("array reduction method '{}' requires a "
-                                 "'with' clause over an array whose elements "
-                                 "are arrays",
-                                 site.method),
-                     Subclause("7.12.3"));
-        }
-      } else if (it->second.is_assoc) {
-        diag.Error(e->range.start,
-                   std::format("array ordering method '{}' cannot be applied "
-                               "to associative array '{}'",
-                               site.method, site.base->text),
-                   Subclause("7.12.2"));
-      } else if (site.has_with && OrderingMethodRejectsWith(site.method)) {
-        diag.Error(e->range.start,
-                   std::format("array ordering method '{}' does not accept a "
-                               "'with' clause",
-                               site.method),
-                   Subclause("7.12.2"));
-      }
-    }
+    if (it != var_array_info.end())
+      CheckArrayMethodSite(e, site, it->second, diag);
   }
   // The method access under a call is the site itself, already checked, so
   // only its receiver is walked below it.

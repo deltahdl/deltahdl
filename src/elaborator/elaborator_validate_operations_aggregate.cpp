@@ -150,22 +150,31 @@ bool IsEqualityOperator(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// §7.4.6: an unpacked array is compared only with another array, and is not
-// treated as an integer by an operator TakesIntegralOrRealOperands lists.
-void CheckUnpackedArrayOperand(const Expr* e, const AggregateOperandNames& n,
-                               DiagEngine& diag) {
-  bool binary = e->kind == ExprKind::kBinary;
-  if (binary && IsEqualityOperator(e->op) && e->lhs != nullptr &&
-      e->rhs != nullptr) {
-    for (auto [array, other] :
-         {std::pair{e->lhs, e->rhs}, std::pair{e->rhs, e->lhs}}) {
-      if (!IsUnpackedArrayOperand(array, n.arrays) || !IsIntegralOperand(other))
-        continue;
+// §7.4.6: an unpacked array is compared only with another array, so an
+// equality whose one operand is an unpacked array and whose other is an
+// integral value is an error, reported at the array.
+void CheckUnpackedArrayComparison(const Expr* e, const AggregateOperandNames& n,
+                                  DiagEngine& diag) {
+  if (e->lhs == nullptr || e->rhs == nullptr) return;
+  for (auto [array, other] :
+       {std::pair{e->lhs, e->rhs}, std::pair{e->rhs, e->lhs}}) {
+    if (IsUnpackedArrayOperand(array, n.arrays) && IsIntegralOperand(other)) {
       diag.Error(array->range.start,
                  "an unpacked array is compared only with another unpacked "
                  "array",
                  Subclause("7.4.6"));
     }
+  }
+}
+
+// §7.4.6: an unpacked array is compared only with another array
+// (CheckUnpackedArrayComparison), and is not treated as an integer by an
+// operator TakesIntegralOrRealOperands lists.
+void CheckUnpackedArrayOperand(const Expr* e, const AggregateOperandNames& n,
+                               DiagEngine& diag) {
+  bool binary = e->kind == ExprKind::kBinary;
+  if (binary && IsEqualityOperator(e->op)) {
+    CheckUnpackedArrayComparison(e, n, diag);
     return;
   }
   if ((!binary && e->kind != ExprKind::kUnary) ||

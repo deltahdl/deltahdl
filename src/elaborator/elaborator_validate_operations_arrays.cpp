@@ -8,6 +8,7 @@
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

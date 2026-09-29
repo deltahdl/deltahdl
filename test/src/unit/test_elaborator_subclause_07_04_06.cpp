@@ -190,7 +190,7 @@ TEST(UnpackedArrayOperandElaboration, AnUnpackedArrayIsNoIntegralOperand) {
       "  end\n"
       "endmodule\n",
       f);
-  const char* kCompared =
+  const char* const kCompared =
       "an unpacked array is compared only with another unpacked array";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 6, "7.4.6"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
