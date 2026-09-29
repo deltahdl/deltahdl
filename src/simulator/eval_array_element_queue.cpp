@@ -496,6 +496,20 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
   return OfQueueElement(outer, sel, ctx, arena);
 }
 
+const QueueObject* AssocElementQueueAt(const AssocArrayObject& aa,
+                                       const Logic4Vec& key, Arena& arena) {
+  const QueueObject* q = nullptr;
+  if (aa.is_string_key) {
+    auto it = aa.str_element_queues.find(AssocStringKey(key));
+    if (it != aa.str_element_queues.end()) q = it->second;
+  } else {
+    auto it = aa.int_element_queues.find(
+        AssocIntKey(key, aa.is_wildcard, aa.index_width, aa.is_index_signed));
+    if (it != aa.int_element_queues.end()) q = it->second;
+  }
+  return q != nullptr ? q : NewElementQueue(ShapeOf(aa), arena);
+}
+
 bool SelectsElementQueue(const Expr* sel, SimContext& ctx, Arena& arena) {
   if (sel == nullptr || sel->kind != ExprKind::kSelect ||
       sel->base == nullptr || sel->index == nullptr ||

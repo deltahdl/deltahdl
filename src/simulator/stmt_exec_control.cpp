@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
@@ -716,6 +717,52 @@ static const ArrayInfo* ForeachArrayShape(const Stmt* stmt,
              : nullptr;
 }
 
+// §12.7.3 with §7.4, §7.8 and §7.10: the second loop variable of a foreach
+// over a queue, dynamic array or associative array whose elements are queues
+// or fixed-size arrays, `foreach (r[k, j])` over `int r[$][2]`, steps through
+// the indices of the element the first names, which is its own queue. `var`
+// is that variable, null where the loop names none or the array's elements
+// are no queues; `queue` or `assoc` the array.
+struct ForeachElementDim {
+  Variable* var = nullptr;
+  const QueueObject* queue = nullptr;
+  const AssocArrayObject* assoc = nullptr;
+};
+
+static ForeachElementDim ForeachElementDimOf(const Stmt* stmt,
+                                             const ForeachSetup& setup,
+                                             SimContext& ctx, Arena& arena) {
+  ForeachElementDim dim;
+  if (stmt->foreach_vars.size() < 2 || stmt->foreach_vars[1].empty())
+    return dim;
+  if (setup.aa != nullptr) {
+    if (!setup.aa->elements_are_queues) return dim;
+    dim.assoc = setup.aa;
+  } else {
+    const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena);
+    if (q == nullptr || !q->elements_are_queues) return dim;
+    dim.queue = q;
+  }
+  dim.var = ctx.CreateLocalVariable(stmt->foreach_vars[1], 32);
+  return dim;
+}
+
+// The queue of the element iteration `i` of the outer loop names.
+static const QueueObject* ForeachElementQueue(const ForeachElementDim& dim,
+                                              const ForeachSetup& setup,
+                                              uint32_t i, Arena& arena) {
+  if (dim.assoc != nullptr)
+    return AssocElementQueueAt(*dim.assoc, setup.keys[i], arena);
+  return ElementQueueOrDefault(*dim.queue, i, arena);
+}
+
+// The index position `p` of the element queue `q` stands for: a fixed-size
+// element's declared index from its left bound, a queue's position itself.
+static int64_t ElementIndexAt(const QueueObject& q, uint32_t p) {
+  auto size = static_cast<int64_t>(q.elements.size());
+  return q.index_descending ? q.index_lo + size - 1 - p : q.index_lo + p;
+}
+
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   EnterLoopLabelScope(stmt, ctx, labeled);
@@ -746,16 +793,36 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   ctx.PushScope();
   Variable* iter_var = CreateForeachIterVar(iter_name, setup, ctx);
+  ForeachElementDim inner = ForeachElementDimOf(stmt, setup, ctx, arena);
 
-  for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
+  bool stop = false;
+  for (uint32_t i = 0; i < size && !stop && !ctx.StopRequested(); ++i) {
     SetForeachIterVar(iter_var, info, setup, i, arena);
-    auto result = co_await ExecStmt(stmt->body, ctx, arena);
-    auto action = ClassifyLoopBodyResult(result);
-    if (action == LoopAction::kBreakLoop) break;
-    if (action == LoopAction::kPropagate) {
-      if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) break;
-      TeardownForeachScopes(stmt, ctx, labeled);
-      co_return result;
+    const QueueObject* element =
+        inner.var != nullptr ? ForeachElementQueue(inner, setup, i, arena)
+                             : nullptr;
+    auto count = element != nullptr
+                     ? static_cast<uint32_t>(element->elements.size())
+                     : 1U;
+    for (uint32_t p = 0; p < count && !ctx.StopRequested(); ++p) {
+      if (element != nullptr) {
+        inner.var->value = MakeLogic4VecVal(
+            arena, 32, static_cast<uint64_t>(ElementIndexAt(*element, p)));
+      }
+      auto result = co_await ExecStmt(stmt->body, ctx, arena);
+      auto action = ClassifyLoopBodyResult(result);
+      if (action == LoopAction::kBreakLoop) {
+        stop = true;
+        break;
+      }
+      if (action == LoopAction::kPropagate) {
+        if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) {
+          stop = true;
+          break;
+        }
+        TeardownForeachScopes(stmt, ctx, labeled);
+        co_return result;
+      }
     }
   }
 

@@ -6,7 +6,9 @@
 namespace delta {
 
 struct ArrayInfo;
+struct AssocArrayObject;
 struct Expr;
+struct Logic4Vec;
 struct QueueObject;
 struct Stmt;
 class SimContext;
@@ -32,6 +34,14 @@ class Arena;
 // element that does not exist.
 QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
                                   Arena& arena, bool allocate);
+
+// §7.8 with §7.4 and §7.10: the queue of the element under `key` of `aa`, an
+// associative array whose elements are queues or fixed-size arrays, to be
+// read, `key` one of the index values AssocIndexValues answers; where no
+// queue was made under it, a new one holding what the element holds until it
+// is written (ElementQueueOrDefault). Nothing is allocated or warned of.
+const QueueObject* AssocElementQueueAt(const AssocArrayObject& aa,
+                                       const Logic4Vec& key, Arena& arena);
 
 // Whether `sel` is a select of one element of an array whose elements are
 // queues or fixed-size arrays, by the array's shape alone: nothing is read or

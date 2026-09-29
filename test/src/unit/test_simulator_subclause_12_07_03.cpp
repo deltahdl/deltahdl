@@ -914,4 +914,30 @@ TEST(LoopStatementSim, ForeachOverASignedAssociativeIndex) {
   EXPECT_EQ(out, " -3 5 f-3 f5 -3 0 u15\n");
 }
 
+// §12.7.3 with §7.8 and §7.10: over a queue or associative array whose
+// elements are arrays, the second loop variable steps through each element,
+// from a fixed-size element's left bound. Only the first stepped, so
+// `foreach (r[k, j])` visited j = 0 alone and summed 12 of 26.
+TEST(LoopStatementSim, ForeachSecondVariableStepsThroughElementArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][2];\n"
+      "  int aq[int][$];\n"
+      "  int rd[$][2:0];\n"
+      "  int n, m;\n"
+      "  initial begin\n"
+      "    r.push_back('{5, 6}); r.push_back('{7, 8});\n"
+      "    aq[1] = '{3, 4};\n"
+      "    rd.push_back('{1, 2, 3});\n"
+      "    foreach (r[k, j]) n += r[k][j];\n"
+      "    foreach (aq[k, j]) m += aq[k][j];\n"
+      "    foreach (rd[k, j]) $write(\"%0d=%0d \", j, rd[k][j]);\n"
+      "    $display(\"%0d %0d\", n, m);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2=1 1=2 0=3 26 7\n");
+}
+
 }  // namespace
