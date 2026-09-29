@@ -460,11 +460,18 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
 }
 
 // §6.16 with §8.7: whether `type`, or a class it extends, declares the
-// property `name` with the string type.
-static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name) {
+// property `name` with the string type -- a string itself, or, where
+// `elements` says so, an array whose elements are strings. §7.4 and §7.5 with
+// §8.5: a property declared as a fixed-size or dynamic array of strings,
+// `string inst[2]`, is no string itself, and a select of it, `h.inst[1] =
+// "ab"`, writes an element rather than a character. Taken for a string, that
+// write set character 1 of the property's empty text, which changed nothing,
+// and the element read back empty.
+static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
+                             bool elements = false) {
   const ClassTypeInfo::PropertyInfo* prop =
       type != nullptr ? type->FindProperty(name) : nullptr;
-  return prop != nullptr && prop->is_string;
+  return prop != nullptr && prop->is_string && prop->IsArray() == elements;
 }
 
 // Whether `e` is a name or a chain of member selects down from one, `h` or
@@ -579,6 +586,10 @@ static bool DeclaredArrayHoldsStrings(std::string_view name, SimContext& ctx) {
 // `a[4].len()` read an empty string. So is a package's array named through
 // the package scope (§26.3), `p::pq[0]`, held under the key `p.pq` as a
 // scoped string variable is (PackageScopedKey).
+static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
+                                        FieldTarget& target,
+                                        bool elements = false);
+
 static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
   if (receiver->kind != ExprKind::kSelect || receiver->index_end != nullptr ||
       receiver->base == nullptr) {
@@ -590,7 +601,9 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
        NamesArrayFormal(base->text, ctx))) {
     return DeclaredArrayHoldsStrings(base->text, ctx);
   }
-  if (NamesStringProperty(base, ctx)) return true;
+  FieldTarget target;
+  if (ResolveStringPropertyTarget(base, ctx, target, /*elements=*/true))
+    return true;
   return DeclaredArrayHoldsStrings(PackageScopedKey(base), ctx);
 }
 
@@ -645,7 +658,7 @@ static const ClassTypeInfo* TargetClassType(const FieldTarget& target) {
 // wrote the string type. A bare name a variable denotes (§23.9) is that
 // variable's, which the callers serve first, and is not resolved here.
 static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
-                                        FieldTarget& target) {
+                                        FieldTarget& target, bool elements) {
   if (receiver->kind == ExprKind::kIdentifier) {
     if (NameDenotesVariable(receiver->text, ctx)) return false;
     target = ResolveBarePropertyTarget(receiver->text, ctx);
@@ -654,7 +667,7 @@ static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
   } else {
     return false;
   }
-  return PropertyIsString(TargetClassType(target), target.field);
+  return PropertyIsString(TargetClassType(target), target.field, elements);
 }
 
 // The text the resolved string property holds.

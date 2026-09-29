@@ -359,4 +359,34 @@ TEST(ObjectPropertySim, WriteThroughChainedHandleIsTheObjectsProperty) {
   EXPECT_EQ(v, 64064u);
 }
 
+// §8.5 with §7.4, §7.5 and §8.9: an element of a property that is an array of
+// strings -- fixed-size, static or dynamic -- holds the string written to it
+// through a handle or the class scope, as it does when a method writes it, and
+// the string methods read it. Taken for one string, the property's select was
+// a character write into its empty text, so the element read back empty.
+TEST(ObjectPropertySim, StringArrayPropertyElementsWrittenFromOutside) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  string inst[2];\n"
+      "  static string names[2];\n"
+      "  string sd[];\n"
+      "  function void set(); inst[0] = \"in\"; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new; h.set();\n"
+      "    h.inst[1] = \"ab\"; C::names[0] = \"s\";\n"
+      "    h.sd = new[1]; h.sd[0] = \"dy\";\n"
+      "    result = (h.inst[0] == \"in\") + 10 * (h.inst[1] == \"ab\") +\n"
+      "             100 * (C::names[0] == \"s\") + 1000 * (h.sd[0] == \"dy\") "
+      "+\n"
+      "             10000 * h.inst[1].len();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 21111u);
+}
+
 }  // namespace
