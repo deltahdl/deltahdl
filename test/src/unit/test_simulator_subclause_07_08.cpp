@@ -679,4 +679,36 @@ TEST(AssocArraySimulation, AnElementOfAnAssociativeArrayPropertyReadsSigned) {
   EXPECT_EQ(out, "1 1\n");
 }
 
+// §7.8 with §7.4.2 and §7.8.7: an associative array's element may be a
+// fixed-size array, each entry an array of its own -- written an element at a
+// time, allocating the entry, or whole from a pattern, read by element, as a
+// whole into a fixed-size array and under %p, a descending element from its
+// left bound, a two-dimensional element through two further selects. Kept as
+// one 32-bit value, each entry held one bit of `af[1][0] = 5` and one value of
+// '{6, 7}.
+TEST(AssocArraySimulation, ElementsThatAreFixedSizeArraysKeepTheirValues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int af[int][2];\n"
+      "  logic [3:0] lf[string][1:0];\n"
+      "  int am[int][2][3];\n"
+      "  int row[2];\n"
+      "  initial begin\n"
+      "    af[1][0] = 5; af[1][1] = 6; af[4] = '{7, 8};\n"
+      "    lf[\"a\"][1] = 4'h3;\n"
+      "    am[0][1][2] = 9;\n"
+      "    row = af[4];\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", af.num(), af[1][0], af[1][1],\n"
+      "             af[4][0], row[1]);\n"
+      "    $display(\"%p %p %p\", af, lf, am);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "2 5 6 7 8\n"
+            "'{1:'{5, 6}, 4:'{7, 8}} '{\"a\":'{3, x}} "
+            "'{0:'{'{0, 0, 0}, '{0, 0, 9}}}\n");
+}
+
 }  // namespace

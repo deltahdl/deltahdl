@@ -148,6 +148,12 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // is a class.
     aa->elements_are_queues = var.elements_are_queues;
     aa->nested_queue_levels = var.element.nested_queue_levels;
+    // §7.8 with §7.4.2: each element of `int af[int][2]` is a fixed-size
+    // array, kept as a queue of its size.
+    aa->element_array_size = var.element.array_size;
+    aa->element_array_lo = var.element.array_lo;
+    aa->element_array_descending = var.element.array_descending;
+    aa->element_inner_dims = InnerDimsOf(var.element);
     if (var.element.assoc_index) {
       aa->element_assoc =
           ElementAssocTemplate(aa, *var.element.assoc_index, arena_);

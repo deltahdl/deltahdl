@@ -60,6 +60,14 @@ QueueObject* FindQueueOfName(std::string_view name, SimContext& ctx,
 QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
                              ClassObject** owner = nullptr);
 
+// §7.8.7 with §7.4: the queue `base` designates as the base of an element
+// select a write is about to write through, as FindQueueOfBase finds it, but
+// with an element of an associative array whose elements are queues or
+// fixed-size arrays allocated where its key is missing, as a write allocates
+// an associative element: `af[1][0] = 5` on `int af[int][2]` makes af[1].
+QueueObject* FindWrittenQueueOfBase(const Expr* base, SimContext& ctx,
+                                    Arena& arena, ClassObject** owner);
+
 // §9.4.2's announcement of a change to the queue `base` designates: to the
 // watchers on the variables designating the object whose property it is,
 // `owner`; to the static watchers of the class whose static property it is

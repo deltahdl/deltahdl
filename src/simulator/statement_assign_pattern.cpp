@@ -583,14 +583,14 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 // §7.10.1: `q[i] = v` writes an element of a declared queue or, §8.5 putting
 // no restriction on a property's type, of a queue property of an object --
 // the running method's own by its bare name (§8.11) or any object's through a
-// handle, `b.q[0] = v` -- which FindQueueOfBase resolves, `owner` naming the
-// object whose watchers §9.4.2 has the write tell.
+// handle, `b.q[0] = v` -- which FindWrittenQueueOfBase resolves, `owner`
+// naming the object whose watchers §9.4.2 has the write tell.
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena&) {
   if (!lhs->base || !lhs->index) return false;
   auto& arena = ctx.GetArena();
   ClassObject* owner = nullptr;
-  auto* q = FindQueueOfBase(lhs->base, ctx, arena, &owner);
+  auto* q = FindWrittenQueueOfBase(lhs->base, ctx, arena, &owner);
   if (!q) return false;
   bool idx_xz = false;
   auto idx = EvalQueueIndex(lhs->index, q, ctx, arena, &idx_xz);

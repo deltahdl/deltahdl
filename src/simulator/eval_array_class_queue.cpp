@@ -338,6 +338,16 @@ static QueueObject* MethodResultQueue(const Expr* base, SimContext& ctx,
   return q;
 }
 
+// Found by FindQueueOfBase, which reads, a missing associative entry's queue
+// was a fresh one that nothing kept, so the element written into it was lost.
+QueueObject* FindWrittenQueueOfBase(const Expr* base, SimContext& ctx,
+                                    Arena& arena, ClassObject** owner) {
+  if (base == nullptr || base->kind != ExprKind::kSelect)
+    return FindQueueOfBase(base, ctx, arena, owner);
+  if (owner != nullptr) *owner = nullptr;
+  return ElementQueueOfSelect(base, ctx, arena, /*allocate=*/true);
+}
+
 QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
                              ClassObject** owner) {
   if (owner != nullptr) *owner = nullptr;

@@ -58,8 +58,11 @@ ElementQueueShape ShapeOf(const QueueObject& outer) {
 }
 
 ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
-  return {aa.elem_width, aa.is_4state, aa.is_signed, aa.element_queue_handles,
-          aa.nested_queue_levels};
+  return {aa.elem_width,          aa.is_4state,
+          aa.is_signed,           aa.element_queue_handles,
+          aa.nested_queue_levels, aa.element_array_size,
+          aa.element_array_lo,    aa.element_array_descending,
+          aa.element_inner_dims};
 }
 
 // §7.4 with Table 7-1: brings `q`, the queue of an element that is a
@@ -461,7 +464,13 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
     if (info != nullptr && info->elements_are_queues)
       return OfFixedElement(sel, ctx, arena);
   }
-  QueueObject* outer = FindQueueOfBase(sel->base, ctx, arena);
+  // §7.8.7: an element written through a select of its own element,
+  // `am[0][1]` of `int am[int][2][3]`, allocates the associative entry the
+  // inner select names, as a write through `am[0]` alone does; read, the
+  // missing entry's queue was a fresh one that nothing kept.
+  QueueObject* outer =
+      allocate ? FindWrittenQueueOfBase(sel->base, ctx, arena, nullptr)
+               : FindQueueOfBase(sel->base, ctx, arena);
   if (outer == nullptr || !outer->elements_are_queues) return nullptr;
   return OfQueueElement(outer, sel, ctx, arena);
 }

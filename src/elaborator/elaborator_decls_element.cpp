@@ -55,19 +55,20 @@ static std::optional<RtlirFixedDim> FixedDimOf(const Expr* dim,
   return RtlirFixedDim{static_cast<uint32_t>(*size), 0, false};
 }
 
-// §7.10 and §7.5 with §7.4 (printed pages 169, 157 and 153): where each
-// element of the queue or dynamic array `item` declares is a fixed-size
-// array, `int q[$][3]`, `int d[][1:3]` or `int q[$][2][3]`, records into
+// §7.10, §7.5 and §7.8 with §7.4 (printed pages 169, 157, 162 and 153): where
+// each element of the queue, dynamic array or associative array `item`
+// declares is a fixed-size array, `int q[$][3]`, `int d[][1:3]`, `int
+// q[$][2][3]` or `int af[int][2]` (`first_is_assoc`), records into
 // `shape` how many elements it holds and its bounds, each such element being
 // kept as a queue of that many elements (RtlirElementShape::array_size), and
 // the dimensions of a multidimensional element after its first
 // (inner_array_dims); nothing for any other declaration.
 static void RecordFixedElementArray(const ModuleItem* item,
-                                    const ScopeMap& scope,
+                                    const ScopeMap& scope, bool first_is_assoc,
                                     RtlirElementShape& shape) {
   const std::vector<Expr*>& dims = item->unpacked_dims;
   if (dims.size() < 2) return;
-  if (dims[0] != nullptr && !IsQueueDim(dims[0])) return;
+  if (dims[0] != nullptr && !IsQueueDim(dims[0]) && !first_is_assoc) return;
   std::vector<RtlirFixedDim> fixed;
   for (size_t i = 1; i < dims.size(); ++i) {
     std::optional<RtlirFixedDim> dim = FixedDimOf(dims[i], scope);
@@ -95,7 +96,7 @@ void ElaborateUnpackedDims(
   const uint32_t kQueueLevels = ElementQueueLevels(item, td_array_dims);
   var.elements_are_queues = kQueueLevels > 0;
   var.element.nested_queue_levels = kQueueLevels > 0 ? kQueueLevels - 1 : 0;
-  RecordFixedElementArray(item, ctx.scope, var.element);
+  RecordFixedElementArray(item, ctx.scope, var.is_assoc, var.element);
   if (var.element.array_size > 0) var.elements_are_queues = true;
   // §7.4.4: each level of a multidimensional element below its first is a
   // queue of the next dimension's elements.

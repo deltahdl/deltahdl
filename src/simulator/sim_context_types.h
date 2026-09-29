@@ -387,6 +387,14 @@ struct AssocArrayObject {
   // §7.4 with §7.5: how many levels of queues each element's queue holds
   // below it (QueueObject::nested_queue_levels).
   uint32_t nested_queue_levels = 0;
+  // §7.8 with §7.4.2: where each element is a fixed-size array, `int
+  // af[int][2]`, its size and bounds, and a multidimensional one's dimensions
+  // after the first, which each element's queue is made with, as
+  // QueueObject's own fields of the same names describe its elements.
+  uint32_t element_array_size = 0;
+  int64_t element_array_lo = 0;
+  bool element_array_descending = false;
+  std::vector<FixedDimShape> element_inner_dims;
   std::map<int64_t, QueueObject*> int_element_queues;
   std::map<std::string, QueueObject*> str_element_queues;
   // §7.8 with §7.4 (printed pages 162 and 153): for an array whose element
