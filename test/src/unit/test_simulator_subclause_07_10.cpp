@@ -757,4 +757,29 @@ TEST(QueueSim, AQueueOfTwoDimensionalArraysHoldsItsElements) {
   EXPECT_EQ(out, "2 7 8 5 2 3\n1 1\n");
 }
 
+// §7.10 with §7.4.4: a queue of fixed-size arrays declared in a procedural
+// block holds its elements as one declared among a module's items does: the
+// row pushed onto q, {1, 2, 3}, reads back whole, as does the two-dimensional
+// element pushed onto r, and a dynamic array of rows sized with new[] holds a
+// row written into it.
+TEST(QueueSim, ABlockQueueOfArraysHoldsItsElements) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    int q[$][3];\n"
+      "    int r[$][2][2];\n"
+      "    int d[][1:2];\n"
+      "    q.push_back('{1, 2, 3});\n"
+      "    r.push_back('{'{9, 8}, '{7, 6}});\n"
+      "    d = new[2];\n"
+      "    d[1][2] = 5;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", q[0][2], r.size(), r[0][1][0],\n"
+      "             d[1][2], d[0].size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 7 5 2\n");
+}
+
 }  // namespace

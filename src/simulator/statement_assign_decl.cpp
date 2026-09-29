@@ -1,5 +1,9 @@
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -145,11 +149,55 @@ static ElementQueues ElementQueuesOf(const Stmt* stmt, SimContext& ctx) {
   return {&item->typedef_type, levels};
 }
 
+// §7.4.2: the extent of the fixed-size dimension `dim` a block declaration
+// writes, `[l:r]` or `[n]`; empty for a queue or dynamic dimension and for a
+// size that is not positive.
+static std::optional<FixedDimShape> BlockFixedDim(const Expr* dim,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  if (dim == nullptr || IsQueueDim(dim)) return std::nullopt;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto l = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
+    auto r = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+    return FixedDimShape{static_cast<uint32_t>(std::abs(l - r) + 1),
+                         std::min(l, r), l > r};
+  }
+  auto size = static_cast<int64_t>(EvalExpr(dim, ctx, arena).ToUint64());
+  if (size <= 0) return std::nullopt;
+  return FixedDimShape{static_cast<uint32_t>(size), 0, false};
+}
+
+// §7.10 and §7.5 with §7.4.4: where each element of the queue or dynamic
+// array `stmt` declares is a fixed-size array, `int q[$][3]`, `int d[][1:2]`
+// or `int q[$][2][2]`, records its dimensions into `q` as
+// Lowerer::LowerVarAggregate records a module-scope declaration's
+// (RtlirElementShape): each element kept as a queue of the first dimension's
+// size, and each level below as queues of the next's.
+static void MarkFixedElementArray(const Stmt* stmt, QueueObject* q,
+                                  SimContext& ctx, Arena& arena) {
+  const std::vector<Expr*>& dims = stmt->var_unpacked_dims;
+  std::vector<FixedDimShape> fixed;
+  for (size_t i = 1; i < dims.size(); ++i) {
+    std::optional<FixedDimShape> dim = BlockFixedDim(dims[i], ctx, arena);
+    if (!dim) return;
+    fixed.push_back(*dim);
+  }
+  if (fixed.empty()) return;
+  q->elements_are_queues = true;
+  q->nested_queue_levels = static_cast<uint32_t>(fixed.size() - 1);
+  q->element_array_size = fixed[0].size;
+  q->element_array_lo = fixed[0].lo;
+  q->element_array_descending = fixed[0].descending;
+  q->element_inner_dims.assign(fixed.begin() + 1, fixed.end());
+}
+
 // §7.10: marks the queue or dynamic array `q` that `stmt` declares as one
-// whose elements are queues, where they are (ElementQueuesOf), with those
-// queues' elements handles where their type is a class (§8.4).
+// whose elements are fixed-size arrays (MarkFixedElementArray) or queues,
+// where they are (ElementQueuesOf), with those queues' elements handles where
+// their type is a class (§8.4).
 static void MarkElementQueues(const Stmt* stmt, QueueObject* q, SimContext& ctx,
                               Arena& arena) {
+  MarkFixedElementArray(stmt, q, ctx, arena);
   ElementQueues queues = ElementQueuesOf(stmt, ctx);
   if (queues.type == nullptr) return;
   q->elements_are_queues = true;
