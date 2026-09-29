@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -418,6 +420,33 @@ TEST(LoopStatementSim, ForHeaderLocalInABlockDropsItsInitializersUnknowns) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §12.7.1's two loops that declare several variables after one data type: a
+// declarator with no data type of its own is a local of the loop like the
+// first, and a later initializer reads an earlier one. The second body copies
+// j at 10, 11 and 12, so j_end is 12.
+TEST(LoopStatementSim, ForSeveralDeclaratorsAfterOneDataType) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int sum = 0, last = -1;\n"
+      "    automatic int offset = 10, pairs = 0, jend;\n"
+      "    for (int count = 0, done = 0, j = 0; j * count < 125;\n"
+      "         j++, count++) begin\n"
+      "      sum += j; last = j;\n"
+      "    end\n"
+      "    $display(\"sum=%0d last=%0d\", sum, last);\n"
+      "    for (int i = 0, j = i + offset; i < 3; i++, j++) begin\n"
+      "      pairs++; jend = j;\n"
+      "    end\n"
+      "    $display(\"pairs=%0d j_end=%0d\", pairs, jend);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "sum=66 last=11\npairs=3 j_end=12\n");
 }
 
 }  // namespace

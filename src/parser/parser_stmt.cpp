@@ -6,6 +6,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
@@ -68,10 +69,23 @@ struct ParserStmtHelpers {
     return init;
   }
 
+  // A.6.8's for_variable_declaration names its data type once, before a
+  // comma-separated list of `variable_identifier = expression`, and a later
+  // for_variable_declaration of the same initialization names its own. An item
+  // after the first that brings neither `var` nor a data type is therefore a
+  // further variable of the declaration before it, and takes that data type:
+  // Parser::ParseDataType consumes nothing at such an item's identifier and
+  // answers DataTypeKind::kImplicit, which every reader of
+  // Stmt::for_init_types takes for an assignment rather than a declaration.
   static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
     do {
-      p.Match(TokenKind::kKwVar);
-      stmt->for_init_types.push_back(p.ParseDataType());
+      bool has_var = p.Match(TokenKind::kKwVar);
+      DataType type = p.ParseDataType();
+      if (!has_var && type.kind == DataTypeKind::kImplicit &&
+          !stmt->for_init_types.empty()) {
+        type = stmt->for_init_types.back();
+      }
+      stmt->for_init_types.push_back(type);
       stmt->for_inits.push_back(ParseForInitItem(
           p,
           "a for loop's variable declaration is written 'data_type "

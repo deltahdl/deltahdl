@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 namespace {
@@ -117,6 +120,47 @@ TEST(LoopSyntaxParsing, ForAllComponentsEmpty) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §12.7.1's for_variable_declaration names a data type once and then one or
+// more `variable_identifier = expression`, so a declarator after the comma
+// that brings no data type of its own declares a variable of the one before
+// it, and one that does starts a declaration of its own type.
+TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePrecedingType) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int a = 0, b = 1, byte c = 2, d = 3; a < 4; a++) ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->kind, StmtKind::kFor);
+  ASSERT_EQ(stmt->for_init_types.size(), 4u);
+  EXPECT_EQ(stmt->for_init_types[0].kind, DataTypeKind::kInt);
+  EXPECT_EQ(stmt->for_init_types[1].kind, DataTypeKind::kInt);
+  EXPECT_EQ(stmt->for_init_types[2].kind, DataTypeKind::kByte);
+  EXPECT_EQ(stmt->for_init_types[3].kind, DataTypeKind::kByte);
+}
+
+// The preceding declarator's whole data type is taken, its packed dimension
+// with it.
+TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePackedDimension) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (logic [7:0] a = 0, b = 1; a < 4; a++) ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->for_init_types.size(), 2u);
+  EXPECT_EQ(stmt->for_init_types[1].kind, DataTypeKind::kLogic);
+  EXPECT_NE(stmt->for_init_types[1].packed_dim_left, nullptr);
 }
 
 }  // namespace
