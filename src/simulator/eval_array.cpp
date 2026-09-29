@@ -129,6 +129,14 @@ static void ApplyDynArrayIdPermutation(std::string_view var_name,
   ids = std::move(reordered);
 }
 
+// A variable's value with the variable's own signedness, as
+// ReadReferencedVariable (eval_expr.cpp) reads it.
+static Logic4Vec ValueAsRead(const Variable& v) {
+  Logic4Vec val = v.value;
+  val.is_signed = v.is_signed;
+  return val;
+}
+
 // §6.11 with §7.12: each element as it reads, with the element type's
 // signedness rather than that of the value written into it -- a queue's or a
 // dynamic array's by TakeElementSignedness, and a fixed-size array's element
@@ -149,12 +157,8 @@ std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
     uint32_t idx = info.lo + i;
     auto name = std::string(var_name) + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(name);
-    if (v == nullptr) {
-      vals.push_back(MakeLogic4VecVal(arena, info.elem_width, 0));
-      continue;
-    }
-    vals.push_back(v->value);
-    vals.back().is_signed = v->is_signed;
+    vals.push_back(v != nullptr ? ValueAsRead(*v)
+                                : MakeLogic4VecVal(arena, info.elem_width, 0));
   }
   return vals;
 }
@@ -286,20 +290,16 @@ static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
   row_info.is_4state = info.is_4state;
   std::string prefix = std::string(ac.var_name) + "[" +
                        std::to_string(info.dim_los[0] + row) + "]";
+  // §7.12 with §6.11: each element of the row keeps its type's signedness.
+  std::vector<Logic4Vec> leaves =
+      CollectVecElements(prefix, row_info, ctx, ac.arena);
   ctx.PushScope();
   for (uint32_t j = 0; j < row_info.size; ++j) {
     std::string index = "[" + std::to_string(row_info.lo + j) + "]";
-    const Variable* leaf = ctx.FindVariable(prefix + index);
     auto* name =
         ac.arena.Create<std::string>(std::string(names.iter_name) + index);
-    Variable* elem = ctx.CreateLocalVariable(*name, info.elem_width);
-    if (leaf == nullptr) {
-      elem->value = MakeLogic4VecVal(ac.arena, info.elem_width, 0);
-      continue;
-    }
-    // §7.12 with §6.11: each element of the row keeps its type's signedness.
-    elem->value = leaf->value;
-    elem->is_signed = leaf->is_signed;
+    ctx.CreateLocalVariable(*name, info.elem_width, leaves[j].is_signed)
+        ->value = leaves[j];
   }
   ctx.RegisterArrayInScope(names.iter_name, row_info);
   ctx.CreateLocalVariable(names.idx_var_name, 32)->value =

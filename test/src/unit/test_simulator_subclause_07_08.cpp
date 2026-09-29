@@ -565,6 +565,26 @@ TEST(AssocArraySimulation, AnElementReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "1 1 0 1 1 0\n");
 }
 
+// §7.8 with §6.16 and §6.12: the element type's signedness is an integral
+// type's alone, so an element of a string or a real type, written from a
+// variable of its type, reads back as the string and the real it holds.
+TEST(AssocArraySimulation, AStringOrRealElementReadsAsItsOwnType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  string sa[int];\n"
+      "  real ra[string];\n"
+      "  string s = \"hey\";\n"
+      "  real r = -1.25;\n"
+      "  initial begin\n"
+      "    sa[1] = s; ra[\"k\"] = r;\n"
+      "    $display(\"%s %0.2f %0d\", sa[1], ra[\"k\"], ra[\"k\"] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hey -1.25 1\n");
+}
+
 // §7.8 with §6.11 and §26.2: an associative array a package declares has
 // elements of its own element type too.
 TEST(AssocArraySimulation, AnElementOfAPackageAssociativeArrayReadsSigned) {

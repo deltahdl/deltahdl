@@ -320,7 +320,6 @@ struct AssocLocatorState {
   Logic4Vec OrderValue(size_t i) const {
     return lc.with_expr ? EvalWith(i) : vals[i];
   }
-  uint64_t SortKey(size_t i) const { return OrderValue(i).ToUint64(); }
 };
 
 // Forward scan over every entry, pushing the projection of each matching entry.
@@ -406,7 +405,7 @@ static void AssocLocatorUnique(std::string_view method,
   const auto& vals = st.vals;
   std::vector<uint64_t> seen;
   for (size_t i = 0; i < vals.size(); ++i) {
-    uint64_t v = st.SortKey(i);
+    uint64_t v = st.OrderValue(i).ToUint64();
     bool dup = false;
     for (uint64_t s : seen)
       if (s == v) {

@@ -386,9 +386,13 @@ AssocArraySpec PropertyIndexSpec(const ClassMember* member,
 AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
                                     const ClassMember* member,
                                     const ClassObject* obj, SimContext& ctx) {
-  const auto* prop = declaring->FindProperty(member->name);
-  uint32_t elem_width = prop != nullptr ? prop->width : 32;
-  bool elem_4state = prop != nullptr && prop->is_4state;
+  // A member without a property record takes the record's defaults: 32 bits,
+  // two-state and unsigned.
+  static const ClassTypeInfo::PropertyInfo kNoProperty;
+  const auto* found = declaring->FindProperty(member->name);
+  const auto& prop = found != nullptr ? *found : kNoProperty;
+  uint32_t elem_width = prop.width;
+  bool elem_4state = prop.is_4state;
   AssocArraySpec spec =
       PropertyIndexSpec(member, declaring, obj, elem_4state, ctx);
   auto* aa = ctx.GetArena().Create<AssocArrayObject>();
@@ -398,7 +402,7 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
   aa->is_wildcard = spec.is_wildcard;
   aa->index_width = spec.index_width;
   aa->is_4state = spec.is_4state;
-  aa->is_signed = prop != nullptr && prop->is_signed;
+  aa->is_signed = prop.is_signed;
   aa->is_index_signed = spec.is_index_signed;
   aa->index_class = spec.index_class;
   aa->index_type_name = spec.index_type_name;
