@@ -54,6 +54,13 @@ TEST(AssignmentPatternSimulation, SingleElement) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
+TEST(AssignmentPatternSimulation, EmptyPattern) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("'{}", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 0u);
+}
+
 TEST(AssignmentPatternSimulation, SizedLiterals) {
   SimFixture f;
   auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
