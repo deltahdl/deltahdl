@@ -483,7 +483,7 @@ TEST(ObjectMethodSim, MethodCalledThroughAQueueElementRuns) {
                                           "  C q[$];\n"
                                           "  int y;\n"
                                           "  initial begin\n"
-                                          "    C c = new;\n"
+                                          "    static C c = new;\n"
                                           "    q.push_back(c);\n"
                                           "    y = q[0].get();\n"
                                           "  end\n"

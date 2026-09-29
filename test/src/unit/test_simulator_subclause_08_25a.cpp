@@ -396,18 +396,18 @@ constexpr const char* kPoolClass =
 // saw no width for KEY and the property was no array at all: add() went
 // nowhere and get() answered its 0.
 TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysAddsAndGets) {
-  EXPECT_EQ(
-      RunAndGet(std::string(kPoolClass) + "module t;\n"
-                                          "  int out;\n"
-                                          "  initial begin\n"
-                                          "    pool #(string, int) p = new;\n"
-                                          "    p.add(\"answer\", 42);\n"
-                                          "    p.add(\"other\", 7);\n"
-                                          "    out = p.get(\"answer\");\n"
-                                          "  end\n"
-                                          "endmodule\n",
-                "out"),
-      0x2Au);
+  EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
+                          "module t;\n"
+                          "  int out;\n"
+                          "  initial begin\n"
+                          "    static pool #(string, int) p = new;\n"
+                          "    p.add(\"answer\", 42);\n"
+                          "    p.add(\"other\", 7);\n"
+                          "    out = p.get(\"answer\");\n"
+                          "  end\n"
+                          "endmodule\n",
+                      "out"),
+            0x2Au);
 }
 
 // §7.9.3 and §7.9.1 through the same specialization: the key add() wrote
@@ -417,7 +417,7 @@ TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysReportsExistsAndNum) {
                           "module t;\n"
                           "  int out;\n"
                           "  initial begin\n"
-                          "    pool #(string, int) p = new;\n"
+                          "    static pool #(string, int) p = new;\n"
                           "    p.add(\"answer\", 42);\n"
                           "    p.add(\"other\", 7);\n"
                           "    out = p.has(\"answer\") * 100 +\n"
@@ -450,7 +450,7 @@ TEST(ClassSim, TypeParameterIndexedPoolDefaultKeysReportExistsAndNum) {
                           "module t;\n"
                           "  int out;\n"
                           "  initial begin\n"
-                          "    pool p = new;\n"
+                          "    static pool p = new;\n"
                           "    p.add(5, 42);\n"
                           "    p.add(9, 1);\n"
                           "    out = p.has(5) * 100 + p.has(6) * 10 +\n"
@@ -469,7 +469,7 @@ TEST(ClassSim, TypeParameterIndexedPoolDeletesAndTraverses) {
                           "module t;\n"
                           "  int out;\n"
                           "  initial begin\n"
-                          "    pool p = new;\n"
+                          "    static pool p = new;\n"
                           "    p.add(1, 10);\n"
                           "    p.add(2, 20);\n"
                           "    p.add(3, 30);\n"

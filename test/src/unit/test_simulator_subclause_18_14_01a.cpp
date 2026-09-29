@@ -323,7 +323,7 @@ TEST(RandomStabilityProperties, ManuallySeededObjectRngPinsRandomization) {
         "  int unsigned a;\n"
         "  int ok;\n"
         "  initial begin\n"
-        "    C o = new;\n"
+        "    static C o = new;\n"
         "    o.srandom(" +
         std::to_string(k) +
         ");\n"

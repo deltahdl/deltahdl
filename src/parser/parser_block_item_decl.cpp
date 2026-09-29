@@ -10,7 +10,9 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -231,26 +233,36 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
   Expect(TokenKind::kSemicolon, Subclause("6.8"));
 }
 
+namespace {
+
+// A let, typedef or import among a block's items, carried as a kBlockItemDecl
+// statement over the ModuleItem its parse returned, starting at `loc`.
+Stmt* BlockItemDeclStmt(Arena& arena, ModuleItem* item, SourceLoc loc,
+                        std::vector<Attribute> attrs) {
+  auto* s = arena.Create<Stmt>();
+  s->kind = StmtKind::kBlockItemDecl;
+  s->range.start = loc;
+  s->decl_item = item;
+  s->attrs = std::move(attrs);
+  return s;
+}
+
+}  // namespace
+
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
   auto attrs = ParseAttributes();
 
   if (Check(TokenKind::kKwLet)) {
-    auto* s = arena_.Create<Stmt>();
-    s->kind = StmtKind::kBlockItemDecl;
-    s->range.start = CurrentLoc();
-    s->decl_item = ParseLetDecl();
-    s->attrs = std::move(attrs);
-    stmts.push_back(s);
+    SourceLoc loc = CurrentLoc();
+    stmts.push_back(
+        BlockItemDeclStmt(arena_, ParseLetDecl(), loc, std::move(attrs)));
     return;
   }
 
   if (Check(TokenKind::kKwTypedef)) {
-    auto* s = arena_.Create<Stmt>();
-    s->kind = StmtKind::kBlockItemDecl;
-    s->range.start = CurrentLoc();
-    s->decl_item = ParseTypedef();
-    s->attrs = std::move(attrs);
-    stmts.push_back(s);
+    SourceLoc loc = CurrentLoc();
+    stmts.push_back(
+        BlockItemDeclStmt(arena_, ParseTypedef(), loc, std::move(attrs)));
     return;
   }
 
@@ -258,12 +270,7 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     std::vector<ModuleItem*> import_items;
     ParseImportDecl(import_items);
     for (auto* imp : import_items) {
-      auto* s = arena_.Create<Stmt>();
-      s->kind = StmtKind::kBlockItemDecl;
-      s->range.start = imp->loc;
-      s->decl_item = imp;
-      s->attrs = attrs;
-      stmts.push_back(s);
+      stmts.push_back(BlockItemDeclStmt(arena_, imp, imp->loc, attrs));
     }
     return;
   }

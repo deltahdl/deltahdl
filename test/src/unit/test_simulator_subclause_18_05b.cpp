@@ -30,8 +30,8 @@ std::string Design(const std::string& body) {
          "  int in_range = 0, ordered = 0, spaced = 0, under_limit = 0;\n"
          "  int escaped = 0, still_ordered = 0, other_in_range = 0;\n"
          "  initial begin\n"
-         "    Item it = new;\n"
-         "    Other ot = new;\n" +
+         "    static Item it = new;\n"
+         "    static Other ot = new;\n" +
          body +
          "  end\n"
          "endmodule\n";

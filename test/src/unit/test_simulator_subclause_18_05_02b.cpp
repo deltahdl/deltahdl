@@ -43,11 +43,11 @@ std::string Design(const std::string& body) {
          "0;\n"
          "  int through_base = 0, range_ok = 0, sealed_ok = 0;\n"
          "  initial begin\n"
-         "    Base b = new;\n"
-         "    Derived d = new;\n"
-         "    Fixed f = new;\n"
-         "    Range r = new;\n"
-         "    Sealed s = new;\n"
+         "    static Base b = new;\n"
+         "    static Derived d = new;\n"
+         "    static Fixed f = new;\n"
+         "    static Range r = new;\n"
+         "    static Sealed s = new;\n"
          "    Base h;\n" +
          body +
          "  end\n"

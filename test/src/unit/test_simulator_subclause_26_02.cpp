@@ -253,7 +253,7 @@ static uint64_t PackageClassReadBesideTheTopsG(const std::string& class_body,
           "  int g = 7;\n"
           "  int y;\n"
           "  initial begin\n"
-          "    p::C c = new;\n"
+          "    static p::C c = new;\n"
           "    y = " +
           read +
           " * 10 + g;\n"

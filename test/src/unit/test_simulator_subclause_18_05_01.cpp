@@ -30,8 +30,8 @@ std::string Design(const std::string& body) {
          "  bit [255:0] seen = 0;\n"
          "  int distinct = 0;\n"
          "  initial begin\n"
-         "    C c = new;\n"
-         "    E e = new;\n" +
+         "    static C c = new;\n"
+         "    static E e = new;\n" +
          body +
          "  end\n"
          "endmodule\n";

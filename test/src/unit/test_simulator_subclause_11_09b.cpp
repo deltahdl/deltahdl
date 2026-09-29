@@ -421,13 +421,14 @@ std::string PairUnionLocalSrc(const std::string& rest) {
 // holding 3 above the byte 4, which the union's frame took as a = 0 and b =
 // 0x304, reading 772 where the members hold 34.
 TEST(TaggedUnionEval, LocalTaggedPatternInitializerIsPlacedByTheMember) {
-  EXPECT_EQ(RunAndGet(PairUnionLocalSrc("  function int g();\n"
-                                        "    u_t v = tagged Add '{3, 8'd4};\n"
-                                        "    return v.Add.a * 10 + v.Add.b;\n"
-                                        "  endfunction\n"
-                                        "  initial y = g();\n"),
-                      "y"),
-            34u);
+  EXPECT_EQ(
+      RunAndGet(PairUnionLocalSrc("  function int g();\n"
+                                  "    static u_t v = tagged Add '{3, 8'd4};\n"
+                                  "    return v.Add.a * 10 + v.Add.b;\n"
+                                  "  endfunction\n"
+                                  "  initial y = g();\n"),
+                "y"),
+      34u);
 }
 
 // §7.3.2 (printed page 151) has the local's value carry Add's tag beside the
@@ -437,17 +438,18 @@ TEST(TaggedUnionEval, LocalTaggedPatternInitializerIsPlacedByTheMember) {
 // so `u.Add.a * 10 + u.Add.b` read 772 from a = 0 and b = 0x304 where the
 // placed members read 34.
 TEST(TaggedUnionEval, LocalTaggedPatternInitializerReachesTheCallerPlaced) {
-  EXPECT_EQ(RunAndGet(PairUnionLocalSrc("  u_t u;\n"
-                                        "  function u_t g();\n"
-                                        "    u_t v = tagged Add '{3, 8'd4};\n"
-                                        "    return v;\n"
-                                        "  endfunction\n"
-                                        "  initial begin\n"
-                                        "    u = g();\n"
-                                        "    y = u.Add.a * 10 + u.Add.b;\n"
-                                        "  end\n"),
-                      "y"),
-            34u);
+  EXPECT_EQ(
+      RunAndGet(PairUnionLocalSrc("  u_t u;\n"
+                                  "  function u_t g();\n"
+                                  "    static u_t v = tagged Add '{3, 8'd4};\n"
+                                  "    return v;\n"
+                                  "  endfunction\n"
+                                  "  initial begin\n"
+                                  "    u = g();\n"
+                                  "    y = u.Add.a * 10 + u.Add.b;\n"
+                                  "  end\n"),
+                "y"),
+      34u);
 }
 
 // §10.9.2 (printed page 263) also lets a structure pattern name its members,
@@ -456,14 +458,14 @@ TEST(TaggedUnionEval, LocalTaggedPatternInitializerReachesTheCallerPlaced) {
 // positional one, 4 landing in a and 3 in b, so the body read 43 where the
 // named members read 34.
 TEST(TaggedUnionEval, LocalKeyedTaggedPatternInitializerIsPlacedByName) {
-  EXPECT_EQ(
-      RunAndGet(PairUnionLocalSrc("  function int g();\n"
-                                  "    u_t v = tagged Add '{b: 4, a: 3};\n"
-                                  "    return v.Add.a * 10 + v.Add.b;\n"
-                                  "  endfunction\n"
-                                  "  initial y = g();\n"),
-                "y"),
-      34u);
+  EXPECT_EQ(RunAndGet(PairUnionLocalSrc(
+                          "  function int g();\n"
+                          "    static u_t v = tagged Add '{b: 4, a: 3};\n"
+                          "    return v.Add.a * 10 + v.Add.b;\n"
+                          "  endfunction\n"
+                          "  initial y = g();\n"),
+                      "y"),
+            34u);
 }
 
 }  // namespace

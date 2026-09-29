@@ -262,7 +262,7 @@ std::string PropertyMailboxSrc(const std::string& head, const std::string& type,
          "endclass\n"
          "module t;\n"
          "  initial begin\n"
-         "    C c = new;\n"
+         "    static C c = new;\n"
          "    c.go();\n"
          "  end\n"
          "endmodule\n";
@@ -345,7 +345,7 @@ std::string PackageClassMailboxSrc(const std::string& typedefs,
          "module top;\n"
          "  int y;\n"
          "  initial begin\n"
-         "    p::C c = new;\n"
+         "    static p::C c = new;\n"
          "    c.go();\n"
          "    y = c.mb.num();\n"
          "  end\n"
