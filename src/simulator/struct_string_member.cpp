@@ -1,6 +1,5 @@
 #include "simulator/struct_string_member.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
