@@ -5,25 +5,26 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 # Autopilot
 
-## The seven standing reminders
+## The eight standing reminders
 
 Every `start` form creates these.
 
 | Cron | Prompt |
 | --- | --- |
-| `0,20,40 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
-| `2,22,42 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
-| `3,23,43 * * * *` | `REMINDER: Let every push carry exactly one commit, and let that commit hold a whole body of work: a matter solved end to end or carried out in full, or a batch of every open issue of one matter (one clause of IEEE 1800-2023 fixed in one subsystem under src/), bounded by the matter and never by a count.` |
-| `6,26,46 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
-| `7,27,47 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
-| `8,28,48 * * * *` | `REMINDER: File what you find as issues, each documenting one indivisible problem. Solve one now only if the work in hand cannot move forward without it; otherwise move on.` |
-| `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
+| `0,15,30,45 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
+| `2,17,32,47 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
+| `3,18,33,48 * * * *` | `REMINDER: Let every push carry exactly one commit, and let that commit hold a whole body of work: a matter solved end to end or carried out in full, or a batch of every open issue of one matter (one clause of IEEE 1800-2023 fixed in one subsystem under src/), bounded by the matter and never by a count.` |
+| `6,21,36,51 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
+| `7,22,37,52 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
+| `8,23,38,53 * * * *` | `REMINDER: File what you find as issues, each documenting one indivisible problem. Solve one now only if the work in hand cannot move forward without it; otherwise move on.` |
+| `9,24,39,54 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
+| `10,25,40,55 * * * *` | `REMINDER: Prune completed tasks off the Claude Code structured task list: set every task marked completed to the status deleted with TaskUpdate, so that the list holds only the tasks still open.` |
 
 ## The three loop reminders
 
 Every `start` form but `reminders-only` adds these.
 
-On `1,21,41 * * * *`, by form:
+On `1,16,31,46 * * * *`, by form:
 
 `start bysubclause`:
 
@@ -53,8 +54,8 @@ And these:
 
 | Cron | Prompt |
 | --- | --- |
-| `4,24,44 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, rewrite the issue's title if necessary, rewrite the issue's body, label the issue 'needs decision', and move on to the next issue.` |
-| `5,25,45 * * * *` | `REMINDER: Before working on an issue, ensure the issue is up to date. If it is outdated, rewrite its title and body as necessary, delete all its comments, and ensure its labels are correct. Ensure too that it documents a single indivisible problem; if it documents more than one, split it into one issue per problem, reusing the issue itself as one of those splits.` |
+| `4,19,34,49 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, rewrite the issue's title if necessary, rewrite the issue's body, label the issue 'needs decision', and move on to the next issue.` |
+| `5,20,35,50 * * * *` | `REMINDER: Before working on an issue, ensure the issue is up to date. If it is outdated, rewrite its title and body as necessary, delete all its comments, and ensure its labels are correct. Ensure too that it documents a single indivisible problem; if it documents more than one, split it into one issue per problem, reusing the issue itself as one of those splits.` |
 
 ## Start
 
@@ -62,7 +63,7 @@ And these:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each adds to the loop's `gh issue list` command, right after `--state open`, a `-label:"<label>"` term in one `--search` flag — `--search '-label:"needs decision" -label:"blocked"'` — and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.`
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the seven standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the eight standing reminders only.
 
 Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the batch the command's first issue seeds.
 
@@ -70,7 +71,7 @@ Call `CronList`. A job on one of the form's cron slots whose prompt differs from
 
 `restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the seven standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the eight standing reminders only.
 
 Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the batch the command's first issue seeds.
 
