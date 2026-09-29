@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 namespace {
@@ -119,6 +120,31 @@ TEST(PassByValueSim, AssignmentPatternActualFillsAnArrayFormal) {
           "endmodule\n",
           "r"),
       123u + 222000u + 123000000u - 511u);
+}
+
+// §13.5 with §6.18 and §7.4.4: a formal declared through a typedef of an
+// unpacked array has the typedef's dimensions, so an assignment pattern bound
+// to it fills its elements, typed or untyped, and an output formal of it
+// hands its elements back. Taken for one element, the pattern's bits reached
+// the formal as one vector, f('{1, 2, 3}) reading 110, and the output
+// formal's elements went nowhere.
+TEST(PassByValueSim, FormalOfAnArrayTypedefHasItsDimensions) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef int arr_t[3];\n"
+                 "  function automatic int f(arr_t a); "
+                 "return a[0] * 100 + a[1] * 10 + a[2]; endfunction\n"
+                 "  task automatic o(output arr_t r); r = '{4, 5, 6}; endtask\n"
+                 "  arr_t ov;\n"
+                 "  initial begin\n"
+                 "    o(ov);\n"
+                 "    $display(\"%0d %0d %0d %p\", f('{1, 2, 3}), "
+                 "f(arr_t'{1, 2, 3}), f('{default: 2}), ov);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "123 123 222 '{4, 5, 6}\n");
 }
 
 }  // namespace

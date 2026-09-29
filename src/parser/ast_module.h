@@ -584,6 +584,13 @@ struct ModuleItem {
   uint8_t drive_strength1 = 0;
 
   DataType return_type;
+  // §13.4.1 with §6.18 and §7.4.4: where `return_type` names a typedef of an
+  // unpacked array, `typedef int a_t[3]` for `function a_t f()`, the
+  // typedef's unpacked dimensions and element type, which the elaborator
+  // records (AdoptProceduralTypedefDims) so that the implicit variable of the
+  // function is an array of that shape; empty for any other return type.
+  std::vector<Expr*> return_array_dims;
+  DataType return_array_elem_type;
   bool is_ansi_ports = false;
   std::vector<FunctionArg> func_args;
   std::vector<Stmt*> func_body_stmts;

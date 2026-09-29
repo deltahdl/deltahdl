@@ -349,4 +349,43 @@ TEST(FunctionReturnSim, MemberOfAnElementOfAnArrayValuedCall) {
   EXPECT_EQ(out, "50 4 50 30\n");
 }
 
+// §13.4.1 with §7.4, §7.5 and §7.10: the implicit variable of a function whose
+// return type names an unpacked-array typedef is an array of that type, so the
+// body may fill it element by element or through its methods, or return an
+// assignment pattern or another such call, and whichever way the body ends
+// the caller reads that array -- a structure element's member included. Made
+// one element wide, each read 0 or the empty queue.
+TEST(FunctionReturnSim, ImplicitVariableOfAnArrayReturnTypeIsAnArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef int a_t[3];\n"
+      "  typedef int q_t[$];\n"
+      "  typedef struct {int x; int y;} s_t;\n"
+      "  typedef s_t sa_t[2];\n"
+      "  function automatic a_t fn(); fn[0] = 7; fn[1] = 8; fn[2] = 9; "
+      "endfunction\n"
+      "  function automatic a_t fp(); return '{7, 8, 9}; endfunction\n"
+      "  function automatic a_t fw(); return fp(); endfunction\n"
+      "  function automatic q_t qn(); qn.push_back(4); qn.push_back(5); "
+      "endfunction\n"
+      "  function automatic q_t qp(); return '{4, 5}; endfunction\n"
+      "  function automatic a_t early(int k); early = '{1, 1, 1};\n"
+      "    if (k) return '{2, 2, 2}; early[0] = 3; endfunction\n"
+      "  function automatic sa_t mk(); mk[0].x = 4; mk[1].y = 50; "
+      "endfunction\n"
+      "  a_t av; q_t qv;\n"
+      "  initial begin\n"
+      "    $write(\"%0d %0d %0d %0d \", fn()[1], fp()[2], qn().size(), "
+      "qp()[1]);\n"
+      "    av = fw(); qv = qn();\n"
+      "    $write(\"%p %p \", av, qv);\n"
+      "    av = early(1); $write(\"%p \", av); av = early(0);\n"
+      "    $display(\"%p %0d\", av, mk()[1].y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 9 2 5 '{7, 8, 9} '{4, 5} '{2, 2, 2} '{3, 1, 1} 50\n");
+}
+
 }  // namespace

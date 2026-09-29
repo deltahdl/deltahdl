@@ -67,6 +67,9 @@ struct FuncExecCtx {
   // §9.6.2: the labels of the named blocks and labeled loops the running
   // statement stands in, innermost last, which a `disable` in the body can end.
   std::vector<std::string_view>* named_scopes = nullptr;
+  // §13.4.1: whether the implicit variable is an unpacked array
+  // (ShapeArrayReturnVariable), which a `return` assigns rather than stores.
+  bool array_return = false;
 };
 
 // Where control goes once a statement of the body has run (§12.8): on to
@@ -596,7 +599,29 @@ static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
 // always done this; a `return` that took the expression's vector whole handed
 // the caller a `logic [7:0]` function's result 32 bits wide, and let a 1-bit
 // comparison's signedness stand in for an `int`'s.
+// §13.4.1 with §10.4: `return X` of a function whose return type is an
+// unpacked array assigns X to the implicit variable, as `fn = X` would --
+// an array variable's elements copied, an assignment pattern distributed over
+// them, a queue rebuilt -- and the body's completion hands that variable's
+// elements to the caller (ExecFunctionBody).
+static void AssignArrayReturn(const Stmt* stmt, const FuncExecCtx& exec) {
+  Expr name;
+  name.kind = ExprKind::kIdentifier;
+  name.text = exec.func_name;
+  name.range = stmt->range;
+  Stmt assign;
+  assign.kind = StmtKind::kBlockingAssign;
+  assign.lhs = &name;
+  assign.rhs = stmt->expr;
+  assign.range = stmt->range;
+  ExecFuncBlockingAssign(&assign, exec.ctx, exec.arena);
+}
+
 static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
+  if (exec.array_return) {
+    AssignArrayReturn(stmt, exec);
+    return;
+  }
   // §13.4.1 with §8.7: `return new` constructs an object of the return type
   // into the implicit variable, as `f = new` does; read as a value, the `new`
   // stored null.
@@ -813,6 +838,32 @@ static void BindReturnStructLayout(const ModuleItem* func, SimContext& ctx) {
   BindNamedLayout(func->name, func->return_type, ctx);
 }
 
+// §13.4.1 with §7.4, §7.5 and §7.10: a function whose return type names a
+// typedef of an unpacked array, `function a_t fn()` under `typedef int
+// a_t[3]`, has an implicit variable of that type, which the body may write
+// element by element, `fn[1] = 8`, or through the array's methods,
+// `qn.push_back(4)`. It is made here as a local declaration of the type would
+// be (CreateDeclAggregate), from the dimensions and element type the
+// elaborator recorded (ModuleItem::return_array_dims). Answers whether it made
+// one; made one element wide, as the implicit variable of any return type is,
+// such writes found no element and the caller read nothing.
+static bool ShapeArrayReturnVariable(const ModuleItem* func, SimContext& ctx,
+                                     Arena& arena) {
+  if (func->return_array_dims.empty()) return false;
+  Stmt decl;
+  decl.kind = StmtKind::kVarDecl;
+  decl.var_name = func->name;
+  decl.var_decl_type = func->return_array_elem_type;
+  decl.var_unpacked_dims = func->return_array_dims;
+  uint32_t width = DeclaredTypeWidth(decl.var_decl_type, ctx);
+  CreateDeclAggregate(&decl, width == 0 ? 32 : width, ctx, arena);
+  // §7.2: elements that are structures are laid out by their type under the
+  // array's name, as a local array of them is, so their members are written
+  // and read, and the caller's `mk()[1].y` reads its member.
+  BindNamedLayout(func->name, func->return_array_elem_type, ctx);
+  return true;
+}
+
 // §6.21 with §13.4.2: a variable a subroutine body declares static has one
 // copy for that subroutine, kept between calls, and §8.25 (printed page 204 of
 // IEEE 1800-2023) makes each specialization of a parameterized class a type of
@@ -871,12 +922,22 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                    func->is_static && !func->is_automatic,
                    &named_scopes};
   BindReturnStructLayout(func, ctx);
+  exec.array_return = ShapeArrayReturnVariable(func, ctx, arena);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
   // the body's own statement list has no loop to act on it; the body ends
   // there, as it does at a return, rather than going on as if the statement
   // had not been written.
   for (auto* s : func->func_body_stmts) {
-    if (ExecFuncStmt(s, exec) != FuncFlow::kNext) return;
+    if (ExecFuncStmt(s, exec) != FuncFlow::kNext) break;
+  }
+  // §13.4.1: whether the body ended at a `return` or fell off its end, the
+  // implicit variable holds the result, and its elements are handed to an
+  // evaluation of the call that asks for them (eval_call_result.cpp).
+  if (exec.array_return) {
+    Expr name;
+    name.kind = ExprKind::kIdentifier;
+    name.text = func->name;
+    RecordReturnedAggregate(&name, ctx, arena);
   }
 }
 

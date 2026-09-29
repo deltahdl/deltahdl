@@ -341,11 +341,45 @@ void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
 // §27.6 makes a generate block's declarations declarations of the module, so a
 // declaration written in one is written in the module's scope and stands under
 // the same clause.
+//
+// §13.4.1 and §13.5 with the same rule: a subroutine's formal declared by
+// such a name, `arr_t a`, has the typedef's dimensions, as a declaration does,
+// and a function whose return type is such a name records the dimensions and
+// the element type beside the name (ModuleItem::return_array_dims), which
+// keeps its width for the value the call yields. Left without them, a formal
+// was one element to which an assignment pattern could not be distributed,
+// and the implicit variable of the function one element wide, so `fn[1] = 8`
+// and `return '{7, 8, 9}` handed the caller nothing.
+static void AdoptSubroutineTypedefDims(
+    ModuleItem* item,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>& td_dims,
+    const TypedefMap& typedefs) {
+  for (FunctionArg& arg : item->func_args) {
+    if (!arg.unpacked_dims.empty() ||
+        arg.data_type.kind != DataTypeKind::kNamed)
+      continue;
+    auto dims = td_dims.find(arg.data_type.type_name);
+    auto base = typedefs.find(arg.data_type.type_name);
+    if (dims == td_dims.end() || base == typedefs.end()) continue;
+    arg.data_type = base->second;
+    arg.unpacked_dims = dims->second;
+  }
+  const DataType& ret = item->return_type;
+  if (ret.kind != DataTypeKind::kNamed || !item->return_array_dims.empty())
+    return;
+  auto dims = td_dims.find(ret.type_name);
+  auto base = typedefs.find(ret.type_name);
+  if (dims == td_dims.end() || base == typedefs.end()) return;
+  item->return_array_dims = dims->second;
+  item->return_array_elem_type = base->second;
+}
+
 void Elaborator::AdoptProceduralTypedefDims(const ModuleDecl* decl) {
   std::function<void(ModuleItem*)> visit = [&](ModuleItem* item) {
     if (item == nullptr) return;
     AdoptTypedefDimsInStmt(item->body);
     for (auto* s : item->func_body_stmts) AdoptTypedefDimsInStmt(s);
+    AdoptSubroutineTypedefDims(item, td_array_dims_, typedefs_);
     for (auto* child : item->gen_body) visit(child);
     visit(item->gen_else);
     for (auto& case_item : item->gen_case_items) {
