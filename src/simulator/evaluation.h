@@ -141,6 +141,12 @@ int64_t SelectBoundValue(const Logic4Vec& val);
 // so that all of them answer such a read alike.
 Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena);
 
+// §6.11 with §7.5 and §7.10: `val`, read out of an element of the queue or
+// dynamic array `q`, given the signedness of `q`'s element type
+// (QueueObject::is_signed), whichever the value written into the element had.
+// A string, a real and a class handle are left as they are.
+void TakeElementSignedness(const QueueObject& q, Logic4Vec& val);
+
 // §6.12: a shortreal is a C float and a real is a C double, so the width of a
 // real vector says which pattern it carries — 32 bits a float, any other width
 // a double. This is the only correct way to read one back, and reading the

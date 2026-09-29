@@ -219,4 +219,73 @@ TEST(DynamicArraySim, PropertyOfClassHandlesSizedByNew) {
   EXPECT_EQ(out, "12 33 2 5\n");
 }
 
+// §7.5 with §6.11: an element of a dynamic array has the array's element type
+// however the value written into it was typed. On `bit [31:0] ud[]`,
+// `ud[0] = -5` stores the unsigned 32'hFFFFFFFB, and on `int d[]`,
+// `d[0] = u` of the unsigned 32'hDEADBEEF stores a signed int, so of the two
+// only `d[0]` is less than 0, as of a `bit [31:0]` and an `int` variable
+// assigned the same values.
+TEST(DynamicArraySimulation, AnElementReadsWithTheElementTypesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  bit [31:0] ud[];\n"
+      "  int d[];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    ud = new[1]; d = new[1];\n"
+      "    ud[0] = -5; d[0] = u;\n"
+      "    $display(\"%0d %0d\", ud[0] < 0, d[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1\n");
+}
+
+// §7.5 with §6.11 and §26.2: a dynamic array a package declares has elements
+// of its element type as a module's does, so on `int p::d[]` the unsigned
+// 32'hDEADBEEF written reads as a signed int, less than 0.
+TEST(DynamicArraySimulation, AnElementOfAPackageDynamicArrayReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  int d[];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    p::d = new[1];\n"
+      "    p::d[0] = u;\n"
+      "    $display(\"%0d\", p::d[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.5 with §6.11 and §13.5: a dynamic array formal, `int a[]`, has elements
+// of its own element type, so the unsigned 32'hDEADBEEF the actual was given
+// reads in the body as a signed int, less than 0.
+TEST(DynamicArraySimulation, AnElementOfADynamicArrayFormalReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int d[];\n"
+      "  bit [31:0] u;\n"
+      "  function int negative(int a[]);\n"
+      "    return a[0] < 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    d = new[1];\n"
+      "    d[0] = u;\n"
+      "    $display(\"%0d\", negative(d));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace

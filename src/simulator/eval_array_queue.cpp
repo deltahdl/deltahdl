@@ -46,6 +46,8 @@ static void PopQueueBack(QueueObject* q, Arena& arena, Logic4Vec& out) {
   }
 }
 
+// §7.10.2.4 and §7.10.2.5: pop_front() and pop_back() return the element they
+// remove, of the queue's element type (TakeElementSignedness).
 static bool DispatchQueueEval(std::string_view method, QueueObject* q,
                               Arena& arena, Logic4Vec& out) {
   if (method == "size") {
@@ -54,10 +56,12 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   }
   if (method == "pop_front") {
     PopQueueFront(q, arena, out);
+    TakeElementSignedness(*q, out);
     return true;
   }
   if (method == "pop_back") {
     PopQueueBack(q, arena, out);
+    TakeElementSignedness(*q, out);
     return true;
   }
   return false;

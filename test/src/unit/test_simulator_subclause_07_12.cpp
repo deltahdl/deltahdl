@@ -297,4 +297,21 @@ TEST(ArrayMethodsSim, MethodResultIsAReceiver) {
   EXPECT_EQ(out, "3 1 9 2 2\n");
 }
 
+// §7.12 with §6.11: the queue a locator method returns holds elements of the
+// array's element type, so the first element of min()'s result on an
+// `int IA[int]` holding only -3 is the signed int -3.
+TEST(ArrayMethodsSim, MethodResultElementKeepsItsSign) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int IA[int];\n"
+      "  initial begin\n"
+      "    IA[0] = -3;\n"
+      "    $display(\"%0d %0d\", IA.min()[0], IA.min()[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 1\n");
+}
+
 }  // namespace

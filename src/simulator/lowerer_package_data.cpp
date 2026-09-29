@@ -340,8 +340,10 @@ static void CreatePackageArray(const ModuleItem* item, std::string_view pkg,
 // key. The carrier alone stood there, so `p1::d = new[3]` sized nothing,
 // `p1::d[2] = 9` wrote nothing and `p1::d.size()` read 0.
 static void CreatePackageDynArray(std::string_view qname, uint32_t width,
-                                  bool is_4state, SimContext& ctx) {
-  ctx.CreateQueue(qname, width, /*max_size=*/-1, is_4state);
+                                  bool is_4state, bool is_signed,
+                                  SimContext& ctx) {
+  ctx.CreateQueue(qname, width, /*max_size=*/-1, is_4state)->is_signed =
+      is_signed;
   ArrayInfo info;
   info.is_dynamic = true;
   info.elem_width = width;
@@ -379,11 +381,15 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   const Expr* dim = item->unpacked_dims.front();
   uint32_t width = PackageDataWidth(item, qname, ctx);
   bool is_4state = DeclaredTypeIs4State(item->data_type);
+  // §6.11 with §7.5 and §7.10: an element reads with the element type's
+  // signedness (TakeElementSignedness in evaluation.h).
+  bool is_signed = DeclaredTypeIsSigned(item->data_type, ctx);
   if (dim == nullptr) {
-    CreatePackageDynArray(qname, width, is_4state, ctx);
+    CreatePackageDynArray(qname, width, is_4state, is_signed, ctx);
   } else if (IsQueueDim(dim)) {
     QueueObject* q = ctx.CreateQueue(
         qname, width, PackageQueueMaxSize(dim, pkg, ctx, arena), is_4state);
+    q->is_signed = is_signed;
     q->holds_class_handles = !ctx.GetVariableClassType(qname).empty();
   } else if (item->unpacked_dims.size() == 1 && IsAssocIndexDim(dim, ctx)) {
     ctx.CreateAssocArray(qname, width, dim->text == "string",

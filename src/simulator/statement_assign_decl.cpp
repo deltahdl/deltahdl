@@ -376,6 +376,7 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   if (queue_type != nullptr) {
     aa->elements_are_queues = true;
     aa->nested_queue_levels = queues.levels - 1;
+    aa->element_queue_signed = DeclaredTypeIsSigned(*queue_type, ctx);
     aa->element_queue_handles =
         !DeclaredClassKey(*queue_type, ctx, arena).empty();
   }

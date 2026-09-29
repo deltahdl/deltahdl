@@ -331,6 +331,9 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
   // callee reads the copy through the same queue-backed select path.
   auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width, src_q->max_size,
                                 src_q->is_4state);
+  // §6.11 with §13.5: the formal's elements are of its own element type, so
+  // they read with that type's signedness (TakeElementSignedness).
+  dst_q->is_signed = DeclaredTypeIsSigned(formal.data_type, ctx);
   // §7.2 with §7.5: a formal of structure elements, `input T a[]`, is laid
   // out by its element type, so `a[1].f1` in the body reads a member.
   BindNamedLayout(formal.name, formal.data_type, ctx);

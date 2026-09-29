@@ -36,6 +36,11 @@ Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena) {
                       : MakeLogic4VecVal(arena, q->elem_width, 0);
 }
 
+void TakeElementSignedness(const QueueObject& q, Logic4Vec& val) {
+  if (val.is_string || val.is_real || q.holds_class_handles) return;
+  val.is_signed = q.is_signed;
+}
+
 int64_t SelectBoundValue(const Logic4Vec& val) {
   return val.is_signed ? SignExtend(val.ToUint64(), val.width)
                        : static_cast<int64_t>(val.ToUint64());
@@ -88,7 +93,7 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
       sampled != nullptr ? *sampled : q->elements;
   out = (idx < elements.size()) ? elements[idx]
                                 : NonexistentQueueElement(q, arena);
-  if (q->is_signed) out.is_signed = true;  // §6.11 (QueueObject::is_signed)
+  TakeElementSignedness(*q, out);
   return true;
 }
 

@@ -243,4 +243,43 @@ TEST(QueuePopFrontSim, PopOnEmptyDoesNotDisturbLaterPush) {
   EXPECT_EQ(v, 1077u);  // size 1, front is 77
 }
 
+// --- The element type's signedness ------------------------------------------
+
+// §7.10.2.4 with §6.11: pop_front() returns the element it removes, of the
+// queue's element type, so on `int q[$]` it returns a signed int however the
+// value was written: 32'hDEADBEEF pushed from a `bit [31:0]` returns as
+// -559038737, which is less than 0.
+TEST(QueuePopFrontSim, ReturnsSignedForASignedElementType) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  bit [31:0] u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    q.push_back(u);\n"
+      "    result = q.pop_front() < 0;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
+}
+
+// §7.10.2.4 with §6.11: on `bit [31:0] q[$]` pop_front() returns an unsigned
+// bit [31:0] however the value was written: the -5 pushed is held as
+// 32'hFFFFFFFB, which is not less than 0.
+TEST(QueuePopFrontSim, ReturnsUnsignedForAnUnsignedElementType) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [31:0] q[$];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q.push_back(-5);\n"
+      "    result = q.pop_front() < 0;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0u);
+}
+
 }  // namespace

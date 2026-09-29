@@ -509,4 +509,131 @@ TEST(QueueSim, QueueOfFixedArraysKeepsTheElementBounds) {
   EXPECT_EQ(out, "3 1 4 50 6\n2 7 8 9\n");
 }
 
+// §7.10 with §6.11: an element of a queue has the queue's element type however
+// the value written into it was typed. On `bit [31:0] uq[$]`, `push_back(-5)`
+// stores the unsigned 32'hFFFFFFFB, and on `int q[$]`, `push_back(u)` of the
+// unsigned 32'hDEADBEEF stores a signed int, so of the two only `q[0]` is less
+// than 0, as of a `bit [31:0]` and an `int` variable assigned the same values.
+TEST(QueueSim, AnElementReadsWithTheElementTypesSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  bit [31:0] uq[$];\n"
+      "  int q[$];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    uq.push_back(-5); q.push_back(u);\n"
+      "    $display(\"%0d %0d %0d\", uq[0] < 0, q[0] < 0, q[$] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 1\n");
+}
+
+// §7.10 with §6.11 and §26.2: a queue a package declares has elements of its
+// element type as a module's does, so on `int p::q[$]` the unsigned
+// 32'hDEADBEEF pushed reads as a signed int, less than 0.
+TEST(QueueSim, AnElementOfAPackageQueueReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  int q[$];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    p::q.push_back(u);\n"
+      "    $display(\"%0d\", p::q[0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.10 with §6.11 and §13.5: a queue formal, `int a[$]`, has elements of its
+// own element type, so the unsigned 32'hDEADBEEF the actual was given reads
+// in the body as a signed int, less than 0.
+TEST(QueueSim, AnElementOfAQueueFormalReadsWithTheFormalsType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$];\n"
+      "  bit [31:0] u;\n"
+      "  function int negative(int a[$]);\n"
+      "    return a[0] < 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    q.push_back(u);\n"
+      "    $display(\"%0d\", negative(q));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.10 with §6.11 and §7.4: each element of a fixed-size array of queues,
+// `q_t fx[2]` under `typedef int q_t[$];`, is a queue of ints, so the unsigned
+// 32'hDEADBEEF pushed onto `fx[1]` reads as a signed int, less than 0.
+TEST(QueueSim, AnElementOfAFixedArrayOfQueuesReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef int q_t[$];\n"
+      "  q_t fx[2];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    fx[1].push_back(u);\n"
+      "    $display(\"%0d\", fx[1][0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.10 with §6.11: each element of a queue of queues, `int qq[$][$]`, is a
+// queue of ints, so the unsigned 32'hDEADBEEF pushed onto the queue that is
+// pushed onto `qq` reads as a signed int, less than 0.
+TEST(QueueSim, AnElementOfAQueueOfQueuesReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int qq[$][$];\n"
+      "  int inner[$];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    inner.push_back(u);\n"
+      "    qq.push_back(inner);\n"
+      "    $display(\"%0d\", qq[0][0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §7.10 with §6.11 and §7.8: each element of an associative array of queues,
+// `int aq[string][$]`, is a queue of ints, whether a module or a block
+// declares the array, so the unsigned 32'hDEADBEEF pushed onto `aq["k"]`
+// reads as a signed int, less than 0.
+TEST(QueueSim, AnElementOfAnAssociativeArrayOfQueuesReadsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int aq[string][$];\n"
+      "  bit [31:0] u;\n"
+      "  initial begin\n"
+      "    int bq[string][$];\n"
+      "    u = 32'hDEADBEEF;\n"
+      "    aq[\"k\"].push_back(u); bq[\"k\"].push_back(u);\n"
+      "    $display(\"%0d %0d\", aq[\"k\"][0] < 0, bq[\"k\"][0] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
 }  // namespace

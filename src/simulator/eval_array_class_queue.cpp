@@ -328,6 +328,11 @@ static QueueObject* MethodResultQueue(const Expr* base, SimContext& ctx,
   if (!TryCollectLocatorResult(base, ctx, arena, elems)) return nullptr;
   auto* q = arena.Create<QueueObject>();
   q->elem_width = elems.empty() ? 32 : elems.front().width;
+  // §6.11: an element is read with the signedness of the queue's element type
+  // (TakeElementSignedness in evaluation.h). That type is the element type of
+  // the array the method was called on, which is not known here, so it is
+  // taken from the elements the method returned.
+  q->is_signed = !elems.empty() && elems.front().is_signed;
   q->elements = std::move(elems);
   q->AssignFreshIds();
   return q;

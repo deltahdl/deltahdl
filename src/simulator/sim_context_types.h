@@ -362,9 +362,11 @@ struct AssocArrayObject {
   // str_data marks the key present, so num(), exists() and foreach see it,
   // and the element's queue is kept under the same key below
   // (ElementQueueOfSelect in eval_array_element_queue.h), its elements as
-  // wide and as four-state as this array's element type and handles where
+  // wide and as four-state as this array's element type, signed where
+  // `element_queue_signed` says that type is (§6.11), and handles where
   // `element_queue_handles` says the type is a class.
   bool elements_are_queues = false;
+  bool element_queue_signed = false;
   bool element_queue_handles = false;
   // §7.4 with §7.5: how many levels of queues each element's queue holds
   // below it (QueueObject::nested_queue_levels).

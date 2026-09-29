@@ -57,6 +57,7 @@ static void CreateFixedElementQueues(std::string_view name,
                                           std::to_string(info->lo + i) + "]");
     QueueObject* q =
         ctx.CreateQueue(*key, var.width, /*max_size=*/-1, var.is_4state);
+    q->is_signed = var.is_signed;
     q->holds_class_handles = !var.class_type_name.empty();
     // §7.4 with §7.5: in `int arr[2][][]` the element's queue, arr[0], holds
     // queues itself.
@@ -138,6 +139,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     }
     aa->element_queue_handles =
         var.elements_are_queues && !var.class_type_name.empty();
+    aa->element_queue_signed = var.elements_are_queues && var.is_signed;
     InitAssocDefault(var.init_expr, aa);
     RecordAssocElemInit(name, var, aa, ctx_, arena_);
   } else {

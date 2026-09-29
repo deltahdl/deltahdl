@@ -25,14 +25,16 @@ namespace delta {
 namespace {
 
 // What each element's queue of an array whose elements are queues is made
-// of: elements of `width` bits, four-state where `is_4state` says so, class
-// handles where `handles` does, `levels` further levels of queues below it
-// (QueueObject::nested_queue_levels), and, where the element is a fixed-size
-// array, `fixed_size` elements addressed by the bounds `fixed_lo` and
-// `fixed_descending` give (QueueObject::element_array_size, index_lo).
+// of: elements of `width` bits, four-state where `is_4state` says so, signed
+// where `is_signed` does, class handles where `handles` does, `levels`
+// further levels of queues below it (QueueObject::nested_queue_levels), and,
+// where the element is a fixed-size array, `fixed_size` elements addressed by
+// the bounds `fixed_lo` and `fixed_descending` give
+// (QueueObject::element_array_size, index_lo).
 struct ElementQueueShape {
   uint32_t width;
   bool is_4state;
+  bool is_signed;
   bool handles;
   uint32_t levels;
   uint32_t fixed_size = 0;
@@ -41,18 +43,15 @@ struct ElementQueueShape {
 };
 
 ElementQueueShape ShapeOf(const QueueObject& outer) {
-  return {outer.elem_width,
-          outer.is_4state,
-          outer.holds_class_handles,
-          outer.nested_queue_levels,
-          outer.element_array_size,
-          outer.element_array_lo,
-          outer.element_array_descending};
+  return {outer.elem_width,          outer.is_4state,
+          outer.is_signed,           outer.holds_class_handles,
+          outer.nested_queue_levels, outer.element_array_size,
+          outer.element_array_lo,    outer.element_array_descending};
 }
 
 ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
-  return {aa.elem_width, aa.is_4state, aa.element_queue_handles,
-          aa.nested_queue_levels};
+  return {aa.elem_width, aa.is_4state, aa.element_queue_signed,
+          aa.element_queue_handles, aa.nested_queue_levels};
 }
 
 // §7.4 with Table 7-1: brings `q`, the queue of an element that is a
@@ -76,6 +75,7 @@ QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   auto* q = arena.Create<QueueObject>();
   q->elem_width = shape.width;
   q->is_4state = shape.is_4state;
+  q->is_signed = shape.is_signed;
   q->holds_class_handles = shape.handles;
   q->elements_are_queues = shape.levels > 0;
   q->nested_queue_levels = shape.levels > 0 ? shape.levels - 1 : 0;
