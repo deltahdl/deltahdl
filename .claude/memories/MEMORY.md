@@ -100,7 +100,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Models and delegation
 
-- [Delegating code to the coder](delegating-code-to-the-coder.md) — research and orchestrate on the latest Opus; hand every code edit to the `coder` subagent, on the latest Sonnet, with a brief that stands alone; name models by alias, never by version.
+- [Writing code in the main session](writing-code-in-the-main-session.md) — write every code edit in the session itself; a subagent gets none of the scheduled reminders.
 
 ## The notes themselves
 
