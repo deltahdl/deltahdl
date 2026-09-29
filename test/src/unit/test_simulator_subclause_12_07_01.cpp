@@ -449,4 +449,33 @@ TEST(LoopStatementSim, ForSeveralDeclaratorsAfterOneDataType) {
   EXPECT_EQ(out, "sum=66 last=11\npairs=3 j_end=12\n");
 }
 
+// §12.7.1 (printed page 330), step b): a for-loop whose expression is omitted
+// executes its statement, so in a function body it runs until a return or a
+// break leaves it -- g and h reach 3 and f3 returns 7 from its fourth pass. A
+// function's loop exited before its first pass when it had no expression, and
+// every value read 0.
+TEST(LoopStatementSim, ForWithoutExpressionRunsInFunctionBody) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int g, h, k;\n"
+      "  function void f();\n"
+      "    for (int i = 0; ; i++) begin g = i; if (i == 3) return; end\n"
+      "  endfunction\n"
+      "  function void f2();\n"
+      "    for (int i = 0; ; i++) begin h = i; if (i == 3) break; end\n"
+      "  endfunction\n"
+      "  function int f3();\n"
+      "    for (int i = 0; ; i++) begin k = i; if (i == 3) return 7; end\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    f(); f2();\n"
+      "    $display(\"g=%0d h=%0d r=%0d k=%0d\", g, h, f3(), k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "g=3 h=3 r=7 k=3\n");
+}
+
 }  // namespace

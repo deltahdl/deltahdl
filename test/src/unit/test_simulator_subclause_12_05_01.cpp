@@ -487,6 +487,32 @@ TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+// §12.5.1 (printed page 322): an x bit under casez compares as a plain case
+// compares it, so it matches an x and nothing else -- an x of the selector
+// does not match the item's 1 in the same position, nor an x of the item the
+// selector's 1, while the x-for-x item does. The comparison read the value
+// half of each bit alone, which an x shares with a 1, so both mismatches
+// selected their item.
+TEST(CasezStatementSim, CasezXOverAOneStaysSignificant) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    sel = 4'b1x01;\n"
+      "    casez (sel) 4'b1101: x += 1; default: x += 10; endcase\n"
+      "    casez (sel) 4'b1x01: x += 100; default: ; endcase\n"
+      "    sel = 4'b1101;\n"
+      "    casez (sel) 4'b1x01: x += 1; default: x += 20; endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 130u);
+}
+
 TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
   SimFixture f;
   auto* var = RunAndFindVar(

@@ -354,10 +354,12 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
 // Runs the condition/body/step iterations of a for-loop. §12.8: a `continue`
 // jumps to the end of the body and the loop's step runs as it does after a
 // body that ran to the end; a `break` leaves the loop without the step, and
-// a `return` leaves the subroutine.
+// a `return` leaves the subroutine. §12.7.1 step b): an omitted expression
+// executes the statement, so the loop runs until one of those leaves it; it
+// was taken as false, and the body never ran.
 static FuncFlow ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
   FuncFlow flow = FuncFlow::kNext;
-  while (stmt->for_cond &&
+  while (!stmt->for_cond ||
          EvalExpr(stmt->for_cond, exec.ctx, exec.arena).IsTruthy()) {
     flow = ExecFuncStmt(stmt->for_body, exec);
     if (!LoopGoesOn(flow)) break;

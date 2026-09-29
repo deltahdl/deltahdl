@@ -54,7 +54,12 @@ static bool CaseDontCareMatch(const Logic4Vec& sel, const Logic4Vec& pat,
     uint32_t pwi = i / 64, pbi = i % 64;
     bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
     bool pa = (pwi < pat.nwords) && ((pat.words[pwi].aval >> pbi) & 1);
-    if (sa != pa) return false;
+    // §12.5.1: a bit the predicate keeps compares as the plain case compares
+    // it, both halves, so a casez x matches an x alone; by the value half
+    // only, an x (aval 1, bval 1) matched a 1.
+    bool sb = (swi < sel.nwords) && ((sel.words[swi].bval >> sbi) & 1);
+    bool pb = (pwi < pat.nwords) && ((pat.words[pwi].bval >> pbi) & 1);
+    if (sa != pa || sb != pb) return false;
   }
   return true;
 }
