@@ -49,12 +49,12 @@ uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
   return result_var->value.ToUint64();
 }
 
-// Runs a case statement where an earlier item (a pattern variable with a
-// don't-care bit) and a later literal item both nominally match the selector,
-// verifying first-match-wins behavior. Shared by the casex and casez
-// "first match wins" tests, which differ in case_kind and the pattern aval.
-uint64_t RunFirstMatchWins(StmtFixture& f, TokenKind case_kind,
-                           uint32_t pat_aval) {
+// Runs a case statement where an earlier item (a pattern variable 8'b0000010z,
+// whose z bit is a don't-care under casex and casez alike, §12.5.1) and a
+// later literal item both match the selector 5, verifying first-match-wins
+// behavior. Shared by the casex and casez "first match wins" tests, which
+// differ in case_kind alone.
+uint64_t RunFirstMatchWins(StmtFixture& f, TokenKind case_kind) {
   auto* result_var = f.ctx.CreateVariable("cfm", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
@@ -65,7 +65,7 @@ uint64_t RunFirstMatchWins(StmtFixture& f, TokenKind case_kind,
 
   auto* pat1 = f.ctx.CreateVariable("p1", 8);
   pat1->value = MakeLogic4Vec(f.arena, 8);
-  pat1->value.words[0].aval = pat_aval;
+  pat1->value.words[0].aval = 0x04;
   pat1->value.words[0].bval = 0x01;
 
   CaseItem item1;
@@ -229,7 +229,7 @@ TEST(CasexStatementSim, CasexSymmetricDontCareBothSides) {
 
 TEST(CasexStatementSim, CasexFirstMatchWins) {
   StmtFixture f;
-  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasex, 0x04), 10u);
+  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasex), 10u);
 }
 
 TEST(CasexStatementSim, CasexEmptyNoItems) {
@@ -583,7 +583,7 @@ TEST(CasezStatementSim, CasezEmptyNoItems) {
 
 TEST(CasezStatementSim, CasezFirstMatchWins) {
   StmtFixture f;
-  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasez, 0x05), 10u);
+  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasez), 10u);
 }
 
 }  // namespace
