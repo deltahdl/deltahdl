@@ -384,6 +384,28 @@ Logic4Vec EvalDefaultInDeclScope(const Expr* default_value, SimContext& ctx,
   return EvalExpr(default_value, ctx, arena);
 }
 
+// §15.5 with §13.5.1: an event output or inout formal hands the caller's
+// actual the synchronization object the formal names on return, so after
+// `getev(f)`, whose body writes `ev = e`, f and e are one event. The actual
+// is rebound in the caller's scope: a local of it in its frame, any other
+// name in the run's tables. False for any other formal or actual, which the
+// value copy serves. Copied as a value, f stayed an event of its own.
+static bool TryWritebackEventFormal(const FunctionArg& formal,
+                                    const Expr* actual, Variable* local,
+                                    SimContext& ctx) {
+  if (formal.data_type.kind != DataTypeKind::kEvent || actual == nullptr ||
+      actual->kind != ExprKind::kIdentifier || !local->is_event) {
+    return false;
+  }
+  CalleeScopeAside aside(ctx);
+  if (ctx.FindLocalVariable(actual->text) != nullptr) {
+    ctx.AliasLocalVariable(actual->text, local);
+  } else {
+    ctx.AliasVariable(actual->text, local);
+  }
+  return true;
+}
+
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   CallerWrites writes;
@@ -402,6 +424,7 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
       CollectElementWritebacks(formal, actual, ctx, arena, writes);
       continue;
     }
+    if (TryWritebackEventFormal(formal, actual, local, ctx)) continue;
     if (actual != nullptr) {
       writes.values.emplace_back(actual, local->value);
     } else if (formal.default_value != nullptr) {

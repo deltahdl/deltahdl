@@ -380,6 +380,12 @@ void SimContext::AliasVariable(std::string_view alias_name,
   if (target) variables_[alias_name] = target;
 }
 
+// §15.5 with §13.5.1: the variable `target` itself, found by no name, which
+// an event output formal hands back to the caller's actual.
+void SimContext::AliasVariable(std::string_view alias_name, Variable* target) {
+  if (target) variables_[alias_name] = target;
+}
+
 void SimContext::AliasNet(std::string_view alias_name,
                           std::string_view target_name) {
   auto* target = FindNet(target_name);

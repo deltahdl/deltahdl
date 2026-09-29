@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
@@ -233,6 +235,83 @@ TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
                                  "a", "b");
   EXPECT_EQ(a, 11u);
   EXPECT_EQ(b, 22u);
+}
+
+// §15.5.2 with §6.21: an event declared as a local of an automatic task, or as
+// an automatic local of a begin-end block, is a named event of its frame, so
+// the wait on it in one fork branch is woken by the trigger in the other: 1
+// and 2, read as 12. Taken for a value, each wait waited for a change the
+// trigger never made, and neither time was written.
+TEST(NamedEventSim, AutomaticLocalEventsWakeTheirWaiters) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int t1, t2, r;\n"
+      "  task automatic loc();\n"
+      "    event le;\n"
+      "    fork\n"
+      "      begin @le; t1 = $time; end\n"
+      "      #1 -> le;\n"
+      "    join\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    loc();\n"
+      "    begin\n"
+      "      automatic event be;\n"
+      "      fork\n"
+      "        begin @be; t2 = $time; end\n"
+      "        #1 -> be;\n"
+      "      join\n"
+      "    end\n"
+      "    r = t1 * 10 + t2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §15.5.2 with §9.3.2 and §24.3: an event declared in a program instance is
+// woken by the trigger a sibling fork branch of the program makes, both
+// branches naming the program's own e: 3. The branch triggered the top's e,
+// which no one waited on, and the wait was never woken.
+TEST(NamedEventSim, ProgramEventIsWokenByASiblingBranch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  event e;\n"
+                       "  initial fork\n"
+                       "    begin @e; $display(\"woke at %0t\", $time); end\n"
+                       "    #3 -> e;\n"
+                       "  join\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  p pi();\n"
+                       "endmodule\n",
+                       f),
+            "woke at 3\n");
+}
+
+// §15.5.2 with §7.10: an event pushed into a queue of events is the event
+// itself, so the wait on q[0] is woken by the trigger of e at 2. Pushed as a
+// value, the element named no event and the wait was never woken.
+TEST(NamedEventSim, EventPushedIntoAQueueIsTheSameEvent) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event q[$];\n"
+      "  event e;\n"
+      "  int at;\n"
+      "  initial begin\n"
+      "    q.push_back(e);\n"
+      "    fork\n"
+      "      begin @q[0]; at = $time; end\n"
+      "      #2 -> e;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f, "at");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 }  // namespace

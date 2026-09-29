@@ -655,4 +655,89 @@ TEST(MailboxSim, PutInsideAFunctionOnAFullMailboxIsAnError) {
   ExpectWord(f, "n", 80u);
 }
 
+// §15.4.5 with §9.7 and §8.11: a class task that waits in get() goes on, once
+// another process's put() places the message, as the process and on the object
+// that called it, so the message lands in the task's x and `got` is written on
+// c: 7, 9 and the time 5 read as 795. Resumed under the process that called
+// put(), the task stored the message nowhere and wrote `got` on no object.
+TEST(MailboxSim, GetInAClassTaskResumesOnItsOwnObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class Cons;\n"
+      "    int id, got;\n"
+      "    mailbox mb;\n"
+      "    function new(int i, mailbox m); id = i; mb = m; endfunction\n"
+      "    task run();\n"
+      "      int x;\n"
+      "      mb.get(x);\n"
+      "      got = this.id * 100 + x * 10 + ($time == 5) * 5;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  mailbox mb = new;\n"
+      "  Cons c;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    c = new(7, mb);\n"
+      "    fork\n"
+      "      c.run();\n"
+      "      #5 mb.put(9);\n"
+      "    join\n"
+      "    r = c.got;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 795u);
+}
+
+// §15.4.5 with §25.3: an interface's mailbox is reached through the instance,
+// `c.mb`, so `c.mb.get(v)` waits on the interface's queue until the
+// interface task send() puts 21 into it at time 3, read as 213. Resolved by
+// no key, the get() reached no mailbox and returned at once with v 0.
+TEST(MailboxSim, InterfaceMailboxGetReachedThroughTheInstance) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "interface chan;\n"
+      "  mailbox mb = new;\n"
+      "  task send(int x); mb.put(x); endtask\n"
+      "endinterface\n"
+      "module t;\n"
+      "  chan c();\n"
+      "  int v, r;\n"
+      "  initial fork\n"
+      "    begin c.mb.get(v); r = v * 10 + $time; end\n"
+      "    #3 c.send(21);\n"
+      "  join\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 213u);
+}
+
+// §15.4.5 with §7.10: get() may retrieve into any left-hand expression of the
+// message's type, a property of an object, an element of a queue and an
+// element of an array among them, each taking the next message: 3, 4 and 5,
+// read as 345. An `int q[$]` element was typed as a select of the queue's
+// carrier, so its int message was refused as of another type and left in the
+// mailbox, and arr[1] took the 4 meant for q[0]: 304.
+TEST(MailboxSim, GetStoresIntoAPropertyAQueueElementAndAnArrayElement) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C; int x; endclass\n"
+      "  mailbox mb = new;\n"
+      "  C c; int q[$]; int arr[2]; int r;\n"
+      "  initial begin\n"
+      "    c = new; q.push_back(0);\n"
+      "    mb.put(3); mb.put(4); mb.put(5);\n"
+      "    mb.get(c.x); mb.get(q[0]); mb.get(arr[1]);\n"
+      "    r = c.x * 100 + q[0] * 10 + arr[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 345u);
+}
+
 }  // namespace

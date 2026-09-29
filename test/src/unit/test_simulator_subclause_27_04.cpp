@@ -310,4 +310,20 @@ TEST(LoopGenerateHierarchicalNameSim, InterfaceInstanceBlockIsReached) {
             "if 100 101\n");
 }
 
+// §27.4 with §6.8: a declaration's initializer in a loop block is evaluated in
+// the instance, where the loop index is that instance's implicit localparam,
+// so each instance's e starts at its own value, 20 and 21. Read with the
+// first instance's index everywhere, both instances started at 20.
+TEST(LoopGenerateIndexSim, DeclarationInitializerReadsItsInstanceIndex) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                       "    logic [7:0] e = 8'(i + 20);\n"
+                       "  end\n"
+                       "  initial #1 $display(\"e %0d %0d\", g[0].e, g[1].e);\n"
+                       "endmodule\n",
+                       f),
+            "e 20 21\n");
+}
+
 }  // namespace

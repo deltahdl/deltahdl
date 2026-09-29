@@ -101,4 +101,32 @@ TEST(MailboxSim, TryPutAnswersZeroOnAFullQueue) {
   EXPECT_EQ(var->value.ToUint64(), 101u);
 }
 
+// §15.2 with §15.4.4 and §8.15: a class may extend the built-in mailbox, and
+// the inherited try_put(), called unqualified in a method, places into the
+// base's queue `super.new(b)` built, from which `m.get(v)` through the handle
+// retrieves the first message: 2 sent and 6, read as 26. Built by nothing,
+// try_put() placed nothing and get() waited for ever.
+TEST(MailboxSim, ClassExtendingTheMailboxHoldsTheBaseQueue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class LogMbx extends mailbox;\n"
+      "    int sent;\n"
+      "    function new(int b = 0); super.new(b); sent = 0; endfunction\n"
+      "    function void send(int x); void'(try_put(x)); sent++; endfunction\n"
+      "  endclass\n"
+      "  LogMbx m;\n"
+      "  int v, r;\n"
+      "  initial begin\n"
+      "    m = new;\n"
+      "    m.send(6); m.send(7);\n"
+      "    m.get(v);\n"
+      "    r = m.sent * 10 + v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 26u);
+}
+
 }  // namespace

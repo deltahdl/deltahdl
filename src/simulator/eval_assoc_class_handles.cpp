@@ -47,8 +47,13 @@ AssocArrayObject* HandleArrayOfSelect(const Expr* sel, SimContext& ctx,
   class_type = aa->elem_class;
   if (class_type.empty() && sel->base->kind == ExprKind::kIdentifier)
     class_type = ctx.GetVariableClassType(sel->base->text);
-  if (class_type.empty() || ctx.FindClassType(class_type) == nullptr)
+  // §15.3 and §15.4: the built-in semaphore and mailbox are classes whose
+  // handles an associative array may hold (NewContainedSyncObject).
+  bool is_builtin_sync = class_type == "semaphore" || class_type == "mailbox";
+  if (class_type.empty() ||
+      (ctx.FindClassType(class_type) == nullptr && !is_builtin_sync)) {
     return nullptr;
+  }
   return aa;
 }
 

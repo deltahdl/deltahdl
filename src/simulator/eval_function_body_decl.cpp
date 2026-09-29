@@ -21,6 +21,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/static_aggregate.h"
+#include "simulator/sync_variable.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
 
@@ -232,6 +233,11 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // body's stores read, so `real l; l = a + b;` keeps the real sum rather
   // than rounding it into an integer whose bits the caller read as 0.0.
   v->is_real = !holds_a_handle && DeclaredTypeIsReal(type, ctx);
+  // §15.5 with §6.21: a local declared event is a named event of its frame,
+  // which `-> le` triggers and `@le` waits on as a module's. Left unmarked,
+  // the trigger and the wait took it for a value and neither reached the
+  // other.
+  v->is_event = type.kind == DataTypeKind::kEvent;
   FillLocalDefault(v, init != nullptr, holds_a_handle, arena);
   if (is_class) {
     ctx.SetVariableClassType(name, class_key);
@@ -334,6 +340,7 @@ static void CreateFuncLocalAggregate(const Stmt* stmt, Variable* var,
   if (var == nullptr) return;
   CreateDeclAggregate(stmt, var->value.width, ctx, arena);
   AssignDeclAggregateInit(stmt, ctx, arena);
+  CreateSyncObjectForLocal(stmt, var, ctx, arena);
 }
 
 // The initializer the element-width carrier CreateFuncLocalVar makes takes:

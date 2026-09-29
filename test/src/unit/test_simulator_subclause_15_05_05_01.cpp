@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
@@ -135,6 +136,31 @@ TEST(IpcSync, MergedEventTriggeredStateShared) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// §15.5.5.1 with §13.5.1: an event output formal hands the caller's actual the
+// synchronization object the formal names when the task returns, so after
+// `getev(f)`, whose body merges ev with e, f is e: the wait on f is woken by
+// the trigger of e at 2. Copied out as a value, f stayed an event of its own
+// and the wait was never woken.
+TEST(NamedEventSim, EventOutputFormalHandsTheMergedEventBack) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event e, f;\n"
+      "  int at;\n"
+      "  task getev(output event ev); ev = e; endtask\n"
+      "  initial begin\n"
+      "    getev(f);\n"
+      "    fork\n"
+      "      begin @f; at = $time; end\n"
+      "      #2 -> e;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f, "at");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 }  // namespace

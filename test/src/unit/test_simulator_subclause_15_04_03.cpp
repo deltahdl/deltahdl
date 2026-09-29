@@ -168,4 +168,78 @@ TEST(MailboxSim, PutWaitsForRoomInABoundedQueue) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
+// §15.4.3 with §8.12: `b = a` leaves one mailbox under both names, so the
+// message b.put() places is the one a.get() retrieves, and the two handles
+// compare equal while an unassigned one is null: 4, then 1, 0 and 1, read as
+// 4101. b's name kept a mailbox of its own, so a.get() waited for ever and r
+// was never written.
+TEST(MailboxSim, PutThroughAHandleCopiedAtModuleScopeReachesTheMailbox) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox a = new;\n"
+      "  mailbox b, c;\n"
+      "  int v, r;\n"
+      "  initial begin\n"
+      "    b = a;\n"
+      "    b.put(4);\n"
+      "    a.get(v);\n"
+      "    r = v * 1000 + (a == b) * 100 + (b == null) * 10 + (c == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4101u);
+}
+
+// §15.4.3 with §23.6 and §27.5: a mailbox a named generate block declares is
+// reached from outside the block by the path through it, `g.mb`, so the
+// message put there is the one the block's own get() retrieves: 7, read as 7.
+// The path reached no mailbox, and the block's get() waited for ever.
+TEST(MailboxSim, PutThroughAGenerateBlockPathReachesTheBlocksMailbox) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  if (1) begin : g\n"
+      "    mailbox mb = new;\n"
+      "    initial begin int v; mb.get(v); r = v; end\n"
+      "  end\n"
+      "  initial #1 g.mb.put(7);\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §15.4.3 with §7.8 and §7.10: a queue and an associative array of mailboxes
+// hold handles, so put() and get() on an element act on the mailbox that
+// element refers to: q[0] and q[1], each built by its own `new`, give back
+// 7 and 8, and m["a"] and m["b"] 3 and 4, with m["a"] then empty: 7, 8, 3,
+// 4 and 0, read as 78340. The elements named no mailbox and every get()
+// left its target at 0.
+TEST(MailboxSim, ElementsOfContainersOfMailboxesHoldTheirQueues) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox q[$];\n"
+      "  mailbox m[string];\n"
+      "  mailbox t;\n"
+      "  int v0, v1, a, b, r;\n"
+      "  initial begin\n"
+      "    t = new; q.push_back(t);\n"
+      "    t = new; q.push_back(t);\n"
+      "    m[\"a\"] = new; m[\"b\"] = new;\n"
+      "    q[0].put(7); q[1].put(8);\n"
+      "    m[\"a\"].put(3); m[\"b\"].put(4);\n"
+      "    q[0].get(v0); q[1].get(v1);\n"
+      "    m[\"a\"].get(a); m[\"b\"].get(b);\n"
+      "    r = v0 * 10000 + v1 * 1000 + a * 100 + b * 10 + m[\"a\"].num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 78340u);
+}
+
 }  // namespace

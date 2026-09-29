@@ -13,6 +13,7 @@ struct ClassObject;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
+struct Logic4Vec;
 struct MailboxObject;
 struct SemaphoreObject;
 struct Stmt;
@@ -151,7 +152,10 @@ bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
 // into the object's map, the same object and not a copy. Answers whether the
 // assignment was one; an assignment to a property from a source that is no
 // handle is left to the caller. Left to the generic store, `mb = m` in a
-// constructor wrote the handle's carrier and the property stayed null.
+// constructor wrote the handle's carrier and the property stayed null. A
+// module's, an instance's or a package's variable as the target has the run's
+// entry for it rebound to the source's object, and answers false, so the
+// generic store still copies the handle's carrier into the variable.
 bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // The object an expression is a handle to: `kind` says which class, kNone
@@ -188,5 +192,44 @@ void BindSyncFormal(const SyncHandle& actual, Variable* var, SimContext& ctx);
 // and before the run's tables, a formal's name shadowing a module's (§8.6).
 SemaphoreObject* SemaphoreOfFormal(const Expr* recv, SimContext& ctx);
 MailboxObject* MailboxOfFormal(const Expr* recv, SimContext& ctx);
+
+// §15.2 with §8.13 and §8.15: the semaphore and the mailbox are built-in
+// classes a user class may extend. An object of a class whose base is
+// `base_class`, one of the two, holds the base's bucket or queue as its own,
+// built here as the construction of the object reaches that base, sized by
+// the arguments of the `super.new(...)` call `super_new` (§15.3.1, §15.4.1),
+// or empty where there is none. Nothing for any other base. Built by none,
+// `super.new(k)` filled no bucket and the inherited methods acted on nothing.
+void BuildBuiltinSyncBase(ClassObject* obj, std::string_view base_class,
+                          const Expr* super_new, SimContext& ctx, Arena& arena);
+
+// The semaphore or the mailbox BuildBuiltinSyncBase gave the object the call
+// `expr` of the inherited `method` acts on -- the running object for a call
+// written unqualified in one of its methods, `try_get()`, or the handle's
+// object for `cs.try_get()` -- or null where there is no such object.
+SemaphoreObject* BuiltinBaseSemaphore(const Expr* expr, std::string_view method,
+                                      SimContext& ctx, Arena& arena);
+MailboxObject* BuiltinBaseMailbox(const Expr* expr, std::string_view method,
+                                  SimContext& ctx, Arena& arena);
+
+// §15.3 and §15.4 with §7.8 and §7.10: a container whose elements are
+// semaphore or mailbox handles, `semaphore q[$]` or `mailbox m[string]`,
+// holds in each element the identity of the object it refers to
+// (SyncObjectIdentity), and the run records the object as the handle is
+// stored (SimContext::RecordContainedSemaphore and RecordContainedMailbox).
+// NewContainedSyncObject builds the object `m["a"] = new(1)` stores, of
+// `class_type`, and answers the element's value; RecordContainedSyncHandle
+// records the object `item`, the handle `q.push_back(t)` stores, is a handle
+// to; ContainedSemaphoreOf and ContainedMailboxOf answer the object an element
+// `elem`, `q[0]` or `m["a"]`, refers to, or null. Treated as class handles,
+// the elements named no object and every method on one answered 0.
+Logic4Vec NewContainedSyncObject(const Expr* new_expr,
+                                 std::string_view class_type, SimContext& ctx,
+                                 Arena& arena);
+void RecordContainedSyncHandle(const Expr* item, SimContext& ctx, Arena& arena);
+SemaphoreObject* ContainedSemaphoreOf(const Expr* elem, SimContext& ctx,
+                                      Arena& arena);
+MailboxObject* ContainedMailboxOf(const Expr* elem, SimContext& ctx,
+                                  Arena& arena);
 
 }  // namespace delta

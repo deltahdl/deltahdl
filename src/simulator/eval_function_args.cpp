@@ -816,6 +816,9 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // method; the formal is then a virtual interface of its own, and a member
   // the body reaches through it is a component of the instance it holds.
   var->is_virtual_interface = DeclaresAVirtualInterface(dt, ctx);
+  // §15.5 with §13.5.1: a formal declared event is an event the body triggers,
+  // waits on and assigns another event to (TryEventVarAssign).
+  var->is_event = dt.kind == DataTypeKind::kEvent;
   var->value = val;
   var->value.is_signed = var->is_signed;
   if (!var->is_4state) CoerceTo2State(var->value);
@@ -837,8 +840,12 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
     const auto& param = func->func_args[i];
     if (param.direction == Direction::kRef &&
         TryBindRefDirectionArg(expr, ai, param, ctx, arena)) {
+      BindRefSyncFormal(param,
+                        ai >= 0 ? expr->args[static_cast<size_t>(ai)] : nullptr,
+                        func, ctx, arena);
       continue;
     }
+    if (TryBindEventFormal(expr, ai, param, ctx)) continue;
     if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)], param,
                                    ctx, arena)) {
       KeepStaticArrayFormal(func, param, ctx, arena);

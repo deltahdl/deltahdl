@@ -236,4 +236,77 @@ TEST(SemaphoreSim, PutThroughANullPropertySemaphoreIsReported) {
                             4, "8.4"));
 }
 
+// §15.3.1 with §6.21: a semaphore declared as a local of an automatic task,
+// built by its declaration's `new(keys)` or by `s = new(keys)` in the body,
+// and one declared `automatic` in a begin-end block, is a bucket of its own
+// holding that many keys, which try_get() drains one at a time: 2, 3 and 4,
+// read as 234. Bound to no bucket, every try_get() answered 0 and r read 0.
+TEST(SemaphoreSim, AutomaticLocalSemaphoresHoldTheirOwnBuckets) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  int r, a, b, m;\n"
+                      "  task automatic count(int keys, output int n);\n"
+                      "    semaphore s = new(keys);\n"
+                      "    n = 0;\n"
+                      "    while (s.try_get()) n++;\n"
+                      "  endtask\n"
+                      "  task automatic count2(int keys, output int n);\n"
+                      "    semaphore s;\n"
+                      "    s = new(keys);\n"
+                      "    n = 0;\n"
+                      "    while (s.try_get()) n++;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    count(2, a);\n"
+                      "    count2(3, b);\n"
+                      "    begin\n"
+                      "      automatic semaphore s2 = new(4);\n"
+                      "      m = 0;\n"
+                      "      while (s2.try_get()) m++;\n"
+                      "    end\n"
+                      "    r = a * 100 + b * 10 + m;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            234u);
+}
+
+// §15.3.1 with §8.12: `b = new(5)` after `b = a` builds a new bucket for b,
+// a's staying as it was, so a.try_get(2) finds the one key a holds and
+// answers 0 while b.try_get(5) answers 1: 1. Filled in place, the new key
+// count landed in a's bucket, which then gave up two keys and left b three
+// short: 10.
+TEST(SemaphoreSim, NewAfterAHandleCopyLeavesTheOtherNamesBucket) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  semaphore a = new(1);\n"
+                      "  semaphore b;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    b = a;\n"
+                      "    b = new(5);\n"
+                      "    r = a.try_get(2) * 10 + b.try_get(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            1u);
+}
+
+// §15.3.1 with §27.4: a semaphore declared in a loop generate block takes the
+// key count its `new(i + 1)` gives with the instance's own loop index, so g[1]
+// holds two keys and two try_get() calls there both succeed while g[0]'s
+// second finds none: 10 and 11, read as 1011. Built with the first instance's
+// index everywhere, g[1] held one key and read 10.
+TEST(SemaphoreSim, LoopGenerateSemaphoreNewReadsItsInstanceIndex) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  int r;\n"
+                      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                      "    semaphore s = new(i + 1);\n"
+                      "    int got;\n"
+                      "    initial got = s.try_get() * 10 + s.try_get();\n"
+                      "  end\n"
+                      "  initial #1 r = g[0].got * 100 + g[1].got;\n"
+                      "endmodule\n",
+                      "r"),
+            1011u);
+}
+
 }  // namespace

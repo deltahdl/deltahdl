@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -19,6 +20,29 @@
 
 namespace delta {
 
+// §13.3 and §13.4 make the argument list of a call with no arguments
+// optional, so `s.put;` and `r = s.try_get` are the calls `s.put()` and
+// `s.try_get()`: the member access of either form, or null for neither.
+static const Expr* MethodAccessOf(const Expr* expr) {
+  if (expr == nullptr) return nullptr;
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution) {
+    return nullptr;
+  }
+  return access;
+}
+
+// The name of the method the call `expr` makes, through a receiver or, inside
+// a class extending the semaphore, unqualified.
+static std::string_view CalledMethodName(const Expr* expr) {
+  if (const Expr* access = MethodAccessOf(expr)) return access->rhs->text;
+  if (expr->kind == ExprKind::kCall && expr->lhs != nullptr) {
+    return expr->lhs->text;
+  }
+  return {};
+}
+
 // §26.3 admits a package-qualified semaphore as the receiver, `p::sem.get()`,
 // found under the "p.sem" key ExtractHandleMethodCallParts answers, given the
 // context's arena as the key's lifetime since the signature carries none.
@@ -31,9 +55,8 @@ namespace delta {
 // reached no bucket.
 SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
                                      std::string_view method) {
-  if (!expr || expr->kind != ExprKind::kCall) return nullptr;
-  const auto* access = expr->lhs;
-  if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
+  const Expr* access = MethodAccessOf(expr);
+  if (!access) return BuiltinBaseSemaphore(expr, method, ctx, ctx.GetArena());
   if (!access->rhs || access->rhs->text != method) return nullptr;
   SyncProperty prop = ResolveSyncProperty(access->lhs, ctx, ctx.GetArena());
   if (prop.kind != SyncKind::kNone) {
@@ -42,10 +65,26 @@ SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
   // §13.5.1 (printed 348) with §8.2 (printed 180): a `semaphore s` formal is
   // a handle to the actual's bucket (BindSyncFormal), asked next.
   if (SemaphoreObject* sem = SemaphoreOfFormal(access->lhs, ctx)) return sem;
+  // §7.10 and §7.8: an element of a queue or an associative array of
+  // semaphores, `q[0].try_get()` (ContainedSemaphoreOf).
+  if (SemaphoreObject* sem =
+          ContainedSemaphoreOf(access->lhs, ctx, ctx.GetArena())) {
+    return sem;
+  }
+  // §15.2 with §8.13: the base bucket of an object of a class extending the
+  // semaphore, reached through a handle, `cs.try_get()`.
+  if (SemaphoreObject* base =
+          BuiltinBaseSemaphore(expr, method, ctx, ctx.GetArena())) {
+    return base;
+  }
   MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, ctx.GetArena(), parts))
-    return nullptr;
-  return ctx.FindSemaphore(parts.var_name);
+  if (ExtractHandleAccessParts(access, ctx.GetArena(), parts)) {
+    return ctx.FindSemaphore(parts.var_name);
+  }
+  // §25.3: an interface instance's semaphore reached by its hierarchical name,
+  // `c.s.put()` (ScopedOrBareTargetKey).
+  std::string_view key = ScopedOrBareTargetKey(access->lhs, ctx.GetArena());
+  return key.empty() ? nullptr : ctx.FindSemaphore(key);
 }
 
 int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -55,15 +94,32 @@ int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,
   return static_cast<int32_t>(static_cast<uint32_t>(val.ToUint64()));
 }
 
+bool ReportNegativeKeyCount(const Expr* expr, int32_t count,
+                            std::string_view subclause, SimContext& ctx) {
+  if (count >= 0) return false;
+  ctx.GetDiag().Error(expr->range.start,
+                      "semaphore " + std::string(CalledMethodName(expr)) +
+                          "(): the key count " + std::to_string(count) +
+                          " is negative",
+                      Subclause(subclause));
+  return true;
+}
+
+// §15.3.2 and §15.3.4: a negative key count is an error of put() and of
+// try_get(), which then returns 0; put() leaves the bucket as it was.
 bool TryEvalSemaphoreMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   if (auto* sem = SemaphoreCallTarget(expr, ctx, "put")) {
-    sem->Put(SemaphoreKeyArg(expr, ctx, arena, 1));
+    int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+    if (!ReportNegativeKeyCount(expr, count, "15.3.2", ctx)) sem->Put(count);
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   if (auto* sem = SemaphoreCallTarget(expr, ctx, "try_get")) {
-    auto got = sem->TryGet(SemaphoreKeyArg(expr, ctx, arena, 1));
+    int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+    int32_t got = ReportNegativeKeyCount(expr, count, "15.3.4", ctx)
+                      ? 0
+                      : sem->TryGet(count);
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(got));
     return true;
   }
@@ -87,14 +143,22 @@ static std::string ReceiverSpelling(const Expr* recv) {
 // on a class property reaches the object's bucket as a module's reaches the
 // module's. Served by the expression evaluator, which answers put() and
 // try_get() alone, a function's `s.get(1)` left the bucket full.
+// The receiver of the call `expr` as a report spells it, `this` for a call
+// written unqualified inside a class extending the semaphore.
+static std::string ReceiverOfCall(const Expr* expr) {
+  const Expr* access = MethodAccessOf(expr);
+  return access != nullptr ? ReceiverSpelling(access->lhs) : "this";
+}
+
 bool TryExecSemaphoreCallInFunction(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   auto* sem = SemaphoreCallTarget(expr, ctx, "get");
   if (!sem) return false;
-  if (sem->Get(SemaphoreKeyArg(expr, ctx, arena, 1)) != SemGetStatus::kBlock)
-    return true;
+  int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+  if (ReportNegativeKeyCount(expr, count, "15.3.3", ctx)) return true;
+  if (sem->Get(count) != SemGetStatus::kBlock) return true;
   ctx.GetDiag().Error(expr->range.start,
-                      "semaphore get(): '" + ReceiverSpelling(expr->lhs->lhs) +
+                      "semaphore get(): '" + ReceiverOfCall(expr) +
                           "' has too few keys, so the call would block "
                           "inside a function",
                       Subclause("13.4"));
@@ -118,11 +182,21 @@ std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena) {
     if (lhs->scope_prefix != "$unit") return lhs->text;
     return *arena.Create<std::string>(DeclaredKindsKey(lhs));
   }
-  if (lhs->kind != ExprKind::kMemberAccess || !lhs->is_scope_resolution ||
-      lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
       lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier) {
     return {};
   }
+  // §23.6 with §25.3 and §27.4: a hierarchical name, `c.s` for an interface
+  // instance's semaphore and `g[1].s` for a generate block instance's, is the
+  // key the run holds it under, the instance's prefix and the name joined by
+  // dots (CreateChildModuleVariables in lowerer_child.cpp) or the path a
+  // generate block member is aliased under (RegisterGenBlockMembers).
+  if (!lhs->is_scope_resolution) {
+    std::string path = HierarchicalReferenceName(lhs);
+    if (path.empty()) return {};
+    return *arena.Create<std::string>(std::move(path));
+  }
+  if (lhs->lhs->kind != ExprKind::kIdentifier) return {};
   return *arena.Create<std::string>(std::string(lhs->lhs->text) + "." +
                                     std::string(lhs->rhs->text));
 }
@@ -143,13 +217,19 @@ bool TrySemaphoreNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     BuildSyncProperty(prop, stmt->rhs, ctx, arena);
     return true;
   }
+  if (TryLocalSyncNewAssign(stmt, ctx, arena)) return true;
   std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
   if (key.empty()) return false;
-  auto* sem = ctx.FindSemaphore(key);
-  if (!sem) return false;
+  SemaphoreObject** slot = ctx.SemaphoreSlot(key);
+  if (slot == nullptr) return false;
   // §15.3.1: new() takes the key count as its one argument and defaults it to
   // zero, so a bucket built without one starts empty.
-  sem->key_count = SemaphoreKeyArg(stmt->rhs, ctx, arena, 0);
+  int32_t keys = SemaphoreKeyArg(stmt->rhs, ctx, arena, 0);
+  if (*slot == nullptr || (*slot)->shared) {
+    *slot = ctx.GetArena().Create<SemaphoreObject>(keys);
+  } else {
+    (*slot)->key_count = keys;
+  }
   HoldSyncVariable(key, ctx);
   return true;
 }

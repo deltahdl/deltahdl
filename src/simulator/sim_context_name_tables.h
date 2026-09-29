@@ -224,6 +224,21 @@ class DeclaredNameTables {
   SemaphoreObject* SemaphoreOfHandle(const Variable* var) const;
   void BindMailboxHandle(const Variable* var, MailboxObject* mbx);
   MailboxObject* MailboxOfHandle(const Variable* var) const;
+  // §15.5 with §7.10: the identity an event is known by as the value of an
+  // element of a queue of events, `q.push_back(e)` storing e's: its address,
+  // recorded so that EventOfIdentity finds the event from the value again,
+  // and null for a value that is no recorded event's.
+  uint64_t RegisterEventIdentity(Variable* event);
+  Variable* EventOfIdentity(uint64_t identity) const;
+  // §15.3 and §15.4 with §7.8 and §7.10: the semaphores and mailboxes an
+  // element of a container holds a handle to, by the identity that element's
+  // value is (SyncObjectIdentity), recorded as the handle is stored into it,
+  // so that `q[0].try_get()` reaches the object from the value; null for a
+  // value that is no recorded object's.
+  void RecordContainedSemaphore(SemaphoreObject* sem);
+  SemaphoreObject* ContainedSemaphore(uint64_t identity) const;
+  void RecordContainedMailbox(MailboxObject* mbx);
+  MailboxObject* ContainedMailbox(uint64_t identity) const;
 
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
@@ -339,6 +354,9 @@ class DeclaredNameTables {
   // §15.3 and §15.4 with §13.5.1: see BindSemaphoreHandle.
   std::unordered_map<const Variable*, SemaphoreObject*> semaphore_handles_;
   std::unordered_map<const Variable*, MailboxObject*> mailbox_handles_;
+  std::unordered_map<uint64_t, Variable*> event_identities_;
+  std::unordered_map<uint64_t, SemaphoreObject*> contained_semaphores_;
+  std::unordered_map<uint64_t, MailboxObject*> contained_mailboxes_;
 
   std::unordered_map<std::string, std::string> instance_types_;
   std::unordered_map<std::string, std::string> instance_paths_;

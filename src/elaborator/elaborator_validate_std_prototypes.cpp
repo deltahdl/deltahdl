@@ -35,7 +35,10 @@ std::optional<StdPackageMember> StdClassOfType(const DataType& type) {
 // Collects the handles a statement and those under it declare.
 void CollectStdHandlesInStmt(const Stmt* s, StdHandles& handles) {
   if (!s) return;
-  if (s->kind == StmtKind::kVarDecl) {
+  // §7.4 with §7.8 and §7.10: a declaration with an unpacked dimension is an
+  // array, a queue or an associative array of handles, not a handle, and
+  // `q.push_back(t)` calls the container's method (§7.10.2).
+  if (s->kind == StmtKind::kVarDecl && s->var_unpacked_dims.empty()) {
     const std::optional<StdPackageMember> kMember =
         StdClassOfType(s->var_decl_type);
     if (kMember) handles[s->var_name] = *kMember;
@@ -164,7 +167,10 @@ void ForEachBodyStmt(const ModuleDecl* decl, Visit visit) {
 void CollectStdHandlesInItems(const ModuleDecl* decl, StdHandles& handles,
                               DiagEngine& diag) {
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    // A declaration with an unpacked dimension is a container of handles
+    // (§7.4, §7.8, §7.10), whose methods are the container's.
+    if (item->kind != ModuleItemKind::kVarDecl || !item->unpacked_dims.empty())
+      continue;
     const std::optional<StdPackageMember> kMember =
         StdClassOfType(item->data_type);
     if (!kMember) continue;

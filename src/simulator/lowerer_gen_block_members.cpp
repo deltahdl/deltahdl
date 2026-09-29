@@ -35,6 +35,10 @@ void Lowerer::RegisterGenBlockMembers(const RtlirModule* mod) {
         ctx_.AliasVariable(*key, *stored);
         AliasVariableKinds(*key, *stored, ctx_, arena_);
         ctx_.AliasNet(*key, *stored);
+        // §15.3 and §15.4: a semaphore's or a mailbox's object, which the
+        // run keeps in tables of its own.
+        ctx_.AliasSemaphore(*key, *stored);
+        ctx_.AliasMailbox(*key, *stored);
         break;
       }
       case RtlirGenBlockMember::Kind::kParam:

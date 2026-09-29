@@ -97,7 +97,7 @@ class SimContext : public DeclaredNameTables,
   Variable* CreateVariable(std::string_view name, uint32_t width);
 
   void AliasVariable(std::string_view alias_name, std::string_view target_name);
-
+  void AliasVariable(std::string_view alias_name, Variable* target);
   void NullifyEventVariable(std::string_view name);
 
   Net* FindNet(std::string_view name);
@@ -574,13 +574,11 @@ class SimContext : public DeclaredNameTables,
   void ClearFileIoError(uint32_t fd);
   const FileIoError* GetFileIoError(uint32_t fd) const;
 
-  // §21.3.8: $feof reports whether a read has previously detected end-of-file
-  // on a descriptor. Direct reads leave that evidence in the host stream's
-  // own indicator, but $fscanf scans a buffered copy and repositions the
-  // stream afterward -- and repositioning clears the host indicator -- so a
-  // scan that ran against the end of its input records the detection here.
-  // Repositioning (§21.3.5), a successful push back (§21.3.4.1), and closing
-  // the file erase the record.
+  // §21.3.8: whether a read has detected end-of-file on a descriptor, for
+  // $feof. $fscanf scans a buffered copy and then repositions the stream,
+  // which clears the host's indicator, so a scan that reached the end records
+  // it here; repositioning (§21.3.5), a push back (§21.3.4.1) and closing the
+  // file erase it.
   void SetFdEofDetected(uint32_t fd, bool detected);
   bool FdEofDetected(uint32_t fd) const;
   // §21.3.4.1: what $ungetc pushed onto a descriptor not open for reading, for
@@ -594,6 +592,9 @@ class SimContext : public DeclaredNameTables,
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
+  // §8.12: the entry FindSemaphore/FindMailbox reads for `name`, or null.
+  SemaphoreObject** SemaphoreSlot(std::string_view name);
+  MailboxObject** MailboxSlot(std::string_view name);
   // The same as AliasQueue, for a semaphore and a mailbox a package declares.
   void AliasSemaphore(std::string_view alias_name,
                       std::string_view target_name);

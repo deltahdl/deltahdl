@@ -19,6 +19,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sync_objects.h"
 
@@ -420,6 +421,13 @@ static uint64_t IdentityOfHandle(const SyncHandle& handle) {
   return SyncObjectIdentity(handle.mbx);
 }
 
+// §8.12: the object `source` holds now has a second name
+// (SemaphoreObject::shared).
+static void MarkShared(const SyncHandle& source) {
+  if (source.sem != nullptr) source.sem->shared = true;
+  if (source.mbx != nullptr) source.mbx->shared = true;
+}
+
 // §8.12: the property `target` made a handle to the object `source` names,
 // the same object under two names, or the null handle where `source` holds
 // none, its carrier following (MirrorSyncCarrier).
@@ -432,6 +440,7 @@ static void StoreSyncHandle(const SyncProperty& target,
     (*MailboxMapOf(target))[name] = source.mbx;
   }
   MirrorSyncCarrier(target, IdentityOfHandle(source), ctx);
+  MarkShared(source);
 }
 
 // §8.7 and §8.9: the property's initializer `init` -- a `new(...)`, which
@@ -475,12 +484,48 @@ bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
   return true;
 }
 
+// §8.12 with §15.3 and §15.4: a module's, an instance's or a package's
+// semaphore or mailbox variable assigned a handle, `b = a`, is left naming
+// the object the source is a handle to, or none for `null` (`is_null`), the
+// run's entry for it rebound (SimContext::SemaphoreSlot and MailboxSlot). A
+// source of the other class leaves it alone. Left unbound, `b.put(4)` placed
+// the message in b's own mailbox, or in none.
+static void RebindScopedSyncHandle(const Stmt* stmt, bool is_null,
+                                   SimContext& ctx, Arena& arena) {
+  std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
+  if (key.empty()) return;
+  SemaphoreObject** sem_slot = ctx.SemaphoreSlot(key);
+  MailboxObject** mbx_slot =
+      sem_slot == nullptr ? ctx.MailboxSlot(key) : nullptr;
+  if (sem_slot == nullptr && mbx_slot == nullptr) return;
+  SyncHandle source =
+      is_null ? SyncHandle{} : ResolveSyncHandle(stmt->rhs, ctx, arena);
+  if (sem_slot != nullptr && (is_null || source.kind == SyncKind::kSemaphore)) {
+    *sem_slot = source.sem;
+  } else if (mbx_slot != nullptr &&
+             (is_null || source.kind == SyncKind::kMailbox)) {
+    *mbx_slot = source.mbx;
+  } else {
+    return;
+  }
+  MarkShared(source);
+}
+
 bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->rhs == nullptr) return false;
   SyncProperty target = ResolveSyncProperty(stmt->lhs, ctx, arena);
-  if (target.kind == SyncKind::kNone || !HasStorage(target)) return false;
   bool is_null =
       stmt->rhs->kind == ExprKind::kIdentifier && stmt->rhs->text == "null";
+  if (target.kind == SyncKind::kNone) {
+    // The generic store still copies the handle's carrier into the variable,
+    // which `a == b` and `b == null` read.
+    if (stmt->rhs->kind == ExprKind::kIdentifier ||
+        stmt->rhs->kind == ExprKind::kMemberAccess) {
+      RebindScopedSyncHandle(stmt, is_null, ctx, arena);
+    }
+    return false;
+  }
+  if (!HasStorage(target)) return false;
   SyncHandle source =
       is_null ? SyncHandle{} : ResolveSyncHandle(stmt->rhs, ctx, arena);
   if (!is_null && source.kind != target.kind) return false;
@@ -519,6 +564,108 @@ SemaphoreObject* SemaphoreOfFormal(const Expr* recv, SimContext& ctx) {
 MailboxObject* MailboxOfFormal(const Expr* recv, SimContext& ctx) {
   const Variable* var = FormalOfReceiver(recv, ctx);
   return var == nullptr ? nullptr : ctx.MailboxOfHandle(var);
+}
+
+// §15.2 with §8.13: the key under which an object of a class extending the
+// built-in semaphore or mailbox keeps the base's bucket or queue, in the maps
+// that hold its properties' (ClassObject::semaphore_properties and
+// mailbox_properties); no property can be named so.
+static constexpr std::string_view kBuiltinBaseKey = "$base";
+
+void BuildBuiltinSyncBase(ClassObject* obj, std::string_view base_class,
+                          const Expr* super_new, SimContext& ctx,
+                          Arena& arena) {
+  if (obj == nullptr) return;
+  std::string key(kBuiltinBaseKey);
+  if (base_class == "semaphore") {
+    obj->semaphore_properties[key] = ctx.GetArena().Create<SemaphoreObject>(
+        super_new != nullptr ? SemaphoreKeyArg(super_new, ctx, arena, 0) : 0);
+  } else if (base_class == "mailbox") {
+    auto* mbx = ctx.GetArena().Create<MailboxObject>();
+    mbx->Build(super_new != nullptr ? MailboxBoundArg(super_new, ctx, arena)
+                                    : 0);
+    obj->mailbox_properties[key] = mbx;
+  }
+}
+
+// The object whose built-in base the call `expr` of `method` acts on: the
+// running object for a call written unqualified inside one of its methods,
+// `try_get()`, and the handle's object for `h.try_get()` or `h.try_get`;
+// null for any other call.
+static ClassObject* BuiltinBaseReceiver(const Expr* expr,
+                                        std::string_view method,
+                                        SimContext& ctx, Arena& arena) {
+  if (expr == nullptr) return nullptr;
+  if (expr->kind == ExprKind::kCall && expr->lhs != nullptr &&
+      expr->lhs->kind == ExprKind::kIdentifier) {
+    return expr->lhs->text == method ? ctx.CurrentThis() : nullptr;
+  }
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->rhs == nullptr ||
+      access->rhs->text != method) {
+    return nullptr;
+  }
+  return HandleSideObject(access->lhs, ctx, arena);
+}
+
+SemaphoreObject* BuiltinBaseSemaphore(const Expr* expr, std::string_view method,
+                                      SimContext& ctx, Arena& arena) {
+  ClassObject* obj = BuiltinBaseReceiver(expr, method, ctx, arena);
+  if (obj == nullptr) return nullptr;
+  auto it = obj->semaphore_properties.find(std::string(kBuiltinBaseKey));
+  return it == obj->semaphore_properties.end() ? nullptr : it->second;
+}
+
+MailboxObject* BuiltinBaseMailbox(const Expr* expr, std::string_view method,
+                                  SimContext& ctx, Arena& arena) {
+  ClassObject* obj = BuiltinBaseReceiver(expr, method, ctx, arena);
+  if (obj == nullptr) return nullptr;
+  auto it = obj->mailbox_properties.find(std::string(kBuiltinBaseKey));
+  return it == obj->mailbox_properties.end() ? nullptr : it->second;
+}
+
+Logic4Vec NewContainedSyncObject(const Expr* new_expr,
+                                 std::string_view class_type, SimContext& ctx,
+                                 Arena& arena) {
+  const void* obj = nullptr;
+  if (class_type == "semaphore") {
+    auto* sem = ctx.GetArena().Create<SemaphoreObject>(
+        SemaphoreKeyArg(new_expr, ctx, arena, 0));
+    ctx.RecordContainedSemaphore(sem);
+    obj = sem;
+  } else {
+    auto* mbx = ctx.GetArena().Create<MailboxObject>();
+    mbx->Build(MailboxBoundArg(new_expr, ctx, arena));
+    ctx.RecordContainedMailbox(mbx);
+    obj = mbx;
+  }
+  return MakeLogic4VecVal(arena, 64, SyncObjectIdentity(obj));
+}
+
+void RecordContainedSyncHandle(const Expr* item, SimContext& ctx,
+                               Arena& arena) {
+  SyncHandle handle = ResolveSyncHandle(item, ctx, arena);
+  if (handle.kind == SyncKind::kSemaphore) {
+    ctx.RecordContainedSemaphore(handle.sem);
+  } else if (handle.kind == SyncKind::kMailbox) {
+    ctx.RecordContainedMailbox(handle.mbx);
+  }
+  // §8.12: the element is a second name for the object, so a later `t = new`
+  // builds t a new one and leaves the element's alone.
+  MarkShared(handle);
+}
+
+SemaphoreObject* ContainedSemaphoreOf(const Expr* elem, SimContext& ctx,
+                                      Arena& arena) {
+  if (elem == nullptr || elem->kind != ExprKind::kSelect) return nullptr;
+  return ctx.ContainedSemaphore(EvalExpr(elem, ctx, arena).ToUint64());
+}
+
+MailboxObject* ContainedMailboxOf(const Expr* elem, SimContext& ctx,
+                                  Arena& arena) {
+  if (elem == nullptr || elem->kind != ExprKind::kSelect) return nullptr;
+  return ctx.ContainedMailbox(EvalExpr(elem, ctx, arena).ToUint64());
 }
 
 }  // namespace delta

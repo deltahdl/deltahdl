@@ -101,9 +101,12 @@ static std::vector<FixedDimShape> InnerDimsOf(const RtlirElementShape& shape) {
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
-    auto* q =
-        ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
+    // §15.5 with §7.10: a queue of events holds each event's identity, as
+    // wide as an address (RegisterEventIdentity).
+    auto* q = ctx_.CreateQueue(name, var.is_event ? 64 : var.width,
+                               var.queue_max_size, var.is_4state);
     q->is_signed = var.is_signed;
+    q->holds_events = var.is_event;
     // §8.4: a queue of a class type holds handles, so `q[i].v` names a
     // property of the object an element refers to (TryEvalQueueElementMember
     // in eval_array_class_queue.h).

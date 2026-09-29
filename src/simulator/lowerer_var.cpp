@@ -11,11 +11,11 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
-#include "simulator/block_enums.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/gen_block_const_frame.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/queue_bound.h"
@@ -469,6 +469,9 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
     elem->is_string = var.is_string;
+    // §15.5 with §7.4: an element of an array of events is a named event,
+    // which `-> arr[1]` triggers and `@arr[1]` waits on (EventArrayElement).
+    elem->is_event = var.is_event;
     FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
                      arena);
   }
@@ -726,6 +729,9 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(name, var);
   }
+  // §27.4: a declaration in a loop generate block reads the instance's loop
+  // index in its initializer, a semaphore's `new(i + 1)` among them.
+  GenBlockConstFrame loop_consts(var.gen_block_consts, ctx_, arena_);
   if (var.init_expr) {
     LowerVarInit(name, var, v, width);
   }
@@ -890,59 +896,6 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
   // and reader of the tag resolves a bare name to (TagKeyOfName).
   if (var.init_expr->kind == ExprKind::kTagged && var.init_expr->rhs)
     ctx_.SetVariableTag(name, var.init_expr->rhs->text);
-}
-
-void Lowerer::RegisterEnumForCast(std::string_view name,
-                                  const RtlirVariable& var) {
-  ctx_.SetVariableEnumType(name, var.enum_type_name);
-}
-
-// The width of the enumeration the module declares under `name`, and whether
-// its base type is 4-state: a variable declared with it carries both, as the
-// elaborator computed them from the declared type; the design's typedef
-// table has the declaration of one no variable is declared with. The width
-// is what BuildEnumMembers (src/elaborator/elaborator_typedef.cpp) gives
-// each member's constant.
-static void SetModuleEnumShape(const RtlirModule* mod,
-                               const RtlirDesign* design, EnumTypeInfo& info) {
-  for (const auto& v : mod->variables) {
-    if (v.enum_type_name != info.type_name) continue;
-    info.width = v.width;
-    info.is_4state = v.is_4state;
-    return;
-  }
-  if (design == nullptr) return;
-  auto it = design->type_enums.find(info.type_name);
-  if (it == design->type_enums.end() || it->second == nullptr) return;
-  info.width = EvalTypeWidth(*it->second);
-  info.is_4state = Is4stateType(*it->second, TypedefMap{});
-}
-
-void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
-  for (const auto& [name, members] : mod->enum_types) {
-    if (ctx_.FindEnumType(name)) continue;
-    EnumTypeInfo info;
-    info.type_name = name;
-    SetModuleEnumShape(mod, design_, info);
-    for (const auto& m : members) {
-      info.members.push_back(EnumMemberInfoOf(m, info.width, ctx_, arena_));
-    }
-    ctx_.RegisterEnumType(name, info);
-  }
-  RegisterBlockEnumTypes(mod, design_, ctx_, arena_);
-}
-
-// A parameter is lowered to a variable ahead of the module's enumerations
-// (Lowerer::LowerParams), so the enumeration its declared type names is
-// looked up here, after them. A parameter declared with no type, or a type
-// parameter, has no decl_type. The key is arena-persisted, as LowerParams
-// persists the storage's, because SimContext keys the table by string_view.
-void Lowerer::RegisterParamEnumTypes(const RtlirModule* mod) {
-  for (const auto& p : mod->params) {
-    if (p.is_type_param || p.decl_type == nullptr) continue;
-    auto* key = arena_.Create<std::string>(inst_prefix_ + std::string(p.name));
-    RecordVariableEnumType(*key, *p.decl_type, ctx_);
-  }
 }
 
 }  // namespace delta

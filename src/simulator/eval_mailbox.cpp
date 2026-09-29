@@ -49,16 +49,35 @@ MailboxObject* MailboxCallTarget(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
   const auto* access = expr->lhs;
-  if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
+  // §15.2 with §8.13: an inherited method called unqualified inside a class
+  // extending the mailbox acts on the object's base queue.
+  if (!access) return nullptr;
+  if (access->kind == ExprKind::kIdentifier) {
+    return BuiltinBaseMailbox(expr, method, ctx, arena);
+  }
+  if (access->kind != ExprKind::kMemberAccess) return nullptr;
   if (!access->rhs || access->rhs->text != method) return nullptr;
   SyncProperty prop = ResolveSyncProperty(access->lhs, ctx, arena);
   if (prop.kind != SyncKind::kNone) {
     return MailboxOfProperty(prop, method, access->rhs->range.start, ctx);
   }
   if (MailboxObject* mbx = MailboxOfFormal(access->lhs, ctx)) return mbx;
+  // §7.10 and §7.8: an element of a queue or an associative array of
+  // mailboxes, `q[0].put(7)` (ContainedMailboxOf).
+  if (MailboxObject* mbx = ContainedMailboxOf(access->lhs, ctx, arena)) {
+    return mbx;
+  }
+  if (MailboxObject* base = BuiltinBaseMailbox(expr, method, ctx, arena)) {
+    return base;
+  }
   MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return nullptr;
-  return ctx.FindMailbox(parts.var_name);
+  if (ExtractHandleMethodCallParts(expr, arena, parts)) {
+    return ctx.FindMailbox(parts.var_name);
+  }
+  // §25.3: an interface instance's mailbox reached by its hierarchical name,
+  // `c.mb.get(v)` (ScopedOrBareTargetKey).
+  std::string_view key = ScopedOrBareTargetKey(access->lhs, arena);
+  return key.empty() ? nullptr : ctx.FindMailbox(key);
 }
 
 int32_t MailboxBoundArg(const Expr* new_expr, SimContext& ctx, Arena& arena) {
@@ -281,7 +300,7 @@ static MailboxMessageType ArrayElementType(const ArrayInfo& info,
 
 // §11.5 with §6.22.2: the type of the select `a[i]`: an element of an array
 // of class handles is of the class recorded under the array's name; an
-// element of any other unpacked array is of its element type; and a
+// element of a queue or any other unpacked array is of its element type; and a
 // bit-select or part-select of a packed object is an unsigned integral of
 // the bits it names (§11.8.1 has a select unsigned regardless of its
 // operand) with the object's number of states. A slice of an unpacked
@@ -293,6 +312,17 @@ static MailboxMessageType ElementTargetType(const Expr* arg, SimContext& ctx,
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return {};
   std::string_view class_name = ctx.GetVariableClassType(base->text);
   if (!class_name.empty()) return ClassMessageType(class_name, ctx);
+  // §7.10: an element of a queue, or of a dynamic array kept as one, is of
+  // the element type the queue records, a handle's of any type. Taken as a
+  // select of the queue's carrier, `mb.get(q[0])` of an `int q[$]` refused
+  // an int message.
+  if (const QueueObject* q = ctx.FindQueue(base->text)) {
+    if (arg->index_end != nullptr || q->holds_class_handles) return {};
+    return MailboxMessageType::Integral(q->elem_width, q->is_signed,
+                                        q->is_4state
+                                            ? MailboxMessageType::States::kFour
+                                            : MailboxMessageType::States::kTwo);
+  }
   if (const ArrayInfo* info = ctx.FindArrayInfo(base->text)) {
     if (arg->index_end != nullptr) return {};
     return ArrayElementType(*info, base->text, arg->index, ctx, arena);
@@ -597,11 +627,17 @@ bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     BuildSyncProperty(prop, stmt->rhs, ctx, arena);
     return true;
   }
+  if (TryLocalSyncNewAssign(stmt, ctx, arena)) return true;
   std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
   if (key.empty()) return false;
-  auto* mbx = ctx.FindMailbox(key);
-  if (!mbx) return false;
-  mbx->Build(MailboxBoundArg(stmt->rhs, ctx, arena));
+  MailboxObject** slot = ctx.MailboxSlot(key);
+  if (slot == nullptr) return false;
+  // §15.4.1, as TrySemaphoreNewAssign builds a bucket
+  // (SyncVariableHoldsHandle).
+  if (*slot == nullptr || (*slot)->shared) {
+    *slot = ctx.GetArena().Create<MailboxObject>();
+  }
+  (*slot)->Build(MailboxBoundArg(stmt->rhs, ctx, arena));
   HoldSyncVariable(key, ctx);
   return true;
 }
@@ -741,12 +777,16 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
     if (msg.refused) co_return StmtResult::kDone;
     MailboxMessageType type = msg.type;
-    co_await MailboxPutAwaiter{*mbx, std::move(msg.value), type};
+    co_await MailboxPutAwaiter{
+        .mbx = *mbx, .msg = std::move(msg.value), .type = type, .ctx = &ctx};
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "get")) {
     if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
-    MailboxGetAwaiter get{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
+    MailboxGetAwaiter get{.mbx = *mbx,
+                          .expected = RetrievalTargetType(expr, ctx, arena),
+                          .msg = {},
+                          .ctx = &ctx};
     MbxGetStatus status = co_await get;
     FinishMailboxRetrieval(expr, get.msg.Get(),
                            status == MbxGetStatus::kTypeError, ctx, arena);
@@ -754,7 +794,10 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "peek")) {
     if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
-    MailboxPeekAwaiter peek{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
+    MailboxPeekAwaiter peek{.mbx = *mbx,
+                            .expected = RetrievalTargetType(expr, ctx, arena),
+                            .msg = {},
+                            .ctx = &ctx};
     MbxPeekStatus status = co_await peek;
     FinishMailboxRetrieval(expr, peek.msg.Get(),
                            status == MbxPeekStatus::kTypeError, ctx, arena);

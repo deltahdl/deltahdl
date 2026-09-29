@@ -3,6 +3,7 @@
 #include <coroutine>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -29,9 +30,17 @@ inline uint64_t SyncObjectIdentity(const void* obj) {
 
 enum class SemGetStatus : uint8_t { kAcquired, kBlock, kError };
 
+// §8.12: whether a handle copy, `b = a`, has put the object under a second
+// name, after which a `new` assigned to either name builds a new object for
+// that name alone. An object no copy has reached is rebuilt in place, so a
+// process waiting on it, and a name aliasing it (a package's, a generate
+// block's path), keep it.
 struct SemaphoreObject {
   int32_t key_count = 0;
-  std::vector<std::pair<int32_t, std::coroutine_handle<>>> waiters;
+  bool shared = false;
+  // Each parked get() with the count it asked for and what resumes it
+  // (SyncWaiterResume in awaiters.h).
+  std::vector<std::pair<int32_t, std::function<void()>>> waiters;
 
   explicit SemaphoreObject(int32_t initial_keys = 0)
       : key_count(initial_keys) {}
@@ -80,9 +89,9 @@ struct SemaphoreObject {
       auto& front = waiters.front();
       if (key_count < front.first) break;
       key_count -= front.first;
-      auto h = front.second;
+      auto resume = std::move(front.second);
       waiters.erase(waiters.begin());
-      h.resume();
+      resume();
     }
   }
 };
@@ -157,6 +166,8 @@ struct MailboxMessageType {
 };
 
 struct MailboxObject {
+  // §8.12: as SemaphoreObject::shared.
+  bool shared = false;
   // §15.4.5: a nonparameterized (typeless) mailbox may carry messages of
   // differing types, so the implementation maintains the data type placed by
   // put() alongside each value to enable the run-time type check performed by
@@ -175,9 +186,11 @@ struct MailboxObject {
   MailboxMessageType param_type;
   std::deque<Logic4Snapshot> messages;
   std::deque<MailboxMessageType> message_types;
-  std::vector<std::coroutine_handle<>> get_waiters;
-  std::vector<std::coroutine_handle<>> peek_waiters;
-  std::vector<std::coroutine_handle<>> put_waiters;
+  // What resumes each parked get(), peek() and put() (SyncWaiterResume in
+  // awaiters.h), in arrival order.
+  std::vector<std::function<void()>> get_waiters;
+  std::vector<std::function<void()>> peek_waiters;
+  std::vector<std::function<void()>> put_waiters;
 
   explicit MailboxObject(int32_t b = 0) : bound(b < 0 ? 0 : b) {}
 
@@ -295,21 +308,21 @@ struct MailboxObject {
 
     auto peeks = std::move(peek_waiters);
     peek_waiters.clear();
-    for (auto h : peeks) h.resume();
+    for (auto& resume : peeks) resume();
 
     if (!get_waiters.empty() && !messages.empty()) {
-      auto h = get_waiters.front();
+      auto resume = std::move(get_waiters.front());
       get_waiters.erase(get_waiters.begin());
-      h.resume();
+      resume();
     }
   }
 
   void WakePutWaiters() {
     if (IsFull()) return;
     if (!put_waiters.empty()) {
-      auto h = put_waiters.front();
+      auto resume = std::move(put_waiters.front());
       put_waiters.erase(put_waiters.begin());
-      h.resume();
+      resume();
     }
   }
 };

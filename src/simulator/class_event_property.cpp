@@ -1,5 +1,6 @@
 #include "simulator/class_event_property.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -12,6 +13,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -116,12 +118,73 @@ Variable* ClassEventVariable(const Expr* expr, SimContext& ctx, Arena& arena) {
   return obj != nullptr ? OnObject(obj, expr->rhs->text, arena) : nullptr;
 }
 
+Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr == nullptr || expr->kind != ExprKind::kSelect ||
+      expr->index_end != nullptr || expr->index == nullptr ||
+      expr->base == nullptr || expr->base->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  Variable* base = ctx.FindVariable(expr->base->text);
+  if (base == nullptr || !base->is_event) return nullptr;
+  Logic4Vec index = EvalExpr(expr->index, ctx, arena);
+  if (const QueueObject* q = ctx.FindQueue(expr->base->text)) {
+    uint64_t i = index.ToUint64();
+    if (!q->holds_events || !index.IsKnown() || i >= q->elements.size()) {
+      return nullptr;
+    }
+    return ctx.EventOfIdentity(q->elements[i].ToUint64());
+  }
+  std::string key = std::string(expr->base->text) + "[" +
+                    (index.is_string ? "\"" + Logic4VecToString(index) + "\""
+                                     : std::to_string(index.ToUint64())) +
+                    "]";
+  if (Variable* elem = ctx.FindVariable(key)) {
+    return elem->is_event ? elem : nullptr;
+  }
+  if (ctx.FindAssocArray(expr->base->text) == nullptr) return nullptr;
+  auto* stored =
+      arena.Create<std::string>(ctx.ActiveInstancePrefix() + std::move(key));
+  Variable* elem = ctx.CreateVariable(*stored, 1);
+  elem->is_event = true;
+  return elem;
+}
+
+Logic4Vec EventIdentityOf(const Expr* expr, SimContext& ctx, Arena& arena) {
+  std::string_view name =
+      expr != nullptr && expr->kind == ExprKind::kIdentifier ? expr->text : "";
+  Variable* event = TriggerTargetEvent(expr, name, ctx);
+  uint64_t identity = event != nullptr && event->is_event
+                          ? ctx.RegisterEventIdentity(event)
+                          : 0;
+  return MakeLogic4VecVal(arena, 64, identity);
+}
+
 Variable* TriggerTargetEvent(const Expr* expr, std::string_view name,
                              SimContext& ctx) {
   if (!name.empty()) {
     if (Variable* var = ctx.FindVariable(name)) return var;
   }
-  return ClassEventVariable(expr, ctx, ctx.GetArena());
+  if (Variable* var = ClassEventVariable(expr, ctx, ctx.GetArena())) {
+    return var;
+  }
+  return EventArrayElement(expr, ctx, ctx.GetArena());
+}
+
+bool TryClassEventTriggered(const Expr* expr, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out) {
+  if (expr == nullptr) return false;
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->rhs == nullptr ||
+      access->rhs->text != "triggered") {
+    return false;
+  }
+  Variable* event = ClassEventVariable(access->lhs, ctx, arena);
+  if (event == nullptr) return false;
+  bool now = !event->is_null_event &&
+             event->triggered_ticks == ctx.CurrentTime().ticks;
+  out = MakeLogic4VecVal(arena, 1, now ? 1u : 0u);
+  return true;
 }
 
 }  // namespace delta

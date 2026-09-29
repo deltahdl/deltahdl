@@ -81,7 +81,12 @@ std::string_view ResolveEventTargetName(const Expr* expr, SimContext& ctx) {
   if (expr->kind == ExprKind::kIdentifier) return expr->text;
   if (expr->kind != ExprKind::kMemberAccess) return {};
   std::string name;
-  if (!BuildEventTargetName(expr, name)) return {};
+  // §23.6 with §27.4: a path through a loop generate block instance,
+  // `g[1].e`, selects the instance by a literal index, which the hierarchical
+  // name spells as the waiting process's lookup does
+  // (HierarchicalReferenceName).
+  if (!BuildEventTargetName(expr, name)) name = HierarchicalReferenceName(expr);
+  if (name.empty()) return {};
   auto* stored = ctx.GetArena().Create<std::string>(std::move(name));
   return *stored;
 }
@@ -92,6 +97,9 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   auto* var = TriggerTargetEvent(stmt->expr, event_name, ctx);
   if (!var || var->is_null_event) return StmtResult::kDone;
   if (!event_name.empty()) ctx.SetEventTriggered(event_name);
+  // §15.5.3: the event itself records the step, which a class's event
+  // property, found by no name, is read by (TryClassEventTriggered).
+  var->triggered_ticks = ctx.CurrentTime().ticks;
 
   auto pending = std::move(var->watchers);
   var->watchers.clear();
@@ -277,6 +285,14 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
     p->is_reactive = spawning_proc->is_reactive;
     p->home_region = spawning_proc->home_region;
     p->program_block_id = spawning_proc->program_block_id;
+    // §9.3.2 with §23.9 and §27.4: a branch's statements are statements of
+    // the scope the fork stands in, so its names resolve in the same module
+    // instance and generate block instances. Left at the defaults, a branch
+    // in a submodule or a program read and triggered the top's names, and
+    // `-> e` there woke no process waiting on the instance's e.
+    p->inst_prefix = spawning_proc->inst_prefix;
+    p->gen_prefixes = spawning_proc->gen_prefixes;
+    p->gen_block_name = spawning_proc->gen_block_name;
   }
   ctx.CopyCarriedStacksTo(*p);
   // §18.14.2: a new thread's RNG is seeded with the next random value drawn
@@ -510,7 +526,12 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   // The wait is why this is served here and put()/try_get() are served by the
   // expression evaluator: only a statement can suspend the process it is in.
   if (auto* sem = SemaphoreCallTarget(expr, ctx, "get")) {
-    co_await SemaphoreGetAwaiter{*sem, SemaphoreKeyArg(expr, ctx, arena, 1)};
+    int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+    // §15.3.3: a negative count is an error, and the process does not wait.
+    if (ReportNegativeKeyCount(expr, count, "15.3.3", ctx)) {
+      co_return StmtResult::kDone;
+    }
+    co_await SemaphoreGetAwaiter{.sem = *sem, .count = count, .ctx = &ctx};
     co_return StmtResult::kDone;
   }
   // §15.4.3, §15.4.5 and §15.4.7: put(), get() and peek() wait on the mailbox.

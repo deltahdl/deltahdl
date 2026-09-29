@@ -7,6 +7,7 @@ namespace delta {
 class Arena;
 struct RtlirVariable;
 class SimContext;
+struct Stmt;
 struct Variable;
 
 // §15.3 (printed page 372 of IEEE 1800-2023) and §15.4 (printed 374): a
@@ -41,5 +42,23 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
 // variable stands under the key. Left at the 0 its declaration stored, the
 // variable compared equal to null after the new.
 void HoldSyncVariable(std::string_view key, SimContext& ctx);
+
+// §15.3.1 and §15.4.1 with §6.21: a semaphore or mailbox declared by `stmt`
+// as a local of a subroutine or a procedural block, just created as `v`, is a
+// handle the frame binds to an object of its own (SimContext::
+// BindSemaphoreHandle and BindMailboxHandle), which the body's `s.try_get()`
+// and `m.put(v)` reach as a formal's (SemaphoreOfFormal and MailboxOfFormal);
+// a `new(...)` initializer sizes the object and marks the handle held, and
+// any other declaration leaves it null. Made for none, `s = new(keys)` and
+// `semaphore s = new(keys)` in an automatic task filled no bucket. Does
+// nothing for a local of any other type.
+void CreateSyncObjectForLocal(const Stmt* stmt, Variable* v, SimContext& ctx,
+                              Arena& arena);
+
+// §15.3.1 and §15.4.1: `s = new(...)` where `s` is a local
+// CreateSyncObjectForLocal bound, which binds it to a new object, sized by
+// the argument, and marks the handle held. False, doing nothing, for any
+// other target.
+bool TryLocalSyncNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

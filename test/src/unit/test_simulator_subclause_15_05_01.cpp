@@ -2,6 +2,7 @@
 
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
@@ -301,6 +302,86 @@ TEST(EventTriggerSimulator, NonblockingTriggerRepeatEventControl) {
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(mid->value.ToUint64(), 0u);
   EXPECT_EQ(result->value.ToUint64(), 55u);
+}
+
+// §15.5.1 and §15.5.2 with §13.5.1: an event passed to an input formal is
+// passed as its handle, so `-> ev` in the task triggers the caller's `done`,
+// waking the wait on it at 1, and `@ev` in another task waits on the
+// caller's `e`, woken by the trigger at 2: 1 and 2, read as 12. Bound as a
+// copy, neither the trigger nor the wait reached the caller's event, and
+// neither time was written.
+TEST(NamedEventSim, EventPassedToAnInputFormalIsTheCallersEvent) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event done, e;\n"
+      "  int t1, t2, r;\n"
+      "  task trigger(event ev); -> ev; endtask\n"
+      "  task waiter(event ev); @ev; t2 = $time; endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @done; t1 = $time; end\n"
+      "      #1 trigger(done);\n"
+      "      waiter(e);\n"
+      "      #2 -> e;\n"
+      "    join\n"
+      "    r = t1 * 10 + t2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §15.5.1 with §23.6 and §27.4: an event a loop generate block declares is
+// triggered and waited on by the path through the instance, `g[1].e`, so the
+// wait is woken by the trigger at 2. The trigger named no event through the
+// select, and the wait was never woken.
+TEST(NamedEventSim, LoopGenerateEventTriggeredByItsPath) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int at;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    event e;\n"
+      "  end\n"
+      "  initial fork\n"
+      "    begin @g[1].e; at = $time; end\n"
+      "    #2 -> g[1].e;\n"
+      "  join\n"
+      "endmodule\n",
+      f, "at");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §15.5.1 and §15.5.2 with §7.4 and §7.8: an element of an array of events is
+// a named event of its own, so the wait on arr[1] is woken by the trigger of
+// arr[1] at 2 and not by that of arr[0] at 1, and the wait on m["k"] of an
+// associative array of events by the trigger of m["k"] at 4: 2 and 4, read as
+// 24. Resolved by no name, the triggers reached nothing and neither wait woke.
+TEST(NamedEventSim, EventArrayElementsAreEventsOfTheirOwn) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event arr[2];\n"
+      "  event m[string];\n"
+      "  int t1, t2, r;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @arr[1]; t1 = $time; end\n"
+      "      begin #1 -> arr[0]; #1 -> arr[1]; end\n"
+      "    join\n"
+      "    fork\n"
+      "      begin @m[\"k\"]; t2 = $time; end\n"
+      "      #2 -> m[\"k\"];\n"
+      "    join\n"
+      "    r = t1 * 10 + t2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 24u);
 }
 
 }  // namespace

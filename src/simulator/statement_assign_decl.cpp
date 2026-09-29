@@ -32,6 +32,7 @@
 #include "simulator/static_aggregate.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/sync_variable.h"
 #include "simulator/virtual_interface.h"
 
 namespace delta {
@@ -547,6 +548,10 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
     // reader holding the variable and one holding the name answer alike.
     var->is_real = is_real;
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
+    // §15.5 with §6.21: a block's or a task's local declared event is a named
+    // event, which `-> le` triggers and `@le` waits on as a module's does.
+    // Left unmarked, `@le` waited for a change of value no trigger makes.
+    var->is_event = stmt->var_decl_type.kind == DataTypeKind::kEvent;
     CreateDeclAggregate(stmt, width, ctx, arena);
   }
 }
@@ -766,9 +771,8 @@ static void BindBlockLocalLayout(const Stmt* stmt, uint32_t width,
   }
 }
 
-StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->kind == StmtKind::kBlockItemDecl)
-    return ExecBlockItemDeclImpl(stmt, ctx, arena);
+static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
   stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
@@ -846,6 +850,18 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     InitializeDeclVariable(stmt, {var, width, is_real}, func_name, ctx, arena);
   }
   return StmtResult::kDone;
+}
+
+// §15.3.1 and §15.4.1 with §6.21: a semaphore or mailbox local of the block
+// is bound to an object of its own once whichever path above has created it
+// (CreateSyncObjectForLocal).
+StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->kind == StmtKind::kBlockItemDecl)
+    return ExecBlockItemDeclImpl(stmt, ctx, arena);
+  StmtResult result = ExecVarDeclBody(stmt, ctx, arena);
+  CreateSyncObjectForLocal(stmt, ctx.FindLocalVariable(stmt->var_name), ctx,
+                           arena);
+  return result;
 }
 
 }  // namespace delta

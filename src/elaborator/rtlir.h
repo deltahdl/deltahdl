@@ -271,6 +271,9 @@ struct RtlirVariable {
   bool is_signed = false;
   bool is_chandle = false;
   const Expr* init_expr = nullptr;
+  // §27.4: the implicit localparam of each loop generate block enclosing the
+  // declaration, which its initializer reads as the loop index.
+  GenBlockConsts gen_block_consts;
   const DataType* dtype = nullptr;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
   // §36.12.1 Table 36-10 rows 3 and 4: what the declaration named this

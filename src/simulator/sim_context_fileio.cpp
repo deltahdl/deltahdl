@@ -474,6 +474,26 @@ SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
   return nullptr;
 }
 
+// §8.12 with §15.3 and §15.4: `b = a` leaves one object under both names,
+// so what is rebound is the entry FindSemaphore or FindMailbox reads `b` by,
+// under the key the scope search reaches first, which keeps an instance's
+// and a generate block's own `b` the one that changes.
+SemaphoreObject** SimContext::SemaphoreSlot(std::string_view name) {
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = semaphores_.find(key);
+    if (it != semaphores_.end()) return &it->second;
+  }
+  return nullptr;
+}
+
+MailboxObject** SimContext::MailboxSlot(std::string_view name) {
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = mailboxes_.find(key);
+    if (it != mailboxes_.end()) return &it->second;
+  }
+  return nullptr;
+}
+
 MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
   auto* mb = arena_.Create<MailboxObject>(bound);
   mailboxes_[name] = mb;

@@ -890,6 +890,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
   var.elem_type_kind = item->data_type.kind;
   var.init_expr = item->init_expr;
+  var.gen_block_consts = gen_loop_consts_;
 
   if (item->init_expr) {
     var_init_names_.insert(item->name);

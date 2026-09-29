@@ -23,6 +23,14 @@ SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
 // §15.3: the number of keys a semaphore method call asks for. Each of the
 // methods takes the count as its one argument and defaults it, so a call
 // written without arguments asks for `absent`.
+// §15.3.2, §15.3.3 and §15.3.4: a negative key count handed to put(), get()
+// or try_get(), the call `expr`, is an error, reported under `subclause`, the
+// method's own. Answers whether it was one, for the caller to act on none of
+// the keys. Taken silently, put(-1) and get(-1) went on and try_get(-1)
+// answered 0 with nothing said.
+bool ReportNegativeKeyCount(const Expr* expr, int32_t count,
+                            std::string_view subclause, SimContext& ctx);
+
 int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,
                         int32_t absent);
 
@@ -51,9 +59,10 @@ bool TryExecSemaphoreCallInFunction(const Expr* expr, SimContext& ctx,
 // is held under -- an identifier's own text, or the "p.name" a package's
 // variable named through the package scope resolution operator, `p::name`,
 // is created under (CreatePackageDataVariables in lowerer_register.cpp),
-// given the arena's lifetime. Empty for any other target shape. Shared with
-// TryMailboxNewAssign, so a semaphore and a mailbox resolve a scoped target
-// alike.
+// given the arena's lifetime, or the dotted path a hierarchical name spells,
+// `c.s` for an interface instance's. Empty for any other target shape. Shared
+// with TryMailboxNewAssign, so a semaphore and a mailbox resolve a scoped
+// target alike.
 std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena);
 
 // §15.3.1: `sem = new(keyCount)` fills the bucket with the keys it names.

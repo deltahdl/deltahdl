@@ -13,6 +13,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
+#include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/clocking.h"
@@ -23,6 +24,7 @@
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
@@ -425,23 +427,19 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   return false;
 }
 
-// §15.5.3: the triggered method is prototyped as `function bit triggered()`, so
-// a program may invoke it with explicit empty parentheses (ev.triggered()) as
-// well as omitting them (ev.triggered). The bare-member form is handled by
-// TryEventSequenceMethod during member-access evaluation; this routine covers
-// the call form, which arrives as a kCall whose receiver is the named event.
-// It yields the same single-bit result: the event's triggered state for the
-// current time step, or 1'b0 when the named event is null. §26.3 admits a
-// package's event as the receiver, `p::e.triggered()`, by the "p.e" key
-// ExtractHandleMethodCallParts answers; taken as an identifier alone, the
-// scoped call fell to the user-method lookup, which found no method.
+// §15.5.3: `function bit triggered()` may be called with its empty argument
+// list, `ev.triggered()`, as well as without, the member form
+// TryEventSequenceMethod serves; this is the call form, on a named event --
+// a package's `p::e.triggered()` by its "p.e" key -- or on a class's event
+// property (TryClassEventTriggered), 0 for a null event.
 bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (parts.method_name != "triggered") return false;
   auto* var = ctx.FindVariable(parts.var_name);
-  if (!var || !var->is_event) return false;
+  if (!var || !var->is_event)
+    return TryClassEventTriggered(expr, ctx, arena, out);
   out = var->is_null_event
             ? MakeLogic4VecVal(arena, 1, 0u)
             : MakeLogic4VecVal(arena, 1,
@@ -617,9 +615,9 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
 // The member selects that are no read of a member of a value: a sequence's
 // end point (§16.9.11), an array reduction or ordering method with a with
 // clause (§7.12), a parameter of a parameterized class scope (§8.25.1), and a
-// process (§9.7) or enumeration (§6.19.5.7) method written without an
-// argument list, `p.kill` or `c.next`, which leave no member of the name to
-// read. True with `out` set when the select was one of them.
+// process (§9.7), enumeration (§6.19.5.7) or semaphore (§15.3) method written
+// without an argument list, `p.kill`, `c.next` or `s.try_get`, which leave no
+// member of the name to read. True with `out` set when the select was one.
 static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
   if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
@@ -630,10 +628,12 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
-  if (TryParameterizedScopeParam(expr, ctx, arena, out)) return true;
-  if (TryScopeSpecializationStaticMember(expr, ctx, arena, out)) return true;
-  if (TryEvalProcessMethodWithoutArgs(expr, ctx, arena, out)) return true;
-  return TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out);
+  return TryParameterizedScopeParam(expr, ctx, arena, out) ||
+         TryScopeSpecializationStaticMember(expr, ctx, arena, out) ||
+         TryEvalProcessMethodWithoutArgs(expr, ctx, arena, out) ||
+         TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out) ||
+         TryEvalSemaphoreMethodCall(expr, ctx, arena, out) ||
+         TryClassEventTriggered(expr, ctx, arena, out);
 }
 
 // §7.8.7: `b[2].x` reads a member of an associative array element, and §8.4
@@ -695,9 +695,8 @@ static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
   return val;
 }
 
-// Whether the leftmost name of the path `expr` is no variable or array, so a
-// select after it selects an instance rather than an element, whose index
-// EvaluatedHierarchicalPath would evaluate a second time.
+// Whether the path `expr` starts at no variable or array, so a select after it
+// picks an instance, not an element, whose index would then be read twice.
 static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
   const Expr* head = expr;
   while (head->kind == ExprKind::kMemberAccess ||
@@ -710,9 +709,8 @@ static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
          ctx.FindArrayInfo(head->text) == nullptr;
 }
 
-// The variable the path `expr`, spelled `resolved`, names: from the top of the
-// design first when `$root`-headed (§23.3.1), and with a non-literal instance
-// select, `g[k].v`, naming the instance its value selects (§23.6).
+// The variable the path `expr`, spelled `resolved`, names: `$root`-headed from
+// the top first (§23.3.1), a non-literal instance select by its value (§23.6).
 static Variable* FindReferencedVariable(const Expr* expr,
                                         const std::string& resolved,
                                         SimContext& ctx, Arena& arena) {

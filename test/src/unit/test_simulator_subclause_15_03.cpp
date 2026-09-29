@@ -644,4 +644,173 @@ TEST(SemaphoreSim, SemaphoreHandlesCompareByTheBucketEachRefersTo) {
             1011u);
 }
 
+// §15.3 with §8.12: `b = a` leaves one bucket under both names, so the key
+// b.put() returns lands in a's bucket, which then holds the two a.try_get(2)
+// asks for, and `b = null` afterwards leaves a's bucket as it is: 1, then 1
+// again after a.put(2), read as 11. b's name kept a bucket of its own, so the
+// first a.try_get(2) found one key and answered 0.
+TEST(SemaphoreSim, HandleAssignedAtModuleScopeSharesTheBucket) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore a = new(1);\n"
+      "  semaphore b;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    b = a;\n"
+      "    b.put();\n"
+      "    r = a.try_get(2);\n"
+      "    a.put(2);\n"
+      "    b = null;\n"
+      "    r = r * 10 + a.try_get(2);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
+// §15.3 with §25.3: an interface's semaphore is reached through the instance,
+// `b.s`, whether it is built there by `b.s = new(1)` or by its declaration,
+// and the bucket is the one the interface's own task waits on: the first
+// try_get() takes the key and the second finds none, and grab() returns when
+// `b.s.put()` returns the key at 3, read as 1, 0 and 3 in 103. Resolved by
+// no key, every call through `b.s` reached no bucket and grab() never
+// waited, 0 and 0.
+TEST(SemaphoreSim, InterfaceSemaphoreReachedThroughTheInstance) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "interface bus;\n"
+      "  semaphore s;\n"
+      "  task grab(); s.get(); endtask\n"
+      "endinterface\n"
+      "module t;\n"
+      "  bus b();\n"
+      "  int r1, r2, at, r;\n"
+      "  initial begin\n"
+      "    b.s = new(1);\n"
+      "    r1 = b.s.try_get(); r2 = b.s.try_get();\n"
+      "    fork\n"
+      "      begin b.grab(); at = $time; end\n"
+      "      #3 b.s.put();\n"
+      "    join\n"
+      "    r = r1 * 100 + r2 * 10 + at;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 103u);
+}
+
+// §15.3 with §23.6 and §27.4: a semaphore a loop generate block declares is
+// reached from outside the block by the path through the instance,
+// `g[1].s`, whose bucket holds the two keys its `new(i + 1)` gave: the first
+// try_get(2) takes both and the second finds none, read as 10. The path
+// reached no bucket, and both answered 0.
+TEST(SemaphoreSim, GenerateBlockSemaphoreReachedByItsPath) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    semaphore s = new(i + 1);\n"
+      "  end\n"
+      "  initial r = g[1].s.try_get(2) * 10 + g[1].s.try_get(2);\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §15.3.2 to §15.3.4 with §13.3 and §13.4: a call with no arguments may
+// leave out its argument list, so `s.put;`, `r = s.try_get` and `s.get;` are
+// the calls with the default key count of one: put returns a key, try_get
+// takes it, and get waits for the put at 2, read as 1 and 2 in 12. Taken as
+// member reads, none acted on the bucket, and get returned at 0: 0.
+TEST(SemaphoreSim, MethodsCalledWithoutAnArgumentListActOnTheBucket) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore s;\n"
+      "  int r, at, v;\n"
+      "  initial begin\n"
+      "    s = new;\n"
+      "    s.put;\n"
+      "    r = s.try_get;\n"
+      "    fork\n"
+      "      begin s.get; at = $time; end\n"
+      "      #2 s.put;\n"
+      "    join\n"
+      "    v = r * 10 + at;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §15.2 with §15.3.1 and §8.15: a class may extend the built-in semaphore, and
+// `super.new(1)` fills the base's bucket with one key, which the inherited
+// try_get(), called unqualified in a method, takes and then finds gone, and
+// which `cs.put()` through the handle returns for `cs.try_get()` to take:
+// 1, 0, 1 taken and 1, read as 1011. Built by nothing, every call answered 0.
+TEST(SemaphoreSim, ClassExtendingTheSemaphoreHoldsTheBaseBucket) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class CountingSem extends semaphore;\n"
+      "    int taken;\n"
+      "    function new(int k); super.new(k); taken = 0; endfunction\n"
+      "    function int grab();\n"
+      "      int r; r = try_get(); if (r) taken++; return r;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  CountingSem cs;\n"
+      "  int r1, r2, r3, r;\n"
+      "  initial begin\n"
+      "    cs = new(1);\n"
+      "    r1 = cs.grab(); r2 = cs.grab();\n"
+      "    cs.put();\n"
+      "    r3 = cs.try_get();\n"
+      "    r = r1 * 1000 + r2 * 100 + cs.taken * 10 + r3;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1011u);
+}
+
+// §15.3 with §7.8 and §7.10: a queue and an associative array of semaphores
+// hold handles, so a method called on an element acts on the bucket that
+// element refers to: q[0] and q[1], pushed from `t` rebuilt between, each
+// hold their own keys, and m["a"] and m["b"] the ones their `new` gave.
+// Read as the digits 1, 1, 0, 1, 1, 1, 0, 1: 11011101. The elements named no
+// bucket, and every call answered 0.
+TEST(SemaphoreSim, ElementsOfContainersOfSemaphoresHoldTheirBuckets) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore q[$];\n"
+      "  semaphore m[string];\n"
+      "  semaphore t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    t = new(2); q.push_back(t);\n"
+      "    t = new(1); q.push_back(t);\n"
+      "    m[\"a\"] = new(1); m[\"b\"] = new(2);\n"
+      "    r = q[0].try_get();\n"
+      "    r = r * 10 + q[1].try_get();\n"
+      "    r = r * 10 + q[1].try_get();\n"
+      "    r = r * 10 + q[0].try_get();\n"
+      "    r = r * 10 + m[\"a\"].try_get();\n"
+      "    r = r * 10 + m[\"b\"].try_get();\n"
+      "    r = r * 10 + m[\"a\"].try_get();\n"
+      "    r = r * 10 + m[\"b\"].try_get();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11011101u);
+}
+
 }  // namespace

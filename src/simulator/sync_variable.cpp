@@ -6,6 +6,8 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/sim_context.h"
@@ -75,6 +77,55 @@ void HoldSyncVariable(std::string_view key, SimContext& ctx) {
   const void* obj = ctx.FindSemaphore(key);
   if (obj == nullptr) obj = ctx.FindMailbox(key);
   MarkSyncVariableHeld(v, obj, ctx.GetArena());
+}
+
+static bool IsNewCall(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
+}
+
+// Binds `v` to a new object of `kind`, sized by `new_expr` where it is a
+// `new(...)`, which also marks the handle held.
+static void BindNewLocalSyncObject(SyncKind kind, const Expr* new_expr,
+                                   Variable* v, SimContext& ctx, Arena& arena) {
+  bool is_new = IsNewCall(new_expr);
+  const void* obj = nullptr;
+  if (kind == SyncKind::kSemaphore) {
+    auto* sem = ctx.GetArena().Create<SemaphoreObject>(
+        is_new ? SemaphoreKeyArg(new_expr, ctx, arena, 0) : 0);
+    ctx.BindSemaphoreHandle(v, sem);
+    obj = sem;
+  } else {
+    auto* mbx = ctx.GetArena().Create<MailboxObject>();
+    if (is_new) mbx->Build(MailboxBoundArg(new_expr, ctx, arena));
+    ctx.BindMailboxHandle(v, mbx);
+    obj = mbx;
+  }
+  MarkSyncVariableHeld(v, is_new ? obj : nullptr, arena);
+}
+
+void CreateSyncObjectForLocal(const Stmt* stmt, Variable* v, SimContext& ctx,
+                              Arena& arena) {
+  if (v == nullptr || !stmt->var_unpacked_dims.empty()) return;
+  SyncKind kind = SyncKindOfType(stmt->var_decl_type, ctx);
+  if (kind == SyncKind::kNone) return;
+  BindNewLocalSyncObject(kind, stmt->var_init, v, ctx, arena);
+}
+
+bool TryLocalSyncNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->lhs == nullptr || stmt->lhs->kind != ExprKind::kIdentifier ||
+      !IsNewCall(stmt->rhs)) {
+    return false;
+  }
+  Variable* v = ctx.FindLocalVariable(stmt->lhs->text);
+  if (v == nullptr) return false;
+  if (ctx.SemaphoreOfHandle(v) != nullptr) {
+    BindNewLocalSyncObject(SyncKind::kSemaphore, stmt->rhs, v, ctx, arena);
+  } else if (ctx.MailboxOfHandle(v) != nullptr) {
+    BindNewLocalSyncObject(SyncKind::kMailbox, stmt->rhs, v, ctx, arena);
+  } else {
+    return false;
+  }
+  return true;
 }
 
 }  // namespace delta

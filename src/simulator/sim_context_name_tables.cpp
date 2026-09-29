@@ -28,6 +28,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -417,6 +418,36 @@ SemaphoreObject* DeclaredNameTables::SemaphoreOfHandle(
     const Variable* var) const {
   auto it = semaphore_handles_.find(var);
   return (it != semaphore_handles_.end()) ? it->second : nullptr;
+}
+
+uint64_t DeclaredNameTables::RegisterEventIdentity(Variable* event) {
+  auto identity = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(event));
+  event_identities_[identity] = event;
+  return identity;
+}
+
+Variable* DeclaredNameTables::EventOfIdentity(uint64_t identity) const {
+  auto it = event_identities_.find(identity);
+  return it != event_identities_.end() ? it->second : nullptr;
+}
+
+void DeclaredNameTables::RecordContainedSemaphore(SemaphoreObject* sem) {
+  if (sem != nullptr) contained_semaphores_[SyncObjectIdentity(sem)] = sem;
+}
+
+SemaphoreObject* DeclaredNameTables::ContainedSemaphore(
+    uint64_t identity) const {
+  auto it = contained_semaphores_.find(identity);
+  return it != contained_semaphores_.end() ? it->second : nullptr;
+}
+
+void DeclaredNameTables::RecordContainedMailbox(MailboxObject* mbx) {
+  if (mbx != nullptr) contained_mailboxes_[SyncObjectIdentity(mbx)] = mbx;
+}
+
+MailboxObject* DeclaredNameTables::ContainedMailbox(uint64_t identity) const {
+  auto it = contained_mailboxes_.find(identity);
+  return it != contained_mailboxes_.end() ? it->second : nullptr;
 }
 
 void DeclaredNameTables::BindMailboxHandle(const Variable* var,

@@ -217,4 +217,28 @@ TEST(SemaphoreStdPackageElaborator, ACallWithMoreActualsThanFormalsIsRejected) {
   }
 }
 
+// §G.3 with §7.4 and §7.10: a declaration with an unpacked dimension is a
+// container of semaphore handles and not a handle, so `q.push_back(t)` and
+// `a.size()` call the container's methods, which the semaphore prototype does
+// not govern, while `t.peek()` on the handle beside them is still rejected.
+TEST(SemaphoreStdPackageElaborator, AContainerOfSemaphoresTakesItsOwnMethods) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  semaphore q[$];\n"
+      "  semaphore a[2];\n"
+      "  semaphore t;\n"
+      "  initial begin\n"
+      "    t = new(1);\n"
+      "    q.push_back(t);\n"
+      "    if (a.size() == 2) t.peek();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'semaphore' declares no method 'peek'", 8,
+                            "G.3"));
+  for (const auto& d : f.diag.Diagnostics()) EXPECT_NE(d.loc.line, 7u);
+}
+
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 
@@ -252,6 +253,37 @@ TEST(IpcSync, WaitOrderElseOnlyBranch) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §15.5.4 with §6.17: wait_order takes a class's event properties, `s.a` and
+// `s.b` through a handle, as it takes declared events: triggered in order at
+// 1 and 2 it succeeds at 2, and triggered out of order it takes the else
+// branch, read as 1, 2 and 0 in 120. Found by name alone, the properties were
+// watched by nothing and neither wait_order ever completed.
+TEST(WaitOrderSim, ClassEventPropertiesAreWaitedOnInOrder) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class S; event a, b; endclass\n"
+      "  S s;\n"
+      "  int ok, at, bad, r;\n"
+      "  initial begin\n"
+      "    s = new;\n"
+      "    fork\n"
+      "      begin wait_order(s.a, s.b) ok = 1; else ok = 0; at = $time; end\n"
+      "      begin #1 -> s.a; #1 -> s.b; end\n"
+      "    join\n"
+      "    bad = 1;\n"
+      "    fork\n"
+      "      wait_order(s.a, s.b) bad = 1; else bad = 0;\n"
+      "      begin #1 -> s.b; #1 -> s.a; end\n"
+      "    join\n"
+      "    r = ok * 100 + at * 10 + bad;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 120u);
 }
 
 }  // namespace

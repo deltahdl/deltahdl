@@ -330,6 +330,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
     simulator/lowerer_alias_kinds.cpp
+    simulator/lowerer_enum_types.cpp
     simulator/lowerer_gen_block_clocking.cpp
     simulator/lowerer_gen_block_members.cpp
     simulator/lowerer_package_class_vars.cpp

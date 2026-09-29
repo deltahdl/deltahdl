@@ -2,6 +2,9 @@
 
 #include <vector>
 
+#include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_semaphore_blocking_getter.h"
 #include "simulator/sync_objects.h"
 
@@ -155,6 +158,62 @@ TEST(IpcSync, SemaphoreGetImmediateAcquireContinuesWithoutBlocking) {
   EXPECT_EQ(sem.key_count, 2);
 
   getter.h.destroy();
+}
+
+// §15.3.3 with §9.7 and §8.11: a class task that waits in get() goes on, once
+// the put() from another process frees the keys, as the process and on the
+// object that called it, so `got` is written on w and reads 7 and the time 4,
+// giving 71. Resumed under the process that called put(), the task read
+// `this.id` of no object and wrote `got` nowhere.
+TEST(SemaphoreSim, GetInAClassTaskResumesOnItsOwnObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class Worker;\n"
+      "    int id, got;\n"
+      "    semaphore s;\n"
+      "    function new(int i); id = i; s = new(0); endfunction\n"
+      "    task run();\n"
+      "      s.get();\n"
+      "      got = this.id * 10 + ($time == 4);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  Worker w;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    w = new(7);\n"
+      "    fork\n"
+      "      w.run();\n"
+      "      #4 w.s.put();\n"
+      "    join\n"
+      "    r = w.got;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 71u);
+}
+
+// §15.3.3 (printed page 373): a negative key count handed to get() is an
+// error, reported at the call, and the process does not wait for keys that
+// could never satisfy it: the empty bucket leaves r written at time 0, 5.
+TEST(SemaphoreSim, GetWithANegativeCountIsReported) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore s = new(0);\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    s.get(-1);\n"
+      "    r = 5 + $time;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "semaphore get(): the key count -1 is negative", 5,
+                            "15.3.3"));
+  EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 }  // namespace

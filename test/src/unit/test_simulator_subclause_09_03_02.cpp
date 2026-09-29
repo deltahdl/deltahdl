@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -352,6 +353,30 @@ TEST(ParallelBlockSimulation, ForkBranchWritesTheMethodsLocal) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 7u);
+}
+
+// §9.3.2 with §23.9: the statements of a fork's branches are statements of the
+// scope the fork stands in, so a branch spawned in a submodule instance reads
+// and writes that instance's variables: the branch reads x as 7 and writes y,
+// read back as 7. Spawned with no instance, the branch read the top's
+// nonexistent x as 0 and wrote a y of its own.
+TEST(ForkSim, BranchInASubmoduleReadsAndWritesTheInstancesVariables) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module m;\n"
+      "  int x = 7, y;\n"
+      "  initial fork\n"
+      "    #1 y = x;\n"
+      "  join\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m mi();\n"
+      "  int r;\n"
+      "  initial #2 r = mi.y;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
 }  // namespace

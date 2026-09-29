@@ -198,4 +198,24 @@ void KeepStaticArrayFormal(const ModuleItem* func, const FunctionArg& formal,
 SyncHandle SyncActualOf(const FunctionArg& param, const Expr* actual,
                         const ModuleItem* func, SimContext& ctx, Arena& arena);
 
+// §13.5.2 with §15.3 and §15.4: a `ref semaphore` or `ref mailbox` formal is
+// the actual itself, so once the formal aliases the actual's variable
+// (TryBindRefDirectionArg) the alias is bound to the object `actual` is a
+// handle to, which the body's `sm.try_get()` reaches as an input formal's
+// (SemaphoreOfFormal). Nothing for a formal of any other type. Left unbound,
+// the body's calls through the formal reached no bucket. Defined in
+// eval_function_args_sync.cpp.
+void BindRefSyncFormal(const FunctionArg& param, const Expr* actual,
+                       const ModuleItem* func, SimContext& ctx, Arena& arena);
+
+// §15.5 with §13.5.1: an event passed to an input formal is passed as its
+// handle, so the formal names the caller's synchronization object: the
+// formal is bound in the callee's frame to the variable the actual, an event
+// named in the caller's scope, stands for, and `-> ev` and `@ev` in the body
+// trigger and wait on the caller's event. False, binding nothing, for any
+// other formal or actual. Bound as a copy, the body's trigger woke no one and
+// its wait was never woken. Defined in eval_function_args_sync.cpp.
+bool TryBindEventFormal(const Expr* call, int arg_index,
+                        const FunctionArg& param, SimContext& ctx);
+
 }  // namespace delta

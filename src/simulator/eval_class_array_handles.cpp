@@ -12,6 +12,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -125,6 +126,11 @@ bool TryEvalDeclaredArrayElementMember(const Expr* expr, SimContext& ctx,
 
 Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
                                  SimContext& ctx, Arena& arena) {
+  // §15.3.1 and §15.4.1: an element of a container of semaphores or mailboxes
+  // is given the built-in object `new` builds (NewContainedSyncObject).
+  if (class_type == "semaphore" || class_type == "mailbox") {
+    return NewContainedSyncObject(rhs, class_type, ctx, arena);
+  }
   if (rhs->lhs != nullptr && rhs->lhs->kind == ExprKind::kIdentifier) {
     auto* src = ctx.GetClassObject(EvalExpr(rhs->lhs, ctx, arena).ToUint64());
     if (src != nullptr) {

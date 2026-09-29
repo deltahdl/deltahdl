@@ -575,6 +575,12 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
     ConstructLevel(info->parent,
                    BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
     c.types = std::move(own);
+  } else if (info->decl != nullptr) {
+    // §15.2 with §8.15: a base that is the built-in semaphore or mailbox.
+    BuildBuiltinSyncBase(
+        c.obj, info->decl->base_class,
+        BaseConstructorActuals(info, ctor, c.new_expr, c.arena).args, c.ctx,
+        c.arena);
   }
   // §8.7 with §23.9 and §26.3: a property initializer is an expression of
   // the class declaration's scope, nested in the package, module or unit

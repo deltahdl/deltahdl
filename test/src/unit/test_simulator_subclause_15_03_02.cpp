@@ -214,4 +214,26 @@ TEST(SemaphoreSim, PropertyGetInsideAMethodTakesTheObjectsKey) {
             5u);
 }
 
+// §15.3.2 (printed page 373): a negative key count handed to put() is an
+// error, reported at the call, and returns no keys: the bucket keeps the one
+// key it held, which try_get(2) cannot take and try_get() can, read as 1.
+TEST(SemaphoreSim, PutWithANegativeCountIsReported) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore s = new(1);\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    s.put(-1);\n"
+      "    r = s.try_get(2) * 10 + s.try_get();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "semaphore put(): the key count -1 is negative", 5,
+                            "15.3.2"));
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

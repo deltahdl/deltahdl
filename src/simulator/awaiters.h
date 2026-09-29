@@ -768,9 +768,28 @@ struct ProcessAwaitAwaiter {
   void await_resume() const noexcept {}
 };
 
+// §15.3.3 and §15.4.3 to §15.4.7: what resumes a process parked on a
+// semaphore's or a mailbox's waiter queue. The put() or get() that frees the
+// wait runs in another process, part way through its own statement, so the
+// waiter is resumed in the process that waited, as a cycle delay is
+// (CycleDelayAwaiter::ResumeIn), and the waking process is restored for the
+// rest of its statement. Resumed in the waker's, a class task's `s.get();`
+// went on to read `this.id` of no object. Without a context, as a test drives
+// an awaiter, the handle is resumed as it stands.
+inline std::function<void()> SyncWaiterResume(std::coroutine_handle<> h,
+                                              SimContext* ctx) {
+  if (ctx == nullptr) return h;
+  return [h, proc = ctx->CurrentProcess(), ctx] {
+    Process* waker = ctx->CurrentProcess();
+    CycleDelayAwaiter::ResumeIn(h, proc, *ctx);
+    ctx->SetCurrentProcess(waker);
+  };
+}
+
 struct SemaphoreGetAwaiter {
   SemaphoreObject& sem;
   int32_t count;
+  SimContext* ctx = nullptr;
 
   bool await_ready() {
     auto status = sem.Get(count);
@@ -778,7 +797,7 @@ struct SemaphoreGetAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    sem.waiters.push_back({count, h});
+    sem.waiters.emplace_back(count, SyncWaiterResume(h, ctx));
   }
 
   void await_resume() const noexcept {}
@@ -800,6 +819,7 @@ struct MailboxPutAwaiter {
   Logic4Snapshot msg;
   MailboxMessageType type;
   bool placed = false;
+  SimContext* ctx = nullptr;
 
   bool await_ready() {
     placed = mbx.Put(msg.Get(), type) == MbxPutStatus::kPlaced;
@@ -807,7 +827,7 @@ struct MailboxPutAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.put_waiters.push_back(h);
+    mbx.put_waiters.push_back(SyncWaiterResume(h, ctx));
   }
 
   // await_resume runs on both the ready and the resumed paths. The message is
@@ -833,6 +853,7 @@ struct MailboxGetAwaiter {
   MailboxMessageType expected;
   Logic4Snapshot msg;
   MbxGetStatus status = MbxGetStatus::kBlock;
+  SimContext* ctx = nullptr;
 
   bool await_ready() {
     status = mbx.Get(msg, expected);
@@ -840,7 +861,7 @@ struct MailboxGetAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.get_waiters.push_back(h);
+    mbx.get_waiters.push_back(SyncWaiterResume(h, ctx));
   }
 
   MbxGetStatus await_resume() {
@@ -861,6 +882,7 @@ struct MailboxPeekAwaiter {
   MailboxMessageType expected;
   Logic4Snapshot msg;
   MbxPeekStatus status = MbxPeekStatus::kBlock;
+  SimContext* ctx = nullptr;
 
   bool await_ready() {
     status = mbx.Peek(msg, expected);
@@ -868,7 +890,7 @@ struct MailboxPeekAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.peek_waiters.push_back(h);
+    mbx.peek_waiters.push_back(SyncWaiterResume(h, ctx));
   }
 
   MbxPeekStatus await_resume() {

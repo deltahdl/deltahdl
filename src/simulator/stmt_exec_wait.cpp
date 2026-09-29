@@ -164,42 +164,48 @@ void CollectMethodReceiverReads(const Expr* cond,
   });
 }
 
+// §15.5.4: one step of a wait_order, the wait for the next of the events
+// still to come, `events`, to be triggered; answers the position among them
+// of the one that was.
 struct WaitOrderStepAwaiter {
-  SimContext& ctx;
-  const std::vector<std::string_view>& event_names;
-  std::string_view triggered_name;
+  const std::vector<Variable*>& events;
+  size_t triggered = 0;
 
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
     auto done = std::make_shared<bool>(false);
-    auto* out = &triggered_name;
-
-    for (auto name : event_names) {
-      auto* var = ctx.FindVariable(name);
-      if (!var) continue;
-      var->AddWatcher([h, name, out, done]() mutable {
+    auto* out = &triggered;
+    for (size_t k = 0; k < events.size(); ++k) {
+      if (events[k] == nullptr) continue;
+      events[k]->AddWatcher([h, k, out, done]() mutable {
         if (*done) return true;
         *done = true;
-        *out = name;
+        *out = k;
         h.resume();
         return true;
       });
     }
   }
 
-  std::string_view await_resume() const noexcept { return triggered_name; }
+  size_t await_resume() const noexcept { return triggered; }
 };
 
-// Collects the names of the wait_order events from index `start` onward, the
-// set the next step must wait on while honoring the required ordering.
-std::vector<std::string_view> RemainingWaitOrderNames(
-    const std::vector<Expr*>& events, size_t start) {
-  std::vector<std::string_view> remaining;
-  for (size_t j = start; j < events.size(); ++j) {
-    remaining.push_back(events[j]->text);
+// §15.5.4 with §6.17: the event each wait_order operand names -- a declared
+// event by its name, or a class's event property, `s.a` through a handle,
+// which no name finds (TriggerTargetEvent) -- null for an operand naming
+// neither. Found by name alone, `wait_order(s.a, s.b)` watched nothing and
+// never completed.
+std::vector<Variable*> WaitOrderEvents(const std::vector<Expr*>& operands,
+                                       SimContext& ctx) {
+  std::vector<Variable*> events;
+  events.reserve(operands.size());
+  for (const Expr* operand : operands) {
+    std::string_view name =
+        operand->kind == ExprKind::kIdentifier ? operand->text : "";
+    events.push_back(TriggerTargetEvent(operand, name, ctx));
   }
-  return remaining;
+  return events;
 }
 
 }  // namespace
@@ -287,22 +293,18 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   bool failed = false;
+  std::vector<Variable*> vars = WaitOrderEvents(events, ctx);
+  uint64_t now = ctx.CurrentTime().ticks;
 
-  for (size_t i = 0; i < events.size() && !failed; ++i) {
-    auto expected_name = events[i]->text;
-
-    if (i == 0 && ctx.IsEventTriggered(expected_name)) {
+  for (size_t i = 0; i < vars.size() && !failed; ++i) {
+    if (i == 0 && vars[0] != nullptr && vars[0]->triggered_ticks == now) {
       continue;
     }
-
-    std::vector<std::string_view> remaining =
-        RemainingWaitOrderNames(events, i);
-
-    auto triggered = co_await WaitOrderStepAwaiter{ctx, remaining, {}};
-
-    if (triggered != expected_name) {
-      failed = true;
-    }
+    std::vector<Variable*> remaining(
+        vars.begin() + static_cast<std::ptrdiff_t>(i), vars.end());
+    size_t triggered = co_await WaitOrderStepAwaiter{remaining, 0};
+    // The first of the remaining events is the one expected next.
+    if (triggered != 0) failed = true;
   }
 
   if (failed) {
@@ -415,14 +417,16 @@ static bool HasSequenceEvent(const Stmt* stmt) {
 
 // §6.17 with §9.4.2: the event a single event control with no edge and no
 // guard waits on where its operand names a class's event property, `@(h.ev)`
-// or `@(ev)` in a method (ClassEventVariable); null otherwise, and where the
+// or `@(ev)` in a method (ClassEventVariable), or an element of an array of
+// events, `@arr[1]` (EventArrayElement); null otherwise, and where the
 // operand is a declared event NamedEventKey finds by name.
 static Variable* ClassEventOfControl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (stmt->events.size() != 1) return nullptr;
   const auto& ev = stmt->events[0];
   if (ev.edge != Edge::kNone || ev.iff_condition) return nullptr;
-  return ClassEventVariable(ev.signal, ctx, arena);
+  if (Variable* var = ClassEventVariable(ev.signal, ctx, arena)) return var;
+  return EventArrayElement(ev.signal, ctx, arena);
 }
 
 ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {

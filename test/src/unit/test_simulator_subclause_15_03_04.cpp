@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <string_view>
 
+#include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -91,6 +94,49 @@ TEST(IpcSync, SemaphoreTryGetConsecutiveCalls) {
   EXPECT_EQ(sem.key_count, 3);
   EXPECT_EQ(sem.TryGet(4), 0);
   EXPECT_EQ(sem.key_count, 3);
+}
+
+// §15.3.4 with §13.5.2: a `ref semaphore` formal is the actual itself, so the
+// body's try_get() takes the one key the caller's bucket holds and then finds
+// none, read as 10. Bound to no bucket, the formal answered 0 twice.
+TEST(SemaphoreSim, TryGetThroughARefFormalDrainsTheCallersBucket) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore s = new(1);\n"
+      "  task automatic probe(ref semaphore sm, output int a, output int b);\n"
+      "    a = sm.try_get(); b = sm.try_get();\n"
+      "  endtask\n"
+      "  int r1, r2, r;\n"
+      "  initial begin\n"
+      "    probe(s, r1, r2);\n"
+      "    r = r1 * 10 + r2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §15.3.4 (printed page 374): a negative key count handed to try_get() is an
+// error, reported at the call, and try_get() returns 0 taking no key, which
+// the plain try_get() after it then takes: 0 and 1, read as 1.
+TEST(SemaphoreSim, TryGetWithANegativeCountIsReportedAndAnswersZero) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  semaphore s = new(1);\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    r = s.try_get(-1) * 10 + s.try_get();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "semaphore try_get(): the key count -1 is negative",
+                            5, "15.3.4"));
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 }  // namespace

@@ -9,11 +9,13 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_array_internal.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -93,6 +95,13 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
 static Logic4Vec PushedValue(QueueObject* q, const Expr* call, uint64_t id,
                              SimContext& ctx, Arena& arena) {
   const Expr* item = call->args.back();
+  // §15.5 with §7.10: an event pushed into a queue of events is the event
+  // itself, held by its identity (EventIdentityOf); pushed as its value, the
+  // element named no event and `@q[0]` waited on nothing.
+  if (q->holds_events) return EventIdentityOf(item, ctx, arena);
+  // §15.3 and §15.4 with §7.10: a semaphore or mailbox handle pushed into a
+  // queue of them is recorded for `q[0].try_get()` to reach its object.
+  if (q->holds_class_handles) RecordContainedSyncHandle(item, ctx, arena);
   if (!q->elements_are_queues) {
     return OwnRhsWords(
         SizedForQueueElement(

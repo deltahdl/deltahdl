@@ -867,4 +867,29 @@ TEST(MailboxSim, MailboxHandlesCompareByTheQueueEachRefersTo) {
             10110u);
 }
 
+// §15.4.1 with §6.21: a mailbox declared as a local of an automatic task,
+// `mailbox m = new;`, is a queue of its own, which holds the two messages put
+// into it and hands back the first: 2 and 3, read as 23. Bound to no queue,
+// num() answered 0 and get() left v at 0.
+TEST(MailboxSim, AutomaticTaskLocalMailboxHoldsItsOwnQueue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int n, v, r;\n"
+      "  task automatic go(output int cnt, output int got);\n"
+      "    mailbox m = new;\n"
+      "    m.put(3); m.put(4);\n"
+      "    cnt = m.num();\n"
+      "    m.get(got);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    go(n, v);\n"
+      "    r = n * 10 + v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 23u);
+}
+
 }  // namespace

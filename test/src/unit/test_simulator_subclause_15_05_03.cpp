@@ -362,4 +362,35 @@ TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §15.5.3 with §6.17: `triggered` on a class's event property is 1 in the time
+// step of its trigger, read in a method of the class right after `-> e` and
+// through the handle by a wait on `s.e.triggered` in a sibling branch, which
+// the trigger at 1 satisfies: 1 and 1, read as 11. Found by no name, the
+// method read 0 and the wait was never satisfied.
+TEST(NamedEventSim, TriggeredOnAClassEventProperty) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class Sync;\n"
+      "    event e;\n"
+      "    function bit fire(); -> e; return e.triggered; endfunction\n"
+      "  endclass\n"
+      "  Sync s;\n"
+      "  int tr, at, r;\n"
+      "  initial begin\n"
+      "    s = new;\n"
+      "    tr = s.fire();\n"
+      "    #1;\n"
+      "    fork\n"
+      "      -> s.e;\n"
+      "      begin wait (s.e.triggered); at = $time; end\n"
+      "    join\n"
+      "    r = tr * 10 + at;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
 }  // namespace

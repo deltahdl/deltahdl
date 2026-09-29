@@ -573,7 +573,15 @@ static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
   }
   auto* rhs_var = ctx.FindVariable(stmt->rhs->text);
   if (rhs_var && rhs_var->is_event) {
-    ctx.AliasVariable(stmt->lhs->text, stmt->rhs->text);
+    // §15.5.5.1 with §13.5.1: a subroutine's local or formal is rebound in its
+    // own frame, where the name is looked up; a module's name in the run's
+    // tables. Rebound in the tables, the local shadowed the new name and
+    // `ev = e` in a task left ev its own event.
+    if (ctx.FindLocalVariable(stmt->lhs->text) != nullptr) {
+      ctx.AliasLocalVariable(stmt->lhs->text, rhs_var);
+    } else {
+      ctx.AliasVariable(stmt->lhs->text, stmt->rhs->text);
+    }
     return true;
   }
   return false;
