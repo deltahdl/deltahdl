@@ -155,13 +155,14 @@ TEST(ArrayMap, OverQueueSource) {
 
 // §7.12.5 rule (2) -- each returned element takes the self-determined type of
 // the with expression (11.6.1), not the source element type. `item << 4` over a
-// byte source is self-determined 8 bits wide, so 8'hFF << 4 truncates to 8'hF0
-// (240); a wider result would give 4080. Observing 240 confirms the mapped
-// element carries the with expression's own 8-bit width.
+// byte source is self-determined 8 bits wide and, byte being signed (6.11),
+// signed (11.8.1), so 8'h7F << 4 truncates to 8'hF0, which is -16 and
+// sign-extends into the int element. A 32-bit result would give 2032, and an
+// unsigned 8-bit one 240.
 TEST(ArrayMap, ElementTakesWithExpressionSelfDeterminedType) {
   uint64_t v = RunAndGet(
       "module m;\n"
-      "  byte b[] = {8'hFF};\n"
+      "  byte b[] = {8'h7F};\n"
       "  int q[$];\n"
       "  int v;\n"
       "  initial begin\n"
@@ -170,14 +171,15 @@ TEST(ArrayMap, ElementTakesWithExpressionSelfDeterminedType) {
       "  end\n"
       "endmodule\n",
       "v");
-  EXPECT_EQ(v, 240u);
+  EXPECT_EQ(v, 0xFFFFFFF0u);
 }
 
 // §7.12.5 rule (2) -- the self-determined type of the with expression can be
 // wider than the source element type, and the returned element keeps that wider
 // type rather than being clamped to the source width. `item * 256` over a byte
-// source is self-determined 32 bits wide (the 256 literal is an int), so
-// 8'hFF * 256 == 65280 survives in full; clamping to 8 bits would give 0.
+// source is self-determined 32 bits wide (the 256 literal is an int) and signed
+// (11.8.1), so 8'hFF * 256 == -256 survives in full; clamping to 8 bits would
+// give 0, and an unsigned product 65280.
 TEST(ArrayMap, ElementTypeWiderThanSourceElement) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -190,7 +192,7 @@ TEST(ArrayMap, ElementTypeWiderThanSourceElement) {
       "  end\n"
       "endmodule\n",
       "v");
-  EXPECT_EQ(v, 65280u);
+  EXPECT_EQ(v, 0xFFFFFF00u);
 }
 
 // §7.12.5 rule (2) -- a comparison with expression is self-determined 1 bit
@@ -288,8 +290,10 @@ TEST(ArrayMap, AssociativeSourcePreservesNonIntIndexType) {
 // §7.12.5 rule (2) for an associative source -- each mapped value also takes
 // the self-determined type of the with expression (11.6.1), produced by the
 // associative map path (distinct code from the indexed path). With a
-// byte-valued source, `x << 4` is self-determined 8 bits wide, so 8'hFF << 4
-// truncates to 8'hF0 (240); a wider result would give 4080.
+// byte-valued source, `x << 4` is self-determined 8 bits wide and signed
+// (11.8.1), so 8'h7F << 4 truncates to 8'hF0, which is -16 and sign-extends
+// into the int value. A 32-bit result would give 2032, and an unsigned 8-bit
+// one 240.
 TEST(ArrayMap, AssociativeElementTakesWithExpressionSelfDeterminedType) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -297,13 +301,13 @@ TEST(ArrayMap, AssociativeElementTakesWithExpressionSelfDeterminedType) {
       "  int bb[int];\n"
       "  int v;\n"
       "  initial begin\n"
-      "    aa[7] = 8'hFF;\n"
+      "    aa[7] = 8'h7F;\n"
       "    bb = aa.map(x) with (x << 4);\n"
       "    v = bb[7];\n"
       "  end\n"
       "endmodule\n",
       "v");
-  EXPECT_EQ(v, 240u);
+  EXPECT_EQ(v, 0xFFFFFFF0u);
 }
 
 // §7.12.5 rules (1)+(3) for a string-keyed associative source -- the index type
