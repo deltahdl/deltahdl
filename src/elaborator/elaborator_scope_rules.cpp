@@ -76,6 +76,20 @@ size_t PushTypedForInitVars(const Stmt* s, ScopeWalk& out) {
   return pushed;
 }
 
+// §12.7.3: a foreach statement declares its loop variables, local to the loop
+// and read-only. Pushes each onto the active-loop-var stack, so an assignment
+// to one is left to the read-only rule rather than reported as undeclared,
+// and returns how many were pushed.
+size_t PushForeachVars(const Stmt* s, ScopeWalk& out) {
+  size_t pushed = 0;
+  for (auto v : s->foreach_vars) {
+    if (v.empty()) continue;
+    out.active_loop_vars.push_back(v);
+    ++pushed;
+  }
+  return pushed;
+}
+
 // The bare identifier `s` is when it is a statement of that shape, or null.
 const Expr* BareCallOf(const Stmt* s) {
   if (s == nullptr || s->kind != StmtKind::kExprStmt || s->expr == nullptr ||
@@ -135,8 +149,10 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   // PushTypedForInitVars pushes nothing unless Stmt::for_inits holds
   // something, which A.6.8 admits on a for-loop statement alone, and a
   // for-loop statement holds its sub-statements in those three members and no
-  // other.
-  size_t pushed = PushTypedForInitVars(s, out);
+  // other. §12.7.3's foreach loop variables are bracketed the same way:
+  // Stmt::foreach_vars is filled on a foreach statement alone, whose one
+  // sub-statement is its body.
+  size_t pushed = PushTypedForInitVars(s, out) + PushForeachVars(s, out);
   ForEachChildStmt(s, [&](Stmt* const& sub) { CollectScopeWalk(sub, out); });
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
@@ -435,7 +451,7 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   std::unordered_set<std::string_view> locals;
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind))
-      CollectProcLocalNames(item->body, locals);
+      CollectProcReadableNames(item->body, locals);
   }
   std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {

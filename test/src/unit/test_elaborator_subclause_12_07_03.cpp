@@ -85,6 +85,27 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignIsError) {
                             4, "12.7.3"));
 }
 
+// §12.7.3 declares the loop variable, so the assignment to it breaks the
+// read-only rule and nothing else: the name resolves, and no §23.9 report of
+// an undeclared identifier stands beside the read-only one.
+TEST(LoopStatementElaboration, ForeachLoopVarAssignIsNotAnUndeclaredName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin i = 0; arr[i] = 1; end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'i'",
+                             4, "23.9"));
+}
+
 TEST(LoopStatementElaboration, ForeachLoopVarIncrementIsError) {
   ElabFixture f;
   ElaborateSrc(

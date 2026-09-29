@@ -115,6 +115,13 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names);
 
+// The names CollectProcLocalNames collects but for the variables a for loop's
+// initialization declares, which §12.7.1 scopes to the loop: the names a read
+// anywhere in the block may resolve to. CollectProcRhsIdents admits a loop's
+// own variables while it walks that loop.
+void CollectProcReadableNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& names);
+
 // Collects the bare identifier reads under `s`: every procedural assignment's
 // right side, every argument of a display, write, strobe, monitor or severity
 // system task statement, every statement's condition, for condition and case

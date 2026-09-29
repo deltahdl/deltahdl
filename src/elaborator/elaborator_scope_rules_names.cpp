@@ -488,8 +488,11 @@ static void CollectBlockEnumMemberNames(
 // block's typedef declares. Collected flat across the whole
 // block tree without tracking scope boundaries — that can only ever SUPPRESS a
 // diagnostic, never raise one, so a missed boundary is always safe.
-void CollectProcLocalNames(const Stmt* s,
-                           std::unordered_set<std::string_view>& names) {
+// `with_for_headers` says whether the variables a for loop's initialization
+// declares are among them.
+static void CollectLocalNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& names,
+                              bool with_for_headers) {
   if (!s) return;
   // §12.6's patterns: those of a `case ... matches` item (§12.6.1), and those
   // under a `matches` operator in the positions CollectProcRhsIdents below
@@ -508,9 +511,16 @@ void CollectProcLocalNames(const Stmt* s,
   for (auto v : s->foreach_vars) names.insert(v);
   // A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
   // and the target of one such assignment is an expression rather than a
-  // statement, so the control variable it declares is read here and not
-  // through the descent below. §12.7.1 makes it a declaration of the loop.
-  for (const auto* fi : s->for_inits) {
+  // statement, so the variable it names is read here and not through the
+  // descent below. §12.7.1 makes a variable the initialization declares a
+  // local of the implicit block around the loop, so without
+  // `with_for_headers` it is left out as no name of the block the loop stands
+  // in; CollectProcRhsIdents admits it while that one loop is walked.
+  for (size_t k = 0; k < s->for_inits.size(); ++k) {
+    const Stmt* fi = s->for_inits[k];
+    if (!with_for_headers && k < s->for_init_types.size() &&
+        s->for_init_types[k].kind != DataTypeKind::kImplicit)
+      continue;
     if (fi && fi->lhs && fi->lhs->kind == ExprKind::kIdentifier) {
       names.insert(fi->lhs->text);
     }
@@ -537,8 +547,19 @@ void CollectProcLocalNames(const Stmt* s,
   // observed the false positive because CollectProcRhsIdents was short by the
   // same four links and never collected the read either, which is why the two
   // halves of the check are put on this list together.
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { CollectProcLocalNames(sub, names); });
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CollectLocalNames(sub, names, with_for_headers);
+  });
+}
+
+void CollectProcLocalNames(const Stmt* s,
+                           std::unordered_set<std::string_view>& names) {
+  CollectLocalNames(s, names, true);
+}
+
+void CollectProcReadableNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& names) {
+  CollectLocalNames(s, names, false);
 }
 
 // Collects the bare identifier reads of every procedural blocking/nonblocking
@@ -553,10 +574,9 @@ void CollectProcLocalNames(const Stmt* s,
 // Those guards are what keep this free of false positives; an earlier version
 // took the right side only when the whole of it was one identifier, which left
 // `r = v + 0;` unchecked.
-void CollectProcRhsIdents(const Stmt* s,
-                          const std::unordered_set<std::string_view>& locals,
-                          std::vector<const Expr*>& out) {
-  if (!s) return;
+static void CollectProcRhsIdentsIn(
+    const Stmt* s, const std::unordered_set<std::string_view>& locals,
+    std::vector<const Expr*>& out) {
   const Expr* read = nullptr;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -613,6 +633,40 @@ void CollectProcRhsIdents(const Stmt* s,
       s, [&](Stmt* const& sub) { CollectProcRhsIdents(sub, locals, out); });
 }
 
+// §12.7.1: the variables the initialization of a for loop `s` declares, the
+// targets whose Stmt::for_init_types entry names a data type. Empty for any
+// other statement and for an initialization that only assigns.
+static std::vector<std::string_view> ForHeaderDeclaredNames(const Stmt* s) {
+  std::vector<std::string_view> names;
+  for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
+       ++k) {
+    const Stmt* fi = s->for_inits[k];
+    if (s->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
+    if (fi && fi->lhs && fi->lhs->kind == ExprKind::kIdentifier) {
+      names.push_back(fi->lhs->text);
+    }
+  }
+  return names;
+}
+
+void CollectProcRhsIdents(const Stmt* s,
+                          const std::unordered_set<std::string_view>& locals,
+                          std::vector<const Expr*>& out) {
+  if (!s) return;
+  // §12.7.1: the variables a for loop's initialization declares are locals of
+  // the implicit block around the loop, visible in its initialization,
+  // condition, step and body and nowhere after it, so they join the locals
+  // for this statement's walk alone.
+  std::vector<std::string_view> header = ForHeaderDeclaredNames(s);
+  if (!header.empty()) {
+    std::unordered_set<std::string_view> inner = locals;
+    inner.insert(header.begin(), header.end());
+    CollectProcRhsIdentsIn(s, inner, out);
+    return;
+  }
+  CollectProcRhsIdentsIn(s, locals, out);
+}
+
 // The names a subroutine's body may read without the module declaring them:
 // §13.3 makes each formal argument a declaration of the subroutine, §13.4.1
 // makes a function's own name a variable of it, and a body may declare its own.
@@ -627,7 +681,7 @@ void CollectSubroutineLocalNames(const ModuleItem* item,
         stmt->decl_item != nullptr && !stmt->decl_item->name.empty()) {
       names.insert(stmt->decl_item->name);
     }
-    CollectProcLocalNames(stmt, names);
+    CollectProcReadableNames(stmt, names);
   }
 }
 
