@@ -18,6 +18,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_typedef_layout.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
@@ -25,6 +26,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 
@@ -690,7 +692,24 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
           FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
       if (dim.size > 0) prop.array_size = dim.size;
     }
-    uint32_t width = EvalTypeWidth(member->data_type, {}, scope);
+    // §8.23: a property declared by a structure or union typedef the class
+    // declares holds the layout that typedef has under this specialization,
+    // folded with its values and registered under its own key, `Box#(16)::S`.
+    const DataType& type = member->data_type;
+    if (const DataType* aggregate =
+            type.kind == DataTypeKind::kNamed && type.scope_name.empty()
+                ? ClassAggregateTypedef(*spec->decl, type.type_name)
+                : nullptr) {
+      std::string_view key = RegisterSpecializationTypedefLayout(
+          spec->name, type.type_name, *aggregate, scope, ctx);
+      if (const StructTypeInfo* layout = ctx.FindStructType(key)) {
+        prop.type_name = key;
+        prop.width = layout->total_width;
+        prop.width_is_declared = true;
+      }
+      continue;
+    }
+    uint32_t width = EvalTypeWidth(type, {}, scope);
     if (width == 0) continue;
     prop.width = width;
     prop.width_is_declared = true;

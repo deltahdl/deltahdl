@@ -321,4 +321,31 @@ TEST(ClassSim, ExtendsClauseValueParametersBindTheBaseLevel) {
   EXPECT_EQ(v, 1438u);
 }
 
+// §8.25 with §8.23: a structure typedef a parameterized class declares has the
+// widths its specialization binds, and a property declared by it holds that
+// structure, so a method of `Box #(16)` selects its two 16-bit members and
+// $bits counts 32, and one of `Box #()` counts 16 under the default W = 8.
+// The property had no layout in either and read 0, with $bits 32 in both.
+TEST(ClassSim, PropertyOfParameterizedClassTypedefHasSpecializationLayout) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Box #(int W = 8);\n"
+      "  typedef struct { bit [W-1:0] a; bit [W-1:0] b; } S;\n"
+      "  S s;\n"
+      "  function void set(); s.b = 5; s.a = 3; endfunction\n"
+      "  function void show();\n"
+      "    $display(\"%0d %0d %0d\", s.a, s.b, $bits(s));\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Box #(16) b; Box #() d;\n"
+      "  initial begin\n"
+      "    b = new; b.set(); b.show();\n"
+      "    d = new; d.set(); d.show();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 5 32\n3 5 16\n");
+}
+
 }  // namespace

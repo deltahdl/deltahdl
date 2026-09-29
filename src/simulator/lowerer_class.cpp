@@ -16,6 +16,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/class_typedef_layout.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
@@ -330,48 +331,63 @@ static const StructTypeInfo* StructPropertyLayout(const DataType& type,
   return ctx.FindStructType(key);
 }
 
-// Whether the class declaration `cls` has a value parameter, in its header or
-// its body, which makes the widths of its typedefs the specialization's.
-static bool DeclaresValueParams(const ClassDecl& cls) {
-  if (!cls.params.empty()) return true;
-  for (const auto* member : cls.members) {
-    if (member->kind == ClassMemberKind::kProperty && member->is_param)
-      return true;
+// The class declaring the typedef named `name` that a property of the class
+// `info`, declared by `cls`, reaches bare: `info` itself or the nearest class
+// of its extends chain declaring it (§8.13 with §8.23), with that class's
+// declaration in `decl`; null where none declares it.
+static const ClassTypeInfo* TypedefDeclarer(std::string_view name,
+                                            const ClassTypeInfo& info,
+                                            const ClassDecl& cls,
+                                            const ClassDecl*& decl) {
+  decl = &cls;
+  for (const ClassTypeInfo* c = &info; c != nullptr && decl != nullptr;) {
+    for (const auto* member : decl->members) {
+      if (member->kind == ClassMemberKind::kTypedef && member->name == name)
+        return c;
+    }
+    c = c->parent;
+    decl = c != nullptr ? c->decl : nullptr;
   }
-  return false;
+  return nullptr;
 }
 
 // §8.23 with §6.18: the key the type a property's declaration names is looked
-// up by. A bare name of a structure or union typedef the class `cls` declares
-// is a name of the class scope, whose layout the design registers under
-// "Class::name", as the elaborator's typedef table keys it; it is registered
-// there here where the design gave it none. Asked by the bare name, such a
-// property had no layout, so a member select of it in a method read 0. Any
-// other name, and a class with value parameters, whose typedef widths are its
-// specialization's, keep the name as written.
+// up by. A bare name of a structure or union typedef that the property's class
+// declares, or one its extends chain declares (§8.13), is a name of that class
+// scope, whose layout the design registers under "Class::name", as the
+// elaborator's typedef table keys it; it is registered there here where the
+// design gave it none. Asked by the bare name, such a property had no layout,
+// so a member select of it in a method read 0. A typedef of the property's own
+// class with value parameters has the widths its specialization binds (§8.25):
+// the default specialization's layout, folded with `params`, stands under
+// "Class#()::name", the key a method's local of the type registers
+// (MethodClassTypedefLayout), and SizeValueParamProperties gives each other
+// specialization its own. Any other name, and a base's typedef of a class with
+// value parameters, keep the name as written.
 static std::string_view PropertyTypeKey(const DataType& type,
                                         const ClassTypeInfo& info,
-                                        const ClassDecl& cls, SimContext& ctx) {
-  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
-      DeclaresValueParams(cls))
+                                        const ClassDecl& cls,
+                                        const ScopeMap& params,
+                                        SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
     return type.type_name;
-  for (const auto* member : cls.members) {
-    if (member->kind != ClassMemberKind::kTypedef ||
-        member->typedef_item == nullptr || member->name != type.type_name)
-      continue;
-    const DataType& decl = member->typedef_item->typedef_type;
-    if ((decl.kind != DataTypeKind::kStruct &&
-         decl.kind != DataTypeKind::kUnion) ||
-        decl.struct_members.empty())
-      return type.type_name;
-    Arena& arena = ctx.GetArena();
-    const auto* key = arena.Create<std::string>(
-        std::string(info.name) + "::" + std::string(type.type_name));
-    if (ctx.FindStructType(*key) == nullptr)
-      RegisterTypeLayout(*key, &decl, ctx, arena);
-    return *key;
+  const ClassDecl* decl = nullptr;
+  const ClassTypeInfo* owner = TypedefDeclarer(type.type_name, info, cls, decl);
+  const DataType* aggregate =
+      owner != nullptr ? ClassAggregateTypedef(*decl, type.type_name) : nullptr;
+  if (aggregate == nullptr) return type.type_name;
+  if (ClassHasValueParams(*decl)) {
+    if (owner != &info) return type.type_name;
+    return RegisterSpecializationTypedefLayout(std::string(info.name) + "#()",
+                                               type.type_name, *aggregate,
+                                               params, ctx);
   }
-  return type.type_name;
+  Arena& arena = ctx.GetArena();
+  const auto* key = arena.Create<std::string>(
+      std::string(owner->name) + "::" + std::string(type.type_name));
+  if (ctx.FindStructType(*key) == nullptr)
+    RegisterTypeLayout(*key, aggregate, ctx, arena);
+  return *key;
 }
 
 // §6.11 with §7.2: whether a member of the structure `layout` lays out is of
@@ -425,8 +441,8 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       info->properties.push_back(PropertyRecord(
-          member, params, PropertyTypeKey(member->data_type, *info, *cls, ctx),
-          ctx));
+          member, params,
+          PropertyTypeKey(member->data_type, *info, *cls, params, ctx), ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

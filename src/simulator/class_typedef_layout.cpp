@@ -22,35 +22,6 @@ namespace delta {
 
 namespace {
 
-// The structure or union type the class declaration `decl` gives the typedef
-// `name`, null where it declares no such typedef.
-const DataType* AggregateTypedefOf(const ClassDecl& decl,
-                                   std::string_view name) {
-  for (const auto* member : decl.members) {
-    if (member->kind != ClassMemberKind::kTypedef ||
-        member->typedef_item == nullptr || member->name != name) {
-      continue;
-    }
-    const DataType& type = member->typedef_item->typedef_type;
-    bool aggregate = (type.kind == DataTypeKind::kStruct ||
-                      type.kind == DataTypeKind::kUnion) &&
-                     !type.struct_members.empty();
-    return aggregate ? &type : nullptr;
-  }
-  return nullptr;
-}
-
-// Whether the class declaration `decl` has a value parameter, in its header
-// or its body.
-bool HasValueParams(const ClassDecl& decl) {
-  if (!decl.params.empty()) return true;
-  for (const auto* member : decl.members) {
-    if (member->kind == ClassMemberKind::kProperty && member->is_param)
-      return true;
-  }
-  return false;
-}
-
 // §8.25: the value each parameter of `cls` holds in the specialization it
 // is, over the compilation unit's constants, which its static properties
 // hold under the parameters' names.
@@ -106,26 +77,60 @@ DataType* FoldedAggregate(const DataType& type, const ScopeMap& scope,
 
 }  // namespace
 
+bool ClassHasValueParams(const ClassDecl& decl) {
+  if (!decl.params.empty()) return true;
+  for (const auto* member : decl.members) {
+    if (member->kind == ClassMemberKind::kProperty && member->is_param)
+      return true;
+  }
+  return false;
+}
+
+const DataType* ClassAggregateTypedef(const ClassDecl& decl,
+                                      std::string_view name) {
+  for (const auto* member : decl.members) {
+    if (member->kind != ClassMemberKind::kTypedef ||
+        member->typedef_item == nullptr || member->name != name) {
+      continue;
+    }
+    const DataType& type = member->typedef_item->typedef_type;
+    bool aggregate = (type.kind == DataTypeKind::kStruct ||
+                      type.kind == DataTypeKind::kUnion) &&
+                     !type.struct_members.empty();
+    return aggregate ? &type : nullptr;
+  }
+  return nullptr;
+}
+
+std::string_view RegisterSpecializationTypedefLayout(std::string_view spelled,
+                                                     std::string_view name,
+                                                     const DataType& type,
+                                                     const ScopeMap& scope,
+                                                     SimContext& ctx) {
+  auto* key = ctx.GetArena().Create<std::string>(std::string(spelled) +
+                                                 "::" + std::string(name));
+  if (ctx.FindStructType(*key) == nullptr) {
+    RegisterTypeLayout(*key, FoldedAggregate(type, scope, ctx.GetArena()), ctx,
+                       ctx.GetArena());
+  }
+  return *key;
+}
+
 const StructTypeInfo* MethodClassTypedefLayout(std::string_view name,
                                                SimContext& ctx,
                                                std::string_view* key) {
   for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
        c = c->parent) {
     if (c->decl == nullptr) continue;
-    const DataType* type = AggregateTypedefOf(*c->decl, name);
+    const DataType* type = ClassAggregateTypedef(*c->decl, name);
     if (type == nullptr) continue;
-    if (!HasValueParams(*c->decl)) return nullptr;
+    if (!ClassHasValueParams(*c->decl)) return nullptr;
     std::string spelled = std::string(c->name);
     if (c->param_actuals == nullptr) spelled += "#()";
-    auto* interned =
-        ctx.GetArena().Create<std::string>(spelled + "::" + std::string(name));
-    if (ctx.FindStructType(*interned) == nullptr) {
-      RegisterTypeLayout(
-          *interned, FoldedAggregate(*type, ParamValuesOf(*c), ctx.GetArena()),
-          ctx, ctx.GetArena());
-    }
-    if (key != nullptr) *key = *interned;
-    return ctx.FindStructType(*interned);
+    std::string_view registered = RegisterSpecializationTypedefLayout(
+        spelled, name, *type, ParamValuesOf(*c), ctx);
+    if (key != nullptr) *key = registered;
+    return ctx.FindStructType(registered);
   }
   return nullptr;
 }

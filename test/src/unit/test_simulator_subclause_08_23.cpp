@@ -770,4 +770,30 @@ TEST(ClassScopeTypedefSim, PropertyOfOwnStructureTypedefSelectsMembers) {
             "3 5 2 7 64\n");
 }
 
+// §8.13 has a derived class inherit its base's members, and §8.23 makes a
+// typedef the base declares a name of its class scope, which the derived class
+// reaches bare, so its property declared by the base's `S` holds that
+// structure: its members select by name in a method and $bits counts both int
+// members. Looked for in the derived class's declaration alone, the typedef
+// was not found, the members read 0 and the property was 32 bits.
+TEST(ClassScopeTypedefSim, PropertyOfBaseClassStructureTypedefSelectsMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Base;\n"
+                       "  typedef struct { int a; int b; } S;\n"
+                       "endclass\n"
+                       "class Der extends Base;\n"
+                       "  S s;\n"
+                       "  function void set(); s.b = 5; s.a = 3; endfunction\n"
+                       "  function void show();\n"
+                       "    $display(\"%0d %0d %0d\", s.a, s.b, $bits(s));\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Der d;\n"
+                       "  initial begin d = new; d.set(); d.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "3 5 64\n");
+}
+
 }  // namespace
