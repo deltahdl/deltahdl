@@ -433,6 +433,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_class_outofblock.cpp
     elaborator/elaborator_validate_class_run.cpp
     elaborator/elaborator_validate_clocking.cpp
+    elaborator/elaborator_clockvar_targets.cpp
     elaborator/elaborator_validate_global_clocking.cpp
     elaborator/elaborator_validate_arg_defaults.cpp
     elaborator/elaborator_validate_assertion_actions.cpp

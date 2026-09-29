@@ -337,4 +337,33 @@ TEST(SyncDriveElab, IntraAssignDelayDriveInRandsequenceCodeBlockErrors) {
                             9, "14.16"));
 }
 
+// §14.16 (printed page 369): a clockvar is written by a synchronous drive
+// alone, and a continuous assignment to one is named as an error; so is a
+// blocking assignment to one, which is no synchronous drive. The drive beside
+// them, `cb.q <= 4`, stays legal. Both were accepted silently.
+TEST(SyncDriveElab, ContinuousOrBlockingWriteToAClockvarErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] q = 1;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output q;\n"
+      "  endclocking\n"
+      "  assign cb.q = 3;\n"
+      "  initial begin\n"
+      "    cb.q = 3;\n"
+      "    cb.q <= 4;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continuous assignment to a clockvar", 7, "14.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not by a blocking assignment", 9, "14.16"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "not by a blocking assignment", 10, "14.16"));
+}
+
 }  // namespace

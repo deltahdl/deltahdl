@@ -708,6 +708,16 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
     if (!item->assign_lhs) continue;
+    // §14.16 (printed page 369): it is an error to write a clockvar except by
+    // a synchronous drive, and the clause names a continuous assignment to one,
+    // `assign cb.q = 3`, as such an error; it was accepted silently.
+    if (ExprTargetsWritableClockvar(item->assign_lhs)) {
+      diag_.Error(item->loc,
+                  "continuous assignment to a clockvar; a clockvar is written "
+                  "only by a synchronous drive",
+                  Subclause("14.16"));
+      continue;
+    }
     // §14.16.2: a continuous assignment to a variable that is associated with
     // an output (or inout) clockvar is illegal. The target may be the whole
     // variable or a bit-/part-select of it, so resolve through any selects to
@@ -796,24 +806,6 @@ void Elaborator::ValidatePrimitiveDriveToClockvar(const ModuleDecl* decl) {
 // or slice (cb.sig[2], cb.sig[8:2]). Returns true when `e` designates such a
 // writable clockvar. Input clockvars are excluded here; writes to them are
 // rejected separately by the clockvar-access check.
-bool Elaborator::ExprTargetsWritableClockvar(const Expr* e) const {
-  while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
-  if (e == nullptr || e->kind != ExprKind::kMemberAccess || e->lhs == nullptr ||
-      e->lhs->kind != ExprKind::kIdentifier)
-    return false;
-  auto block_it = clocking_signals_.find(e->lhs->text);
-  if (block_it == clocking_signals_.end()) return false;
-  std::string_view member;
-  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier)
-    member = e->rhs->text;
-  else if (!e->text.empty())
-    member = e->text;
-  if (member.empty()) return false;
-  auto sig_it = block_it->second.find(member);
-  if (sig_it == block_it->second.end()) return false;
-  return sig_it->second.direction == Direction::kOutput ||
-         sig_it->second.direction == Direction::kInout;
-}
 
 namespace {
 
@@ -821,6 +813,15 @@ namespace {
 void CheckSyncDriveAssign(const Stmt* s,
                           const ClockvarPredicate& targets_writable,
                           DiagEngine& diag) {
+  // §14.16 (printed page 369): a clockvar is written by the synchronous drive
+  // alone, which takes the nonblocking operator; a blocking assignment to one,
+  // `cb.q = 3`, is another means of writing it and was accepted silently.
+  if (s->kind == StmtKind::kBlockingAssign && targets_writable(s->lhs)) {
+    diag.Error(s->lhs->range.start,
+               "a clockvar is written only by a synchronous drive (<=), not "
+               "by a blocking assignment",
+               Subclause("14.16"));
+  }
   if (targets_writable(s->lhs)) {
     // §14.16: the only timing control permitted on a synchronous drive is a
     // leading cycle delay (## ...). A regular intra-assignment delay (# ...)

@@ -325,4 +325,34 @@ TEST(ClockingBlockSim, ClockingEventIffReadsTheBlocksInstance) {
       "$finish at time 40\n");
 }
 
+// §14.3 with §23.6 (printed pages 354 and 741): a clocking block is a named
+// item of the module declaring it, so the parent reaches its submodule's block
+// by hierarchical name -- `@(u.cb)` waits for its event, `u.cb.d` reads its
+// sample and `u.cb.q <= 77` drives through it. The elaborator reported `u.cb`
+// as undeclared in module m.
+TEST(ClockingBlockSim, SubmoduleClockingBlockByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m(input logic clk);\n"
+                       "  logic [7:0] d = 3, q = 0;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    input d;\n"
+                       "    output q;\n"
+                       "  endclocking\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  m u(clk);\n"
+                       "  initial begin\n"
+                       "    @(u.cb);\n"
+                       "    $write(\"%0t:%0d \", $time, u.cb.d);\n"
+                       "    u.cb.q <= 77;\n"
+                       "    #1 $display(\"%0t:%0d\", $time, u.q);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5:3 6:77\n$finish at time 6\n");
+}
+
 }  // namespace

@@ -446,4 +446,36 @@ TEST(GlobalClockingSim,
   EXPECT_EQ(hits->value.ToUint64(), 3u);
 }
 
+// §14.14 (printed pages 363-366): `$global_clock` in a task body names the
+// global clocking event effective where the task is declared, so
+// `@($global_clock)` in tk waits for the edge at 6 as the initial beside it
+// does, and another_module's t, enabled from subsystem1 by hierarchical name,
+// waits for another_module's clock at 6 rather than subsystem1's at 3 -- the
+// clause's own example. The task body was not rewritten, and the run
+// reported $global_clock as no system function it implements.
+TEST(GlobalClockingSim, GlobalClockInATaskBodyNamesTheDeclaringScopesEvent) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module another_module;\n"
+      "  logic another_clk = 0;\n"
+      "  global clocking another_clocking @(posedge another_clk);\n"
+      "  endclocking\n"
+      "  initial #6 another_clk = 1;\n"
+      "  task t(); @($global_clock); $display(\"t %0t\", $time); endtask\n"
+      "  task tk(); @($global_clock); $display(\"tk %0t\", $time); endtask\n"
+      "  initial tk();\n"
+      "endmodule\n"
+      "module subsystem1;\n"
+      "  logic subclk1 = 0;\n"
+      "  global clocking sub_sys1 @(posedge subclk1); endclocking\n"
+      "  initial #3 subclk1 = 1;\n"
+      "  initial another_module.t();\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("tk 6\n"), std::string::npos);
+  EXPECT_NE(out.find("t 6\n"), std::string::npos);
+}
+
 }  // namespace

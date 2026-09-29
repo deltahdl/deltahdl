@@ -741,4 +741,43 @@ TEST(CycleDelayElab, PackageWithoutCycleDelayNoError) {
              f));
 }
 
+// §14.16 with §25.5.5 and §25.9.1 (printed pages 368, 791-792 and 803): a
+// synchronous drive through a path to an interface instance, `b1.sb.c <= ##1
+// 1`, and through a virtual interface formal, `v.sb.c <= ##1 1`, carries a
+// leading cycle delay as one on the interface's own clockvar does; the
+// module's own `a <= ##1 1`, on no clockvar, is still refused. Asked of the
+// module's own clocking blocks alone, both drives were reported under §14.11.
+TEST(CycleDelayElab, DriveThroughAnInterfaceClockingBlockPathTakesACycleDelay) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface SyncBus(input logic clk);\n"
+      "  logic a, b, c;\n"
+      "  clocking sb @(posedge clk);\n"
+      "    input a; output b; inout c;\n"
+      "  endclocking\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic clk = 0, a;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  SyncBus b1(clk);\n"
+      "  task automatic do_it(virtual SyncBus v); v.sb.c <= ##1 1; endtask\n"
+      "  initial begin\n"
+      "    b1.sb.c <= ##1 1;\n"
+      "    do_it(b1);\n"
+      "    a <= ##1 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 15, "14.11"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 11, "14.11"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 13, "14.11"));
+}
+
 }  // namespace

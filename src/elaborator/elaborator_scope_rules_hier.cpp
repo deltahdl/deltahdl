@@ -230,6 +230,11 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
          RangeHasName(
              m->children, [](const RtlirModuleInst& c) { return c.inst_name; },
              name) ||
+         // §14.3 with §23.6 (printed page 354 and 741): a clocking block is a
+         // named item of the module declaring it, so `u.cb` names u's block
+         // and `u.cb.d` its clockvar. Asked of no clocking block, the name
+         // was reported undeclared in the module that declares it.
+         RangeHasName(m->clocking_blocks, ptr_name, name) ||
          EnumTypesDeclare(m, name);
 }
 
