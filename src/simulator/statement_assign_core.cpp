@@ -108,7 +108,11 @@ void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   // establishes its own value by writing the field directly rather than through
   // this, so nothing a force or a release needs is declined.
   if (var->is_forced) return;
-  var->value = ResizeToWidth(val, var->value.width, arena);
+  // §6.16: a string has no declared width, so a string variable -- an element
+  // of a fixed-size array of strings among them -- takes the whole text rather
+  // than the width of whatever was written to it first.
+  var->value = var->is_string ? StripStringZeros(val, arena)
+                              : ResizeToWidth(val, var->value.width, arena);
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 }

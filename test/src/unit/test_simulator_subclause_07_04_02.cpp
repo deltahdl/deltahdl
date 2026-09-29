@@ -351,4 +351,28 @@ TEST(UnpackedArraySim, ForeachOverAMultidimensionalPropertyThroughAHandle) {
   EXPECT_EQ(out, "6 15 5 2\n");
 }
 
+// §7.4.2 with §6.16: an element of a fixed-size array of strings is a string
+// variable, so it holds the whole text of each write rather than as many
+// characters as the first one: "longer" after "x" keeps all six, in an array
+// a module declares with one dimension or two and in one a block declares.
+TEST(UnpackedArraySim, AStringElementHoldsTheWholeTextOfEachWrite) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string sh[2];\n"
+      "  string m[2][2];\n"
+      "  initial begin\n"
+      "    string b[2][2];\n"
+      "    sh[0] = \"x\"; sh[0] = \"longer\";\n"
+      "    m[1][0] = \"x\"; m[1][0] = \"longer\";\n"
+      "    b[0][1] = \"x\"; b[0][1] = \"longer\";\n"
+      "    sh[1] = \"cdef\"; sh[1] = \"g\";\n"
+      "    $display(\"%s %s %s %s %0d\", sh[0], m[1][0], b[0][1], sh[1],\n"
+      "             sh[1].len());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "longer longer longer g 1\n");
+}
+
 }  // namespace

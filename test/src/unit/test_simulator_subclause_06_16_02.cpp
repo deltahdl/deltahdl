@@ -227,4 +227,28 @@ TEST(StringMethods, PutcEquivalentToIndexedAssignment) {
   EXPECT_EQ(v, 1u);
 }
 
+// §6.16.2 with §7.4, §7.5, §7.8 and §7.10: an element of an array of strings
+// is a string, so putc() writes the element's character, in a queue, a
+// fixed-size, a dynamic and an associative array alike; an index past the end
+// and a zero character leave the element as it is. Each element contributes
+// its own bit, 15 in all.
+TEST(StringMethods, PutcWritesAnElementOfAnArrayOfStrings) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string sq[$]; string sf[2]; string sd[]; string sk[string];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    sq.push_back(\"abc\"); sf[1] = \"abc\"; sd = new[1];\n"
+      "    sd[0] = \"abc\"; sk[\"k\"] = \"abc\";\n"
+      "    sq[0].putc(0, \"Q\"); sf[1].putc(1, \"Q\"); sd[0].putc(2, \"Q\");\n"
+      "    sk[\"k\"].putc(0, \"Q\"); sk[\"k\"].putc(5, \"Z\"); sq[0].putc(1, "
+      "0);\n"
+      "    n = (sq[0] == \"Qbc\") + 2 * (sf[1] == \"aQc\") +\n"
+      "        4 * (sd[0] == \"abQ\") + 8 * (sk[\"k\"] == \"Qbc\");\n"
+      "  end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 15u);
+}
+
 }  // namespace

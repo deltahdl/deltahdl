@@ -193,4 +193,25 @@ TEST(StringMethods, ItoaResultUsedInConcatenation) {
   EXPECT_EQ(v, 1u);
 }
 
+// §6.16.11 with §7.4, §7.5, §7.8 and §7.10: itoa() on an element of an array
+// of strings stores the text in that element, however long the text it held
+// before, in a queue, a fixed-size, a dynamic and an associative array alike.
+// Each element contributes its own bit, 15 in all.
+TEST(StringMethods, ItoaStoresIntoAnElementOfAnArrayOfStrings) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string sq[$]; string sf[2]; string sd[]; string sk[int];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    sq.push_back(\"abc\"); sf[0] = \"x\"; sd = new[1]; sk[3] = \"x\";\n"
+      "    sq[0].itoa(42); sf[0].itoa(1000); sd[0].itoa(7);\n"
+      "    sk[3].itoa(65535);\n"
+      "    n = (sq[0] == \"42\") + 2 * (sf[0] == \"1000\") +\n"
+      "        4 * (sd[0] == \"7\") + 8 * (sk[3] == \"65535\");\n"
+      "  end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(v, 15u);
+}
+
 }  // namespace

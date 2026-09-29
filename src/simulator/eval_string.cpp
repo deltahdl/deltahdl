@@ -103,10 +103,11 @@ Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str) {
 }
 
 // One string method call: the string it is called on, as text, and where
-// that string lives -- `var` for a string variable of the run's tables, else
-// `target` for a class property resolved to its storage (§8.5, §8.9), which
-// the six methods that write their object store through; a method that
-// answers a value reads `str` alone and both may be null.
+// that string lives -- `var` for a string variable of the run's tables,
+// `target` for a class property resolved to its storage (§8.5, §8.9), or
+// `element` for an element of an array of strings (§7.4, §7.5, §7.8, §7.10),
+// which the six methods that write their object store through; a method that
+// answers a value reads `str` alone and all three may be null.
 struct StringMethodArgs {
   Variable* var;
   const FieldTarget* target;
@@ -114,15 +115,22 @@ struct StringMethodArgs {
   const Expr* call_expr;
   SimContext& ctx;
   Arena& arena;
+  const Expr* element = nullptr;
 };
 
 // §6.16.2 and §6.16.11 through §6.16.15: the text a mutating method leaves
 // in its object, stored where the object lives. A property takes it as an
-// assignment to the property does (WriteResolvedField), whole, since §6.16
-// gives a string no declared width to truncate to.
+// assignment to the property does (WriteResolvedField), and an array element
+// as an assignment to the element does (PerformBlockingAssign), whole, since
+// §6.16 gives a string no declared width to truncate to.
 static void StoreString(const StringMethodArgs& a, std::string_view text) {
   if (a.var != nullptr) {
     a.var->value = StringToLogic4Vec(a.arena, text);
+    return;
+  }
+  if (a.element != nullptr) {
+    PerformBlockingAssign(a.element, StringToLogic4Vec(a.arena, text), a.ctx,
+                          a.arena);
     return;
   }
   WriteResolvedField(*a.target, StringToLogic4Vec(a.arena, text), a.ctx,
@@ -558,7 +566,9 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
     std::string_view name = receiver->base->text;
     const ArrayInfo* info = ctx.FindArrayInfo(name);
     if (info == nullptr)
-      return ctx.FindQueue(name) != nullptr && ctx.IsStringVariable(name);
+      return (ctx.FindQueue(name) != nullptr ||
+              ctx.FindAssocArray(name) != nullptr) &&
+             ctx.IsStringVariable(name);
     return info->elem_type_kind == DataTypeKind::kString ||
            ctx.IsStringVariable(name) ||
            ctx.IsStringVariable(std::string(name) + "[" +
@@ -639,7 +649,8 @@ bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
 
 // The string methods on a receiver that is no string variable of the run's
 // tables: a value-answering one reads the receiver ReadStringReceiver reads,
-// and one that writes its object writes the property storage
+// and one that writes its object writes the array element
+// SelectsStringElement accepts or the property storage
 // ResolveStringPropertyTarget resolves. The name is asked first so that a
 // receiver is evaluated for a string method alone: a call of a class's own
 // method on a chain of handles is left to the dispatcher that runs it, its
@@ -659,6 +670,16 @@ static bool TryEvalStringMethodOnReceiver(const Expr* expr, SimContext& ctx,
     return DispatchReturningMethod(method, args, out);
   }
   if (!StringMethodWritesItsObject(method)) return false;
+  if (SelectsStringElement(access->lhs, ctx)) {
+    StringMethodArgs args{nullptr,
+                          nullptr,
+                          Logic4VecToString(EvalExpr(access->lhs, ctx, arena)),
+                          expr,
+                          ctx,
+                          arena,
+                          access->lhs};
+    return DispatchMutatingMethod(method, args, out);
+  }
   FieldTarget target;
   if (!ResolveStringPropertyTarget(access->lhs, ctx, target)) return false;
   StringMethodArgs args{nullptr, &target, StringPropertyText(target, arena),

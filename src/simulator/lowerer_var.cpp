@@ -282,6 +282,7 @@ static Variable* NewMultiDimLeaf(const MultiDimArray& m,
   RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
   elem->is_4state = m.var.is_4state;
   elem->is_signed = m.var.is_signed;
+  elem->is_string = m.var.is_string;
   return elem;
 }
 
@@ -466,6 +467,7 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     // rather than by whatever value flowed in.
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
+    elem->is_string = var.is_string;
     FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
                      arena);
   }

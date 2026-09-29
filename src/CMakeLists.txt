@@ -534,6 +534,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sim_context_random_stability.cpp
     simulator/sim_context_systask_state.cpp
     simulator/statement_assign_decl.cpp
+    simulator/statement_assign_decl_array.cpp
     simulator/static_aggregate.cpp
     simulator/statement_assign_force.cpp
     simulator/statement_assign_lhs.cpp

@@ -585,6 +585,34 @@ TEST(AssocArraySimulation, AStringOrRealElementReadsAsItsOwnType) {
   EXPECT_EQ(out, "hey -1.25 1\n");
 }
 
+// §7.8 with §6.16: an element of an associative array of strings is a string,
+// so the string methods answer from the text it holds, for an array a module,
+// a block or an imported package declares, under an integral or a string
+// index.
+TEST(AssocArraySimulation, AStringMethodReadsTheElementsText) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  string ps[int];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  string sa[int];\n"
+      "  string sk[string];\n"
+      "  initial begin\n"
+      "    string sb[byte];\n"
+      "    sa[1] = \"hi\"; sk[\"k\"] = \"wxyz\"; sb[2] = \"abc\";\n"
+      "    ps[0] = \"pqrst\";\n"
+      "    $display(\"%0d %0d %0d %0d\", sa[1].len(), sk[\"k\"].len(),\n"
+      "             sb[2].len(), ps[0].len());\n"
+      "    $display(\"%s %s %0d\", sa[1].toupper(), sk[\"k\"].substr(1, 2),\n"
+      "             sb[2].getc(1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 4 3 5\nHI xy 98\n");
+}
+
 // §7.8 with §6.11 and §26.2: an associative array a package declares has
 // elements of its own element type too.
 TEST(AssocArraySimulation, AnElementOfAPackageAssociativeArrayReadsSigned) {

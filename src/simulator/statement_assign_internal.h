@@ -160,6 +160,12 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
 // declaration has unpacked dimensions, assigned to the array
 // CreateDeclAggregate made as the statement `name = init` would assign it.
 void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// Defined in statement_assign_decl_array.cpp. §7.4.2 and §7.4.4: registers
+// the fixed-size unpacked array a procedural declaration's own dimensions
+// describe, every one of them, and creates a variable for each of its elements,
+// `elem_width` wide.
+void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
+                              SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_decl.cpp; also used by the module-scope
 // declaration lowering in lowerer_var.cpp. §8.25: records the parameter value

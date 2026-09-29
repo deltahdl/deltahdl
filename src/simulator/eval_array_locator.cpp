@@ -671,6 +671,11 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
     return false;
   }
 
+  // §7.12 with §7.2: the iterator of every locator's with clause, optional or
+  // required, over an associative or an indexed array, reads the members of
+  // the structure element it holds.
+  IteratorLayout layout(ExtractIterNames(expr).iter_name, parts.var_name, ctx);
+
   // Associative arrays are stored separately and honor index-type returns
   // and key ordering through a dedicated path.
   if (aa != nullptr)
@@ -696,7 +701,6 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
     return false;
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-  IteratorLayout layout(lc.iter_name, parts.var_name, ctx);
   DispatchIndexedLocator(parts.method_name, lc, out);
   return true;
 }

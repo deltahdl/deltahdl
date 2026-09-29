@@ -858,4 +858,53 @@ TEST(ArrayLocator, TheIteratorOfAnAssociativeMapReadsSigned) {
   EXPECT_EQ(out, "1 1\n");
 }
 
+// §7.12 with §7.2: over an array of structures the with clause's iterator is
+// laid out by the element type in min(), max(), unique() and unique_index() as
+// in find(), so `item.x` reads each element's member: -2 is the least x, 3 the
+// greatest, and the x values 1, -2, 3, 1 hold three distinct ones.
+TEST(ArrayLocator, AnOptionalWithClauseReadsTheIteratorsMembers) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int x; int y;} s_t;\n"
+      "  s_t q[$] = '{'{1, 10}, '{-2, 20}, '{3, 30}, '{1, 40}};\n"
+      "  s_t f[3] = '{'{1, 10}, '{-2, 20}, '{3, 30}};\n"
+      "  s_t r1[$], r2[$], r3[$];\n"
+      "  int r4[$];\n"
+      "  initial begin\n"
+      "    r1 = q.max with (item.x);\n"
+      "    r2 = f.min with (item.x);\n"
+      "    r3 = q.unique with (item.x);\n"
+      "    r4 = q.unique_index with (item.x);\n"
+      "    $display(\"%0d %0d %0d %0d\", r1[0].y, r2[0].y, r3.size(), r4[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "30 20 3 2\n");
+}
+
+// §7.12 with §7.2 and §7.8: the same over an associative array of structures,
+// with an integral and a string index, for find() as for the others.
+TEST(ArrayLocator, AnAssociativeLocatorReadsTheIteratorsMembers) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int x; int y;} s_t;\n"
+      "  s_t aa[int], as[string];\n"
+      "  s_t r1[$], r2[$], r3[$], r4[$];\n"
+      "  initial begin\n"
+      "    aa[0] = '{1, 10}; aa[1] = '{-2, 20}; aa[2] = '{3, 30};\n"
+      "    aa[3] = '{1, 40}; as[\"a\"] = '{1, 10}; as[\"b\"] = '{-2, 20};\n"
+      "    r1 = aa.max with (item.x);\n"
+      "    r2 = aa.find with (item.x == 3);\n"
+      "    r3 = as.min with (item.x);\n"
+      "    r4 = aa.unique with (item.x);\n"
+      "    $display(\"%0d %0d %0d %0d\", r1[0].y, r2.size(), r3[0].y, "
+      "r4.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "30 1 20 3\n");
+}
+
 }  // namespace
