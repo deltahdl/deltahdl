@@ -40,6 +40,29 @@ namespace delta {
 // them all, and §7.4.1 having each index of a multidimensional one address an
 // element); a name written with a dimension of its own stacks it on the type
 // and keeps the declaration's own DataType.
+//
+// §21.7.5 (Table 21-11) with §6.18: a name standing for an integral keyword
+// type with no dimension, `typedef int myint`, is set the same way, since the
+// kind is the one fact of such a type the width does not carry, and the
+// lowerer declares a dumped variable by it (VcdEffectiveDeclKind); left with
+// the name alone, `myint v` was dumped with var_type wire, a net's.
+static bool IsIntegralKeywordKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena) {
   if (var.dtype != nullptr || item->data_type.kind != DataTypeKind::kNamed ||
@@ -48,7 +71,8 @@ void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
   const DataType* bound = FindNamedType(item->data_type, typedefs);
   if (bound == nullptr || bound->kind == DataTypeKind::kNamed ||
-      bound->packed_dim_left == nullptr) {
+      (bound->packed_dim_left == nullptr &&
+       !IsIntegralKeywordKind(bound->kind))) {
     return;
   }
   var.dtype = arena.Create<DataType>(*bound);

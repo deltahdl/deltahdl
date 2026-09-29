@@ -89,7 +89,8 @@ void ElaborateUnpackedDims(
 
 // §11.5.1 with §6.18: sets the resolved type as `var.dtype` for a declaration
 // written with a typedef name standing for a vector of one packed dimension,
-// so that the lowerer records the range the name was declared with; see the
+// so that the lowerer records the range the name was declared with, or for an
+// integral keyword type, so that it knows the kind (§21.7.5); see the
 // definition in elaborator_decls_var.cpp.
 void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena);

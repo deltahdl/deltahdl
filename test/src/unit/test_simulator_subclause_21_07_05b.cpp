@@ -163,6 +163,37 @@ TEST_F(VcdLogicTypeMapping, PackageVariablesTakeTheirDeclaredTypesVarType) {
   }
 }
 
+// §21.7.5 (Table 21-11) with §6.18: a variable declared through a typedef of
+// an integral keyword type is that type, so it is dumped as the keyword's own
+// var_type -- `myint v` under `typedef int myint` as integer, a typedef of
+// time as time and of logic as reg. Declared by the name alone, each was a
+// wire, the var_type of a net.
+TEST_F(VcdLogicTypeMapping, TypedefOfAKeywordTypeTakesTheKeywordsVarType) {
+  auto content = RunVcd(
+      "typedef int myint;\n"
+      "typedef time tm_t;\n"
+      "typedef logic lg_t;\n"
+      "module t;\n"
+      "  myint v;\n"
+      "  tm_t tm;\n"
+      "  lg_t l;\n"
+      "  initial begin $dumpvars; #1 v = 1; end\n"
+      "endmodule\n");
+  struct Expected {
+    const char* name;
+    const char* var_type;
+    const char* size;
+  };
+  for (const Expected& e :
+       {Expected{"v", "integer", "32"}, Expected{"tm", "time", "64"},
+        Expected{"l", "reg", "1"}}) {
+    auto decl = VarDecl(content, e.name);
+    ASSERT_EQ(decl.size(), 6u) << e.name << "\n" << content;
+    EXPECT_EQ(decl[1], e.var_type) << e.name << "\n" << content;
+    EXPECT_EQ(decl[2], e.size) << e.name << "\n" << content;
+  }
+}
+
 Variable* MakeVar(Arena& arena, uint32_t width) {
   auto* v = arena.Create<Variable>();
   v->value = MakeLogic4VecVal(arena, width, 0);
