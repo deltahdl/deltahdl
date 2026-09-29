@@ -111,6 +111,25 @@ static void SetVcdPortRange(VcdSignalSpec& spec) {
   }
 }
 
+// The data type the $var declaration of the dumped object `name` is written
+// under. §21.7.2.1: value changes for a real variable are real numbers, so its
+// $var declaration carries the real var_type keyword. The declared type
+// decides this -- the Variable's value only turns real once a real assignment
+// lands, which is after registration. Every other variable is declared under
+// VcdDataTypeForDeclKind: the 1364-2005 type §21.7.5 (Table 21-11) lends its
+// declared SystemVerilog type, or, where Syntax 21-20 already lists that type
+// as a var_type keyword, the keyword itself. An unmapped kind yields kNet,
+// leaving the §21.7.2.3 net var_type default intact. A parameter, real or
+// not, is declared parameter, the var_type Syntax 21-20 has for it; declared
+// by its value's type, a localparam was a wire, which a reader takes for a
+// net.
+static VcdDataType DeclaredVcdDataType(const VcdDumpState& state,
+                                       std::string_view name, bool is_real) {
+  if (state.IsVcdParameter(name)) return VcdDataType::kParameter;
+  if (is_real) return VcdDataType::kReal;
+  return VcdDataTypeForDeclKind(state.GetVcdVarKind(name));
+}
+
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
   std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
                                                            variables_.end());
@@ -147,24 +166,7 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     spec.ref_name = ref_name;
     spec.width = var->value.width;
     spec.var = var;
-    // §21.7.2.1: value changes for a real variable are real numbers, so its
-    // $var declaration carries the real var_type keyword. The declared type
-    // decides this -- the Variable's value only turns real once a real
-    // assignment lands, which is after registration. Every other variable is
-    // declared under VcdDataTypeForDeclKind: the 1364-2005 type §21.7.5
-    // (Table 21-11) lends its declared SystemVerilog type, or, where Syntax
-    // 21-20 already lists that type as a var_type keyword, the keyword itself.
-    // An unmapped kind yields kNet, leaving the §21.7.2.3 net var_type default
-    // intact. A parameter, real or not, is declared parameter, the var_type
-    // Syntax 21-20 has for it; declared by its value's type, a localparam was
-    // a wire, which a reader takes for a net.
-    if (vcd_.IsVcdParameter(name)) {
-      spec.data_type = VcdDataType::kParameter;
-    } else {
-      spec.data_type = IsRealVariable(name)
-                           ? VcdDataType::kReal
-                           : VcdDataTypeForDeclKind(vcd_.GetVcdVarKind(name));
-    }
+    spec.data_type = DeclaredVcdDataType(vcd_, name, IsRealVariable(name));
     // §21.7.4.3.1: which of the three state-character lists this object's port
     // records are written from.
     spec.direction = vcd_.GetVcdPortDirection(name);
