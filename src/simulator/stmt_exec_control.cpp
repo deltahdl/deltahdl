@@ -224,40 +224,32 @@ static ExecTask ExecIfBindingPredicate(const Stmt* stmt, SimContext& ctx,
   co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
 }
 
+// An if with no unique, unique0 or priority qualifier.
+static ExecTask ExecPlainIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (PatternBindsIdentifiers(stmt->condition)) {
+    co_return co_await ExecIfBindingPredicate(stmt, ctx, arena);
+  }
+  if (EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
+    co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
+  }
+  if (stmt->else_branch == nullptr) co_return StmtResult::kDone;
+  co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
+}
+
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
   auto qual = stmt->qualifier;
-
+  StmtResult r = StmtResult::kDone;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    auto r = co_await ExecUniqueIf(stmt, qual, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return r;
-  }
-  if (qual == CaseQualifier::kPriority) {
-    auto r = co_await ExecPriorityIf(stmt, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return r;
-  }
-
-  if (PatternBindsIdentifiers(stmt->condition)) {
-    auto r = co_await ExecIfBindingPredicate(stmt, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return r;
-  }
-  auto cond = EvalExpr(stmt->condition, ctx, arena);
-  if (cond.IsTruthy()) {
-    auto r = co_await ExecStmt(stmt->then_branch, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return r;
-  }
-  if (stmt->else_branch) {
-    auto r = co_await ExecStmt(stmt->else_branch, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return r;
+    r = co_await ExecUniqueIf(stmt, qual, ctx, arena);
+  } else if (qual == CaseQualifier::kPriority) {
+    r = co_await ExecPriorityIf(stmt, ctx, arena);
+  } else {
+    r = co_await ExecPlainIf(stmt, ctx, arena);
   }
   if (labeled) ctx.PopStaticScope(stmt->label);
-  co_return StmtResult::kDone;
+  co_return r;
 }
 
 static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
@@ -439,7 +431,7 @@ std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  uint64_t count = *LoopIterationLimit(stmt, ctx, arena);
+  uint64_t count = RepeatIterationCount(EvalExpr(stmt->condition, ctx, arena));
   for (uint64_t i = 0; i < count && ProcessGoesOn(ctx); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;

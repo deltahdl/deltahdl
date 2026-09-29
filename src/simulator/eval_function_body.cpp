@@ -232,30 +232,30 @@ static FuncFlow ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
   return FuncFlow::kNext;
 }
 
+// An if with no unique, unique0 or priority qualifier. §12.6.2: the
+// identifiers the predicate's patterns bind are in scope in its later clauses
+// and its true arm (EvalMatchesPredicate), not the else.
+static FuncFlow ExecFuncPlainIf(const Stmt* stmt, const FuncExecCtx& exec) {
+  bool scoped = PatternBindsIdentifiers(stmt->condition);
+  if (scoped) exec.ctx.PushScope();
+  bool holds =
+      scoped ? EvalMatchesPredicate(stmt->condition, exec.ctx, exec.arena)
+             : EvalExpr(stmt->condition, exec.ctx, exec.arena).ToUint64() != 0;
+  FuncFlow r = holds ? ExecFuncStmt(stmt->then_branch, exec) : FuncFlow::kNext;
+  if (scoped) exec.ctx.PopScope();
+  if (!holds && stmt->else_branch) r = ExecFuncStmt(stmt->else_branch, exec);
+  return r;
+}
+
 static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
-
   auto qual = stmt->qualifier;
-  FuncFlow r = FuncFlow::kNext;
-  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    r = ExecFuncUniqueIf(stmt, qual, exec);
-  } else if (qual == CaseQualifier::kPriority) {
-    r = ExecFuncPriorityIf(stmt, exec);
-  } else {
-    // §12.6.2: the identifiers the predicate's patterns bind are in scope in
-    // its later clauses and its true arm (EvalMatchesPredicate), not the else.
-    bool scoped = PatternBindsIdentifiers(stmt->condition);
-    if (scoped) exec.ctx.PushScope();
-    bool holds =
-        scoped
-            ? EvalMatchesPredicate(stmt->condition, exec.ctx, exec.arena)
-            : EvalExpr(stmt->condition, exec.ctx, exec.arena).ToUint64() != 0;
-    if (holds) r = ExecFuncStmt(stmt->then_branch, exec);
-    if (scoped) exec.ctx.PopScope();
-    if (!holds && stmt->else_branch) r = ExecFuncStmt(stmt->else_branch, exec);
-  }
-
+  FuncFlow r =
+      (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0)
+          ? ExecFuncUniqueIf(stmt, qual, exec)
+      : qual == CaseQualifier::kPriority ? ExecFuncPriorityIf(stmt, exec)
+                                         : ExecFuncPlainIf(stmt, exec);
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return r;
 }
