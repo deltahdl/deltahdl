@@ -35,6 +35,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -319,7 +320,9 @@ static bool TryContainerElementMemberWrite(const Expr* lhs,
   if (field == nullptr) return false;
   Logic4Vec element =
       ElementBeforeMemberWrite(select, layout->total_width, ctx, arena);
-  DepositBitField(element, offset, ResizeToWidth(rhs_val, field->width, arena),
+  DepositBitField(element, offset,
+                  ResizeToWidth(MemberBitsOf(rhs_val, field->type_kind, arena),
+                                field->width, arena),
                   field->width);
   PerformBlockingAssign(select, element, ctx, arena);
   return true;

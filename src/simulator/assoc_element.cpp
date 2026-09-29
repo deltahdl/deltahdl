@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -15,6 +16,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -121,12 +123,13 @@ static void BuildFieldPath(const Expr* expr, std::string& out) {
   }
 }
 
-// The layout of an associative array's element type, together with the offset
-// and width of the member `expr` names within it. `expr` is a member access
-// whose left operand selects the element. Returns false unless every part of
-// that shape holds and the member resolves.
+// The layout of an associative array's element type, together with the offset,
+// width and declared type of the member `expr` names within it. `expr` is a
+// member access whose left operand selects the element. Returns false unless
+// every part of that shape holds and the member resolves.
 static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
-                               uint32_t* bit_offset, uint32_t* width) {
+                               uint32_t* bit_offset, uint32_t* width,
+                               DataTypeKind* kind) {
   if (!expr || expr->kind != ExprKind::kMemberAccess) return false;
   auto* sel = expr->lhs;
   if (!AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
@@ -137,19 +140,21 @@ static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
   if (!info) return false;
   std::string path;
   BuildFieldPath(expr->rhs, path);
-  return ResolveStructFieldPath(info, path, bit_offset, width);
+  return ResolveStructFieldPath(info, path, bit_offset, width, kind);
 }
 
 bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
-  if (!ResolveAssocMember(lhs, ctx, &bit_offset, &width)) return false;
+  DataTypeKind kind = DataTypeKind::kImplicit;
+  if (!ResolveAssocMember(lhs, ctx, &bit_offset, &width, &kind)) return false;
   auto* entry = AssocEntryForWrite(lhs->lhs, ctx, arena);
   // A declined entry is §7.8.6's invalid index, which allocates nothing and
   // writes nothing, so there is no change for §9.4.2 to announce.
   if (!entry) return true;
-  DepositBitField(*entry, bit_offset, rhs_val, width);
+  DepositBitField(*entry, bit_offset, MemberBitsOf(rhs_val, kind, arena),
+                  width);
   NotifyOwningVar(ctx, lhs->lhs->base->text);
   return true;
 }
@@ -158,9 +163,11 @@ bool TryEvalAssocMemberField(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
-  if (!ResolveAssocMember(expr, ctx, &bit_offset, &width)) return false;
+  DataTypeKind kind = DataTypeKind::kImplicit;
+  if (!ResolveAssocMember(expr, ctx, &bit_offset, &width, &kind)) return false;
   auto elem = EvalExpr(expr->lhs, ctx, arena);
-  out = ExtractBitField(arena, elem, bit_offset, width);
+  out = MemberValueOf(ExtractBitField(arena, elem, bit_offset, width), kind,
+                      arena);
   return true;
 }
 

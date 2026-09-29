@@ -9,6 +9,7 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "parser/ast_type.h"
 #include "simulator/stmt_result.h"
 
 namespace delta {
@@ -202,6 +203,9 @@ struct PropertyFieldWindow {
   // carrier, which holds a one-member structure and loses every member of a
   // wider one above its top.
   uint32_t total_width = 0;
+  // The member's declared type, which says whether the window holds a string
+  // member's handle (§7.2 with §6.16).
+  DataTypeKind member_kind = DataTypeKind::kImplicit;
   bool valid = false;
 };
 
@@ -235,6 +239,9 @@ struct FieldTarget {
   Variable* var = nullptr;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
+  // kBits and kPropertyBits: the member's declared type, which says whether
+  // the window holds a string member's handle (§7.2 with §6.16).
+  DataTypeKind member_kind = DataTypeKind::kImplicit;
   // kPropertyBits: the width of the whole value the window sits in, which the
   // held value is widened to before the deposit where it is narrower.
   uint32_t holder_width = 0;

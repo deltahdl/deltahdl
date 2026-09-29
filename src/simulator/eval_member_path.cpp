@@ -17,6 +17,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -375,6 +376,11 @@ bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
   Logic4Vec element = EvalExpr(select, ctx, arena);
   if (element.width < info->total_width) return false;
   out = ExtractBitField(arena, element, offset, field->width);
+  // §7.2 with §6.16: a string member's bits are a handle to its text.
+  if (field->type_kind == DataTypeKind::kString) {
+    out = StringMemberText(out, arena);
+    return true;
+  }
   out.is_real = field->type_kind == DataTypeKind::kReal ||
                 field->type_kind == DataTypeKind::kShortreal ||
                 field->type_kind == DataTypeKind::kRealtime;

@@ -346,4 +346,140 @@ TEST(StructType, ArrayMethodsOnAnArrayMember) {
   EXPECT_EQ(out, "15 3 120 1\n");
 }
 
+// §7.2 with §6.16: a string member of an unpacked structure is a string
+// variable, holding whatever string is written to it at whatever length: "d"
+// reads back as "d", and a 28-character string reads back whole, its len()
+// 28, beside an enum member that keeps its own value.
+TEST(StructType, AStringMemberHoldsTheStringWrittenToIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum {ON, OFF} switch_e;\n"
+      "  typedef struct {switch_e sw; string s;} pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p.sw = OFF;\n"
+      "    p.s = \"d\";\n"
+      "    $display(\"[%s] %0d\", p.s, p.sw);\n"
+      "    p.s = \"hello world, a longer string\";\n"
+      "    $display(\"[%s] %0d\", p.s, p.s.len());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[d] 1\n[hello world, a longer string] 28\n");
+}
+
+// §7.2 with §10.9.2: an assignment pattern gives a string member its string,
+// positionally or by the member's name, and a copy of the whole structure,
+// through an associative array's element among others, carries the string
+// with it; a member never written holds the empty string.
+TEST(StructType, AStringMemberTravelsWithItsStructure) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  pair_t p, q, r, blank;\n"
+      "  pair_t va[int];\n"
+      "  initial begin\n"
+      "    q = '{7, \"hello\"};\n"
+      "    va[20] = q;\n"
+      "    p = va[20];\n"
+      "    r = '{s: \"x\", n: 3};\n"
+      "    $display(\"[%s] %0d [%s] %0d [%s]\", p.s, p.n, r.s, r.n, blank.s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[hello] 7 [x] 3 []\n");
+}
+
+// §21.2.1.6 with §7.2: %p prints a structure's string member as its quoted
+// string.
+TEST(StructType, PercentPPrintsAStringMemberQuoted) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum {ON, OFF} switch_e;\n"
+      "  typedef struct {switch_e sw; string s;} pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p.sw = OFF;\n"
+      "    p.s = \"d\";\n"
+      "    $display(\"%p\", p);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{sw:OFF, s:\"d\"}\n");
+}
+
+// §11.4.5 with §7.2: structures whose string members hold equal strings,
+// written separately, compare equal, and ones whose strings differ do not.
+TEST(StructType, StructuresWithEqualStringMembersCompareEqual) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  pair_t p, q;\n"
+      "  initial begin\n"
+      "    p = '{1, \"ab\"};\n"
+      "    q.n = 1;\n"
+      "    q.s = {\"a\", \"b\"};\n"
+      "    $display(\"%0d\", p == q);\n"
+      "    q.s = \"ac\";\n"
+      "    $display(\"%0d\", p == q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n0\n");
+}
+
+// §7.2 with §6.16: a structure's string member holds its string wherever the
+// structure is kept -- a class property, an element of an associative array,
+// a queue or a fixed-size array -- whether the member is written in place and
+// the structure then copied out, or the structure copied in whole and the
+// member then read in place; and a function returning the structure returns
+// its string with it.
+TEST(StructType, AStringMemberHoldsItsStringWhereverTheStructureIsKept) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  class C;\n"
+      "    pair_t p;\n"
+      "  endclass\n"
+      "  function automatic pair_t mk();\n"
+      "    pair_t r;\n"
+      "    r.s = \"from a function\";\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  C c;\n"
+      "  pair_t va[int];\n"
+      "  pair_t q[$];\n"
+      "  pair_t arr[2];\n"
+      "  pair_t tmp;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.p.s = \"in a class property\";\n"
+      "    va[1].s = \"in an associative element\";\n"
+      "    q.push_back(tmp);\n"
+      "    q[0].s = \"in a queue element\";\n"
+      "    arr[1].s = \"in an array element\";\n"
+      "    tmp = c.p; $display(\"[%s]\", tmp.s);\n"
+      "    tmp = va[1]; $display(\"[%s]\", tmp.s);\n"
+      "    tmp = q[0]; $display(\"[%s]\", tmp.s);\n"
+      "    tmp = arr[1]; $display(\"[%s]\", tmp.s);\n"
+      "    tmp.s = \"copied in whole\";\n"
+      "    c.p = tmp; va[2] = tmp; q.push_back(tmp); arr[0] = tmp;\n"
+      "    $display(\"[%s] [%s] [%s] [%s]\", c.p.s, va[2].s, q[1].s, "
+      "arr[0].s);\n"
+      "    $display(\"[%s]\", mk().s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "[in a class property]\n[in an associative element]\n"
+            "[in a queue element]\n[in an array element]\n"
+            "[copied in whole] [copied in whole] [copied in whole] "
+            "[copied in whole]\n[from a function]\n");
+}
+
 }  // namespace

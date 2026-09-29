@@ -23,6 +23,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
 
@@ -168,7 +169,7 @@ PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
   const StructTypeInfo* info = ctx.FindStructType(prop->type_name);
   if (info == nullptr) return window;
   if (!ResolveStructFieldPath(info, path.substr(dot + 1), &window.bit_offset,
-                              &window.width)) {
+                              &window.width, &window.member_kind)) {
     return window;
   }
   window.property = first;
@@ -300,6 +301,7 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
       bits.field = std::string(window.property);
       bits.bit_offset = window.bit_offset;
       bits.width = window.width;
+      bits.member_kind = window.member_kind;
       bits.holder_width = window.total_width;
       return bits;
     }
@@ -612,7 +614,7 @@ static FieldTarget ResolveVariableField(std::string_view base_name,
       return target;
     }
     if (ResolveStructFieldPath(info, field_name, &target.bit_offset,
-                               &target.width)) {
+                               &target.width, &target.member_kind)) {
       target.kind = FieldTarget::Kind::kBits;
       target.var = base_var;
       return target;
@@ -719,7 +721,9 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena) {
   switch (target.kind) {
     case FieldTarget::Kind::kBits:
-      DepositBitField(target.var->value, target.bit_offset, rhs_val,
+      // §7.2 with §6.16: a string member takes a handle to its new text.
+      DepositBitField(target.var->value, target.bit_offset,
+                      MemberBitsOf(rhs_val, target.member_kind, arena),
                       target.width);
       target.var->NotifyWatchers();
       return;
@@ -750,7 +754,9 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
               : target.obj->GetProperty(target.field, arena);
       Logic4Vec updated =
           WidenToHolder(OwnRhsWords(held, arena), target.holder_width, arena);
-      DepositBitField(updated, target.bit_offset, rhs_val, target.width);
+      DepositBitField(updated, target.bit_offset,
+                      MemberBitsOf(rhs_val, target.member_kind, arena),
+                      target.width);
       SetClassField(target.obj, target.type, target.field, updated, arena);
       if (target.notify) target.notify->NotifyWatchers();
       if (target.obj) ctx.NotifyClassHandleWatchers(target.obj->handle);

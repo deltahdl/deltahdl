@@ -594,6 +594,14 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
   return DeclaredArrayHoldsStrings(PackageScopedKey(base), ctx);
 }
 
+// §7.2 with §6.16: whether `receiver`, `p.s`, names a string member of the
+// structure a variable holds, which is a string variable of its own.
+static bool SelectsStringMember(const Expr* receiver, SimContext& ctx) {
+  FieldTarget target = ResolveFieldTarget(receiver, ctx);
+  return target.kind == FieldTarget::Kind::kBits &&
+         target.member_kind == DataTypeKind::kString;
+}
+
 static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
                                Arena& arena, std::string& str) {
   if (receiver == nullptr) return false;
@@ -610,6 +618,10 @@ static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
   }
   if (receiver->is_scope_resolution)
     return ReadScopedStringProperty(receiver, ctx, arena, str);
+  if (SelectsStringMember(receiver, ctx)) {
+    str = Logic4VecToString(EvalExpr(receiver, ctx, arena));
+    return true;
+  }
   return ReadHandleStringProperty(receiver, ctx, arena, str);
 }
 

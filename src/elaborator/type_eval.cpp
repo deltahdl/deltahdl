@@ -111,6 +111,8 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
       return 64;
     case DataTypeKind::kVoid:
       return 0;
+    case DataTypeKind::kString:
+      return kStringMemberHandleWidth;
     default:
       return 1;
   }

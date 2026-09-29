@@ -25,6 +25,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 
 namespace delta {
 
@@ -166,6 +167,11 @@ bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
     return false;
   }
   out = ExtractBitField(arena, value, bit_offset, width);
+  // §7.2 with §6.16: a string member's bits are a handle to its text.
+  if (kind == DataTypeKind::kString) {
+    out = StringMemberText(out, arena);
+    return true;
+  }
   if (!Is4stateType(kind)) CoerceTo2State(out);
   return true;
 }

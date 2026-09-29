@@ -8,6 +8,17 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct StructTypeInfo;
+struct Variable;
+
+// §7.2.1: the member `field` (a dotted path through nested members) of the
+// structure `base_var` holds, whose layout is `info`, read as its declared
+// type: a 2-state member of a packed union with its unknowns as zeros
+// (§7.3.1), a real member as a real (§6.12), a signed member as signed
+// (§6.11), and a string member as its text (§7.2 with §6.16). A one-bit zero
+// where the path names no member.
+Logic4Vec ExtractStructField(Variable* base_var, const StructTypeInfo* info,
+                             std::string_view field, Arena& arena);
 
 // §8.11: inside a method, a property of the enclosing class may be named
 // without a `this.` prefix -- the clause resolves an unqualified name by

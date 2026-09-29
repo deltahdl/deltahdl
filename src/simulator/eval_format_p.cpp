@@ -18,6 +18,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -107,6 +108,9 @@ static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
     if (const EnumTypeInfo* et = ctx.FindEnumType(f.type_name))
       return label + FormatEnumValueForP(*et, slice);
   }
+  // §7.2 with §6.16: a string member's bits are a handle to its text.
+  if (f.type_kind == DataTypeKind::kString)
+    slice = StringMemberText(slice, ctx.GetArena());
   return label + FormatSingularForP(slice, f.type_kind);
 }
 

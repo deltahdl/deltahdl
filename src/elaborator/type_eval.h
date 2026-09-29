@@ -66,6 +66,11 @@ bool IsStringType(const DataType& type, const TypedefMap& typedefs);
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 
+// §7.2 with §6.16: the width a string member of an unpacked structure takes
+// in the structure's packed value, which holds a handle to the member's text
+// rather than the text itself, a string being of any length.
+inline constexpr uint32_t kStringMemberHandleWidth = 64;
+
 struct StructMember;
 uint32_t EvalStructMemberWidth(const StructMember& m);
 // §7.2 with §7.4.2: the number of elements an unpacked array member of a
