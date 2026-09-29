@@ -178,8 +178,8 @@ static uint64_t HeldPropertyHandle(const ClassObject* self,
         self->properties.find(std::string(t->name) + "::" + std::string(name));
     if (it != self->properties.end()) return it->second.ToUint64();
   }
-  auto it = self->properties.find(std::string(name));
-  if (it != self->properties.end()) return it->second.ToUint64();
+  if (const Logic4Vec* held = self->FindPropertyValue(name))
+    return held->ToUint64();
   return kNullClassHandle;
 }
 

@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
@@ -15,6 +16,7 @@ struct ArrayInfo;
 struct ClassArrayRef;
 struct ClassObject;
 struct ClassTypeInfo;
+struct DataType;
 struct Expr;
 struct FunctionArg;
 struct ModuleItem;
@@ -159,6 +161,21 @@ ArrayInfo ClassArrayShape(const ClassArrayRef& ref);
 // names no array. Defined in eval_function_args_array.cpp.
 bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                      SimContext& ctx, Arena& arena);
+
+// §13.5.2 with §8.5: the object and the key of the instance property, or of
+// the element of an instance array property, that the ref actual `actual`
+// names through a handle -- `c.k`, `this.k`, `c.arr[i]` -- read in the
+// running scope; false for any other actual, a static property among them.
+// Defined in eval_function_args_array.cpp.
+bool RefPropertyTarget(const Expr* actual, SimContext& ctx, Arena& arena,
+                       ClassObject*& obj, std::string& key);
+
+// §13.3 with §6.21 and §6.8 (Table 6-7): the value an output formal of
+// `type`, `width` bits wide, starts at on entry to an automatic subroutine,
+// which is what it copies out if the body never writes it: x for a 4-state
+// integral type, 0 for any other. Defined in eval_function_args_array.cpp.
+Logic4Vec OutputFormalDefault(const DataType& type, uint32_t width,
+                              const SimContext& ctx, Arena& arena);
 
 // §13.3.2 (printed page 339): the formals of a static subroutine `func`,
 // "including input, output, and inout type arguments", "retain their values

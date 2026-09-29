@@ -479,6 +479,26 @@ struct ClassObject {
   // values it tags.
   std::unordered_map<std::string, std::string> property_tags;
 
+  // §13.5.2: a ref formal is its actual, so a property passed by reference,
+  // `w(c.k)` or `w(c.arr[1])`, is held for the call in a variable the formal
+  // aliases, keyed by the property's key and shared by every call holding it.
+  // While a cell stands, it is the property's value: GetProperty and
+  // FindPropertyValue read it, and SetProperty writes it with the map.
+  // ReleaseRefCell puts its value back into the map when the last holder
+  // returns. A copy the formal held instead was seen by no other process until
+  // the call returned, and a write made meanwhile was overwritten by it.
+  struct RefCell {
+    Variable* var = nullptr;
+    uint32_t holders = 0;
+  };
+  std::unordered_map<std::string, RefCell> ref_cells;
+  Variable* AcquireRefCell(std::string_view name, Arena& arena);
+  void ReleaseRefCell(std::string_view name);
+
+  // The value the property `name` holds under its own key, a ref cell's where
+  // one stands, or null where the object holds none under that key.
+  const Logic4Vec* FindPropertyValue(std::string_view name) const;
+
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 
   void SetProperty(std::string_view name, const Logic4Vec& raw);

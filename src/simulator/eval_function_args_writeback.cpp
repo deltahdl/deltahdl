@@ -341,6 +341,29 @@ static void AssignInCallerScope(const CallerWrites& writes, SimContext& ctx,
   });
 }
 
+// §13.5.2: the ref cells the call's property actuals held
+// (TryBindRefPropertyArg in eval_function_args.cpp) are released once the
+// copy-out has run, each actual read in the caller's scope as at the bind.
+static void ReleaseRefPropertyCells(const ModuleItem* func, const Expr* expr,
+                                    SimContext& ctx, Arena& arena) {
+  WithCalleeScopeOff(ctx, [&] {
+    for (size_t i = 0; i < func->func_args.size(); ++i) {
+      const FunctionArg& formal = func->func_args[i];
+      int ai = ResolveArgIndex(func, expr, i);
+      if (formal.direction != Direction::kRef || formal.is_const || ai < 0 ||
+          !formal.unpacked_dims.empty()) {
+        continue;
+      }
+      ClassObject* obj = nullptr;
+      std::string key;
+      if (RefPropertyTarget(expr->args[static_cast<size_t>(ai)], ctx, arena,
+                            obj, key)) {
+        obj->ReleaseRefCell(key);
+      }
+    }
+  });
+}
+
 // §13.5.2: an output or inout formal is copied to its actual when the
 // subroutine returns, and so is a ref formal bound to a member or property
 // (CopiesOutOnReturn). A formal with no variable of its own name is one
@@ -382,6 +405,7 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
     }
   }
   if (!writes.Empty()) AssignInCallerScope(writes, ctx, arena);
+  ReleaseRefPropertyCells(func, expr, ctx, arena);
   if (default_writes.Empty()) return;
   // §13.5.3: a default names its target in the scope of the declaration, the
   // instance the process stands in for the call, not the caller's.

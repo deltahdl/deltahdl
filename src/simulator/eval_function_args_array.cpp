@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/queue_dim.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -348,6 +349,64 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
   return true;
 }
 
+bool RefPropertyTarget(const Expr* actual, SimContext& ctx, Arena& arena,
+                       ClassObject*& obj, std::string& key) {
+  if (actual == nullptr) return false;
+  if (actual->kind == ExprKind::kSelect && actual->index != nullptr &&
+      actual->index_end == nullptr && actual->base != nullptr &&
+      actual->base->kind == ExprKind::kMemberAccess) {
+    ClassArrayRef ref;
+    if (!ResolveClassArray(actual->base, ctx, arena, ref) ||
+        ref.obj == nullptr || ref.static_owner != nullptr ||
+        ClassArrayHoldsSubarrays(ref)) {
+      return false;
+    }
+    Logic4Vec idx = EvalExpr(actual->index, ctx, arena);
+    if (HasUnknownBits(idx)) return false;
+    obj = ref.obj;
+    key = ClassArrayRefElementKey(ref, static_cast<int64_t>(idx.ToUint64()));
+    return obj->FindPropertyValue(key) != nullptr;
+  }
+  if (actual->kind != ExprKind::kMemberAccess || actual->is_scope_resolution ||
+      actual->lhs == nullptr || actual->rhs == nullptr ||
+      actual->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  obj =
+      actual->lhs->kind == ExprKind::kIdentifier && actual->lhs->text == "this"
+          ? ctx.CurrentThis()
+          : ctx.GetClassObject(EvalExpr(actual->lhs, ctx, arena).ToUint64());
+  if (obj == nullptr || obj->type == nullptr ||
+      obj->type->StaticPropertyDeclarer(actual->rhs->text) != nullptr) {
+    return false;
+  }
+  key = std::string(actual->rhs->text);
+  return obj->FindPropertyValue(key) != nullptr;
+}
+
+// §6.8 (Table 6-7) with §6.21: whether a variable of `type` starts at x --
+// a 4-state integral kind, or a name standing for a 4-state enumeration, a
+// packed structure with a 4-state member, or a 4-state integral type. A class
+// handle, a string, a real and every 2-state type start at their own
+// defaults, which the zero this answers against stands for.
+static bool StartsAtX(const DataType& type, const SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed) return Is4stateType(type.kind);
+  std::string key =
+      type.scope_name.empty()
+          ? std::string(type.type_name)
+          : std::string(type.scope_name) + "::" + std::string(type.type_name);
+  if (const EnumTypeInfo* e = ctx.FindEnumType(key)) return e->is_4state;
+  if (const StructTypeInfo* s = ctx.FindStructType(key))
+    return s->is_packed && HasFourStateMember(*s);
+  return Is4stateType(ctx.FindTypeKind(key));
+}
+
+Logic4Vec OutputFormalDefault(const DataType& type, uint32_t width,
+                              const SimContext& ctx, Arena& arena) {
+  return StartsAtX(type, ctx) ? MakeAllX(arena, width)
+                              : MakeLogic4VecVal(arena, width, 0);
+}
+
 // Binds a fixed-size unpacked-array actual by copying each element variable
 // into a fresh per-element formal variable.
 //
@@ -379,6 +438,12 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
 // record of that layout, so the body's `y[1][3] = 8'hAB` wrote bit 3 of it.
 // The formal's declared packed dimensions are recorded as a declaration's are
 // (RecordPackedRange), which is what SelectStorageBits reads the index by.
+//
+// §7.2.1 with §13.5.1: an element of a formal of structure elements, `input B
+// b[2]`, is a structure, so `b[1].lo` in the body selects a member. The
+// layout is bound under the formal's name, as TryBindQueueArg binds a
+// dynamic formal's and a declaration binds a local array's; bound to none,
+// the member read 0.
 static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
                               const ArrayInfo& info, SimContext& ctx,
                               Arena& arena) {
@@ -392,6 +457,7 @@ static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
   }
   // §13.4, as above: the shape lives as long as the call does.
   ctx.RegisterArrayInScope(formal.name, shape);
+  BindNamedLayout(formal.name, formal.data_type, ctx);
   uint32_t count = ArrayElementCount(info);
   for (uint32_t k = 0; k < count; ++k) {
     auto src = IdentifierLookupKey(call_arg) + ArrayElementSuffixAt(info, k);
@@ -400,7 +466,7 @@ static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
     auto val =
         src_var ? src_var->value : MakeLogic4VecVal(arena, info.elem_width, 0);
     if (formal.direction == Direction::kOutput)
-      val = MakeLogic4VecVal(arena, val.width, 0);
+      val = OutputFormalDefault(formal.data_type, val.width, ctx, arena);
     auto* dst_var = ctx.CreateLocalVariable(
         *arena.Create<std::string>(std::move(dst)), val.width);
     // §13.5.1 again: `val` is the caller's element variable's own Logic4Vec

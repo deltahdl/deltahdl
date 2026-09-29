@@ -141,4 +141,30 @@ TEST(PassByRef, QueuePropertyActualIsTheObjectsQueue) {
   EXPECT_EQ(out, "1 1\n2 3 2\n");
 }
 
+// §13.5.2: a ref formal is the actual itself, so a write through it is seen
+// by another process while the task is suspended, and a write to the actual
+// is seen through it -- for a class property through a handle and an element
+// of a class array property as for a module variable. The formal was a copy
+// written back when the task returned: at #1 both read 0, and the task's
+// `v += 1` at #2 added to its own 1 and overwrote the caller's 11 with 2.
+TEST(PassByRef, RefFormalOfAClassPropertyIsWrittenInPlace) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int k; int arr[3]; endclass\n"
+      "module t;\n"
+      "  task automatic w(ref int v); v = 1; #2 v += 1; endtask\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    fork\n"
+      "      w(c.k);\n"
+      "      w(c.arr[1]);\n"
+      "      begin #1 $write(\"%0d %0d \", c.k, c.arr[1]); c.k += 10; end\n"
+      "    join\n"
+      "    $display(\"%0d %0d\", c.k, c.arr[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 12 2\n");
+}
+
 }  // namespace

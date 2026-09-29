@@ -28,6 +28,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
 
 namespace delta {
@@ -493,6 +494,32 @@ static void RegisterValueArgStructType(const FunctionArg& param,
                                        const ActualArgRef& ref,
                                        SimContext& ctx);
 
+// §13.5.2 lists a class property among what may be passed by reference, and
+// a reference is the property itself for as long as the call runs. The
+// property is held in the object's ref cell (ClassObject::AcquireRefCell) and
+// the formal aliases it, so a write through the formal is the property's at
+// once and a write to the property is read through the formal; the cell is
+// released at return (WritebackOutputArgs). A copy the formal held instead
+// was the property's only when the call returned, which a task suspending in
+// between showed. The actual is read with the callee's scope set aside.
+static bool TryBindRefPropertyArg(const Expr* call_arg,
+                                  const FunctionArg& param, SimContext& ctx,
+                                  Arena& arena) {
+  if (param.is_const || !param.unpacked_dims.empty()) return false;
+  ClassObject* obj = nullptr;
+  std::string key;
+  {
+    CalleeScopeAside aside(ctx);
+    if (!RefPropertyTarget(call_arg, ctx, arena, obj, key)) return false;
+  }
+  Variable* cell = obj->AcquireRefCell(key, arena);
+  cell->is_4state = DeclaredTypeIs4State(param.data_type, ctx);
+  cell->is_signed = DeclaredTypeIsSigned(param.data_type, ctx);
+  ctx.AliasLocalVariable(param.name, cell);
+  RegisterValueArgClassType(param, ctx);
+  return true;
+}
+
 // Attempts the ref-binding strategies (whole aggregate, plain ref, queue
 // element, assoc element, fixed-size array element) for a ref-direction
 // formal. Returns true when one of them bound the argument. The aggregate bind
@@ -512,6 +539,11 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
   if (arg_index >= 0 &&
       TryBindRefAggregateArg(expr->args[static_cast<size_t>(arg_index)], param,
                              ctx, arena)) {
+    return true;
+  }
+  if (arg_index >= 0 &&
+      TryBindRefPropertyArg(expr->args[static_cast<size_t>(arg_index)], param,
+                            ctx, arena)) {
     return true;
   }
   if (TryBindRefArg(expr, arg_index, param.name, ctx)) {
@@ -730,9 +762,12 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // input and inout formals receive the actual's value. The actual is evaluated
   // above solely to size the formal - reset the bits to the default so a
   // read-before-write (and, for an automatic task, each fresh entry) observes
-  // the default value rather than the caller's current value.
+  // the default value rather than the caller's current value. §6.8 (Table
+  // 6-7): that default is the type's, x for a 4-state one
+  // (OutputFormalDefault); a zero for every type copied 0 out of a `logic`
+  // output the body never wrote.
   if (param.direction == Direction::kOutput)
-    val = MakeLogic4VecVal(arena, val.width, 0);
+    val = OutputFormalDefault(dt, val.width, ctx, arena);
 
   bool is_static_sub = func && func->is_static && !func->is_automatic;
   SyncHandle sync = SyncActualOf(param, ActualExprOf(bound), func, ctx, arena);

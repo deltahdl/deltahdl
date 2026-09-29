@@ -147,4 +147,57 @@ TEST(PassByValueSim, FormalOfAnArrayTypedefHasItsDimensions) {
       "123 123 222 '{4, 5, 6}\n");
 }
 
+// §13.5.1 with §7.2.1: a fixed-size array formal passed by value holds copies
+// of the caller's elements, each of the formal's element type, so `b[1].lo`
+// selects a member of a packed structure element in a function and in a task
+// alike. The element variables were bound to no layout, and the member read 0.
+TEST(PassByValueSim, MemberOfAnElementOfAPackedStructureArrayFormal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "typedef struct packed { logic [3:0] hi; logic [3:0] lo; } B;\n"
+                "module t;\n"
+                "  function automatic int f(input B b[2]);\n"
+                "    return b[1].lo * 10 + b[0].hi;\n"
+                "  endfunction\n"
+                "  task automatic tk(input B b[2], output int r);\n"
+                "    r = b[1].hi;\n"
+                "  endtask\n"
+                "  B arr[2];\n"
+                "  int r;\n"
+                "  initial begin\n"
+                "    arr[0] = '{hi: 3, lo: 1}; arr[1] = '{hi: 9, lo: 2};\n"
+                "    tk(arr, r);\n"
+                "    $display(\"%0d %0d\", f(arr), r);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "23 9\n");
+}
+
+// §13.3 has an output formal copy its value out when the subroutine returns,
+// and §6.21 with §6.8 (Table 6-7) starts each variable of an automatic
+// subroutine's call at its type's default: x for `logic` and for the
+// elements of a `logic` array, 0 for `int` and `bit`. An output the body never
+// writes therefore copies out that default. Every output formal started at 0,
+// and the 4-state ones copied out 0 where they hold x.
+TEST(PassByValueSim, UnwrittenOutputFormalCopiesOutItsTypesDefault) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module t;\n"
+                "  function automatic void f(output logic [3:0] l,\n"
+                "                            output int i,\n"
+                "                            output bit [3:0] b);\n"
+                "  endfunction\n"
+                "  task automatic tk(output logic [1:0] a[2]); endtask\n"
+                "  logic [3:0] l = 4'b1010; int i = 7; bit [3:0] b = 4'b1111;\n"
+                "  logic [1:0] a[2] = '{2'b01, 2'b10};\n"
+                "  initial begin\n"
+                "    f(l, i, b); tk(a);\n"
+                "    $display(\"%b %0d %b %b %b\", l, i, b, a[0], a[1]);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "xxxx 0 0000 xx xx\n");
+}
+
 }  // namespace

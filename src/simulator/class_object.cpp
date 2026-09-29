@@ -14,6 +14,7 @@
 #include "parser/ast_class.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -66,10 +67,35 @@ const ClassTypeInfo* ClassTypeInfo::StaticPropertyOwner(
 // read through a handle is the declaring class's one storage, C's for a D
 // object's `n` where D extends C, the same `c.n` through a C handle reads.
 // Asked of the object's own class alone, `d.n` read 0 after `C::n = 5`.
+const Logic4Vec* ClassObject::FindPropertyValue(std::string_view name) const {
+  std::string key(name);
+  if (auto cell = ref_cells.find(key); cell != ref_cells.end())
+    return &cell->second.var->value;
+  auto it = properties.find(key);
+  return it != properties.end() ? &it->second : nullptr;
+}
+
+Variable* ClassObject::AcquireRefCell(std::string_view name, Arena& arena) {
+  RefCell& cell = ref_cells[std::string(name)];
+  if (cell.var == nullptr) {
+    cell.var = arena.Create<Variable>();
+    cell.var->value = GetProperty(name, arena);
+  }
+  ++cell.holders;
+  return cell.var;
+}
+
+void ClassObject::ReleaseRefCell(std::string_view name) {
+  auto it = ref_cells.find(std::string(name));
+  if (it == ref_cells.end() || --it->second.holders > 0) return;
+  Logic4Vec held = it->second.var->value;
+  ref_cells.erase(it);
+  SetPropertyForType(name, type, held);
+}
+
 Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
-  auto it = properties.find(key);
-  if (it != properties.end()) return it->second;
+  if (const Logic4Vec* held = FindPropertyValue(key)) return *held;
   const ClassTypeInfo* declarer =
       type != nullptr ? type->StaticPropertyDeclarer(name) : nullptr;
   if (declarer != nullptr) return declarer->static_properties.find(key)->second;
@@ -102,6 +128,8 @@ void ClassObject::SetProperty(std::string_view name, const Logic4Vec& raw) {
     return;
   }
   properties[key] = val;
+  if (auto cell = ref_cells.find(key); cell != ref_cells.end())
+    cell->second.var->value = val;
 }
 
 ModuleItem* ClassObject::ResolveVirtualMethod(
@@ -143,7 +171,13 @@ Logic4Vec ClassObject::GetPropertyForType(std::string_view name,
   for (const auto* t = declared_type; t != nullptr; t = t->parent) {
     std::string scoped = std::string(t->name) + "::" + std::string(name);
     auto it = properties.find(scoped);
-    if (it != properties.end()) return it->second;
+    if (it == properties.end()) continue;
+    // §13.5.2: a ref cell stands for the bare key, the storage `t` declares
+    // unless a level below shadows it.
+    auto cell = ref_cells.find(std::string(name));
+    if (cell != ref_cells.end() && BareNameIsDeclaredBy(name, t))
+      return cell->second.var->value;
+    return it->second;
   }
   return GetProperty(name, arena);
 }
@@ -174,7 +208,7 @@ void ClassObject::SetPropertyForType(std::string_view name,
     auto it = properties.find(scoped);
     if (it != properties.end()) {
       it->second = val;
-      if (BareNameIsDeclaredBy(name, t)) properties[std::string(name)] = val;
+      if (BareNameIsDeclaredBy(name, t)) SetProperty(name, val);
       return;
     }
   }
