@@ -487,4 +487,24 @@ TEST(ArrayAssignmentSimulation, DynamicArrayToAFixedSubarray) {
   EXPECT_EQ(kept->value.ToUint64(), 42u);
 }
 
+// §7.6 with §7.5: assigning a dynamic array of fixed-size arrays to another
+// copies every element, one never written as its default row: e[0] is d[0],
+// three zeros, and e[1][2] is the 5 written to d[1][2].
+TEST(ArrayAssignmentSimulation, DynamicArrayOfRowsCopiesEveryRow) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int d[][3], e[][3];\n"
+      "  initial begin\n"
+      "    d = new[2];\n"
+      "    d[1][2] = 5;\n"
+      "    e = d;\n"
+      "    $display(\"%0d %0d %0d %0d\", e.size(), e[0].size(), e[0][0],\n"
+      "             e[1][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 3 0 5\n");
+}
+
 }  // namespace

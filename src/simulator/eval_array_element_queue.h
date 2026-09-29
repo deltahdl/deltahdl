@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <string_view>
+
 namespace delta {
 
 struct ArrayInfo;
@@ -39,6 +42,15 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
 // elements and any other one value.
 QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
                                   SimContext& ctx, Arena& arena);
+
+// §7.12 with §7.10: binds the iterator `iter_name` of a with clause, in the
+// current scope, to the element at position `pos` of `outer`, a queue or
+// dynamic array whose elements are queues or fixed-size arrays: a local
+// queue holding a copy of that element's values, so that `item.sum()` and
+// `item[1]` read them.
+void BindElementQueueIterator(const QueueObject& outer, size_t pos,
+                              std::string_view iter_name, SimContext& ctx,
+                              Arena& arena);
 
 // §7.4 with §10.9 (printed pages 153 and 261): `q`, a queue or dynamic array
 // whose elements are queues, assigned the positional assignment pattern

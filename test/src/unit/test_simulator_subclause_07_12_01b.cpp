@@ -147,4 +147,29 @@ TEST(ArrayLocatorRows, FindWithoutAWithClauseIsReportedOnceIntoAQueueOfRows) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §7.12.1 with §7.10: over a queue whose elements are fixed-size arrays each
+// element a locator visits is one of those arrays: the rows whose sums pass 5
+// are 0 and 2, the row holding 9 at [1] is {0, 9, 0}, and the row of the
+// greatest sum is {4, 5, 6}.
+TEST(ArrayLocatorRows, LocatorsSeeEachElementOfAQueueOfArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int s[$][3], w[$][3], x[$][3];\n"
+      "  int qi[$];\n"
+      "  initial begin\n"
+      "    s.push_back('{4, 5, 6});\n"
+      "    s.push_back('{1, 1, 1});\n"
+      "    s.push_back('{0, 9, 0});\n"
+      "    qi = s.find_index with (item.sum() > 5);\n"
+      "    w = s.find with (item[1] == 9);\n"
+      "    x = s.max with (item.sum());\n"
+      "    $display(\"%p %0d %0d %0d %0d\", qi, w.size(), w[0][1], x.size(),\n"
+      "             x[0][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{0, 2} 1 9 1 6\n");
+}
+
 }  // namespace

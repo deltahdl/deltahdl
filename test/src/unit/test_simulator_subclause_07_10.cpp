@@ -690,4 +690,25 @@ TEST(QueueSim, AnEmptyConcatenationEmptiesAQueueOfArrays) {
   EXPECT_EQ(out, "0\n");
 }
 
+// §7.10 with §7.6: assigning one queue of fixed-size arrays to another copies
+// every element's values, so s holds r's two rows, and a later write to r
+// leaves s as it was.
+TEST(QueueSim, AssigningAQueueOfArraysCopiesEveryElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][3], s[$][3];\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r.push_back('{1, 2, 3});\n"
+      "    s = r;\n"
+      "    r[0][1] = 9;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", s.size(), s[0][0], s[0][1],\n"
+      "             s[1][2], r[0][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 4 5 3 9\n");
+}
+
 }  // namespace

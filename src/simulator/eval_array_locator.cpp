@@ -13,6 +13,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -52,6 +53,9 @@ struct LocatorCtx {
   // whose elements are values.
   std::string_view subarray_owner = {};
   const ArrayInfo* subarray_info = nullptr;
+  // §7.10: the queue or dynamic array whose elements are queues or fixed-size
+  // arrays, each of which the iterator is bound to; null for any other array.
+  const QueueObject* element_queue_owner = nullptr;
   // §7.12.4 with §7.4.2: the index of the first element, a fixed-size array's
   // low bound, which every reported index and the index iterator count from.
   uint32_t index_base = 0;
@@ -82,7 +86,10 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
 static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
                               size_t item_index) {
   lc.ctx.PushScope();
-  if (lc.subarray_info != nullptr) {
+  if (lc.element_queue_owner != nullptr) {
+    BindElementQueueIterator(*lc.element_queue_owner, item_index, lc.iter_name,
+                             lc.ctx, lc.arena);
+  } else if (lc.subarray_info != nullptr) {
     BindSubarrayIterator(SubarrayElement{lc.subarray_owner, *lc.subarray_info,
                                          static_cast<uint32_t>(item_index)},
                          lc.iter_name, lc.ctx, lc.arena);
@@ -531,15 +538,27 @@ struct IndexedLocatorInput {
   const ArrayInfo& info;
 };
 
+// §7.10: the queue or dynamic array `name` names, where `info` describes one
+// and its elements are queues or fixed-size arrays; null otherwise.
+static const QueueObject* QueueOfQueuesNamed(std::string_view name,
+                                             const ArrayInfo& info,
+                                             SimContext& ctx) {
+  if (!info.is_dynamic) return nullptr;
+  const QueueObject* q = ctx.FindQueue(name);
+  return q != nullptr && q->elements_are_queues ? q : nullptr;
+}
+
 // The iterator context of the indexed locator `in`, its indices counted from
 // the array's low bound and its iterator bound to each subarray where the
-// array's elements are subarrays.
+// array's elements are subarrays, or to each element's queue where they are
+// queues or fixed-size arrays kept as queues.
 static LocatorCtx MakeIndexedLocatorCtx(const IndexedLocatorInput& in) {
   const LocatorEnv& env = in.env;
   LocatorCtx lc =
       MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
   lc.index_base = in.info.lo;
   lc.is_descending = in.info.is_descending;
+  lc.element_queue_owner = QueueOfQueuesNamed(in.var_name, in.info, env.ctx);
   if (HasSubarrayElements(in.info)) {
     lc.subarray_owner = in.var_name;
     lc.subarray_info = &in.info;
@@ -686,14 +705,30 @@ static void DispatchIndexedLocator(std::string_view method,
   LocatorFindDispatch(method, lc, out);
 }
 
-// The offsets 0 to `count` - 1, one for each element of a multidimensional
-// array's first dimension.
-static std::vector<Logic4Vec> SubarrayOffsets(uint32_t count, Arena& arena) {
+// The offsets 0 to `count` - 1, one for each element of an array whose
+// elements are arrays.
+static std::vector<Logic4Vec> SubarrayOffsets(size_t count, Arena& arena) {
   std::vector<Logic4Vec> offsets;
   offsets.reserve(count);
-  for (uint32_t i = 0; i < count; ++i)
+  for (size_t i = 0; i < count; ++i)
     offsets.push_back(MakeLogic4VecVal(arena, 32, i));
   return offsets;
+}
+
+// The element list a locator over the array `name` walks: each element's
+// value, or, where the elements are arrays that no one value holds -- the
+// subarrays of a multidimensional array (§7.4.4) and the queues or
+// fixed-size arrays of a queue or dynamic array (§7.10) -- each element's
+// offset, which a locator that returns elements returns for
+// TryCollectLocatorRows to read the elements by.
+static std::vector<Logic4Vec> LocatorElements(std::string_view name,
+                                              const ArrayInfo& info,
+                                              SimContext& ctx, Arena& arena) {
+  if (HasSubarrayElements(info))
+    return SubarrayOffsets(info.dim_sizes[0], arena);
+  if (const QueueObject* q = QueueOfQueuesNamed(name, info, ctx))
+    return SubarrayOffsets(q->elements.size(), arena);
+  return CollectVecElements(name, info, ctx, arena);
 }
 
 static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
@@ -729,14 +764,7 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
     info = &queue_info;
   }
 
-  // §7.4.4: an element of a multidimensional array is a subarray, which no
-  // one value holds, so each stands in the element list as its offset into
-  // the first dimension; the with clause binds the subarray itself
-  // (SetupLocatorScope), and a locator that returns elements returns those
-  // offsets for TryCollectLocatorRows to read the rows by.
-  auto elems = HasSubarrayElements(*info)
-                   ? SubarrayOffsets(info->dim_sizes[0], arena)
-                   : CollectVecElements(parts.var_name, *info, ctx, arena);
+  auto elems = LocatorElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
   IndexedLocatorInput in{LocatorEnv{expr, ctx, arena}, elems, is_str,
@@ -772,11 +800,15 @@ bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
       !ReturnsElements(parts.method_name))
     return false;
   const ArrayInfo* info = ctx.FindArrayInfo(parts.var_name);
-  if (info == nullptr || info->dim_sizes.size() != 2) return false;
+  const QueueObject* queue = ctx.FindQueue(parts.var_name);
+  bool rows_of_array = info != nullptr && info->dim_sizes.size() == 2;
+  bool elements_of_queue = queue != nullptr && queue->elements_are_queues;
+  if (!rows_of_array && !elements_of_queue) return false;
   std::vector<Logic4Vec> picked;
   if (!CollectLocatorResult(expr, ctx, arena, picked)) return false;
   out.array_name = parts.var_name;
   out.info = info;
+  out.queue = elements_of_queue ? queue : nullptr;
   for (const Logic4Vec& offset : picked)
     out.offsets.push_back(static_cast<uint32_t>(offset.ToUint64()));
   return true;

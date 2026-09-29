@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -223,41 +225,122 @@ static void ResetToPlaceholders(QueueObject* q, size_t count, Arena& arena) {
   q->AssignFreshIds();
 }
 
-// §7.12.1 with §7.4.4: `q`, a queue whose elements are fixed-size arrays,
-// assigned the rows the locator `rhs` selects of a two-dimensional array
-// (TryCollectLocatorRows), holds one element per row, each a copy of the
-// row's elements. False, with `q` left alone, where `rhs` selects no rows.
-static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
-                                     SimContext& ctx, Arena& arena) {
-  LocatorRows rows;
-  if (!TryCollectLocatorRows(rhs, ctx, arena, rows)) return false;
-  ResetToPlaceholders(q, rows.offsets.size(), arena);
-  ElementQueueShape empty = ShapeOf(*q);
+// The queue of the element at position `pos` of `outer`, an array whose
+// elements are queues; null where that element's queue was never made.
+static const QueueObject* ElementQueueAt(const QueueObject& outer, size_t pos) {
+  auto it = outer.element_queues.find(outer.ElementQueueKeyAt(pos));
+  return it == outer.element_queues.end() ? nullptr : it->second;
+}
+
+// A copy of `src`, the queue of one element of an array whose elements are
+// queues, made in the shape `shape` gives the target's elements: each value
+// owning its words and the element type's fixed size kept. A null `src`, an
+// element whose queue was never made, copies as the shape's default. Queues
+// nested a level further down hold no values yet (#4587), so none are copied.
+static QueueObject* CopyElementQueue(const QueueObject* src,
+                                     const ElementQueueShape& shape,
+                                     Arena& arena) {
+  if (src == nullptr) return NewElementQueue(shape, arena);
+  ElementQueueShape empty = shape;
   empty.fixed_size = 0;
+  QueueObject* copy = NewElementQueue(empty, arena);
+  for (const Logic4Vec& value : src->elements)
+    copy->elements.push_back(OwnRhsWords(value, arena));
+  FitToFixedSize(copy, shape.fixed_size, arena);
+  copy->AllocateIdsForAppended();
+  return copy;
+}
+
+// §7.12.1 with §7.4.4: a copy of the row at `offset` of the two-dimensional
+// fixed-size array `rows` names, as an element queue of the shape `shape`
+// gives the target's elements.
+static QueueObject* CopyArrayRow(const LocatorRows& rows, uint32_t offset,
+                                 const ElementQueueShape& shape,
+                                 SimContext& ctx, Arena& arena) {
   ArrayInfo row_info;
   row_info.lo = rows.info->dim_los[1];
   row_info.size = rows.info->dim_sizes[1];
   row_info.elem_width = rows.info->elem_width;
   row_info.is_4state = rows.info->is_4state;
-  for (size_t i = 0; i < rows.offsets.size(); ++i) {
-    std::string row = std::string(rows.array_name) + "[" +
-                      std::to_string(rows.info->dim_los[0] + rows.offsets[i]) +
-                      "]";
-    QueueObject* element = NewElementQueue(empty, arena);
-    for (const Logic4Vec& leaf : CollectVecElements(row, row_info, ctx, arena))
-      element->elements.push_back(
-          OwnRhsWords(SizedForQueueElement(*element, leaf, arena), arena));
-    FitToFixedSize(element, q->element_array_size, arena);
-    element->AllocateIdsForAppended();
-    q->element_queues[q->ElementQueueKeyAt(i)] = element;
+  std::string row = std::string(rows.array_name) + "[" +
+                    std::to_string(rows.info->dim_los[0] + offset) + "]";
+  ElementQueueShape empty = shape;
+  empty.fixed_size = 0;
+  QueueObject* element = NewElementQueue(empty, arena);
+  for (const Logic4Vec& leaf : CollectVecElements(row, row_info, ctx, arena))
+    element->elements.push_back(
+        OwnRhsWords(SizedForQueueElement(*element, leaf, arena), arena));
+  FitToFixedSize(element, shape.fixed_size, arena);
+  element->AllocateIdsForAppended();
+  return element;
+}
+
+// §7.12.1 with §7.4.4: `q`, a queue whose elements are fixed-size arrays or
+// queues, assigned the elements the locator `rhs` selects of a
+// two-dimensional array (its rows) or of an array whose elements are queues
+// (TryCollectLocatorRows), holds one element per selection, each a copy of
+// the selected element's values. False, with `q` left alone, where `rhs`
+// selects no such elements.
+static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
+                                     SimContext& ctx, Arena& arena) {
+  LocatorRows rows;
+  if (!TryCollectLocatorRows(rhs, ctx, arena, rows)) return false;
+  ElementQueueShape shape = ShapeOf(*q);
+  std::vector<QueueObject*> copies;
+  copies.reserve(rows.offsets.size());
+  for (uint32_t offset : rows.offsets) {
+    copies.push_back(rows.queue != nullptr
+                         ? CopyElementQueue(ElementQueueAt(*rows.queue, offset),
+                                            shape, arena)
+                         : CopyArrayRow(rows, offset, shape, ctx, arena));
   }
+  ResetToPlaceholders(q, copies.size(), arena);
+  for (size_t i = 0; i < copies.size(); ++i)
+    q->element_queues[q->ElementQueueKeyAt(i)] = copies[i];
   return true;
+}
+
+// §7.6 with §7.10: `q`, a queue whose elements are queues, assigned `rhs`
+// naming another such queue, holds a copy of each of its elements' queues
+// (CopyElementQueue), made before `q` is emptied so that `q = q` keeps what it
+// held. False, with `q` left alone, where `rhs` names no such queue.
+static bool FillQueueFromQueueOfQueues(QueueObject* q, const Expr* rhs,
+                                       SimContext& ctx, Arena& arena) {
+  if (rhs->kind != ExprKind::kIdentifier &&
+      rhs->kind != ExprKind::kMemberAccess)
+    return false;
+  const QueueObject* src = FindQueueOfBase(rhs, ctx, arena);
+  if (src == nullptr || !src->elements_are_queues) return false;
+  std::vector<QueueObject*> copies;
+  copies.reserve(src->elements.size());
+  for (size_t i = 0; i < src->elements.size(); ++i)
+    copies.push_back(
+        CopyElementQueue(ElementQueueAt(*src, i), ShapeOf(*q), arena));
+  ResetToPlaceholders(q, copies.size(), arena);
+  for (size_t i = 0; i < copies.size(); ++i)
+    q->element_queues[q->ElementQueueKeyAt(i)] = copies[i];
+  return true;
+}
+
+void BindElementQueueIterator(const QueueObject& outer, size_t pos,
+                              std::string_view iter_name, SimContext& ctx,
+                              Arena& arena) {
+  const QueueObject* src = ElementQueueAt(outer, pos);
+  if (src == nullptr) src = NewElementQueue(ShapeOf(outer), arena);
+  QueueObject* item =
+      ctx.CreateQueue(iter_name, outer.elem_width, -1, outer.is_4state);
+  item->is_signed = outer.is_signed;
+  item->index_lo = src->index_lo;
+  item->index_descending = src->index_descending;
+  item->elements = src->elements;
+  item->AllocateIdsForAppended();
 }
 
 bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
                        Arena& arena) {
   if (!q->elements_are_queues) return false;
   if (FillQueueFromLocatorRows(q, pattern, ctx, arena)) return true;
+  if (FillQueueFromQueueOfQueues(q, pattern, ctx, arena)) return true;
   if (pattern->kind != ExprKind::kAssignmentPattern ||
       !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
     return false;
