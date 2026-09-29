@@ -171,11 +171,13 @@ inline bool ResolveVirtualInterfaceSignal(const Expr* signal, SimContext& ctx,
 inline Variable* ResolveMemberAccessSignal(const Expr* signal,
                                            SimContext& ctx) {
   Variable* var = nullptr;
-  if (signal->lhs && signal->lhs->kind == ExprKind::kIdentifier) {
-    auto* mgr = ctx.GetClockingManager();
-    std::string_view member = MemberAccessField(signal);
-    if (mgr && !member.empty())
-      var = mgr->ResolveClockingMember(signal->lhs->text, member, ctx);
+  auto* mgr = ctx.GetClockingManager();
+  std::string_view member = MemberAccessField(signal);
+  if (mgr && !member.empty() && signal->lhs != nullptr) {
+    // §14.15 with §25.5.5 and §25.9.1: a clockvar reached through a path to
+    // its interface instance names the same sample as the bare name does.
+    if (const ClockingBlock* block = ResolveClockingBlockOf(signal->lhs, ctx))
+      var = mgr->ClockvarVariable(*block, member, ctx);
   }
   if (!var && ResolveVirtualInterfaceSignal(signal, ctx, &var)) return var;
   if (!var) {

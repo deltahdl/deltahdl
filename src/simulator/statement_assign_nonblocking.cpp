@@ -585,16 +585,15 @@ static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
 static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
                                                 SimContext& ctx,
                                                 std::string_view* block_name) {
-  if (lhs->kind != ExprKind::kMemberAccess) return nullptr;
-  if (lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier) {
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr) {
     return nullptr;
   }
-  auto* mgr = ctx.GetClockingManager();
-  if (mgr == nullptr) return nullptr;
   // §23.9: a clockvar spells its block by the bare name the module declared, so
   // the block it reaches is the one belonging to the instance the assignment is
-  // running in.
-  const ClockingBlock* block = mgr->FindInScope(lhs->lhs->text, ctx);
+  // running in. §25.5.5 and §25.9.1: or by a path to its interface instance,
+  // `b1.sb.b` or `vif.sb.b` (ResolveClockingBlockOf); only the bare name was
+  // taken, and a drive through any path was dropped.
+  const ClockingBlock* block = ResolveClockingBlockOf(lhs->lhs, ctx);
   if (block == nullptr) return nullptr;
   std::string_view member = lhs->text;
   if (lhs->rhs != nullptr && lhs->rhs->kind == ExprKind::kIdentifier) {
@@ -630,14 +629,65 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
 // member access, so they are not clockvars to this function and take the
 // ordinary path, which finds no variable for them and drops them. That is the
 // state they were already in.
+//
+// §14.16 (printed pages 368-369): the drive's `##N`, `cycles`, postpones the
+// update by N cycles of the clockvar's block after the drive's governing
+// event, the right-hand side having been evaluated already; `##0` is no delay.
 static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
-                                     SimContext& ctx) {
+                                     SimContext& ctx, uint32_t cycles = 0) {
   std::string_view block_name;
   const ClockingSignal* sig = FindClockvarSignal(lhs, ctx, &block_name);
   if (sig == nullptr) return false;
-  ctx.GetClockingManager()->ScheduleOutputDrive(block_name, sig->signal_name,
-                                                rhs_val.ToUint64(), ctx,
-                                                ctx.GetScheduler());
+  ctx.GetClockingManager()->ScheduleCycleDelayedDrive(
+      block_name, sig->signal_name, ClockingValue::Of(rhs_val), cycles, ctx,
+      ctx.GetScheduler());
+  return true;
+}
+
+// An integer literal standing for the index `v` the drive evaluated.
+static Expr* IndexLiteral(const Expr* like, const Logic4Vec& v, Arena& arena) {
+  auto* literal = arena.Create<Expr>();
+  literal->kind = ExprKind::kIntegerLiteral;
+  literal->range = like->range;
+  std::string text = std::to_string(v.ToUint64());
+  literal->text = {arena.AllocString(text.data(), text.size()), text.size()};
+  literal->int_val = v.ToUint64();
+  return literal;
+}
+
+// §14.16 (printed page 368): a synchronous drive's target may be a bit-select
+// or a slice of a clockvar, `cb.q[2]` or `cb.q[7:4]`, which drives that part
+// of the signal alone. The indices are evaluated where the drive runs, as its
+// right-hand side is, and the drive assigns the same select of the signal
+// itself at its clocking event. A select was no clockvar to
+// TryScheduleClockvarDrive, found no variable on the ordinary path, and was
+// dropped.
+static bool TryScheduleClockvarSelectDrive(const Expr* lhs,
+                                           const Logic4Vec& rhs_val,
+                                           uint32_t cycles, SimContext& ctx,
+                                           Arena& arena) {
+  if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr ||
+      lhs->base->kind != ExprKind::kMemberAccess || lhs->index == nullptr) {
+    return false;
+  }
+  std::string_view block_name;
+  const ClockingSignal* sig = FindClockvarSignal(lhs->base, ctx, &block_name);
+  if (sig == nullptr || sig->target_expr != nullptr) return false;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->range = lhs->base->range;
+  base->text = sig->target_path.empty() ? sig->signal_name : sig->target_path;
+  auto* target = arena.Create<Expr>(*lhs);
+  target->base = base;
+  target->index =
+      IndexLiteral(lhs->index, EvalExpr(lhs->index, ctx, arena), arena);
+  if (lhs->index_end != nullptr) {
+    target->index_end = IndexLiteral(
+        lhs->index_end, EvalExpr(lhs->index_end, ctx, arena), arena);
+  }
+  ctx.GetClockingManager()->ScheduleCycleDelayedDrive(
+      block_name, sig->signal_name, ClockingValue::Of(rhs_val), cycles, ctx,
+      ctx.GetScheduler(), target);
   return true;
 }
 
@@ -700,6 +750,21 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   LhsIndexPin pin(stmt->lhs, ctx, arena);
 
   const Logic4Vec& rhs_val = sample.value;
+  // §14.16: a synchronous drive's cycle delay is read off the statement here,
+  // where it executes; dropped, `cb.v <= ##2 r` updated v in the current
+  // cycle.
+  uint32_t cycles =
+      stmt->cycle_delay != nullptr
+          ? static_cast<uint32_t>(
+                EvalExpr(stmt->cycle_delay, ctx, arena).ToUint64())
+          : 0;
+  if (stmt->cycle_delay != nullptr &&
+      stmt->lhs->kind == ExprKind::kMemberAccess &&
+      TryScheduleClockvarDrive(stmt->lhs, rhs_val, ctx, cycles)) {
+    return;
+  }
+  if (TryScheduleClockvarSelectDrive(stmt->lhs, rhs_val, cycles, ctx, arena))
+    return;
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;

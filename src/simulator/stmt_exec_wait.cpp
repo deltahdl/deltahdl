@@ -18,6 +18,7 @@
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -209,11 +210,35 @@ void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
   CollectStaticPropertyReads(expr, ctx, reads);
 }
 
+// §14.15 with §25.5.5 and §25.9.1: a clockvar the condition reads, through
+// whatever path reaches its block -- `cb.gnt`, `b1.sb.gnt`, `vif.sb.gnt` --
+// changes when its block samples a new value, which the block's sample
+// variable holds under the clockvar's full name. That name is read here, so
+// the wait wakes on the sample. Read by the path it was spelled with, the
+// clockvar named no variable and the wait never woke.
+static void CollectClockvarReads(const Expr* cond, SimContext& ctx,
+                                 std::unordered_set<std::string>& reads) {
+  auto* mgr = ctx.GetClockingManager();
+  if (mgr == nullptr) return;
+  ForEachSubExpr(cond, [&](const Expr* e) {
+    if (e->kind != ExprKind::kMemberAccess || e->lhs == nullptr) return;
+    const ClockingBlock* block = ResolveClockingBlockOf(e->lhs, ctx);
+    if (block == nullptr) return;
+    std::string_view field =
+        e->rhs != nullptr && e->rhs->kind == ExprKind::kIdentifier
+            ? e->rhs->text
+            : e->text;
+    if (mgr->FindBlockSignal(*block, field) == nullptr) return;
+    reads.insert(std::string(block->name) + "." + std::string(field));
+  });
+}
+
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
+  CollectClockvarReads(stmt->condition, ctx, reads);
   CollectMethodReceiverReads(stmt->condition, reads);
   CollectStaticPropertyReads(stmt->condition, ctx, reads);
   CollectPackageScopedReads(stmt->condition, ctx, reads);
@@ -305,9 +330,12 @@ ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto val = EvalExpr(stmt->cycle_delay, ctx, arena);
     cycles = static_cast<uint32_t>(val.ToUint64());
   }
-  if (cycles > 0) {
-    co_await CycleDelayAwaiter{ctx, cycles};
-  }
+  // §14.11 (printed page 361): a zero count is a wait too -- `##0`, or
+  // `##(n)` with n at 0, suspends until the clocking block event of a time
+  // step in which it has not yet occurred -- so it reaches the awaiter, whose
+  // await_ready lets it through where the event has occurred. Skipped for a
+  // zero count, every `##0` ran on at once.
+  co_await CycleDelayAwaiter{ctx, cycles};
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);
   }

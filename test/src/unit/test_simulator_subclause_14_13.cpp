@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -252,6 +253,37 @@ TEST(InputSamplingSim, InoutClockvarReadYieldsSampledValue) {
   f.scheduler.Run();
 
   EXPECT_EQ(ReadClockvar(f, "cb", "data"), 0x5Au);
+}
+
+// §14.13 (printed page 366) with §6.3 and §14.16: an input clockvar reads
+// its sample whole and a drive writes its value whole -- the x and z bits of
+// a 4-state signal and every bit of one wider than 64. Kept as 64 known bits,
+// 1x0z read as 1000, the 96-bit input lost its top word, and the drives wrote
+// 0100 and the low 64 bits alone.
+TEST(ClockingSampleSim, ClockvarKeepsUnknownBitsAndEveryWord) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic [3:0] a = 4'b1x0z, r = 0;\n"
+      "  logic [95:0] w = {32'hAAAA_BBBB, 64'h1111_2222_3333_4444}, v = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, w;\n"
+      "    output r, v;\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin\n"
+      "    @(cb);\n"
+      "    cb.r <= 4'bz1x0;\n"
+      "    cb.v <= {32'hCCCC_DDDD, 64'h5555_6666_7777_8888};\n"
+      "    #1 $display(\"%b %h %b %h\", cb.a, cb.w, r, v);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "1x0z aaaabbbb1111222233334444 z1x0 ccccdddd5555666677778888\n"
+            "$finish at time 6\n");
 }
 
 }  // namespace

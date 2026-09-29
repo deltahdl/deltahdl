@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -269,6 +270,65 @@ TEST(ClockingSkewSim, DefaultSkewValues) {
 
   EXPECT_EQ(cmgr.GetInputSkew("cb", "data").ticks, 0u);
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "data").ticks, 0u);
+}
+
+// §14.4 (printed page 356) with §14.3: an input with a numeric skew samples
+// the signal that many time units before the clocking event, so at the edge
+// at 15 `#1` reads the 14 written at 14, `#3` the 12 written at 12, a block's
+// `default input #2` and a parameter skew `#S` the 13 written at 13, and
+// `#1step` the 14 standing before the edge's step. The skew was dropped, and
+// every input read what d held at the edge.
+TEST(ClockingSkewSim, NumericInputSkewSamplesThatLongBeforeTheEdge) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  parameter S = 2;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] d = 11;\n"
+      "  clocking c1 @(posedge clk); input #1 d; endclocking\n"
+      "  clocking c2 @(posedge clk); input #3 d; endclocking\n"
+      "  clocking c3 @(posedge clk); input #1step d; endclocking\n"
+      "  clocking c4 @(posedge clk); default input #2; input d; endclocking\n"
+      "  clocking c5 @(posedge clk); input #S d; endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin #12 d = 12; #1 d = 13; #1 d = 14; #1 d = 15; end\n"
+      "  initial begin\n"
+      "    @(posedge clk); @(posedge clk); #0;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", c1.d, c2.d, c3.d, c4.d, c5.d);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "14 12 14 13 13\n$finish at time 15\n");
+}
+
+// §14.3 (printed pages 355-356): a skew may be an edge of the clock. `input
+// negedge d` samples d at the negedge preceding the clocking event -- the 2
+// written at 7, not the 3 written at 12 -- and `output negedge q` drives q at
+// the negedge following the drive's event, 10 rather than the posedge at 5.
+// Both were taken for a zero skew: 3, and q at 6 by 9.
+TEST(ClockingSkewSim, EdgeSkewSamplesAndDrivesAtThatEdge) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] d = 1, q = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input negedge d;\n"
+      "    output negedge q;\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin #7 d = 2; #5 d = 3; end\n"
+      "  initial begin\n"
+      "    @(posedge clk); cb.q <= 6;\n"
+      "    #4 $write(\"%0d \", q);\n"
+      "    #2 $write(\"%0d \", q);\n"
+      "    @(cb); $display(\"%0d\", cb.d);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 6 2\n$finish at time 15\n");
 }
 
 }  // namespace

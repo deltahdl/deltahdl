@@ -471,4 +471,29 @@ TEST(ClockingBlockEventSim, AChildInstancesBlockTriggersItsOwnEvent) {
   EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
+// §14.3 (printed pages 354-355) with §15.5: the clocking event may be a
+// named event, so `clocking cb @(e)` samples its inputs and fires its own
+// event at each trigger of e: at 4, reading the 2 standing before the step,
+// and at 9, reading the 3 written at 5. A named event makes no edge, the block
+// waited for one, and `@(cb)` never woke.
+TEST(ClockingBlockEventSim, NamedEventClocksTheBlock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  event e;\n"
+      "  logic [7:0] d = 1;\n"
+      "  clocking cb @(e);\n"
+      "    input d;\n"
+      "  endclocking\n"
+      "  initial begin #2 d = 2; #2 -> e; #1 d = 3; #4 -> e; end\n"
+      "  initial begin\n"
+      "    @(cb); $write(\"%0t:%0d \", $time, cb.d);\n"
+      "    @(cb); $display(\"%0t:%0d\", $time, cb.d);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4:2 9:3\n$finish at time 9\n");
+}
+
 }  // namespace

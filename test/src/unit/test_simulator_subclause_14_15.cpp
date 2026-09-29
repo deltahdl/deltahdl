@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -202,6 +203,36 @@ TEST(SyncEventSim, OutputClockingSignalHasNoSynchronousValue) {
   f.scheduler.Run();
 
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0u);
+}
+
+// §14.15 (printed page 367): an event control on an input clockvar is
+// synchronised to the clocking event, waking on a change of the value the
+// clockvar sampled. So `@(cb.d)` wakes at 15, where the 2 written at 7 is
+// sampled; `@(posedge cb.en)` misses the pulse at 7-8 that no edge samples and
+// wakes at 25; and `@(posedge cb.a or cb.b)` wakes at 15 on b's sample. Bound
+// to the signals, each woke on the raw change: 7, 7 and 12.
+TEST(ClockvarEventSim, EventControlOnAClockvarWakesAtItsSample) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] d = 1, b = 1;\n"
+      "  logic en = 0, a = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input d, en, a, b;\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin #7 d = 2; en = 1; #1 en = 0; #4 b = 9; #6 en = 1; end\n"
+      "  initial begin @(cb.d); $write(\"%0t:%0d \", $time, cb.d); end\n"
+      "  initial begin @(posedge cb.a or cb.b); $write(\"%0t:%0d \", $time, "
+      "cb.b); end\n"
+      "  initial begin\n"
+      "    @(posedge cb.en); $display(\"%0t\", $time);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "15:2 15:9 25\n$finish at time 25\n");
 }
 
 }  // namespace

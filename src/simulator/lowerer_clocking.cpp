@@ -1,5 +1,6 @@
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "common/arena.h"
@@ -13,6 +14,7 @@
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -56,7 +58,10 @@ bool IsOneStepSkew(const Expr* delay) {
 // is carried by the mark above instead.
 SimTime ClockingSkewOf(const Expr* delay, const ClockingLowerScope& scope) {
   if (delay == nullptr || IsOneStepSkew(delay)) return SimTime{0};
-  return SimTime{EvalExpr(delay, scope.ctx, scope.arena).ToUint64()};
+  // §14.4: a skew is a delay, in the declaring scope's time unit or the unit
+  // it writes, `#2ns`, so it is scaled to ticks as any delay is.
+  return SimTime{
+      DelayValueToTicks(EvalExpr(delay, scope.ctx, scope.arena), scope.ctx)};
 }
 
 // §14.3 gives each clocking_item an optional clocking_skew and §14.4 has the
@@ -76,6 +81,26 @@ const Expr* SkewExprOf(const ClockingSignalDecl& decl, const ModuleItem* item,
   return own != nullptr ? own : item->default_output_skew_delay;
 }
 
+// §14.3's clocking_skew written as an edge, `input negedge d`, for the
+// sampling side of an input or inout item and the driving side of an output
+// or inout one, read as SkewExprOf reads the delay: the item's own skew where
+// it wrote one, the block's default otherwise. An output-only item keeps its
+// skew in the first pair of fields, an inout in the second.
+Edge SampleEdgeOf(const ClockingSignalDecl& decl, const ModuleItem* item) {
+  if (decl.skew_edge != Edge::kNone || decl.skew_delay != nullptr)
+    return decl.skew_edge;
+  return item->default_input_skew_edge;
+}
+
+Edge DriveEdgeOf(const ClockingSignalDecl& decl, const ModuleItem* item,
+                 ClockingDir dir) {
+  Edge own = dir == ClockingDir::kOutput ? decl.skew_edge : decl.out_skew_edge;
+  const Expr* own_delay =
+      dir == ClockingDir::kOutput ? decl.skew_delay : decl.out_skew_delay;
+  if (own != Edge::kNone || own_delay != nullptr) return own;
+  return item->default_output_skew_edge;
+}
+
 ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
                                 const ModuleItem* item,
                                 const ClockingLowerScope& scope) {
@@ -91,6 +116,10 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
     BuildLhsName(decl.hier_expr, path);
     if (!path.empty()) {
       sig.target_path = *scope.arena.Create<std::string>(std::move(path));
+    } else {
+      // §14.5 (printed pages 357-358): an expression that is no name, a slice
+      // or a concatenation, is sampled and driven as the expression it is.
+      sig.target_expr = decl.hier_expr;
     }
   }
   sig.direction = ClockingDirOf(decl.direction);
@@ -101,6 +130,10 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
   // in the Preponed one, so a stated zero is not the same as a stated nothing.
   sig.is_explicit_zero_skew =
       skew != nullptr && !sig.is_one_step_skew && sig.skew.ticks == 0;
+  if (sig.direction != ClockingDir::kOutput)
+    sig.sample_edge = SampleEdgeOf(decl, item);
+  if (sig.direction != ClockingDir::kInput)
+    sig.drive_edge = DriveEdgeOf(decl, item, sig.direction);
   return sig;
 }
 
@@ -120,9 +153,23 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
 // resolved from the block's instance when the watcher attaches
 // (ClockingManager::Attach). Dropped here, the block never fired and a process
 // waiting in `@(cb)` waited for ever.
+//
+// §14.3 (printed page 355) makes the identifier optional for the default and
+// the global clocking, which the source reaches through `##` and
+// `$global_clock` rather than by name, so such a block is registered under a
+// name no source can spell. Dropped for want of one, an unnamed `default
+// clocking @(posedge clk)` was no default and every `##` ran on at once.
+std::string_view RegisteredBlockName(const ModuleItem* item) {
+  if (!item->name.empty()) return item->name;
+  if (item->is_default_clocking) return "$default_clocking";
+  if (item->is_global_clocking) return "$global_clocking";
+  return {};
+}
+
 std::optional<ClockingBlock> BuildClockingBlock(
     const ModuleItem* item, const ClockingLowerScope& scope) {
-  if (item->name.empty() || item->clocking_event.empty()) return std::nullopt;
+  std::string_view own_name = RegisteredBlockName(item);
+  if (own_name.empty() || item->clocking_event.empty()) return std::nullopt;
   const Expr* clock = item->clocking_event[0].signal;
   if (clock == nullptr || (clock->kind != ExprKind::kIdentifier &&
                            clock->kind != ExprKind::kMemberAccess)) {
@@ -135,7 +182,7 @@ std::optional<ClockingBlock> BuildClockingBlock(
   // name a reference in that instance spells. Both strings are arena-persisted
   // because the manager keys on a string_view.
   block.name = *scope.arena.Create<std::string>(scope.inst_prefix +
-                                                std::string(item->name));
+                                                std::string(own_name));
   block.inst_prefix = *scope.arena.Create<std::string>(scope.inst_prefix);
   if (clock->kind == ExprKind::kIdentifier && clock->scope_prefix.empty()) {
     block.clock_signal = clock->text;
@@ -174,6 +221,19 @@ std::optional<ClockingBlock> BuildClockingBlock(
 // reaches the running instance's block through ClockingManager::FindInScope.
 void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
   for (const ModuleItem* item : mod->clocking_blocks) {
+    // §14.12 (printed page 362): `default clocking busB;` declares no block
+    // but makes the one of that name, declared in the same scope, the default,
+    // so what is recorded is that block's registered name. Dropped for its want
+    // of a clocking event, it made no block the default.
+    if (item->is_default_clocking && item->clocking_event.empty() &&
+        !item->name.empty()) {
+      auto& mgr = ctx_.AcquireClockingManager();
+      std::string_view named =
+          *arena_.Create<std::string>(inst_prefix_ + std::string(item->name));
+      mgr.SetDefaultClocking(named);
+      mgr.SetScopeDefaultClocking(inst_prefix_, named);
+      continue;
+    }
     ClockingLowerScope scope{inst_prefix_, ctx_, arena_};
     auto block = BuildClockingBlock(item, scope);
     if (!block.has_value()) continue;
@@ -182,7 +242,10 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     // §14.12: "the default clocking" and §14.14's global clocking are the two
     // the source can name without naming the block, so which block each is has
     // to be recorded beside the registration.
-    if (item->is_default_clocking) mgr.SetDefaultClocking(block->name);
+    if (item->is_default_clocking) {
+      mgr.SetDefaultClocking(block->name);
+      mgr.SetScopeDefaultClocking(inst_prefix_, block->name);
+    }
     if (item->is_global_clocking) mgr.SetGlobalClocking(block->name);
 
     // §14.10: "Upon processing its specified clocking event, a clocking block

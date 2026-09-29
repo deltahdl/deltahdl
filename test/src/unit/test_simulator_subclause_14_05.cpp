@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
@@ -135,6 +137,35 @@ TEST(ClockingHierExprSim, OutputClockvarDrivesTheSignalItsExpressionNames) {
           "endprogram\n",
           f),
       "mod d=5 at 5\n");
+}
+
+// §14.5 (printed pages 357-358): a clockvar may be bound to an expression that
+// is no name. An input bound to a concatenation of slices samples the whole
+// concatenation under its own name, and an output bound to a slice drives
+// that slice alone. With no variable of the clockvar's name, the input read x
+// and the drive landed nowhere, leaving q at 11110000.
+TEST(ClockingHierExprSim, ClockvarBoundToASliceOrConcatenation) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic clk = 0;\n"
+          "  logic [3:0] opcode = 4'b1010, regA = 4'b0110, regB = 4'b0101;\n"
+          "  logic [7:0] q = 8'b11110000;\n"
+          "  clocking cb @(posedge clk);\n"
+          "    input instr = {opcode, regA, regB[3:1]};\n"
+          "    output nib = q[3:0];\n"
+          "  endclocking\n"
+          "  always #5 clk = ~clk;\n"
+          "  initial begin\n"
+          "    @(cb);\n"
+          "    cb.nib <= 4'b0101;\n"
+          "    #1 $display(\"%b %b\", cb.instr, q);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "10100110010 11110101\n$finish at time 6\n");
 }
 
 }  // namespace

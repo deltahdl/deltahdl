@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -85,6 +87,52 @@ TEST(ModportConnectionSim, TwoModportsOfOneInstanceShareItsMembers) {
                        "endmodule\n",
                        f),
             "m x=9\ns y=5\ntop x=9 y=5\n");
+}
+
+// §25.5.5 and §25.9.1 (printed pages 791-792 and 803) with §14: a clocking
+// block is a member of the interface declaring it, sampled and driven at its
+// event through every name denoting the instance -- the instance's own path,
+// `b1.sb.req <= 1`; a class property of the clocking modport's virtual
+// interface type, `@(vif.sb)` and `vif.sb.a`; and a formal of that type,
+// `wait (s.sb.gnt == 1)`. The drive through the path was dropped, the read
+// through the virtual interface gave 0, and the wait never woke.
+TEST(ModportConnectionSim,
+     InterfaceClockingBlockThroughEveryNameOfTheInstance) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface A_Bus(input logic clk);\n"
+      "  logic req, gnt, a;\n"
+      "  clocking sb @(posedge clk);\n"
+      "    input gnt, a;\n"
+      "    output req;\n"
+      "  endclocking\n"
+      "  modport STB(clocking sb);\n"
+      "endinterface\n"
+      "typedef virtual A_Bus.STB SYNCTB;\n"
+      "class Tb;\n"
+      "  virtual A_Bus.STB vif;\n"
+      "  function new(virtual A_Bus.STB v); vif = v; endfunction\n"
+      "  task run(); @(vif.sb); $write(\"%0t:%0d \", $time, vif.sb.a); "
+      "endtask\n"
+      "endclass\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  A_Bus b1(clk);\n"
+      "  always @(posedge clk) b1.gnt <= b1.req;\n"
+      "  task automatic wait_grant(SYNCTB s); wait (s.sb.gnt == 1); endtask\n"
+      "  initial begin\n"
+      "    automatic Tb tb = new(b1);\n"
+      "    b1.req = 0; b1.gnt = 0; b1.a = 1;\n"
+      "    b1.sb.req <= 1;\n"
+      "    tb.run();\n"
+      "    wait_grant(b1);\n"
+      "    $display(\"%0t %0d\", $time, b1.req);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5:1 25 1\n$finish at time 25\n");
 }
 
 }  // namespace

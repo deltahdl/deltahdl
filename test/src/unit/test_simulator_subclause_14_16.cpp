@@ -206,7 +206,9 @@ TEST(SyncDriveSim, DriveToAnInputClockvarLeavesTheSignalAlone) {
 
 // §14.16's synchronous drive, written against a block a child instance
 // declares. The clockvar names the block by the bare name the child's module
-// declared, and the signal it drives is the child instance's own.
+// declared, and the signal it drives is the child instance's own. The drive
+// runs at 5, between clocking events, so it lands at the block's event at 7
+// (printed page 369).
 TEST(SyncDriveSim, AChildInstancesClockvarDrivesThatInstancesSignal) {
   SimFixture f;
   auto* sig = RunAndFindVar(
@@ -220,6 +222,7 @@ TEST(SyncDriveSim, AChildInstancesClockvarDrivesThatInstancesSignal) {
       "module top;\n"
       "  logic clk = 1'b0;\n"
       "  leaf u(.clk(clk));\n"
+      "  initial #7 clk = 1'b1;\n"
       "  initial #10 $finish;\n"
       "endmodule\n",
       f, "u.sig");
@@ -344,6 +347,93 @@ TEST(SyncDriveSim, ProgramDriveReachesTheDesignAtTheNextEdge) {
                        "endmodule\n",
                        f),
             "dut t=15 in=55\n$finish at time 15\n");
+}
+
+// §14.16 (printed pages 368-369): a drive's cycle delay evaluates its right-
+// hand side at once and postpones the update by that many cycles after the
+// drive's governing event, so `cb.v <= ##2 r` run at the event at 5 drives the
+// 5 r held then at 25, the 6 written after it unseen, and drives with other
+// delays in one process mature in their own cycles. The delay was dropped:
+// every drive landed in the cycle it ran in, v read 5 at 15, and the drives of
+// the second process at 5 and 15 read 3 and 2.
+TEST(SyncDriveSim, DriveWithACycleDelayMaturesThatManyCyclesLater) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] v = 1, w = 0, r = 5;\n"
+                       "  default clocking cb @(posedge clk);\n"
+                       "    output v, w;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin @(cb); cb.v <= ##2 r; r = 6; end\n"
+                       "  initial begin\n"
+                       "    ##1; cb.w <= 1; cb.w <= ##2 3; ##1 cb.w <= 2;\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #6 $write(\"%0d %0d \", v, w);\n"
+                       "    #10 $write(\"%0d %0d \", v, w);\n"
+                       "    #10 $display(\"%0d %0d\", v, w);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1 1 2 5 3\n$finish at time 26\n");
+}
+
+// §14.16 (printed page 368): a drive's target may be a bit-select or a slice
+// of a clockvar, which drives that part of the signal alone and leaves the
+// rest, the index read where the drive runs; a cycle delay applies to it as
+// to the whole clockvar. Neither form was a clockvar to the drive, and both
+// were dropped: q stayed 00000000.
+TEST(SyncDriveSim, DriveToABitSelectOrSliceOfAClockvar) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] q = 8'b00000000;\n"
+                       "  int i = 2;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    output q;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    cb.q[i] <= 1'b1;\n"
+                       "    cb.q[7:4] <= 4'b1010;\n"
+                       "    cb.q[1:0] <= ##1 2'b11;\n"
+                       "    i = 0;\n"
+                       "    #1 $write(\"%b \", q);\n"
+                       "    #10 $display(\"%b\", q);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "10100100 10100111\n$finish at time 16\n");
+}
+
+// §14.16 (printed page 369): a drive executed at a time not coincident with
+// its clocking event does not block, evaluates its right-hand side at once and
+// performs its drive action as if it had executed at the next clocking event.
+// So `#3 cb.v <= r` leaves v 0 at 4 and drives it at 5 with the 5 r held at 3.
+// The drive was placed where it ran, and v read 5 at 4.
+TEST(SyncDriveSim, DriveBetweenClockingEventsMaturesAtTheNextEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] v = 0, r = 5;\n"
+                       "  default clocking cb @(posedge clk);\n"
+                       "    output v;\n"
+                       "  endclocking\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin\n"
+                       "    #3 cb.v <= r;\n"
+                       "    r = 6;\n"
+                       "    #1 $write(\"%0d \", v);\n"
+                       "    #2 $display(\"%0d\", v);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 5\n$finish at time 6\n");
 }
 
 }  // namespace

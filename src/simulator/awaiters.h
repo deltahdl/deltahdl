@@ -694,7 +694,7 @@ struct CycleDelayAwaiter {
     // current time step.
     auto* mgr = ctx.GetClockingManager();
     if (!mgr) return true;
-    auto block_name = mgr->GetDefaultClocking();
+    auto block_name = mgr->DefaultClockingFor(ctx);
     if (block_name.empty()) return true;
     return mgr->ZeroCycleDelayProceeds(block_name, ctx.CurrentTime());
   }
@@ -705,7 +705,7 @@ struct CycleDelayAwaiter {
       h.resume();
       return;
     }
-    auto block_name = mgr->GetDefaultClocking();
+    auto block_name = mgr->DefaultClockingFor(ctx);
     if (block_name.empty()) {
       h.resume();
       return;
@@ -713,26 +713,25 @@ struct CycleDelayAwaiter {
     auto* proc = ctx.CurrentProcess();
     if (cycles == 0) {
       // §14.11: a ##0 whose clocking event has not yet occurred this time step
-      // suspends until that event fires, then proceeds. Resume exactly once.
-      auto* done = new bool(false);
-      mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
-                                [h, done, proc, &ctx = ctx]() mutable {
-                                  if (*done) return;
-                                  *done = true;
-                                  delete done;
-                                  ResumeIn(h, proc, ctx);
-                                });
+      // suspends until that event fires, then proceeds.
+      mgr->RegisterEdgeWait(block_name, [h, proc, &ctx = ctx]() {
+        ResumeIn(h, proc, ctx);
+        return false;
+      });
       return;
     }
-    auto* counter = new uint32_t(cycles);
-    mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
-                              [h, counter, proc, &ctx = ctx]() mutable {
-                                if (*counter > 0) --(*counter);
-                                if (*counter == 0) {
-                                  delete counter;
-                                  ResumeIn(h, proc, ctx);
-                                }
-                              });
+    // §14.11: a ##N waits for N clocking block events, and one executed in the
+    // time step of an event waits a full cycle for its first, so an event of
+    // the step the wait began in is not one of the N. Counted, `@(cb); ##1`
+    // and two consecutive `##2` each ran one cycle short.
+    SimTime start = ctx.CurrentTime();
+    mgr->RegisterEdgeWait(
+        block_name, [h, proc, start, remaining = cycles, &ctx = ctx]() mutable {
+          if (ctx.CurrentTime() == start) return true;
+          if (--remaining > 0) return true;
+          ResumeIn(h, proc, ctx);
+          return false;
+        });
   }
 
   // §9.7 with §14.11: resumes `h` as DelayAwaiter's event does, in the process

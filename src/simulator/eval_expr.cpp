@@ -449,29 +449,6 @@ bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §14.13: reading a clockvar (cb.data) yields the value sampled at the clocking
-// block's most recent input event, not the signal's live value.
-// ResolveClockingMember confirms `base_name` names a clocking block carrying
-// signal `field_name` and yields the underlying variable for its width. Returns
-// true and fills `out` when the access resolved to a clockvar.
-static bool TryClockvarMemberAccess(std::string_view base_name,
-                                    std::string_view field_name,
-                                    SimContext& ctx, Arena& arena,
-                                    Logic4Vec& out) {
-  auto* mgr = ctx.GetClockingManager();
-  if (!mgr) return false;
-  // §23.9: `cb.data` spells the block by the bare name the module declared, so
-  // the sampled value read back is the one belonging to the instance this
-  // expression is running in, which is what the block was registered under.
-  const ClockingBlock* block = mgr->FindInScope(base_name, ctx);
-  if (block == nullptr) return false;
-  auto* sig_var = mgr->ResolveClockingMember(base_name, field_name, ctx);
-  if (!sig_var) return false;
-  uint64_t sampled = mgr->GetSampledValue(block->name, field_name);
-  out = MakeLogic4VecVal(arena, sig_var->value.width, sampled);
-  return true;
-}
-
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
                                      SimContext& ctx, Arena& arena,
@@ -718,6 +695,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryEvalStringMethodWithoutParens(expr, ctx, arena, out)) return out;
   if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
+  if (TryClockvarPathRead(expr, ctx, arena, out)) return out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 
   if (TryObjectMemberRead(expr, ctx, arena, out)) return out;

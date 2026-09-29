@@ -10,6 +10,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -185,6 +186,18 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
     // so a continuous assign driven through the port reaches the shared net and
     // the value is observable on the connected interface instance.
     ctx_.AliasNet(*alias, target);
+    ctx_.AliasVariable(*alias, target);
+  }
+  // §25.5.5 (printed pages 791-792): the interface's clocking blocks are its
+  // members too, reached through the port as `b1.sb` is from the program the
+  // port is declared in, so each block, and the event variable §14.10 names by
+  // it, answers to the port's name for it.
+  for (const ModuleItem* cb : ifc->clocking_blocks) {
+    if (cb->name.empty()) continue;
+    auto* alias =
+        arena_.Create<std::string>(port_prefix + std::string(cb->name));
+    std::string target = conn_prefix + std::string(cb->name);
+    ctx_.AcquireClockingManager().AddBlockAlias(*alias, target);
     ctx_.AliasVariable(*alias, target);
   }
   return true;

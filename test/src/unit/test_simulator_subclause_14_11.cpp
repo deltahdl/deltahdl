@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -156,6 +157,86 @@ TEST(CycleDelaySim, ClassTaskResumedFromACycleDelayWritesItsObject) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 315u);
+}
+
+// §14.11 (printed page 361) with §9.2 and §9.3.2: a cycle delay is a blocking
+// wait like any other, so a process may take any number of them in sequence,
+// in a loop or in parallel fork branches and run on. A resumed process
+// registered its next wait while the waits were being called, which grew the
+// table under the loop, and a wait kept after it resumed counted on freed
+// memory: each of these crashed the run or stopped it short.
+TEST(CycleDelaySim, SequentialLoopedAndForkedCycleDelaysRunOn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int n = 0;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  always begin ##2; n++; end\n"
+      "  task automatic both(); fork ##1; ##3; join endtask\n"
+      "  initial begin\n"
+      "    ##1; $write(\"%0t \", $time);\n"
+      "    ##1; $write(\"%0t \", $time);\n"
+      "    #2 ##1; $write(\"%0t \", $time);\n"
+      "    both(); $write(\"%0t \", $time);\n"
+      "    #2 $display(\"n=%0d\", n);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 15 25 55 n=3\n$finish at time 57\n");
+}
+
+// §14.11: `##N` waits for N clocking block events, and one executed in the
+// time step of an event -- after `@(cb)`, after the edge's own `@(posedge
+// clk)`, or straight after another cycle delay resumed by that event -- waits
+// a full cycle for the first of them. Each counted the event of its own time
+// step and returned a cycle early: 5, 5 and 25 in place of 15, 15 and 35.
+TEST(CycleDelaySim, CycleDelayDoesNotCountTheEventOfItsOwnTimeStep) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin @(cb); ##1; $write(\"%0t \", $time); end\n"
+      "  initial begin @(posedge clk); ##1; $write(\"%0t \", $time); end\n"
+      "  initial begin\n"
+      "    #40 ##2; $write(\"%0t \", $time);\n"
+      "    ##2; $display(\"%0t\", $time);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "15 15 55 75\n$finish at time 75\n");
+}
+
+// §14.11 (printed page 361): `##0` suspends until the clocking block event
+// when that event has not yet occurred in the current time step and runs on
+// when it has, and `##(n)` with n at 0 is the same wait. So the first `##0`
+// waits for the edge at 5, the second, in that step, does not, and one at 7
+// waits for 15. A zero count was skipped, and each ran on at once: 0, 0, 7.
+TEST(CycleDelaySim, ZeroCycleDelayWaitsForTheEventOfItsStep) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int n = 0;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin\n"
+      "    ##0; $write(\"%0t \", $time);\n"
+      "    ##(n); $write(\"%0t \", $time);\n"
+      "    #2 ##0; $display(\"%0t\", $time);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 5 15\n$finish at time 15\n");
 }
 
 }  // namespace
