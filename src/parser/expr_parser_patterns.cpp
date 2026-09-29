@@ -216,7 +216,13 @@ Expr* Parser::ParseAssignmentPattern() {
   pat->kind = ExprKind::kAssignmentPattern;
   pat->range.start = loc;
 
+  // §10.9: every form Syntax 10-5 gives an assignment pattern holds at least
+  // one item between `'{` and `}`, so `'{}` is no assignment pattern; the
+  // empty unpacked array concatenation `{}` is what §10.10 gives an empty
+  // queue. Reported, the brace is consumed so parsing goes on.
   if (Check(TokenKind::kRBrace)) {
+    diag_.Error(loc, "assignment pattern shall hold at least one item",
+                Subclause("10.9"));
     Consume();
     return pat;
   }
