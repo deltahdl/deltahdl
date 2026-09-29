@@ -575,4 +575,72 @@ TEST(ArrayReductionSim, NestedReductionOverTheSubarraysOfA3DArray) {
   EXPECT_EQ(out, "28 8 3\n");
 }
 
+// §7.12.3 with §7.4.4: a select of a multidimensional array's leading
+// dimensions names a subarray, an unpacked array, which a reduction folds as
+// it folds a one-dimensional array -- by a constant or a variable index, with
+// or without a with clause, and on a subarray of a descending dimension. The
+// select named no array of its own name, so each answered 0.
+TEST(ArrayReductionSim, ReductionOnASubarraySelectFoldsItsElements) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int m2[2][3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "  int m3[2][2][2] = '{'{'{1, 2}, '{3, 4}}, '{'{5, 6}, '{7, 8}}};\n"
+      "  int d[3:2][1:0] = '{'{1, 2}, '{3, 4}};\n"
+      "  int k = 1;\n"
+      "  initial\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", m2[1].sum(), "
+      "m2[k].product(),\n"
+      "             m2[0].xor(), m3[1][0].sum(), m2[1].sum() with (item * 2),\n"
+      "             d[3].sum(), d[2].sum());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "15 120 0 11 30 3 7\n");
+}
+
+// §7.12.3 with §6.11: a reduction without a with clause is of the array's
+// element type, so over signed elements -- a byte or an int fixed-size array,
+// a queue, an associative array, a subarray -- it is signed and -1 + -2 reads
+// -3. Built unsigned, the byte sums read 253 and the int sums 4294967293.
+TEST(ArrayReductionSim, ReductionOverSignedElementsIsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  byte b[2] = '{-1, -2};\n"
+      "  int i[2] = '{-1, -2};\n"
+      "  byte q[$] = '{-1, -2};\n"
+      "  int aa[int];\n"
+      "  byte n[2][2] = '{'{-1, -2}, '{3, 4}};\n"
+      "  int unsigned u[2] = '{32'hFFFF_FFFF, 32'hFFFF_FFFF};\n"
+      "  initial begin\n"
+      "    aa[1] = -1; aa[2] = -2;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", b.sum(), i.sum(), i.sum,\n"
+      "             q.sum(), aa.sum(), n[0].sum(), u.sum());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 -3 -3 -3 -3 -3 4294967294\n");
+}
+
+// §7.12.3 with §6.11: a reduction with a with clause is of the with
+// expression's type, so `item` of an int array -- a queue's, an associative
+// array's, and `item.sum()` of each row of a two-dimensional one -- makes it a
+// signed int. Built unsigned, each read 4294967293 or 4294967294.
+TEST(ArrayReductionSim, ReductionWithASignedWithExpressionIsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$] = '{-1, -2};\n"
+      "  int aa[int];\n"
+      "  int m[2][2] = '{'{-1, -2}, '{-3, 4}};\n"
+      "  initial begin\n"
+      "    aa[1] = -1; aa[2] = -2;\n"
+      "    $display(\"%0d %0d %0d\", q.sum() with (item),\n"
+      "             aa.sum() with (item), m.sum() with (item.sum()));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-3 -3 -2\n");
+}
+
 }  // namespace

@@ -96,6 +96,16 @@ void BindSubarrayIterator(const SubarrayElement& element,
                           std::string_view iter_name, SimContext& ctx,
                           Arena& arena);
 
+// §7.4.4: `sel`, a select of one or more leading dimensions of a
+// multidimensional fixed-size array, `m2[1]` or `m3[1][0]`, names a subarray,
+// itself an unpacked array: `prefix` receives the name its elements' variables
+// begin with, "m2[1]", and `sub` the dimensions left, so the array paths that
+// read an array by name and ArrayInfo read it. False where `sel` names no
+// subarray, an index holding an x or z bit or outside its dimension included.
+// Defined in eval_array_subarray.cpp.
+bool ResolveSubarraySelect(const Expr* sel, SimContext& ctx, Arena& arena,
+                           std::string& prefix, ArrayInfo& sub);
+
 // §7.12.3: the array reduction methods over an associative array, which reach
 // its elements by a route of their own rather than through ArrayInfo. Empty
 // where `method` names no reduction, which is what lets a caller go on to try

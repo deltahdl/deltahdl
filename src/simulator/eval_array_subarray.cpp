@@ -7,7 +7,9 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array_internal.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -83,6 +85,34 @@ static void BindSubarrayLeaves(const LeafBinding& lb, const std::string& src,
     lb.ctx.CreateLocalVariable(*name, sub.elem_width, leaves[j].is_signed)
         ->value = leaves[j];
   }
+}
+
+bool ResolveSubarraySelect(const Expr* sel, SimContext& ctx, Arena& arena,
+                           std::string& prefix, ArrayInfo& sub) {
+  std::vector<const Expr*> indices;
+  const Expr* base = sel;
+  while (base != nullptr && base->kind == ExprKind::kSelect &&
+         base->index != nullptr && base->index_end == nullptr) {
+    indices.insert(indices.begin(), base->index);
+    base = base->base;
+  }
+  if (indices.empty() || base == nullptr || base->kind != ExprKind::kIdentifier)
+    return false;
+  const ArrayInfo* info = ctx.FindArrayInfo(base->text);
+  if (info == nullptr || info->dim_sizes.size() <= indices.size()) return false;
+  prefix = std::string(base->text);
+  ArrayInfo level = *info;
+  for (const Expr* index : indices) {
+    Logic4Vec value = EvalExpr(index, ctx, arena);
+    uint32_t lo = level.dim_los[0];
+    uint64_t at = value.ToUint64();
+    if (HasUnknownBits(value) || at < lo || at >= lo + level.dim_sizes[0])
+      return false;
+    prefix += "[" + std::to_string(at) + "]";
+    level = SubarrayInfo(level);
+  }
+  sub = level;
+  return true;
 }
 
 void BindSubarrayIterator(const SubarrayElement& element,

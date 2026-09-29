@@ -169,46 +169,6 @@ std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
   return vals;
 }
 
-static Logic4Vec ArraySum(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  uint64_t result = 0;
-  for (auto v : vals) result += v;
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
-static Logic4Vec ArrayProduct(std::string_view var_name, const ArrayInfo& info,
-                              SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  uint64_t result = 1;
-  for (auto v : vals) result *= v;
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
-static Logic4Vec ArrayAnd(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  uint64_t result = vals.empty() ? 0 : vals[0];
-  for (size_t i = 1; i < vals.size(); ++i) result &= vals[i];
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
-static Logic4Vec ArrayOr(std::string_view var_name, const ArrayInfo& info,
-                         SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  uint64_t result = 0;
-  for (auto v : vals) result |= v;
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
-static Logic4Vec ArrayXor(std::string_view var_name, const ArrayInfo& info,
-                          SimContext& ctx, Arena& arena) {
-  auto vals = CollectElements(var_name, info, ctx);
-  uint64_t result = 0;
-  for (auto v : vals) result ^= v;
-  return MakeLogic4VecVal(arena, info.elem_width, result);
-}
-
 IterNames ExtractIterNames(const Expr* expr) {
   std::string_view iter_name = "item";
   std::string_view index_name = "index";
@@ -262,16 +222,25 @@ static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
   return ev;
 }
 
+// §7.12.3: the type a reduction with a with clause takes, the with
+// expression's, as its first value states it: the width, 0 where there is no
+// value, and the signedness, so `q.sum() with (item)` over an int queue is a
+// signed int; built unsigned, -1 + -2 read 4294967293.
+struct WithResultType {
+  uint32_t width = 0;
+  bool is_signed = false;
+};
+
 static std::vector<uint64_t> EvalReduceWithValues(
     const std::vector<Logic4Vec>& elems, const Expr* expr,
-    const WithIterEnv& env, uint32_t& result_width) {
+    const WithIterEnv& env, WithResultType& type) {
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
-  result_width = 0;
+  type = {};
   for (size_t i = 0; i < elems.size(); ++i) {
     Logic4Vec ev = EvalWithExprForElement(expr->with_expr, env, elems[i], i);
     vals.push_back(ev.ToUint64());
-    if (i == 0) result_width = ev.width;
+    if (i == 0) type = {ev.width, ev.is_signed};
   }
   return vals;
 }
@@ -307,14 +276,17 @@ static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
                                     std::string_view method) {
   IterNames names = ExtractIterNames(expr);
   std::vector<uint64_t> vals;
-  uint32_t width = 0;
+  WithResultType type;
   for (uint32_t row = 0; row < ac.info.dim_sizes[0]; ++row) {
     Logic4Vec value = EvalWithForRow(ac, expr, names, row);
-    if (row == 0) width = value.width;
+    if (row == 0) type = {value.width, value.is_signed};
     vals.push_back(value.ToUint64());
   }
-  if (width == 0) width = ac.info.elem_width;
-  return MakeLogic4VecVal(ac.arena, width, ApplyReduction(method, vals));
+  if (type.width == 0) type.width = ac.info.elem_width;
+  Logic4Vec out =
+      MakeLogic4VecVal(ac.arena, type.width, ApplyReduction(method, vals));
+  out.is_signed = type.is_signed;
+  return out;
 }
 
 // Reduces the values produced by the with-clause expression of `expr` for each
@@ -333,12 +305,14 @@ static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
                   ac.info.lo};
   IteratorLayout layout(names.iter_name, ac.var_name, ac.ctx);
 
-  uint32_t result_width = 0;
-  auto vals = EvalReduceWithValues(elems, expr, env, result_width);
-  if (result_width == 0) result_width = ac.info.elem_width;
+  WithResultType type;
+  auto vals = EvalReduceWithValues(elems, expr, env, type);
+  if (type.width == 0) type.width = ac.info.elem_width;
 
   uint64_t result = ApplyReduction(method, vals);
-  return MakeLogic4VecVal(ac.arena, result_width, result);
+  Logic4Vec out = MakeLogic4VecVal(ac.arena, type.width, result);
+  out.is_signed = type.is_signed;
+  return out;
 }
 
 static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
@@ -414,58 +388,61 @@ std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
     WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
     env.keys = &keys;
     env.string_keys = aa->is_string_key;
-    uint32_t result_width = 0;
-    auto vals = EvalReduceWithValues(elems, expr, env, result_width);
-    if (result_width == 0) result_width = aa->elem_width;
-    return MakeLogic4VecVal(arena, result_width, ApplyReduction(method, vals));
+    WithResultType type;
+    auto vals = EvalReduceWithValues(elems, expr, env, type);
+    if (type.width == 0) type.width = aa->elem_width;
+    Logic4Vec out =
+        MakeLogic4VecVal(arena, type.width, ApplyReduction(method, vals));
+    out.is_signed = type.is_signed;
+    return out;
   }
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
   for (const auto& e : elems) vals.push_back(e.ToUint64());
-  return MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
+  // §7.12.3 with §6.11: of the element type, signed where it is (#4609).
+  Logic4Vec out =
+      MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
+  out.is_signed = aa->is_signed;
+  return out;
+}
+
+// §7.12.3 with §6.11: whether the elements of the array `ac` names are of a
+// signed type, as a queue or dynamic array records for its elements and a
+// fixed-size array's element variables each record for themselves.
+static bool ElementsAreSigned(const ArrayCtx& ac) {
+  if (ac.info.is_dynamic) {
+    const QueueObject* q = ac.ctx.FindQueue(ac.var_name);
+    return q != nullptr && q->is_signed;
+  }
+  const Variable* first = ac.ctx.FindVariable(std::string(ac.var_name) + "[" +
+                                              std::to_string(ac.info.lo) + "]");
+  return first != nullptr && first->is_signed;
+}
+
+// §7.12.3: the reduction `method` of the elements of the array `ac` names,
+// with no with clause, of the element type -- signed where the elements are,
+// so `b.sum()` over `byte b[2] = '{-1, -2}` is -3; built unsigned, it read
+// 253.
+static Logic4Vec ReduceElements(std::string_view method, const ArrayCtx& ac) {
+  Logic4Vec out = MakeLogic4VecVal(
+      ac.arena, ac.info.elem_width,
+      ApplyReduction(method, CollectElements(ac.var_name, ac.info, ac.ctx)));
+  out.is_signed = ElementsAreSigned(ac);
+  return out;
 }
 
 static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
                               Logic4Vec& out) {
-  if (method == "sum") {
-    out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  if (method == "product") {
-    out = ArrayProduct(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  if (method == "and") {
-    out = ArrayAnd(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  if (method == "or") {
-    out = ArrayOr(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  if (method == "xor") {
-    out = ArrayXor(ac.var_name, ac.info, ac.ctx, ac.arena);
-    return true;
-  }
-  return false;
+  if (!IsReductionMethod(method)) return false;
+  out = ReduceElements(method, ac);
+  return true;
 }
 
 static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
                                   const Expr* expr, Logic4Vec& out) {
   if (!IsReductionMethod(method)) return false;
-  if (expr->with_expr) {
-    out = ReduceWithExpr(ac, expr, method);
-  } else if (method == "sum") {
-    out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
-  } else if (method == "product") {
-    out = ArrayProduct(ac.var_name, ac.info, ac.ctx, ac.arena);
-  } else if (method == "and") {
-    out = ArrayAnd(ac.var_name, ac.info, ac.ctx, ac.arena);
-  } else if (method == "or") {
-    out = ArrayOr(ac.var_name, ac.info, ac.ctx, ac.arena);
-  } else if (method == "xor") {
-    out = ArrayXor(ac.var_name, ac.info, ac.ctx, ac.arena);
-  }
+  out = expr->with_expr ? ReduceWithExpr(ac, expr, method)
+                        : ReduceElements(method, ac);
   return true;
 }
 
@@ -532,9 +509,28 @@ static bool TryQueuePropertyReduction(const Expr* expr, SimContext& ctx,
          TryEvalArrayMethodCall(receiver.Call(), ctx, arena, out);
 }
 
+// §7.12.3 with §7.4.4: a reduction on a subarray, `m2[1].sum()`, folds the
+// elements of that subarray (ResolveSubarraySelect), with or without a with
+// clause, as it folds a one-dimensional array's. The select names no array
+// by its own name, so the paths below found none and answered 0.
+static bool TrySubarrayReduction(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || !IsReductionMethod(access->rhs->text))
+    return false;
+  std::string prefix;
+  ArrayInfo sub;
+  if (!ResolveSubarraySelect(access->lhs, ctx, arena, prefix, sub))
+    return false;
+  ArrayCtx ac{prefix, sub, ctx, arena};
+  return DispatchReductionExpr(access->rhs->text, ac, expr, out);
+}
+
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   if (TryStructArrayMemberMethod(expr, ctx, arena, out)) return true;
+  if (TrySubarrayReduction(expr, ctx, arena, out)) return true;
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts))
     return TryQueuePropertyReduction(expr, ctx, arena, out);
