@@ -327,4 +327,25 @@ TEST(EventControlParsing, BareEventNameStopsBeforePrefixIncrement) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kExprStmt);
 }
 
+// A hierarchical_identifier may open with `$root.`, which the lexer gives as
+// a system identifier rather than a name; the bare event name takes it as the
+// first part of the path all the same.
+TEST(EventControlParsing, BareEventNameFromRoot) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  int got;\n"
+      "  initial @$root.m.e got = 5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
