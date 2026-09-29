@@ -45,9 +45,11 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
 // `pattern`, holds one element per item, each item making that element's
 // queue as a pushed argument makes it (ElementQueueFromItem): §10.10.3's
 // `'{ {1}, T_QI'{2,3,4}, {5,6} }` is three elements of one, three and two
-// values. What `q` held before, the queues of its elements with it, is gone.
-// False, with `q` left alone, where its elements are no queues or `pattern`
-// is no positional pattern.
+// values. §7.12.1 with §7.4.4: `pattern` may instead be a locator selecting
+// rows of a two-dimensional array, `m.find with (item.sum() > 5)`, and each
+// selected row becomes an element holding a copy of the row's elements. What
+// `q` held before, the queues of its elements with it, is gone. False, with
+// `q` left alone, where its elements are no queues or `pattern` is neither.
 bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
                        Arena& arena);
 

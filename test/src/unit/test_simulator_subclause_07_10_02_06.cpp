@@ -188,4 +188,24 @@ TEST(QueuePushFrontSim, PushedValueRoundTripsThroughPopFront) {
   EXPECT_EQ(v, 9u);
 }
 
+// §7.10.2.6 with §7.4: where the queue's elements are fixed-size arrays, the
+// item pushed from an array variable is a whole element, a copy of every one
+// of the variable's elements: `a` of {1, 2, 3} lands as r[0], ahead of the row
+// already present.
+TEST(QueuePushFrontSim, PushesAnArrayVariableOntoAQueueOfArrays) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int r[$][3];\n"
+      "  int a[3] = '{1, 2, 3};\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r.push_front(a);\n"
+      "    result = r[0][0] * 1000 + r[0][1] * 100 + r[0][2] * 10 + r[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1236u);
+}
+
 }  // namespace

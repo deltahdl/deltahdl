@@ -245,4 +245,26 @@ TEST(QueuePushBackSim, ElementKeepsTheValueOfAStructPushed) {
   EXPECT_EQ(v, 110322u);
 }
 
+// §7.10.2.7 with §7.4: where the queue's elements are fixed-size arrays, the
+// item pushed from an array variable is a whole element, a copy of every one
+// of the variable's elements: `a` of {1, 2, 3} lands as r[1], after the row
+// already present, and a later write to `a` leaves it as it was.
+TEST(QueuePushBackSim, PushesAnArrayVariableOntoAQueueOfArrays) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int r[$][3];\n"
+      "  int a[3] = '{1, 2, 3};\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r.push_back(a);\n"
+      "    a[1] = 9;\n"
+      "    result = r.size() * 10000 + r[1][0] * 100 + r[1][1] * 10 +\n"
+      "             r[1][2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 20123u);
+}
+
 }  // namespace

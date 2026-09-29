@@ -55,6 +55,9 @@ struct LocatorCtx {
   // §7.12.4 with §7.4.2: the index of the first element, a fixed-size array's
   // low bound, which every reported index and the index iterator count from.
   uint32_t index_base = 0;
+  // §7.12.1 with §7.4.2: whether the array's range was declared from the high
+  // index down, which puts its leftmost element at the end of `elems`.
+  bool is_descending = false;
 };
 
 static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
@@ -110,6 +113,16 @@ static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
   return result;
 }
 
+// §7.12.1: whether the first- or last-finding locator `method` scans from the
+// highest index down. The first element is the one closest to the leftmost
+// index and the last the one closest to the rightmost, which are the lowest
+// and highest indices of an ascending range and the other way round for a
+// descending one.
+static bool ScansFromHighEnd(std::string_view method, const LocatorCtx& lc) {
+  bool is_last = method == "find_last" || method == "find_last_index";
+  return is_last != lc.is_descending;
+}
+
 static void LocatorFind(std::string_view method, const LocatorCtx& lc,
                         std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
@@ -121,7 +134,7 @@ static void LocatorFind(std::string_view method, const LocatorCtx& lc,
 
 static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
                                 std::vector<Logic4Vec>& out) {
-  if (method == "find_last") {
+  if (method != "find" && ScansFromHighEnd(method, lc)) {
     for (size_t i = lc.elems.size(); i > 0; --i) {
       if (!EvalLocatorPredicate(lc, lc.elems[i - 1], i - 1)) continue;
       out.push_back(lc.elems[i - 1]);
@@ -134,7 +147,7 @@ static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
 
 static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
                              std::vector<Logic4Vec>& out) {
-  if (method == "find_last_index") {
+  if (method != "find_index" && ScansFromHighEnd(method, lc)) {
     for (size_t i = lc.elems.size(); i > 0; --i) {
       if (!EvalLocatorPredicate(lc, lc.elems[i - 1], i - 1)) continue;
       out.push_back(MakeLogic4VecVal(lc.arena, 32, lc.index_base + i - 1));
@@ -145,7 +158,7 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
     out.push_back(MakeLogic4VecVal(lc.arena, 32, lc.index_base + i));
-    if (method == "find_first_index") break;
+    if (method != "find_index") break;
   }
 }
 
@@ -526,6 +539,7 @@ static LocatorCtx MakeIndexedLocatorCtx(const IndexedLocatorInput& in) {
   LocatorCtx lc =
       MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
   lc.index_base = in.info.lo;
+  lc.is_descending = in.info.is_descending;
   if (HasSubarrayElements(in.info)) {
     lc.subarray_owner = in.var_name;
     lc.subarray_info = &in.info;
@@ -672,6 +686,16 @@ static void DispatchIndexedLocator(std::string_view method,
   LocatorFindDispatch(method, lc, out);
 }
 
+// The offsets 0 to `count` - 1, one for each element of a multidimensional
+// array's first dimension.
+static std::vector<Logic4Vec> SubarrayOffsets(uint32_t count, Arena& arena) {
+  std::vector<Logic4Vec> offsets;
+  offsets.reserve(count);
+  for (uint32_t i = 0; i < count; ++i)
+    offsets.push_back(MakeLogic4VecVal(arena, 32, i));
+  return offsets;
+}
+
 static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
@@ -705,7 +729,14 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
     info = &queue_info;
   }
 
-  auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
+  // §7.4.4: an element of a multidimensional array is a subarray, which no
+  // one value holds, so each stands in the element list as its offset into
+  // the first dimension; the with clause binds the subarray itself
+  // (SetupLocatorScope), and a locator that returns elements returns those
+  // offsets for TryCollectLocatorRows to read the rows by.
+  auto elems = HasSubarrayElements(*info)
+                   ? SubarrayOffsets(info->dim_sizes[0], arena)
+                   : CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
   IndexedLocatorInput in{LocatorEnv{expr, ctx, arena}, elems, is_str,
@@ -720,6 +751,30 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
 
   LocatorCtx lc = MakeIndexedLocatorCtx(in);
   DispatchIndexedLocator(parts.method_name, lc, out);
+  return true;
+}
+
+// §7.12.1: the locators that return elements of the array rather than their
+// indices or the values of a with clause.
+static bool ReturnsElements(std::string_view method) {
+  return method == "find" || method == "find_first" || method == "find_last" ||
+         method == "min" || method == "max" || method == "unique";
+}
+
+bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
+                           LocatorRows& out) {
+  MethodCallParts parts;
+  if (!ExtractLocatorParts(expr, arena, parts) ||
+      !ReturnsElements(parts.method_name))
+    return false;
+  const ArrayInfo* info = ctx.FindArrayInfo(parts.var_name);
+  if (info == nullptr || info->dim_sizes.size() != 2) return false;
+  std::vector<Logic4Vec> picked;
+  if (!CollectLocatorResult(expr, ctx, arena, picked)) return false;
+  out.array_name = parts.var_name;
+  out.info = info;
+  for (const Logic4Vec& offset : picked)
+    out.offsets.push_back(static_cast<uint32_t>(offset.ToUint64()));
   return true;
 }
 

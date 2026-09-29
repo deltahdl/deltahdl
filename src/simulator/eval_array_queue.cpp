@@ -79,11 +79,11 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
   return StructLayoutOfName(access->lhs->text, ctx);
 }
 
-// The value the push `call` puts in the queue `q` for its argument `item`, the
-// element being given the identity `id`. §7.10.2 with §7.4: where each element
-// of `q` is itself a queue, the argument is a queue value, which is kept under
-// the element's identity (ElementQueueFromItem in
-// eval_array_element_queue.h), and the element holds a placeholder. §10.9.2:
+// The value the push or insert `call` puts in the queue `q` for its item, the
+// last of its arguments, the element being given the identity `id`. §7.10.2
+// with §7.4: where each element of `q` is itself a queue, the argument is a
+// queue value, which is kept under the element's identity (ElementQueueFromItem
+// in eval_array_element_queue.h), and the element holds a placeholder. §10.9.2:
 // where the elements are structures, a pattern argument, `q.push_back('{1,
 // 10, 3})`, is packed by the structure's layout (EvalItemForLayout);
 // concatenated at its items' own widths it held the low bits of three 32-bit
@@ -92,7 +92,7 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
 // push, depositing in place, reached the element too.
 static Logic4Vec PushedValue(QueueObject* q, const Expr* call, uint64_t id,
                              SimContext& ctx, Arena& arena) {
-  const Expr* item = call->args[0];
+  const Expr* item = call->args.back();
   if (!q->elements_are_queues) {
     return OwnRhsWords(
         SizedForQueueElement(
@@ -123,24 +123,22 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
   ++q->generation;
 }
 
+// §7.10.2.2: insert(index, item) puts the item at `index`, built as a push
+// builds it (PushedValue), so that where each element is itself a queue, a
+// fixed-size array's elements among them, the item becomes its element queue.
 static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   auto idx_val = EvalExpr(expr->args[0], ctx, arena);
-  auto val = OwnRhsWords(
-      SizedForQueueElement(
-          *q,
-          EvalItemForLayout(expr->args[1], QueueElementLayout(expr, ctx), ctx,
-                            arena),
-          arena),
-      arena);
   if (!idx_val.IsKnown()) return;
   auto raw = static_cast<int64_t>(idx_val.ToUint64());
   if (idx_val.is_signed && raw < 0) return;
   auto idx = static_cast<size_t>(raw);
   if (idx <= q->elements.size()) {
+    uint64_t id = q->AllocateId();
+    Logic4Vec val = PushedValue(q, expr, id, ctx, arena);
     q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx), val);
     q->element_ids.insert(q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
-                          q->AllocateId());
+                          id);
     EnforceQueueBound(q, "insert", expr->range.start, ctx);
     ++q->generation;
   }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -8,6 +9,7 @@
 namespace delta {
 
 struct Expr;
+struct ArrayInfo;
 struct AssocArrayObject;
 class SimContext;
 class Arena;
@@ -79,6 +81,22 @@ std::vector<Logic4Vec> AssocIndexValues(const AssocArrayObject* aa,
 
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out);
+
+// §7.12.1 with §7.4.4: the rows a locator that returns elements selects of a
+// two-dimensional fixed-size array -- the array, its shape, and the offset of
+// each selected row into the first dimension, in the order the locator
+// returns them.
+struct LocatorRows {
+  std::string_view array_name;
+  const ArrayInfo* info = nullptr;
+  std::vector<uint32_t> offsets;
+};
+
+// The rows `expr`, a call of find, find_first, find_last, min, max or unique
+// on a two-dimensional fixed-size array, selects, in `out`. False where
+// `expr` is no such call. Defined in eval_array_locator.cpp.
+bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
+                           LocatorRows& out);
 
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out);

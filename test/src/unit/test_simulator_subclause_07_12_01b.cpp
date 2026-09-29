@@ -70,4 +70,60 @@ TEST(ArrayLocatorRows, IndexLocatorsSeeEachSubarrayOfA3DArray) {
   EXPECT_EQ(out, "'{1}\n");
 }
 
+// §7.12.1 with §7.4.2: the first element is the one closest to the leftmost
+// index and the last the one closest to the rightmost, so on a[3:1] the first
+// element above 5 is a[3] (30) and the last is a[1] (10), and over the rows of
+// m[1:0][2] the first row whose sum is above 0 is row 1. Counted from the low
+// index, each answer would come from the other end.
+TEST(ArrayLocatorRows, FirstAndLastFollowADescendingRange) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a[3:1] = '{30, 20, 10};\n"
+      "  int m[1:0][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  int f[$], fi[$], l[$], li[$], mi[$];\n"
+      "  initial begin\n"
+      "    f = a.find_first with (item > 5);\n"
+      "    fi = a.find_first_index with (item > 5);\n"
+      "    l = a.find_last with (item > 5);\n"
+      "    li = a.find_last_index with (item > 5);\n"
+      "    mi = m.find_first_index with (item.sum() > 0);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", f[0], fi[0], l[0], li[0], "
+      "mi[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "30 3 10 1 1\n");
+}
+
+// §7.12.1 with §7.4.4: the locators that return elements return rows of a
+// two-dimensional array, each a copy of the row's elements in the queue of
+// rows they are assigned to: find keeps row 1, {3, 4, 5}, the one row whose
+// sum passes 5; find_last and max pick row 1 and find_first and min row 0;
+// and unique keeps one row for each of the sums 3 and 10, the last of them
+// {5, 5}.
+TEST(ArrayLocatorRows, ElementLocatorsReturnTheRowsOfA2DArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int m[2][3];\n"
+      "  int u[3][2] = '{'{1, 2}, '{3, 0}, '{5, 5}};\n"
+      "  int r[$][3], s[$][3], l[$][3], w[$][3], x[$][3], y[$][2];\n"
+      "  initial begin\n"
+      "    foreach (m[i, j]) m[i][j] = i * 3 + j;\n"
+      "    r = m.find with (item.sum() > 5);\n"
+      "    s = m.find_first with (item[0] >= 0);\n"
+      "    l = m.find_last with (item[0] >= 0);\n"
+      "    w = m.max with (item.sum());\n"
+      "    x = m.min with (item.sum());\n"
+      "    y = u.unique with (item.sum());\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\", r.size(),\n"
+      "             r[0][0], r[0][1], r[0][2], s[0][2], l[0][2], w[0][2],\n"
+      "             x[0][2], y.size(), y[y.size() - 1][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 3 4 5 2 5 5 2 2 5\n");
+}
+
 }  // namespace

@@ -11,8 +11,10 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/assoc_element.h"
+#include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -152,13 +154,23 @@ QueueObject* OfQueueElement(QueueObject* outer, const Expr* sel,
 }
 
 // Appends to `q` what `item` contributes as an item of an unpacked array
-// concatenation (§10.10): a queue's elements where it designates one, else its
-// one value, sized to the element type.
+// concatenation (§10.10): a queue's elements where it designates one, a copy
+// of each element of a fixed-size array variable where it names one (§7.6),
+// else its one value, sized to the element type.
 void AppendItem(QueueObject* q, const Expr* item, SimContext& ctx,
                 Arena& arena) {
   if (const QueueObject* src = FindQueueOfBase(item, ctx, arena)) {
     q->elements.insert(q->elements.end(), src->elements.begin(),
                        src->elements.end());
+    return;
+  }
+  const ArrayInfo* info = item->kind == ExprKind::kIdentifier
+                              ? ctx.FindArrayInfo(item->text)
+                              : nullptr;
+  if (info != nullptr) {
+    for (const Logic4Vec& e : CollectVecElements(item->text, *info, ctx, arena))
+      q->elements.push_back(
+          OwnRhsWords(SizedForQueueElement(*q, e, arena), arena));
     return;
   }
   q->elements.push_back(
@@ -200,17 +212,56 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   return q;
 }
 
-bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
-                       Arena& arena) {
-  if (!q->elements_are_queues ||
-      pattern->kind != ExprKind::kAssignmentPattern ||
-      !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
-    return false;
+// Empties `q`, a queue whose elements are queues, the element queues with it,
+// and gives it `count` placeholder elements with fresh identities, under which
+// the caller keeps each element's queue.
+static void ResetToPlaceholders(QueueObject* q, size_t count, Arena& arena) {
   q->elements.clear();
   q->element_queues.clear();
-  for (size_t i = 0; i < pattern->elements.size(); ++i)
+  for (size_t i = 0; i < count; ++i)
     q->elements.push_back(NonexistentQueueElement(q, arena));
   q->AssignFreshIds();
+}
+
+// §7.12.1 with §7.4.4: `q`, a queue whose elements are fixed-size arrays,
+// assigned the rows the locator `rhs` selects of a two-dimensional array
+// (TryCollectLocatorRows), holds one element per row, each a copy of the
+// row's elements. False, with `q` left alone, where `rhs` selects no rows.
+static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
+                                     SimContext& ctx, Arena& arena) {
+  LocatorRows rows;
+  if (!TryCollectLocatorRows(rhs, ctx, arena, rows)) return false;
+  ResetToPlaceholders(q, rows.offsets.size(), arena);
+  ElementQueueShape empty = ShapeOf(*q);
+  empty.fixed_size = 0;
+  ArrayInfo row_info;
+  row_info.lo = rows.info->dim_los[1];
+  row_info.size = rows.info->dim_sizes[1];
+  row_info.elem_width = rows.info->elem_width;
+  row_info.is_4state = rows.info->is_4state;
+  for (size_t i = 0; i < rows.offsets.size(); ++i) {
+    std::string row = std::string(rows.array_name) + "[" +
+                      std::to_string(rows.info->dim_los[0] + rows.offsets[i]) +
+                      "]";
+    QueueObject* element = NewElementQueue(empty, arena);
+    for (const Logic4Vec& leaf : CollectVecElements(row, row_info, ctx, arena))
+      element->elements.push_back(
+          OwnRhsWords(SizedForQueueElement(*element, leaf, arena), arena));
+    FitToFixedSize(element, q->element_array_size, arena);
+    element->AllocateIdsForAppended();
+    q->element_queues[q->ElementQueueKeyAt(i)] = element;
+  }
+  return true;
+}
+
+bool FillQueueOfQueues(QueueObject* q, const Expr* pattern, SimContext& ctx,
+                       Arena& arena) {
+  if (!q->elements_are_queues) return false;
+  if (FillQueueFromLocatorRows(q, pattern, ctx, arena)) return true;
+  if (pattern->kind != ExprKind::kAssignmentPattern ||
+      !pattern->pattern_keys.empty() || pattern->repeat_count != nullptr)
+    return false;
+  ResetToPlaceholders(q, pattern->elements.size(), arena);
   for (size_t i = 0; i < pattern->elements.size(); ++i) {
     q->element_queues[q->ElementQueueKeyAt(i)] =
         ElementQueueFromItem(q, pattern->elements[i], ctx, arena);

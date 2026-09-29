@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 
@@ -165,6 +167,27 @@ TEST(QueueMethods, InsertWithZIndexIsNoopFromSource) {
       "  initial q.insert(idx, 99);\n"
       "endmodule\n",
       "q", {10u, 20u});
+}
+
+// §7.10.2.2 with §7.4: where the queue's elements are fixed-size arrays,
+// insert() places the whole item at the index: '{7, 8, 9} becomes r[1],
+// between the two rows already present, which keep their values.
+TEST(QueueMethods, InsertsAnArrayElementIntoAQueueOfArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][3];\n"
+      "  int a[3] = '{1, 2, 3};\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r.push_back(a);\n"
+      "    r.insert(1, '{7, 8, 9});\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", r.size(), r[0][2], r[1][0],\n"
+      "             r[1][1], r[1][2], r[2][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 6 7 8 9 3\n");
 }
 
 }  // namespace
