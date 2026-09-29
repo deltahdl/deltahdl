@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 namespace delta {
 
@@ -17,6 +18,15 @@ struct RtlirAssocIndex {
   uint32_t width = 32;
   std::string_view class_name;
   std::string_view type_name;
+};
+
+// §7.4.2: one fixed-size dimension of an array: how many elements it holds,
+// the lower of its bounds, and whether it was written from a higher left
+// bound down, `[2:0]`.
+struct RtlirFixedDim {
+  uint32_t size = 0;
+  int64_t lo = 0;
+  bool descending = false;
 };
 
 // §7.4 with §7.5, §7.8 and §7.10 (printed pages 153, 157, 162 and 169): what
@@ -37,6 +47,11 @@ struct RtlirElementShape {
   uint32_t array_size = 0;
   int64_t array_lo = 0;
   bool array_descending = false;
+  // §7.4.4: where each such element is a multidimensional fixed-size array,
+  // `int q[$][2][3]`, its dimensions after the first, outermost first, each
+  // level of it kept as a queue of that many elements in turn; empty for an
+  // element of one dimension.
+  std::vector<RtlirFixedDim> inner_array_dims;
   // For an associative array whose element type is itself an associative
   // array, `int m[string][int]`, the index its elements have; empty for any
   // other variable.

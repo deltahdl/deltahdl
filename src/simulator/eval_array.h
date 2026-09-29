@@ -84,8 +84,9 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out);
 
 // §7.12.1 with §7.4.4: the elements a locator that returns elements selects
-// of an array whose elements are arrays -- the rows of a two-dimensional
-// fixed-size array, which `array_name` and `info` describe, or the elements
+// of an array whose elements are arrays -- the subarrays of a
+// multidimensional fixed-size array, which `array_name` and `info` describe,
+// or the elements
 // of a queue or dynamic array whose elements are queues or fixed-size arrays,
 // `queue` -- and the offset of each selected one into the array, in the order
 // the locator returns them.

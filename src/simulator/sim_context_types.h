@@ -173,6 +173,15 @@ struct ElementDrive {
   }
 };
 
+// §7.4.2: one fixed-size dimension of an array: how many elements it holds,
+// the lower of its bounds, and whether it was written from a higher left
+// bound down, `[2:0]`.
+struct FixedDimShape {
+  uint32_t size = 0;
+  int64_t lo = 0;
+  bool descending = false;
+};
+
 struct QueueObject {
   std::vector<Logic4Vec> elements;
   std::vector<uint64_t> element_ids;
@@ -250,6 +259,10 @@ struct QueueObject {
   // was written from the higher down, `[2:0]` (RtlirElementShape).
   int64_t element_array_lo = 0;
   bool element_array_descending = false;
+  // §7.4.4: where each element is a multidimensional fixed-size array, `int
+  // q[$][2][3]`, its dimensions after the first, outermost first, which the
+  // element queues below each level are made with in turn; empty otherwise.
+  std::vector<FixedDimShape> element_inner_dims;
   std::map<uint64_t, QueueObject*> element_queues;
   // The key element_queues keeps the queue of the element at position `pos`
   // under: the element's identity where this queue keeps one per element, and

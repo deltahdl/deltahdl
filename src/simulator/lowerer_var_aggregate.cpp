@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -87,6 +88,16 @@ static const AssocArrayObject* ElementAssocTemplate(
   return inner;
 }
 
+// §7.4.4: the dimensions of a multidimensional element after its first, as
+// the element queues below each level are made with.
+static std::vector<FixedDimShape> InnerDimsOf(const RtlirElementShape& shape) {
+  std::vector<FixedDimShape> dims;
+  dims.reserve(shape.inner_array_dims.size());
+  for (const RtlirFixedDim& dim : shape.inner_array_dims)
+    dims.push_back(FixedDimShape{dim.size, dim.lo, dim.descending});
+  return dims;
+}
+
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
@@ -102,6 +113,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     q->element_array_size = var.element.array_size;
     q->element_array_lo = var.element.array_lo;
     q->element_array_descending = var.element.array_descending;
+    q->element_inner_dims = InnerDimsOf(var.element);
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
@@ -116,6 +128,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     q->element_array_size = var.element.array_size;
     q->element_array_lo = var.element.array_lo;
     q->element_array_descending = var.element.array_descending;
+    q->element_inner_dims = InnerDimsOf(var.element);
     LowerDynArrayInit(q, var);
 
     ArrayInfo info;

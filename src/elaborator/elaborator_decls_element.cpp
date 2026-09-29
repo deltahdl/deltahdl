@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -36,30 +38,46 @@ static uint32_t ElementQueueLevels(
   return it == td_array_dims.end() ? 0 : QueueLevelsFrom(it->second, 0);
 }
 
+// §7.4.2: the extent of the fixed-size dimension `dim`, `[l:r]` or `[n]`;
+// empty where `dim` is no fixed-size dimension or a bound does not fold.
+static std::optional<RtlirFixedDim> FixedDimOf(const Expr* dim,
+                                               const ScopeMap& scope) {
+  if (dim == nullptr || IsQueueDim(dim)) return std::nullopt;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto lv = ConstEvalInt(dim->lhs, scope);
+    auto rv = ConstEvalInt(dim->rhs, scope);
+    if (!lv || !rv) return std::nullopt;
+    return RtlirFixedDim{static_cast<uint32_t>(std::abs(*lv - *rv) + 1),
+                         std::min(*lv, *rv), *lv > *rv};
+  }
+  auto size = ConstEvalInt(dim, scope);
+  if (!size || *size <= 0) return std::nullopt;
+  return RtlirFixedDim{static_cast<uint32_t>(*size), 0, false};
+}
+
 // §7.10 and §7.5 with §7.4 (printed pages 169, 157 and 153): where each
 // element of the queue or dynamic array `item` declares is a fixed-size
-// array, `int q[$][3]` or `int d[][1:3]`, records into `shape` how many
-// elements it holds and its bounds, each such element being kept as a queue
-// of that many elements (RtlirElementShape::array_size); nothing for any
-// other declaration.
+// array, `int q[$][3]`, `int d[][1:3]` or `int q[$][2][3]`, records into
+// `shape` how many elements it holds and its bounds, each such element being
+// kept as a queue of that many elements (RtlirElementShape::array_size), and
+// the dimensions of a multidimensional element after its first
+// (inner_array_dims); nothing for any other declaration.
 static void RecordFixedElementArray(const ModuleItem* item,
                                     const ScopeMap& scope,
                                     RtlirElementShape& shape) {
   const std::vector<Expr*>& dims = item->unpacked_dims;
-  if (dims.size() != 2 || dims[1] == nullptr || IsQueueDim(dims[1])) return;
+  if (dims.size() < 2) return;
   if (dims[0] != nullptr && !IsQueueDim(dims[0])) return;
-  const Expr* dim = dims[1];
-  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    auto lv = ConstEvalInt(dim->lhs, scope);
-    auto rv = ConstEvalInt(dim->rhs, scope);
-    if (!lv || !rv) return;
-    shape.array_size = static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
-    shape.array_lo = std::min(*lv, *rv);
-    shape.array_descending = *lv > *rv;
-    return;
+  std::vector<RtlirFixedDim> fixed;
+  for (size_t i = 1; i < dims.size(); ++i) {
+    std::optional<RtlirFixedDim> dim = FixedDimOf(dims[i], scope);
+    if (!dim) return;
+    fixed.push_back(*dim);
   }
-  auto size = ConstEvalInt(dim, scope);
-  if (size && *size > 0) shape.array_size = static_cast<uint32_t>(*size);
+  shape.array_size = fixed[0].size;
+  shape.array_lo = fixed[0].lo;
+  shape.array_descending = fixed[0].descending;
+  shape.inner_array_dims.assign(fixed.begin() + 1, fixed.end());
 }
 
 // §7.4 (printed pages 153-156): what the unpacked dimensions `item` declares
@@ -79,6 +97,12 @@ void ElaborateUnpackedDims(
   var.element.nested_queue_levels = kQueueLevels > 0 ? kQueueLevels - 1 : 0;
   RecordFixedElementArray(item, ctx.scope, var.element);
   if (var.element.array_size > 0) var.elements_are_queues = true;
+  // §7.4.4: each level of a multidimensional element below its first is a
+  // queue of the next dimension's elements.
+  if (!var.element.inner_array_dims.empty()) {
+    var.element.nested_queue_levels =
+        static_cast<uint32_t>(var.element.inner_array_dims.size());
+  }
 }
 
 }  // namespace delta

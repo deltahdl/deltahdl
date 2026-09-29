@@ -34,7 +34,9 @@ namespace {
 // further levels of queues below it (QueueObject::nested_queue_levels), and,
 // where the element is a fixed-size array, `fixed_size` elements addressed by
 // the bounds `fixed_lo` and `fixed_descending` give
-// (QueueObject::element_array_size, index_lo).
+// (QueueObject::element_array_size, index_lo), and, where that array is
+// multidimensional, `inner` its dimensions after the first, which the queues
+// one level down are made with (QueueObject::element_inner_dims).
 struct ElementQueueShape {
   uint32_t width;
   bool is_4state;
@@ -44,13 +46,15 @@ struct ElementQueueShape {
   uint32_t fixed_size = 0;
   int64_t fixed_lo = 0;
   bool fixed_descending = false;
+  std::vector<FixedDimShape> inner = {};
 };
 
 ElementQueueShape ShapeOf(const QueueObject& outer) {
   return {outer.elem_width,          outer.is_4state,
           outer.is_signed,           outer.holds_class_handles,
           outer.nested_queue_levels, outer.element_array_size,
-          outer.element_array_lo,    outer.element_array_descending};
+          outer.element_array_lo,    outer.element_array_descending,
+          outer.element_inner_dims};
 }
 
 ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
@@ -85,6 +89,14 @@ QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   q->nested_queue_levels = shape.levels > 0 ? shape.levels - 1 : 0;
   q->index_lo = shape.fixed_lo;
   q->index_descending = shape.fixed_descending;
+  // §7.4.4: the elements of a multidimensional element's queue are the next
+  // dimension's arrays, each kept as a queue of that dimension's size.
+  if (!shape.inner.empty()) {
+    q->element_array_size = shape.inner[0].size;
+    q->element_array_lo = shape.inner[0].lo;
+    q->element_array_descending = shape.inner[0].descending;
+    q->element_inner_dims.assign(shape.inner.begin() + 1, shape.inner.end());
+  }
   FitToFixedSize(q, shape.fixed_size, arena);
   q->AllocateIdsForAppended();
   return q;
@@ -201,16 +213,18 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   // lists the element's items as the bare pattern does.
   item = UnwrapTypedPattern(item);
   // §7.10 with §10.9.1: where the element's own elements are queues, `a[0]`
-  // of `int a[$][$][$]`, each of its items makes one of those queues in turn.
-  if (FillQueueOfQueues(q, item, ctx, arena)) return q;
-  bool listed = item->kind == ExprKind::kConcatenation ||
-                (item->kind == ExprKind::kAssignmentPattern &&
-                 item->pattern_keys.empty());
-  if (listed) {
-    for (const Expr* element : item->elements)
-      AppendItem(q, element, ctx, arena);
-  } else {
-    AppendItem(q, item, ctx, arena);
+  // of `int a[$][$][$]` or of `int q[$][2][2]`, each of its items makes one
+  // of those queues in turn.
+  if (!FillQueueOfQueues(q, item, ctx, arena)) {
+    bool listed = item->kind == ExprKind::kConcatenation ||
+                  (item->kind == ExprKind::kAssignmentPattern &&
+                   item->pattern_keys.empty());
+    if (listed) {
+      for (const Expr* element : item->elements)
+        AppendItem(q, element, ctx, arena);
+    } else {
+      AppendItem(q, item, ctx, arena);
+    }
   }
   FitToFixedSize(q, outer->element_array_size, arena);
   q->AllocateIdsForAppended();
@@ -260,36 +274,53 @@ static QueueObject* CopyElementQueue(const QueueObject* src,
   return copy;
 }
 
-// §7.12.1 with §7.4.4: a copy of the row at `offset` of the two-dimensional
-// fixed-size array `rows` names, as an element queue of the shape `shape`
-// gives the target's elements.
-static QueueObject* CopyArrayRow(const LocatorRows& rows, uint32_t offset,
-                                 const ElementQueueShape& shape,
-                                 SimContext& ctx, Arena& arena) {
-  ArrayInfo row_info;
-  row_info.lo = rows.info->dim_los[1];
-  row_info.size = rows.info->dim_sizes[1];
-  row_info.elem_width = rows.info->elem_width;
-  row_info.is_4state = rows.info->is_4state;
-  std::string row = std::string(rows.array_name) + "[" +
-                    std::to_string(rows.info->dim_los[0] + offset) + "]";
+// The multidimensional fixed-size array a subarray is copied from, `info`,
+// and the context and arena the copy is made in.
+struct SubarraySource {
+  const ArrayInfo& info;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// §7.12.1 with §7.4.4: a copy of the subarray under `prefix` of the array
+// `src` describes, whose first dimension is `dim`, as an element queue of the
+// shape `shape` gives the target's elements: the leaves of its last
+// dimension as values, and each level above as queues of the level below.
+static QueueObject* CopySubarray(const SubarraySource& src,
+                                 const std::string& prefix, size_t dim,
+                                 const ElementQueueShape& shape) {
   ElementQueueShape empty = shape;
   empty.fixed_size = 0;
-  QueueObject* element = NewElementQueue(empty, arena);
-  for (const Logic4Vec& leaf : CollectVecElements(row, row_info, ctx, arena))
+  QueueObject* element = NewElementQueue(empty, src.arena);
+  ArrayInfo level;
+  level.lo = src.info.dim_los[dim];
+  level.size = src.info.dim_sizes[dim];
+  level.elem_width = src.info.elem_width;
+  level.is_4state = src.info.is_4state;
+  bool is_last = dim + 1 == src.info.dim_sizes.size();
+  for (const Logic4Vec& value :
+       CollectVecElements(prefix, level, src.ctx, src.arena)) {
     element->elements.push_back(
-        OwnRhsWords(SizedForQueueElement(*element, leaf, arena), arena));
-  FitToFixedSize(element, shape.fixed_size, arena);
+        is_last ? OwnRhsWords(SizedForQueueElement(*element, value, src.arena),
+                              src.arena)
+                : NonexistentQueueElement(element, src.arena));
+  }
+  FitToFixedSize(element, shape.fixed_size, src.arena);
   element->AllocateIdsForAppended();
+  for (uint32_t j = 0; !is_last && j < level.size; ++j) {
+    element->element_queues[element->ElementQueueKeyAt(j)] =
+        CopySubarray(src, prefix + "[" + std::to_string(level.lo + j) + "]",
+                     dim + 1, ShapeOf(*element));
+  }
   return element;
 }
 
 // §7.12.1 with §7.4.4: `q`, a queue whose elements are fixed-size arrays or
 // queues, assigned the elements the locator `rhs` selects of a
-// two-dimensional array (its rows) or of an array whose elements are queues
-// (TryCollectLocatorRows), holds one element per selection, each a copy of
-// the selected element's values. False, with `q` left alone, where `rhs`
-// selects no such elements.
+// multidimensional array (its subarrays) or of an array whose elements are
+// queues (TryCollectLocatorRows), holds one element per selection, each a
+// copy of the selected element's values. False, with `q` left alone, where
+// `rhs` selects no such elements.
 static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
   LocatorRows rows;
@@ -298,10 +329,15 @@ static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
   std::vector<QueueObject*> copies;
   copies.reserve(rows.offsets.size());
   for (uint32_t offset : rows.offsets) {
-    copies.push_back(rows.queue != nullptr
-                         ? CopyElementQueue(ElementQueueAt(*rows.queue, offset),
-                                            shape, arena)
-                         : CopyArrayRow(rows, offset, shape, ctx, arena));
+    if (rows.queue != nullptr) {
+      copies.push_back(
+          CopyElementQueue(ElementQueueAt(*rows.queue, offset), shape, arena));
+      continue;
+    }
+    std::string subarray = std::string(rows.array_name) + "[" +
+                           std::to_string(rows.info->dim_los[0] + offset) + "]";
+    copies.push_back(CopySubarray(SubarraySource{*rows.info, ctx, arena},
+                                  subarray, 1, shape));
   }
   ResetToPlaceholders(q, copies.size(), arena);
   for (size_t i = 0; i < copies.size(); ++i)

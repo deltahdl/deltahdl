@@ -172,4 +172,28 @@ TEST(ArrayLocatorRows, LocatorsSeeEachElementOfAQueueOfArrays) {
   EXPECT_EQ(out, "'{0, 2} 1 9 1 6\n");
 }
 
+// §7.12.1 with §7.4.4: the locators that return elements return the
+// two-dimensional subarrays of a three-dimensional array into a queue of such
+// arrays, each a copy of every level of the subarray: find keeps k[1],
+// {{4, 5}, {6, 7}}, the one subarray holding 7 at [1][1], and min by its
+// first leaf keeps k[0].
+TEST(ArrayLocatorRows, ElementLocatorsReturnTheSubarraysOfA3DArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int k[2][2][2];\n"
+      "  int r[$][2][2], s[$][2][2];\n"
+      "  initial begin\n"
+      "    foreach (k[i, j, l]) k[i][j][l] = i * 4 + j * 2 + l;\n"
+      "    r = k.find with (item[1][1] == 7);\n"
+      "    s = k.min with (item[0][0]);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", r.size(), r[0][0][0], "
+      "r[0][1][1],\n"
+      "             s.size(), s[0][1][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 7 1 2\n");
+}
+
 }  // namespace

@@ -801,7 +801,7 @@ bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
     return false;
   const ArrayInfo* info = ctx.FindArrayInfo(parts.var_name);
   const QueueObject* queue = ctx.FindQueue(parts.var_name);
-  bool rows_of_array = info != nullptr && info->dim_sizes.size() == 2;
+  bool rows_of_array = info != nullptr && HasSubarrayElements(*info);
   bool elements_of_queue = queue != nullptr && queue->elements_are_queues;
   if (!rows_of_array && !elements_of_queue) return false;
   std::vector<Logic4Vec> picked;

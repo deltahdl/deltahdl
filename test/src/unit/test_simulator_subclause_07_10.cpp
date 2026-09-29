@@ -732,4 +732,29 @@ TEST(QueueSim, AQueueNestedThreeDeepHoldsANestedPattern) {
   EXPECT_EQ(out, "2 2 7 4 2 3\n");
 }
 
+// §7.10 with §7.4.4: a queue whose elements are two-dimensional fixed-size
+// arrays holds them whole: a pushed pattern lands at r[0], {{9, 8}, {7, 6}},
+// with r[0][1][0] reading 7, one of its leaves can be written, a copy of the
+// queue carries both levels of every element, and a nested pattern assigned
+// to the whole queue gives its one element's rows.
+TEST(QueueSim, AQueueOfTwoDimensionalArraysHoldsItsElements) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][2][2], s[$][2][2];\n"
+      "  initial begin\n"
+      "    r.push_back('{'{9, 8}, '{7, 6}});\n"
+      "    r[0][1][1] = 5;\n"
+      "    r.push_back('{'{1, 2}, '{3, 4}});\n"
+      "    s = r;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", r.size(), r[0][1][0],\n"
+      "             r[0][0][1], r[0][1][1], s[1][0][1], s[1][1][0]);\n"
+      "    r = '{'{'{0, 0}, '{0, 1}}};\n"
+      "    $display(\"%0d %0d\", r.size(), r[0][1][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 7 8 5 2 3\n1 1\n");
+}
+
 }  // namespace
