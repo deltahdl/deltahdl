@@ -466,6 +466,17 @@ class SynthLower {
   void LowerStmt(const Stmt* stmt, AigGraph& aig);
   void LowerIfStmt(const Stmt* stmt, AigGraph& aig);
   void LowerCaseStmt(const Stmt* stmt, AigGraph& aig);
+
+  // §12.5: the length the case expression of `stmt` and its case item
+  // expressions are compared at, which is the longest of them, and nothing
+  // where the case expression has no width SynthLower::ExprWidth can answer.
+  // An item it cannot answer for contributes nothing.
+  std::optional<uint32_t> CaseCompareWidth(const Stmt* stmt);
+
+  // §12.5: whether the case expression of `stmt` and its case item
+  // expressions are compared as signed values, which they are only where every
+  // one of them is signed.
+  bool IsSignedCase(const Stmt* stmt);
   void LowerAssignStmt(const Stmt* stmt, AigGraph& aig);
 
   // Lower one of the four §11.4.2 increment and decrement operators over a
@@ -559,8 +570,9 @@ class SynthLower {
   // propagates the size in propagated_width_ down with. §11.8.1 rules that the
   // type of an expression "does not depend on the left-hand side (if any)", so
   // this is the type of the right-hand side and not the type the target was
-  // declared with. It is read only where propagated_width_ is non-zero, which
-  // is what says an assignment is being lowered at all.
+  // declared with. Whatever sets propagated_width_ sets this beside it: a
+  // comparison, a truth value or a case statement (§12.5) propagates the type
+  // of its own operands.
   bool propagated_signed_ = false;
 
   // The expressions ReportExprUnlowered has already reported: the §11.4.3

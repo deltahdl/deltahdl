@@ -1,12 +1,15 @@
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 #include "synthesizer/synth_pattern.h"
@@ -304,6 +307,47 @@ uint32_t SynthLower::LowerCompareBit(const Expr* expr, AigGraph& aig,
   propagated_signed_ = saved_signed;
   if (ComparesNegated(expr->op)) return aig.AddNot(match);
   return match;
+}
+
+// The case item expressions §12.5 sizes a case statement's comparison by: each
+// item of every item that is not the default, and both bounds of a §11.4.13
+// value range `[lo:hi]`, which Parser::ParseInsideValueRange builds as an
+// ExprKind::kSelect with no base, in place of the range.
+static std::vector<const Expr*> CaseItemOperands(const Stmt* stmt) {
+  std::vector<const Expr*> operands;
+  for (const auto& ci : stmt->case_items) {
+    for (const auto* pat : ci.patterns) {
+      if (pat->kind == ExprKind::kSelect && pat->base == nullptr) {
+        operands.push_back(pat->index);
+        operands.push_back(pat->index_end);
+      } else {
+        operands.push_back(pat);
+      }
+    }
+  }
+  return operands;
+}
+
+std::optional<uint32_t> SynthLower::CaseCompareWidth(const Stmt* stmt) {
+  // §12.5 makes the case expression and every case item expression as long as
+  // the longest of them before any is compared, which is what
+  // SynthLower::CompareWidth does for the two operands of `==`.
+  std::optional<uint32_t> width = ExprWidth(stmt->condition);
+  if (!width) return std::nullopt;
+  for (const auto* operand : CaseItemOperands(stmt)) {
+    width = std::max(*width, ExprWidth(operand).value_or(0));
+  }
+  return width;
+}
+
+bool SynthLower::IsSignedCase(const Stmt* stmt) {
+  // §12.5 makes the comparison unsigned where any of the expressions is
+  // unsigned, as §11.4.5 does for the operands of `==`.
+  if (!IsSignedExpr(stmt->condition)) return false;
+  for (const auto* operand : CaseItemOperands(stmt)) {
+    if (!IsSignedExpr(operand)) return false;
+  }
+  return true;
 }
 
 }  // namespace delta

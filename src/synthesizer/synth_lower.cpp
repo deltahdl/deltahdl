@@ -1,6 +1,7 @@
 #include "synthesizer/synth_lower.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -641,13 +642,24 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     }
   }
 
+  // §12.5 compares every bit of the case expression and the items, so one
+  // whose length is unknown leaves nothing to compare over.
+  std::optional<uint32_t> width = CaseCompareWidth(stmt);
+  if (!width) {
+    ReportExprUnlowered(stmt->condition,
+                        "case expression has no width in the synthesizer, so "
+                        "the case statement has no lowering",
+                        Subclause("12.5"));
+    return;
+  }
+  bool is_signed = IsSignedCase(stmt);
+
   auto base_bits = signal_bits_;
   if (default_item && default_item->body) {
     LowerStmt(default_item->body, aig);
   }
   auto result_bits = signal_bits_;
 
-  uint32_t sel_width = SignalWidth(stmt->condition->text);
   // §12.5.4 rules that "the inside operator uses asymmetric wildcard matching
   // (see 11.4.6)" and that each case_item_expression is its right operand.
   // §11.4.6 makes both the x and the z of that operand wildcards, which is the
@@ -662,12 +674,21 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     LowerStmt(ci.body, aig);
     auto case_bits = signal_bits_;
 
+    // §11.8.2 carries the case's common length and type down into the
+    // context-determined operands of the case expression and the items, in
+    // place of what the item's own body left, and they are handed back after.
+    uint32_t saved_width = propagated_width_;
+    bool saved_signed = propagated_signed_;
+    propagated_width_ = *width;
+    propagated_signed_ = is_signed;
     uint32_t match = AigGraph::kConstFalse;
     LowerCtx ctx{aig, *this};
     for (const auto* pat : ci.patterns) {
       match = aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, ctx,
-                                                 sel_width, item_kind));
+                                                 *width, item_kind));
     }
+    propagated_width_ = saved_width;
+    propagated_signed_ = saved_signed;
     MuxCaseBits(result_bits, case_bits, match, aig);
   }
   signal_bits_ = result_bits;

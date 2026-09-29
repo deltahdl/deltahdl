@@ -110,14 +110,13 @@ uint32_t SynthLower::LowerShiftBit(const Expr* expr, AigGraph& aig,
   // shift's own left operand does not: `(a >>> 1) | b` over an unsigned `b` is
   // unsigned however `a` was declared. §11.8.2 propagates that type back down
   // to the context-determined operands of the expression, and
-  // SynthLower::propagated_signed_ is what carries it here.
-  //
-  // propagated_signed_ is read only where propagated_width_ says an assignment
-  // is being lowered. A shift lowered anywhere else, such as in the condition
-  // of an if statement, has no expression above it to propagate a type, and
-  // §11.8.1 answers its type off its own operands.
-  bool result_signed =
-      propagated_width_ > 0 ? propagated_signed_ : IsSignedExpr(expr);
+  // SynthLower::propagated_signed_ is what carries it here. Every place a
+  // shift is lowered from sets it: an assignment and a concatenation operand
+  // from the expression, a comparison from both its operands, an if condition
+  // or other truth value from the operand itself (§11.8.1 making a
+  // self-determined operand's type its own), and a case statement from the
+  // case expression and its items (§12.5).
+  bool result_signed = propagated_signed_;
 
   // §11.8.2 rules that an operand the propagated size extends "shall be
   // sign-extended only if the propagated type is signed", which is the rule
