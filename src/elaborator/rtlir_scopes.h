@@ -135,7 +135,7 @@ struct RtlirGenBlockSubroutine {
 // unnamed block has no entry: §27.6 leaves such a block no name a hierarchical
 // path can use.
 struct RtlirGenBlockMember {
-  enum class Kind { kStorage, kParam, kIndex };
+  enum class Kind : uint8_t { kStorage, kParam, kIndex };
   Kind kind = Kind::kStorage;
   std::string_view name;
   std::string_view storage;

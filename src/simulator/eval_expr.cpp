@@ -710,6 +710,21 @@ static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
          ctx.FindArrayInfo(head->text) == nullptr;
 }
 
+// The variable the path `expr`, spelled `resolved`, names: from the top of the
+// design first when `$root`-headed (§23.3.1), and with a non-literal instance
+// select, `g[k].v`, naming the instance its value selects (§23.6).
+static Variable* FindReferencedVariable(const Expr* expr,
+                                        const std::string& resolved,
+                                        SimContext& ctx, Arena& arena) {
+  std::string rooted = RootedReferenceKey(expr);
+  auto* var = rooted.empty() ? nullptr : ctx.FindVariable(rooted);
+  if (var == nullptr) var = ctx.FindVariable(resolved);
+  if (var == nullptr && HeadNamesAnInstance(expr, ctx)) {
+    var = ctx.FindVariable(EvaluatedHierarchicalPath(expr, ctx, arena));
+  }
+  return var;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
   if (TryContainerElementMember(expr, ctx, arena, out)) return out;
@@ -723,16 +738,9 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   auto resolved = HierarchicalReferenceName(expr);
   if (TryLocalScopeQualifier(resolved, ctx, arena, out)) return out;
-  // §23.3.1: a `$root`-headed name is read from the top of the design first.
-  std::string rooted = RootedReferenceKey(expr);
-  auto* var = rooted.empty() ? nullptr : ctx.FindVariable(rooted);
-  if (var == nullptr) var = ctx.FindVariable(resolved);
-  // §23.6: an instance select that is no literal, `g[k].v`, names the
-  // instance its value selects where the read runs.
-  if (var == nullptr && HeadNamesAnInstance(expr, ctx)) {
-    var = ctx.FindVariable(EvaluatedHierarchicalPath(expr, ctx, arena));
+  if (auto* var = FindReferencedVariable(expr, resolved, ctx, arena)) {
+    return ReadReferencedVariable(*var, ctx);
   }
-  if (var) return ReadReferencedVariable(*var, ctx);
 
   auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);

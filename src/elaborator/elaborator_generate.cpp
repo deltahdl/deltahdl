@@ -382,9 +382,13 @@ static void RecordBlockItemMembers(RtlirModule* mod, const HierPath& path,
                                    const DeclarationCounts& before) {
   auto record_storage = [&](std::string_view stored) {
     if (!stored.starts_with(prefix)) return;
-    RecordGenBlockMember(
-        mod->gen_block_members, path,
-        {.name = stored.substr(prefix.size()), .storage = stored});
+    RecordGenBlockMember(mod->gen_block_members, path,
+                         {.kind = RtlirGenBlockMember::Kind::kStorage,
+                          .name = stored.substr(prefix.size()),
+                          .storage = stored,
+                          .param_index = 0,
+                          .index_value = 0,
+                          .gen_block_path = {}});
   };
   for (size_t i = before.variables; i < mod->variables.size(); ++i)
     record_storage(mod->variables[i].name);
@@ -394,7 +398,10 @@ static void RecordBlockItemMembers(RtlirModule* mod, const HierPath& path,
     RecordGenBlockMember(mod->gen_block_members, path,
                          {.kind = RtlirGenBlockMember::Kind::kParam,
                           .name = mod->params[i].name,
-                          .param_index = i});
+                          .storage = {},
+                          .param_index = i,
+                          .index_value = 0,
+                          .gen_block_path = {}});
   }
 }
 
@@ -810,6 +817,22 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
   return GenerateForOpening{genvar_name, *init_val};
 }
 
+// Retargets the loop block step ending `path` at the instance `index` and
+// records its implicit localparam `genvar_name` (§27.4), apart from
+// ElaborateGenerateFor, which stands at the statement threshold.
+static void EnterLoopBlockInstance(RtlirModule* mod, HierPath& path,
+                                   std::string_view genvar_name,
+                                   int64_t index) {
+  path.back().index = index;
+  RecordGenBlockMember(mod->gen_block_members, path,
+                       {.kind = RtlirGenBlockMember::Kind::kIndex,
+                        .name = genvar_name,
+                        .storage = {},
+                        .param_index = 0,
+                        .index_value = index,
+                        .gen_block_path = {}});
+}
+
 void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                                       const ScopeMap& scope) {
   auto opening = OpenGenerateForLoop(item, mod, scope);
@@ -890,12 +913,8 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                               loop_scope[genvar_name]);
     gen_prefix_scopes_.back() = InternedGenPrefix();
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
-    gen_block_path_.back().index = loop_scope[genvar_name];
-    // §27.4: the instance's implicit localparam, named as the loop index.
-    RecordGenBlockMember(mod->gen_block_members, gen_block_path_,
-                         {.kind = RtlirGenBlockMember::Kind::kIndex,
-                          .name = genvar_name,
-                          .index_value = loop_scope[genvar_name]});
+    EnterLoopBlockInstance(mod, gen_block_path_, genvar_name,
+                           loop_scope[genvar_name]);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
     // Stop the loop when the genvar cannot advance, which
