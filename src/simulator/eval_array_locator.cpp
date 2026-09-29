@@ -761,10 +761,14 @@ static bool ReturnsElements(std::string_view method) {
          method == "min" || method == "max" || method == "unique";
 }
 
+// Every locator that returns elements needs a with clause to select rows, as
+// the find family requires one and the relational operators min, max and
+// unique would otherwise order by are not defined for an unpacked array; a
+// call without one is left to the path that reports it.
 bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
                            LocatorRows& out) {
   MethodCallParts parts;
-  if (!ExtractLocatorParts(expr, arena, parts) ||
+  if (expr->with_expr == nullptr || !ExtractLocatorParts(expr, arena, parts) ||
       !ReturnsElements(parts.method_name))
     return false;
   const ArrayInfo* info = ctx.FindArrayInfo(parts.var_name);

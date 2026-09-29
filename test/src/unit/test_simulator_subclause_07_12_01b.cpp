@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -124,6 +125,26 @@ TEST(ArrayLocatorRows, ElementLocatorsReturnTheRowsOfA2DArray) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1 3 4 5 2 5 5 2 2 5\n");
+}
+
+// §7.12.1: find requires a with clause over a two-dimensional array as over
+// any other, and the call without one is reported once, on its line, when its
+// result is assigned to a queue of rows.
+TEST(ArrayLocatorRows, FindWithoutAWithClauseIsReportedOnceIntoAQueueOfRows) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int m[2][3];\n"
+      "  int r[$][3];\n"
+      "  initial begin\n"
+      "    r = m.find;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array locator method 'find' requires a 'with' clause", 5, "7.12.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

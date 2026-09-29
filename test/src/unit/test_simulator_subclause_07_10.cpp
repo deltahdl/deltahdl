@@ -671,4 +671,23 @@ TEST(QueueSim, AnElementOfABlockAssociativeArrayOfTypedefQueuesReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
+// §7.10 with §10.10: the empty unpacked array concatenation empties a queue
+// whose elements are fixed-size arrays, as it empties any queue, whatever rows
+// it held.
+TEST(QueueSim, AnEmptyConcatenationEmptiesAQueueOfArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][3];\n"
+      "  initial begin\n"
+      "    r.push_back('{4, 5, 6});\n"
+      "    r.push_back('{1, 2, 3});\n"
+      "    r = {};\n"
+      "    $display(\"%0d\", r.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace
