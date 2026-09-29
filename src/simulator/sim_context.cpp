@@ -618,20 +618,26 @@ void SimContext::RegisterProgramInitial(uint32_t program_block_id,
   }
 }
 
+// §24.3: an initial procedure of a program reaching its end is counted out,
+// and its descendant threads end with it. One that $exit already ended was
+// counted out by ExitProgramBlock and is no longer registered, so a coroutine
+// that ran on to its end after the $exit counts nothing out a second time,
+// which would take another program's initial for ended.
 void SimContext::OnProgramInitialComplete(Process* proc) {
   if (proc) {
     KillDescendants(proc);
     if (proc->program_block_id != 0) {
       auto it = program_initials_by_block_.find(proc->program_block_id);
-      if (it != program_initials_by_block_.end()) {
-        auto& vec = it->second;
-        vec.erase(std::remove(vec.begin(), vec.end(), proc), vec.end());
-      }
+      if (it == program_initials_by_block_.end()) return;
+      auto& vec = it->second;
+      auto pos = std::find(vec.begin(), vec.end(), proc);
+      if (pos == vec.end()) return;
+      vec.erase(pos);
     }
   }
   if (pending_program_initials_ > 0) {
     --pending_program_initials_;
-    if (pending_program_initials_ == 0) stop_requested_ = true;
+    if (pending_program_initials_ == 0) programs_ended_ = true;
   }
 }
 
@@ -647,7 +653,7 @@ void SimContext::ExitProgramBlock(uint32_t program_block_id) {
     proc->active = false;
     if (pending_program_initials_ > 0) --pending_program_initials_;
   }
-  if (pending_program_initials_ == 0) stop_requested_ = true;
+  if (pending_program_initials_ == 0) programs_ended_ = true;
 }
 
 void SimContext::RunFinalBlocks() {

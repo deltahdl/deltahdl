@@ -148,6 +148,10 @@ bool Scheduler::Halted() const {
   return ctx_ != nullptr && ctx_->FinishRequested();
 }
 
+bool Scheduler::ProgramsEnded() const {
+  return ctx_ != nullptr && ctx_->ProgramsEnded();
+}
+
 void Scheduler::ReleaseSlot(TimeSlot& slot) {
   for (auto& queue : slot.regions) {
     while (!queue.empty()) pool_.Release(queue.Pop());
@@ -167,11 +171,15 @@ void Scheduler::Run() {
   // -- a process suspended on a delay must not resume in a time step past the
   // finish (e.g. `forever #10` with `#45 $finish` performs its t=40 iteration
   // but not the t=50 one) -- and ExecuteTimeSlot stops the slot the halt came
-  // in, whose remaining events are released here unrun. This checks
-  // Halted(), not the broader StopRequested(): program completion (§24) raises
-  // only the soft stop so the event calendar still drains and a program's own
-  // pending nonblocking assign in a later slot takes effect.
-  while (!event_calendar_.empty() && !stop_requested_ && !Halted()) {
+  // in, whose remaining events are released here unrun.
+  //
+  // §24.3: the implicit $finish due once every program initial has ended
+  // (ProgramsEnded) ends the run when the time slot it came in is done. The
+  // rest of that slot runs, the design's side of a port the program wrote in
+  // it among them, and no later slot does: a design process waiting on a
+  // delay past the program's end never resumes.
+  while (!event_calendar_.empty() && !stop_requested_ && !Halted() &&
+         !ProgramsEnded()) {
     auto it = event_calendar_.begin();
     if (!SlotHasLiveEvent(it->second)) {
       // Every event here is a superseded inertial-delay timeout that an earlier
@@ -193,6 +201,7 @@ void Scheduler::Run() {
   // after Run() returns - resolves in the top scope instead of inheriting the
   // last-run instance's prefix and finding a same-named variable it shadows.
   if (ctx_) ctx_->SetCurrentProcess(nullptr);
+  if (ProgramsEnded()) ctx_->RequestStop();
 
   // §38.36.3: "cbEndOfSimulation -- end of simulation (simulation ended because
   // no more events remain in the event queue or a $finish system task

@@ -208,6 +208,9 @@ class Scheduler {
   // after which no scheduled event runs, in the current time slot or a later
   // one. A scheduler with no context is never halted.
   bool Halted() const;
+  // §24.3: whether every initial procedure of every program has ended, which
+  // ends the run once the current time slot is done.
+  bool ProgramsEnded() const;
   // Returns every event still queued in `slot` to the pool without running it.
   void ReleaseSlot(TimeSlot& slot);
   void ExecuteTimeSlot(TimeSlot& slot);

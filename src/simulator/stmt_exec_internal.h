@@ -69,6 +69,14 @@ StmtResult ExecImmediateBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                        Arena& arena);
 
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §24.7 with §9.6.2 and §9.7: whether the running process was ended while it
+// ran, by $exit ending its program, a disable or kill(), so that it starts no
+// further statement, however deep in a task, loop or block the next one lies.
+bool CurrentProcessEnded(const SimContext& ctx);
+// Whether a loop in the running process goes on to its next iteration: not
+// once the run is stopping, nor once CurrentProcessEnded holds, where a loop
+// whose body no longer runs would otherwise go round without end.
+bool ProcessGoesOn(const SimContext& ctx);
 // §9.6.2's disable and §9.6.3's disable fork, defined in
 // stmt_exec_disable.cpp.
 StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx);

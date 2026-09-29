@@ -118,13 +118,8 @@ class SimContext : public DeclaredNameTables,
   bool StopRequested() const { return stop_requested_; }
 
   // §20.2: an explicit $finish/$stop/$fatal ends the run and drops every event
-  // still scheduled, in its own time slot as in a later one (§9.2.3 lets none
-  // run after the final procedures). This is distinct from the "soft"
-  // stop that program completion (§24) raises through RequestStop(): that only
-  // tells running processes to stop starting new work and lets the event
-  // calendar drain naturally, so a program's own pending nonblocking assign
-  // still takes effect. RequestFinish() raises both, so process loops guarding
-  // on StopRequested() unwind while the scheduler halts on FinishRequested().
+  // still scheduled, in its own time slot as in a later one (§9.2.3); it
+  // raises the stop too, so process loops guarding on StopRequested() unwind.
   void RequestFinish();
   bool FinishRequested() const { return finish_requested_; }
   // §20.10: $fatal terminates the simulation with an error code and $error
@@ -200,10 +195,13 @@ class SimContext : public DeclaredNameTables,
   // §40.3.2.1 coverage-collection state driven by $coverage_control.
   CoverageControlState& GetCoverageControlState() { return coverage_control_; }
 
+  // §24.3 with §24.7: the program initials, each counted out as it ends or as
+  // $exit ends its program; with none left the run ends by an implicit $finish
+  // once that time step is done (Scheduler::Run), so no later step runs.
   void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
-
   void ExitProgramBlock(uint32_t program_block_id);
+  bool ProgramsEnded() const { return programs_ended_; }
 
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
@@ -851,6 +849,7 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<Variable*, Logic4Vec> monitor_last_values_;
 
   uint32_t pending_program_initials_ = 0;
+  bool programs_ended_ = false;
 
   std::unordered_map<uint32_t, std::vector<Process*>>
       program_initials_by_block_;

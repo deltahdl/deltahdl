@@ -261,4 +261,77 @@ TEST(ProgramConstructSim, EnumTypedefProgramItemAnswersItsMethods) {
       "prog s=GREEN n=1 next=BLUE\n");
 }
 
+// §24.3: once every initial procedure of every program has ended, the run
+// ends at once through an implicit $finish, so a module initial waiting past
+// that time never runs its statement and the run stops at the program's end.
+TEST(ProgramConstructSim, ProgramEndEndsTheRunBeforeLaterDesignEvents) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial #2 $display(\"prog at %0t\", $time);\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  p pi();\n"
+                       "  initial #9 $display(\"mod at 9\");\n"
+                       "endmodule\n",
+                       f),
+            "prog at 2\n");
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 2u);
+}
+
+// §24.3 as above beside a free-running design clock, whose next toggle is
+// no reason to go on: the run still ends at 2.
+TEST(ProgramConstructSim, ProgramEndEndsTheRunBesideAFreeRunningClock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial #2 $display(\"prog at %0t\", $time);\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  p pi();\n"
+                       "  initial #9 $display(\"mod at 9\");\n"
+                       "endmodule\n",
+                       f),
+            "prog at 2\n");
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 2u);
+}
+
+// §24.3 with §9.3.2: after join_any the initial runs to its end at 1, which
+// ends the sibling still pending and the run with it.
+TEST(ProgramConstructSim, ProgramEndAfterJoinAnyEndsTheRun) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial begin\n"
+                       "    fork\n"
+                       "      #1 $display(\"fast at %0t\", $time);\n"
+                       "      #6 $display(\"slow\");\n"
+                       "    join_any\n"
+                       "    $display(\"parent at %0t\", $time);\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  p pi();\n"
+                       "  initial #9 $display(\"mod at 9\");\n"
+                       "endmodule\n",
+                       f),
+            "fast at 1\nparent at 1\n");
+}
+
+// §24.3: with an input port connected and driven by the module after the
+// program's end, the program's end at 4 still ends the run there.
+TEST(ProgramConstructSim, ProgramWithDrivenInputPortEndsTheRunAtItsEnd) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p(input logic d);\n"
+                       "  initial #4 $display(\"prog end at %0t\", $time);\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic d = 0;\n"
+                       "  p pi(d);\n"
+                       "  initial begin #5 d = 1; $display(\"mod at 5\"); end\n"
+                       "endmodule\n",
+                       f),
+            "prog end at 4\n");
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
+}
+
 }  // namespace

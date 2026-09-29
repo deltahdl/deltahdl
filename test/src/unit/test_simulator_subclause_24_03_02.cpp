@@ -219,4 +219,24 @@ TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }
 
+// §24.3.2 with §24.3: a program's blocking write to its output port as the
+// last statement of its only initial reaches the connected design variable in
+// that time step, before the implicit $finish ends the run.
+TEST(ProgramPortConnectionSim, OutputPortWriteInTheLastStepReachesTheDesign) {
+  SimFixture f;
+  auto* q = RunAndFindVar(
+      "program p(output logic [7:0] q);\n"
+      "  initial begin #4 q = 8'd77; end\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic [7:0] q;\n"
+      "  p pi(.q(q));\n"
+      "endmodule\n",
+      f, "q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(q->value.IsKnown());
+  EXPECT_EQ(q->value.ToUint64(), 77u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
+}
+
 }  // namespace

@@ -814,8 +814,19 @@ static ExecTask ExecLabeledStmt(const Stmt* stmt, SimContext& ctx,
   co_return result;
 }
 
+bool CurrentProcessEnded(const SimContext& ctx) {
+  const Process* cur = ctx.CurrentProcess();
+  return cur != nullptr && !cur->active;
+}
+
+bool ProcessGoesOn(const SimContext& ctx) {
+  return !ctx.StopRequested() && !CurrentProcessEnded(ctx);
+}
+
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (!stmt) return ExecTask::Immediate(StmtResult::kDone);
+  if (!stmt || CurrentProcessEnded(ctx)) {
+    return ExecTask::Immediate(StmtResult::kDone);
+  }
   // Named begin/end and fork blocks push their own label scope (ExecBlock /
   // ExecFork); every other labeled statement gets the scope wrapper here.
   if (!stmt->label.empty() && stmt->kind != StmtKind::kBlock &&

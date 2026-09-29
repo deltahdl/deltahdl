@@ -345,7 +345,7 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (scoped) ctx.PushScope();
   CreateForInitVars(stmt, ctx);
   for (auto* init : stmt->for_inits) co_await ExecStmt(init, ctx, arena);
-  while (!ctx.StopRequested()) {
+  while (ProcessGoesOn(ctx)) {
     if (!ForConditionHolds(stmt, ctx, arena)) break;
     auto result = co_await ExecStmt(stmt->for_body, ctx, arena);
     auto action = ClassifyLoopBodyResult(result);
@@ -364,7 +364,7 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  while (!ctx.StopRequested()) {
+  while (ProcessGoesOn(ctx)) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
@@ -381,7 +381,7 @@ ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  while (!ctx.StopRequested()) {
+  while (ProcessGoesOn(ctx)) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
@@ -412,7 +412,7 @@ ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (labeled) ctx.PushStaticScope(stmt->label);
   auto count_val = EvalExpr(stmt->condition, ctx, arena);
   uint64_t count = RepeatIterationCount(count_val);
-  for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
+  for (uint64_t i = 0; i < count && ProcessGoesOn(ctx); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
@@ -436,7 +436,7 @@ ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
-  } while (!ctx.StopRequested());
+  } while (ProcessGoesOn(ctx));
   if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
@@ -662,7 +662,7 @@ static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
     vars.push_back(ctx.CreateLocalVariable(d.name, 32));
     total *= d.size;
   }
-  for (uint64_t n = 0; n < total && !ctx.StopRequested(); ++n) {
+  for (uint64_t n = 0; n < total && ProcessGoesOn(ctx); ++n) {
     uint64_t rem = n;
     for (size_t d = dims.size(); d-- > 0;) {
       auto idx = static_cast<uint32_t>(rem % dims[d].size);

@@ -95,6 +95,9 @@ TEST(ReNbaRegionSim, NonblockingAssignFromReactiveSetSchedulesReNBA) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 3u);
 }
 
+// The program's initial waits out the delay, since its end would end the run
+// (§24.3) before the update's time step; the update lands in that step's
+// Re-NBA region, which the step runs before the run ends.
 TEST(ReNbaRegionSim,
      NonblockingAssignFromReactiveSetWithDelaySchedulesReNBALater) {
   SimFixture f;
@@ -102,7 +105,7 @@ TEST(ReNbaRegionSim,
       "module top;\n"
       "  logic [7:0] b;\n"
       "  program p;\n"
-      "    initial b <= #5 8'd99;\n"
+      "    initial begin b <= #5 8'd99; #5; end\n"
       "  endprogram\n"
       "endmodule\n",
       f);
