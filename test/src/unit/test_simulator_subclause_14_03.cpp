@@ -355,4 +355,118 @@ TEST(ClockingBlockSim, SubmoduleClockingBlockByHierarchicalName) {
             "5:3 6:77\n$finish at time 6\n");
 }
 
+// §14.3 with §27.5 and §23.6: a clocking block written in a named generate
+// block is a named item of the block's scope, so a process outside the block
+// reaches it as `g.cb` -- `@(g.cb)` waits for its event, `g.cb.d` reads its
+// sample and `g.cb.q <= 77` drives through it. None answered to the path, and
+// the wait never woke.
+TEST(ClockingBlockSim, GenerateBlockClockingBlockByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] d = 4, q = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  if (1) begin : g\n"
+                       "    clocking cb @(posedge clk);\n"
+                       "      input d;\n"
+                       "      output q;\n"
+                       "    endclocking\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    @(g.cb);\n"
+                       "    $write(\"%0t:%0d \", $time, g.cb.d);\n"
+                       "    g.cb.q <= 77;\n"
+                       "    #1 $display(\"%0t:%0d\", $time, q);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "  initial #60 $finish;\n"
+                       "endmodule\n",
+                       f),
+            "5:4 6:77\n$finish at time 6\n");
+}
+
+// §14.3 with §23.6: the path to a generate block's clocking block may start at
+// a submodule instance, `u.g.cb`, whose block samples that instance's signal.
+TEST(ClockingBlockSim, SubmoduleGenerateBlockClockingBlockByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m(input logic clk);\n"
+                       "  logic [7:0] d = 6;\n"
+                       "  if (1) begin : g\n"
+                       "    clocking cb @(posedge clk);\n"
+                       "      input d;\n"
+                       "    endclocking\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  m u(clk);\n"
+                       "  initial begin\n"
+                       "    @(u.g.cb);\n"
+                       "    $display(\"%0t:%0d\", $time, u.g.cb.d);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "  initial #60 $finish;\n"
+                       "endmodule\n",
+                       f),
+            "5:6\n$finish at time 5\n");
+}
+
+// §14.3 with §23.9 and §27.4: a clocking block names its signals and its clock
+// as a reference written where it stands does, so in a generate block a bare
+// name is that block's own declaration. `cb.e` sampled 0, `e` naming nothing
+// outside the block, and a clock the block declared never fired.
+TEST(ClockingBlockSim, GenerateBlockClockingBlockSamplesTheBlocksSignals) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : g\n"
+                       "    logic gclk = 0;\n"
+                       "    logic [7:0] e = 8'd20;\n"
+                       "    always #5 gclk = ~gclk;\n"
+                       "    clocking cb @(posedge gclk);\n"
+                       "      input e;\n"
+                       "    endclocking\n"
+                       "    initial begin\n"
+                       "      @(cb);\n"
+                       "      $display(\"%0t:%0d\", $time, cb.e);\n"
+                       "      $finish;\n"
+                       "    end\n"
+                       "  end\n"
+                       "  initial #60 $finish;\n"
+                       "endmodule\n",
+                       f),
+            "5:20\n$finish at time 5\n");
+}
+
+// §14.3 with §27.4: each instance of a loop generate block is a scope of its
+// own, so each declares its own clocking block, sampling its own signal and
+// reached from outside by its index, `g[1].cb`. Every instance registered its
+// block under the one name `cb`, and all of them reached the last.
+TEST(ClockingBlockSim, LoopGenerateInstancesDeclareTheirOwnClockingBlocks) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                       "    logic [7:0] e;\n"
+                       "    initial e = 8'(i + 20);\n"
+                       "    clocking cb @(posedge clk);\n"
+                       "      input e;\n"
+                       "    endclocking\n"
+                       "    initial begin\n"
+                       "      @(cb);\n"
+                       "      #(i) $write(\"in%0d:%0d \", i, cb.e);\n"
+                       "    end\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    @(g[0].cb);\n"
+                       "    #2 $display(\"out:%0d\", g[0].cb.e);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "  initial #60 $finish;\n"
+                       "endmodule\n",
+                       f),
+            "in0:20 in1:21 out:20\n$finish at time 7\n");
+}
+
 }  // namespace

@@ -144,6 +144,21 @@ struct RtlirGenBlockMember {
   HierPath gen_block_path;
 };
 
+// §14.3 with §27.4: a clocking block declared in a generate block instance.
+// The run registers the block, so what is kept is what the registration needs
+// beyond the item: the prefixes a bare name written in the block resolves
+// through (§23.9), which also tell apart the blocks the instances of one loop
+// declare, and the path that names the block from outside, `g.cb` (§23.6).
+struct RtlirGenBlockClocking {
+  // The block's position in RtlirModule::clocking_blocks. The instances of a
+  // loop generate block share one body, so the item alone says not which
+  // instance declared the entry.
+  size_t index = 0;
+  const ModuleItem* block = nullptr;
+  HierPath gen_block_path;
+  GenBlockPrefixes gen_block_prefixes;
+};
+
 // Appends `member` to `members` as a declaration of the generate block instance
 // `path`, the steps from the module to it; nothing for a declaration of the
 // module itself or of a block with an unnamed step (§27.6).

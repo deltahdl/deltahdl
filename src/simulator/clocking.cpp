@@ -17,8 +17,10 @@
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/net.h"
+#include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
@@ -129,8 +131,16 @@ std::string_view ClockingManager::DefaultClockingFor(
 
 const ClockingBlock* ClockingManager::FindInScope(std::string_view name,
                                                   const SimContext& ctx) const {
-  const std::string kQualified = ctx.ActiveInstancePrefix() + std::string(name);
-  if (const auto* block = Find(kQualified)) return block;
+  const std::string kInstPrefix = ctx.ActiveInstancePrefix();
+  // §23.9 with §27.4: a process in a generate block reaches the block its own
+  // instance declares, registered under that instance's prefix, first.
+  if (const Process* proc = ctx.CurrentProcess()) {
+    for (const std::string& key :
+         GenerateBlockKeys(kInstPrefix, proc->gen_prefixes, name)) {
+      if (const auto* block = Find(key)) return block;
+    }
+  }
+  if (const auto* block = Find(kInstPrefix + std::string(name))) return block;
   return Find(name);
 }
 

@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -6,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -13,6 +15,7 @@
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_gen_block_clocking.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
@@ -221,7 +224,11 @@ std::optional<ClockingBlock> BuildClockingBlock(
 // -- the `cb` of `cb.sig <= ...`, of `@(cb.sig)` and of `always @(cb)` --
 // reaches the running instance's block through ClockingManager::FindInScope.
 void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
-  for (const ModuleItem* item : mod->clocking_blocks) {
+  for (size_t index = 0; index < mod->clocking_blocks.size(); ++index) {
+    const ModuleItem* item = mod->clocking_blocks[index];
+    // §14.3 with §27.4: a block declared in a generate block is that block
+    // instance's, registered under its prefix and named through its path.
+    const RtlirGenBlockClocking* gen = FindGenBlockClocking(mod, index);
     // §14.12 (printed page 362): `default clocking busB;` declares no block
     // but makes the one of that name, declared in the same scope, the default,
     // so what is recorded is that block's registered name. Dropped for its want
@@ -229,8 +236,8 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     if (item->is_default_clocking && item->clocking_event.empty() &&
         !item->name.empty()) {
       auto& mgr = ctx_.AcquireClockingManager();
-      std::string_view named =
-          *arena_.Create<std::string>(inst_prefix_ + std::string(item->name));
+      std::string_view named = *arena_.Create<std::string>(
+          inst_prefix_ + GenBlockClockingPrefix(gen) + std::string(item->name));
       mgr.SetDefaultClocking(named);
       mgr.SetScopeDefaultClocking(inst_prefix_, named);
       continue;
@@ -238,6 +245,7 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     ClockingLowerScope scope{inst_prefix_, ctx_, arena_};
     auto block = BuildClockingBlock(item, scope);
     if (!block.has_value()) continue;
+    PlaceClockingBlockInGenBlock(gen, *block, ctx_, arena_);
     auto& mgr = ctx_.AcquireClockingManager();
     mgr.Register(*block);
     // §14.12: "the default clocking" and §14.14's global clocking are the two
@@ -262,6 +270,7 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     if (event_var == nullptr) continue;
     event_var->is_event = true;
     mgr.SetBlockEventVar(block->name, event_var);
+    AliasGenBlockClockingBlock(gen, *block, ctx_, arena_);
   }
 }
 

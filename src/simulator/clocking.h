@@ -173,9 +173,11 @@ class ClockingManager {
   const ClockingBlock* Find(std::string_view name) const;
   // §23.9: the block `name` reaches from where the reference stands. A clockvar
   // and an `always @(cb)` spell the block by the bare name its module declared,
-  // so the running instance's own block is looked for first and the bare name
-  // is the answer only where that instance declared none -- which is the whole
-  // of it for a block declared in a module elaborated as a top.
+  // so the running instance's own block is looked for first -- the one a
+  // generate block the running process stands in declares ahead of the
+  // module's (§27.4) -- and the bare name is the answer only where that
+  // instance declared none, which is the whole of it for a block declared in a
+  // module elaborated as a top.
   const ClockingBlock* FindInScope(std::string_view name,
                                    const SimContext& ctx) const;
   SimTime GetInputSkew(std::string_view block_name,

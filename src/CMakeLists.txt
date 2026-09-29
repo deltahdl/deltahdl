@@ -330,6 +330,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
     simulator/lowerer_alias_kinds.cpp
+    simulator/lowerer_gen_block_clocking.cpp
     simulator/lowerer_gen_block_members.cpp
     simulator/lowerer_package_class_vars.cpp
     simulator/vcd_writer.cpp
@@ -399,6 +400,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_generate.cpp
     elaborator/elaborator_generate_naming.cpp
     elaborator/elaborator_generate_scope.cpp
+    elaborator/gen_block_members.cpp
     elaborator/elaborator_import.cpp
     elaborator/elaborator_child_type_params.cpp
     elaborator/elaborator_class_typedef_specialization.cpp

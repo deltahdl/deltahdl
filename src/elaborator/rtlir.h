@@ -745,6 +745,9 @@ struct RtlirModule {
   // generate block instances, each with the path that names its instance;
   // see RtlirGenBlockMember.
   std::vector<RtlirGenBlockMember> gen_block_members;
+  // §14.3 with §27.4: those of clocking_blocks declared in generate blocks;
+  // see RtlirGenBlockClocking.
+  std::vector<RtlirGenBlockClocking> gen_block_clocking;
   std::vector<ModuleItem*> let_decls;
   // §35.5.4's imported subroutines, declared in this module. They are held
   // apart from let_decls because §11.12's let is a substitution of the
