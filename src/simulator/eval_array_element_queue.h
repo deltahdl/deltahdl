@@ -33,6 +33,11 @@ class Arena;
 QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
                                   Arena& arena, bool allocate);
 
+// Whether `sel` is a select of one element of an array whose elements are
+// queues or fixed-size arrays, by the array's shape alone: nothing is read or
+// allocated, so a missing associative entry is neither warned of nor made.
+bool SelectsElementQueue(const Expr* sel, SimContext& ctx, Arena& arena);
+
 // §7.10.2 with §10.10 (printed pages 170 and 264): the queue an element pushed
 // onto `outer`, a queue whose elements are queues, holds, made from the
 // method's argument `item`: the elements of the queue `item` designates,

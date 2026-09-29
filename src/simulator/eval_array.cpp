@@ -14,6 +14,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
@@ -527,10 +528,48 @@ static bool TrySubarrayReduction(const Expr* expr, SimContext& ctx,
   return DispatchReductionExpr(access->rhs->text, ac, expr, out);
 }
 
+// §7.12.3 with §7.4 and §7.10: an element of an array whose elements are
+// queues or fixed-size arrays, `r[0]` of `int r[$][2]` or `aq[1]` of `int
+// aq[int][$]`, is an unpacked array itself, kept as its own queue
+// (ElementQueueOfSelect), and a reduction on it folds that queue's values:
+// without a with clause of the element type, signed where it is, and with
+// one of the with expression's type. The select names no array of its own
+// name, so the paths below found none and answered 0.
+static bool TryElementQueueReduction(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || !IsReductionMethod(access->rhs->text))
+    return false;
+  const QueueObject* q =
+      ElementQueueOfSelect(access->lhs, ctx, arena, /*allocate=*/false);
+  if (q == nullptr || q->elements_are_queues) return false;
+  std::vector<Logic4Vec> elems = q->elements;
+  for (Logic4Vec& e : elems) TakeElementSignedness(*q, e);
+  std::string_view method = access->rhs->text;
+  if (expr->with_expr == nullptr) {
+    std::vector<uint64_t> vals;
+    vals.reserve(elems.size());
+    for (const Logic4Vec& e : elems) vals.push_back(e.ToUint64());
+    out = MakeLogic4VecVal(arena, q->elem_width, ApplyReduction(method, vals));
+    out.is_signed = q->is_signed;
+    return true;
+  }
+  IterNames names = ExtractIterNames(expr);
+  WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
+  WithResultType type;
+  std::vector<uint64_t> vals = EvalReduceWithValues(elems, expr, env, type);
+  if (type.width == 0) type.width = q->elem_width;
+  out = MakeLogic4VecVal(arena, type.width, ApplyReduction(method, vals));
+  out.is_signed = type.is_signed;
+  return true;
+}
+
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   if (TryStructArrayMemberMethod(expr, ctx, arena, out)) return true;
   if (TrySubarrayReduction(expr, ctx, arena, out)) return true;
+  if (TryElementQueueReduction(expr, ctx, arena, out)) return true;
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts))
     return TryQueuePropertyReduction(expr, ctx, arena, out);

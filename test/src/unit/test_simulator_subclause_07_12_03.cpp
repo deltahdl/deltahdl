@@ -643,4 +643,32 @@ TEST(ArrayReductionSim, ReductionWithASignedWithExpressionIsSigned) {
   EXPECT_EQ(out, "-3 -3 -2\n");
 }
 
+// §7.12.3 with §7.4 and §7.10: an element of an array whose elements are
+// queues or fixed-size arrays is an unpacked array, so a reduction on it folds
+// its values -- of a queue of fixed-size arrays, of a queue of queues, of an
+// associative array of queues or of fixed-size arrays, signed where the
+// element type is, and through a with clause. The select named no array of
+// its own name, so each answered 0.
+TEST(ArrayReductionSim, ReductionOnAnElementThatIsAnArrayFoldsItsValues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int r[$][2];\n"
+      "  int qq[$][$];\n"
+      "  int aq[int][$];\n"
+      "  int af[int][2];\n"
+      "  initial begin\n"
+      "    r.push_back('{5, 6});\n"
+      "    qq.push_back('{1, 2});\n"
+      "    aq[1] = '{3, 4};\n"
+      "    af[2] = '{-1, -2};\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", r[0].sum(), qq[0].sum(),\n"
+      "             aq[1].sum(), af[2].sum(), r[0].product(),\n"
+      "             qq[0].sum() with (item * 10));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11 3 7 -3 30 30\n");
+}
+
 }  // namespace

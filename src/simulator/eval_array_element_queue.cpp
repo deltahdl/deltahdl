@@ -131,19 +131,40 @@ QueueObject* AssocElementQueue(AssocArrayObject* aa, KeyedEntries<Key> entries,
   return q;
 }
 
+// §7.8.6: a read of an entry the array lacks answers the element's default
+// and is warned of, as a read of any other associative element is
+// (WarnAssocMiss in eval_select_assoc.cpp), unless the array has a
+// user-specified default. Read here, `af[9][1]` on `int af[int][2]` and
+// `aq["x"].size()` on `int aq[string][$]` answered the default unwarned.
+static void WarnAssocElementMiss(const AssocArrayObject* aa, bool present,
+                                 const Expr* sel, SimContext& ctx) {
+  if (present || aa->has_default) return;
+  std::string name;
+  BuildLhsName(sel->base, name);
+  ctx.GetDiag().Warning(
+      sel->index->range.start,
+      "associative array '" + name + "': read of non-existent index",
+      Subclause("7.8.6"));
+}
+
 // §7.8: the element `sel` selects of the associative array `aa`, keyed as the
 // array keys its entries (AssocStringKey, AssocIntKey).
 QueueObject* OfAssocElement(AssocArrayObject* aa, const Expr* sel,
                             SimContext& ctx, Arena& arena, bool allocate) {
   Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
   if (aa->is_string_key) {
+    std::string key = AssocStringKey(idx);
+    if (!allocate)
+      WarnAssocElementMiss(aa, aa->str_data.count(key) != 0, sel, ctx);
     return AssocElementQueue(
         aa, KeyedEntries<std::string>{aa->str_data, aa->str_element_queues},
-        AssocStringKey(idx), allocate, arena);
+        key, allocate, arena);
   }
   if (HasUnknownBits(idx)) return nullptr;
   int64_t key =
       AssocIntKey(idx, aa->is_wildcard, aa->index_width, aa->is_index_signed);
+  if (!allocate)
+    WarnAssocElementMiss(aa, aa->int_data.count(key) != 0, sel, ctx);
   return AssocElementQueue(
       aa, KeyedEntries<int64_t>{aa->int_data, aa->int_element_queues}, key,
       allocate, arena);
@@ -473,6 +494,22 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
                : FindQueueOfBase(sel->base, ctx, arena);
   if (outer == nullptr || !outer->elements_are_queues) return nullptr;
   return OfQueueElement(outer, sel, ctx, arena);
+}
+
+bool SelectsElementQueue(const Expr* sel, SimContext& ctx, Arena& arena) {
+  if (sel == nullptr || sel->kind != ExprKind::kSelect ||
+      sel->base == nullptr || sel->index == nullptr ||
+      sel->index_end != nullptr) {
+    return false;
+  }
+  if (const AssocArrayObject* aa = FindAssocArrayOfBase(sel->base, ctx, arena))
+    return aa->elements_are_queues;
+  if (sel->base->kind == ExprKind::kIdentifier) {
+    const ArrayInfo* info = ctx.FindArrayInfo(sel->base->text);
+    if (info != nullptr) return info->elements_are_queues;
+  }
+  const QueueObject* outer = FindQueueOfBase(sel->base, ctx, arena);
+  return outer != nullptr && outer->elements_are_queues;
 }
 
 bool TryCopyElementQueueToArray(const Stmt* stmt, const ArrayInfo& dst,

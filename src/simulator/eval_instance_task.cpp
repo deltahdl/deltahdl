@@ -18,6 +18,7 @@
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
@@ -217,6 +218,11 @@ static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
   }
   if (ResolveMethodOnStaticHandle(access, ctx, arena, call)) return true;
   if (access->lhs->kind == ExprKind::kIdentifier) return false;
+  // §7.8.7 with §7.10: an element that is a queue or a fixed-size array,
+  // `aq["b"]` of `int aq[string][$]`, holds no handle, and evaluated as a
+  // value it was a read of a missing entry that `aq["b"].push_back(1)`, a
+  // write, was warned of under §7.8.6.
+  if (SelectsElementQueue(access->lhs, ctx, arena)) return false;
   ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
   return ResolveMethodByDeclaredClass(obj, {}, access->rhs->text, ctx, call);

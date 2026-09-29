@@ -446,4 +446,53 @@ TEST(AssocInvalidIndex, XzMethodIndexWarningNames7_8_6) {
                               "7.8.6"));
 }
 
+// §7.8.6: a read of a missing entry of an associative array whose elements
+// are queues or fixed-size arrays -- a method of the element's queue, an
+// element of the element's array -- warns as a read of any other missing
+// entry does. Found through the element's queue, each answered the default
+// unwarned.
+TEST(AssocInvalidIndex, MissingElementQueueReadWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aq[string][$];\n"
+      "  int af[int][2];\n"
+      "  int n, v;\n"
+      "  initial begin\n"
+      "    n = aq[\"x\"].size();\n"
+      "    v = af[9][1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "associative array 'aq': read of non-existent index", 6, "7.8.6"));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "associative array 'af': read of non-existent index", 7, "7.8.6"));
+}
+
+// §7.8.7: a queue method statement that changes a missing element's queue,
+// `aq["b"].push_back(1);`, writes the element and allocates it, reading
+// nothing, so it raises no §7.8.6 warning. Its receiver was evaluated as a
+// value to look for a class handle, a read of the missing entry, and warned.
+TEST(AssocInvalidIndex, QueueMethodStatementOnAMissingElementDoesNotWarn) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aq[string][$];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    aq[\"b\"].push_back(1);\n"
+      "    aq[\"c\"].push_front(2);\n"
+      "    n = aq[\"b\"][0] + aq[\"c\"][0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 3u);
+}
+
 }  // namespace
