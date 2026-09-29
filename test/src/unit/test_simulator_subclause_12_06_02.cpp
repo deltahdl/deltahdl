@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_matches_short_circuit.h"
@@ -416,6 +418,80 @@ TEST(IfMatchesSim, MatchesNoElse) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// The design of §12.6.2's own chained predicate, run once per value: a named
+// structure pattern under a tag with a filter reading its identifiers, then an
+// identifier pattern under the other tag with a filter, then the else arm. `y`
+// records which arm ran and what the identifiers held.
+std::string JmpModule(const std::string& value, const std::string& body) {
+  return "module t;\n"
+         "  typedef union tagged {\n"
+         "    bit [9:0] JmpU;\n"
+         "    struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+         "  } Jmp;\n"
+         "  Jmp e;\n"
+         "  int rf [0:3];\n"
+         "  int y;\n" +
+         body +
+         "  initial begin\n"
+         "    rf[1] = 3;\n"
+         "    e = " +
+         value + ";\n    go();\n  end\nendmodule\n";
+}
+
+constexpr const char* kJmpTask =
+    "  task go();\n"
+    "    if (e matches (tagged JmpC '{cc:.c, addr:.a}) &&& (rf[c] != 0))\n"
+    "      y = c * 1000 + a;\n"
+    "    else if (e matches (tagged JmpU .u) &&& u > 5)\n"
+    "      y = u;\n"
+    "    else\n"
+    "      y = 5;\n"
+    "  endtask\n";
+
+// §12.6.2: the pattern's identifiers are in scope in the filter after it and
+// in the true arm, so `rf[c]` reads rf[1] and the arm reads c and a.
+TEST(IfMatchesSim, TheFilterAndTheTrueArmReadTheBoundIdentifiers) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunModule(f, JmpModule("tagged JmpC '{1, 77}", kJmpTask).c_str(), "y"),
+      1077u);
+}
+
+// §12.6.2: a clause whose pattern names another tag fails, and the else-if
+// predicate's pattern matches and binds its own identifier.
+TEST(IfMatchesSim, AValueOfAnotherTagFailsTheClause) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f, JmpModule("tagged JmpU (9)", kJmpTask).c_str(), "y"),
+            9u);
+}
+
+// §12.6.2: a filter that is false after a matching clause makes the predicate
+// false, so the else arm runs.
+TEST(IfMatchesSim, AFalseFilterAfterAMatchTakesTheElseArm) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunModule(f, JmpModule("tagged JmpC '{2, 77}", kJmpTask).c_str(), "y"),
+      5u);
+}
+
+// §13.4: the same predicate in a function body.
+TEST(IfMatchesSim, AFunctionBodyReadsTheBoundIdentifiers) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunModule(f,
+                JmpModule("tagged JmpC '{1, 77}",
+                          "  function void go();\n"
+                          "    if (e matches (tagged JmpC '{cc:.c, addr:.a}) "
+                          "&&& (rf[c] != 0))\n"
+                          "      y = c * 1000 + a;\n"
+                          "    else\n"
+                          "      y = 5;\n"
+                          "  endfunction\n")
+                    .c_str(),
+                "y"),
+      1077u);
 }
 
 }  // namespace

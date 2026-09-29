@@ -177,6 +177,11 @@ struct ClassTypeInfo {
     // read its dimensions from.
     std::vector<uint32_t> dim_los = {};
     std::vector<uint32_t> dim_sizes = {};
+    // §12.7.3: whether each of those dimensions was declared with its left
+    // bound the higher, one entry per entry of dim_los, as
+    // ArrayInfo::dim_descending says of a variable's; a foreach walks each
+    // from its left bound.
+    std::vector<bool> dim_descending = {};
 
     bool IsArray() const { return array_size > 0 || is_dynamic; }
   };

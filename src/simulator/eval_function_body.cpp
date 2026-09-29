@@ -25,6 +25,8 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
+#include "simulator/foreach_dims.h"
+#include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -241,12 +243,17 @@ static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   } else if (qual == CaseQualifier::kPriority) {
     r = ExecFuncPriorityIf(stmt, exec);
   } else {
-    auto cond = EvalExpr(stmt->condition, exec.ctx, exec.arena);
-    if (cond.ToUint64() != 0) {
-      r = ExecFuncStmt(stmt->then_branch, exec);
-    } else if (stmt->else_branch) {
-      r = ExecFuncStmt(stmt->else_branch, exec);
-    }
+    // §12.6.2: the identifiers the predicate's patterns bind are in scope in
+    // its later clauses and its true arm (EvalMatchesPredicate), not the else.
+    bool scoped = PatternBindsIdentifiers(stmt->condition);
+    if (scoped) exec.ctx.PushScope();
+    bool holds =
+        scoped
+            ? EvalMatchesPredicate(stmt->condition, exec.ctx, exec.arena)
+            : EvalExpr(stmt->condition, exec.ctx, exec.arena).ToUint64() != 0;
+    if (holds) r = ExecFuncStmt(stmt->then_branch, exec);
+    if (scoped) exec.ctx.PopScope();
+    if (!holds && stmt->else_branch) r = ExecFuncStmt(stmt->else_branch, exec);
   }
 
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
@@ -373,17 +380,6 @@ static FuncFlow ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   return named.Leave(flow);
 }
 
-static std::string GetForeachArrayName(const Expr* expr) {
-  if (!expr) return {};
-  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  if (expr->kind == ExprKind::kMemberAccess) {
-    std::string name;
-    BuildLhsName(expr, name);
-    return name;
-  }
-  return {};
-}
-
 // §12.7.6/§12.8: the body runs while the condition holds; a `continue` goes
 // back to the condition, a `break` leaves the loop and a `return` leaves the
 // subroutine.
@@ -420,12 +416,16 @@ static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
 
 // §12.7.2/§12.8: a `forever` in a subroutine body ends only through a `break`
 // or a `return` of its body; there is no timing control to suspend it (§13.4).
-static FuncFlow ExecFuncForever(const Stmt* stmt, const FuncExecCtx& exec) {
+// A `repeat` also ends after the count LoopIterationLimit reads.
+static FuncFlow ExecFuncRepeatOrForever(const Stmt* stmt,
+                                        const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
   FuncNamedScope named(stmt->label, exec);
+  std::optional<uint64_t> limit =
+      LoopIterationLimit(stmt, exec.ctx, exec.arena);
   FuncFlow flow = FuncFlow::kNext;
-  for (;;) {
+  for (uint64_t i = 0; !limit || i < *limit; ++i) {
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
@@ -525,45 +525,37 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   return LoopExitFlow(flow);
 }
 
-// Sets the loop variables `vars` to the combination `n` of the dimensions
-// `ref`'s property declares from the first, counted as nested loops count them
-// with the last dimension varying fastest (§12.7.3).
-static void SetForeachCombination(const ClassArrayRef& ref,
-                                  const std::vector<Variable*>& vars,
-                                  uint64_t n, Arena& arena) {
-  for (size_t k = vars.size(); k-- > 0;) {
-    uint32_t size = ref.prop->dim_sizes[k];
-    uint64_t idx = n % size;
-    n /= size;
-    if (vars[k] != nullptr)
-      vars[k]->value = MakeLogic4VecVal(arena, 32, ref.prop->dim_los[k] + idx);
+// §12.7.3: the dimensions a foreach in a subroutine body walks one named loop
+// variable per dimension, as nested loops: a declared array's or vector's
+// (DeclaredForeachDims), a property's (ClassArrayForeachDims) or a structure
+// member's (StructMemberForeachDims). None where the loop steps through
+// ForeachIndexValues, whose arrays are tried first in the same order.
+static std::vector<ForeachDim> FuncForeachDims(const Stmt* stmt,
+                                               const FuncExecCtx& exec) {
+  if (FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena) ||
+      FindQueueOfBase(stmt->expr, exec.ctx, exec.arena)) {
+    return {};
   }
+  if (const StructFieldInfo* member =
+          ResolveStructArrayMember(stmt->expr, exec.ctx))
+    return StructMemberForeachDims(stmt, *member);
+  ClassArrayRef ref;
+  if (ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref))
+    return ClassArrayForeachDims(stmt, ref);
+  return DeclaredForeachDims(stmt, exec.ctx);
 }
 
-// §12.7.3 with §7.4.2 and §8.5: a foreach naming a loop variable for more
-// than one dimension of a property with more than one unpacked dimension,
-// `foreach (g[i, j])` over `int g[2][3]`, runs as nested loops over them, one
-// variable per dimension. Nothing where `stmt` is no such loop.
-static std::optional<FuncFlow> TryExecFuncForeachMultiDim(
-    const Stmt* stmt, const FuncExecCtx& exec) {
-  ClassArrayRef ref;
-  if (stmt->foreach_vars.size() < 2 ||
-      !ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref) ||
-      ref.dim != 0 || !ClassArrayHoldsSubarrays(ref)) {
-    return std::nullopt;
-  }
-  size_t dims = std::min(stmt->foreach_vars.size(), ref.prop->dim_sizes.size());
+// Runs a foreach over `dims` as nested loops, the last dimension varying
+// fastest and each walked from its declared left bound (SetForeachDimVars).
+static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
+                                    const std::vector<ForeachDim>& dims,
+                                    const FuncExecCtx& exec) {
   exec.ctx.PushScope();
-  std::vector<Variable*> vars(dims, nullptr);
-  uint64_t total = 1;
-  for (size_t k = 0; k < dims; ++k) {
-    if (!stmt->foreach_vars[k].empty())
-      vars[k] = exec.ctx.CreateLocalVariable(stmt->foreach_vars[k], 32);
-    total *= ref.prop->dim_sizes[k];
-  }
+  std::vector<Variable*> vars = CreateForeachDimVars(dims, exec.ctx);
+  uint64_t total = ForeachCombinationCount(dims);
   FuncFlow flow = FuncFlow::kNext;
   for (uint64_t n = 0; n < total; ++n) {
-    SetForeachCombination(ref, vars, n, exec.arena);
+    SetForeachDimVars(dims, vars, n, exec.arena);
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
@@ -574,9 +566,11 @@ static std::optional<FuncFlow> TryExecFuncForeachMultiDim(
 static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
-  if (std::optional<FuncFlow> flow = TryExecFuncForeachMultiDim(stmt, exec)) {
+  std::vector<ForeachDim> dims = FuncForeachDims(stmt, exec);
+  if (!dims.empty()) {
+    FuncFlow flow = ExecFuncForeachDims(stmt, dims, exec);
     if (labeled) exec.ctx.PopStaticScope(stmt->label);
-    return *flow;
+    return flow;
   }
   auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
   std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
@@ -699,13 +693,20 @@ static FuncFlow ExecFuncImmediateAssert(const Stmt* stmt,
 }
 
 // §13.4: a case statement in a function body selects its item as one in a
-// process does and runs the body here, synchronously; answers where control
-// went from the body.
+// process does and runs the body here, synchronously, with the identifiers
+// the item's pattern bound in scope (§12.6.1); answers where control went
+// from the body.
 static FuncFlow ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
-  const Stmt* body = SelectCaseBody(stmt, exec.ctx, exec.arena);
-  FuncFlow flow = ExecFuncStmt(body, exec);
+  CaseSelection chosen = SelectCaseItem(stmt, exec.ctx, exec.arena);
+  bool scoped = !chosen.bindings.empty();
+  if (scoped) {
+    exec.ctx.PushScope();
+    InstallPatternBindings(chosen.bindings, exec.ctx);
+  }
+  FuncFlow flow = ExecFuncStmt(chosen.body, exec);
+  if (scoped) exec.ctx.PopScope();
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return flow;
 }
@@ -791,7 +792,8 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
     case StmtKind::kDoWhile:
       return ExecFuncDoWhile(stmt, exec);
     case StmtKind::kForever:
-      return ExecFuncForever(stmt, exec);
+    case StmtKind::kRepeat:
+      return ExecFuncRepeatOrForever(stmt, exec);
     case StmtKind::kEventTrigger:
     case StmtKind::kNbEventTrigger:
       // §13.4.4 names no event trigger among what a function may not hold, and

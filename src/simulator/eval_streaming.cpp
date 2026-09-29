@@ -17,7 +17,7 @@
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/evaluation_internal.h"
+#include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/struct_string_member.h"
@@ -829,30 +829,18 @@ Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
   return EvalAssignmentPattern(expr, ctx, arena);
 }
 
-// §12.6: a constant expression pattern succeeds when the value equals the
-// constant's value, and §12.6.2 matches `e matches p` the same way; the
-// narrower operand is extended to the wider's width, as §12.5's case
-// comparison is, and every word of the two is compared, not the first alone.
-// A pattern bit that is x or z is taken as matching either value -- a grant
-// §12.6.1 gives only casez and casex -- and a value bit that is x or z reads
-// as 0, as ToUint64 reads it. The result is 1 bit, 0 or 1, never x or z.
+// §12.6.2: `e matches p` as an expression, 1 where the pattern matches and 0
+// where it does not, never x or z (MatchPattern). A constant pattern is
+// compared as MatchesClauseValueMatch compares it. The identifiers the pattern
+// binds are read only by a predicate that holds them, which
+// EvalMatchesPredicate evaluates in a scope of its own, so here they are
+// dropped.
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
-  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
-  uint32_t width = std::max(lhs_val.width, rhs_val.width);
-  bool sign_ext = lhs_val.is_signed && rhs_val.is_signed;
-  if (lhs_val.width < width)
-    lhs_val = ExtendVec(lhs_val, width, sign_ext, arena);
-  if (rhs_val.width < width)
-    rhs_val = ExtendVec(rhs_val, width, sign_ext, arena);
-
-  bool match = true;
-  uint32_t nwords = std::min(lhs_val.nwords, rhs_val.nwords);
-  for (uint32_t i = 0; i < nwords && match; ++i) {
-    uint64_t la = lhs_val.words[i].aval & ~lhs_val.words[i].bval;
-    uint64_t mask = ~rhs_val.words[i].bval;
-    match = (la & mask) == (rhs_val.words[i].aval & mask);
-  }
+  std::vector<PatternBinding> bindings;
+  PatternMatchEnv env{TokenKind::kKwCase, MatchesClauseValueMatch, ctx, arena,
+                      bindings};
+  bool match =
+      MatchPattern(expr->rhs, PatternSubjectOf(expr->lhs, ctx, arena), env);
   return MakeLogic4VecVal(arena, 1, match ? 1 : 0);
 }
 

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -21,10 +22,11 @@
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
+#include "simulator/foreach_dims.h"
+#include "simulator/pattern_match.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
-#include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
@@ -206,6 +208,22 @@ static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// §12.6.2: an if whose predicate binds pattern identifiers. They are created
+// in a scope that holds the predicate's later clauses and the true arm
+// (EvalMatchesPredicate); the else arm stands outside it.
+static ExecTask ExecIfBindingPredicate(const Stmt* stmt, SimContext& ctx,
+                                       Arena& arena) {
+  ctx.PushScope();
+  if (EvalMatchesPredicate(stmt->condition, ctx, arena)) {
+    auto r = co_await ExecStmt(stmt->then_branch, ctx, arena);
+    ctx.PopScope();
+    co_return r;
+  }
+  ctx.PopScope();
+  if (stmt->else_branch == nullptr) co_return StmtResult::kDone;
+  co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
+}
+
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
@@ -222,6 +240,11 @@ ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return r;
   }
 
+  if (PatternBindsIdentifiers(stmt->condition)) {
+    auto r = co_await ExecIfBindingPredicate(stmt, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
+  }
   auto cond = EvalExpr(stmt->condition, ctx, arena);
   if (cond.IsTruthy()) {
     auto r = co_await ExecStmt(stmt->then_branch, ctx, arena);
@@ -407,11 +430,16 @@ static uint64_t RepeatIterationCount(const Logic4Vec& count_val) {
   return count_val.ToUint64();
 }
 
+std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
+                                           Arena& arena) {
+  if (stmt->kind != StmtKind::kRepeat) return std::nullopt;
+  return RepeatIterationCount(EvalExpr(stmt->condition, ctx, arena));
+}
+
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  auto count_val = EvalExpr(stmt->condition, ctx, arena);
-  uint64_t count = RepeatIterationCount(count_val);
+  uint64_t count = *LoopIterationLimit(stmt, ctx, arena);
   for (uint64_t i = 0; i < count && ProcessGoesOn(ctx); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
@@ -439,17 +467,6 @@ ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   } while (ProcessGoesOn(ctx));
   if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
-}
-
-static std::string GetForeachArrayName(const Expr* expr) {
-  if (!expr) return {};
-  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  if (expr->kind == ExprKind::kMemberAccess) {
-    std::string name;
-    BuildLhsName(expr, name);
-    return name;
-  }
-  return {};
 }
 
 static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
@@ -481,16 +498,6 @@ static bool ForeachOnWildcardAssoc(const AssocArrayObject* aa,
   return true;
 }
 
-// §12.7.3: maps a zero-based iteration counter to the array's declared index
-// value. With array-info present the index walks the declared range, counting
-// down for a descending dimension; otherwise it counts up from `lo`, the
-// lowest declared index of an array property or 0.
-static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
-                                         int64_t lo, uint32_t i) {
-  if (!info) return static_cast<uint32_t>(lo + i);
-  return info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
-}
-
 // Result of the non-coroutine prologue of ExecForeach: the array name, its
 // iteration count, and whether the loop should run at all. `bail` is set when
 // the loop must terminate immediately (wildcard associative array, or a
@@ -498,7 +505,10 @@ static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
 // array `keys` holds the index values the loop variable steps through, one per
 // iteration, and `string_keys` whether they are strings. `lo` is the index
 // the first iteration takes where the array carries no array-info entry: the
-// lowest declared index of a fixed-size array property, 0 otherwise.
+// lowest declared index of a fixed-size array property, 0 otherwise. `dims`
+// holds the dimensions the loop walks one named variable per dimension, as
+// nested loops (DeclaredForeachDims, ClassArrayForeachDims); empty where the
+// loop steps through `keys` or from `lo` instead.
 struct ForeachSetup {
   std::string arr_name;
   uint32_t size = 0;
@@ -507,6 +517,7 @@ struct ForeachSetup {
   std::vector<Logic4Vec> keys;
   bool string_keys = false;
   const AssocArrayObject* aa = nullptr;
+  std::vector<ForeachDim> dims;
 };
 
 // §12.7.3: resolves the array being iterated and how many iterations it
@@ -551,6 +562,7 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     // its bounds. Looked up as an array of its name, it was none.
     setup.size = member->elem_count;
     setup.lo = std::min(member->elem_left, member->elem_right);
+    setup.dims = StructMemberForeachDims(stmt, *member);
   } else if (ClassArrayRef ref;
              ResolveClassArray(stmt->expr, ctx, arena, ref)) {
     // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
@@ -560,8 +572,10 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     // its name, which it is not, and the loop ran no times.
     setup.size = ref.size;
     setup.lo = ref.lo;
+    setup.dims = ClassArrayForeachDims(stmt, ref);
   } else {
     setup.size = GetArraySize(stmt, ctx);
+    setup.dims = DeclaredForeachDims(stmt, ctx);
   }
   if (setup.size == 0) setup.bail = true;
   return setup;
@@ -577,21 +591,20 @@ static std::string_view ForeachIterName(const Stmt* stmt) {
 }
 
 // Assigns the loop variable for iteration `i`: the i-th index the associative
-// array holds, where the loop is over one, else the zero-based counter mapped
-// onto the array's declared index range. A no-op when the dimension is
-// unnamed (`iter_var` is null). §12.7.3 types the loop variable after the
-// index type, so a string index makes the variable a string.
-static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
-                              const ForeachSetup& setup, uint32_t i,
-                              Arena& arena) {
+// array holds, where the loop is over one, else the zero-based counter counted
+// up from `lo`. A no-op when the dimension is unnamed (`iter_var` is null).
+// §12.7.3 types the loop variable after the index type, so a string index
+// makes the variable a string.
+static void SetForeachIterVar(Variable* iter_var, const ForeachSetup& setup,
+                              uint32_t i, Arena& arena) {
   if (!iter_var) return;
   if (!setup.keys.empty()) {
     iter_var->value = setup.keys[i];
     iter_var->is_string = setup.string_keys;
     return;
   }
-  uint32_t index = ForeachIndexForIteration(info, setup.size, setup.lo, i);
-  iter_var->value = MakeLogic4VecVal(arena, 32, index);
+  iter_var->value =
+      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(setup.lo + i));
 }
 
 // Creates the loop variable `iter_name` names in the scope ExecForeach
@@ -619,58 +632,22 @@ static void TeardownForeachScopes(const Stmt* stmt, SimContext& ctx,
   ExitLoopLabelScope(stmt, ctx, labeled);
 }
 
-// §12.7.3: for a multidimensional (unpacked) array each loop variable
-// corresponds to one dimension. Collects, in declaration order, the loop
-// variable name plus its dimension's low index and size for every dimension
-// that has a named loop variable, so ExecForeach can iterate them as nested
-// loops. A dimension whose variable slot is omitted (an empty name) is not
-// iterated and contributes no entry.
-struct ForeachDimIter {
-  std::string_view name;
-  uint32_t lo;
-  uint32_t size;
-};
-
-static std::vector<ForeachDimIter> CollectForeachDims(const Stmt* stmt,
-                                                      const ArrayInfo* info) {
-  std::vector<ForeachDimIter> dims;
-  size_t ndims = info->dim_sizes.size();
-  size_t nvars = stmt->foreach_vars.size();
-  for (size_t k = 0; k < nvars && k < ndims; ++k) {
-    if (stmt->foreach_vars[k].empty()) continue;
-    uint32_t lo = (k < info->dim_los.size()) ? info->dim_los[k] : 0;
-    dims.push_back({stmt->foreach_vars[k], lo, info->dim_sizes[k]});
-  }
-  return dims;
-}
-
-// §12.7.3: drives a multidimensional foreach as nested loops. A flat odometer
-// over the product of the iterated dimension sizes yields the same nesting the
-// LRM prescribes: the last (highest-cardinality, innermost) dimension changes
-// most rapidly, the first (lowest-cardinality, outermost) most slowly. Each
-// step maps the counter back to per-dimension index values before running the
-// body once, so `continue` advances to the next combination and `break` (or a
-// disable of the loop's own label) leaves the whole loop.
-static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
-                                    Arena& arena, const ArrayInfo* info,
-                                    bool labeled) {
-  std::vector<ForeachDimIter> dims = CollectForeachDims(stmt, info);
+// §12.7.3: drives a foreach over `dims`, one named loop variable per
+// dimension, as nested loops. A flat odometer over the product of the
+// dimension sizes yields the same nesting the LRM prescribes: the last
+// (innermost) dimension changes most rapidly, the first (outermost) most
+// slowly, and each walks from its declared left bound (SetForeachDimVars). Each
+// step sets the variables before running the body once, so `continue` advances
+// to the next combination and `break` (or a disable of the loop's own label)
+// leaves the whole loop.
+static ExecTask ExecForeachDims(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                                const std::vector<ForeachDim>& dims,
+                                bool labeled) {
   ctx.PushScope();
-  std::vector<Variable*> vars;
-  uint64_t total = 1;
-  for (const auto& d : dims) {
-    vars.push_back(ctx.CreateLocalVariable(d.name, 32));
-    total *= d.size;
-  }
+  std::vector<Variable*> vars = CreateForeachDimVars(dims, ctx);
+  uint64_t total = ForeachCombinationCount(dims);
   for (uint64_t n = 0; n < total && ProcessGoesOn(ctx); ++n) {
-    uint64_t rem = n;
-    for (size_t d = dims.size(); d-- > 0;) {
-      auto idx = static_cast<uint32_t>(rem % dims[d].size);
-      rem /= dims[d].size;
-      if (vars[d]) {
-        vars[d]->value = MakeLogic4VecVal(arena, 32, dims[d].lo + idx);
-      }
-    }
+    SetForeachDimVars(dims, vars, n, arena);
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     auto action = ClassifyLoopBodyResult(result);
     if (action == LoopAction::kBreakLoop) break;
@@ -682,39 +659,6 @@ static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
   }
   TeardownForeachScopes(stmt, ctx, labeled);
   co_return StmtResult::kDone;
-}
-
-// §12.7.3 with §7.4.2 and §8.5: where a foreach names a loop variable for
-// more than one dimension of a class property with more than one unpacked
-// dimension, `foreach (h.g[i, j])` over `int g[2][3]`, describes the
-// property's dimensions into `shape` for ExecForeachMultiDim, answering
-// whether it did.
-static bool MultiDimPropertyShape(const Stmt* stmt, SimContext& ctx,
-                                  Arena& arena, ArrayInfo& shape) {
-  ClassArrayRef ref;
-  if (stmt->foreach_vars.size() < 2 ||
-      !ResolveClassArray(stmt->expr, ctx, arena, ref) || ref.dim != 0 ||
-      !ClassArrayHoldsSubarrays(ref)) {
-    return false;
-  }
-  shape.dim_los = ref.prop->dim_los;
-  shape.dim_sizes = ref.prop->dim_sizes;
-  return true;
-}
-
-// The shape the foreach `stmt` iterates by: the declared array's under
-// `arr_name`, or a multidimensional class property's described into
-// `property_shape` (MultiDimPropertyShape); null for anything else.
-static const ArrayInfo* ForeachArrayShape(const Stmt* stmt,
-                                          const std::string& arr_name,
-                                          SimContext& ctx, Arena& arena,
-                                          ArrayInfo& property_shape) {
-  if (!arr_name.empty()) {
-    if (const ArrayInfo* info = ctx.FindArrayInfo(arr_name)) return info;
-  }
-  return MultiDimPropertyShape(stmt, ctx, arena, property_shape)
-             ? &property_shape
-             : nullptr;
 }
 
 // §12.7.3 with §7.4, §7.8 and §7.10: the second loop variable of a foreach
@@ -790,32 +734,20 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     ExitLoopLabelScope(stmt, ctx, labeled);
     co_return StmtResult::kDone;
   }
-  const std::string& arr_name = setup.arr_name;
-  uint32_t size = setup.size;
-
-  std::string_view iter_name = ForeachIterName(stmt);
-
-  // §12.7.3: the loop variable steps through the array's declared index range,
-  // not a fixed zero base. A descending dimension counts down from its high
-  // index. Variables, packed vectors, and strings carry no array-info entry
-  // and keep the natural zero-based ordering.
-  ArrayInfo property_shape;
-  const ArrayInfo* info =
-      ForeachArrayShape(stmt, arr_name, ctx, arena, property_shape);
-
-  // §12.7.3: a multidimensional unpacked array binds one loop variable per
-  // dimension; iterate every dimension as nested loops rather than only the
-  // outermost.
-  if (info && info->dim_sizes.size() >= 2 && stmt->foreach_vars.size() >= 2) {
-    co_return co_await ExecForeachMultiDim(stmt, ctx, arena, info, labeled);
+  // §12.7.3: each loop variable walks the declared range of the dimension it
+  // names, from its left bound, as nested loops over every named dimension.
+  if (!setup.dims.empty()) {
+    co_return co_await ExecForeachDims(stmt, ctx, arena, setup.dims, labeled);
   }
+  uint32_t size = setup.size;
+  std::string_view iter_name = ForeachIterName(stmt);
 
   ctx.PushScope();
   Variable* iter_var = CreateForeachIterVar(iter_name, setup, ctx);
   ForeachElementDim inner = ForeachElementDimOf(stmt, setup, ctx, arena);
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
-    SetForeachIterVar(iter_var, info, setup, i, arena);
+    SetForeachIterVar(iter_var, setup, i, arena);
     auto result = inner.var == nullptr
                       ? co_await ExecStmt(stmt->body, ctx, arena)
                       : co_await ExecForeachElement(

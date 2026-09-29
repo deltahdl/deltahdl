@@ -1,4 +1,7 @@
 #include <cstdint>
+#include <optional>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -8,6 +11,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
+#include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
@@ -151,18 +155,64 @@ static Logic4Vec CaseItemValue(const Expr* pat, const Logic4Vec& sel,
   return pv;
 }
 
-static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
+// §12.6.1: a constant pattern of a pattern-matching case compared with what it
+// is matched against, sized as CaseItemValue sizes a plain item's value, by
+// the statement's case kind.
+static bool CaseMatchesValueMatch(const Logic4Vec& value,
+                                  const Logic4Vec& constant,
+                                  TokenKind case_kind, Arena& arena) {
+  if (constant.fills_width && constant.width < value.width)
+    return CaseMatchesMatch(
+        value, FillUnbasedUnsized(constant, value.width, arena), case_kind);
+  return CaseMatchesMatch(value, constant, case_kind);
+}
+
+// The case expression as each item is matched against it: its value, and, for
+// a pattern-matching case (§12.6.1), what the patterns are matched against and
+// the identifiers the first item to match bound, which its statement reads.
+struct CaseSubject {
+  Logic4Vec sel;
+  PatternSubject pattern;
+  std::optional<std::vector<PatternBinding>> bound;
+};
+
+// §12.6.1: the `&&&` filters of the item pattern `e` after its pattern
+// `pattern`, evaluated from the left and each true where it is nonzero.
+static bool FiltersHold(const Expr* e, const Expr* pattern, SimContext& ctx,
+                        Arena& arena) {
+  if (e == pattern) return true;
+  if (e->kind == ExprKind::kBinary && e->op == TokenKind::kAmpAmpAmp) {
+    return FiltersHold(e->lhs, pattern, ctx, arena) &&
+           EvalExpr(e->rhs, ctx, arena).IsTruthy();
+  }
+  return EvalExpr(e, ctx, arena).IsTruthy();
+}
+
+// §12.6.1: an item's pattern, the leftmost operand of the `&&&` filters it may
+// carry, matched against the case expression (MatchPattern). The filters read
+// the identifiers the pattern binds, so those are created in a scope of their
+// own while the filters run; the first matching item's are kept in `cs` for
+// its statement.
+static bool CaseMatchesPatternMatch(CaseSubject& cs, const Expr* pat_expr,
                                     SimContext& ctx, Arena& arena,
                                     TokenKind case_kind) {
-  if (pat_expr->kind == ExprKind::kBinary &&
-      pat_expr->op == TokenKind::kAmpAmpAmp) {
-    auto pat_val = CaseItemValue(pat_expr->lhs, sel, ctx, arena);
-    if (!CaseMatchesMatch(sel, pat_val, case_kind)) return false;
-    auto guard = EvalExpr(pat_expr->rhs, ctx, arena);
-    return guard.IsTruthy();
+  const Expr* pattern = pat_expr;
+  while (pattern->kind == ExprKind::kBinary &&
+         pattern->op == TokenKind::kAmpAmpAmp) {
+    pattern = pattern->lhs;
   }
-  auto pv = CaseItemValue(pat_expr, sel, ctx, arena);
-  return CaseMatchesMatch(sel, pv, case_kind);
+  std::vector<PatternBinding> bindings;
+  PatternMatchEnv env{case_kind, CaseMatchesValueMatch, ctx, arena, bindings};
+  if (!MatchPattern(pattern, cs.pattern, env)) return false;
+  bool scoped = !bindings.empty() && pattern != pat_expr;
+  if (scoped) {
+    ctx.PushScope();
+    InstallPatternBindings(bindings, ctx);
+  }
+  bool holds = FiltersHold(pat_expr, pattern, ctx, arena);
+  if (scoped) ctx.PopScope();
+  if (holds && !cs.bound) cs.bound = std::move(bindings);
+  return holds;
 }
 
 static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
@@ -172,19 +222,19 @@ static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
   return CaseExactMatch(sel, pat);
 }
 
-static bool CasePatternMatch(const Logic4Vec& sel, const Expr* pat,
-                             const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->case_inside) return CaseInsidePatternMatch(sel, pat, ctx, arena);
+static bool CasePatternMatch(CaseSubject& cs, const Expr* pat, const Stmt* stmt,
+                             SimContext& ctx, Arena& arena) {
+  if (stmt->case_inside) return CaseInsidePatternMatch(cs.sel, pat, ctx, arena);
   if (stmt->case_matches)
-    return CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
-  return CaseItemMatches(sel, CaseItemValue(pat, sel, ctx, arena),
+    return CaseMatchesPatternMatch(cs, pat, ctx, arena, stmt->case_kind);
+  return CaseItemMatches(cs.sel, CaseItemValue(pat, cs.sel, ctx, arena),
                          stmt->case_kind);
 }
 
-static bool CaseItemHasMatch(const Logic4Vec& sel, const CaseItem& item,
+static bool CaseItemHasMatch(CaseSubject& cs, const CaseItem& item,
                              const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (auto* pat : item.patterns) {
-    if (CasePatternMatch(sel, pat, stmt, ctx, arena)) return true;
+    if (CasePatternMatch(cs, pat, stmt, ctx, arena)) return true;
   }
   return false;
 }
@@ -202,16 +252,15 @@ struct UniqueCaseResult {
   bool has_default = false;
 };
 
-static UniqueCaseResult ScanUniqueCaseItems(const Logic4Vec& sel,
-                                            const Stmt* stmt, SimContext& ctx,
-                                            Arena& arena) {
+static UniqueCaseResult ScanUniqueCaseItems(CaseSubject& cs, const Stmt* stmt,
+                                            SimContext& ctx, Arena& arena) {
   UniqueCaseResult result;
   for (const auto& item : stmt->case_items) {
     if (item.is_default) {
       result.has_default = true;
       continue;
     }
-    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) {
+    if (CaseItemHasMatch(cs, item, stmt, ctx, arena)) {
       result.match_count++;
       if (!result.first_match_body) result.first_match_body = item.body;
     }
@@ -222,10 +271,10 @@ static UniqueCaseResult ScanUniqueCaseItems(const Logic4Vec& sel,
 // §12.5.3.1: the item a unique or unique0 case selects, the violations the
 // qualifier defines reported on the way: more than one matching item, and
 // for unique no matching item and no default.
-static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, const Logic4Vec& sel,
+static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, CaseSubject& cs,
                                         CaseQualifier qual, SimContext& ctx,
                                         Arena& arena) {
-  auto info = ScanUniqueCaseItems(sel, stmt, ctx, arena);
+  auto info = ScanUniqueCaseItems(cs, stmt, ctx, arena);
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique case: multiple items matched",
@@ -245,13 +294,12 @@ static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, const Logic4Vec& sel,
 // §12.5: the item a case selects by the linear search, the first whose
 // pattern matches, else the default; §12.5.3.1 reports a priority case
 // that selects none.
-static const Stmt* SelectStandardCaseBody(const Stmt* stmt,
-                                          const Logic4Vec& sel,
+static const Stmt* SelectStandardCaseBody(const Stmt* stmt, CaseSubject& cs,
                                           CaseQualifier qual, SimContext& ctx,
                                           Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
-    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) return item.body;
+    if (CaseItemHasMatch(cs, item, stmt, ctx, arena)) return item.body;
   }
   const Stmt* default_body = FindCaseDefault(stmt);
   if (default_body) return default_body;
@@ -263,21 +311,41 @@ static const Stmt* SelectStandardCaseBody(const Stmt* stmt,
   return nullptr;
 }
 
-const Stmt* SelectCaseBody(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto qual = stmt->qualifier;
-  auto sel = EvalExpr(stmt->condition, ctx, arena);
-  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    return SelectUniqueCaseBody(stmt, sel, qual, ctx, arena);
+  CaseSubject cs;
+  if (stmt->case_matches) {
+    cs.pattern = PatternSubjectOf(stmt->condition, ctx, arena);
+    cs.sel = cs.pattern.value;
+  } else {
+    cs.sel = EvalExpr(stmt->condition, ctx, arena);
   }
-  return SelectStandardCaseBody(stmt, sel, qual, ctx, arena);
+  CaseSelection chosen;
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    chosen.body = SelectUniqueCaseBody(stmt, cs, qual, ctx, arena);
+  } else {
+    chosen.body = SelectStandardCaseBody(stmt, cs, qual, ctx, arena);
+  }
+  if (cs.bound) chosen.bindings = std::move(*cs.bound);
+  return chosen;
 }
 
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  const Stmt* body = SelectCaseBody(stmt, ctx, arena);
+  CaseSelection chosen = SelectCaseItem(stmt, ctx, arena);
   StmtResult r = StmtResult::kDone;
-  if (body != nullptr) r = co_await ExecStmt(body, ctx, arena);
+  if (chosen.body != nullptr) {
+    // §12.6.1: the identifiers the item's pattern bound are in scope in its
+    // statement.
+    bool scoped = !chosen.bindings.empty();
+    if (scoped) {
+      ctx.PushScope();
+      InstallPatternBindings(chosen.bindings, ctx);
+    }
+    r = co_await ExecStmt(chosen.body, ctx, arena);
+    if (scoped) ctx.PopScope();
+  }
   if (labeled) ctx.PopStaticScope(stmt->label);
   co_return r;
 }

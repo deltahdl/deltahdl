@@ -1,11 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "simulator/exec_task.h"
+#include "simulator/pattern_match.h"
 #include "simulator/stmt_result.h"
 
 namespace delta {
@@ -103,15 +106,27 @@ ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §12.5: the body of the item the case statement `stmt` selects, its case
 // expression evaluated once and the violations §12.5.3.1 defines for its
-// qualifier reported; nullptr where no item and no default matches. Shared
-// by the process executor above and the function body's (§13.4), which runs
-// the body synchronously (stmt_exec_control.cpp).
-const Stmt* SelectCaseBody(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// qualifier reported; nullptr where no item and no default matches. For a
+// pattern-matching case (§12.6.1), also the identifiers the selected item's
+// pattern bound, which its statement reads and which the executor creates in
+// a scope around it (InstallPatternBindings). Shared by the process executor
+// above and the function body's (§13.4), which runs the body synchronously.
+struct CaseSelection {
+  const Stmt* body = nullptr;
+  std::vector<PatternBinding> bindings;
+};
+CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §12.7.2: how many times the repeat `stmt` runs its body, its count evaluated
+// here once, before the first iteration; nullopt for a forever, which has no
+// count. Shared by ExecRepeat and the function body's executor (§13.4), which
+// runs either loop synchronously.
+std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
+                                           Arena& arena);
 ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §16.3 immediate assertion, including its deferred forms (defined in

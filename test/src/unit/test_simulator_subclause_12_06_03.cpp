@@ -315,4 +315,32 @@ TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterSelectsAlternative) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+// §12.6.3: the pattern's identifiers are in scope in the consequent, which
+// reads the member of a matching value; a value of another tag fails the
+// predicate and the alternative is taken.
+TEST(TernaryMatchesSim, TheConsequentReadsTheBoundIdentifier) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void None; int Some; } Opt;\n"
+      "  Opt o;\n"
+      "  int some, none;\n"
+      "  initial begin\n"
+      "    o = tagged Some (42);\n"
+      "    some = (o matches (tagged Some .x)) ? x : -1;\n"
+      "    o = tagged None;\n"
+      "    none = (o matches (tagged Some .x)) ? x : -1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* some = f.ctx.FindVariable("some");
+  auto* none = f.ctx.FindVariable("none");
+  ASSERT_NE(some, nullptr);
+  ASSERT_NE(none, nullptr);
+  EXPECT_EQ(some->value.ToUint64(), 42u);
+  EXPECT_EQ(none->value.ToUint64(), 0xFFFFFFFFu);
+}
+
 }  // namespace

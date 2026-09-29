@@ -300,4 +300,115 @@ TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// §12.7.2's own shift-add multiplier, run as a function body (§13.4): the
+// loop runs `size` times inside the call, so 13 * 17 is 221 where a body that
+// skipped the loop returned 0. The widths are written as literals, the
+// example's `longsize` and `size` standing for 16 and 8.
+TEST(LoopStatementSim, RepeatInsideAFunctionRunsItsCount) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  parameter size = 8;\n"
+      "  function logic [16:1] mult(logic [8:1] opa, logic [8:1] opb);\n"
+      "    logic [16:1] shift_opa, shift_opb, result;\n"
+      "    shift_opa = opa; shift_opb = opb; result = 0;\n"
+      "    repeat (size) begin\n"
+      "      if (shift_opb[1]) result = result + shift_opa;\n"
+      "      shift_opa = shift_opa << 1;\n"
+      "      shift_opb = shift_opb >> 1;\n"
+      "    end\n"
+      "    return result;\n"
+      "  endfunction\n"
+      "  logic [15:0] x;\n"
+      "  initial x = mult(13, 17);\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 221u);
+}
+
+// A class method's body runs a repeat on its argument's count as a module
+// function's does.
+TEST(LoopStatementSim, RepeatInsideAClassMethodRunsItsCount) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class R;\n"
+      "  int acc;\n"
+      "  function int m(int n, int v);\n"
+      "    acc = 0;\n"
+      "    repeat (n) acc += v;\n"
+      "    return acc;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  R r;\n"
+      "  int x;\n"
+      "  initial begin r = new; x = r.m(3, 10); end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 30u);
+}
+
+// §12.8: a break ends a repeat in a function body before its count runs out.
+TEST(LoopStatementSim, BreakEndsARepeatInsideAFunction) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function int f();\n"
+      "    int r;\n"
+      "    r = 0;\n"
+      "    repeat (100) begin r++; if (r == 5) break; end\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial x = f();\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// §12.8: a continue skips the rest of the body and the repeat goes on to its
+// next iteration, so the count still runs out and the assignment after the
+// continue is never reached.
+TEST(LoopStatementSim, ContinueInARepeatInsideAFunctionGoesOn) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function int f();\n"
+      "    int r;\n"
+      "    r = 0;\n"
+      "    repeat (4) begin r++; continue; r = 100; end\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial x = f();\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+}
+
+// §12.7.2: a negative count of a signed expression runs the body no times in a
+// function body as it does in a process; read as unsigned, -1 would run it
+// more than four billion times.
+TEST(LoopStatementSim, NegativeRepeatCountInsideAFunctionRunsNoTimes) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function int f(int n);\n"
+      "    int r;\n"
+      "    r = 7;\n"
+      "    repeat (n) r++;\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial x = f(-1);\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
 }  // namespace

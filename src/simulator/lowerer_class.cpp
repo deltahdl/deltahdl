@@ -400,7 +400,8 @@ static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
 
 // §7.4.2 with §20.7: gives `prop` the extents of the unpacked dimensions
 // `dims` declares where it declares more than one and each folds to a fixed
-// one, which is what the array query functions read.
+// one, which is what the array query functions read, and which way each was
+// declared, which a foreach walks it by (§12.7.3).
 static void FoldMultiDimExtents(const std::vector<Expr*>& dims,
                                 const ScopeMap& scope, SimContext& ctx,
                                 Arena& arena,
@@ -408,14 +409,17 @@ static void FoldMultiDimExtents(const std::vector<Expr*>& dims,
   if (prop == nullptr) return;
   std::vector<uint32_t> los;
   std::vector<uint32_t> sizes;
+  std::vector<bool> descending;
   for (const Expr* dim : dims) {
     PropertyArrayDim folded = FoldPropertyDimension(dim, scope, ctx, arena);
     if (folded.size == 0) return;
     los.push_back(static_cast<uint32_t>(folded.lo));
     sizes.push_back(folded.size);
+    descending.push_back(folded.descending);
   }
   prop->dim_los = std::move(los);
   prop->dim_sizes = std::move(sizes);
+  prop->dim_descending = std::move(descending);
 }
 
 // The property `info` itself declares under `name`, null where it declares

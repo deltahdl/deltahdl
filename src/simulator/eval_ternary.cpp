@@ -8,6 +8,8 @@
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
+#include "simulator/pattern_match.h"
+#include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 
 namespace delta {
@@ -151,8 +153,31 @@ static void WidenTernaryResultType(const Logic4Vec& other,
   if (other.is_real) rt.is_real = true;
 }
 
+// §12.6.3: a conditional whose predicate binds pattern identifiers. They are
+// created in a scope that holds the predicate's later clauses and the
+// consequent (EvalMatchesPredicate), and the alternative stands outside it.
+// The operand not chosen names identifiers bound only when the predicate
+// holds, so it is not read for the result type; the chosen one is extended
+// by its own sign or truncated to the context.
+static Logic4Vec EvalTernaryBindingPredicate(const Expr* expr, SimContext& ctx,
+                                             Arena& arena,
+                                             uint32_t context_width) {
+  ctx.PushScope();
+  bool holds = EvalMatchesPredicate(expr->condition, ctx, arena);
+  Logic4Vec chosen;
+  if (holds) chosen = EvalExpr(expr->true_expr, ctx, arena, context_width);
+  ctx.PopScope();
+  if (!holds) chosen = EvalExpr(expr->false_expr, ctx, arena, context_width);
+  if (chosen.is_real || context_width == 0) return chosen;
+  if (chosen.width < context_width)
+    return ExtendVec(chosen, context_width, chosen.is_signed, arena);
+  return ResizeToWidth(chosen, context_width, arena);
+}
+
 Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
                       uint32_t context_width) {
+  if (PatternBindsIdentifiers(expr->condition))
+    return EvalTernaryBindingPredicate(expr, ctx, arena, context_width);
   auto cond = EvalExpr(expr->condition, ctx, arena);
 
   if (HasUnknownBits(cond)) {

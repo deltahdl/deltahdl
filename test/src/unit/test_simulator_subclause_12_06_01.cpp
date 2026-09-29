@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
@@ -571,6 +573,270 @@ TEST(CaseMatchesItemSim, CasexMatchesZInSelectorIgnored) {
                       "endmodule\n",
                       "x"),
             1u);
+}
+
+// A module declaring the two tagged unions the pattern tests below match
+// against: `VInt` with a void and an int member, and `U` with two four-bit
+// members, so a member value can be the same under either tag.
+constexpr const char* kTaggedTypes =
+    "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+    "  typedef union tagged { logic [3:0] A; logic [3:0] B; } U;\n";
+
+std::string TaggedModule(const std::string& body) {
+  return "module t;\n" + std::string(kTaggedTypes) + body + "endmodule\n";
+}
+
+// §12.6: `tagged Valid .n` matches a value tagged Valid and binds `n` to its
+// member, which the item's statement reads (§12.6.1's Example 1).
+TEST(CaseMatchesItemSim, AnIdentifierMemberPatternBindsTheMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  VInt v;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    v = tagged Valid (37);\n"
+                                   "    case (v) matches\n"
+                                   "      tagged Invalid : y = 1;\n"
+                                   "      tagged Valid .n : y = n;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            37u);
+}
+
+// §12.6: a tagged pattern matches only a value carrying its tag, so
+// `tagged Valid .n` does not match a value tagged Invalid.
+TEST(CaseMatchesItemSim, ATaggedPatternRejectsAValueOfAnotherTag) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  VInt v;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    v = tagged Invalid;\n"
+                                   "    case (v) matches\n"
+                                   "      tagged Valid .n : y = 1;\n"
+                                   "      default : y = 2;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            2u);
+}
+
+// §12.6: the wildcard `.*` under a tag matches any member of that tag.
+TEST(CaseMatchesItemSim, AWildcardMemberPatternMatchesItsTag) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  VInt v;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    v = tagged Valid (12);\n"
+                                   "    case (v) matches\n"
+                                   "      tagged Valid .* : y = 1;\n"
+                                   "      default : y = 2;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            1u);
+}
+
+// §12.6: a constant member pattern is compared only under its own tag, so
+// `tagged A 6` does not select a value tagged B whose member is also 6.
+TEST(CaseMatchesItemSim, AConstantMemberPatternComparesTheTagFirst) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  U u;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    u = tagged B (4'd6);\n"
+                                   "    case (u) matches\n"
+                                   "      tagged A 6 : y = 1;\n"
+                                   "      tagged B 6 : y = 2;\n"
+                                   "      default : y = 3;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            2u);
+}
+
+// §12.6.1: casez ignores a z bit wherever two bits are compared during the
+// match, member bits included, so the member 4'b1z01 matches 4'b1101.
+TEST(CaseMatchesItemSim, CasezIgnoresAZBitOfTheMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  U u;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    u = tagged B (4'b1z01);\n"
+                                   "    casez (u) matches\n"
+                                   "      tagged B 4'b1101 : y = 1;\n"
+                                   "      default : y = 2;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            1u);
+}
+
+// §12.6.1: the identifiers a pattern binds are in scope in the item's `&&&`
+// filter. A(3) passes `x < 8` and takes the first item; A(9) fails it and
+// falls to the second.
+TEST(CaseMatchesItemSim, TheFilterReadsTheBoundIdentifier) {
+  SimFixture f;
+  auto* design =
+      ElaborateSrc(TaggedModule("  U u;\n"
+                                "  int y, z;\n"
+                                "  initial begin\n"
+                                "    u = tagged A (4'd3);\n"
+                                "    case (u) matches\n"
+                                "      tagged A .x &&& (x < 8) : y = x + 100;\n"
+                                "      tagged A .x : y = 1;\n"
+                                "    endcase\n"
+                                "    u = tagged A (4'd9);\n"
+                                "    case (u) matches\n"
+                                "      tagged A .x &&& (x < 8) : z = x + 100;\n"
+                                "      tagged A .x : z = 1;\n"
+                                "    endcase\n"
+                                "  end\n"),
+                   f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(y, nullptr);
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 103u);
+  EXPECT_EQ(z->value.ToUint64(), 1u);
+}
+
+// A module declaring the structure and the tagged union of structures the
+// structure-pattern tests below match against.
+std::string StructModule(const std::string& body) {
+  return "module t;\n"
+         "  typedef struct { bit [3:0] a; bit [3:0] b; } S;\n"
+         "  typedef union tagged {\n"
+         "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+         "    struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+         "  } Instr;\n" +
+         body + "endmodule\n";
+}
+
+// §12.6: a positional structure pattern of constants matches a structure
+// whose members equal them in declaration order.
+TEST(CaseMatchesItemSim, APositionalStructurePatternMatchesEachMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      StructModule("  S s;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    s = '{5, 9};\n"
+                                   "    case (s) matches\n"
+                                   "      '{9, 5} : y = 1;\n"
+                                   "      '{5, 9} : y = 2;\n"
+                                   "      default : y = 3;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            2u);
+}
+
+// §12.6: a wildcard element of a structure pattern matches any member, and
+// the rest still has to match.
+TEST(CaseMatchesItemSim, AStructurePatternWildcardMatchesAnyMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      StructModule("  S s;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    s = '{5, 9};\n"
+                                   "    case (s) matches\n"
+                                   "      '{.*, 8} : y = 1;\n"
+                                   "      '{.*, 9} : y = 2;\n"
+                                   "      default : y = 3;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            2u);
+}
+
+// §12.6: a named structure pattern matches the member each name names and
+// binds an identifier to the member it stands for.
+TEST(CaseMatchesItemSim, ANamedStructurePatternBindsAMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      StructModule("  S s;\n"
+                                   "  int y;\n"
+                                   "  initial begin\n"
+                                   "    s = '{5, 9};\n"
+                                   "    case (s) matches\n"
+                                   "      '{b:5, a:.aa} : y = 1;\n"
+                                   "      '{a:5, b:.bb} : y = bb + 100;\n"
+                                   "      default : y = 3;\n"
+                                   "    endcase\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            109u);
+}
+
+// §12.6.1's Example 6: a named structure pattern under a tag, its members in
+// an order of its own and one of them left out.
+TEST(CaseMatchesItemSim, ANamedStructurePatternUnderATagBindsItsMembers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      StructModule("  Instr instr;\n"
+                   "  int y, z;\n"
+                   "  initial begin\n"
+                   "    instr = tagged Add '{1, 2, 6};\n"
+                   "    case (instr) matches\n"
+                   "      tagged Add '{reg2:.r2, regd:.rd, reg1:.r1} :\n"
+                   "        y = r1 * 100 + r2 * 10 + rd;\n"
+                   "      tagged JmpC '{addr:.a} : y = a;\n"
+                   "    endcase\n"
+                   "    instr = tagged JmpC '{2, 300};\n"
+                   "    case (instr) matches\n"
+                   "      tagged Add '{reg2:.r2, regd:.rd, reg1:.r1} :\n"
+                   "        z = r1 * 100 + r2 * 10 + rd;\n"
+                   "      tagged JmpC '{addr:.a} : z = a;\n"
+                   "    endcase\n"
+                   "  end\n"),
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(y, nullptr);
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 126u);
+  EXPECT_EQ(z->value.ToUint64(), 300u);
+}
+
+// §13.4: a function body selects the item and binds its identifiers as a
+// process does.
+TEST(CaseMatchesItemSim, AFunctionBodyBindsTheMatchedMember) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      TaggedModule("  VInt v;\n"
+                                   "  int y;\n"
+                                   "  function int f();\n"
+                                   "    case (v) matches\n"
+                                   "      tagged Invalid : return 1;\n"
+                                   "      tagged Valid .n : return n;\n"
+                                   "    endcase\n"
+                                   "    return 2;\n"
+                                   "  endfunction\n"
+                                   "  initial begin\n"
+                                   "    v = tagged Valid (37);\n"
+                                   "    y = f();\n"
+                                   "  end\n")
+                          .c_str(),
+                      "y"),
+            37u);
 }
 
 }  // namespace
