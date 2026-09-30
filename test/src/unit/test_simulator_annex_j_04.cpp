@@ -1,14 +1,20 @@
 #include <gtest/gtest.h>
+#include <stdlib.h>
 #include <unistd.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "driver/cli_options.h"
 #include "helpers_command_line.h"
+#include "helpers_reported_error.h"
 #include "simulator/foreign_code.h"
+#include "simulator/shared_library.h"
 
 using namespace delta;
 
@@ -129,6 +135,17 @@ struct ForeignCodeLibraryDir {
     return kWithout.string();
   }
 
+  // The path name without extension of a shared library the system C
+  // compiler built from `c_source` under `name`.
+  std::string Built(const std::string& name,
+                    const std::string& c_source) const {
+    const fs::path kWithout = dir / name;
+    const std::string kError =
+        BuildCSharedLibrary(c_source, kWithout.string(), "cc");
+    EXPECT_EQ(kError, "");
+    return kWithout.string();
+  }
+
   // The path name without extension of a link to the library `target`.
   std::string Link(const std::string& name, const std::string& target) const {
     const fs::path kWithout = dir / name;
@@ -189,6 +206,76 @@ TEST(ForeignCodeObjectInclusion, ASwitchWithoutItsValueIsRefused) {
   EXPECT_FALSE(ParseCommandLine({"top.sv", "-sv_liblist"}, list));
   EXPECT_TRUE(list.rejected_argument);
   EXPECT_TRUE(list.sv_liblists.empty());
+}
+
+// A library whose constructor appends `letter` to DELTAHDL_ANNEX_J_04_ORDER
+// when the library is loaded, and which defines `symbol`, returning 7.
+std::string OrderRecordingLibrary(const std::string& letter,
+                                  const std::string& symbol) {
+  return "#include <stdio.h>\n"
+         "#include <stdlib.h>\n"
+         "__attribute__((constructor)) static void loaded(void) {\n"
+         "  const char* seen = getenv(\"DELTAHDL_ANNEX_J_04_ORDER\");\n"
+         "  char next[64];\n"
+         "  snprintf(next, sizeof next, \"%s" +
+         letter +
+         "\", seen ? seen : \"\");\n"
+         "  setenv(\"DELTAHDL_ANNEX_J_04_ORDER\", next, 1);\n"
+         "}\n"
+         "int " +
+         symbol + "(void) { return 7; }\n";
+}
+
+// §J.2 and §J.4: the object code a specification names is loaded into the
+// simulator, the bootstrap file's entries ahead of the -sv_lib values, and
+// what a library defines is a global symbol from then on.
+TEST(ForeignCodeObjectLoading, EachLibraryIsLoadedInTheOrderJ4Gives) {
+  const ForeignCodeLibraryDir kDir;
+  const std::string kSwitch = kDir.Built(
+      "switch_lib", OrderRecordingLibrary("s", "deltahdl_annex_j_04_switch"));
+  const std::string kEntry = kDir.Built(
+      "entry_lib", OrderRecordingLibrary("e", "deltahdl_annex_j_04_entry"));
+  setenv("DELTAHDL_ANNEX_J_04_ORDER", "", 1);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_TRUE(ForeignCodeLoadLibraries({kEntry}, {kSwitch}, diag));
+  EXPECT_TRUE(diag.Diagnostics().empty());
+  EXPECT_EQ(std::string(std::getenv("DELTAHDL_ANNEX_J_04_ORDER")), "es");
+  EXPECT_NE(GlobalSymbol("deltahdl_annex_j_04_switch"), nullptr);
+  EXPECT_NE(GlobalSymbol("deltahdl_annex_j_04_entry"), nullptr);
+}
+
+// §J.4: a location naming no file once the platform's extension is appended
+// is a failure of the run, reported against the location as written.
+TEST(ForeignCodeObjectLoading, ALocationWithNoFileIsReported) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_FALSE(ForeignCodeLoadLibraries({}, {"/no/such/annex_j_04_lib"}, diag));
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "object code file '/no/such/annex_j_04_lib', "
+                            "named by -sv_lib, is not there",
+                            0, "J.4"));
+}
+
+// §J.4: a file that is there but is no shared library the loader can load is
+// reported with the loader's own account, and the libraries after it in the
+// order are loaded all the same.
+TEST(ForeignCodeObjectLoading, AFileTheLoaderRejectsIsReportedWithItsAccount) {
+  const ForeignCodeLibraryDir kDir;
+  const std::string kEmpty = kDir.Library("not_object_code");
+  const std::string kAfter = kDir.Built(
+      "after_lib", OrderRecordingLibrary("a", "deltahdl_annex_j_04_after"));
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_FALSE(ForeignCodeLoadLibraries({kEmpty}, {kAfter}, diag));
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "', named by a bootstrap entry, could not be "
+                            "loaded: ",
+                            0, "J.4"));
+  ASSERT_EQ(diag.Diagnostics().size(), 1U);
+  EXPECT_NE(diag.Diagnostics()[0].message.find("not_object_code"),
+            std::string::npos);
+  EXPECT_NE(GlobalSymbol("deltahdl_annex_j_04_after"), nullptr);
 }
 
 }  // namespace

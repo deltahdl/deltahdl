@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -212,11 +213,11 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
       return DpiArgValue::FromLogicVec(SvLogicVecVal{
           static_cast<uint32_t>(word.aval), static_cast<uint32_t>(word.bval)});
     case DataTypeKind::kString:
-      // §35.5.6 admits a string formal, whose value lives outside the aval/bval
-      // pair a Logic4Vec carries. Nothing lowers a design's string into one
-      // yet, so the crossing yields the empty string rather than a reading of
-      // bits that do not hold one.
-      return DpiArgValue::FromString("");
+      // §35.5.6 admits a string formal, and §H.8.10 has its characters laid
+      // out for C as a C string. A design's string is held a byte per
+      // character, the first character highest, which is what is read back
+      // into the characters here.
+      return DpiArgValue::FromString(Logic4VecToString(v));
     default:
       // Every remaining integral type -- byte, shortint, int, and whatever a
       // declaration left at DpiArg's own default -- narrows and sign-extends
@@ -229,19 +230,31 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
 // A value of the declared type carrying what crossed the boundary, unknown bits
 // included. A real is carried as its own bit pattern in a 64-bit vector marked
 // is_real, which is the shape MakeRealVec in src/simulator/evaluation.cpp
-// builds and what the rest of the evaluator reads a real out of.
+// builds and what the rest of the evaluator reads a real out of. An integral
+// value is marked signed where the declared type is (`is_signed`): §11.8.1
+// reads a function call's signedness off the type of its result, so a byte
+// result of -100 is -100 wherever the call is used, and an output formal of a
+// signed type sign-extends into a wider actual as an assignment of one does.
 Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
-                         uint32_t declared_width, const DpiArgValue& value) {
+                         uint32_t declared_width, const DpiArgValue& value,
+                         bool is_signed) {
   // A value that crossed in the canonical array carries the width it was built
   // at, and reading the union below would rebuild it out of a member nothing
   // wrote. §35.5.6's packed formals are what arrive this way, in both
   // directions: the write-back of an output formal is this call too.
   if (value.IsWideVec()) {
-    return VecOfCanonicalWords(arena, value.AsLogicVecWords(),
-                               value.VecWidth());
+    Logic4Vec wide =
+        VecOfCanonicalWords(arena, value.AsLogicVecWords(), value.VecWidth());
+    wide.is_signed = is_signed;
+    return wide;
   }
   uint32_t width = DpiValueWidth(kind, declared_width);
   if (IsRealKind(kind)) return MakeRealVec(arena, value.AsReal(), width);
+  // §H.8.10: a string the foreign side supplies is copied into the design's
+  // own storage, a byte per character, as a string literal is held.
+  if (kind == DataTypeKind::kString) {
+    return StringToLogic4Vec(arena, value.AsString());
+  }
 
   Logic4Word word;
   switch (kind) {
@@ -260,8 +273,6 @@ Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
       word.aval = value.AsLogicVec().aval;
       word.bval = value.AsLogicVec().bval;
       break;
-    case DataTypeKind::kString:
-      break;
     case DataTypeKind::kLongint:
     case DataTypeKind::kTime:
       word.aval = static_cast<uint64_t>(value.AsLongint());
@@ -275,6 +286,7 @@ Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
   uint64_t mask = width >= 64 ? ~0ULL : ((1ULL << width) - 1);
   v.words[0].aval = word.aval & mask;
   v.words[0].bval = word.bval & mask;
+  v.is_signed = is_signed;
   return v;
 }
 
@@ -388,8 +400,9 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
     // all, and the assignment narrows it to whatever the actual holds, as an
     // assignment to that actual would anywhere else.
     const Expr* lhs = b.call->args[static_cast<size_t>(ai)];
-    Logic4Vec next = DpiValueOfType(b.arena, import->args[i].type,
-                                    import->args[i].width, actuals[i]);
+    Logic4Vec next =
+        DpiValueOfType(b.arena, import->args[i].type, import->args[i].width,
+                       actuals[i], !import->args[i].is_unsigned);
     if (!AssignmentWouldChangeActual(lhs, next, b.ctx, b.arena)) continue;
     PerformBlockingAssign(lhs, next, b.ctx, b.arena);
   }
@@ -421,15 +434,19 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (import == nullptr) return MakeLogic4VecVal(arena, 1, 0);
   // §35.4 makes an imported subroutine's declaration a reference to a global
   // symbol the foreign side defines, and §35.5.4 leaves the binding of that
-  // symbol to the tool: this one binds nothing, because no route exists for a
-  // foreign object to supply an implementation (#3441). A call reaching no
-  // implementation is reported rather than answered: the zero it would
+  // symbol to the tool, which BindDpiImports makes before the run. A call
+  // reaching a declaration it could not bind -- no loaded library defines the
+  // symbol, or one does and the binding could not be made, whose reason is
+  // then given -- is reported rather than answered: the zero it would
   // otherwise yield is a value the design reads as data and cannot tell from a
   // foreign function that returned zero.
   if (!import->impl && !import->arg_impl) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "imported subroutine '" + std::string(callee) +
-                            "' is bound to no foreign implementation",
+    std::string message = "imported subroutine '" + std::string(callee) +
+                          "' is bound to no foreign implementation";
+    if (!import->unbound_reason.empty()) {
+      message += ": " + import->unbound_reason;
+    }
+    ctx.GetDiag().Error(expr->range.start, std::move(message),
                         Subclause("35.5.4"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
@@ -476,7 +493,8 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // one of which the kind's own width states, so no declared width travels
   // with it the way §35.5.6's packed formals carry one.
   return DpiValueOfType(arena, import->return_type, 0,
-                        CoerceArgValue(result, import->return_type));
+                        CoerceArgValue(result, import->return_type),
+                        !import->return_is_unsigned);
 }
 
 }  // namespace delta

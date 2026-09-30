@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -275,6 +277,66 @@ TEST(DpiStringArgumentRules, AStringToBeKeptIsCopiedByTheKeepingSide) {
             DpiMemorySide::kSystemVerilog);
   EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kImportOutput),
             DpiMemorySide::kSystemVerilog);
+}
+
+// The C functions the imports below are bound to, each taking or giving a
+// string as §H.8.10 has it cross.
+int LengthOfInput(const char* s) { return static_cast<int>(std::strlen(s)); }
+void PointOutputAtText(const char** o) { *o = "from C"; }
+void PointOutputAtNothing(const char** o) { *o = nullptr; }
+char shouted[16] = {};
+void ShoutInout(const char** s) {
+  std::size_t i = 0;
+  for (; (*s)[i] != '\0' && i + 1 < sizeof(shouted); ++i) {
+    shouted[i] = static_cast<char>((*s)[i] - 'a' + 'A');
+  }
+  shouted[i] = '\0';
+  *s = shouted;
+}
+const char* ReturnText() { return "returned"; }
+
+// §H.8.10: an input string reaches C as a const char* to its characters laid
+// out as a C string; an output string's pointer is written by C and the
+// characters it names are copied back, none where it names nothing; an inout
+// arrives pointing at the string's characters and its new pointer's are
+// copied back; and a string result is the pointer C returns, its characters
+// copied likewise.
+TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
+  DpiCBinding b;
+  b.dpi.RegisterImport(
+      CImport("length_of_input", DataTypeKind::kInt,
+              {CFormal("s", DataTypeKind::kString, Direction::kInput)}));
+  b.dpi.RegisterImport(
+      CImport("point_output_at_text", DataTypeKind::kVoid,
+              {CFormal("o", DataTypeKind::kString, Direction::kOutput)}));
+  b.dpi.RegisterImport(
+      CImport("point_output_at_nothing", DataTypeKind::kVoid,
+              {CFormal("o", DataTypeKind::kString, Direction::kOutput)}));
+  b.dpi.RegisterImport(
+      CImport("shout_inout", DataTypeKind::kVoid,
+              {CFormal("s", DataTypeKind::kString, Direction::kInout)}));
+  b.dpi.RegisterImport(CImport("return_text", DataTypeKind::kString, {}));
+  b.Bind({{"length_of_input", reinterpret_cast<void*>(&LengthOfInput)},
+          {"point_output_at_text", reinterpret_cast<void*>(&PointOutputAtText)},
+          {"point_output_at_nothing",
+           reinterpret_cast<void*>(&PointOutputAtNothing)},
+          {"shout_inout", reinterpret_cast<void*>(&ShoutInout)},
+          {"return_text", reinterpret_cast<void*>(&ReturnText)}},
+         "annex_h_08_10_strings");
+  ASSERT_TRUE(b.diag.Diagnostics().empty());
+  std::vector<DpiArgValue> input = {DpiArgValue::FromString("hello")};
+  EXPECT_EQ(b.Call("length_of_input", input).AsInt(), 5);
+  std::vector<DpiArgValue> output = {DpiArgValue::FromString("seed")};
+  b.Call("point_output_at_text", output);
+  EXPECT_EQ(output[0].AsString(), "from C");
+  std::vector<DpiArgValue> nothing = {DpiArgValue::FromString("seed")};
+  b.Call("point_output_at_nothing", nothing);
+  EXPECT_EQ(nothing[0].AsString(), "");
+  std::vector<DpiArgValue> inout = {DpiArgValue::FromString("hello")};
+  b.Call("shout_inout", inout);
+  EXPECT_EQ(inout[0].AsString(), "HELLO");
+  std::vector<DpiArgValue> none;
+  EXPECT_EQ(b.Call("return_text", none).AsString(), "returned");
 }
 
 }  // namespace

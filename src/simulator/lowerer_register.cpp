@@ -591,6 +591,9 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
     // declaration.
     func.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
     func.return_type = item->return_type.kind;
+    // §H.7.4: the parser has settled the result type's signedness, a byte,
+    // shortint, int or longint being signed unless qualified unsigned.
+    func.return_is_unsigned = !item->return_type.is_signed;
     // §35.5.1.3: the declaration says whether the subroutine is pure or
     // context, and §35.5.2 and §35.5.3 are read off those two.
     func.is_pure = item->dpi_is_pure;
@@ -631,6 +634,9 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
       formal.is_unsigned = !arg.data_type.is_signed;
       // §H.7.5: a struct or union crosses under the name of its type.
       formal.type_name = arg.data_type.type_name;
+      // §35.5.6.1: a formal with unpacked dimensions is an array of values of
+      // its type rather than one of them.
+      formal.has_unpacked_dimensions = !arg.unpacked_dims.empty();
       func.args.push_back(formal);
     }
     dpi->RegisterImport(std::move(func));

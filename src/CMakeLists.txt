@@ -348,10 +348,13 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
+    simulator/dpi_binding.cpp
+    simulator/dpi_c_call.cpp
     simulator/dpi_c_type.cpp
     simulator/dpi_context.cpp
     simulator/dpi_include_file.cpp
     simulator/foreign_code.cpp
+    simulator/shared_library.cpp
     simulator/dpi_side.cpp
     simulator/dpi_time.cpp
     simulator/dpi_runtime.cpp

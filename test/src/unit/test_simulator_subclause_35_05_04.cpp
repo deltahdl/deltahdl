@@ -106,6 +106,32 @@ TEST(DpiImportLowering, AnImportedFunctionCarriesItsPackedFormalsWidth) {
   EXPECT_EQ(import->args[1].width, 0U);
 }
 
+// §35.5.6.1: a formal written with unpacked dimensions after its name, sized
+// or open, is an array of values of its type, and the C side receives it as
+// an array or an open-array handle rather than as one such value. Nothing
+// else about the formal says so -- `bit [7:0] b [0:3]` has the kind and width
+// of `bit [7:0] b` -- so the registration records it.
+TEST(DpiImportLowering, AFormalWithUnpackedDimensionsIsRecordedAsSuch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  import \"DPI-C\" function void take_arrays(input int open [],\n"
+      "                                            input bit [7:0] b [0:3],\n"
+      "                                            input bit [7:0] c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  const DpiRtFunction* import = dpi->FindImport("take_arrays");
+  ASSERT_NE(import, nullptr);
+  ASSERT_EQ(import->args.size(), 3u);
+  EXPECT_TRUE(import->args[0].has_unpacked_dimensions);
+  EXPECT_TRUE(import->args[1].has_unpacked_dimensions);
+  EXPECT_FALSE(import->args[2].has_unpacked_dimensions);
+}
+
 // §35.4 makes the declaration a reference to a global symbol the foreign side
 // defines and §35.5.4 leaves the binding to the tool. Nothing supplies one
 // here, so the call reaches no implementation, and what it must not do is

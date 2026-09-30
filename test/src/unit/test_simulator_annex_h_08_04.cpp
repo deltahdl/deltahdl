@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <vector>
 
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
+#include "simulator/dpi_runtime.h"
 
 using namespace delta;
 
@@ -74,6 +77,64 @@ TEST(DpiPassingByReference, AReferenceIsAPointerToTheTypeOrItsCanonicalForm) {
 TEST(DpiPassingByReference, AReferenceIsNotToBeKeptAcrossCalls) {
   EXPECT_FALSE(DpiReferenceOutlivesTheCall());
   EXPECT_EQ(DpiSideOwningACopyKeptAcrossCalls(), DpiMemorySide::kC);
+}
+
+// The C functions the imports below are bound to, each reading a packed input
+// through the pointer to its canonical representation.
+int TopWordByReference(const uint32_t* v) { return static_cast<int>(v[3]); }
+
+long long UpperPairByReference(const SvLogicVecVal* v) {
+  return (static_cast<long long>(v[1].aval) * 1000) + v[1].bval;
+}
+
+int IntegerAndTimeByReference(const SvLogicVecVal* integer,
+                              const SvLogicVecVal* time) {
+  return static_cast<int>((integer[0].aval * 1000) + (integer[0].bval * 100) +
+                          (time[1].aval * 10) + time[0].aval);
+}
+
+// §H.8.4: a packed input is passed by reference to its canonical
+// representation, 32 bits to a chunk with the least significant chunk first
+// (§H.7.7) -- svBitVecVal words for a 2-state array, svLogicVecVal pairs for a
+// 4-state one, whose bval keeps an unknown bit unknown.
+TEST(DpiPassingByReference, APackedInputArrivesAsItsCanonicalArray) {
+  DpiCBinding b;
+  b.dpi.RegisterImport(
+      CImport("top_word", DataTypeKind::kInt,
+              {CFormal("v", DataTypeKind::kBit, Direction::kInput, 128)}));
+  b.dpi.RegisterImport(
+      CImport("upper_pair", DataTypeKind::kLongint,
+              {CFormal("v", DataTypeKind::kLogic, Direction::kInput, 40)}));
+  b.Bind({{"top_word", reinterpret_cast<void*>(&TopWordByReference)},
+          {"upper_pair", reinterpret_cast<void*>(&UpperPairByReference)}},
+         "annex_h_08_04_packed");
+  ASSERT_TRUE(b.diag.Diagnostics().empty());
+  std::vector<DpiArgValue> wide = {DpiArgValue::FromLogicVecWords(
+      {{1, 0}, {2, 0}, {3, 0}, {0x12345678, 0}}, 128, DataTypeKind::kBit)};
+  EXPECT_EQ(b.Call("top_word", wide).AsInt(), 0x12345678);
+  // Bit 33 of the logic array is x: aval and bval both set, in the second
+  // chunk.
+  std::vector<DpiArgValue> logic = {DpiArgValue::FromLogicVecWords(
+      {{0, 0}, {3, 2}}, 40, DataTypeKind::kLogic)};
+  EXPECT_EQ(b.Call("upper_pair", logic).AsLongint(), 3002);
+}
+
+// §H.7.3: integer and time are packed 4-state types, an integer one chunk and
+// a time two, so they too cross by reference to svLogicVecVal pairs.
+TEST(DpiPassingByReference, IntegerAndTimeArriveAsCanonicalPairs) {
+  DpiCBinding b;
+  b.dpi.RegisterImport(
+      CImport("integer_and_time", DataTypeKind::kInt,
+              {CFormal("i", DataTypeKind::kInteger, Direction::kInput),
+               CFormal("t", DataTypeKind::kTime, Direction::kInput)}));
+  b.Bind({{"integer_and_time",
+           reinterpret_cast<void*>(&IntegerAndTimeByReference)}},
+         "annex_h_08_04_integer_time");
+  ASSERT_TRUE(b.diag.Diagnostics().empty());
+  DpiArgValue time = DpiArgValue::FromLongint((2LL << 32) | 5);
+  time.type = DataTypeKind::kTime;
+  std::vector<DpiArgValue> args = {DpiArgValue::FromLogicVec({4, 1}), time};
+  EXPECT_EQ(b.Call("integer_and_time", args).AsInt(), 4125);
 }
 
 }  // namespace

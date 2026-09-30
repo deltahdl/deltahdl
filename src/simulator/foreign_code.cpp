@@ -9,6 +9,10 @@
 #include <system_error>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "simulator/shared_library.h"
+
 namespace delta {
 
 ForeignCodeRedistributionForm ForeignCodeIntendedRedistributionForm() {
@@ -266,6 +270,53 @@ std::vector<std::string> ForeignCodeLibraryFileNames(
     names.push_back(ForeignCodeSharedLibraryFileName(library.path));
   }
   return names;
+}
+
+namespace {
+
+// How the report of a library names the method that specified it.
+std::string_view NamedBy(ForeignCodeSpecificationMethod method) {
+  return method == ForeignCodeSpecificationMethod::kBootstrapFileEntry
+             ? "a bootstrap entry"
+             : "-sv_lib";
+}
+
+// Loads one library of a load order, reporting it under §J.4 where its file is
+// not there or does not load. False where it was not loaded.
+bool LoadForeignLibrary(const ForeignCodeLibrary& library, DiagEngine& diag) {
+  const std::string kFile = ForeignCodeSharedLibraryFileName(library.path);
+  const std::string kLocation = "object code file '" + library.path +
+                                "', named by " +
+                                std::string(NamedBy(library.method));
+  if (!std::filesystem::exists(kFile)) {
+    diag.Error(SourceLoc::None(),
+               kLocation +
+                   ", is not there with the platform's shared library "
+                   "extension appended",
+               Subclause("J.4"));
+    return false;
+  }
+  SharedLibraryLoad load = LoadSharedLibrary(kFile);
+  if (load.handle == nullptr) {
+    diag.Error(SourceLoc::None(),
+               kLocation + ", could not be loaded: " + load.error,
+               Subclause("J.4"));
+    return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+bool ForeignCodeLoadLibraries(const std::vector<std::string>& bootstrap_entries,
+                              const std::vector<std::string>& lib_switch_values,
+                              DiagEngine& diag) {
+  bool ok = true;
+  for (const ForeignCodeLibrary& library :
+       ForeignCodeLoadOrder(bootstrap_entries, lib_switch_values)) {
+    if (!LoadForeignLibrary(library, diag)) ok = false;
+  }
+  return ok;
 }
 
 }  // namespace delta

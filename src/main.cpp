@@ -45,6 +45,7 @@
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/cover_results.h"
+#include "simulator/dpi_binding.h"
 #include "simulator/foreign_code.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -519,6 +520,9 @@ int SimulateDesign(const delta::CliOptions& opts,
       {opts.negative_timing_checks, opts.no_timing_checks});
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
+  // §35.4: the imports lowering registered are bound to the global symbols
+  // their linkage names name, before any process can call one.
+  delta::BindDesignDpiImports(sim_ctx);
 
   if (!opts.vcd_file.empty()) SetupVcd(sim_ctx, top, opts.vcd_file);
 
@@ -792,46 +796,19 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
   return ok;
 }
 
-// §J.4: each location an entry or an -sv_lib switch specifies names an
-// object code file, given without its extension, which the application
-// appends for the platform, and the compiled object code is provided as a
-// shared library of that name. A location naming no such file is a failure
-// of the run, reported against the location, rather than a condition the
-// run proceeds past with the imports the library was to bind unbound. The
-// report names the location as it was written, the extension being the
-// platform's. False where any file is missing.
-bool ForeignLibrariesArePresent(const std::vector<std::string>& bootstrap,
-                                const std::vector<std::string>& switches,
-                                delta::DiagEngine& diag) {
-  bool ok = true;
-  auto check = [&](const std::string& location, std::string_view named_by) {
-    if (std::filesystem::exists(
-            delta::ForeignCodeSharedLibraryFileName(location))) {
-      return;
-    }
-    diag.Error(delta::SourceLoc::None(),
-               "object code file '" + location + "', named by " +
-                   std::string(named_by) +
-                   ", is not there with the platform's shared library "
-                   "extension appended",
-               delta::Subclause("J.4"));
-    ok = false;
-  };
-  for (const auto& location : bootstrap) check(location, "a bootstrap entry");
-  for (const auto& location : switches) check(location, "-sv_lib");
-  return ok;
-}
-
-// Annex J.4: both facts about the object code the command line specifies --
-// each bootstrap file well formed, each library present -- settled before the
-// run, in the order the annex processes them.
-bool ForeignCodeIsWellFormed(const delta::CliOptions& opts,
-                             delta::SourceManager& src_mgr,
-                             delta::DiagEngine& diag) {
+// Annex J.4: the object code the command line specifies, settled before the
+// design is read -- each bootstrap file well formed, then each library it or
+// an -sv_lib switch names loaded, in the order the annex processes them -- so
+// that the symbols the libraries define are there to bind the design's
+// imports to.
+bool ForeignCodeIsLoaded(const delta::CliOptions& opts,
+                         delta::SourceManager& src_mgr,
+                         delta::DiagEngine& diag) {
   std::vector<std::string> bootstrap_libraries;
   return BootstrapFilesAreWellFormed(opts, src_mgr, diag,
                                      bootstrap_libraries) &&
-         ForeignLibrariesArePresent(bootstrap_libraries, opts.sv_libs, diag);
+         delta::ForeignCodeLoadLibraries(bootstrap_libraries, opts.sv_libs,
+                                         diag);
 }
 
 // What the run does with a parsed compilation unit, chosen by the options
@@ -916,7 +893,7 @@ int main(int argc, char* argv[]) {
     diag.SetWarningsAsErrors(true);
   }
 
-  if (!ForeignCodeIsWellFormed(opts, src_mgr, diag)) return 1;
+  if (!ForeignCodeIsLoaded(opts, src_mgr, diag)) return 1;
 
   int mode_status = 0;
   if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;

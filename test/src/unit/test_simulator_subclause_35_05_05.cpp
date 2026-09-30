@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -106,6 +107,49 @@ TEST(DpiFunctionResultInADesign, ANarrowResultStillOccupiesOneWord) {
   EXPECT_EQ(run.result.width, 8U);
   EXPECT_EQ(run.result.nwords, 1U);
   EXPECT_EQ(run.result.words[0].aval, 0x5AU);
+}
+
+// The C functions the imports below are bound to.
+char NegativeByte() { return -100; }
+void WriteNegativeByte(char* b) { *b = -100; }
+unsigned int AllOnes() { return 0xFFFFFFFFU; }
+
+// §35.5.5 with §11.8.1: a call's value is signed or unsigned as its result
+// type is, so a byte result of -100 extends to -100 in an int, where read as
+// unsigned it would be 156; an output of a signed type likewise extends into
+// a wider actual as the assignment of it does; and an int unsigned result of
+// all ones is 4294967295 in a longint rather than -1.
+TEST(DpiFunctionResult, AResultAndAnOutputAreSignedAsTheirTypesAre) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function byte negative_byte();\n"
+      "  import \"DPI-C\" function void write_negative_byte(output byte b);\n"
+      "  import \"DPI-C\" function int unsigned all_ones();\n"
+      "  int r;\n"
+      "  int o;\n"
+      "  longint u;\n"
+      "  initial begin\n"
+      "    r = negative_byte();\n"
+      "    write_negative_byte(o);\n"
+      "    u = all_ones();\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"negative_byte", reinterpret_cast<void*>(&NegativeByte)},
+       {"write_negative_byte", reinterpret_cast<void*>(&WriteNegativeByte)},
+       {"all_ones", reinterpret_cast<void*>(&AllOnes)}},
+      "subclause_35_05_05_signedness");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* r = f.ctx.FindVariable("r");
+  auto* o = f.ctx.FindVariable("o");
+  auto* u = f.ctx.FindVariable("u");
+  ASSERT_NE(r, nullptr);
+  ASSERT_NE(o, nullptr);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0xFFFFFF9CU);
+  EXPECT_EQ(o->value.ToUint64(), 0xFFFFFF9CU);
+  EXPECT_EQ(u->value.ToUint64(), 0xFFFFFFFFU);
 }
 
 }  // namespace

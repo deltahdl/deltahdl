@@ -1,6 +1,12 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
+#include "helpers_reported_error.h"
+#include "simulator/dpi_binding.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/lowerer.h"
+#include "simulator/shared_library.h"
 
 using namespace delta;
 
@@ -111,6 +117,129 @@ TEST(DpiGlobalNameSpace, ANameNoDeclarationResolvedToIsNotInTheNameSpace) {
   rt.RegisterImport(MakeImport("c_add", "sv_add"));
   EXPECT_FALSE(rt.HasGlobalName("c_absent"));
   EXPECT_FALSE(rt.HasGlobalName("sv_add"));
+}
+
+// The C function the imports below are bound to.
+int AddSeven(int a) { return a + 7; }
+
+// §35.4: an import resolves to the global symbol its linkage name names -- the
+// c_identifier where the declaration gives one -- and a call reaches the
+// function defined under that name. The SystemVerilog name `add7` names no
+// function here, so a binding looking it up would find nothing.
+TEST(DpiImportBinding, TheCallReachesTheFunctionTheLinkageNameNames) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" add_seven = function int add7(input int a);\n"
+      "  int r;\n"
+      "  initial r = add7(35);\n"
+      "endmodule\n",
+      f, {{"add_seven", reinterpret_cast<void*>(&AddSeven)}},
+      "subclause_35_04_linkage");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 42U);
+}
+
+// §35.5.4: an import no loaded code defines a symbol for stays unbound, and
+// only its call is reported; nothing is built for it, so a C compiler that
+// cannot be run goes unnoticed.
+TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function int add7(input int a);\n"
+      "  int r;\n"
+      "  initial r = add7(35);\n"
+      "endmodule\n",
+      f, {}, "subclause_35_04_no_symbol", "deltahdl-no-such-compiler");
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(f.diag.Diagnostics()[0].message,
+            "imported subroutine 'add7' is bound to no foreign "
+            "implementation");
+}
+
+// §35.4 with §35.5.6.1: an import whose symbol is found but whose formal is
+// an open array, which this simulator lays out in no C object yet, is left
+// unbound, and its call's report says why.
+TEST(DpiImportBinding, AFormalWithNoCLayoutHereIsNamedAtTheCall) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function int sum_open(input int a []);\n"
+      "  int arr [2] = '{1, 2};\n"
+      "  int r;\n"
+      "  initial r = sum_open(arr);\n"
+      "endmodule\n",
+      f, {{"sum_open", reinterpret_cast<void*>(&AddSeven)}},
+      "subclause_35_04_no_layout");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "imported subroutine 'sum_open' is bound to no "
+                            "foreign implementation: deltahdl does not yet "
+                            "lay out in C the type of its formal 'a'",
+                            5, "35.5.4"));
+}
+
+// A binding whose calls the C compiler cannot build is reported with what the
+// compiler said, and leaves every import it was building for unbound, each
+// call saying so.
+TEST(DpiImportBinding, CallsTheCompilerCannotBuildLeaveTheImportsUnbound) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" add_seven = function int add7(input int a);\n"
+      "  int r;\n"
+      "  initial r = add7(35);\n"
+      "endmodule\n",
+      f, {{"add_seven", reinterpret_cast<void*>(&AddSeven)}},
+      "subclause_35_04_no_compiler", "deltahdl-no-such-compiler");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the calls into C of the design's imported subroutines could not be "
+      "built: 'deltahdl-no-such-compiler' did not build a shared library",
+      0, ""));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "imported subroutine 'add7' is bound to no "
+                            "foreign implementation: its call into C could "
+                            "not be built",
+                            4, "35.5.4"));
+}
+
+// §35.4 with Annex J: the run looks each linkage name up among the global
+// symbols of the process, where a library loaded with its symbols global puts
+// the functions it defines.
+TEST(DpiImportBinding, TheRunFindsFunctionsALoadedLibraryDefines) {
+  const SharedLibraryLoad kLibrary = BuildAndLoadCSharedLibrary(
+      "int deltahdl_subclause_35_04_triple(int a) { return 3 * a; }\n",
+      CallBuildDir("subclause_35_04_library"), "cc");
+  ASSERT_NE(kLibrary.handle, nullptr) << kLibrary.error;
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  import \"DPI-C\" deltahdl_subclause_35_04_triple =\n"
+      "      function int triple(input int a);\n"
+      "  int r;\n"
+      "  initial r = triple(7);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  BindDesignDpiImports(f.ctx);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 21U);
+}
+
+// A design that declares no import has no registry and nothing to bind.
+TEST(DpiImportBinding, ARunWithNoImportBindsNothing) {
+  SimFixture f;
+  BindDesignDpiImports(f.ctx);
+  EXPECT_EQ(f.ctx.GetDpiRuntime(), nullptr);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
 }  // namespace

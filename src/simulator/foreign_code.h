@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
+
 namespace delta {
 
 // §J.1: what the guidelines of the annex are for -- the redistribution of C
@@ -245,6 +247,19 @@ std::vector<std::string> ForeignCodeResolveBootstrapEntries(
 // the platform's extension appended to each path name.
 std::vector<std::string> ForeignCodeLibraryFileNames(
     const std::vector<ForeignCodeLibrary>& order);
+
+// §J.2 and §J.4: loads into the simulator the object code the specification
+// names -- the bootstrap files' entries, then the -sv_lib values -- in the
+// order ForeignCodeLoadOrder gives, each library once, as a shared library
+// whose symbols are made global and kept for the rest of the run (see
+// LoadSharedLibrary). A location naming no file once the platform's extension
+// is appended, and a file the loader cannot load, are each reported under
+// §J.4 against the location as it was written, the second with the loader's
+// own account, and the run is not to proceed past either. False where any
+// library was not loaded.
+bool ForeignCodeLoadLibraries(const std::vector<std::string>& bootstrap_entries,
+                              const std::vector<std::string>& lib_switch_values,
+                              DiagEngine& diag);
 
 }  // namespace delta
 

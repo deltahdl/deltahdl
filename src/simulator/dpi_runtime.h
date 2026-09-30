@@ -95,6 +95,11 @@ struct DpiRtFunction {
   std::string_view c_name;
   std::string_view sv_name;
   DataTypeKind return_type = DataTypeKind::kVoid;
+  // §H.7.4: whether the result type is unsigned -- a byte, shortint, int or
+  // longint result the declaration qualified unsigned. Such a result reads as
+  // unsigned where the call is used, and every other integral result as
+  // signed or not as its type is.
+  bool return_is_unsigned = false;
   std::vector<DpiArg> args;
   DpiRtCallback impl;
   // §35.5.1.2: optional direction-aware implementation. When set,
@@ -112,6 +117,11 @@ struct DpiRtFunction {
   // simulator need not implement, so a declaration that does not ask for them
   // gets the canonical representation.
   DpiPackedArgPassing packed_arg_passing = DpiPackedArgPassing::kCanonical;
+  // §35.4: why the global symbol this declaration resolves to, though defined,
+  // could not be bound to it -- empty where it was bound, and where no symbol
+  // of its linkage name was found. A call reaching the declaration unbound
+  // reports this with the rest of §35.5.4's report.
+  std::string unbound_reason;
 };
 
 struct DpiRtExport {
@@ -221,6 +231,9 @@ bool DpiScopeTimescale(const DpiScope* scope, int32_t* time_unit,
 class DpiRuntime {
  public:
   void RegisterImport(DpiRtFunction func);
+  // Every import registered, in the order registered, open to the binding of
+  // each to the foreign implementation its linkage name names (§35.4).
+  std::vector<DpiRtFunction>& Imports() { return imports_; }
   const DpiRtFunction* FindImport(std::string_view sv_name) const;
   bool HasImport(std::string_view sv_name) const;
   uint32_t ImportCount() const;

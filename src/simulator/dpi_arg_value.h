@@ -114,6 +114,11 @@ struct DpiArg {
   // example's `pair i2` is `const pair* i2` in C. Empty for a formal whose
   // kind names its C type itself.
   std::string_view type_name = {};
+  // §35.5.6.1 and §H.7.3: whether the declaration gave the formal unpacked
+  // dimensions, sized or open, after its name. Such a formal is an array whose
+  // elements are what the kind and width describe, and crosses as a C array
+  // or an open-array handle rather than as one value of that type.
+  bool has_unpacked_dimensions = false;
 };
 
 struct DpiArgValue {
