@@ -1893,6 +1893,13 @@ jobs:
   # its uses; a header that fails prints what the tool would change and fails
   # the step, and one that does not compile on its own fails it the same way.
   #
+  # The headers are split across eight shards by SHARD_SLICE, at the top of
+  # this file, drawn once over their paths relative to the checkout and written
+  # to a list both steps after it read, since the compile commands name each
+  # header by its absolute path and the check by its relative one. A shard
+  # whose slice is empty writes no compile command and checks nothing: xargs
+  # -r runs no command on empty input.
+  #
   # src/simulator/vpi_user.h is the one header both finds leave out. It is the
   # C include file Annex K.2 of IEEE 1800-2023 prints, and the annex's
   # portability help (printed page 1306) selects by platform the header that
@@ -1905,6 +1912,7 @@ jobs:
   # the check on them: it compiles the file as the C the annex writes it in,
   # on Linux, where <inttypes.h> is where int64_t comes from.
   clang-include-cleaner-headers:
+    name: clang-include-cleaner-headers-shard-${{ matrix.shard }}
     needs: [cache-googletest]
     runs-on: ubuntu-latest
     steps:
@@ -1923,7 +1931,16 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      - name: Write a compile command for every header
+      - name: >-
+          List this shard's headers (shard ${{ matrix.shard }}/${{
+          strategy.job-total }})
+        run: |
+          find src lib/cpp -name '*.h' -not -path src/simulator/vpi_user.h |
+            sort |
+            awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE" > "$RUNNER_TEMP/headers"
+          wc -l < "$RUNNER_TEMP/headers"
+      - name: Write a compile command for every header of the shard
         run: |
           mkdir -p build/headers
           jq '
@@ -1934,14 +1951,12 @@ jobs:
                     command: (($tu.command | sub(" -o \\S+ -c \\S+$"; ""))
                               + " -x c++ -c " + .) } ]
           ' build/compile_commands.json \
-            --args $(find src lib/cpp -name '*.h' \
-                       -not -path src/simulator/vpi_user.h | sort | sed "s#^#$PWD/#") \
+            --args $(sed "s#^#$PWD/#" "$RUNNER_TEMP/headers") \
             > build/headers/compile_commands.json
           jq length build/headers/compile_commands.json
-      - name: Check every header includes what it uses and only that
+      - name: Check every header of the shard includes what it uses and only that
         run: |
-          find src lib/cpp -name '*.h' -not -path src/simulator/vpi_user.h |
-            sort | xargs -P "$(nproc)" -n 1 sh -c '
+          xargs -r -P "$(nproc)" -n 1 sh -c '
             out=$(clang-include-cleaner -p build/headers --print=changes "$0" 2>&1)
             status=$?
             if [ -n "$out" ] || [ "$status" -ne 0 ]; then
@@ -1949,7 +1964,11 @@ jobs:
               echo "$out"
               exit 1
             fi
-            echo "$0: includes match uses"'
+            echo "$0: includes match uses"' < "$RUNNER_TEMP/headers"
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
