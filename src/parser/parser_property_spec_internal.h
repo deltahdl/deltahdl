@@ -44,8 +44,6 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* NewPropertyNode(Parser& p,
                                            PropertyExprNode::Kind kind);
   static PropertyExprNode* TryParsePropertyGroup(Parser& p, bool& group);
-  static Expr* JoinActualEvents(Parser& p, TokenKind op, Expr* lhs, Expr* rhs);
-  static Expr* ParseActualEvent(Parser& p);
   static Expr* ParseEventActual(Parser& p);
   static Expr* ParsePropertyActualArg(Parser& p, bool& plain);
   static Expr* ParseFormalDefault(Parser& p);

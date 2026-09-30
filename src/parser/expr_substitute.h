@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
@@ -34,6 +35,15 @@ ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
 ActualsByFormal BindActualsWithDefaults(
     const std::vector<std::string_view>& formals,
     const std::vector<Expr*>& defaults, const Expr* instance);
+
+// §9.4.2: the event `ev` as an event expression given as an actual argument
+// is kept: an edge keyword over its signal opening at `loc`, or the signal
+// alone where the event names no edge, under an `iff` holding its guard where
+// it has one.
+Expr* EventAsActual(const EventExpr& ev, SourceLoc loc, Arena& arena);
+
+// §9.4.2: the event expressions `lhs` and `rhs` joined by `or`.
+Expr* EitherEventActual(Expr* lhs, Expr* rhs, Arena& arena);
 
 // §16.8.1 b) and §9.4.2: whether `actual` is an event expression given to a
 // formal of type event as the parser keeps one: an edge keyword over its

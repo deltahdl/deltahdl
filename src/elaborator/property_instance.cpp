@@ -9,7 +9,6 @@
 #include "common/source_loc.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -146,17 +145,15 @@ void PromoteSequenceInstances(PropertyExprNode* node,
 }
 
 // §16.14.7: the event expression of the inferred clock as an actual argument
-// of an event formal writes it, an edge keyword over the signal, or the
-// signal alone where the event names no edge; an iff is left behind.
-static Expr* ClockActual(const EventExpr& ev, Arena& arena) {
-  if (ev.edge == Edge::kNone) return ev.signal;
-  auto* actual = arena.Create<Expr>();
-  actual->kind = ExprKind::kUnary;
-  actual->op = ev.edge == Edge::kPosedge   ? TokenKind::kKwPosedge
-               : ev.edge == Edge::kNegedge ? TokenKind::kKwNegedge
-                                           : TokenKind::kKwEdge;
-  actual->lhs = ev.signal;
-  actual->range = ev.signal != nullptr ? ev.signal->range : SourceRange{};
+// of an event formal writes it, each event with its edge and its iff guard as
+// EventAsActual writes one, and the events joined by `or`.
+static Expr* ClockActual(const std::vector<EventExpr>& clock, Arena& arena) {
+  Expr* actual = nullptr;
+  for (const EventExpr& ev : clock) {
+    Expr* event = EventAsActual(ev, ev.signal->range.start, arena);
+    actual =
+        actual == nullptr ? event : EitherEventActual(actual, event, arena);
+  }
   return actual;
 }
 
@@ -184,7 +181,7 @@ static bool HasInferredDefault(const ModuleItem* decl) {
 static Expr* InferredActual(InferredDefault kind,
                             const InferredAtInstance& inferred, Arena& arena) {
   if (kind == InferredDefault::kClock && !inferred.clock.empty()) {
-    return ClockActual(inferred.clock[0], arena);
+    return ClockActual(inferred.clock, arena);
   }
   if (kind == InferredDefault::kDisable) {
     return inferred.disable != nullptr ? inferred.disable : FalseLiteral(arena);

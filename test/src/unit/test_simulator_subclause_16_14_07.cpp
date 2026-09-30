@@ -141,4 +141,54 @@ TEST(InferredClockingFunctionsRun, OutsideAnyDefaultDisableTheDefaultIsFalse) {
             "$finish at time 48\n");
 }
 
+// A module whose default clocking is `@(event)`: clk rises at 5, 15, ..., 95
+// and falls at 10, 20, ..., 90 by 98; en is true from 42, so at the six rises
+// of 45 to 95 and the five falls of 50 to 90; and a is 1 throughout. c1 counts
+// the attempts of a sequence clocked on an event formal defaulted to
+// $inferred_clock, and c2 those of a statement clocked by the default clocking
+// itself.
+std::string RunInferredClockCase(const std::string& event) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic en = 0; initial #42 en = 1;\n"
+      "  logic a = 1;\n"
+      "  int c1 = 0, c2 = 0;\n"
+      "  default clocking @(" +
+          event +
+          "); endclocking\n"
+          "  sequence s(untyped x, event e = $inferred_clock);\n"
+          "    @(e) x;\n"
+          "  endsequence\n"
+          "  cover property (s(a)) c1++;\n"
+          "  cover property (a) c2++;\n"
+          "  initial #98 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+          "endmodule\n",
+      f);
+}
+
+// §16.14.7 with §9.4.2: $inferred_clock stands for the whole event expression
+// of the inferred clock, its iff guard included, so the sequence is attempted
+// at the six rises at which en holds, as the default clocking itself is.
+TEST(InferredClockingFunctionsRun, AGuardedInferredClockKeepsItsGuard) {
+  EXPECT_NE(RunInferredClockCase("posedge clk iff en").find("c1=6 c2=6\n"),
+            std::string::npos);
+}
+
+// §16.14.7 with §9.4.2: an inferred clock joining events with `or` stands in
+// whole, so the sequence is attempted at the ten rises and the nine falls.
+TEST(InferredClockingFunctionsRun, AnOrJoinedInferredClockKeepsEachEvent) {
+  EXPECT_NE(
+      RunInferredClockCase("posedge clk or negedge clk").find("c1=19 c2=19\n"),
+      std::string::npos);
+}
+
+// §16.14.7 with §9.4.2: an inferred clock naming no edge, guarded, stands in
+// as any change of clk at which en holds, the six rises and five falls.
+TEST(InferredClockingFunctionsRun, AnEdgelessGuardedInferredClockStandsIn) {
+  EXPECT_NE(RunInferredClockCase("clk iff en").find("c1=11 c2=11\n"),
+            std::string::npos);
+}
+
 }  // namespace

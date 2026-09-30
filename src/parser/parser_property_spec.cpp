@@ -10,6 +10,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 
@@ -225,45 +226,17 @@ static bool IsEdgeKeyword(TokenKind k) {
          k == TokenKind::kKwEdge;
 }
 
-// §9.4.2: two events of an event expression given as an actual argument
-// joined by `op`, `or` joining two events and `iff` an event and its guard.
-Expr* ParserPropertySpecHelpers::JoinActualEvents(Parser& p, TokenKind op,
-                                                  Expr* lhs, Expr* rhs) {
-  auto* joint = p.arena_.Create<Expr>();
-  joint->kind = ExprKind::kBinary;
-  joint->op = op;
-  joint->lhs = lhs;
-  joint->rhs = rhs;
-  joint->range.start = lhs->range.start;
-  return joint;
-}
-
-// §9.4.2: one event of an event expression given as an actual argument, an
-// edge keyword over its signal, or the signal alone where no edge keyword is
-// written, under an `iff` holding its guard where one is written.
-Expr* ParserPropertySpecHelpers::ParseActualEvent(Parser& p) {
-  Token head = p.CurrentToken();
-  EventExpr ev = p.ParseSingleEvent();
-  Expr* event = ev.signal;
-  if (ev.edge != Edge::kNone) {
-    event = p.arena_.Create<Expr>();
-    event->kind = ExprKind::kUnary;
-    event->op = head.kind;
-    event->text = head.text;
-    event->range.start = head.loc;
-    event->lhs = ev.signal;
-  }
-  if (ev.iff_condition == nullptr) return event;
-  return JoinActualEvents(p, TokenKind::kKwIff, event, ev.iff_condition);
-}
-
 // §16.8.1 b) and §9.4.2: an event expression opening with an edge keyword,
 // given as the actual argument of a formal of type event: its events, each
-// with any iff guard, joined by `or`.
+// with any iff guard, joined by `or`, kept as EventAsActual and
+// EitherEventActual write them.
 Expr* ParserPropertySpecHelpers::ParseEventActual(Parser& p) {
-  Expr* event = ParseActualEvent(p);
+  SourceLoc loc = p.CurrentLoc();
+  Expr* event = EventAsActual(p.ParseSingleEvent(), loc, p.arena_);
   while (p.Match(TokenKind::kKwOr)) {
-    event = JoinActualEvents(p, TokenKind::kKwOr, event, ParseActualEvent(p));
+    loc = p.CurrentLoc();
+    Expr* next = EventAsActual(p.ParseSingleEvent(), loc, p.arena_);
+    event = EitherEventActual(event, next, p.arena_);
   }
   return event;
 }

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -76,6 +77,27 @@ bool IsJoint(const Expr* e, TokenKind op) {
   return e->kind == ExprKind::kBinary && e->op == op;
 }
 
+Expr* JoinEvents(TokenKind op, Expr* lhs, Expr* rhs, Arena& arena) {
+  auto* joint = arena.Create<Expr>();
+  joint->kind = ExprKind::kBinary;
+  joint->op = op;
+  joint->lhs = lhs;
+  joint->rhs = rhs;
+  joint->range.start = lhs->range.start;
+  return joint;
+}
+
+struct EdgeSpelling {
+  TokenKind op;
+  std::string_view text;
+};
+
+EdgeSpelling SpellEdge(Edge edge) {
+  if (edge == Edge::kPosedge) return {TokenKind::kKwPosedge, "posedge"};
+  if (edge == Edge::kNegedge) return {TokenKind::kKwNegedge, "negedge"};
+  return {TokenKind::kKwEdge, "edge"};
+}
+
 // §9.4.2: a guard holding where `own` and `other` both hold, the one alone
 // where the other is null.
 Expr* ConjoinGuards(Expr* own, Expr* other, Arena& arena) {
@@ -112,6 +134,25 @@ void CollectEvents(Expr* e, std::vector<EventExpr>& out) {
 }
 
 }  // namespace
+
+Expr* EventAsActual(const EventExpr& ev, SourceLoc loc, Arena& arena) {
+  Expr* event = ev.signal;
+  if (ev.edge != Edge::kNone) {
+    EdgeSpelling spelling = SpellEdge(ev.edge);
+    event = arena.Create<Expr>();
+    event->kind = ExprKind::kUnary;
+    event->op = spelling.op;
+    event->text = spelling.text;
+    event->range.start = loc;
+    event->lhs = ev.signal;
+  }
+  if (ev.iff_condition == nullptr) return event;
+  return JoinEvents(TokenKind::kKwIff, event, ev.iff_condition, arena);
+}
+
+Expr* EitherEventActual(Expr* lhs, Expr* rhs, Arena& arena) {
+  return JoinEvents(TokenKind::kKwOr, lhs, rhs, arena);
+}
 
 bool IsEventActual(const Expr* actual) {
   return actual != nullptr &&
