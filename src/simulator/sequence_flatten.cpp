@@ -522,7 +522,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   // a formal of type sequence expanding to the operands of its actual.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
-  const Expansion expansion{op, body, actuals, ctx, arena, depth};
+  Expansion expansion{op, body, actuals, ctx, arena, depth};
   for (size_t j = 0; j < body.operands.size(); ++j) {
     begins.push_back(out.operands.size());
     if (!AppendInstanceOperand(expansion, j, out)) return false;
