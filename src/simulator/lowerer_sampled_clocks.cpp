@@ -43,7 +43,6 @@ SimCoroutine MakeSampledClockMonitor(const Expr* site, SimContext& ctx,
 }  // namespace
 
 void Lowerer::LowerSampledClockMonitors(const Stmt* body) {
-  if (body == nullptr) return;
   ForEachStmtReadExpr(body, [this](const Expr* e) {
     ForEachSubExpr(e, [this](const Expr* sub) {
       if (sub->kind != ExprKind::kSystemCall || sub->sampled_clock == nullptr ||
