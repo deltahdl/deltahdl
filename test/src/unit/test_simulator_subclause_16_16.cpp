@@ -241,10 +241,10 @@ TEST(ClockResolutionRun, AnInterfacePropertyReadsTheInstancesStructMember) {
 // the path of an instance reads the instance's own signals whatever the shape
 // of its body: a local variable assigned in a match item, a clock named again
 // before an operand of a sequence or of a property, an or, an and and an
-// intersect of sequences, a first_match with a match item, a case and a
-// throughout. Each is asserted beside the same property declared in the module
-// over the module's signals, which the instance's are bound to, and fails as
-// often.
+// intersect of properties, a first_match with a match item and one over an or
+// and over an and of sequences, a case and a throughout. Each is asserted
+// beside the same property declared in the module over the module's signals,
+// which the instance's are bound to, and fails as often.
 TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
   SimFixture f;
   std::string out = RunCapture(
@@ -260,6 +260,10 @@ TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
       "  property p_node; @(posedge clk) a |=> @(posedge clk) b; endproperty\n"
       "  property p_fm; bit v; @(posedge clk) first_match(a ##[1:2] b, v = c) "
       "|=> (d == v); endproperty\n"
+      "  property p_fo; @(posedge clk) first_match((a ##1 b) or (c ##1 d)) |=> "
+      "a; endproperty\n"
+      "  property p_fa; @(posedge clk) first_match((a ##1 b) and (c ##1 d)) "
+      "|=> b; endproperty\n"
       "  property p_case; @(posedge clk) case (sel) 1'b0: a; default: b; "
       "endcase; endproperty\n"
       "  property p_thr; @(posedge clk) a throughout (b ##1 c); endproperty\n"
@@ -286,10 +290,14 @@ TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
       "  property m_node; @(posedge clk) a |=> @(posedge clk) b; endproperty\n"
       "  property m_fm; bit v; @(posedge clk) first_match(a ##[1:2] b, v = c) "
       "|=> (d == v); endproperty\n"
+      "  property m_fo; @(posedge clk) first_match((a ##1 b) or (c ##1 d)) |=> "
+      "a; endproperty\n"
+      "  property m_fa; @(posedge clk) first_match((a ##1 b) and (c ##1 d)) "
+      "|=> b; endproperty\n"
       "  property m_case; @(posedge clk) case (sel) 1'b0: a; default: b; "
       "endcase; endproperty\n"
       "  property m_thr; @(posedge clk) a throughout (b ##1 c); endproperty\n"
-      "  int fi[9], fm[9];\n"
+      "  int fi[11], fm[11];\n"
       "  assert property (i0.p_local) else fi[0]++;   assert property "
       "(m_local) else fm[0]++;\n"
       "  assert property (i0.p_clk) else fi[1]++;     assert property (m_clk) "
@@ -308,7 +316,11 @@ TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
       "else fm[7]++;\n"
       "  assert property (i0.p_fm) else fi[8]++;      assert property (m_fm) "
       "else fm[8]++;\n"
-      "  initial #98 for (int i = 0; i < 9; i++) $display(\"%0d: ifc=%0d "
+      "  assert property (i0.p_fo) else fi[9]++;     assert property (m_fo) "
+      "else fm[9]++;\n"
+      "  assert property (i0.p_fa) else fi[10]++;    assert property (m_fa) "
+      "else fm[10]++;\n"
+      "  initial #98 for (int i = 0; i < 11; i++) $display(\"%0d: ifc=%0d "
       "mod=%0d\", i, fi[i], fm[i]);\n"
       "endmodule\n",
       f);
@@ -316,7 +328,8 @@ TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
   EXPECT_EQ(out,
             "0: ifc=1 mod=1\n1: ifc=5 mod=5\n2: ifc=2 mod=2\n"
             "3: ifc=8 mod=8\n4: ifc=7 mod=7\n5: ifc=3 mod=3\n"
-            "6: ifc=8 mod=8\n7: ifc=2 mod=2\n8: ifc=2 mod=2\n");
+            "6: ifc=8 mod=8\n7: ifc=2 mod=2\n8: ifc=2 mod=2\n"
+            "9: ifc=3 mod=3\n10: ifc=0 mod=0\n");
 }
 
 }  // namespace
