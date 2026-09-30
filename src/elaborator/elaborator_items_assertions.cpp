@@ -154,7 +154,8 @@ void CollectInstanceSequenceClocks(const Expr* operand,
   const ModuleItem* decl =
       InstantiatedDecl(operand, ModuleItemKind::kSequenceDecl, registry);
   if (decl == nullptr) return;
-  ActualsByFormal actuals = BindActuals(decl->prop_formals, operand);
+  ActualsByFormal actuals = BindActualsWithDefaults(
+      decl->prop_formals, decl->prop_formal_defaults, operand);
   for (const EventExpr& ev : decl->seq_clock) {
     AppendClockOnce(out, InstanceClockEvent(ev, actuals));
   }
@@ -229,7 +230,8 @@ void CollectInstanceClocks(const Expr* instance,
   if (decl != nullptr) {
     // §16.13.2: a property declared with a clock is evaluated on it, the
     // actuals in the formals' places.
-    ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
+    ActualsByFormal actuals = BindActualsWithDefaults(
+        decl->prop_formals, decl->prop_formal_defaults, instance);
     for (const EventExpr& ev : decl->prop_clock) {
       AppendClockOnce(out, InstanceClockEvent(ev, actuals));
     }
@@ -485,9 +487,11 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   // §16.15: the disable iff clause the property declares is the instance's
   // own, the actuals in the formals' places, ahead of any default.
   if (stmt->assert_disable_iff == nullptr) {
-    stmt->assert_disable_iff =
-        SubstituteFormals(decl->prop_disable_iff,
-                          BindActuals(decl->prop_formals, instance), arena);
+    stmt->assert_disable_iff = SubstituteFormals(
+        decl->prop_disable_iff,
+        BindActualsWithDefaults(decl->prop_formals, decl->prop_formal_defaults,
+                                instance),
+        arena);
   }
 }
 

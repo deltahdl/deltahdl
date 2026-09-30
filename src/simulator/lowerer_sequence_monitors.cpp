@@ -92,7 +92,8 @@ void SequenceFormalInstances(const Expr* instance, SimContext& ctx,
   if (instance->kind != ExprKind::kCall) return;
   const ModuleItem* decl = ctx.FindSequenceDecl(instance->callee);
   if (decl == nullptr) return;
-  ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
+  ActualsByFormal actuals = BindActualsWithDefaults(
+      decl->prop_formals, decl->prop_formal_defaults, instance);
   for (size_t i = 0;
        i < decl->prop_formals.size() && i < decl->prop_formal_type_kw.size();
        ++i) {

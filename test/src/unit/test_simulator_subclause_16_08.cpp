@@ -262,4 +262,24 @@ TEST(NamedSequenceInstance, APackageSequenceIsNamedThroughTheScopeAlone) {
   EXPECT_EQ(out, "p=10 f=0\n");
 }
 
+// §16.8 with §16.8.1 b) and §16.16: a sequence clocked on its event formal,
+// the formal left to its default, `posedge clk`, is the whole property of the
+// statement, so the statement is attempted at every rise of clk, the default
+// in the formal's place, as it is with the event given.
+TEST(NamedSequenceInstance, AnEventFormalLeftToItsDefaultClocksTheStatement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic a = 1;\n"
+      "  int c3 = 0, c4 = 0;\n"
+      "  sequence s_p(untyped x, event e = posedge clk); @(e) x; endsequence\n"
+      "  cover property (s_p(a)) c3++;\n"
+      "  cover property (s_p(a, posedge clk)) c4++;\n"
+      "  initial #98 $display(\"c3=%0d c4=%0d\", c3, c4);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c3=10 c4=10\n"), std::string::npos);
+}
+
 }  // namespace

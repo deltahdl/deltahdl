@@ -26,6 +26,13 @@ Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
 ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
                             const Expr* instance);
 
+// §16.8: the actuals BindActuals binds, and each formal the instance leaves
+// with none, or with an empty one, bound to its default actual argument where
+// `defaults`, parallel to `formals`, declares one.
+ActualsByFormal BindActualsWithDefaults(
+    const std::vector<std::string_view>& formals,
+    const std::vector<Expr*>& defaults, const Expr* instance);
+
 // §23.6: whether two expressions name the same object by the same spelling:
 // an identifier by its text and scope prefix, a member access, `i0.clk`, whose
 // own text is empty, by the whole path, and a select of a constant index by

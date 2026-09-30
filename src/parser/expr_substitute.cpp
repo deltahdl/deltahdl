@@ -47,6 +47,20 @@ ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
   return actuals;
 }
 
+ActualsByFormal BindActualsWithDefaults(
+    const std::vector<std::string_view>& formals,
+    const std::vector<Expr*>& defaults, const Expr* instance) {
+  ActualsByFormal actuals = BindActuals(formals, instance);
+  for (size_t i = 0; i < formals.size() && i < defaults.size(); ++i) {
+    if (defaults[i] == nullptr) continue;
+    auto it = actuals.find(formals[i]);
+    if (it == actuals.end() || it->second == nullptr) {
+      actuals[formals[i]] = defaults[i];
+    }
+  }
+  return actuals;
+}
+
 bool SamePath(const Expr* a, const Expr* b) {
   if (a == nullptr || b == nullptr || a->kind != b->kind) return false;
   if (a->kind == ExprKind::kMemberAccess) {
