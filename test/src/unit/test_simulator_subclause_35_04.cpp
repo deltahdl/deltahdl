@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
 #include "helpers_reported_error.h"
@@ -154,10 +158,15 @@ TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
       "  initial r = add7(35);\n"
       "endmodule\n",
       f, {}, "subclause_35_04_no_symbol", "deltahdl-no-such-compiler");
-  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
-  EXPECT_EQ(f.diag.Diagnostics()[0].message,
-            "imported subroutine 'add7' is bound to no foreign "
-            "implementation");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'add7' is bound to no foreign implementation", 4,
+      "35.5.4"));
+  EXPECT_TRUE(std::none_of(f.diag.Diagnostics().begin(),
+                           f.diag.Diagnostics().end(), [](const Diagnostic& d) {
+                             return d.message.find("could not be built") !=
+                                    std::string::npos;
+                           }));
 }
 
 // §35.4 with §35.5.6.1: an import whose symbol is found but whose formal is

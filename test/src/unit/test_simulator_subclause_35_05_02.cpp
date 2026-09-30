@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -263,6 +264,45 @@ TEST(DpiPureCallInADesign, TheReusedResultIsTheValueTheCallWouldCompute) {
 TEST(DpiPureCallInADesign, AnImportWithoutThePropertyIsEnteredOnEveryCall) {
   CallingASquaringImportTwice run(/*is_pure=*/false, 6);
   EXPECT_EQ(run.entries, 2);
+}
+
+// The C function the pure import below is bound to, counting its calls.
+int cube_calls = 0;
+int Cube(int a) {
+  ++cube_calls;
+  return a * a * a;
+}
+
+// §35.5.2: a pure function bound to C is entered for a call presenting input
+// values not seen before, and a call presenting the same values again is
+// answered with the value computed then, without entering the C function.
+TEST(PureDpiCallRemoval, APureImportBoundToCIsEnteredOncePerInputValue) {
+  cube_calls = 0;
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" pure function int cube(input int a);\n"
+      "  int r;\n"
+      "  int s;\n"
+      "  int u;\n"
+      "  initial begin\n"
+      "    r = cube(3);\n"
+      "    s = cube(4);\n"
+      "    u = cube(3);\n"
+      "  end\n"
+      "endmodule\n",
+      f, {{"cube", reinterpret_cast<void*>(&Cube)}}, "subclause_35_05_02_pure");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* r = f.ctx.FindVariable("r");
+  auto* s = f.ctx.FindVariable("s");
+  auto* u = f.ctx.FindVariable("u");
+  ASSERT_NE(r, nullptr);
+  ASSERT_NE(s, nullptr);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 27U);
+  EXPECT_EQ(s->value.ToUint64(), 64U);
+  EXPECT_EQ(u->value.ToUint64(), 27U);
+  EXPECT_EQ(cube_calls, 2);
 }
 
 }  // namespace

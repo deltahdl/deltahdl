@@ -358,7 +358,9 @@ DpiArgValue CallDpiCFunction(const DpiCFunction& function,
   std::vector<void*> addresses(kCount);
   for (std::size_t i = 0; i < kCount; ++i) {
     const DpiArg& formal = function.formals[i];
-    objects[i].object = *ObjectOfFormal(formal);
+    // Only an import DpiImportNotCallableInC accepted is bound, so every formal
+    // here has an object; the int is never taken.
+    objects[i].object = ObjectOfFormal(formal).value_or(DpiCObject::kInt);
     objects[i].width = PackedWidthOf(formal);
     StoreValue(objects[i], formal.type, args[i]);
     addresses[i] = objects[i].Address();

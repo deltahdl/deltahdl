@@ -171,4 +171,26 @@ TEST(DpiPassingByValue, RealsScalarsAndHandlesArriveAsTheirCTypes) {
   EXPECT_EQ(b.Call("scalars_by_value", scalars).AsInt(), 137);
 }
 
+double RealtimeAndRegByValue(double r, unsigned char g) { return r + (g * 10); }
+
+// §H.7.4 and Table H.1: a realtime is a real and so crosses as a double, and
+// a scalar reg uses logic's encoding, an svLogic.
+TEST(DpiPassingByValue, ARealtimeAndARegArriveAsDoubleAndSvLogic) {
+  DpiCBinding b;
+  b.dpi.RegisterImport(
+      CImport("realtime_and_reg", DataTypeKind::kReal,
+              {CFormal("r", DataTypeKind::kRealtime, Direction::kInput),
+               CFormal("g", DataTypeKind::kReg, Direction::kInput)}));
+  b.Bind(
+      {{"realtime_and_reg", reinterpret_cast<void*>(&RealtimeAndRegByValue)}},
+      "annex_h_08_03_realtime_reg");
+  ASSERT_TRUE(b.diag.Diagnostics().empty());
+  DpiArgValue realtime = DpiArgValue::FromReal(1.5);
+  realtime.type = DataTypeKind::kRealtime;
+  DpiArgValue reg = DpiArgValue::FromLogic(3);
+  reg.type = DataTypeKind::kReg;
+  std::vector<DpiArgValue> args = {realtime, reg};
+  EXPECT_DOUBLE_EQ(b.Call("realtime_and_reg", args).AsReal(), 31.5);
+}
+
 }  // namespace
