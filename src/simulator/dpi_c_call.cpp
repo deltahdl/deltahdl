@@ -158,6 +158,23 @@ std::vector<SvLogicVecVal> CanonicalWordsOf(const DpiArgValue& value,
   return words;
 }
 
+// §H.7.7: the svBitVecVal words of a 2-state canonical array, the avals of
+// the pairs `words` hold.
+std::vector<uint32_t> AvalsOf(const std::vector<SvLogicVecVal>& words) {
+  std::vector<uint32_t> avals;
+  avals.reserve(words.size());
+  for (const SvLogicVecVal& word : words) avals.push_back(word.aval);
+  return avals;
+}
+
+// The 2-state canonical array `bits` as pairs of aval and bval, every bval 0.
+std::vector<SvLogicVecVal> PairsOf(const std::vector<uint32_t>& bits) {
+  std::vector<SvLogicVecVal> words;
+  words.reserve(bits.size());
+  for (uint32_t word : bits) words.push_back({word, 0});
+  return words;
+}
+
 // Lays `value` out in the C objects `storage` holds for a formal of `kind`.
 void StoreValue(DpiCStorage& storage, DataTypeKind kind,
                 const DpiArgValue& value) {
@@ -193,16 +210,11 @@ void StoreValue(DpiCStorage& storage, DataTypeKind kind,
       storage.scalar.u8 =
           kind == DataTypeKind::kBit ? value.AsBit() : value.AsLogic();
       break;
-    case DpiCObject::kBitVector: {
-      const std::vector<SvLogicVecVal> kWords =
-          CanonicalWordsOf(value, kind, storage.width);
-      storage.bits.resize(kWords.size());
-      for (std::size_t i = 0; i < kWords.size(); ++i) {
-        storage.bits[i] = kWords[i].aval;
-      }
+    case DpiCObject::kBitVector:
+      storage.bits = AvalsOf(CanonicalWordsOf(value, kind, storage.width));
       break;
-    }
-    case DpiCObject::kLogicVector:
+    default:
+      // DpiCObject::kLogicVector, the one object left.
       storage.logic = CanonicalWordsOf(value, kind, storage.width);
       break;
   }
@@ -263,13 +275,10 @@ DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind) {
               ? DpiArgValue::FromBit(static_cast<SvBit>(storage.scalar.u8 & 1U))
               : DpiArgValue::FromLogic(storage.scalar.u8);
       break;
-    case DpiCObject::kBitVector: {
-      std::vector<SvLogicVecVal> words;
-      words.reserve(storage.bits.size());
-      for (uint32_t word : storage.bits) words.push_back({word, 0});
-      return PackedValueOf(std::move(words), kind, storage.width);
-    }
-    case DpiCObject::kLogicVector:
+    case DpiCObject::kBitVector:
+      return PackedValueOf(PairsOf(storage.bits), kind, storage.width);
+    default:
+      // DpiCObject::kLogicVector, the one object left.
       return PackedValueOf(storage.logic, kind, storage.width);
   }
   value.type = kind;
