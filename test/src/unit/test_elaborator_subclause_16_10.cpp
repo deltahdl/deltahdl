@@ -107,4 +107,24 @@ TEST(LocalVariableElaboration, InstantiatedSequencesLocalIsNotVisible) {
                             10, "16.10"));
 }
 
+// §16.10 names the local only where the reading text instantiates the
+// declaration holding it. Here the assertion instantiates `s2` alone, so its
+// read of `v`, which only `s1` declares, is an unresolved name (§23.9) and
+// not an invisible local.
+TEST(LocalVariableElaboration, LocalOfASequenceNotInstantiatedIsUnresolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input logic clk, a);\n"
+      "  sequence s1; int v; (a, v = 1) ##1 (v == 1); endsequence\n"
+      "  sequence s2(x); x; endsequence\n"
+      "  assert property (@(posedge clk) s2(a) ##1 v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'v'", 4,
+                            "23.9"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is a local variable", 4, "16.10"));
+}
+
 }  // namespace

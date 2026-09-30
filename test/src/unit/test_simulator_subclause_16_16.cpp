@@ -132,4 +132,32 @@ TEST(ClockResolutionRun, AnInterfacePropertyInstancedByPathTakesItsClock) {
   EXPECT_EQ(out, "f0=3 f1=5\n");
 }
 
+// The property's read of a member of the interface's struct, `pair.lo`, is
+// rewritten through the instance like a whole signal: each instance's
+// assertion reads its own `pair`, and the two fail on different cycles.
+TEST(ClockResolutionRun, AnInterfacePropertyReadsTheInstancesStructMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc(input logic clk);\n"
+      "  struct packed { logic hi; logic lo; } pair;\n"
+      "  property low; @(posedge clk) !pair.lo; endproperty\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0000011111;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  ifc i0(clk), i1(clk);\n"
+      "  assign i0.pair = {av[0], !av[0]};\n"
+      "  assign i1.pair = {bv[0], !bv[0]};\n"
+      "  int f0 = 0, f1 = 0;\n"
+      "  assert property (i0.low) else f0++;\n"
+      "  assert property (i1.low) else f1++;\n"
+      "  initial #98 $display(\"f0=%0d f1=%0d\", f0, f1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "f0=3 f1=5\n");
+}
+
 }  // namespace
