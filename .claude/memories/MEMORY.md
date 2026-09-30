@@ -6,7 +6,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Commits and pushes
 
-- [Pushing to main](pushing-to-main.md) — commit straight to `main`; there are no pull requests here.
+- [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking; there are no pull requests here.
 - [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds a matter solved end to end, or a batch of issues of one matter solved in full, never one step of either.
 - [Grouping issues into one push](grouping-issues-into-a-push.md) — every open issue of one clause and one `src/` subsystem, bounded by the matter and never by a count, solved uncommitted and committed once; CI, build, shared-fixture and red-run fixes go alone.
 - [Draining the push queue first](draining-the-push-queue-first.md) — while commits sit unpushed, take no new issue; squash them in queue order, never by file-disjointness, and push until none are left.

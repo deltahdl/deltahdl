@@ -2,12 +2,17 @@
 name: pushing-to-main
 description: Commit straight to main; there is no pull-request cycle in this repository.
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: 03cfcaf6-69fa-40b2-b2b5-b6a99bf34be9
+  modified: 2026-09-30T22:51:29.565Z
 ---
 
 # Pushing to main
 
 Commit directly to `main`. Do not frame work as pull requests, do not suggest opening one, and do not structure advice around review cycles.
+
+A requested change is finished when it is committed and pushed, so commit and push it without asking whether to: asking only holds back work the user has already asked for.
 
 **Why:** This repository has no pull-request cycle: work is pushed to `main`, and `git log --merges` on `main` is empty.
 
