@@ -483,39 +483,6 @@ struct SequencePortScan {
         ParserPropertySpecHelpers::ParseFormalDefault(*parser);
   }
 
-  // §16.14.7: a system function that opens the current formal's default value
-  // (it directly follows `=`). $inferred_clock may only default an untyped or
-  // event formal, so on any other, whatever its type was written or carried
-  // from, that default is rejected (clock_default_allowed). An inferred
-  // clocking or disable function shall also be the entire default value
-  // expression: a following token that is neither the formal separator ',' nor
-  // the closing ')' means it is only part of a larger expression.
-  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag,
-                                ModuleItem* item) {
-    auto fn = lexer.Peek().text;
-    auto fn_loc = lexer.Peek().loc;
-    bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
-    if (is_inferred && !item->prop_formal_inferred.empty()) {
-      item->prop_formal_inferred.back() = fn == "$inferred_clock"
-                                              ? InferredDefault::kClock
-                                              : InferredDefault::kDisable;
-    }
-    if (fn == "$inferred_clock" && !clock_default_allowed) {
-      diag.Error(fn_loc,
-                 "$inferred_clock default requires an untyped or event "
-                 "formal argument",
-                 Subclause("16.14.7"));
-    }
-    lexer.Next();
-    if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
-        !LexerCheck(lexer, TokenKind::kRParen)) {
-      diag.Error(fn_loc,
-                 "an inferred clocking or disable function must be the "
-                 "entire default value of a formal argument",
-                 Subclause("16.14.7"));
-    }
-  }
-
   bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kComma)) {
       HandleComma(lexer, diag, item);
@@ -543,7 +510,7 @@ struct SequencePortScan {
       HandleDefaultEq(lexer, item);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      HandleSystemDefaultValue(lexer, diag, item);
+      ScanSystemDefaultValue(lexer, diag, item, clock_default_allowed);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);

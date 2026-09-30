@@ -169,6 +169,41 @@ bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
   }
 }
 
+// §16.14.7: a system-function name that opens a formal's default value (it
+// directly follows `=`), in a sequence's or a property's port list.
+// $inferred_clock shall only default a formal that is untyped or of type
+// `event`, whatever its type was written or carried from (§16.8), so it is
+// rejected where `clock_default_allowed` is false. An inferred clocking or
+// disable function shall also be the entire default value expression: if any
+// further token of the default follows the call (the next token is neither the
+// formal separator ',' nor the port list's closing ')'), it is only part of a
+// larger expression. The function is recorded on the formal just harvested.
+void ScanSystemDefaultValue(Lexer& lexer, DiagEngine& diag, ModuleItem* item,
+                            bool clock_default_allowed) {
+  auto fn = lexer.Peek().text;
+  auto fn_loc = lexer.Peek().loc;
+  bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+  if (is_inferred && !item->prop_formal_inferred.empty()) {
+    item->prop_formal_inferred.back() = fn == "$inferred_clock"
+                                            ? InferredDefault::kClock
+                                            : InferredDefault::kDisable;
+  }
+  if (fn == "$inferred_clock" && !clock_default_allowed) {
+    diag.Error(fn_loc,
+               "$inferred_clock default requires an untyped or event "
+               "formal argument",
+               Subclause("16.14.7"));
+  }
+  lexer.Next();
+  if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
+      !LexerCheck(lexer, TokenKind::kRParen)) {
+    diag.Error(fn_loc,
+               "an inferred clocking or disable function must be the "
+               "entire default value of a formal argument",
+               Subclause("16.14.7"));
+  }
+}
+
 // §16.12 named-property port-list scan state carried across loop iterations.
 struct PropertyPortScan {
   // The parser whose lexer the scan reads, which parses a formal's default.
@@ -295,39 +330,6 @@ struct PropertyPortScan {
   // Handles the depth==1 (top-level) tokens of the property port list. Returns
   // true if the current token was consumed here; false means the caller falls
   // through to the default skip. All branches assume depth==1 already holds.
-  // §16.14.7: a system-function name that opens a formal's default value (it
-  // directly follows `=`). $inferred_clock shall only default a formal that is
-  // untyped or of type `event`, so it is rejected on a data-typed, `sequence`,
-  // or `property` formal. An inferred clocking or disable function shall also
-  // be the entire default value expression: if any further token of the default
-  // follows the call (the next token is neither the formal separator ',' nor
-  // the port list's closing ')'), it is only part of a larger expression.
-  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag,
-                                ModuleItem* item) {
-    auto fn = lexer.Peek().text;
-    auto fn_loc = lexer.Peek().loc;
-    bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
-    if (is_inferred && !item->prop_formal_inferred.empty()) {
-      item->prop_formal_inferred.back() = fn == "$inferred_clock"
-                                              ? InferredDefault::kClock
-                                              : InferredDefault::kDisable;
-    }
-    if (fn == "$inferred_clock" && !clock_default_allowed) {
-      diag.Error(fn_loc,
-                 "$inferred_clock default requires an untyped or event "
-                 "formal argument",
-                 Subclause("16.14.7"));
-    }
-    lexer.Next();
-    if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
-        !LexerCheck(lexer, TokenKind::kRParen)) {
-      diag.Error(fn_loc,
-                 "an inferred clocking or disable function must be the "
-                 "entire default value of a formal argument",
-                 Subclause("16.14.7"));
-    }
-  }
-
   // §16.12 with §16.8: `formal = default` gives the formal just harvested a
   // default actual argument, kept beside it for an instance that omits the
   // formal to take.
@@ -367,7 +369,7 @@ struct PropertyPortScan {
       HandleInputDirection(lexer, diag);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      HandleSystemDefaultValue(lexer, diag, item);
+      ScanSystemDefaultValue(lexer, diag, item, clock_default_allowed);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);

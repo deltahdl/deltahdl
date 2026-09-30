@@ -26,4 +26,12 @@ bool IsLocalVariableOfDecl(const ModuleItem* item, std::string_view name);
 void ScanClockEventGroupForLocals(Lexer& lexer, DiagEngine& diag,
                                   const ModuleItem* item);
 
+// §16.14.7: consumes the system function opening a formal's default value in
+// a sequence's or a property's port list, records an inferred clocking or
+// disable function on the formal just harvested, and reports one placed
+// where §16.14.7 forbids it; `clock_default_allowed` says whether the formal's
+// type, written or carried, is untyped or `event`.
+void ScanSystemDefaultValue(Lexer& lexer, DiagEngine& diag, ModuleItem* item,
+                            bool clock_default_allowed);
+
 }  // namespace delta
