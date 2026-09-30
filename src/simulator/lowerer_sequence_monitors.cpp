@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -8,8 +9,10 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/expr_substitute.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
@@ -63,16 +66,63 @@ std::unordered_set<std::string_view> TriggeredDependencies(
   return deps;
 }
 
+// Whether the body of `decl` applies `triggered` or `matched` to its formal
+// `formal`, as `a.triggered`.
+bool AppliesMethodToFormal(const ModuleItem* decl, std::string_view formal) {
+  bool applies = false;
+  ForEachBodyExpr(decl->seq_linear, [&](const Expr* e) {
+    if (e->kind == ExprKind::kMemberAccess && e->lhs != nullptr &&
+        e->rhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
+        e->lhs->text == formal &&
+        (e->rhs->text == "triggered" || e->rhs->text == "matched")) {
+      applies = true;
+    }
+  });
+  return applies;
+}
+
+// §16.9.11 with §16.8.1 (a): the instances with arguments bound as actuals of
+// `instance` to formals of type sequence that the instantiated body applies
+// `triggered` or `matched` to, which the method, once the formal is
+// replaced, reads the end point of.
+void SequenceFormalInstances(const Expr* instance, SimContext& ctx,
+                             std::vector<const Expr*>& out) {
+  if (instance->kind != ExprKind::kCall) return;
+  const ModuleItem* decl = ctx.FindSequenceDecl(instance->callee);
+  if (decl == nullptr) return;
+  ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
+  for (size_t i = 0;
+       i < decl->prop_formals.size() && i < decl->prop_formal_type_kw.size();
+       ++i) {
+    if (decl->prop_formal_type_kw[i] != TokenKind::kKwSequence) continue;
+    auto it = actuals.find(decl->prop_formals[i]);
+    if (it == actuals.end() || it->second == nullptr ||
+        it->second->kind != ExprKind::kCall ||
+        ctx.FindSequenceDecl(it->second->callee) == nullptr ||
+        !AppliesMethodToFormal(decl, decl->prop_formals[i])) {
+      continue;
+    }
+    out.push_back(it->second);
+  }
+}
+
 // The instances with arguments the module applies `triggered` to, in its
-// sequence bodies and its procedures, each once.
+// sequence bodies and its procedures, directly or through a formal of type
+// sequence, each once.
 std::vector<const Expr*> TriggeredInstances(const RtlirModule* mod,
                                             SimContext& ctx) {
   std::vector<const Expr*> instances;
   std::unordered_set<const Expr*> seen;
   auto collect = [&](const Expr* e) {
-    if (TriggeredSequenceName(e, ctx).empty()) return;
-    if (e->lhs->kind != ExprKind::kCall || !seen.insert(e->lhs).second) return;
-    instances.push_back(e->lhs);
+    std::vector<const Expr*> found;
+    SequenceFormalInstances(e, ctx, found);
+    if (!TriggeredSequenceName(e, ctx).empty() &&
+        e->lhs->kind == ExprKind::kCall) {
+      found.push_back(e->lhs);
+    }
+    for (const Expr* instance : found) {
+      if (seen.insert(instance).second) instances.push_back(instance);
+    }
   };
   for (const auto* seq : mod->sequence_decls) {
     ForEachBodyExpr(seq->seq_linear, collect);

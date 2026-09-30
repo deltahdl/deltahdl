@@ -123,4 +123,35 @@ TEST(TypedSequenceFormals, TypedDelayFormalTakesAConstantActual) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
+// §16.8.1 (a): a formal of type sequence stands for the sequence bound to it,
+// a sequence expression or a named sequence. With a, b and c holding the
+// bits of av, bv and cv at the rises of clk, a ##1 b ##1 c matches from the
+// rises at 5 and 55, twice, and a ##1 b from 5, 25 and 55, three times.
+std::string SequenceFormalSource() {
+  return "module t;\n"
+         "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+         "  bit [0:9] av = 10'b1010010000, bv = 10'b0101001010,\n"
+         "            cv = 10'b0010000100;\n"
+         "  bit a, b, c;\n"
+         "  assign a = av[0]; assign b = bv[0]; assign c = cv[0];\n"
+         "  always @(negedge clk) begin\n"
+         "    av <= av << 1; bv <= bv << 1; cv <= cv << 1;\n"
+         "  end\n"
+         "  int cseq = 0, cseq2 = 0;\n"
+         "  sequence s_seq(sequence sq, untyped z); sq ##1 z; endsequence\n"
+         "  sequence s_seq2(sequence sq); sq; endsequence\n"
+         "  sequence ab; a ##1 b; endsequence\n"
+         "  cover property (@(posedge clk) s_seq(a ##1 b, c)) cseq++;\n"
+         "  cover property (@(posedge clk) s_seq2(ab)) cseq2++;\n"
+         "endmodule\n";
+}
+
+TEST(TypedSequenceFormals, ASequenceFormalStandsForTheSequenceBoundToIt) {
+  SimFixture f;
+  auto* cseq = RunAndFindVar(SequenceFormalSource(), f, "cseq");
+  ASSERT_NE(cseq, nullptr);
+  EXPECT_EQ(cseq->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("cseq2")->value.ToUint64(), 3u);
+}
+
 }  // namespace

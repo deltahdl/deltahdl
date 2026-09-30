@@ -427,6 +427,19 @@ std::vector<EventExpr> InstanceOperandClock(const LinearSequence& body,
   return op.clock;
 }
 
+// §16.8.1 (a): the sequence an operand of an instantiated body stands for
+// once a formal of type sequence in it is replaced by its actual: a named
+// sequence the actual names or instantiates, or the sequence_expr the parser
+// carries in a placeholder's property_actual; nullptr for any other operand.
+const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
+  if (operand->property_actual != nullptr) {
+    const PropertyExprNode* tree = operand->property_actual;
+    return tree->kind == PropertyExprNode::Kind::kSequence ? tree->sequence
+                                                           : nullptr;
+  }
+  return InstantiatedSequence(operand, ctx);
+}
+
 // Appends the instantiated body's flattened operands with the actuals
 // substituted, its clock taken where the outer sequence has none, and the
 // §16.8.2 assignments of its local variable formal arguments: the
@@ -452,24 +465,44 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     out.clock = SubstituteClock(body.clock, actuals, arena);
   }
   size_t first = out.operands.size();
+  // Where each operand of the body begins and ends among the flattened ones,
+  // a formal of type sequence expanding to the operands of its actual.
+  std::vector<size_t> begins;
+  std::vector<size_t> ends;
   for (size_t j = 0; j < body.operands.size(); ++j) {
-    out.operands.push_back(SubstituteFormals(body.operands[j], actuals, arena));
+    Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
     SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
-    out.delays.push_back(j == 0 ? AddDelays(op.before, delay) : delay);
-    out.match_items.push_back(
-        SubstituteMatchItems(body.match_items[j], actuals, arena));
-    out.repetitions.push_back(body.repetitions[j]);
+    if (j == 0) delay = AddDelays(op.before, delay);
     // §16.13.1 and §16.13.3: an operand of the instantiated body is
     // evaluated on the clock it names, else on the declaration's own, else
     // on the one flowing into the instance.
-    PushOperandClock(out, InstanceOperandClock(body, j, op, actuals, arena));
+    std::vector<EventExpr> clock =
+        InstanceOperandClock(body, j, op, actuals, arena);
+    std::vector<SeqMatchAssign> items =
+        SubstituteMatchItems(body.match_items[j], actuals, arena);
+    begins.push_back(out.operands.size());
+    if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
+      if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
+                          ctx, arena, out, depth + 1)) {
+        return false;
+      }
+      auto& last_items = out.match_items.back();
+      last_items.insert(last_items.end(), items.begin(), items.end());
+    } else {
+      out.operands.push_back(operand);
+      out.delays.push_back(delay);
+      out.match_items.push_back(std::move(items));
+      out.repetitions.push_back(body.repetitions[j]);
+      PushOperandClock(out, clock);
+    }
+    ends.push_back(out.operands.size() - 1);
   }
-  // §16.9.9: a throughout of the instantiated body spans the same operands
-  // where they now stand, its condition over the actuals.
+  // §16.9.9: a throughout of the instantiated body spans the operands its
+  // operands became, its condition over the actuals.
   for (SeqThroughout guard : body.throughouts) {
     guard.cond = SubstituteFormals(guard.cond, actuals, arena);
-    guard.first += first;
-    guard.last += first;
+    guard.first = begins[guard.first];
+    guard.last = ends[guard.last];
     out.throughouts.push_back(guard);
   }
   if (out.operands.size() == first) return true;

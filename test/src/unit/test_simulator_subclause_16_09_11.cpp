@@ -246,4 +246,38 @@ TEST(SequenceComposition, EmptyMatchDoesNotActivateTriggeredLive) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 32u);
 }
 
+// §16.9.11 with §16.8.1 (a): `triggered` applied to a formal of type sequence
+// is `triggered` on the sequence bound to it, an instance with arguments
+// among them. x rises at the tick of 15 and y and z hold at 25 and 35, so
+// e2(x, y, z) reaches its end point at 35, and e3's `a.triggered ##1 b`,
+// with w at 45, matches once, as `e2(x, y, z).triggered` written directly
+// does at 35.
+TEST(SequenceComposition, TriggeredAppliesToASequenceFormalsInstanceActual) {
+  SimFixture f;
+  auto* c = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] xv = 10'b0110000000, yv = 10'b0010000000,\n"
+      "            zv = 10'b0001000000, wv = 10'b0000100000;\n"
+      "  bit x, y, z, w;\n"
+      "  assign x = xv[0]; assign y = yv[0]; assign z = zv[0];\n"
+      "  assign w = wv[0];\n"
+      "  always @(negedge clk) begin\n"
+      "    xv <= xv << 1; yv <= yv << 1; zv <= zv << 1; wv <= wv << 1;\n"
+      "  end\n"
+      "  int c = 0, c2 = 0;\n"
+      "  sequence e2(a, b, cc); @(posedge clk) $rose(a) ##1 b ##1 cc;\n"
+      "  endsequence\n"
+      "  sequence e3(sequence a, untyped b);\n"
+      "    @(posedge clk) a.triggered ##1 b;\n"
+      "  endsequence\n"
+      "  cover property (e3(e2(x, y, z), w)) c++;\n"
+      "  cover property (@(posedge clk) e2(x, y, z).triggered) c2++;\n"
+      "endmodule\n",
+      f, "c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 1u);
+}
+
 }  // namespace
