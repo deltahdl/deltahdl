@@ -4,6 +4,8 @@ description: "Before labelling an issue 'needs decision', check whether the stan
 metadata:
   node_type: memory
   type: feedback
+  originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
+  modified: 2026-09-30T02:54:59.959Z
 ---
 
 # A question the rules answer is not a decision
@@ -28,5 +30,8 @@ for a sibling construct, and every clause that cites this one, often settle
 a reading the clause alone leaves open, as §16.3's grant for immediate
 assertions and §17.3's use of the §16.14 list settle that §16.14's list of
 places is the whole grant. Questions of order or priority
-between issues the loop selects are answered that way. Once the answer stands,
+between issues the loop selects are answered that way. A concern the
+standard does not raise, such as the hazard of loading a library a source
+file names under §34.5.28.2, does not make a shall optional: the shall is
+implemented and the concern, if worth keeping, is filed as its own issue. Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
