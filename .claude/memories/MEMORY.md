@@ -37,7 +37,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
 - [A shall outranks an example and a can](shall-outranks-examples-and-can.md) — §1.5 and §1.10 settle a clash inside the standard; only two equal requirements go to a person.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
-- [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
+- [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag, or whether suite or UVM library code was legal, in its own edition.
 - [No local paths in code or workflows](no-local-paths-in-code-or-workflows.md) — code, tests, scripts and workflows say `IEEE 1800-2023`; the path `~/IEEE 1800-2023.pdf` is written only under .claude/.
 - [A library is not a standard](a-library-is-not-a-standard.md) — a construct the UVM library or sv-tests writes against 1800-2023 is reported, checked in 1800-2023, 1800-2017 and 1800.2-2020, never held for a person.
 - [The LRM's text is copyrighted](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
