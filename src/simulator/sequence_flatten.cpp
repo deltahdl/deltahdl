@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -424,6 +425,42 @@ const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
 bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth);
 
+// One operand of a body with the actuals in the formals' places: the
+// operand, the delay before it, its match items and its repetition.
+struct SubstitutedOperand {
+  Expr* operand;
+  SeqCycleDelay delay;
+  std::vector<SeqMatchAssign> items;
+  SeqRepetition repetition;
+  std::vector<EventExpr> clock;
+};
+
+// The substituted operand appended to `out` as it stands.
+void AppendOperand(SubstitutedOperand sub, LinearSequence& out) {
+  out.operands.push_back(sub.operand);
+  out.delays.push_back(sub.delay);
+  out.match_items.push_back(std::move(sub.items));
+  out.repetitions.push_back(sub.repetition);
+  PushOperandClock(out, sub.clock);
+}
+
+// The sequence standing as `operand`, flattened, kept under it in `out`.
+void AddNested(LinearSequence& out, const Expr* operand,
+               LinearSequence nested) {
+  out.nested.emplace_back(
+      operand, std::make_shared<const LinearSequence>(std::move(nested)));
+}
+
+// §16.8 and §16.13.3: an instantiated body's own clock, its formals replaced
+// by the actuals, is the clock of an outer sequence that has none.
+void AdoptInstanceClock(const LinearSequence& body,
+                        const ActualsByFormal& actuals, Arena& arena,
+                        LinearSequence& out) {
+  if (out.clock.empty() && !body.clock.empty()) {
+    out.clock = SubstituteClock(body.clock, actuals, arena);
+  }
+}
+
 // One instance being expanded: the instance, the flattened body of the
 // sequence it instantiates, its actuals bound to that sequence's formals, and
 // what the expansion runs in, the depth of the instance among them.
@@ -457,6 +494,16 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
       InstanceOperandClock(body, j, op, actuals, arena);
   std::vector<SeqMatchAssign> items =
       SubstituteMatchItems(body.match_items[j], actuals, arena);
+  // A nested sequence of the body stays under its operand, the actuals
+  // substituted in it in turn.
+  if (const LinearSequence* nested = NestedOperand(body, j)) {
+    AddNested(out, body.operands[j],
+              SubstituteLinearSequence(*nested, actuals, ctx, arena));
+    AppendOperand(
+        {body.operands[j], delay, std::move(items), body.repetitions[j], clock},
+        out);
+    return true;
+  }
   if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
     if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
                         ctx, arena, out, x.depth + 1)) {
@@ -466,12 +513,25 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
     last_items.insert(last_items.end(), items.begin(), items.end());
     return true;
   }
-  out.operands.push_back(operand);
-  out.delays.push_back(delay);
-  out.match_items.push_back(std::move(items));
-  out.repetitions.push_back(body.repetitions[j]);
-  PushOperandClock(out, clock);
+  AppendOperand({operand, delay, std::move(items), body.repetitions[j], clock},
+                out);
   return true;
+}
+
+// §16.8 and §16.9.5 to §16.9.7: the instantiated body, its actuals in the
+// formals' places, appended whole as one nested operand under the delay and
+// the clock written before the instance, the body's clock taken where the
+// outer sequence has none, and repeated by an exact count as an instance
+// spliced into the chain is.
+bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
+                         SimContext& ctx, Arena& arena, LinearSequence& out) {
+  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
+  AdoptInstanceClock(body, actuals, arena, out);
+  size_t first = out.operands.size();
+  Expr* operand = arena.Create<Expr>(*op.instance);
+  AddNested(out, operand, SubstituteLinearSequence(body, actuals, ctx, arena));
+  AppendOperand({operand, op.before, {}, {}, op.clock}, out);
+  return UnrollInstanceRepetition(out, first, op.repetition);
 }
 
 // Appends the instantiated body's flattened operands with the actuals
@@ -484,10 +544,10 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
   // A sequence with `intersect`, `and` or `or` operands of its own does not
-  // splice into one chain.
+  // splice into one chain, so it stands in it whole.
   if (!body.alternatives.empty() || !body.conjuncts.empty() ||
       !body.intersects.empty()) {
-    return false;
+    return AppendNestedOperand(op, body, ctx, arena, out);
   }
   ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
@@ -495,9 +555,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
   std::vector<LocalBinding> formals =
       RenameInstanceLocals(op.inner, body, actuals, renaming);
-  if (out.clock.empty() && !body.clock.empty()) {
-    out.clock = SubstituteClock(body.clock, actuals, arena);
-  }
+  AdoptInstanceClock(body, actuals, arena, out);
   size_t first = out.operands.size();
   // Where each operand of the body begins and ends among the flattened ones,
   // a formal of type sequence expanding to the operands of its actual.
@@ -638,7 +696,9 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
   for (size_t i = 0; i < body.operands.size(); ++i) {
     Expr* operand = body.operands[i];
     const SeqCycleDelay& before = body.delays[i];
-    const ModuleItem* inner = InstantiatedSequence(operand, ctx);
+    // A group the parser read into a sequence of its own is expanded as an
+    // instance of it is.
+    const ModuleItem* inner = SequenceActualOf(operand, ctx);
     begins.push_back(out.operands.size());
     if (inner == nullptr) {
       out.operands.push_back(operand);
@@ -683,6 +743,9 @@ void ForEachLinearSequenceExpr(const LinearSequence& body,
   for (const LinearSequence& inner : body.alternatives) {
     ForEachLinearSequenceExpr(inner, fn);
   }
+  for (const auto& entry : body.nested) {
+    ForEachLinearSequenceExpr(*entry.second, fn);
+  }
 }
 
 const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
@@ -715,6 +778,13 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   return Flatten(seq, ctx, arena, out, 0);
 }
 
+const LinearSequence* NestedOperand(const LinearSequence& body, size_t pos) {
+  for (const auto& [operand, nested] : body.nested) {
+    if (operand == body.operands[pos]) return nested.get();
+  }
+  return nullptr;
+}
+
 namespace {
 
 // §16.12.18: the declaration holding the sequence_expr an operand was
@@ -726,16 +796,6 @@ const ModuleItem* SequenceActual(const Expr* operand) {
   if (tree->kind != PropertyExprNode::Kind::kSequence) return nullptr;
   return tree->sequence;
 }
-
-// One operand of a body with the actuals in the formals' places: the
-// operand, the delay before it, its match items and its repetition.
-struct SubstitutedOperand {
-  Expr* operand;
-  SeqCycleDelay delay;
-  std::vector<SeqMatchAssign> items;
-  SeqRepetition repetition;
-  std::vector<EventExpr> clock;
-};
 
 SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
                                      const ActualsByFormal& actuals,
@@ -762,11 +822,7 @@ void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
       return;
     }
   }
-  out.operands.push_back(sub.operand);
-  out.delays.push_back(sub.delay);
-  out.match_items.push_back(std::move(sub.items));
-  out.repetitions.push_back(sub.repetition);
-  PushOperandClock(out, sub.clock);
+  AppendOperand(std::move(sub), out);
 }
 
 }  // namespace
@@ -792,14 +848,24 @@ LinearSequence SubstituteLinearSequence(const LinearSequence& body,
   out.operand_clocks.clear();
   out.operand_clock_index.clear();
   out.throughouts.clear();
+  out.nested.clear();
   // Where each of the body's operands begins and ends among the substituted
   // ones, a sequence actual among them expanding to several.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
   for (size_t j = 0; j < body.operands.size(); ++j) {
     begins.push_back(out.operands.size());
-    AppendSubstitutedOperand(SubstituteOperand(body, j, actuals, ctx, arena),
-                             ctx, arena, out);
+    SubstitutedOperand sub = SubstituteOperand(body, j, actuals, ctx, arena);
+    // A nested sequence stays under its operand, the actuals substituted in
+    // it in turn.
+    if (const LinearSequence* nested = NestedOperand(body, j)) {
+      sub.operand = body.operands[j];
+      AddNested(out, sub.operand,
+                SubstituteLinearSequence(*nested, actuals, ctx, arena));
+      AppendOperand(std::move(sub), out);
+    } else {
+      AppendSubstitutedOperand(std::move(sub), ctx, arena, out);
+    }
     ends.push_back(out.operands.size() - 1);
   }
   for (SeqThroughout guard : body.throughouts) {

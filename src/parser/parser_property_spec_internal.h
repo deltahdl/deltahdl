@@ -46,6 +46,7 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* TryParsePropertyGroup(Parser& p, bool& group);
   static Expr* ParseEventActual(Parser& p);
   static Expr* ParsePropertyActualArg(Parser& p, bool& plain);
+  static PropertyExprNode* ParseWholeSequenceActual(Parser& p);
   static Expr* ParseFormalDefault(Parser& p);
   static bool ParseNamedActualPrefix(Parser& p, Expr* call, bool& named);
   static bool ParsePropertyActualList(Parser& p, Expr* call, bool& plain);

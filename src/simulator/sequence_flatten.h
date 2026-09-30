@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "parser/ast_expr.h"
@@ -66,6 +68,14 @@ struct LinearSequence {
   // the matches of one attempt, over every `or` operand, only those ending
   // at the earliest tick count.
   bool first_match = false;
+  // §16.9.5 to §16.9.7 and §16.8: the sequences standing as one operand of
+  // the chain, an instance or a group whose body has `intersect`, `and` or
+  // `or` operands of its own and so does not splice into it, each flattened
+  // under the operand it stands for; the monitor begins an attempt of one
+  // where the chain reaches its operand rather than reading that as a
+  // Boolean, and the chain goes on from each of the attempt's matches.
+  std::vector<std::pair<const Expr*, std::shared_ptr<const LinearSequence>>>
+      nested;
 };
 
 // §16.8: the sequential behaviour of an instance of a named sequence is that
@@ -91,13 +101,17 @@ struct LinearSequence {
 // has none, or where instances nest past the depth a cyclic dependency, which
 // §16.8 makes an error, would reach.
 // Every expression a flattened sequence holds -- its operands, match items,
-// throughout conditions -- and those of its intersects, conjuncts and
-// alternatives, each handed to `fn` once.
+// throughout conditions -- and those of its intersects, conjuncts,
+// alternatives and nested sequences, each handed to `fn` once.
 void ForEachLinearSequenceExpr(const LinearSequence& body,
                                const std::function<void(const Expr*)>& fn);
 
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out);
+
+// The sequence standing as the operand at `pos`, flattened, or nullptr where
+// the operand is a Boolean.
+const LinearSequence* NestedOperand(const LinearSequence& body, size_t pos);
 
 // §16.13.1: the clock the operand at `pos` is evaluated on, empty for the
 // leading clock, and its number, 0 where the property has not numbered it.

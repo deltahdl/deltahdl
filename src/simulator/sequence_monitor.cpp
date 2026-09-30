@@ -20,31 +20,15 @@
 #include "simulator/scheduler.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_local_flow.h"
+#include "simulator/sequence_locals.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
-#include "simulator/stmt_exec.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
 namespace delta {
-
-uint32_t LocalWidth(TokenKind type_kw) {
-  switch (type_kw) {
-    case TokenKind::kKwByte:
-      return 8;
-    case TokenKind::kKwShortint:
-      return 16;
-    case TokenKind::kKwInt:
-    case TokenKind::kKwInteger:
-      return 32;
-    case TokenKind::kKwLongint:
-      return 64;
-    default:
-      return 1;
-  }
-}
 
 namespace {
 
@@ -72,6 +56,9 @@ struct LinearAttempt {
   // `triggered` hands its locals on from, an attempt going on per match; a
   // pick other than the first marks a copy made for its match.
   uint32_t flow_pick = 0;
+  // §16.9.5 to §16.9.7: where the operand at pos is a nested sequence, the
+  // attempt of it begun where this attempt arrived at the operand.
+  LinearSequenceAttempt* sub = nullptr;
 };
 
 // §16.13.1: whether the clock the operand at `pos` is evaluated on ticked at
@@ -81,63 +68,6 @@ bool OperandClockTicked(const LinearSequence& body, size_t pos,
   uint32_t ticked = ctx.AssertionSamples().ClockTicks();
   int clock = OperandClockIndex(body, pos);
   return clock >= 32 || ((ticked >> clock) & 1u) != 0;
-}
-
-// §16.10 and §6.8: the state of a local declared with a data type keyword,
-// and the value it holds before any assignment, x for a 4-state type and 0
-// for a 2-state one.
-bool LocalIs4State(TokenKind type_kw) {
-  return type_kw == TokenKind::kKwLogic || type_kw == TokenKind::kKwReg ||
-         type_kw == TokenKind::kKwInteger;
-}
-
-// §16.10: the initialization assignments are performed in the order the
-// locals are declared, one's expression reading the locals declared before
-// it as assigned, so each is stood up in a scope of its own as its value is
-// found; a local without an initialization is unassigned, x for a 4-state
-// type.
-std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
-                                     SimContext& ctx, Arena& arena) {
-  std::vector<Logic4Vec> values;
-  values.reserve(decls.size());
-  ctx.PushScope();
-  for (const SeqLocalDecl& decl : decls) {
-    Logic4Vec value = MakeLogic4Vec(arena, LocalWidth(decl.type_kw));
-    if (decl.init != nullptr) {
-      value = ResizeToWidth(OwnRhsWords(EvalExpr(decl.init, ctx, arena), arena),
-                            LocalWidth(decl.type_kw), arena);
-    } else if (LocalIs4State(decl.type_kw)) {
-      FillWithX(value);
-    }
-    Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
-    var->is_4state = LocalIs4State(decl.type_kw);
-    var->value = value;
-    values.push_back(value);
-  }
-  ctx.PopScope();
-  return values;
-}
-
-// §16.11: a subroutine call attached to a sequence is executed at each end
-// point, in the Reactive region like an action block, and does not hold the
-// evaluation up; an argument passed by value reads the sampled value the
-// match was evaluated with, so each argument is evaluated here, the attempt's
-// locals in scope, and its value stands in for the expression while the call
-// runs.
-void ScheduleMatchCall(const Expr* call, SimContext& ctx, Arena& arena) {
-  std::vector<std::pair<const Expr*, Logic4Vec>> snaps;
-  for (const Expr* arg : call->args) {
-    if (arg != nullptr) snaps.emplace_back(arg, EvalExpr(arg, ctx, arena));
-  }
-  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [call, snaps = std::move(snaps), &ctx, &arena]() {
-    for (const auto& snap : snaps) {
-      ctx.SetDeferredArgSnapshot(snap.first, snap.second);
-    }
-    if (!TryExecSystemCallTask(call, ctx, arena)) EvalExpr(call, ctx, arena);
-    for (const auto& snap : snaps) ctx.ClearDeferredArgSnapshot(snap.first);
-  };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive, ev);
 }
 
 // §16.10: the attempt's locals stood up as variables of a scope of their own
@@ -356,15 +286,42 @@ void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
   KeepRepeating(step, std::move(advanced));
 }
 
+// §16.9.5 to §16.9.7: one tick of the attempt of the nested sequence the
+// attempt stands at, `begin` at the tick it arrived at the operand, read with
+// the attempt's locals in scope: the chain goes on from each of its matches,
+// and the attempt waits in it while it can match further.
+void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
+  const LinearSequence& nested = *NestedOperand(step.body, holder.pos);
+  SequenceStep result = SequenceStep::kFailed;
+  {
+    AttemptLocalsScope scope(step.body.locals, holder, step.ctx);
+    result =
+        StepSequenceAttempt(nested, *holder.sub, begin, step.ctx, step.arena);
+  }
+  if (result == SequenceStep::kMatched ||
+      result == SequenceStep::kMatchedLast) {
+    LinearAttempt ended = holder;
+    ended.sub = nullptr;
+    EndOperand(step, ended);
+  }
+  if (result == SequenceStep::kPending || result == SequenceStep::kMatched) {
+    step.carry.push_back(std::move(holder));
+  }
+}
+
 // An attempt arriving at its operand within the delay range reads it: a
-// plain operand ends where it holds, a repeated one begins its repetition,
-// and an empty consecutive repetition also lets the attempt pass on, as
-// §16.9.2.1 has `empty ##n seq` be `##(n-1) seq`.
+// plain operand ends where it holds, a nested sequence begins an attempt of
+// its own, a repeated one begins its repetition, and an empty consecutive
+// repetition also lets the attempt pass on, as §16.9.2.1 has `empty ##n seq`
+// be `##(n-1) seq`.
 void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
                      const SeqRepetition& rep) {
   if (rep.kind == SeqRepetition::Kind::kNone) {
     LinearAttempt advanced = attempt;
-    if (EvalOperand(step.body, advanced, step.ctx, step.arena)) {
+    if (const LinearSequence* nested = NestedOperand(step.body, attempt.pos)) {
+      advanced.sub = NewSequenceAttempt(*nested, step.arena);
+      StepNested(step, std::move(advanced), true);
+    } else if (EvalOperand(step.body, advanced, step.ctx, step.arena)) {
       EndOperand(step, advanced);
     }
     return;
@@ -449,6 +406,10 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   const SeqCycleDelay& delay = step.body.delays[attempt.pos];
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
   if (!ThroughoutHolds(step, attempt)) return;
+  if (attempt.sub != nullptr) {
+    StepNested(step, std::move(attempt), false);
+    return;
+  }
   if (EndsAsTrailingEmpty(step, attempt)) MatchAt(step, attempt);
   if (attempt.repeating) {
     if (rep.kind == SeqRepetition::Kind::kConsecutive) {

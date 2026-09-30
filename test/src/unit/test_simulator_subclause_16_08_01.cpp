@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_sequence_ticks.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -152,6 +153,35 @@ TEST(TypedSequenceFormals, ASequenceFormalStandsForTheSequenceBoundToIt) {
   ASSERT_NE(cseq, nullptr);
   EXPECT_EQ(cseq->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("cseq2")->value.ToUint64(), 3u);
+}
+
+// §16.8.1 (a): a sequence formal stands for its actual wherever the body
+// references it, so an actual built with `or` or `and`, referenced as one
+// operand of the chain `te1 ##1 q ##1 te5`, is one sequence there. From tick
+// 2, te4 ends at 3 and te2 ##1 te3 at 4, so with `or` te5 is read at 4 and 5
+// and the sequence ends at both, the ticks at 35 and 45, and with `and` the
+// whole ends at 4 and te5 is read at 5 alone.
+TEST(TypedSequenceFormals, AnActualBuiltWithOrOrAndIsOneSequence) {
+  const std::string kFramed =
+      "  sequence framed(sequence q);\n"
+      "    te1 ##1 q ##1 te5;\n"
+      "  endsequence\n";
+  SimFixture f;
+  auto* either = RunAndFindVar(
+      SequenceTickSource("framed(te2 ##1 te3 or te4)",
+                         DriveTicks({{2}, {3}, {4}, {3}, {4, 5}}), kFramed),
+      f, "hits");
+  ASSERT_NE(either, nullptr);
+  EXPECT_EQ(either->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+  SimFixture g;
+  auto* both = RunAndFindVar(
+      SequenceTickSource("framed(te2 ##1 te3 and te4)",
+                         DriveTicks({{2}, {3}, {4}, {3}, {4, 5}}), kFramed),
+      g, "hits");
+  ASSERT_NE(both, nullptr);
+  EXPECT_EQ(both->value.ToUint64(), 1u);
+  EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
 }  // namespace

@@ -188,12 +188,11 @@ const ModuleItem* NamedSequence(const ParseResult& r, std::string_view name) {
 }
 
 // §16.16 (f) and §16.7: a sequence declared with a leading clocking event
-// over a body of a shape the linear capture does not hold, a parenthesised
-// `and` of two concatenations followed by `##0`, keeps that event as its
-// own, which an assertion instantiating it resolves to; only the linear
-// operands are left empty.
-TEST(ClockResolutionParse,
-     ASequenceKeepsItsLeadingClockWhereItsBodyIsNotLinear) {
+// over a parenthesised `and` of two concatenations followed by `##0` keeps
+// that event as its own, which an assertion instantiating it resolves to;
+// the group, which does not splice into the chain, is one operand of it, a
+// placeholder carrying the group's own sequence (§16.9.5), and `e` the other.
+TEST(ClockResolutionParse, ASequenceKeepsItsLeadingClockOverANestedGroup) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d, e, clk;\n"
@@ -209,7 +208,12 @@ TEST(ClockResolutionParse,
   EXPECT_EQ(s->seq_clock[0].edge, Edge::kPosedge);
   ASSERT_NE(s->seq_clock[0].signal, nullptr);
   EXPECT_EQ(s->seq_clock[0].signal->text, "clk");
-  EXPECT_TRUE(s->seq_linear.operands.empty());
+  ASSERT_EQ(s->seq_linear.operands.size(), 2u);
+  const PropertyExprNode* group = s->seq_linear.operands[0]->property_actual;
+  ASSERT_NE(group, nullptr);
+  EXPECT_EQ(group->kind, PropertyExprNode::Kind::kSequence);
+  ASSERT_NE(group->sequence, nullptr);
+  EXPECT_EQ(group->sequence->seq_linear.conjuncts.size(), 1u);
 }
 
 // §16.16 (f): the same body declared with no clocking event has none of its
@@ -228,7 +232,7 @@ TEST(ClockResolutionParse, ASequenceWithoutALeadingClockRecordsNone) {
   const ModuleItem* s = NamedSequence(r, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_TRUE(s->seq_clock.empty());
-  EXPECT_TRUE(s->seq_linear.operands.empty());
+  EXPECT_EQ(s->seq_linear.operands.size(), 2u);
 }
 
 // §16.16 (f) with §9.4 Syntax 9-4: a clocking_event written without

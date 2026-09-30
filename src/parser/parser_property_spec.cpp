@@ -273,7 +273,8 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   if (ends) return expr;
   p.lexer_.RestorePos(saved);
   plain = false;
-  PropertyExprNode* tree = ParsePropertyImplication(p);
+  PropertyExprNode* tree = ParseWholeSequenceActual(p);
+  if (tree == nullptr) tree = ParsePropertyImplication(p);
   if (tree == nullptr ||
       (!p.Check(TokenKind::kComma) && !p.Check(TokenKind::kRParen))) {
     return nullptr;
@@ -282,6 +283,29 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   holder->text = "<property_actual>";
   holder->property_actual = tree;
   return holder;
+}
+
+// §16.8.1 (a): an actual that reads whole as a sequence_expr, ending at the
+// `,` or `)` after it, is one sequence, its `and` and `or` those of §16.9.5
+// and §16.9.7 rather than a property's, which §16.12.2 makes the same where
+// the formal is of type property; null, the position put back, for any
+// other actual. An actual opening with its clocking event is left to the
+// property's reading, which keeps that event as the actual's own clock
+// (§16.13.6).
+PropertyExprNode* ParserPropertySpecHelpers::ParseWholeSequenceActual(
+    Parser& p) {
+  if (p.Check(TokenKind::kAt)) return nullptr;
+  auto saved = p.lexer_.SavePos();
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
+  p.diag_.PushSuppress();
+  node->sequence = TryParseSequenceSpec(p, node->strong, false);
+  p.diag_.PopSuppress();
+  if (node->sequence != nullptr &&
+      (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen))) {
+    return node;
+  }
+  p.lexer_.RestorePos(saved);
+  return nullptr;
 }
 
 // §16.8 and §16.12: a formal's default actual argument, read as an actual

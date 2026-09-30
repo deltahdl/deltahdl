@@ -175,4 +175,104 @@ TEST(SequenceIntersect, BindsTighterThanAnd) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 115u);
 }
 
+// §16.9.6 and §16.7: an intersection written as a group is one operand of
+// the chain around it, begun where the delay before it is up and the chain
+// going on from its match. From tick 2 the group begins at 3, where
+// te2[*1:2] ends at 3 or 4 and te3 ##1 te4 at 4, so the pair of length two
+// ends at 4 and te5 is read at 5, the tick at 45; from tick 7 te2[*1:2] ends
+// at 8 alone and te3 ##1 te4 at 9, lengths that differ, so the te5 at 10
+// that an `and` would reach is never read.
+TEST(SequenceIntersect, AGroupIsOneOperandOfTheChainAroundIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource(
+          "te1 ##1 (te2[*1:2] intersect te3 ##1 te4) ##1 te5",
+          DriveTicks({{2, 7}, {3, 4, 8}, {3, 8}, {4, 9}, {5, 10}})),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// §16.8: an instance of a named sequence whose body is an intersection
+// behaves as that body does, so as one operand of a chain it matches as the
+// group of the case above does.
+TEST(SequenceIntersect, AnInstanceIsOneOperandOfTheChainAroundIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource(
+          "te1 ##1 both ##1 te5",
+          DriveTicks({{2, 7}, {3, 4, 8}, {3, 8}, {4, 9}, {5, 10}}),
+          "  sequence both;\n"
+          "    te2[*1:2] intersect te3 ##1 te4;\n"
+          "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// §16.9.6 and §16.12.7: a grouped intersection is a consequent and part of
+// an antecedent. s is high at ticks 1 and 5, e at 1 to 3, 5 and 6, and g at
+// 3 and 7. From 1, e[*3] and ##2 g both end at 3; from 5, e is low at 7. So
+// the consequent holds from 1 and fails from 5, and the antecedent matches
+// from 1 alone, ending at 3, with e low at 4; every other attempt of either
+// is vacuous.
+TEST(SequenceIntersect, AGroupIsAnImplicationsConsequentOrAntecedent) {
+  SimFixture f;
+  auto* p1 = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] sv = 10'b0100010000, ev = 10'b0111011000,\n"
+      "            gv = 10'b0001000100;\n"
+      "  bit s, e, g;\n"
+      "  assign s = sv[0]; assign e = ev[0]; assign g = gv[0];\n"
+      "  always @(negedge clk) begin\n"
+      "    sv <= sv << 1; ev <= ev << 1; gv <= gv << 1;\n"
+      "  end\n"
+      "  int p1 = 0, f1 = 0, p2 = 0, f2 = 0;\n"
+      "  assert property (@(posedge clk) s |-> (e[*3] intersect ##2 g))\n"
+      "    p1++; else f1++;\n"
+      "  assert property (@(posedge clk)\n"
+      "    (s ##0 (e[*3] intersect ##2 g)) |=> e) p2++; else f2++;\n"
+      "endmodule\n",
+      f, "p1");
+  ASSERT_NE(p1, nullptr);
+  EXPECT_EQ(p1->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("f1")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("p2")->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("f2")->value.ToUint64(), 1u);
+}
+
+// §16.12.1 and §16.9.6: the actual of a property's formal stands for the
+// formal inside a grouped intersection too. With `e` bound to x, the
+// property is the implication of the case above, holding from 1 and failing
+// from 5, where a formal left unbound inside the group would fail from 1 as
+// well.
+TEST(SequenceIntersect, AFormalInsideAGroupTakesItsActual) {
+  SimFixture f;
+  auto* p = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] sv = 10'b0100010000, ev = 10'b0111011000,\n"
+      "            gv = 10'b0001000100;\n"
+      "  bit s, e, g;\n"
+      "  assign s = sv[0]; assign e = ev[0]; assign g = gv[0];\n"
+      "  always @(negedge clk) begin\n"
+      "    sv <= sv << 1; ev <= ev << 1; gv <= gv << 1;\n"
+      "  end\n"
+      "  int p = 0, f = 0;\n"
+      "  property framed(x);\n"
+      "    @(posedge clk) s |-> (x[*3] intersect ##2 g);\n"
+      "  endproperty\n"
+      "  assert property (framed(e)) p++; else f++;\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), 1u);
+}
+
 }  // namespace

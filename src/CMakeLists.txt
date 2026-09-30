@@ -267,6 +267,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_static_method.cpp
     simulator/sequence_flatten.cpp
     simulator/sequence_local_flow.cpp
+    simulator/sequence_locals.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
     simulator/eval_systask_cast.cpp

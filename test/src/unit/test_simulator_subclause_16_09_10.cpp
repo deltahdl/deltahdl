@@ -154,4 +154,19 @@ TEST(SequenceWithin, ClauseExampleMatchesFromTickThreeToEleven) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 105u);
 }
 
+// §16.9.10 and §16.7: a within written as a group is one operand of the
+// chain around it. From tick 2 the group begins at 3, te2 ##2 te3 spanning
+// 3 to 5 with te4 high at 4 inside it, so the sequence ends at 5, the tick
+// at 45; from tick 8 the span is 9 to 11 and te4 is high at 13 alone.
+TEST(SequenceWithin, AGroupIsOneOperandOfTheChainAroundIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource("te1 ##1 (te4 within te2 ##2 te3)",
+                         DriveTicks({{2, 8}, {3, 9}, {5, 11}, {4, 13}, {}})),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
 }  // namespace

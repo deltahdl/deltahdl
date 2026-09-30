@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/instance_bindings.h"
@@ -42,9 +41,6 @@ enum class SequenceStep : uint8_t { kPending, kMatched, kMatchedLast, kFailed };
 LinearSequenceAttempt* NewSequenceAttempt(const LinearSequence& body,
                                           Arena& arena);
 
-// §16.10 and §6.8: the width of a local declared with a data type keyword,
-// 1 for a bit type.
-uint32_t LocalWidth(TokenKind type_kw);
 SequenceStep StepSequenceAttempt(const LinearSequence& body,
                                  LinearSequenceAttempt& attempt, bool begin,
                                  SimContext& ctx, Arena& arena);

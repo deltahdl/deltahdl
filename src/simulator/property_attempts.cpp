@@ -25,6 +25,7 @@
 #include "simulator/property_clocks.h"
 #include "simulator/property_instance_clocks.h"
 #include "simulator/sequence_flatten.h"
+#include "simulator/sequence_locals.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"

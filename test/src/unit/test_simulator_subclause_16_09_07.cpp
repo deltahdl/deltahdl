@@ -148,4 +148,54 @@ TEST(SequenceOr, OneOperandMatchingAloneIsAMatch) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 115u);
 }
 
+// §16.9.7 and §16.7: an or written as a group is one operand of the chain
+// around it, the chain going on from each operand's match. From tick 2 the
+// group begins at 3, where te4 ends at 3 and te2 ##1 te3 at 4, so te5 is
+// read at 4 and at 5, and the sequence ends at both, the ticks at 35 and 45.
+TEST(SequenceOr, AGroupIsOneOperandOfTheChainAroundIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource("te1 ##1 (te2 ##1 te3 or te4) ##1 te5",
+                         DriveTicks({{2}, {3}, {4}, {3}, {4, 5}})),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// §16.8: an instance of a named sequence whose body is an or, as one operand
+// of a chain, matches as the group of the case above does.
+TEST(SequenceOr, AnInstanceIsOneOperandOfTheChainAroundIt) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(SequenceTickSource("te1 ##1 alt ##1 te5",
+                                       DriveTicks({{2}, {3}, {4}, {3}, {4, 5}}),
+                                       "  sequence alt;\n"
+                                       "    te2 ##1 te3 or te4;\n"
+                                       "  endsequence\n"),
+                    f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// §16.8 and §16.9.7: an instance's actual stands for its formal inside a
+// grouped or of the body too. With te4 bound to x and high at 3, the group
+// begun at 3 ends there through x and at 4 through te2 ##1 te3, so te5 is
+// read at 4 and at 5, the ticks at 35 and 45; a formal left unbound would
+// end the group at 4 alone.
+TEST(SequenceOr, AFormalInsideAGroupTakesItsActual) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(SequenceTickSource(
+                        "framed(te4)", DriveTicks({{2}, {3}, {4}, {3}, {4, 5}}),
+                        "  sequence framed(x);\n"
+                        "    te1 ##1 (te2 ##1 te3 or x) ##1 te5;\n"
+                        "  endsequence\n"),
+                    f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
 }  // namespace

@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -163,29 +164,46 @@ struct ParserSeqLinearHelpers {
     return repetition;
   }
 
-  // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`,
-  // a `throughout` or a repetition at its own depth: a sub-sequence, §16.10's
-  // `( sequence_expr , sequence_match_item ... )`, §16.9.9's condition over
-  // one or a repeated operand in parentheses, none of which ParseExpr can
-  // read. The lexer is rewound.
-  static bool AheadIsSequenceGroup(Parser& p) {
+  // Whether the token is §16.9's `and`, `or`, `intersect` or `within`, an
+  // operator joining two sequences that no expression has.
+  static bool AtSequenceOperator(Parser& p) {
+    return p.Check(TokenKind::kKwAnd) || p.Check(TokenKind::kKwOr) ||
+           p.Check(TokenKind::kKwIntersect) || p.Check(TokenKind::kKwWithin);
+  }
+
+  // Whether the token is a `##`, a `,`, a `throughout`, a repetition or a
+  // sequence operator, which only a sequence holds.
+  static bool AtSequenceToken(Parser& p) {
+    return p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma) ||
+           p.Check(TokenKind::kKwThroughout) || AtRepetitionBracket(p) ||
+           AtSequenceOperator(p);
+  }
+
+  // Whether the tokens ahead are a parenthesised group holding, at its own
+  // depth, a token `at` answers true for. The lexer is rewound.
+  static bool AheadGroupHolds(Parser& p, bool (*at)(Parser&)) {
     if (!p.Check(TokenKind::kLParen)) return false;
     auto saved = p.lexer_.SavePos();
     p.Consume();
     int depth = 1;
-    bool is_group = false;
+    bool holds = false;
     while (depth > 0 && !p.AtEnd()) {
       if (p.Check(TokenKind::kLParen)) ++depth;
       if (p.Check(TokenKind::kRParen)) --depth;
-      if (depth == 1 &&
-          (p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma) ||
-           p.Check(TokenKind::kKwThroughout) || AtRepetitionBracket(p))) {
-        is_group = true;
-      }
+      if (depth == 1 && at(p)) holds = true;
       p.Consume();
     }
     p.lexer_.RestorePos(saved);
-    return is_group;
+    return holds;
+  }
+
+  // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`,
+  // a `throughout`, a repetition or a sequence operator at its own depth: a
+  // sub-sequence, §16.10's `( sequence_expr , sequence_match_item ... )`,
+  // §16.9.9's condition over one or a repeated operand in parentheses, none
+  // of which ParseExpr can read. The lexer is rewound.
+  static bool AheadIsSequenceGroup(Parser& p) {
+    return AheadGroupHolds(p, AtSequenceToken);
   }
 
   // §16.8: a sequence instance's argument list, `sequence_list_of_arguments`,
@@ -422,6 +440,45 @@ struct ParserSeqLinearHelpers {
     }
   }
 
+  // One operand of a chain, the delay owed before it, its repetition and the
+  // clock it is evaluated on, appended to `body` with no match items of its
+  // own.
+  static void AppendOperand(SeqLinearBody& body, Expr* op, SeqCycleDelay before,
+                            const SeqRepetition& rep,
+                            const std::vector<EventExpr>& clock) {
+    body.operands.push_back(op);
+    body.delays.push_back(before);
+    body.match_items.emplace_back();
+    body.repetitions.push_back(rep);
+    PushOperandClock(body, clock);
+  }
+
+  // §16.9.5 to §16.9.7 and §16.9.10: a group holding `and`, `or`,
+  // `intersect` or `within` at its own depth does not splice into the chain
+  // around it, so its sequence_expr is read into a sequence of its own, which
+  // stands as one operand of the chain through a placeholder carrying it, as
+  // a sequence bound to a formal of type sequence does (§16.8.1).
+  static bool ParseNestedGroup(Parser& p, SeqLinearBody& body,
+                               SeqCycleDelay before,
+                               const std::vector<EventExpr>& clock) {
+    SourceLoc loc = p.CurrentLoc();
+    p.Consume();
+    auto* inner = p.arena_.Create<ModuleItem>();
+    inner->kind = ModuleItemKind::kSequenceDecl;
+    inner->loc = loc;
+    auto* tree = p.arena_.Create<PropertyExprNode>();
+    tree->kind = PropertyExprNode::Kind::kSequence;
+    tree->sequence = inner;
+    Expr* holder =
+        ParserPropertySpecHelpers::PropertySpecPlaceholder(p.arena_, loc);
+    holder->property_actual = tree;
+    SeqRepetition rep;
+    bool ok = ParseLinearSeqOperands(p, inner) && p.Match(TokenKind::kRParen) &&
+              ParseSequenceRepetition(p, rep);
+    AppendOperand(body, holder, before, rep, clock);
+    return ok;
+  }
+
   // A parenthesised group, `( sequence_expr [, match_items] )`: its operands
   // are read into `body` as the outer operands are, the delay before the group
   // adding to the group's leading delay, and its match items are attached to
@@ -429,6 +486,9 @@ struct ParserSeqLinearHelpers {
   static bool ParseSequenceGroup(Parser& p, SeqLinearBody& body,
                                  SeqCycleDelay before,
                                  const std::vector<EventExpr>& clock) {
+    if (AheadGroupHolds(p, AtSequenceOperator)) {
+      return ParseNestedGroup(p, body, before, clock);
+    }
     p.Expect(TokenKind::kLParen, Subclause("16.10"));
     size_t first = body.operands.size();
     if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
@@ -541,11 +601,7 @@ struct ParserSeqLinearHelpers {
     }
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;
-    body.operands.push_back(op);
-    body.delays.push_back(before);
-    body.match_items.emplace_back();
-    body.repetitions.push_back(rep);
-    PushOperandClock(body, clock);
+    AppendOperand(body, op, before, rep, clock);
     return true;
   }
 
