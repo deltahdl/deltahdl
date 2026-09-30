@@ -273,7 +273,9 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
     stmt->assert_property = arena.Create<PropertyExprNode>();
     stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
     stmt->assert_property->sequence = SequenceInstanceBody(instance, arena);
-    if (stmt->assert_clock.empty()) stmt->assert_clock = seq->seq_clock;
+    if (stmt->assert_clock.empty()) {
+      stmt->assert_clock = SequenceInstanceClock(seq, instance, arena);
+    }
     return;
   }
   const ModuleItem* decl =

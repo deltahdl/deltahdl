@@ -295,7 +295,7 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->sensitivity = decl->seq_clock;
+  item->sensitivity = SequenceInstanceClock(decl, item->assert_expr, arena);
   item->body = stmt;
   return true;
 }

@@ -53,6 +53,17 @@ EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
   return ev;
 }
 
+std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
+                                             const Expr* instance,
+                                             Arena& arena) {
+  ActualsByFormal actuals = BindActuals(seq->prop_formals, instance);
+  std::vector<EventExpr> clock;
+  for (const EventExpr& ev : seq->seq_clock) {
+    clock.push_back(SubstituteClockEvent(ev, actuals, arena));
+  }
+  return clock;
+}
+
 // The declaration `operand` instantiates where it names one of `kind`, an
 // identifier or a call naming a sequence or a property.
 const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,

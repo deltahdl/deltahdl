@@ -29,6 +29,13 @@ bool InstanceHasTreeActual(const Expr* instance);
 EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
                                Arena& arena);
 
+// §16.16 (f) with §16.8.1: the clock the named sequence `seq` is declared
+// with, as its instance `instance` has it, each formal the clock names
+// replaced by the instance's actual.
+std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
+                                             const Expr* instance,
+                                             Arena& arena);
+
 // The declaration `operand` instantiates where it names one of `kind`, an
 // identifier or a call naming a sequence or a property; nullptr otherwise.
 const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,
