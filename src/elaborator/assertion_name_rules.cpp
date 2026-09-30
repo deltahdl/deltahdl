@@ -1,7 +1,6 @@
 #include "elaborator/assertion_name_rules.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <format>
 #include <functional>
 #include <string_view>
@@ -109,6 +108,24 @@ void ReportRead(const ModuleItem* item, const AssertionRead& read,
              Subclause("23.9"));
 }
 
+// The sequence or property `arg` is passed to by `item`, when the formal it
+// binds is written in a cycle delay or a repetition bound and the actual is a
+// variable rather than one of `item`'s own formals; null otherwise.
+const ModuleItem* CalleeTakingAVariableAsAConstant(
+    const ModuleItem* item, const AssertionInstanceArg& arg,
+    const DeclsByName& decls,
+    const std::function<bool(std::string_view)>& is_variable) {
+  auto it = decls.find(arg.callee);
+  if (it == decls.end()) return nullptr;
+  const ModuleItem* callee = it->second;
+  if (arg.index >= callee->prop_formals.size()) return nullptr;
+  if (!Holds(callee->assertion_const_names, callee->prop_formals[arg.index]) ||
+      Holds(item->prop_formals, arg.name) || !is_variable(arg.name)) {
+    return nullptr;
+  }
+  return callee;
+}
+
 }  // namespace
 
 void ReportAssertionUnresolved(
@@ -141,15 +158,10 @@ void ReportNonConstantBoundActuals(
   for (const ModuleItem* item : decl->items) {
     if (!IsAssertionTextItem(item->kind)) continue;
     for (const AssertionInstanceArg& arg : item->assertion_instance_args) {
-      auto it = decls.find(arg.callee);
-      if (it == decls.end()) continue;
-      const ModuleItem* callee = it->second;
-      if (arg.index >= callee->prop_formals.size()) continue;
+      const ModuleItem* callee =
+          CalleeTakingAVariableAsAConstant(item, arg, decls, is_variable);
+      if (callee == nullptr) continue;
       std::string_view formal = callee->prop_formals[arg.index];
-      if (!Holds(callee->assertion_const_names, formal) ||
-          Holds(item->prop_formals, arg.name) || !is_variable(arg.name)) {
-        continue;
-      }
       diag.Error(arg.loc,
                  std::format(
                      "the actual argument '{}' bound to the formal '{}' of "

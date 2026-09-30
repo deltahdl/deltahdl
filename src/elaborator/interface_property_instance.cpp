@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/property_rewrite.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"

@@ -54,7 +54,7 @@ TEST(CheckerProcedures, CheckerWithPortsElaborates) {
 TEST(CheckerProcedures, CheckerWithAssertionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "checker chk;\n"
+      "checker chk(input logic clk, input logic a, input logic b);\n"
       "  assert property (@(posedge clk) a |-> b);\n"
       "endchecker\n",
       f, "chk");

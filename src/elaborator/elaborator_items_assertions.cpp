@@ -668,10 +668,8 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   if (item->body != nullptr) {
     ReportDisableIffOperand(item->body->assert_property, property_registry_,
                             item->loc, nullptr, diag_);
-  }
-  // §16.12.22: the sequences the property_spec uses as properties and as
-  // antecedents, a sequential property standing as the whole spec included.
-  if (item->body != nullptr) {
+    // §16.12.22: the sequences the property_spec uses as properties and as
+    // antecedents, a sequential property standing as the whole spec included.
     ValidateSequenceDegeneracy(item->body->assert_property, item->loc,
                                property_registry_, diag_);
     ValidateSequenceUsedAsProperty(item->body->assert_sequence, item->loc,
