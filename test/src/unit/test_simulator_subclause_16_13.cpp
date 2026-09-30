@@ -176,4 +176,31 @@ TEST(MulticlockSequences, AnotherClockTickingFirstBeginsNoAttempt) {
   EXPECT_EQ(hits->value.ToUint64(), 10u);
 }
 
+// §16.13.1 with §23.6: a clock of a multiclocked sequence whose signal is
+// named by a path, `@(negedge i0.clk)` through an interface instance bound to
+// clk, ticks as the clock written over clk does, so the two covers match
+// equally often.
+TEST(MulticlockSequences, AClockNamedByAPathTicksAsItsSignalDoes) {
+  SimFixture f;
+  auto* path = RunAndFindVar(
+      "interface ifc(input logic clk);\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111;\n"
+      "  bit [0:19] bv = 20'b01101001011101000110;\n"
+      "  always @(posedge clk) av <= av << 1;\n"
+      "  always @(clk) bv <= bv << 1;\n"
+      "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  ifc i0(clk);\n"
+      "  int c1 = 0, c2 = 0;\n"
+      "  cover property (@(posedge clk) a ##1 @(negedge i0.clk) b) c1++;\n"
+      "  cover property (@(posedge clk) a ##1 @(negedge clk) b) c2++;\n"
+      "endmodule\n",
+      f, "c1");
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 4u);
+}
+
 }  // namespace

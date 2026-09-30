@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -45,12 +46,12 @@ bool EdgeHappened(Edge edge, bool was, bool now) {
   return false;
 }
 
-// The variable the event's signal names, where it names one.
+// The variable the event's signal names, where it names one: a plain name, or,
+// §23.6, a path such as `i0.clk`, resolved as the event control an assertion's
+// process waits on resolves it.
 Variable* SignalOf(const EventExpr& ev, SimContext& ctx) {
-  if (ev.signal == nullptr || ev.signal->kind != ExprKind::kIdentifier) {
-    return nullptr;
-  }
-  return ctx.FindVariable(ev.signal->text);
+  if (ev.signal == nullptr) return nullptr;
+  return ResolveSignalToVariable(ev.signal, ctx);
 }
 
 // One event watched: the number of its clock, and its slot among the
