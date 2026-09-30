@@ -9,11 +9,11 @@ concurrency:
 # the next shard, and a target registered anywhere but last in
 # test/CMakeLists.txt, which 7 of the 200 commits before this one did, sent
 # most of every slice to a shard whose ccache or ctcache had never held it.
-# The price is evenness: of the 3,237 unit-test targets, eighteen shards get
-# 156 to 196 by hash where position gave 179 or 180. The hash is a polynomial
-# over the printable ASCII a target name or path is made of, kept below 2^53 so
-# every awk computes it exactly, and s is added to 0 so a shard spelled '07'
-# compares as the number 7.
+# The price is evenness: of the 3,269 unit-test targets, seventeen shards get
+# 177 to 210 by hash where position would give 192 or 193. The hash is a
+# polynomial over the printable ASCII a target name or path is made of, kept
+# below 2^53 so every awk computes it exactly, and s is added to 0 so a shard
+# spelled '07' compares as the number 7.
 env:
   SHARD_SLICE: >-
     BEGIN { for (c = 32; c < 127; c++) ord[sprintf("%c", c)] = c }
@@ -3055,7 +3055,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17']
+                '10', '11', '12', '13', '14', '15', '16']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
