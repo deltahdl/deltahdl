@@ -494,6 +494,7 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
 void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
   sequence_names_.insert(item->name);
   mod->sequence_decls.push_back(item);
+  item->seq_triggered_unread = !unit_->triggered_names.contains(item->name);
   // §16.8: a cyclic dependency among named sequences is an error. All sequence
   // decls are registered before elaboration (see ElaborateModule), so this DFS
   // sees the full graph regardless of declaration order.

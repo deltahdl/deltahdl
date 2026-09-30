@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -134,6 +135,9 @@ struct CompilationUnit {
   std::vector<IncludeStmt*> lib_includes;
   std::vector<BindDirective*> bind_directives;
   std::vector<ModuleItem*> cu_items;
+  // §16.13.6: the names `triggered` or `matched` is applied to anywhere in the
+  // unit, a named sequence's among them, by the last name of the path.
+  std::unordered_set<std::string_view> triggered_names;
   std::vector<ExternalConstraintBlock> external_constraints;
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;

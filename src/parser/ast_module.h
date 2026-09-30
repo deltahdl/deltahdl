@@ -737,6 +737,9 @@ struct ModuleItem {
   // is unaffected. Both empty for any other sequence shape.
   std::vector<EventExpr> seq_clock;
   SeqLinearBody seq_linear;
+  // §16.11 with §16.13.6: set on a named sequence whose `triggered` and
+  // `matched` nothing reads, whose monitor then runs no attached call.
+  bool seq_triggered_unread = false;
 
   // §16.16(b1): true when this property or sequence declaration's body begins
   // with an explicit leading clocking event (a `@(...)`). Recorded so a

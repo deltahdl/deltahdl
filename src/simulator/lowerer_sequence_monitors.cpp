@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -364,11 +365,32 @@ class TriggeredContextClocks {
 // flattening then answers as the sequence's own. §16.9.11: where `triggered`
 // is applied to it, it takes the clock of the context the method is read in,
 // `context_clock`.
+// §16.11: `body` without the subroutine calls its match items attach, in its
+// nested operands and its intersect, and and or operands too.
+static void DropMatchCalls(LinearSequence& body) {
+  for (std::vector<SeqMatchAssign>& items : body.match_items) {
+    std::erase_if(
+        items, [](const SeqMatchAssign& item) { return item.call != nullptr; });
+  }
+  for (auto* list : {&body.intersects, &body.conjuncts, &body.alternatives}) {
+    for (LinearSequence& inner : *list) DropMatchCalls(inner);
+  }
+  for (auto& entry : body.nested) {
+    LinearSequence inner = *entry.second;
+    DropMatchCalls(inner);
+    entry.second = std::make_shared<const LinearSequence>(std::move(inner));
+  }
+}
+
 void Lowerer::LowerSequenceMonitor(
     const ModuleItem* seq, std::string_view ep_name,
     const std::vector<EventExpr>* context_clock) {
   LinearSequence body;
   if (!FlattenLinearSequence(seq, ctx_, arena_, body)) return;
+  // §16.11 with §16.13.6: a monitor no `triggered` or `matched` read asks for
+  // is no evaluation the source instantiates, so the calls attached to the
+  // sequence are left to the evaluations that do, run at their end points.
+  if (seq->seq_triggered_unread) DropMatchCalls(body);
   if (body.clock.empty() && context_clock != nullptr) {
     body.clock = *context_clock;
   }

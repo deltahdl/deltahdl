@@ -607,6 +607,9 @@ Expr* Parser::MakeMemberAccess(Expr* base) {
                 Subclause("8.12"));
     ParseExpr();
   }
+  if (member_tok.text == "triggered" || member_tok.text == "matched") {
+    RecordTriggeredRead(base);
+  }
   auto* member_id = arena_.Create<Expr>();
   member_id->kind = ExprKind::kIdentifier;
   member_id->text = member_tok.text;

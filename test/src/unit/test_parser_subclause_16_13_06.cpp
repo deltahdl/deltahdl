@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -72,6 +73,20 @@ TEST(SequenceMethodParsing, AnExpressionActualInASequenceBodyStaysOne) {
   const Expr* actual = e4->seq_linear.operands[0]->args[0];
   EXPECT_EQ(actual->property_actual, nullptr);
   EXPECT_EQ(actual->text, "ready");
+}
+
+// §16.13.6 with A.2.10: a method applied to a sequence named through an
+// instance, `u.s.triggered`, reads the sequence `s`, which the unit records so
+// that the sequence's monitor keeps the calls its match items attach.
+TEST(SequenceMethodParsing, AMethodThroughAnInstanceRecordsTheSequence) {
+  auto r = Parse(
+      "module t;\n"
+      "  always @(posedge clk) if (u.s.triggered) hits++;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->triggered_names.contains("s"));
+  EXPECT_FALSE(r.cu->triggered_names.contains("u"));
 }
 
 }  // namespace

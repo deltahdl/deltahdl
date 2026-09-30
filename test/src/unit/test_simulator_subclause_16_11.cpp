@@ -116,4 +116,43 @@ TEST(AttachedSubroutine, VoidFunctionMethodIsCalledAtTheMatch) {
   EXPECT_EQ(out, "noted 25\n$finish at time 160\n");
 }
 
+// The module both cases below share: `s` calls note() at each end point,
+// its match of v1 at the posedges at 5 and 15 and v2 throughout ending at 15
+// and 25, and `use` stands where the sequence is instantiated, or nowhere.
+std::string NoteAtEachMatch(const std::string& use) {
+  return "module t;\n"
+         "  logic clk = 0, v1 = 0, v2 = 1;\n"
+         "  int samples = 0, hits = 0;\n"
+         "  function void note(); samples++; endfunction\n"
+         "  sequence s;\n"
+         "    @(posedge clk) v1 ##1 (v2, note());\n"
+         "  endsequence\n" +
+         use +
+         "  always #5 clk = ~clk;\n"
+         "  initial begin #2 v1 = 1; #20 v1 = 0; #30 $finish; end\n"
+         "endmodule\n";
+}
+
+// §16.11: the calls attached to a sequence run at each end point of the
+// evaluation that instantiates it, here the cover property's, so note() runs
+// at its two matches. It ran four times, the monitor kept for `s.triggered`
+// running the calls at the same end points though nothing reads it.
+TEST(AttachedSubroutine, RunsOncePerEndPointOfTheInstance) {
+  SimFixture f;
+  auto* samples = RunAndFindVar(
+      NoteAtEachMatch("  c1: cover property (s) hits++;\n"), f, "samples");
+  ASSERT_NE(samples, nullptr);
+  EXPECT_EQ(samples->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("hits")->value.ToUint64(), 2u);
+}
+
+// §16.11 with §16.8: a sequence nothing instantiates is not evaluated, so
+// the call attached to it never runs. It ran at both matches.
+TEST(AttachedSubroutine, NeverRunsForASequenceNothingInstantiates) {
+  SimFixture f;
+  auto* samples = RunAndFindVar(NoteAtEachMatch(""), f, "samples");
+  ASSERT_NE(samples, nullptr);
+  EXPECT_EQ(samples->value.ToUint64(), 0u);
+}
+
 }  // namespace

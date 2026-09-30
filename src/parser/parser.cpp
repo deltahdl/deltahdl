@@ -272,7 +272,18 @@ CompilationUnit* Parser::Parse() {
   DefaultLibraryToWork(unit->udps);
   DefaultLibraryToWork(unit->packages);
   DefaultLibraryToWork(unit->configs);
+  unit->triggered_names = std::move(triggered_names_);
   return unit;
+}
+
+void Parser::RecordTriggeredRead(const Expr* base) {
+  if (base->kind == ExprKind::kCall) {
+    triggered_names_.insert(base->callee);
+  } else if (base->kind == ExprKind::kMemberAccess) {
+    triggered_names_.insert(base->rhs->text);
+  } else {
+    triggered_names_.insert(base->text);
+  }
 }
 
 CompilationUnit* Parser::ParseLibraryText() {

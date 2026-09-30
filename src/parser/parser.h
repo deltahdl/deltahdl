@@ -552,6 +552,10 @@ class Parser {
       std::vector<std::pair<std::string_view, Expr*>>& out);
   bool ParsePortConnection(ModuleItem* item);
   Expr* ParsePortActual();
+  // §16.13.6: records the name `triggered` or `matched` is applied to in
+  // `base`, its last name, or its callee where it is an instance with
+  // arguments; see CompilationUnit::triggered_names.
+  void RecordTriggeredRead(const Expr* base);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   Expr* ParseAssocIndexDim();
   void ParseParenList(std::vector<Expr*>& out);
@@ -789,6 +793,8 @@ class Parser {
   Lexer& lexer_;
   Arena& arena_;
   DiagEngine& diag_;
+  // §16.13.6: see RecordTriggeredRead.
+  std::unordered_set<std::string_view> triggered_names_;
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
