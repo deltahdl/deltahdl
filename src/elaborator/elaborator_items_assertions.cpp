@@ -148,6 +148,22 @@ void CollectBodyClocks(const SeqLinearBody& body,
 
 EventExpr InstanceClockEvent(EventExpr ev, const ActualsByFormal& actuals);
 
+// §16.13.3 with §16.8.1: an operand instantiating a named sequence brings the
+// clock the sequence is declared with, the instance's actuals in its formals'
+// places, and the clocks its body names.
+void CollectInstanceSequenceClocks(const Expr* operand,
+                                   const PropertyRegistry& registry,
+                                   std::vector<EventExpr>& out, int depth) {
+  const ModuleItem* decl =
+      InstantiatedDecl(operand, ModuleItemKind::kSequenceDecl, registry);
+  if (decl == nullptr) return;
+  ActualsByFormal actuals = BindActuals(decl->prop_formals, operand);
+  for (const EventExpr& ev : decl->seq_clock) {
+    AppendClockOnce(out, InstanceClockEvent(ev, actuals));
+  }
+  CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
+}
+
 void CollectBodiesClocks(const std::vector<SeqLinearBody>& bodies,
                          const PropertyRegistry& registry,
                          std::vector<EventExpr>& out, int depth) {
@@ -167,17 +183,7 @@ void CollectBodyClocks(const SeqLinearBody& body,
   }
   if (depth < 4) {
     for (const Expr* operand : body.operands) {
-      const ModuleItem* decl =
-          InstantiatedDecl(operand, ModuleItemKind::kSequenceDecl, registry);
-      if (decl != nullptr) {
-        // §16.13.3: a sequence declared with a clock is evaluated on it,
-        // §16.8.1: the instance's actuals in its formals' places.
-        ActualsByFormal actuals = BindActuals(decl->prop_formals, operand);
-        for (const EventExpr& ev : decl->seq_clock) {
-          AppendClockOnce(out, InstanceClockEvent(ev, actuals));
-        }
-        CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
-      }
+      CollectInstanceSequenceClocks(operand, registry, out, depth);
     }
   }
   CollectBodiesClocks(body.intersects, registry, out, depth);

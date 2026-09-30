@@ -120,9 +120,17 @@ TEST(TypedSequenceFormal, EventTypedFormalRejectsEdgeIdentifierActual) {
       /*actual_combined_with_edge_identifier=*/true));
 }
 
+// One clocking event written as its edge keyword and its signal's name.
+std::string EventText(const EventExpr& ev) {
+  std::string edge;
+  if (ev.edge == Edge::kPosedge) edge = "posedge ";
+  if (ev.edge == Edge::kNegedge) edge = "negedge ";
+  return edge + std::string(ev.signal != nullptr ? ev.signal->text : "");
+}
+
 // The clocking events the process of the static concurrent assertion in `src`
-// wakes on, an always_ff under §16.14.5, each written as its edge keyword and
-// its signal's name; empty where the source does not elaborate cleanly.
+// wakes on, an always_ff under §16.14.5, each as EventText writes it; empty
+// where the source does not elaborate cleanly.
 std::vector<std::string> AssertionWakeEvents(const std::string& src) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(src, f, "t");
@@ -132,13 +140,7 @@ std::vector<std::string> AssertionWakeEvents(const std::string& src) {
   }
   for (const RtlirProcess& p : design->top_modules[0]->processes) {
     if (p.kind != RtlirProcessKind::kAlwaysFF) continue;
-    for (const EventExpr& ev : p.sensitivity) {
-      std::string edge = ev.edge == Edge::kPosedge   ? "posedge "
-                         : ev.edge == Edge::kNegedge ? "negedge "
-                                                     : "";
-      events.push_back(
-          edge + std::string(ev.signal != nullptr ? ev.signal->text : ""));
-    }
+    for (const EventExpr& ev : p.sensitivity) events.push_back(EventText(ev));
   }
   return events;
 }
