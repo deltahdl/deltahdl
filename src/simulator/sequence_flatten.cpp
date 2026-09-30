@@ -440,6 +440,45 @@ const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
   return InstantiatedSequence(operand, ctx);
 }
 
+bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
+                    LinearSequence& out, int depth);
+
+// The operand at `j` of the flattened body of the instance `op`, appended to
+// `out` with the actuals substituted: its delay, the one written before the
+// instance added to the first operand's, its clock and its match items, or,
+// §16.8.1 (a), where it is a formal of type sequence, the sequence bound to
+// it expanded in its place with those.
+bool AppendInstanceOperand(const LinearSequence& body, size_t j,
+                           const InstanceOperand& op,
+                           const ActualsByFormal& actuals, SimContext& ctx,
+                           Arena& arena, LinearSequence& out, int depth) {
+  Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
+  SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
+  if (j == 0) delay = AddDelays(op.before, delay);
+  // §16.13.1 and §16.13.3: an operand of the instantiated body is evaluated
+  // on the clock it names, else on the declaration's own, else on the one
+  // flowing into the instance.
+  std::vector<EventExpr> clock =
+      InstanceOperandClock(body, j, op, actuals, arena);
+  std::vector<SeqMatchAssign> items =
+      SubstituteMatchItems(body.match_items[j], actuals, arena);
+  if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
+    if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
+                        ctx, arena, out, depth + 1)) {
+      return false;
+    }
+    auto& last_items = out.match_items.back();
+    last_items.insert(last_items.end(), items.begin(), items.end());
+    return true;
+  }
+  out.operands.push_back(operand);
+  out.delays.push_back(delay);
+  out.match_items.push_back(std::move(items));
+  out.repetitions.push_back(body.repetitions[j]);
+  PushOperandClock(out, clock);
+  return true;
+}
+
 // Appends the instantiated body's flattened operands with the actuals
 // substituted, its clock taken where the outer sequence has none, and the
 // §16.8.2 assignments of its local variable formal arguments: the
@@ -470,30 +509,9 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   std::vector<size_t> begins;
   std::vector<size_t> ends;
   for (size_t j = 0; j < body.operands.size(); ++j) {
-    Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
-    SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
-    if (j == 0) delay = AddDelays(op.before, delay);
-    // §16.13.1 and §16.13.3: an operand of the instantiated body is
-    // evaluated on the clock it names, else on the declaration's own, else
-    // on the one flowing into the instance.
-    std::vector<EventExpr> clock =
-        InstanceOperandClock(body, j, op, actuals, arena);
-    std::vector<SeqMatchAssign> items =
-        SubstituteMatchItems(body.match_items[j], actuals, arena);
     begins.push_back(out.operands.size());
-    if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
-      if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
-                          ctx, arena, out, depth + 1)) {
-        return false;
-      }
-      auto& last_items = out.match_items.back();
-      last_items.insert(last_items.end(), items.begin(), items.end());
-    } else {
-      out.operands.push_back(operand);
-      out.delays.push_back(delay);
-      out.match_items.push_back(std::move(items));
-      out.repetitions.push_back(body.repetitions[j]);
-      PushOperandClock(out, clock);
+    if (!AppendInstanceOperand(body, j, op, actuals, ctx, arena, out, depth)) {
+      return false;
     }
     ends.push_back(out.operands.size() - 1);
   }
