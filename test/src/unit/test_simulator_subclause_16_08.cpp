@@ -282,4 +282,33 @@ TEST(NamedSequenceInstance, AnEventFormalLeftToItsDefaultClocksTheStatement) {
   EXPECT_NE(out.find("c3=10 c4=10\n"), std::string::npos);
 }
 
+// §16.8 with §23.6: a sequence declared in an interface is instantiated
+// through an instance of it, `u.s`, its body reading that instance's req and
+// gnt. As the consequent of `|->` it starts at the end of the antecedent's
+// match: req is high at the rises of 15 and 45 and gnt at 25 alone, so the
+// attempt of 15 holds, that of 45 fails at 55, and the other eight hold
+// vacuously.
+TEST(NamedSequenceInstance,
+     AnInterfaceSequenceIsInstantiatedThroughAnInstance) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "  sequence s; req ##1 gnt; endsequence\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000, bv = 10'b0010000000;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  bus u(clk);\n"
+      "  assign u.req = av[0]; assign u.gnt = bv[0];\n"
+      "  int p = 0, f = 0;\n"
+      "  assert property (@(posedge clk) u.req |-> u.s) p++;\n"
+      "    else begin f++; $display(\"fail at %0t\", $time); end\n"
+      "  initial #98 $display(\"p=%0d f=%0d\", p, f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "fail at 55\np=9 f=1\n");
+}
+
 }  // namespace

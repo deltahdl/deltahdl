@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +33,13 @@ ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
 ActualsByFormal BindActualsWithDefaults(
     const std::vector<std::string_view>& formals,
     const std::vector<Expr*>& defaults, const Expr* instance);
+
+// §16.8 and §16.12: the name an instance of a named sequence or property is
+// declared or registered under: its bare name, written as an identifier or
+// called; "pk::name" where it is written through a package scope, `pk::s` or
+// `pk::p(a, b)` (§26.3); and "u.name" where it is written through an interface
+// instance, `u.s` (§23.6). Empty for any other expression.
+std::string InstanceDeclName(const Expr* instance);
 
 // §23.6: whether two expressions name the same object by the same spelling:
 // an identifier by its text and scope prefix, a member access, `i0.clk`, whose

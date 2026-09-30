@@ -10,6 +10,7 @@
 #include "elaborator/sampled_value.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -76,21 +77,8 @@ const ModuleItem* PropertyRegistry::Find(std::string_view name) const {
 }
 
 const ModuleItem* PropertyRegistry::FindInstance(const Expr* instance) const {
-  if (instance == nullptr) return nullptr;
-  if (instance->kind == ExprKind::kIdentifier) return Find(instance->text);
-  const Expr* scoped = instance;
-  if (instance->kind == ExprKind::kCall) {
-    if (!instance->callee.empty()) return Find(instance->callee);
-    scoped = instance->lhs;
-  }
-  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
-      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
-      scoped->rhs->kind != ExprKind::kIdentifier) {
-    return nullptr;
-  }
-  return Find(std::string(scoped->lhs->text) +
-              "::" + std::string(scoped->rhs->text));
+  std::string name = InstanceDeclName(instance);
+  return name.empty() ? nullptr : Find(name);
 }
 
 int PropertyRegistry::FlattenedDisableIffCount(const ModuleItem* decl) const {

@@ -65,6 +65,18 @@ Expr* InstanceMember(std::string_view inst, std::string_view name,
   return access;
 }
 
+// The member of instance `inst` that stands for each of `names`, for a
+// substitution to put in their places.
+ActualsByFormal InstanceMembers(
+    const std::unordered_set<std::string_view>& names, std::string_view inst,
+    SourceLoc loc, Arena& arena) {
+  ActualsByFormal members;
+  for (std::string_view name : names) {
+    members[name] = InstanceMember(inst, name, loc, arena);
+  }
+  return members;
+}
+
 // Each expression slot of a list of clocking events, the signal and the iff
 // condition of each.
 template <typename Fn>
@@ -172,10 +184,7 @@ PropertyExprNode* InstanceTree(const ModuleItem* decl, std::string_view inst,
   for (const SeqLocalDecl& local : decl->prop_locals) locals.insert(local.name);
   for (std::string_view local : locals) names.erase(local);
   for (std::string_view formal : decl->prop_formals) names.erase(formal);
-  ActualsByFormal members;
-  for (std::string_view name : names) {
-    members[name] = InstanceMember(inst, name, decl->loc, arena);
-  }
+  ActualsByFormal members = InstanceMembers(names, inst, decl->loc, arena);
   ForEachTreeSlot(tree, [&members, &arena](Expr*& e) {
     e = SubstituteFormals(e, members, arena);
   });
@@ -195,10 +204,7 @@ ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
     CollectFreeNames(ev.iff_condition, names);
   }
   for (std::string_view formal : decl->prop_formals) names.erase(formal);
-  ActualsByFormal members;
-  for (std::string_view name : names) {
-    members[name] = InstanceMember(inst, name, decl->loc, arena);
-  }
+  ActualsByFormal members = InstanceMembers(names, inst, decl->loc, arena);
   auto* copy = arena.Create<ModuleItem>(*decl);
   copy->name = *arena.Create<std::string>(std::string(inst) + "." +
                                           std::string(decl->name));
@@ -219,12 +225,48 @@ ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
   return copy;
 }
 
+// §16.8 with §23.6: `decl`, a sequence of the interface, as instance `inst`
+// sees it: named "inst.name", with each name its body and its clock read, a
+// formal or a local aside, made the member of `inst` the path reaches.
+ModuleItem* InstanceSequence(const ModuleItem* decl, std::string_view inst,
+                             Arena& arena) {
+  auto* copy = arena.Create<ModuleItem>(*decl);
+  copy->name = *arena.Create<std::string>(std::string(inst) + "." +
+                                          std::string(decl->name));
+  std::unordered_set<std::string_view> names;
+  auto collect = [&names](Expr*& e) { CollectFreeNames(e, names); };
+  ForEachBodySlot(copy->seq_linear, collect);
+  ForEachEventSlot(copy->seq_clock, collect);
+  std::unordered_set<std::string_view> locals;
+  CollectBodyLocals(copy->seq_linear, locals);
+  for (std::string_view local : decl->prop_seq_assert_vars) {
+    locals.insert(local);
+  }
+  for (std::string_view local : locals) names.erase(local);
+  for (std::string_view formal : decl->prop_formals) names.erase(formal);
+  ActualsByFormal members = InstanceMembers(names, inst, decl->loc, arena);
+  auto substitute = [&members, &arena](Expr*& e) {
+    e = SubstituteFormals(e, members, arena);
+  };
+  ForEachBodySlot(copy->seq_linear, substitute);
+  ForEachEventSlot(copy->seq_clock, substitute);
+  return copy;
+}
+
 // The properties of the interface `ifc` as its instance `inst` sees them, each
-// registered, and each whose body is a tree also appended to `run_decls`.
+// registered, and each whose body is a tree also appended to
+// `run.properties`; and its sequences likewise, each registered and appended
+// to `run.sequences`.
 void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
                             PropertyRegistry& registry, Arena& arena,
-                            std::vector<ModuleItem*>& run_decls) {
+                            RunDeclarations run) {
   for (const ModuleItem* member : ifc->items) {
+    if (member->kind == ModuleItemKind::kSequenceDecl) {
+      ModuleItem* copy = InstanceSequence(member, inst, arena);
+      registry.Register(copy);
+      run.sequences.push_back(copy);
+      continue;
+    }
     if (member->kind != ModuleItemKind::kPropertyDecl ||
         (member->prop_body_expr == nullptr &&
          member->prop_body_tree == nullptr)) {
@@ -232,7 +274,7 @@ void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
     }
     ModuleItem* copy = InstanceCopy(member, inst, arena);
     registry.Register(copy);
-    if (copy->prop_body_tree != nullptr) run_decls.push_back(copy);
+    if (copy->prop_body_tree != nullptr) run.properties.push_back(copy);
   }
 }
 
@@ -241,14 +283,13 @@ void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
 void RegisterInterfaceInstanceProperties(const ModuleDecl* decl,
                                          const CompilationUnit* unit,
                                          PropertyRegistry& registry,
-                                         Arena& arena,
-                                         std::vector<ModuleItem*>& run_decls) {
+                                         Arena& arena, RunDeclarations run) {
   if (decl == nullptr || unit == nullptr) return;
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
     const ModuleDecl* ifc = FindInterface(item->inst_module, unit);
     if (ifc == nullptr) continue;
-    RegisterInstanceCopies(ifc, item->inst_name, registry, arena, run_decls);
+    RegisterInstanceCopies(ifc, item->inst_name, registry, arena, run);
   }
 }
 

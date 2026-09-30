@@ -48,8 +48,9 @@ class PropertyRegistry {
 
   // §16.8 and §16.12: the declaration an instance names, by its bare name,
   // written as an identifier or called, or, §26.3, by "pk::name" where it is
-  // written through the package scope, `pk::s` or `pk::p(a, b)`; null where
-  // the registry holds none.
+  // written through the package scope, `pk::s` or `pk::p(a, b)`, or, §23.6,
+  // by "u.name" where it is written through an interface instance, `u.s`;
+  // null where the registry holds none.
   const ModuleItem* FindInstance(const Expr* instance) const;
 
   // §F.4.1 step 1 inlines callees recursively; this returns the total

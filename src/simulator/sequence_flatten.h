@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <functional>
-#include <string_view>
 #include <vector>
 
 #include "parser/ast_expr.h"
@@ -123,12 +122,6 @@ bool NamesAnotherClock(const LinearSequence& body);
 std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
                                        const ActualsByFormal& actuals,
                                        Arena& arena);
-
-// §16.8 and §16.12: the name an instance of a named sequence or property is
-// registered by: its bare name, written as an identifier or called, or, §26.3,
-// "pk::name" where it is written through the package scope, `pk::s` or
-// `pk::s(a, b)`; empty for any other expression.
-std::string_view AssertionInstanceName(const Expr* instance, SimContext& ctx);
 
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
                                     const Expr* instance, Arena& arena);

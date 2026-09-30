@@ -1,6 +1,7 @@
 #include "parser/expr_substitute.h"
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -59,6 +60,27 @@ ActualsByFormal BindActualsWithDefaults(
     }
   }
   return actuals;
+}
+
+std::string InstanceDeclName(const Expr* instance) {
+  if (instance == nullptr) return {};
+  if (instance->kind == ExprKind::kIdentifier) {
+    return std::string(instance->text);
+  }
+  const Expr* path = instance;
+  if (instance->kind == ExprKind::kCall) {
+    if (!instance->callee.empty()) return std::string(instance->callee);
+    path = instance->lhs;
+  }
+  if (path == nullptr || path->kind != ExprKind::kMemberAccess ||
+      path->lhs == nullptr || path->rhs == nullptr ||
+      path->lhs->kind != ExprKind::kIdentifier ||
+      path->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  std::string_view joint = path->is_scope_resolution ? "::" : ".";
+  return std::string(path->lhs->text) + std::string(joint) +
+         std::string(path->rhs->text);
 }
 
 bool SamePath(const Expr* a, const Expr* b) {
