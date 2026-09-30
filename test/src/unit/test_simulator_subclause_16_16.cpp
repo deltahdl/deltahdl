@@ -179,6 +179,36 @@ TEST(ClockResolutionRun, AnInterfacePropertyInstancedByPathTakesItsClock) {
   EXPECT_EQ(out, "f0=3 f1=5\n");
 }
 
+// §16.16 (f) with §16.12 and §23.6: the same for a property whose body is
+// temporal, `a |=> b`, which reads the instance's own clock and signals. At
+// clk's rises i0's a is 1101001111 and its b 0110011110, so the implication
+// fails from the ticks 3 and 8, twice; i1 has the two patterns swapped and
+// fails from the tick 1 alone.
+TEST(ClockResolutionRun, AnInterfacePropertyWithATemporalBodyTakesItsClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc(input logic clk);\n"
+      "  logic a, b;\n"
+      "  property p; @(posedge clk) a |=> b; endproperty\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0110011110;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  ifc i0(clk), i1(clk);\n"
+      "  assign i0.a = av[0]; assign i0.b = bv[0];\n"
+      "  assign i1.a = bv[0]; assign i1.b = av[0];\n"
+      "  int f0 = 0, f1 = 0;\n"
+      "  assert property (i0.p) else f0++;\n"
+      "  assert property (i1.p) else f1++;\n"
+      "  initial #98 $display(\"f0=%0d f1=%0d\", f0, f1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "f0=2 f1=1\n");
+}
+
 // The property's read of a member of the interface's struct, `pair.lo`, is
 // rewritten through the instance like a whole signal: each instance's
 // assertion reads its own `pair`, and the two fail on different cycles.

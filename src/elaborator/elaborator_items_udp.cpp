@@ -803,7 +803,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       nested_module_decls_.begin(), nested_module_decls_.end());
 
   BuildPropertyRegistry(decl, property_registry_, arena_);
-  RegisterInterfaceInstanceProperties(decl, unit_, property_registry_, arena_);
+  RegisterInterfaceInstanceProperties(decl, unit_, property_registry_, arena_,
+                                      mod->property_decls);
   PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);
   // §16.15: the default disable iff of this scope, wherever it stands among
   // the items, or the enclosing declaration's where this is a nested
