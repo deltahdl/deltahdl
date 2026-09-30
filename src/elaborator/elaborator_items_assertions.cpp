@@ -17,7 +17,6 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
