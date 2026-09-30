@@ -207,7 +207,8 @@ TEST(MulticlockSequences, AClockNamedByAPathTicksAsItsSignalDoes) {
 // body names a second clock begins its attempts at its leading clock alone.
 // The interface's port clk falls from x at 0, a tick of the second clock
 // before the leading clock has risen, and no attempt begins there, so the
-// instance fails as often as the same property declared in the module.
+// instance fails as often as the same property declared in the module, six
+// times by the end of the run, where an attempt begun at 0 made it seven.
 TEST(MulticlockSequences, AnInstancesSecondClockTickingFirstBeginsNoAttempt) {
   SimFixture f;
   auto* fi = RunAndFindVar(
@@ -229,8 +230,8 @@ TEST(MulticlockSequences, AnInstancesSecondClockTickingFirstBeginsNoAttempt) {
       "endmodule\n",
       f, "fi");
   ASSERT_NE(fi, nullptr);
-  EXPECT_EQ(fi->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 5u);
+  EXPECT_EQ(fi->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 6u);
 }
 
 // The same for an instance with actuals, whose body's sequence the actuals
