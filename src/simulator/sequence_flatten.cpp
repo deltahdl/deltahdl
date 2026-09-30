@@ -16,6 +16,8 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
+#include "simulator/eval_function_hier.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -234,17 +236,27 @@ std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
   return out;
 }
 
+std::string_view AssertionInstanceName(const Expr* instance, SimContext& ctx) {
+  if (instance == nullptr) return {};
+  if (instance->kind == ExprKind::kIdentifier) return instance->text;
+  if (instance->kind == ExprKind::kCall) {
+    if (!instance->callee.empty()) return instance->callee;
+    if (!IsPackageScopedCall(instance)) return {};
+    return ScopedClassKey(instance->lhs, ctx.GetArena());
+  }
+  if (instance->kind == ExprKind::kMemberAccess &&
+      instance->is_scope_resolution && instance->lhs != nullptr &&
+      instance->lhs->elements.empty()) {
+    return ScopedClassKey(instance, ctx.GetArena());
+  }
+  return {};
+}
+
 namespace {
 
 const ModuleItem* InstantiatedSequence(const Expr* operand, SimContext& ctx) {
-  if (operand == nullptr) return nullptr;
-  if (operand->kind != ExprKind::kIdentifier &&
-      operand->kind != ExprKind::kCall) {
-    return nullptr;
-  }
-  std::string_view name =
-      operand->kind == ExprKind::kCall ? operand->callee : operand->text;
-  return ctx.FindSequenceDecl(name);
+  std::string_view name = AssertionInstanceName(operand, ctx);
+  return name.empty() ? nullptr : ctx.FindSequenceDecl(name);
 }
 
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,

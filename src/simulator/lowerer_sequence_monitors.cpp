@@ -15,10 +15,12 @@
 #include "parser/expr_substitute.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/process.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 namespace {
@@ -282,6 +284,27 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
       break;
     }
     waiting = std::move(deferred);
+  }
+}
+
+// §16.8 and §16.12: each named property and sequence of the module under its
+// name, and each sequence's end-point event, which `.triggered` reads.
+void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
+  for (auto* prop_decl : mod->property_decls) {
+    ctx.RegisterPropertyDecl(prop_decl->name, prop_decl);
+  }
+  for (auto* seq_decl : mod->sequence_decls) {
+    ctx.RegisterSequenceDecl(seq_decl->name, seq_decl);
+
+    std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
+    if (!ctx.FindVariable(ep_name)) {
+      // variables_ keys by string_view, so the key's backing string must
+      // outlive the map; intern it in the arena. A local std::string would
+      // dangle and make every later FindVariable("__seq_<name>") miss.
+      auto* stored = ctx.GetArena().Create<std::string>(std::move(ep_name));
+      auto* ep_var = ctx.CreateVariable(*stored, 1);
+      ep_var->is_event = true;
+    }
   }
 }
 

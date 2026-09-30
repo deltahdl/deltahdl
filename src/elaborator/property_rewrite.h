@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "elaborator/sampled_value.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
 namespace delta {
@@ -37,7 +38,19 @@ class PropertyRegistry {
  public:
   void Register(const ModuleItem* decl);
 
+  // §26.3: `decl` registered under `name` too: "pk::name" for a package's
+  // declaration, and the bare name where the scope imports it. A name the
+  // registry already holds keeps its declaration, §26.3 having a declaration
+  // of the scope take the name over an import.
+  void RegisterAs(std::string_view name, const ModuleItem* decl);
+
   const ModuleItem* Find(std::string_view name) const;
+
+  // §16.8 and §16.12: the declaration an instance names, by its bare name,
+  // written as an identifier or called, or, §26.3, by "pk::name" where it is
+  // written through the package scope, `pk::s` or `pk::p(a, b)`; null where
+  // the registry holds none.
+  const ModuleItem* FindInstance(const Expr* instance) const;
 
   // §F.4.1 step 1 inlines callees recursively; this returns the total
   // `disable iff` count after that inlining finishes.

@@ -69,13 +69,7 @@ std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
 // identifier or a call naming a sequence or a property.
 const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,
                                    const PropertyRegistry& registry) {
-  if (operand == nullptr) return nullptr;
-  if (operand->kind != ExprKind::kIdentifier &&
-      operand->kind != ExprKind::kCall) {
-    return nullptr;
-  }
-  const ModuleItem* decl = registry.Find(
-      operand->kind == ExprKind::kCall ? operand->callee : operand->text);
+  const ModuleItem* decl = registry.FindInstance(operand);
   return decl != nullptr && decl->kind == kind ? decl : nullptr;
 }
 

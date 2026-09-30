@@ -173,4 +173,33 @@ TEST(PropertyEvaluation, AnOmittedPropertyFormalTakesItsDefault) {
   EXPECT_NE(out.find("c1=3 c2=2\n"), std::string::npos);
 }
 
+// §16.12 with §26.3: a property declared in a package is instantiated through
+// a wildcard import by its bare name and by its package-qualified name, and
+// means what the same property declared in the module means. a is high at
+// the rises of 15 and 45 and b at 25 alone, so the attempt of 15 holds, that
+// of 45 fails at 55, and the other eight hold vacuously, in all three forms.
+TEST(PropertyEvaluation, APackagePropertyIsInstantiatedByImportAndByScope) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  property p2(x, y); x |=> y; endproperty\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::*;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000, bv = 10'b0010000000;\n"
+      "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  int p = 0, f = 0, p2 = 0, f2 = 0, p3 = 0, f3 = 0;\n"
+      "  property pl(x, y); x |=> y; endproperty\n"
+      "  assert property (@(posedge clk) pl(a, b)) p++; else f++;\n"
+      "  assert property (@(posedge clk) p2(a, b)) p2++; else f2++;\n"
+      "  assert property (@(posedge clk) pk::p2(a, b)) p3++; else f3++;\n"
+      "  initial #98 $display(\"%0d %0d %0d %0d %0d %0d\", p, f, p2, f2, p3, "
+      "f3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 1 9 1 9 1\n");
+}
+
 }  // namespace

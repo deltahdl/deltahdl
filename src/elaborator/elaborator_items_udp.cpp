@@ -658,6 +658,46 @@ void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry,
   }
 }
 
+// §26.3: whether the scope whose items are `items` imports `name` from `pkg`,
+// by a wildcard import of the package or by an import of the name.
+bool ImportsName(const std::vector<ModuleItem*>& items, std::string_view pkg,
+                 std::string_view name) {
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    if (imp.package_name != pkg) continue;
+    if (imp.is_wildcard || imp.item_name == name) return true;
+  }
+  return false;
+}
+
+// §16.8 and §16.12 with §26.3: the named sequences and properties declared in
+// a package are reached from the module through the package scope,
+// "pk::name", and by their bare names where the module or the compilation
+// unit imports them; the module's own declarations, registered first, keep
+// their names.
+void RegisterPackageAssertionDecls(const ModuleDecl* decl,
+                                   const CompilationUnit* unit,
+                                   PropertyRegistry& registry, Arena& arena) {
+  if (unit == nullptr) return;
+  for (const PackageDecl* pkg : unit->packages) {
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kPropertyDecl &&
+          item->kind != ModuleItemKind::kSequenceDecl) {
+        continue;
+      }
+      registry.RegisterAs(
+          *arena.Create<std::string>(std::string(pkg->name) +
+                                     "::" + std::string(item->name)),
+          item);
+      if (ImportsName(decl->items, pkg->name, item->name) ||
+          ImportsName(unit->cu_items, pkg->name, item->name)) {
+        registry.RegisterAs(item->name, item);
+      }
+    }
+  }
+}
+
 // True if port-less nested module `nested_decl` (named `name`) is an implicit-
 // instantiation candidate: not an interface and not explicitly instantiated.
 bool IsImplicitNestedInstantiationCandidate(std::string_view name,
@@ -803,6 +843,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       nested_module_decls_.begin(), nested_module_decls_.end());
 
   BuildPropertyRegistry(decl, property_registry_, arena_);
+  RegisterPackageAssertionDecls(decl, unit_, property_registry_, arena_);
   RegisterInterfaceInstanceProperties(decl, unit_, property_registry_, arena_,
                                       mod->property_decls);
   PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);

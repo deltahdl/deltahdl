@@ -1,12 +1,14 @@
 #include "elaborator/property_rewrite.h"
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "elaborator/sampled_value.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
 namespace delta {
@@ -62,10 +64,33 @@ void PropertyRegistry::Register(const ModuleItem* decl) {
   by_name_.emplace(decl->name, decl);
 }
 
+void PropertyRegistry::RegisterAs(std::string_view name,
+                                  const ModuleItem* decl) {
+  by_name_.emplace(name, decl);
+}
+
 const ModuleItem* PropertyRegistry::Find(std::string_view name) const {
   auto it = by_name_.find(name);
   if (it == by_name_.end()) return nullptr;
   return it->second;
+}
+
+const ModuleItem* PropertyRegistry::FindInstance(const Expr* instance) const {
+  if (instance == nullptr) return nullptr;
+  if (instance->kind == ExprKind::kIdentifier) return Find(instance->text);
+  const Expr* scoped = instance;
+  if (instance->kind == ExprKind::kCall) {
+    if (!instance->callee.empty()) return Find(instance->callee);
+    scoped = instance->lhs;
+  }
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  return Find(std::string(scoped->lhs->text) +
+              "::" + std::string(scoped->rhs->text));
 }
 
 int PropertyRegistry::FlattenedDisableIffCount(const ModuleItem* decl) const {

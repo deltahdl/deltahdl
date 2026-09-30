@@ -480,8 +480,8 @@ void RegisterGenBlockSubroutines(const RtlirModule* mod,
 // name as well, in LowerPackageItem. §8.24 keeps an out-of-block method body
 // out of the package's own subroutines.
 // One item of package `pkg` recorded as the package's: its subroutine under
-// "pkg::name" and as the package's, its let under "pkg::name", and its import
-// as one of the package's.
+// "pkg::name" and as the package's, its let, sequence and property under
+// "pkg::name", and its import as one of the package's.
 static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
                                       SimContext& ctx, Arena& arena) {
   // §26.3 with §13.4: the package's subroutines read its variables, and
@@ -500,6 +500,16 @@ static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
   // named from any scope through the package, `pex::twice(7)`.
   if (item->kind == ModuleItemKind::kLetDecl) {
     ctx.RegisterLetDecl(*key, item);
+    return;
+  }
+  // §16.8 and §16.12 with §26.3: so are its named sequences and properties,
+  // `pk::s2(a, b)`.
+  if (item->kind == ModuleItemKind::kSequenceDecl) {
+    ctx.RegisterSequenceDecl(*key, item);
+    return;
+  }
+  if (item->kind == ModuleItemKind::kPropertyDecl) {
+    ctx.RegisterPropertyDecl(*key, item);
     return;
   }
   bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
@@ -922,25 +932,6 @@ void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx) {
   }
   if (design->compilation_unit != nullptr) {
     RegisterDpiImportDecls(design->compilation_unit->cu_items, ctx);
-  }
-}
-
-void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
-  for (auto* prop_decl : mod->property_decls) {
-    ctx.RegisterPropertyDecl(prop_decl->name, prop_decl);
-  }
-  for (auto* seq_decl : mod->sequence_decls) {
-    ctx.RegisterSequenceDecl(seq_decl->name, seq_decl);
-
-    std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
-    if (!ctx.FindVariable(ep_name)) {
-      // variables_ keys by string_view, so the key's backing string must
-      // outlive the map; intern it in the arena. A local std::string would
-      // dangle and make every later FindVariable("__seq_<name>") miss.
-      auto* stored = ctx.GetArena().Create<std::string>(std::move(ep_name));
-      auto* ep_var = ctx.CreateVariable(*stored, 1);
-      ep_var->is_event = true;
-    }
   }
 }
 

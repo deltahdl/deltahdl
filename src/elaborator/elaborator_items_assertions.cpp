@@ -447,8 +447,7 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
       instance->kind != ExprKind::kCall) {
     return;
   }
-  const ModuleItem* decl = registry.Find(
-      instance->kind == ExprKind::kCall ? instance->callee : instance->text);
+  const ModuleItem* decl = registry.FindInstance(instance);
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
     // §16.12.2 and §16.13.4: `@(negedge clk) s2` is the sequential property
     // the sequence s2 is, evaluated on the clock written.

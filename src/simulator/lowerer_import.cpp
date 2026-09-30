@@ -84,6 +84,16 @@ void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
     // §11.12 with §26.3: an imported let is referenced by its bare name, as an
     // imported function is; a declaration of the importing scope keeps it.
     if (!ctx_.FindLetDecl(item->name)) ctx_.RegisterLetDecl(item->name, item);
+  } else if (item->kind == ModuleItemKind::kSequenceDecl) {
+    // §16.8 and §16.12 with §26.3: and so are an imported named sequence and
+    // property.
+    if (!ctx_.FindSequenceDecl(item->name)) {
+      ctx_.RegisterSequenceDecl(item->name, item);
+    }
+  } else if (item->kind == ModuleItemKind::kPropertyDecl) {
+    if (!ctx_.FindPropertyDecl(item->name)) {
+      ctx_.RegisterPropertyDecl(item->name, item);
+    }
   }
 }
 

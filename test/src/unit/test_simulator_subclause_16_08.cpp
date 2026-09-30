@@ -212,4 +212,30 @@ TEST(NamedSequenceInstance, AnOmittedDelayFormalTakesItsDefault) {
   EXPECT_NE(out.find("c1=2\n"), std::string::npos);
 }
 
+// §16.8 with §26.3: a sequence declared in a package, instantiated through an
+// import and by its package-qualified name as the consequent of `|->`, starts
+// at the end of the antecedent's match. a is high at the rises of 15 and 45
+// and b at 25 alone, so the attempt of 15 holds, that of 45 fails at 55, and
+// the other eight hold vacuously.
+TEST(NamedSequenceInstance, APackageSequenceIsInstantiatedByImportAndByScope) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  sequence s2(x, y); x ##1 y; endsequence\n"
+      "endpackage\n"
+      "import pk::*;\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000, bv = 10'b0010000000;\n"
+      "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  int p = 0, f = 0, p2 = 0, f2 = 0;\n"
+      "  assert property (@(posedge clk) a |-> s2(a, b)) p++; else f++;\n"
+      "  assert property (@(posedge clk) a |-> pk::s2(a, b)) p2++; else f2++;\n"
+      "  initial #98 $display(\"p=%0d f=%0d p2=%0d f2=%0d\", p, f, p2, f2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p=9 f=1 p2=9 f2=1\n");
+}
+
 }  // namespace
