@@ -692,6 +692,11 @@ struct ModuleItem {
   // argument declared (`formal = default_expression`). Used by the elaborator
   // to decide which formals an instance must supply an actual for.
   std::vector<bool> prop_formal_has_default;
+  // §16.8: parallel to prop_formals for a sequence declaration; the default
+  // actual argument declared for the formal, which an instance that omits the
+  // formal takes, null where none is declared or it is one of §16.14.7's
+  // inferred functions, which prop_formal_inferred records.
+  std::vector<Expr*> prop_formal_defaults;
   // §16.14.7: parallel to prop_formals; which of the two inferred functions
   // the formal's default value is, $inferred_clock or $inferred_disable, or
   // neither, the elaborator putting the clocking event or the disable

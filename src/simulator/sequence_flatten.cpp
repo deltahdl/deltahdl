@@ -178,14 +178,25 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 
 // The parser keeps the named actuals after the positional ones with their
 // names beside.
+// §16.8: the default actual argument declared for the formal numbered `i`,
+// null where it has none.
+static Expr* DefaultActual(const ModuleItem* decl, size_t i) {
+  return i < decl->prop_formal_defaults.size() ? decl->prop_formal_defaults[i]
+                                               : nullptr;
+}
+
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
                                     const Expr* instance, Arena& arena) {
   ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
-  for (size_t i = 0;
-       i < decl->prop_formals.size() && i < decl->prop_formal_type_kw.size();
-       ++i) {
-    auto it = actuals.find(decl->prop_formals[i]);
-    if (it == actuals.end()) continue;
+  for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
+    std::string_view formal = decl->prop_formals[i];
+    auto it = actuals.find(formal);
+    // §16.8: a formal the instance binds no actual to takes its default.
+    Expr* fallback = DefaultActual(decl, i);
+    if (fallback != nullptr && (it == actuals.end() || it->second == nullptr)) {
+      it = actuals.insert_or_assign(formal, fallback).first;
+    }
+    if (it == actuals.end() || i >= decl->prop_formal_type_kw.size()) continue;
     it->second = CastActual(it->second, decl->prop_formal_type_kw[i], arena);
   }
   return actuals;

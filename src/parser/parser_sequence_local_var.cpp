@@ -276,6 +276,8 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
 // and the formal-name expectation so each iteration's handler can update them
 // in place.
 struct SequencePortScan {
+  // The parser whose lexer the scan reads, which parses a formal's default.
+  Parser* parser = nullptr;
   int depth = 1;
   bool expect_formal_name = true;
 
@@ -385,6 +387,7 @@ struct SequencePortScan {
     // §16.8: the formal starts out with no default; a following `= actual`
     // (handled in DispatchTopLevel) flips this entry to true.
     item->prop_formal_has_default.push_back(false);
+    item->prop_formal_defaults.push_back(nullptr);
     item->prop_formal_inferred.push_back(InferredDefault::kNone);
     expect_formal_name = false;
   }
@@ -438,6 +441,18 @@ struct SequencePortScan {
     }
     lexer.Next();
     expect_formal_name = false;
+    RecordDefault(lexer, item);
+  }
+
+  // §16.8: the default actual itself, kept beside the formal for an instance
+  // that omits the formal to take. §16.14.7's inferred functions are left to
+  // HandleSystemDefaultValue, which checks and records them apart.
+  void RecordDefault(Lexer& lexer, ModuleItem* item) {
+    if (parser == nullptr || item->prop_formal_defaults.empty()) return;
+    std::string_view head = lexer.Peek().text;
+    if (head == "$inferred_clock" || head == "$inferred_disable") return;
+    item->prop_formal_defaults.back() =
+        ParserPropertySpecHelpers::ParseFormalDefault(*parser);
   }
 
   // §16.14.7: a system function that opens the current formal's default value
@@ -543,9 +558,10 @@ struct SequencePortScan {
 // drains the comma-separated formal list through its matching ')', harvesting
 // formal_port_identifier names and policing the §16.8.2 local-variable rules.
 // Behaviour matches the original inline loop exactly.
-static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
-                                  ModuleItem* item) {
+static void ParseSequencePortList(Parser& parser, Lexer& lexer,
+                                  DiagEngine& diag, ModuleItem* item) {
   SequencePortScan scan;
+  scan.parser = &parser;
   scan.item_start = lexer.Peek().loc;
   while (scan.depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
     if (!scan.Step(lexer, diag, item)) break;
@@ -572,7 +588,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
   // For each local-marked formal we also record its (possibly inferred)
   // direction so later stages can apply the §16.10 local-variable rules.
   if (Match(TokenKind::kLParen)) {
-    ParseSequencePortList(lexer_, diag_, item);
+    ParseSequencePortList(*this, lexer_, diag_, item);
   }
 
   Expect(TokenKind::kSemicolon, Subclause("16.8"));

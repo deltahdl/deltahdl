@@ -268,6 +268,23 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   return holder;
 }
 
+// §16.8: a formal's default actual argument, read as an actual argument is,
+// ending at the ',' or ')' after it; null, with the position put back, where
+// it is not one, so the port list scan reads its tokens as it would have.
+Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  p.diag_.PushSuppress();
+  bool plain = true;
+  Expr* actual = ParsePropertyActualArg(p, plain);
+  p.diag_.PopSuppress();
+  if (actual != nullptr &&
+      (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen))) {
+    return actual;
+  }
+  p.lexer_.RestorePos(saved);
+  return nullptr;
+}
+
 // The `.formal(` opening an actual bound by name, where one is written,
 // the name recorded on `call`; `named` says one was, and the answer is
 // false where it is malformed.

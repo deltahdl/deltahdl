@@ -172,4 +172,44 @@ TEST(NamedSequenceInstance, InstanceMayPrecedeTheDeclaration) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
+// §16.8: an instance that omits a formal with a default actual takes the
+// default. a is high at the rises of 5, 25 and 55 and b at 15, 35, 65 and 85,
+// so `a ##1 b` with y defaulted to b matches from 5, 25 and 55.
+TEST(NamedSequenceInstance, AnOmittedFormalTakesItsDefault) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1010010000, bv = 10'b0101001010;\n"
+      "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  int cdef = 0;\n"
+      "  sequence s_def(x, y = b); x ##1 y; endsequence\n"
+      "  cover property (@(posedge clk) s_def(a)) cdef++;\n"
+      "  initial #98 $display(\"cdef=%0d\", cdef);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("cdef=3\n"), std::string::npos);
+}
+
+// A typed formal's default stands where the formal does, a cycle delay among
+// them: with d defaulted to 3, `a ##3 b` matches from 5 and 55 alone, where
+// the delay read as 1 matched three times.
+TEST(NamedSequenceInstance, AnOmittedDelayFormalTakesItsDefault) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1010010000, bv = 10'b0101001010;\n"
+      "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  int c1 = 0;\n"
+      "  sequence s_def2(x, shortint d = 3); x ##d b; endsequence\n"
+      "  cover property (@(posedge clk) s_def2(a)) c1++;\n"
+      "  initial #98 $display(\"c1=%0d\", c1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c1=2\n"), std::string::npos);
+}
+
 }  // namespace
