@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_systask.h"
 #include "common/source_mgr.h"
@@ -653,6 +654,81 @@ TEST(AssertControlSim, DirectiveMaskStopsCoverImmediate) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.ImmediateCovers().Evaluated(), 0u);
+}
+
+// §20.11: Kill aborts the attempts of the selected assertions that are in
+// flight, and an aborted attempt reaches no verdict. `a` is high at the rises
+// of 25 and 45 and `b` never, so the attempts begun there fail at 35 and 55;
+// the kill at 32 aborts the one begun at 25, and the rise of 35 begins none,
+// checking being off until 42. The seven attempts with `a` low pass.
+TEST(AssertControlSim, AssertKillAbortsAnImplicationInFlight) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0010100000;\n"
+      "  bit a, b = 0;\n"
+      "  assign a = av[0];\n"
+      "  always @(negedge clk) av <= av << 1;\n"
+      "  int p = 0, f = 0;\n"
+      "  assert property (@(posedge clk) a |=> b) p++; else f++;\n"
+      "  initial begin\n"
+      "    #32 $assertkill;\n"
+      "    #10 $asserton;\n"
+      "  end\n"
+      "  initial #98 $display(\"p=%0d f=%0d\", p, f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p=7 f=1\n");
+}
+
+// The same for a sequential property: every attempt of `1 ##1 b` fails at
+// the rise after its own, but the one begun at 25 is aborted at 32 and the
+// rise of 35 begins none, so the attempts of 5, 15 and 45 to 85 fail, the one
+// of 95 ending with the run undecided.
+TEST(AssertControlSim, AssertKillAbortsASequenceInFlight) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit b = 0;\n"
+      "  int f = 0;\n"
+      "  assert property (@(posedge clk) 1 ##1 b) else f++;\n"
+      "  initial begin\n"
+      "    #32 $assertkill;\n"
+      "    #10 $asserton;\n"
+      "  end\n"
+      "  initial #98 $display(\"f=%0d\", f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f=7\n");
+}
+
+// §16.9.4 puts the attempt of an assertion naming a future sampled value
+// function in flight until the global clocking tick after its own. Each
+// attempt of `$rising_gclk(b)` fails there, `b` never rising; the kill at 7
+// aborts the one begun at 5, so the attempts of 15 to 85 fail, the one of 95
+// ending with the run undecided.
+TEST(AssertControlSim, AssertKillAbortsAFutureSampledValueAttemptInFlight) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  global clocking @(posedge clk); endclocking\n"
+      "  bit b = 0;\n"
+      "  int f = 0;\n"
+      "  assert property (@(posedge clk) $rising_gclk(b)) else f++;\n"
+      "  initial begin\n"
+      "    #7 $assertkill;\n"
+      "    #5 $asserton;\n"
+      "  end\n"
+      "  initial #98 $display(\"f=%0d\", f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f=8\n");
 }
 
 }  // namespace

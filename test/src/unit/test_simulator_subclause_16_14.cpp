@@ -137,4 +137,100 @@ TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
   EXPECT_EQ(out, "t.m_named failed at 15\n$finish at time 40\n");
 }
 
+// §16.14 and §27: a static concurrent assertion in a generate loop is
+// attempted at every tick of its clock, as one at module level is, whether the
+// clock is written on it, taken from the default clocking (§14.12), or the
+// operand is indexed by the genvar. a is low at the rises of 25, 45 and 55
+// alone, so each of the four fails three times.
+TEST(ConcurrentAssertionStatements, AStatementInAGenerateLoopIsAttempted) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111;\n"
+      "  always @(negedge clk) av <= av << 1;\n"
+      "  bit a; assign a = av[0];\n"
+      "  logic [1:0] v; assign v = {a, a};\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  int f0 = 0;\n"
+      "  assert property (a) else f0++;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g1\n"
+      "    int f = 0;\n"
+      "    assert property (@(posedge clk) a) else f++;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g2\n"
+      "    int f = 0;\n"
+      "    assert property (a) else f++;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g3\n"
+      "    int f = 0;\n"
+      "    assert property (@(posedge clk) v[i]) else f++;\n"
+      "  end\n"
+      "  initial #98 $display(\"f0=%0d f1=%0d f2=%0d f3=%0d\", f0, g1[0].f, "
+      "g2[0].f, g3[0].f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f0=3 f1=3 f2=3 f3=3\n");
+}
+
+// Each iteration of a generate loop holds an assertion of its own, reading its
+// own bit of v: bit 0 is low at three rises, bit 1 at the first five and bit 2
+// never, so the three instances fail three, five and no times.
+TEST(ConcurrentAssertionStatements,
+     EachGenerateIterationIsAnAssertionOfItsOwn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0000011111;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  logic [2:0] v; assign v = {1'b1, bv[0], av[0]};\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  for (genvar i = 0; i < 3; i++) begin : g\n"
+      "    int f = 0;\n"
+      "    assert property (v[i]) else f++;\n"
+      "  end\n"
+      "  initial #98 $display(\"f0=%0d f1=%0d f2=%0d\", g[0].f, g[1].f, "
+      "g[2].f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f0=3 f1=5 f2=0\n");
+}
+
+// §16.14: a concurrent assertion is a module item whatever the module's ports
+// are, so one reading an interface through a modport port or a port of the
+// interface's type, its clock the interface's own port, is attempted at every
+// tick. req is high at the rises of 15 and 45 and gnt at 25 alone, so the
+// attempt of 15 passes, that of 45 fails at 55 and the other eight pass
+// vacuously.
+TEST(ConcurrentAssertionStatements, AStatementReadsThroughAnInterfacePort) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "  modport mon(input clk, input req, input gnt);\n"
+      "endinterface\n"
+      "module chk_mp(bus.mon m);\n"
+      "  int p = 0, f = 0;\n"
+      "  assert property (@(posedge m.clk) m.req |=> m.gnt) p++; else f++;\n"
+      "endmodule\n"
+      "module chk_plain(bus m);\n"
+      "  int p = 0, f = 0;\n"
+      "  assert property (@(posedge m.clk) m.req |=> m.gnt) p++; else f++;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000, bv = 10'b0010000000;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  bus b(clk);\n"
+      "  assign b.req = av[0]; assign b.gnt = bv[0];\n"
+      "  chk_mp u1(b.mon);\n"
+      "  chk_plain u2(b);\n"
+      "  initial #98 $display(\"p=%0d f=%0d p2=%0d f2=%0d\", u1.p, u1.f, "
+      "u2.p, u2.f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p=9 f=1 p2=9 f2=1\n");
+}
+
 }  // namespace

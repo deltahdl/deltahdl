@@ -850,4 +850,8 @@ size_t PendingSequenceAttempts(const SequencePropertyState& state) {
   return state.attempts.size();
 }
 
+void AbortSequencePropertyAttempts(SequencePropertyState& state) {
+  state.attempts.clear();
+}
+
 }  // namespace delta

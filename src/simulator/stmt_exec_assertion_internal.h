@@ -1,6 +1,7 @@
 #pragma once
 
 #include <coroutine>
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -126,5 +127,11 @@ void ScheduleAssertionChildStart(Process* p, Region region, SimContext& ctx);
 void ExecConcurrentAssertionTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena);
+
+// §20.11: Kill aborts the attempts in flight of every concurrent assertion
+// whose assertion type and directive type the masks select, in whichever
+// process keeps them; the aborted attempts reach no verdict.
+void AbortKilledAttempts(uint32_t assertion_type, uint32_t directive_type,
+                         SimContext& ctx);
 
 }  // namespace delta

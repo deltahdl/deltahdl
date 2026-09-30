@@ -74,4 +74,7 @@ void ForEachPropertyActual(
 // false and a weak one true, and reaches its verdict.
 std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state);
 
+// §20.11: Kill aborts every attempt in flight, which reaches no verdict.
+void AbortPropertyTreeAttempts(PropertyTreeState& state);
+
 }  // namespace delta

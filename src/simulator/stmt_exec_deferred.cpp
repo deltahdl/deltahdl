@@ -746,6 +746,7 @@ static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
   auto* samples = SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
   auto* p = CreateAssertionChildProcess(ctx, arena, Region::kObserved);
   p->is_concurrent_clocked = true;
+  p->future_gclk_attempt_of = stmt;
   // The coroutine's body runs only when the attempt is first resumed, by
   // which time the scopes the assertion stands in have been popped, so they
   // are captured here.
@@ -774,6 +775,45 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
       JudgeAssertion(stmt, ctx, arena);
       samples.SetInstanceBindings(nullptr);
     }
+  }
+}
+
+// §20.11: the assertion_type and directive_type masks of a Kill, and whether
+// they select an assertion.
+struct KillMasks {
+  uint32_t assertion_type;
+  uint32_t directive_type;
+  bool Selects(const Stmt* stmt) const {
+    return (ImmediateAssertionTypeBit(stmt) & assertion_type) != 0 &&
+           (ImmediateDirectiveTypeBit(stmt) & directive_type) != 0;
+  }
+};
+
+// The attempts in flight that `proc` keeps of the assertions `kill` selects,
+// aborted. §16.9.4: an attempt waiting in a process of its own for the global
+// clocking tick is aborted with the process.
+static void AbortProcessAttempts(Process& proc, const KillMasks& kill) {
+  if (proc.future_gclk_attempt_of != nullptr &&
+      kill.Selects(proc.future_gclk_attempt_of)) {
+    proc.active = false;
+  }
+  for (auto& [stmt, state] : proc.property_tree_states) {
+    if (state != nullptr && kill.Selects(stmt)) {
+      AbortPropertyTreeAttempts(*state);
+    }
+  }
+  for (auto& [stmt, state] : proc.sequence_property_states) {
+    if (state != nullptr && kill.Selects(stmt)) {
+      AbortSequencePropertyAttempts(*state);
+    }
+  }
+}
+
+void AbortKilledAttempts(uint32_t assertion_type, uint32_t directive_type,
+                         SimContext& ctx) {
+  KillMasks kill{assertion_type, directive_type};
+  for (Process* proc : ctx.GetScheduler().Threads()) {
+    AbortProcessAttempts(*proc, kill);
   }
 }
 

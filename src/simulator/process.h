@@ -132,6 +132,10 @@ struct Process {
   // it evaluates, empty for every process whose property names none of the five
   // future sampled value functions. RtlirProcess::gclk_future_event says why.
   std::vector<EventExpr> gclk_future_event;
+  // §16.9.4: the assertion whose one attempt this process carries until the
+  // global clocking tick answers it, which §20.11's Kill aborts; nullptr for
+  // every other process.
+  const Stmt* future_gclk_attempt_of = nullptr;
 
   WaitForkState wait_fork_state;
 

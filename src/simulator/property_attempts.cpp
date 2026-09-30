@@ -930,4 +930,8 @@ std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
   return verdicts;
 }
 
+void AbortPropertyTreeAttempts(PropertyTreeState& state) {
+  state.attempts.clear();
+}
+
 }  // namespace delta

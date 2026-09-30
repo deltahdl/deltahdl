@@ -177,17 +177,21 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
         arena_.Create<std::string>(port_prefix + std::string(var.name));
     ctx_.AliasVariable(*alias, conn_prefix + std::string(var.name));
   }
-  for (const auto& net : ifc->nets) {
-    auto* alias =
-        arena_.Create<std::string>(port_prefix + std::string(net.name));
-    std::string target = conn_prefix + std::string(net.name);
-    // A net shares one storage between its net-map entry (driver resolution)
-    // and its variable-map entry (value reads). Alias both, like LowerAliases,
-    // so a continuous assign driven through the port reaches the shared net and
-    // the value is observable on the connected interface instance.
+  // A net shares one storage between its net-map entry (driver resolution)
+  // and its variable-map entry (value reads). Alias both, like LowerAliases,
+  // so a continuous assign driven through the port reaches the shared net and
+  // the value is observable on the connected interface instance.
+  auto alias_net = [&](std::string_view name) {
+    auto* alias = arena_.Create<std::string>(port_prefix + std::string(name));
+    std::string target = conn_prefix + std::string(name);
     ctx_.AliasNet(*alias, target);
     ctx_.AliasVariable(*alias, target);
-  }
+  };
+  for (const auto& net : ifc->nets) alias_net(net.name);
+  // The interface's own ports are members too, the `clk` of
+  // `interface bus(input logic clk)` among them, whether §23.2.2.3 makes the
+  // port a net or a variable.
+  for (const RtlirPort& ifc_port : ifc->ports) alias_net(ifc_port.name);
   // §25.5.5 (printed pages 791-792): the interface's clocking blocks are its
   // members too, reached through the port as `b1.sb` is from the program the
   // port is declared in, so each block, and the event variable §14.10 names by

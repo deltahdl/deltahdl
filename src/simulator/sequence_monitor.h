@@ -93,4 +93,7 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
 // run ends.
 size_t PendingSequenceAttempts(const SequencePropertyState& state);
 
+// §20.11: Kill aborts every attempt in flight, which reaches no verdict.
+void AbortSequencePropertyAttempts(SequencePropertyState& state);
+
 }  // namespace delta

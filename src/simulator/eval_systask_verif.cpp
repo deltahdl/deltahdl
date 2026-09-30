@@ -16,6 +16,7 @@
 #include "simulator/expr_walk.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/sva_engine_queues.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
@@ -516,9 +517,13 @@ static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
       ctx.SetGlobalAssertFailActionOn();
       break;
     case AssertControlType::kOff:
-    case AssertControlType::kKill:
-      // §20.11: Off/Kill stop the checking of the selected assertions.
+      // §20.11: Off stops the checking of the selected assertions.
       ctx.SetGlobalAssertCheckingOff(inv.assertion_type, inv.directive_type);
+      break;
+    case AssertControlType::kKill:
+      // §20.11: Kill stops it too, and aborts their attempts in flight.
+      ctx.SetGlobalAssertCheckingOff(inv.assertion_type, inv.directive_type);
+      AbortKilledAttempts(inv.assertion_type, inv.directive_type, ctx);
       break;
     case AssertControlType::kFailOn:
       ctx.SetGlobalAssertFailActionOn();

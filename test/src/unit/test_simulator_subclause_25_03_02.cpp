@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -158,6 +160,39 @@ TEST(InterfaceNamedBundleSim, VariableRefAccessViaWildcardConnection) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"top.sb_intf.gnt", 1u}});
+}
+
+// §25.3.2 and §25.5: the interface's own ports are among the members a port
+// of its type shares with the connected instance, so `b.clk`, the `clk` of
+// `interface A_Bus(input logic clk)`, reads the instance's clk and an event
+// control on it wakes at its edges, through the plain port and through a
+// modport port alike. clk rises at 5, 15 and 25 before the display at 28.
+TEST(InterfaceNamedBundleSim, TheInterfacesOwnPortIsReachedThroughThePort) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface A_Bus(input logic clk);\n"
+      "  logic req;\n"
+      "  modport DUT(input clk, input req);\n"
+      "endinterface\n"
+      "module dev(A_Bus b);\n"
+      "  int n = 0;\n"
+      "  always @(posedge b.clk) n++;\n"
+      "endmodule\n"
+      "module mdev(A_Bus.DUT b);\n"
+      "  int n = 0;\n"
+      "  always @(posedge b.clk) n++;\n"
+      "  initial #7 $display(\"clk=%b\", b.clk);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  A_Bus b2(clk);\n"
+      "  dev d(b2);\n"
+      "  mdev m(b2);\n"
+      "  initial #28 begin $display(\"n=%0d m=%0d\", d.n, m.n); $finish; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "clk=1\nn=3 m=3\n$finish at time 28\n");
 }
 
 }  // namespace
