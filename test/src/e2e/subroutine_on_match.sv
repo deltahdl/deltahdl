@@ -5,8 +5,11 @@
 // evaluation waiting on them; an argument passed by value reads the sampled
 // value the match was evaluated with, and a local variable assigned before
 // the call in the list may be passed by value. The clause's s1 and three
-// sequences beside it run below, clk rising at 5, 15, 25, ... so that tick n
-// is at 10n - 5, the tick counter counting straight through.
+// sequences beside it run below, each evaluated by a cover sequence, which
+// reaches every end point of its sequence, since a declaration alone is
+// evaluated nowhere and so calls nothing; every_end's sequence is written in
+// its cover sequence rather than named. clk rises at 5, 15, 25, ... so that
+// tick n is at 10n - 5, the tick counter counting straight through.
 //
 // s1 matches at the first b strictly after an a, and its $display writes v
 // and w as assigned from e and f: a is high at tick 1 with e high and b at 3
@@ -50,10 +53,6 @@ module subroutine_on_match;
       (b[->1], w = f, $display("b after a with v = %h, w = %h", v, w));
   endsequence
 
-  sequence every_end;
-    @(posedge clk) (c ##[1:2] d, $display("c ##[1:2] d ends at tick %0d", tick));
-  endsequence
-
   sequence in_order;
     @(posedge clk) (g, $display("first at tick %0d", tick),
                        $display("second at tick %0d", tick), note(tick));
@@ -62,6 +61,12 @@ module subroutine_on_match;
   sequence sampled;
     @(posedge clk) (h, show(k, k));
   endsequence
+
+  cover sequence (s1);
+  every_end: cover sequence (@(posedge clk)
+    (c ##[1:2] d, $display("c ##[1:2] d ends at tick %0d", tick)));
+  cover sequence (in_order);
+  cover sequence (sampled);
 
   initial #450 $finish;
 endmodule
