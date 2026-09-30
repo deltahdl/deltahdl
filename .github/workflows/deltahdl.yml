@@ -9,8 +9,8 @@ concurrency:
 # the next shard, and a target registered anywhere but last in
 # test/CMakeLists.txt, which 7 of the 200 commits before this one did, sent
 # most of every slice to a shard whose ccache or ctcache had never held it.
-# The price is evenness: of the 3,269 unit-test targets, seventeen shards get
-# 177 to 210 by hash where position would give 192 or 193. The hash is a
+# The price is evenness: of the 3,271 unit-test targets, twenty shards get
+# 149 to 183 by hash where position would give 163 or 164. The hash is a
 # polynomial over the printable ASCII a target name or path is made of, kept
 # below 2^53 so every awk computes it exactly, and s is added to 0 so a shard
 # spelled '07' compares as the number 7.
@@ -1201,7 +1201,8 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
       # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
       # to compile, and this step bounds the cache instead: it evicts every
@@ -1231,7 +1232,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   build-coverage-lib:
     # Every coverage shard compiled the whole instrumented deltahdl target
     # before its slice of the unit tests, so the same 284 translation units
@@ -1563,7 +1565,8 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
       # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
       # to compile, and this step bounds the cache instead: it evicts every
@@ -1593,7 +1596,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   build-ubuntu-24-04-x86-64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1644,7 +1648,8 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk -v n=4 -v s=${{ matrix.shard }} "$SHARD_SLICE")
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
       # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
       # to compile, and this step bounds the cache instead: it evicts every
@@ -1674,7 +1679,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   build-ubuntu-24-04-x86-64-gcc:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1725,7 +1731,8 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk -v n=5 -v s=${{ matrix.shard }} "$SHARD_SLICE")
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
       # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
       # to compile, and this step bounds the cache instead: it evicts every
@@ -1755,7 +1762,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   # Decides which googletest release the run builds against, and makes sure
   # its archive is in the cache before any job that configures the test tree
   # starts. The release is whichever one google/googletest has published most
@@ -1893,7 +1901,7 @@ jobs:
   # its uses; a header that fails prints what the tool would change and fails
   # the step, and one that does not compile on its own fails it the same way.
   #
-  # The headers are split across eight shards by SHARD_SLICE, at the top of
+  # The headers are split across twenty shards by SHARD_SLICE, at the top of
   # this file, drawn once over their paths relative to the checkout and written
   # to a list both steps after it read, since the compile commands name each
   # header by its absolute path and the check by its relative one. A shard
@@ -1968,7 +1976,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
@@ -2041,7 +2050,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
@@ -2112,9 +2122,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['00', '01', '02', '03', '04', '05',
-                '06', '07', '08', '09', '10', '11',
-                '12', '13', '14', '15']
+        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   copy-paste-src:
     runs-on: ubuntu-latest
     steps:
@@ -2736,7 +2745,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   unit-test-coverage:
     # A shard compiles and runs its slice of the unit tests, caching the
     # instrumented objects it makes and nothing else, src/ arriving prebuilt.
@@ -2788,11 +2798,6 @@ jobs:
     # to write a whole slice, against 7.8 to 10.5 for level 10 and 5.3 to 10.6
     # for level 6. Ten costs what the levels below it cost, and the level above
     # it costs twenty times as much.
-    #
-    # The shards start once every clang-tidy-test shard has finished, whatever
-    # it concluded: clang-tidy-test is in `needs` for the ordering alone, and
-    # the condition tests only build-coverage-lib, whose artifact the shard
-    # unpacks, so a red or skipped clang-tidy shard holds nothing back.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -2800,7 +2805,7 @@ jobs:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
     name: unit-test-coverage-shard-${{ matrix.shard }}
-    needs: [build-coverage-lib, clang-tidy-test]
+    needs: build-coverage-lib
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -3074,7 +3079,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16']
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
@@ -3116,7 +3121,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   unit-test-ubuntu-24-04-x86-64-clang:
     name: unit-test-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-clang
@@ -3140,7 +3146,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   unit-test-ubuntu-24-04-x86-64-gcc:
     name: unit-test-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-gcc
@@ -3164,7 +3171,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19]
   # Nothing is held behind this job. The argument that a linter is only as
   # trustworthy as the file defining it would put every scanning job in this
   # workflow behind it, and acting on it would let a YAML breach leave the
