@@ -75,7 +75,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [The sv-tests build exception](the-sv-tests-build-exception.md) — build only to run one already-failing file, only for the stdout the log drops.
 - [A stash round trip leaves the build stale](stale-build-after-a-stash.md) — build the unchanged binary for a comparison in a worktree or scratch directory, never by stash, build and pop in build/.
-- [A local coverage build](local-coverage-build.md) — per-line coverage of one file needs an instrumented build with the flags passed by hand; DELTAHDL_COVERAGE=ON wants lld, which the Mac lacks.
+- [A local coverage build](local-coverage-build.md) — per-line coverage of one file needs an instrumented build with the flags passed by hand; DELTAHDL_COVERAGE=ON wants lld, which the Mac lacks; compare missed regions, as CI counts a line missed where a zero region starts.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.
 
