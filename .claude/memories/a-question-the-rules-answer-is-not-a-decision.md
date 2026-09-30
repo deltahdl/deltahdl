@@ -1,6 +1,6 @@
 ---
 name: a-question-the-rules-answer-is-not-a-decision
-description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the LRM already answer the question; if one does, act on it"
+description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the standards (1800-2023, 1800-2017, 1800.2-2020, and the clauses that cite or parallel the rule) already answer the question; if one does, act on it"
 metadata:
   node_type: memory
   type: feedback
@@ -9,8 +9,8 @@ metadata:
 # A question the rules answer is not a decision
 
 An issue is labelled 'needs decision' only for a question that the autopilot
-skill's standing reminders, the issue itself, the linked issues and the LRM
-all leave open. A question they answer is acted on, with its answer and what
+skill's standing reminders, the issue itself, the linked issues and the
+standards all leave open. A question they answer is acted on, with its answer and what
 the answer rests on written into the issue.
 
 **Why:** A question the rules already answer has its answer; labelled 'needs
@@ -19,6 +19,14 @@ Questions of order are the usual case: the reminder to solve whatever issues
 the original one depends on answers them.
 
 **How to apply:** Before writing a question for a person, test it against each
-reminder and against the blocked-by links. Questions of order or priority
+reminder and against the blocked-by links. For a question of what the language
+allows, read the rule in all three standards: `~/IEEE 1800-2023.pdf`, the same
+rule in `~/IEEE 1800-2017.pdf` per [[the-2017-edition]], and
+`~/IEEE 1800.2-2020.pdf`; write what each says into the issue, pages included.
+Read beyond the clause itself too: the clause that states the parallel rule
+for a sibling construct, and every clause that cites this one, often settle
+a reading the clause alone leaves open, as §16.3's grant for immediate
+assertions and §17.3's use of the §16.14 list settle that §16.14's list of
+places is the whole grant. Questions of order or priority
 between issues the loop selects are answered that way. Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.

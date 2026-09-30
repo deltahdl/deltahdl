@@ -95,7 +95,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
 - [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there; never a name the reader must already know.
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out; never append round after round.
-- [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and the LRM leave the question open; order and priority never qualify.
+- [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and all three standards (1800-2023, 1800-2017, 1800.2-2020, with the clauses citing or paralleling the rule) leave the question open; order and priority never qualify.
 
 ## Tasks
 
