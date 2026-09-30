@@ -441,16 +441,13 @@ struct SequencePortScan {
     }
     lexer.Next();
     expect_formal_name = false;
-    RecordDefault(lexer, item);
+    RecordDefault(item);
   }
 
   // §16.8: the default actual itself, kept beside the formal for an instance
-  // that omits the formal to take. §16.14.7's inferred functions are left to
-  // HandleSystemDefaultValue, which checks and records them apart.
-  void RecordDefault(Lexer& lexer, ModuleItem* item) {
+  // that omits the formal to take.
+  void RecordDefault(ModuleItem* item) {
     if (parser == nullptr || item->prop_formal_defaults.empty()) return;
-    std::string_view head = lexer.Peek().text;
-    if (head == "$inferred_clock" || head == "$inferred_disable") return;
     item->prop_formal_defaults.back() =
         ParserPropertySpecHelpers::ParseFormalDefault(*parser);
   }

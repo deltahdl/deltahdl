@@ -191,6 +191,8 @@ bool IsDisallowedLocalVarTypeKw(TokenKind k) {
 
 // §16.12 named-property port-list scan state carried across loop iterations.
 struct PropertyPortScan {
+  // The parser whose lexer the scan reads, which parses a formal's default.
+  Parser* parser = nullptr;
   int depth = 1;
   bool expect_formal_name = true;
   bool saw_local = false;
@@ -232,6 +234,8 @@ struct PropertyPortScan {
     item->prop_formal_type_kw.push_back(carry_type_kw);
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
+    item->prop_formal_has_default.push_back(false);
+    item->prop_formal_defaults.push_back(nullptr);
     item->prop_formal_inferred.push_back(InferredDefault::kNone);
     expect_formal_name = false;
     saw_local = false;
@@ -344,14 +348,26 @@ struct PropertyPortScan {
     }
   }
 
+  // §16.12 with §16.8: `formal = default` gives the formal just harvested a
+  // default actual argument, kept beside it for an instance that omits the
+  // formal to take.
+  void HandleDefaultEq(Lexer& lexer, ModuleItem* item) {
+    lexer.Next();
+    expect_formal_name = false;
+    if (item->prop_formal_defaults.empty()) return;
+    item->prop_formal_has_default.back() = true;
+    if (parser == nullptr) return;
+    item->prop_formal_defaults.back() =
+        ParserPropertySpecHelpers::ParseFormalDefault(*parser);
+  }
+
   bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kComma)) {
       lexer.Next();
       expect_formal_name = true;
       saw_local = false;
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
-      lexer.Next();
-      expect_formal_name = false;
+      HandleDefaultEq(lexer, item);
     } else if (LexerCheck(lexer, TokenKind::kKwLocal)) {
       lexer.Next();
       saw_local = true;
@@ -414,9 +430,10 @@ struct PropertyPortScan {
 // ')' , recording formal names and their local-variable qualification while
 // policing the §16.12.19 direction rules. Behaviour matches the original
 // inline loop exactly.
-static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
-                                  ModuleItem* item) {
+static void ParsePropertyPortList(Parser& parser, Lexer& lexer,
+                                  DiagEngine& diag, ModuleItem* item) {
   PropertyPortScan scan;
+  scan.parser = &parser;
   while (scan.depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
     if (!scan.Step(lexer, diag, item)) break;
   }
@@ -892,7 +909,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
   item->name = Expect(TokenKind::kIdentifier, Subclause("16.12")).text;
 
   if (Match(TokenKind::kLParen)) {
-    ParsePropertyPortList(lexer_, diag_, item);
+    ParsePropertyPortList(*this, lexer_, diag_, item);
   }
 
   Expect(TokenKind::kSemicolon, Subclause("16.12"));

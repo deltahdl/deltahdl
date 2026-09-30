@@ -394,13 +394,13 @@ TEST(SequenceDeclaration, MalformedSequenceHeaderNames16_8) {
 // argument, which an instance that omits the formal takes, so the parser keeps
 // the expression beside the formal: an identifier, a literal, and a sequence
 // expression, where a formal with none, and one whose default is §16.14.7's
-// $inferred_clock, which is carried by prop_formal_inferred instead, keep
-// none.
+// $inferred_clock, `untyped` so that the shortint before it does not carry to
+// it, which is carried by prop_formal_inferred instead, keep none.
 TEST(SequenceDeclaration, AFormalsDefaultActualIsRecorded) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b;\n"
-      "  sequence s(x, y = b, shortint d = 3, e = $inferred_clock,\n"
+      "  sequence s(x, y = b, shortint d = 3, untyped e = $inferred_clock,\n"
       "             sequence z = a ##1 b);\n"
       "    x ##d y;\n"
       "  endsequence\n"

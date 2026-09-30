@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -262,6 +263,41 @@ TEST(PropertyDeclaration, MalformedPropertyHeaderNames16_12) {
       "  endproperty\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "16.12"));
+}
+
+// §16.12: a formal of a property declaration may declare a default actual
+// argument, which an instance that omits the formal takes, so the parser keeps
+// the expression beside the formal, and marks the formal as having one: an
+// identifier, a literal, and a property expression, where a formal with none,
+// and one whose default is §16.14.7's $inferred_clock, `untyped` so that the
+// int before it does not carry to it, keep none.
+TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  property p(x, y = b, int d = 3, untyped e = $inferred_clock,\n"
+      "            property q = a |-> b);\n"
+      "    x ##d y;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formal_defaults.size(), 5u);
+  ASSERT_EQ(item->prop_formal_has_default.size(), 5u);
+  EXPECT_FALSE(item->prop_formal_has_default[0]);
+  EXPECT_TRUE(item->prop_formal_has_default[1]);
+  EXPECT_TRUE(item->prop_formal_has_default[3]);
+  EXPECT_EQ(item->prop_formal_defaults[0], nullptr);
+  ASSERT_NE(item->prop_formal_defaults[1], nullptr);
+  EXPECT_EQ(item->prop_formal_defaults[1]->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->prop_formal_defaults[1]->text, "b");
+  ASSERT_NE(item->prop_formal_defaults[2], nullptr);
+  EXPECT_EQ(item->prop_formal_defaults[2]->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(item->prop_formal_defaults[3], nullptr);
+  ASSERT_NE(item->prop_formal_defaults[4], nullptr);
+  EXPECT_NE(item->prop_formal_defaults[4]->property_actual, nullptr);
 }
 
 }  // namespace

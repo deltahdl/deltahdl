@@ -1,3 +1,4 @@
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -268,10 +269,14 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   return holder;
 }
 
-// §16.8: a formal's default actual argument, read as an actual argument is,
-// ending at the ',' or ')' after it; null, with the position put back, where
-// it is not one, so the port list scan reads its tokens as it would have.
+// §16.8 and §16.12: a formal's default actual argument, read as an actual
+// argument is, ending at the ',' or ')' after it; null, with the position put
+// back, where it is not one, so the port list scan reads its tokens as it
+// would have. §16.14.7's inferred functions are null too, left to the scan,
+// which checks and records them apart.
 Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
+  std::string_view head = p.lexer_.Peek().text;
+  if (head == "$inferred_clock" || head == "$inferred_disable") return nullptr;
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   bool plain = true;
