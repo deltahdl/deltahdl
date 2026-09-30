@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -218,9 +219,58 @@ static bool IsImplicationExpr(const Expr* e) {
          (e->op == TokenKind::kPipeDashGt || e->op == TokenKind::kPipeEqGt);
 }
 
+// §9.4.2: whether `k` is an edge_identifier, which opens an event.
+static bool IsEdgeKeyword(TokenKind k) {
+  return k == TokenKind::kKwPosedge || k == TokenKind::kKwNegedge ||
+         k == TokenKind::kKwEdge;
+}
+
+// §9.4.2: two events of an event expression given as an actual argument
+// joined by `op`, `or` joining two events and `iff` an event and its guard.
+Expr* ParserPropertySpecHelpers::JoinActualEvents(Parser& p, TokenKind op,
+                                                  Expr* lhs, Expr* rhs) {
+  auto* joint = p.arena_.Create<Expr>();
+  joint->kind = ExprKind::kBinary;
+  joint->op = op;
+  joint->lhs = lhs;
+  joint->rhs = rhs;
+  joint->range.start = lhs->range.start;
+  return joint;
+}
+
+// §9.4.2: one event of an event expression given as an actual argument, an
+// edge keyword over its signal, or the signal alone where no edge keyword is
+// written, under an `iff` holding its guard where one is written.
+Expr* ParserPropertySpecHelpers::ParseActualEvent(Parser& p) {
+  Token head = p.CurrentToken();
+  EventExpr ev = p.ParseSingleEvent();
+  Expr* event = ev.signal;
+  if (ev.edge != Edge::kNone) {
+    event = p.arena_.Create<Expr>();
+    event->kind = ExprKind::kUnary;
+    event->op = head.kind;
+    event->text = head.text;
+    event->range.start = head.loc;
+    event->lhs = ev.signal;
+  }
+  if (ev.iff_condition == nullptr) return event;
+  return JoinActualEvents(p, TokenKind::kKwIff, event, ev.iff_condition);
+}
+
+// §16.8.1 b) and §9.4.2: an event expression opening with an edge keyword,
+// given as the actual argument of a formal of type event: its events, each
+// with any iff guard, joined by `or`.
+Expr* ParserPropertySpecHelpers::ParseEventActual(Parser& p) {
+  Expr* event = ParseActualEvent(p);
+  while (p.Match(TokenKind::kKwOr)) {
+    event = JoinActualEvents(p, TokenKind::kKwOr, event, ParseActualEvent(p));
+  }
+  return event;
+}
+
 // §16.12.18: one actual argument of a property instance: `$`, kept as an
 // identifier named `$`; an event expression opening with an edge keyword,
-// kept as the edge over its signal for a formal of type event; an
+// kept as ParseEventActual reads it for a formal of type event; an
 // expression running to the comma or parenthesis ending the argument; or,
 // where the tokens are not one, a sequence_expr or a property_expr for a
 // formal of type sequence or property, read as a property and carried by
@@ -237,17 +287,9 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     dollar->range.start = tok.loc;
     return dollar;
   }
-  if (p.Check(TokenKind::kKwPosedge) || p.Check(TokenKind::kKwNegedge) ||
-      p.Check(TokenKind::kKwEdge)) {
+  if (IsEdgeKeyword(p.CurrentToken().kind)) {
     plain = false;
-    Token edge = p.Consume();
-    auto* event = p.arena_.Create<Expr>();
-    event->kind = ExprKind::kUnary;
-    event->op = edge.kind;
-    event->text = edge.text;
-    event->range.start = edge.loc;
-    event->lhs = p.ParseExpr();
-    return event->lhs != nullptr ? event : nullptr;
+    return ParseEventActual(p);
   }
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
@@ -272,11 +314,15 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
 // §16.8 and §16.12: a formal's default actual argument, read as an actual
 // argument is, ending at the ',' or ')' after it; null, with the position put
 // back, where it is not one, so the port list scan reads its tokens as it
-// would have. §16.14.7's inferred functions are null too, left to the scan,
-// which checks and records them apart.
+// would have. A default opening with an edge keyword can be nothing but an
+// event expression, so where it is not one, §9.4.2's syntax is reported.
+// §16.14.7's inferred functions are null too, left to the scan, which checks
+// and records them apart.
 Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
-  std::string_view head = p.lexer_.Peek().text;
-  if (head == "$inferred_clock" || head == "$inferred_disable") return nullptr;
+  Token head = p.CurrentToken();
+  if (head.text == "$inferred_clock" || head.text == "$inferred_disable") {
+    return nullptr;
+  }
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   bool plain = true;
@@ -287,6 +333,12 @@ Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
     return actual;
   }
   p.lexer_.RestorePos(saved);
+  if (IsEdgeKeyword(head.kind)) {
+    p.diag_.Error(head.loc,
+                  "a default actual argument opening with an edge keyword is "
+                  "not an event expression",
+                  Subclause("9.4.2"));
+  }
   return nullptr;
 }
 

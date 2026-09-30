@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 
@@ -33,6 +34,23 @@ ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
 ActualsByFormal BindActualsWithDefaults(
     const std::vector<std::string_view>& formals,
     const std::vector<Expr*>& defaults, const Expr* instance);
+
+// §16.8.1 b) and §9.4.2: whether `actual` is an event expression given to a
+// formal of type event as the parser keeps one: an edge keyword over its
+// signal, an `iff` over an event and its guard, or an `or` of two events.
+bool IsEventActual(const Expr* actual);
+
+// §9.4.2: the events the event expression `actual` joins by `or`, each with
+// its edge, none where no edge keyword is written, its signal and its guard.
+std::vector<EventExpr> EventsOfActual(Expr* actual);
+
+// §16.8.1 b) and §9.4.2: the events a clock event `ev` stands for where the
+// formal it names is bound to the event expression `actual`, appended to
+// `out`: one for each event of the actual, with that event's edge and signal,
+// guarded where `ev`'s own guard and the event's both hold. `ev`'s guard is
+// taken as it is, its formals already substituted.
+void AppendActualEvents(const EventExpr& ev, Expr* actual, Arena& arena,
+                        std::vector<EventExpr>& out);
 
 // §16.8 and §16.12: the name an instance of a named sequence or property is
 // declared or registered under: its bare name, written as an identifier or

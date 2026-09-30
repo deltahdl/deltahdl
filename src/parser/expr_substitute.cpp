@@ -6,7 +6,9 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 
@@ -60,6 +62,79 @@ ActualsByFormal BindActualsWithDefaults(
     }
   }
   return actuals;
+}
+
+namespace {
+
+bool IsEdgeEvent(const Expr* e) {
+  return e->kind == ExprKind::kUnary &&
+         (e->op == TokenKind::kKwPosedge || e->op == TokenKind::kKwNegedge ||
+          e->op == TokenKind::kKwEdge);
+}
+
+bool IsJoint(const Expr* e, TokenKind op) {
+  return e->kind == ExprKind::kBinary && e->op == op;
+}
+
+// §9.4.2: a guard holding where `own` and `other` both hold, the one alone
+// where the other is null.
+Expr* ConjoinGuards(Expr* own, Expr* other, Arena& arena) {
+  if (own == nullptr) return other;
+  if (other == nullptr) return own;
+  auto* both = arena.Create<Expr>();
+  both->kind = ExprKind::kBinary;
+  both->op = TokenKind::kAmpAmp;
+  both->lhs = own;
+  both->rhs = other;
+  both->range = own->range;
+  return both;
+}
+
+void CollectEvents(Expr* e, std::vector<EventExpr>& out) {
+  if (IsJoint(e, TokenKind::kKwOr)) {
+    CollectEvents(e->lhs, out);
+    CollectEvents(e->rhs, out);
+    return;
+  }
+  EventExpr ev;
+  if (IsJoint(e, TokenKind::kKwIff)) {
+    ev.iff_condition = e->rhs;
+    e = e->lhs;
+  }
+  ev.signal = e;
+  if (IsEdgeEvent(e)) {
+    ev.edge = e->op == TokenKind::kKwPosedge   ? Edge::kPosedge
+              : e->op == TokenKind::kKwNegedge ? Edge::kNegedge
+                                               : Edge::kEdge;
+    ev.signal = e->lhs;
+  }
+  out.push_back(ev);
+}
+
+}  // namespace
+
+bool IsEventActual(const Expr* actual) {
+  return actual != nullptr &&
+         (IsEdgeEvent(actual) || IsJoint(actual, TokenKind::kKwIff) ||
+          IsJoint(actual, TokenKind::kKwOr));
+}
+
+std::vector<EventExpr> EventsOfActual(Expr* actual) {
+  std::vector<EventExpr> events;
+  CollectEvents(actual, events);
+  return events;
+}
+
+void AppendActualEvents(const EventExpr& ev, Expr* actual, Arena& arena,
+                        std::vector<EventExpr>& out) {
+  for (const EventExpr& event : EventsOfActual(actual)) {
+    EventExpr copy = ev;
+    copy.edge = event.edge;
+    copy.signal = event.signal;
+    copy.iff_condition =
+        ConjoinGuards(ev.iff_condition, event.iff_condition, arena);
+    out.push_back(copy);
+  }
 }
 
 std::string InstanceDeclName(const Expr* instance) {

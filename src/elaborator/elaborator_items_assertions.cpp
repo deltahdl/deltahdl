@@ -143,7 +143,8 @@ void CollectBodyClocks(const SeqLinearBody& body,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth);
 
-EventExpr InstanceClockEvent(EventExpr ev, const ActualsByFormal& actuals);
+void AppendInstanceClockEvents(EventExpr ev, const ActualsByFormal& actuals,
+                               std::vector<EventExpr>& out);
 
 // §16.13.3 with §16.8.1: an operand instantiating a named sequence brings the
 // clock the sequence is declared with, the instance's actuals in its formals'
@@ -157,7 +158,7 @@ void CollectInstanceSequenceClocks(const Expr* operand,
   ActualsByFormal actuals = BindActualsWithDefaults(
       decl->prop_formals, decl->prop_formal_defaults, operand);
   for (const EventExpr& ev : decl->seq_clock) {
-    AppendClockOnce(out, InstanceClockEvent(ev, actuals));
+    AppendInstanceClockEvents(ev, actuals, out);
   }
   CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
 }
@@ -193,29 +194,25 @@ void CollectTreeClocks(const PropertyExprNode* node,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth);
 
-// §16.13.2 by way of §16.8.1: one event of an instantiated property's
+// §16.13.2 by way of §16.8.1: the events of an instantiated property's
 // declared clock with the actual in the formal's place, for the process to
-// wake on: an event actual supplies the edge and the signal, and any other
-// stands as the signal under the edge the clock wrote.
-EventExpr InstanceClockEvent(EventExpr ev, const ActualsByFormal& actuals) {
-  if (ev.signal == nullptr || ev.signal->kind != ExprKind::kIdentifier) {
-    return ev;
+// wake on, each appended to `out` once: an event actual supplies its events,
+// each with its edge, its signal and its own guard, and any other stands as
+// the signal under the edge the clock wrote. The clock's own guard, which the
+// evaluation applies, is not needed to wake.
+void AppendInstanceClockEvents(EventExpr ev, const ActualsByFormal& actuals,
+                               std::vector<EventExpr>& out) {
+  if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
+    auto it = actuals.find(ev.signal->text);
+    if (it != actuals.end() && IsEventActual(it->second)) {
+      for (const EventExpr& event : EventsOfActual(it->second)) {
+        AppendClockOnce(out, event);
+      }
+      return;
+    }
+    if (it != actuals.end() && it->second != nullptr) ev.signal = it->second;
   }
-  auto it = actuals.find(ev.signal->text);
-  if (it == actuals.end() || it->second == nullptr) return ev;
-  Expr* actual = it->second;
-  if (actual->kind == ExprKind::kUnary &&
-      (actual->op == TokenKind::kKwPosedge ||
-       actual->op == TokenKind::kKwNegedge ||
-       actual->op == TokenKind::kKwEdge)) {
-    ev.edge = actual->op == TokenKind::kKwPosedge   ? Edge::kPosedge
-              : actual->op == TokenKind::kKwNegedge ? Edge::kNegedge
-                                                    : Edge::kEdge;
-    ev.signal = actual->lhs;
-    return ev;
-  }
-  ev.signal = actual;
-  return ev;
+  AppendClockOnce(out, ev);
 }
 
 // §16.13: the clocks an instance among the tree's booleans brings: those of
@@ -233,7 +230,7 @@ void CollectInstanceClocks(const Expr* instance,
     ActualsByFormal actuals = BindActualsWithDefaults(
         decl->prop_formals, decl->prop_formal_defaults, instance);
     for (const EventExpr& ev : decl->prop_clock) {
-      AppendClockOnce(out, InstanceClockEvent(ev, actuals));
+      AppendInstanceClockEvents(ev, actuals, out);
     }
     CollectTreeClocks(decl->prop_body_tree, registry, out, depth + 1);
   }
@@ -423,10 +420,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->sensitivity.clear();
-  for (const EventExpr& ev : clock) {
-    item->sensitivity.push_back(SubstituteClockEvent(ev, actuals, arena));
-  }
+  item->sensitivity = SubstituteClockEvents(clock, actuals, arena);
   item->body = stmt;
 }
 

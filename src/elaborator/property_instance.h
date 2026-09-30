@@ -24,10 +24,12 @@ struct RtlirModule;
 // instance is evaluated as the body's tree.
 bool InstanceHasTreeActual(const Expr* instance);
 
-// §16.12.18 by way of §16.8.1: one event of the instantiated property's
-// clock with the actuals in the formals' places.
-EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
-                               Arena& arena);
+// §16.12.18 by way of §16.8.1: the clock of the instantiated property or
+// sequence with the actuals in the formals' places, each event actual an
+// event expression standing for its events.
+std::vector<EventExpr> SubstituteClockEvents(
+    const std::vector<EventExpr>& clock, const ActualsByFormal& actuals,
+    Arena& arena);
 
 // §16.16 (f) with §16.8.1: the clock the named sequence `seq` is declared
 // with, as its instance `instance` has it, each formal the clock names

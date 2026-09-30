@@ -237,9 +237,7 @@ void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
   const std::vector<EventExpr>& clock = decl->prop_clock.empty()
                                             ? FlowedBodyClock(decl, registry)
                                             : decl->prop_clock;
-  for (const EventExpr& ev : clock) {
-    stmt->assert_clock.push_back(SubstituteClockEvent(ev, actuals, arena));
-  }
+  stmt->assert_clock = SubstituteClockEvents(clock, actuals, arena);
 }
 
 // §16.12.1 and §16.13.4, for a statement in procedural code: the body of

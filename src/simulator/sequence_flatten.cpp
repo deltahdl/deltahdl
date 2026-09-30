@@ -28,20 +28,6 @@ namespace {
 // cycle it is handed all the same ends the instance rather than the run.
 constexpr int kMaxInstanceDepth = 16;
 
-// Whether an actual is the edge-and-signal form ParseSequenceActualArg keeps
-// for a formal of type event.
-bool IsEventActual(const Expr* e) {
-  return e != nullptr && e->kind == ExprKind::kUnary &&
-         (e->op == TokenKind::kKwPosedge || e->op == TokenKind::kKwNegedge ||
-          e->op == TokenKind::kKwEdge);
-}
-
-Edge EdgeOfActual(const Expr* e) {
-  if (e->op == TokenKind::kKwPosedge) return Edge::kPosedge;
-  if (e->op == TokenKind::kKwNegedge) return Edge::kNegedge;
-  return Edge::kEdge;
-}
-
 // §16.8.1 (c): an actual bound to a formal of a keyword data type is cast to
 // that type before it is substituted, so an 8-bit actual passed to a `bit`
 // formal is truncated and a `bit` passed to a `byte` formal extended. A `$`,
@@ -201,9 +187,9 @@ std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
     if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
       auto it = actuals.find(ev.signal->text);
       if (it != actuals.end() && IsEventActual(it->second)) {
-        copy.edge = EdgeOfActual(it->second);
-        copy.signal = it->second->lhs;
-        out.push_back(copy);
+        copy.iff_condition =
+            SubstituteFormals(ev.iff_condition, actuals, arena);
+        AppendActualEvents(copy, it->second, arena, out);
         continue;
       }
       // A signal under an edge is watched as the object it names, so the cast

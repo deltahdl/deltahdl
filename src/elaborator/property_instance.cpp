@@ -28,42 +28,40 @@ bool InstanceHasTreeActual(const Expr* instance) {
   return false;
 }
 
-// §16.12.18 by way of §16.8.1: one event of the instantiated property's
-// clock with the actuals in the formals' places: the actual of a formal of
-// type event, an edge keyword over a signal, supplies the edge and the
-// signal, and any other actual the signal under the edge the clock wrote.
-EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
-                               Arena& arena) {
-  ev.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
-  if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
-    auto it = actuals.find(ev.signal->text);
-    const Expr* actual = it == actuals.end() ? nullptr : it->second;
-    if (actual != nullptr && actual->kind == ExprKind::kUnary &&
-        (actual->op == TokenKind::kKwPosedge ||
-         actual->op == TokenKind::kKwNegedge ||
-         actual->op == TokenKind::kKwEdge)) {
-      ev.edge = actual->op == TokenKind::kKwPosedge   ? Edge::kPosedge
-                : actual->op == TokenKind::kKwNegedge ? Edge::kNegedge
-                                                      : Edge::kEdge;
-      ev.signal = actual->lhs;
-      return ev;
+// §16.12.18 by way of §16.8.1: the clock of the instantiated property or
+// sequence with the actuals in the formals' places: the actual of a formal of
+// type event, an event expression, supplies its events, each with its edge,
+// its signal and its guard beside the clock's own (§9.4.2), and any other
+// actual the signal under the edge the clock wrote.
+std::vector<EventExpr> SubstituteClockEvents(
+    const std::vector<EventExpr>& clock, const ActualsByFormal& actuals,
+    Arena& arena) {
+  std::vector<EventExpr> out;
+  for (EventExpr ev : clock) {
+    ev.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
+    Expr* actual = nullptr;
+    if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
+      auto it = actuals.find(ev.signal->text);
+      if (it != actuals.end()) actual = it->second;
     }
+    if (IsEventActual(actual)) {
+      AppendActualEvents(ev, actual, arena, out);
+      continue;
+    }
+    ev.signal = SubstituteFormals(ev.signal, actuals, arena);
+    out.push_back(ev);
   }
-  ev.signal = SubstituteFormals(ev.signal, actuals, arena);
-  return ev;
+  return out;
 }
 
 std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              const Expr* instance,
                                              Arena& arena) {
-  ActualsByFormal actuals = BindActualsWithDefaults(
-      seq->prop_formals, seq->prop_formal_defaults, instance);
-  std::vector<EventExpr> clock;
-  clock.reserve(seq->seq_clock.size());
-  for (const EventExpr& ev : seq->seq_clock) {
-    clock.push_back(SubstituteClockEvent(ev, actuals, arena));
-  }
-  return clock;
+  return SubstituteClockEvents(
+      seq->seq_clock,
+      BindActualsWithDefaults(seq->prop_formals, seq->prop_formal_defaults,
+                              instance),
+      arena);
 }
 
 // The declaration `operand` instantiates where it names one of `kind`, an
@@ -149,8 +147,7 @@ void PromoteSequenceInstances(PropertyExprNode* node,
 
 // §16.14.7: the event expression of the inferred clock as an actual argument
 // of an event formal writes it, an edge keyword over the signal, or the
-// signal alone where the event names no edge; an iff, which no actual can
-// carry, is left behind.
+// signal alone where the event names no edge; an iff is left behind.
 static Expr* ClockActual(const EventExpr& ev, Arena& arena) {
   if (ev.edge == Edge::kNone) return ev.signal;
   auto* actual = arena.Create<Expr>();

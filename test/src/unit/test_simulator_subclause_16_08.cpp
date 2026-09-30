@@ -332,4 +332,85 @@ TEST(NamedSequenceInstance,
       "fail at 55\np=9 f=1\n");
 }
 
+// The harness the event-actual cases share: clk rises at 5, 15, ..., 95; en
+// is true from 42, so at the six rises of 45 to 95; h is true from 22 to 62,
+// so at the four rises of 25 to 55; and a is 1 throughout. `decls` declares
+// the named sequences and properties, and `covers` the cover statements,
+// counting into c1 and c2, printed at 98.
+std::string RunEventActualCase(const std::string& decls,
+                               const std::string& covers) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic en = 0; initial #42 en = 1;\n"
+      "  logic h = 0; initial begin #22 h = 1; #40 h = 0; end\n"
+      "  logic a = 1;\n"
+      "  int c1 = 0, c2 = 0;\n" +
+          decls + covers +
+          "  initial #98 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+          "endmodule\n",
+      f);
+}
+
+// §16.8.1 b) with §9.4.2 and §16.16: an event formal's actual may carry an
+// iff guard, and the sequence clocked on the formal is then attempted at each
+// rise of clk at which en holds, six, where the event without its guard gives
+// all ten.
+TEST(NamedSequenceInstance, AGuardedEventActualClocksWhereTheGuardHolds) {
+  std::string out = RunEventActualCase(
+      "  sequence s_g(untyped x, event e); @(e) x; endsequence\n",
+      "  cover property (s_g(a, posedge clk iff en)) c1++;\n"
+      "  cover property (s_g(a, posedge clk)) c2++;\n");
+  EXPECT_NE(out.find("c1=6 c2=10\n"), std::string::npos);
+}
+
+// §16.8 with §9.4.2: an event formal's default may carry an iff guard, and an
+// instance leaving the formal to it is clocked where the guard holds.
+TEST(NamedSequenceInstance, AGuardedEventDefaultClocksWhereTheGuardHolds) {
+  std::string out = RunEventActualCase(
+      "  sequence s_d(untyped x, event e = posedge clk iff en);\n"
+      "    @(e) x;\n"
+      "  endsequence\n",
+      "  cover property (s_d(a)) c1++;\n"
+      "  cover property (s_d(a, posedge clk)) c2++;\n");
+  EXPECT_NE(out.find("c1=6 c2=10\n"), std::string::npos);
+}
+
+// §16.8 with §9.4.2: an event formal's default may join events with `or`,
+// and an instance leaving the formal to it is clocked on either, the ten
+// rises and the nine falls of clk to 98, as one given `edge clk` is.
+TEST(NamedSequenceInstance, AnOrEventDefaultClocksOnEitherEvent) {
+  std::string out = RunEventActualCase(
+      "  sequence s_o(untyped x, event e = posedge clk or negedge clk);\n"
+      "    @(e) x;\n"
+      "  endsequence\n",
+      "  cover property (s_o(a)) c1++;\n"
+      "  cover property (s_o(a, edge clk)) c2++;\n");
+  EXPECT_NE(out.find("c1=19 c2=19\n"), std::string::npos);
+}
+
+// §16.8.1 b) with §9.4.2: a clock that guards the event formal it names,
+// `@(e iff g)`, holds where its own guard and the actual's both do, at the
+// rises of 45 and 55, and where the actual carries none, at those h guards.
+TEST(NamedSequenceInstance, AClocksGuardHoldsBesideTheActualsGuard) {
+  std::string out = RunEventActualCase(
+      "  sequence s_c(untyped x, event e, untyped g);\n"
+      "    @(e iff g) x;\n"
+      "  endsequence\n",
+      "  cover property (s_c(a, posedge clk iff en, h)) c1++;\n"
+      "  cover property (s_c(a, posedge clk, h)) c2++;\n");
+  EXPECT_NE(out.find("c1=2 c2=4\n"), std::string::npos);
+}
+
+// §16.12.18 with §16.8.1 b): a property clocked on its event formal takes a
+// guarded actual and an `or` of two as a sequence does.
+TEST(NamedSequenceInstance, APropertyClockedOnItsEventFormalTakesEither) {
+  std::string out = RunEventActualCase(
+      "  property p_g(untyped x, event e); @(e) x; endproperty\n",
+      "  cover property (p_g(a, posedge clk iff en)) c1++;\n"
+      "  cover property (p_g(a, posedge clk or negedge clk)) c2++;\n");
+  EXPECT_NE(out.find("c1=6 c2=19\n"), std::string::npos);
+}
+
 }  // namespace

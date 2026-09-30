@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
@@ -422,11 +425,11 @@ TEST(SequenceDeclaration, AFormalsDefaultActualIsRecorded) {
 }
 
 // §16.8 with §9.4.2: an event formal's default may be any event expression,
-// one with an `iff` guard among them. The scan reads past it to the formal
-// that follows, `untyped` so that the event type does not carry to it, which
-// is harvested as the port list's second formal with its own default, and
-// raises nothing.
-TEST(SequenceDeclaration, TheScanReadsPastAGuardedEventDefault) {
+// one with an `iff` guard among them, which is recorded as the guard over the
+// edge and its signal. The scan reads past it to the formal that follows,
+// `untyped` so that the event type does not carry to it, which is harvested
+// as the port list's second formal with its own default, and raises nothing.
+TEST(SequenceDeclaration, AGuardedEventDefaultIsRecorded) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, en, a;\n"
@@ -442,8 +445,74 @@ TEST(SequenceDeclaration, TheScanReadsPastAGuardedEventDefault) {
   EXPECT_EQ(item->prop_formals[0], "e");
   EXPECT_EQ(item->prop_formals[1], "x");
   ASSERT_EQ(item->prop_formal_defaults.size(), 2u);
+  const Expr* guarded = item->prop_formal_defaults[0];
+  ASSERT_NE(guarded, nullptr);
+  EXPECT_EQ(guarded->kind, ExprKind::kBinary);
+  EXPECT_EQ(guarded->op, TokenKind::kKwIff);
+  ASSERT_NE(guarded->lhs, nullptr);
+  EXPECT_EQ(guarded->lhs->op, TokenKind::kKwPosedge);
+  ASSERT_NE(guarded->lhs->lhs, nullptr);
+  EXPECT_EQ(guarded->lhs->lhs->text, "clk");
+  ASSERT_NE(guarded->rhs, nullptr);
+  EXPECT_EQ(guarded->rhs->text, "en");
   ASSERT_NE(item->prop_formal_defaults[1], nullptr);
   EXPECT_EQ(item->prop_formal_defaults[1]->text, "a");
+}
+
+// §16.8 with §9.4.2: an event formal's default joining events with `or` is
+// recorded as the `or` of the two, the second written with no edge keyword
+// kept as its signal alone.
+TEST(SequenceDeclaration, AnOrEventDefaultIsRecorded) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, rst, a;\n"
+      "  sequence s(untyped x, event e = posedge clk or rst);\n"
+      "    @(e) x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formal_defaults.size(), 2u);
+  const Expr* either = item->prop_formal_defaults[1];
+  ASSERT_NE(either, nullptr);
+  EXPECT_EQ(either->kind, ExprKind::kBinary);
+  EXPECT_EQ(either->op, TokenKind::kKwOr);
+  ASSERT_NE(either->lhs, nullptr);
+  EXPECT_EQ(either->lhs->op, TokenKind::kKwPosedge);
+  ASSERT_NE(either->rhs, nullptr);
+  EXPECT_EQ(either->rhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(either->rhs->text, "rst");
+}
+
+// §16.8 with §9.4.2: a default opening with an edge keyword can be nothing
+// but an event expression, so one stopping short of an event, an edge keyword
+// with no signal after it or an `or` with no event after it, is reported
+// where it opens, and no default is recorded for the formal.
+TEST(SequenceDeclaration, AnEventDefaultStoppingShortIsReported) {
+  for (const char* dflt :
+       {"posedge", "negedge", "posedge clk or", "edge clk or"}) {
+    auto r = Parse(
+        "module m;\n"
+        "  logic clk, a;\n"
+        "  sequence s(untyped x, event e = " +
+        std::string(dflt) +
+        ");\n"
+        "    @(e) x;\n"
+        "  endsequence\n"
+        "endmodule\n");
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a default actual argument opening with an edge "
+                              "keyword is not an event expression",
+                              3, "9.4.2"))
+        << dflt;
+    auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+    ASSERT_NE(item, nullptr);
+    ASSERT_EQ(item->prop_formal_defaults.size(), 2u) << dflt;
+    EXPECT_EQ(item->prop_formal_defaults[1], nullptr) << dflt;
+  }
 }
 
 }  // namespace
