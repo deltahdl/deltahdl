@@ -99,4 +99,21 @@ TEST(AttachedSubroutine, VoidFunctionIsCalledAtTheMatch) {
   EXPECT_EQ(out, "noted 25\n$finish at time 160\n");
 }
 
+// §16.11: a void function method is among the subroutines a match item calls,
+// named through the handle of the object it is called on.
+TEST(AttachedSubroutine, VoidFunctionMethodIsCalledAtTheMatch) {
+  SimFixture f;
+  std::string out =
+      RunCapture(SequenceTickSource("(te1 ##1 te2, h.note($time))",
+                                    DriveTicks({{2}, {3}, {}, {}, {}}),
+                                    "  class C;\n"
+                                    "    function void note(int t);\n"
+                                    "      $display(\"noted %0d\", t);\n"
+                                    "    endfunction\n"
+                                    "  endclass\n"
+                                    "  C h = new;\n"),
+                 f);
+  EXPECT_EQ(out, "noted 25\n$finish at time 160\n");
+}
+
 }  // namespace

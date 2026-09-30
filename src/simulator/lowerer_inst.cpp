@@ -3,19 +3,24 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
+#include "simulator/checker_actuals.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 
@@ -482,16 +487,40 @@ static Expr* LocalPortExpr(const RtlirPortBinding& binding,
 
 // §17.3: the actuals a checker instance binds to its formals, registered under
 // the instance for its assertions to take a delay bound written as a formal's
-// name from (sequence_flatten.cpp).
+// name, an event, a sequence or a property from, each of the last three
+// reading its names in `parent_prefix`, the scope instantiating the checker.
 static void RecordCheckerActuals(const RtlirModuleInst& inst,
+                                 const std::string& parent_prefix,
                                  const std::string& inst_prefix,
-                                 SimContext& ctx) {
+                                 SimContext& ctx, Arena& arena) {
   if (!inst.resolved->is_checker) return;
   ActualsByFormal actuals;
   for (const RtlirPortBinding& binding : inst.port_bindings) {
-    actuals[binding.port_name] = binding.connection;
+    actuals[binding.port_name] =
+        ActualInInstantiatingScope(binding.connection, parent_prefix, arena);
   }
   ctx.RegisterCheckerActuals(inst_prefix, std::move(actuals));
+}
+
+const std::vector<EventExpr>& Lowerer::ClockOf(const RtlirProcess& proc) {
+  if (!lowering_checker_) return proc.sensitivity;
+  return *arena_.Create<std::vector<EventExpr>>(SubstituteClock(
+      proc.sensitivity, CheckerTreeActuals(inst_prefix_, ctx_), arena_));
+}
+
+// §16.5.1 with §17.3: the variables a checker's sequence or property actual
+// reads are read sampled in the checker's assertions, as they are where the
+// actual is written, so they are enrolled under the instantiating scope.
+void Lowerer::RecordCheckerActualSampleScope(const RtlirModuleInst& inst) {
+  std::unordered_set<std::string> names;
+  for (const RtlirPortBinding& binding : inst.port_bindings) {
+    CollectActualReadNames(binding.connection, names);
+  }
+  if (names.empty()) return;
+  AssertionSampleScope scope;
+  scope.inst_prefix = inst_prefix_;
+  scope.names.assign(names.begin(), names.end());
+  assertion_sample_scopes_.push_back(std::move(scope));
 }
 
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
@@ -502,7 +531,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   // connection (.a == .a(a)) resolves to the child's own same-named port and
   // self-assigns instead of propagating.
   std::string inst_seg = std::string(inst.inst_name) + ".";
-  RecordCheckerActuals(inst, inst_prefix_ + inst_seg, ctx_);
+  RecordCheckerActuals(inst, inst_prefix_, inst_prefix_ + inst_seg, ctx_,
+                       arena_);
+  RecordCheckerActualSampleScope(inst);
   std::unordered_map<std::string_view, std::string_view> inout_joins;
   for (const auto& binding : inst.port_bindings) {
     if (TryAliasInterfacePort(inst, binding)) continue;

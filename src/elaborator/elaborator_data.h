@@ -26,6 +26,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -250,6 +251,11 @@ class ElaboratorData {
   // §17.3: the formals the checker instance being elaborated binds, with the
   // constant values of their actuals, taken by Elaborator::ElaborateModule.
   BoundCheckerFormals pending_checker_actuals_;
+  // §17.3: the formals each checker instance binds to a sequence or a
+  // property, with the actuals, keyed by the instance's module; the pending
+  // ones are taken by Elaborator::ElaborateModule.
+  ActualsByFormal pending_checker_tree_actuals_;
+  std::unordered_map<const RtlirModule*, ActualsByFormal> checker_tree_actuals_;
 
   std::unordered_set<std::string_view> declared_names_;
   // §23.9: the declared names of each elaborated module scope, keyed by the

@@ -649,8 +649,36 @@ void Elaborator::ResolveStaticAssertionClock(
   }
 }
 
+// §17.2 and §17.3: the assertion `item` of a checker instance whose formals
+// `actuals` binds to sequences or properties, as the instance reads it: a
+// copy, the item being shared by every instance of the checker, whose
+// boolean, where it names such a formal, is the root of a tree the evaluator
+// substitutes the actual into.
+static ModuleItem* CheckerInstanceAssertion(const ModuleItem* item,
+                                            const ActualsByFormal& actuals,
+                                            Arena& arena) {
+  auto* copy = arena.Create<ModuleItem>(*item);
+  const Stmt* stmt = item->body;
+  bool names_formal = stmt != nullptr && stmt->assert_property == nullptr &&
+                      stmt->assert_sequence == nullptr &&
+                      stmt->assert_expr != nullptr &&
+                      stmt->assert_expr->kind == ExprKind::kIdentifier &&
+                      actuals.contains(stmt->assert_expr->text);
+  if (!names_formal) return copy;
+  auto* body = arena.Create<Stmt>(*stmt);
+  body->assert_property = arena.Create<PropertyExprNode>();
+  body->assert_property->boolean = body->assert_expr;
+  copy->body = body;
+  return copy;
+}
+
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
+  auto tree_actuals = checker_tree_actuals_.find(mod);
+  if (tree_actuals != checker_tree_actuals_.end() &&
+      !tree_actuals->second.empty()) {
+    item = CheckerInstanceAssertion(item, tree_actuals->second, arena_);
+  }
   InferredAtInstance inferred;
   inferred.clock = DefaultClockingEvent(mod);
   inferred.disable = mod != nullptr ? mod->default_disable_iff : nullptr;

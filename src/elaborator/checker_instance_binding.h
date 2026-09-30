@@ -6,10 +6,12 @@
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -37,6 +39,19 @@ using ConstantCheckerFormals =
 BoundCheckerFormals BindCheckerActuals(const ModuleItem* item,
                                        const ModuleDecl* decl,
                                        const ScopeMap& scope);
+
+// §17.2 and §17.3: the formals of the checker `decl` the instance `item`
+// binds, by position or by name, to a sequence or a property, each with its
+// actual, which the checker's assertions read in the formal's place.
+ActualsByFormal CheckerTreeActuals(const ModuleItem* item,
+                                   const ModuleDecl* decl);
+
+// §23.3.2 (A.4.1.1): each port connection of `item`, an instance of the
+// module, interface or program `inst` resolves to, that is an event
+// expression, a sequence or a property, reported, a port connection there
+// being an expression; a checker's actuals may be any of the three (§17.3).
+void ReportActualsOnlyACheckerTakes(const RtlirModuleInst& inst,
+                                    const ModuleItem* item, DiagEngine& diag);
 
 // §17.2 and §17.9: a checker formal whose actual, or default where the
 // instance binds none, is an elaboration-time constant is that constant within

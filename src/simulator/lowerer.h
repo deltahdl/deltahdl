@@ -104,6 +104,11 @@ class Lowerer {
   // UDP instances of `mod`; a program's or a checker's processes and
   // continuous assignments are scheduled in the Reactive region.
   void LowerModuleProcesses(const RtlirModule* mod);
+  // §17.3: the event control of `proc`, each event formal of the checker
+  // instance being lowered replaced by the event expression its actual is,
+  // held as long as the process that waits on it. Defined in
+  // src/simulator/lowerer_inst.cpp.
+  const std::vector<EventExpr>& ClockOf(const RtlirProcess& proc);
   // Creates the storage a variable declaration states, keyed under `name`.
   // `name` is the name the storage is reachable by, which is the declared name
   // at the top of the hierarchy and the instance-prefixed form under an
@@ -311,6 +316,7 @@ class Lowerer {
                                   const RtlirModule* resolved);
 
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
+  void RecordCheckerActualSampleScope(const RtlirModuleInst& inst);
   bool LowerArrayPortBinding(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding,
                              const std::string& inst_seg, bool from_program);

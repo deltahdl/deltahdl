@@ -4,13 +4,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -60,6 +63,35 @@ BoundCheckerFormals BindCheckerActuals(const ModuleItem* item,
     bound.emplace_back(name, ConstEvalInt(actual, scope));
   }
   return bound;
+}
+
+ActualsByFormal CheckerTreeActuals(const ModuleItem* item,
+                                   const ModuleDecl* decl) {
+  ActualsByFormal actuals;
+  for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+    auto [name, actual] = item->inst_ports[i];
+    if (name.empty() && i < decl->ports.size()) name = decl->ports[i].name;
+    if (actual != nullptr && actual->property_actual != nullptr) {
+      actuals[name] = actual;
+    }
+  }
+  return actuals;
+}
+
+void ReportActualsOnlyACheckerTakes(const RtlirModuleInst& inst,
+                                    const ModuleItem* item, DiagEngine& diag) {
+  if (inst.resolved == nullptr || inst.resolved->is_checker) return;
+  for (const auto& [name, actual] : item->inst_ports) {
+    if (actual == nullptr ||
+        (actual->property_actual == nullptr && !IsEventActual(actual))) {
+      continue;
+    }
+    diag.Error(actual->range.start,
+               "port connection of instance '" + std::string(item->inst_name) +
+                   "' is an event expression, a sequence or a property, "
+                   "which only a checker's port takes",
+               Subclause("23.3.2"));
+  }
 }
 
 ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,

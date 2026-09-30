@@ -899,6 +899,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   if (child_decl->decl_kind == ModuleDeclKind::kChecker) {
     pending_checker_actuals_ =
         BindCheckerActuals(item, child_decl, parent_scope);
+    pending_checker_tree_actuals_ = CheckerTreeActuals(item, child_decl);
   }
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);
@@ -909,6 +910,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
 void Elaborator::CheckInstancePorts(const RtlirModuleInst& inst,
                                     const ModuleItem* item, RtlirModule* mod) {
   CheckPortCoercion(inst, item->loc);
+  ReportActualsOnlyACheckerTakes(inst, item, diag_);
   CheckUwirePortMerge(inst, item, mod);
   CheckInterconnectPortMerge(inst, item, mod);
 }

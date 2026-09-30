@@ -646,7 +646,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       // loop instead made it re-fire on its own nonblocking-assign updates and
       // spin forever.
       p->kind = ProcessKind::kAlwaysFF;
-      p->coro = MakeAlwaysSensCoroutine(proc.body, proc.sensitivity,
+      p->coro = MakeAlwaysSensCoroutine(proc.body, ClockOf(proc),
                                         lowering_checker_, ctx_, arena_)
                     .Release();
       break;

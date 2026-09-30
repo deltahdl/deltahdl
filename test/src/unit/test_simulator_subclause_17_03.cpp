@@ -232,4 +232,136 @@ TEST(CheckerInstanceScheduling, AFormalBoundsACycleDelay) {
   EXPECT_EQ(f.ctx.FindVariable("c.p4")->value.ToUint64(), 5u);
 }
 
+// §17.3: the actual of a checker's event formal is an event expression, so
+// `@clk` in the checker waits on the edge the instance writes: c's posedge
+// clk at 5, 15, 25, 35 and 45, and c2's negedge clk, bound by name, at 10 to
+// 50. a is low from 17 to 22, over the negedge at 20 alone, so c holds at
+// all five and c2 fails once. Both were parse errors.
+TEST(CheckerInstanceScheduling, AnEdgeActualClocksTheCheckersAssertion) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(logic a, event clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@clk a) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(a, posedge clk);\n"
+      "  chk c2(.a(a), .clk(negedge clk));\n"
+      "  initial begin #17 a = 0; #5 a = 1; #30 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c2.pass")->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("c2.fail")->value.ToUint64(), 1u);
+}
+
+// §17.2 and §17.3: the actual of a checker's sequence formal is a sequence
+// expression, so `s |-> b` in the checker is `a ##1 a |-> b`. a is high
+// throughout and b until 32, so the attempts from 5 and 15 end where b holds
+// and those from 25 and 35 where it does not; the attempt from 45 is still
+// open at 52. Read as `a` alone, the formal would pass three times. The
+// actual was a parse error.
+TEST(CheckerInstanceScheduling, ASequenceActualStandsForItsFormal) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(sequence s, logic b, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) s |-> b) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1, b = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(a ##1 a, b, clk);\n"
+      "  initial begin #32 b = 0; #20 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
+}
+
+// §17.2 and §17.3: the actual of a checker's property formal is a property
+// expression, so `assert property (@(posedge clk) p)` with the actual
+// `a |-> b` asserts the implication at each posedge, its names those of the
+// module, not the checker's formal a, bound to !a. a is high throughout and b
+// until 32, so it holds at 5, 15 and 25 and fails at 35 and 45. The formal
+// read as a variable, failing at every posedge.
+TEST(CheckerInstanceScheduling, APropertyActualStandsForItsFormal) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(property p, logic a, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) p) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1, b = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(a |-> b, !a, clk);\n"
+      "  initial begin #32 b = 0; #20 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
+}
+
+// §17.3 with §16.5.1: the names a sequence actual reads are read sampled in
+// the checker's assertion, as in an assertion written where the actual is. y
+// is toggled by a nonblocking assignment at each posedge, so its sampled
+// value is 1, 0, 1, 0, 1 at the five posedges and the value it takes there
+// the opposite. The actual read the value y took.
+TEST(CheckerInstanceScheduling, ASequenceActualReadsSampledValues) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(sequence s, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) s) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, y = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) y <= ~y;\n"
+      "  chk c(y ##0 1, clk);\n"
+      "  initial #52 $finish;\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
+}
+
+// §17.3 with §23.3: a property actual reads the names of the instance
+// writing it, in a call's arguments and a concatenation's elements too, so
+// each of two instances of m gives its checker its own b: u1's high, where
+// {a, b} holds two ones at the five posedges, and u2's low, where it holds
+// one.
+TEST(CheckerInstanceScheduling, APropertyActualReadsItsOwnInstance) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(property p, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) p) pass++; else fail++;\n"
+      "endchecker\n"
+      "module m(input logic clk, input logic b);\n"
+      "  logic a = 1;\n"
+      "  chk c(a |-> $countones({a, b}) == 2, clk);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  m u1(clk, 1'b1);\n"
+      "  m u2(clk, 1'b0);\n"
+      "  initial #52 $finish;\n"
+      "endmodule\n",
+      f, "u1.c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("u2.c.pass")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("u2.c.fail")->value.ToUint64(), 5u);
+}
+
 }  // namespace

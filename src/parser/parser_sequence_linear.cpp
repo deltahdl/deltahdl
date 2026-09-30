@@ -308,13 +308,19 @@ struct ParserSeqLinearHelpers {
   }
 
   // §16.11: whether the tokens ahead are a subroutine call, a system task's
-  // name or an identifier followed by `(`, rather than the local an
-  // assignment begins with. The lexer is rewound.
+  // name or a name followed by `(`, rather than the local an assignment
+  // begins with. The name may be dotted or scoped, a method called through a
+  // handle, `cg_1.sample()` (§17.6), or a subroutine of a package or class,
+  // `p::f()`. The lexer is rewound.
   static bool AheadIsSubroutineCall(Parser& p) {
     if (p.Check(TokenKind::kSystemIdentifier)) return true;
     if (!p.Check(TokenKind::kIdentifier)) return false;
     auto saved = p.lexer_.SavePos();
     p.Consume();
+    while (p.Check(TokenKind::kDot) || p.Check(TokenKind::kColonColon)) {
+      p.Consume();
+      p.Consume();
+    }
     bool call = p.Check(TokenKind::kLParen);
     p.lexer_.RestorePos(saved);
     return call;

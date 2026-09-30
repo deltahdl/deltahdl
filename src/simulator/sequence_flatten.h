@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -147,6 +148,13 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
 LinearSequence SubstituteLinearSequence(const LinearSequence& body,
                                         const ActualsByFormal& actuals,
                                         SimContext& ctx, Arena& arena);
+
+// §17.2 and §17.3: the formals of the checker instance `inst_prefix` names
+// that its instantiation binds to an event expression, a sequence or a
+// property, each with the actual, which the checker's assertions read in the
+// formal's place; empty for a prefix naming no checker instance.
+ActualsByFormal CheckerTreeActuals(const std::string& inst_prefix,
+                                   SimContext& ctx);
 
 // A literal holding `value`, its width and sign kept, for an expression
 // that reads the value as it stood; the copy of a local of a named property

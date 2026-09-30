@@ -194,6 +194,30 @@ void Parser::ParseParamValueAssignment(
   }
 }
 
+// §17.3: one actual of a port connection list. A checker's actuals are
+// A.2.10's property_actual_arg, an event expression, a sequence or a property
+// as well as an expression, while a module's, an interface's or a program's
+// are expressions. Which the instance names is not known here, so an actual
+// read whole as an event expression, a sequence or a property is kept as
+// ParsePropertyActualArg reads it for a property instance, and any other is
+// parsed again as an expression with its diagnostics.
+Expr* Parser::ParsePortActual() {
+  auto saved = lexer_.SavePos();
+  uint32_t errors = diag_.SuppressedErrorCount();
+  diag_.PushSuppress();
+  bool plain = true;
+  Expr* actual =
+      ParserPropertySpecHelpers::ParsePropertyActualArg(*this, plain);
+  bool read = !plain && actual != nullptr &&
+              (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) &&
+              (actual->property_actual != nullptr ||
+               errors == diag_.SuppressedErrorCount());
+  diag_.PopSuppress();
+  if (read) return actual;
+  lexer_.RestorePos(saved);
+  return ParseExpr();
+}
+
 bool Parser::ParsePortConnection(ModuleItem* item) {
   ParseAttributes();
   if (Check(TokenKind::kDotStar)) {
@@ -214,7 +238,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
     if (Match(TokenKind::kLParen)) {
       Expr* expr = nullptr;
       if (!Check(TokenKind::kRParen)) {
-        expr = ParseExpr();
+        expr = ParsePortActual();
       }
       Expect(TokenKind::kRParen, Subclause("23.3.2.2"));
       item->inst_ports.push_back({name.text, expr});
@@ -234,7 +258,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
     item->inst_ports.push_back({{}, nullptr});
     item->inst_ports_implicit.push_back(false);
   } else {
-    item->inst_ports.push_back({{}, ParseExpr()});
+    item->inst_ports.push_back({{}, ParsePortActual()});
     item->inst_ports_implicit.push_back(false);
   }
   return false;

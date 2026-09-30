@@ -836,10 +836,15 @@ PropertyTreeState* CreatePropertyTreeState(
     const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
     SimContext& ctx, Arena& arena) {
   auto* state = arena.Create<PropertyTreeState>();
+  // §17.3: a checker's assertion reads the event, sequence or property bound
+  // to a formal in the formal's place, as a property instance's body does.
+  const ActualsByFormal kActuals =
+      CheckerTreeActuals(ctx.ActiveInstancePrefix(), ctx);
+  if (!kActuals.empty()) root = SubstituteTree(root, kActuals, arena);
   state->root = root;
-  state->clocks.clocks.push_back(leading_clock);
-  const ActualsByFormal kNoActuals;
-  Collection collection{*state, ctx, arena, kNoActuals, {}};
+  state->clocks.clocks.push_back(
+      SubstituteClock(leading_clock, kActuals, arena));
+  Collection collection{*state, ctx, arena, kActuals, {}};
   if (!CollectSequences(root, collection, 0)) return nullptr;
   RegisterInstanceBodyClocks(root, state->clocks, ctx, arena);
   InstallClockWatchers(state->clocks, ctx, arena);

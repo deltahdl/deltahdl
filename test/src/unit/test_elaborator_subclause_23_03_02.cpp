@@ -185,4 +185,31 @@ TEST(ModuleInstantiationElaboration, PortlessInstanceWithoutParensIsReported) {
                             3, "23.3.2"));
 }
 
+// §23.3.2 (A.4.1.1): a port connection of a module instance is an expression,
+// so an event expression, a sequence or a property, which only a checker's
+// actual may be (§17.3), is reported where it is bound, by position or by
+// name. The parser reads any of the three, not knowing what the instance
+// names.
+TEST(ModuleInstantiationElaboration, ModulePortTakesNoSequenceOrEventActual) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input logic x);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  m u(posedge clk);\n"
+      "  m u2(a ##1 a);\n"
+      "  m u3(.x(a |-> a));\n"
+      "  m u4(a);\n"
+      "endmodule\n",
+      f, "top");
+  const char* const kMessage =
+      "is an event expression, a sequence or a property, which only a "
+      "checker's port takes";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "23.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "23.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 7, "23.3.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "23.3.2"));
+}
+
 }  // namespace

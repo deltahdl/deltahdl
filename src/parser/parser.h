@@ -551,6 +551,7 @@ class Parser {
   bool ParseParamValueEntry(
       std::vector<std::pair<std::string_view, Expr*>>& out);
   bool ParsePortConnection(ModuleItem* item);
+  Expr* ParsePortActual();
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   Expr* ParseAssocIndexDim();
   void ParseParenList(std::vector<Expr*>& out);

@@ -810,6 +810,20 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   return flattened;
 }
 
+ActualsByFormal CheckerTreeActuals(const std::string& inst_prefix,
+                                   SimContext& ctx) {
+  ActualsByFormal trees;
+  if (const ActualsByFormal* checker = ctx.CheckerActuals(inst_prefix)) {
+    for (const auto& [formal, actual] : *checker) {
+      if (actual != nullptr &&
+          (actual->property_actual != nullptr || IsEventActual(actual))) {
+        trees[formal] = actual;
+      }
+    }
+  }
+  return trees;
+}
+
 const LinearSequence* NestedOperand(const LinearSequence& body, size_t pos) {
   for (const auto& [operand, nested] : body.nested) {
     if (operand == body.operands[pos]) return nested.get();
