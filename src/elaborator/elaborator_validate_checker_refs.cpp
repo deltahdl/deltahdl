@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_expr.h"
@@ -90,27 +91,33 @@ static void WalkStmtsForCheckerRef(
   });
 }
 
+// The report of §23.6's rule on one expression an item holds outside any
+// statement, at the item.
+static void ReportIfRefersToChecker(
+    const Expr* e, SourceLoc loc,
+    const std::unordered_set<std::string_view>& checker_names,
+    DiagEngine& diag) {
+  if (ExprRefersToChecker(e, checker_names))
+    diag.Error(loc, "hierarchical reference into a checker is not permitted",
+               Subclause("23.6"));
+}
+
 void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
   if (checker_inst_names_.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToChecker(item->assign_lhs, checker_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference into a checker is not permitted",
-                    Subclause("23.6"));
-      if (ExprRefersToChecker(item->assign_rhs, checker_inst_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference into a checker is not permitted",
-                    Subclause("23.6"));
+      ReportIfRefersToChecker(item->assign_lhs, item->loc, checker_inst_names_,
+                              diag_);
+      ReportIfRefersToChecker(item->assign_rhs, item->loc, checker_inst_names_,
+                              diag_);
     }
     // §17.7.1's `wire x = my_check.a;`: a net or variable declaration's
     // initializer is an assignment outside the checker too.
-    bool is_decl = item->kind == ModuleItemKind::kNetDecl ||
-                   item->kind == ModuleItemKind::kVarDecl;
-    if (is_decl && ExprRefersToChecker(item->init_expr, checker_inst_names_))
-      diag_.Error(item->loc,
-                  "hierarchical reference into a checker is not permitted",
-                  Subclause("23.6"));
+    if (item->kind == ModuleItemKind::kNetDecl ||
+        item->kind == ModuleItemKind::kVarDecl) {
+      ReportIfRefersToChecker(item->init_expr, item->loc, checker_inst_names_,
+                              diag_);
+    }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForCheckerRef(item->body, checker_inst_names_, diag_);
