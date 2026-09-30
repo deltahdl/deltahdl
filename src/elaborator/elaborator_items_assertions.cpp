@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"
@@ -649,14 +650,18 @@ void Elaborator::ResolveStaticAssertionClock(
   }
 }
 
-// §17.2 and §17.3: the assertion `item` of a checker instance whose formals
-// `actuals` binds to sequences or properties, as the instance reads it: a
-// copy, the item being shared by every instance of the checker, whose
-// boolean, where it names such a formal, is the root of a tree the evaluator
-// substitutes the actual into.
-static ModuleItem* CheckerInstanceAssertion(const ModuleItem* item,
-                                            const ActualsByFormal& actuals,
-                                            Arena& arena) {
+// §17.2 and §17.3: the assertion `item` of `mod` as the instance reads it.
+// Where `mod` is a checker instance whose formals `trees` binds to sequences
+// or properties, that is a copy, the item being shared by every instance of
+// the checker, whose boolean, where it names such a formal, is the root of a
+// tree the evaluator substitutes the actual into; `item` itself otherwise.
+static ModuleItem* CheckerInstanceAssertion(
+    ModuleItem* item, const RtlirModule* mod,
+    const std::unordered_map<const RtlirModule*, ActualsByFormal>& trees,
+    Arena& arena) {
+  auto found = trees.find(mod);
+  if (found == trees.end() || found->second.empty()) return item;
+  const ActualsByFormal& actuals = found->second;
   auto* copy = arena.Create<ModuleItem>(*item);
   const Stmt* stmt = item->body;
   bool names_formal = stmt != nullptr && stmt->assert_property == nullptr &&
@@ -674,11 +679,7 @@ static ModuleItem* CheckerInstanceAssertion(const ModuleItem* item,
 
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
-  auto tree_actuals = checker_tree_actuals_.find(mod);
-  if (tree_actuals != checker_tree_actuals_.end() &&
-      !tree_actuals->second.empty()) {
-    item = CheckerInstanceAssertion(item, tree_actuals->second, arena_);
-  }
+  item = CheckerInstanceAssertion(item, mod, checker_tree_actuals_, arena_);
   InferredAtInstance inferred;
   inferred.clock = DefaultClockingEvent(mod);
   inferred.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
