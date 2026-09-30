@@ -2122,8 +2122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
+        shard: ['00', '01', '02', '03', '04', '05', '06', '07']
   copy-paste-src:
     runs-on: ubuntu-latest
     steps:
@@ -3078,8 +3077,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
+        shard: ['00', '01', '02', '03', '04', '05', '06', '07']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
