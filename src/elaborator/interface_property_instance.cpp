@@ -219,6 +219,23 @@ ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
   return copy;
 }
 
+// The properties of the interface `ifc` as its instance `inst` sees them, each
+// registered, and each whose body is a tree also appended to `run_decls`.
+void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
+                            PropertyRegistry& registry, Arena& arena,
+                            std::vector<ModuleItem*>& run_decls) {
+  for (const ModuleItem* member : ifc->items) {
+    if (member->kind != ModuleItemKind::kPropertyDecl ||
+        (member->prop_body_expr == nullptr &&
+         member->prop_body_tree == nullptr)) {
+      continue;
+    }
+    ModuleItem* copy = InstanceCopy(member, inst, arena);
+    registry.Register(copy);
+    if (copy->prop_body_tree != nullptr) run_decls.push_back(copy);
+  }
+}
+
 }  // namespace
 
 void RegisterInterfaceInstanceProperties(const ModuleDecl* decl,
@@ -231,16 +248,7 @@ void RegisterInterfaceInstanceProperties(const ModuleDecl* decl,
     if (item->kind != ModuleItemKind::kModuleInst) continue;
     const ModuleDecl* ifc = FindInterface(item->inst_module, unit);
     if (ifc == nullptr) continue;
-    for (const ModuleItem* member : ifc->items) {
-      if (member->kind != ModuleItemKind::kPropertyDecl ||
-          (member->prop_body_expr == nullptr &&
-           member->prop_body_tree == nullptr)) {
-        continue;
-      }
-      ModuleItem* copy = InstanceCopy(member, item->inst_name, arena);
-      registry.Register(copy);
-      if (copy->prop_body_tree != nullptr) run_decls.push_back(copy);
-    }
+    RegisterInstanceCopies(ifc, item->inst_name, registry, arena, run_decls);
   }
 }
 

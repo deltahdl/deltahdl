@@ -237,4 +237,86 @@ TEST(ClockResolutionRun, AnInterfacePropertyReadsTheInstancesStructMember) {
   EXPECT_EQ(out, "f0=3 f1=5\n");
 }
 
+// §16.12 with §23.6: a property declared in an interface and instantiated by
+// the path of an instance reads the instance's own signals whatever the shape
+// of its body: a local variable assigned in a match item, a clock named again
+// before an operand of a sequence or of a property, an or, an and and an
+// intersect of sequences, a first_match with a match item, a case and a
+// throughout. Each is asserted beside the same property declared in the module
+// over the module's signals, which the instance's are bound to, and fails as
+// often.
+TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc(input logic clk);\n"
+      "  logic a, b, c, d, sel;\n"
+      "  property p_local; bit v; @(posedge clk) (a, v = b) |=> (c == v); "
+      "endproperty\n"
+      "  property p_clk; @(posedge clk) a ##1 @(posedge clk) b; endproperty\n"
+      "  property p_or; @(posedge clk) (a ##1 b) or (c ##2 d); endproperty\n"
+      "  property p_and; @(posedge clk) (a ##1 b) and (c ##1 d); endproperty\n"
+      "  property p_int; @(posedge clk) (a ##[1:2] b) intersect (c ##2 d); "
+      "endproperty\n"
+      "  property p_node; @(posedge clk) a |=> @(posedge clk) b; endproperty\n"
+      "  property p_fm; bit v; @(posedge clk) first_match(a ##[1:2] b, v = c) "
+      "|=> (d == v); endproperty\n"
+      "  property p_case; @(posedge clk) case (sel) 1'b0: a; default: b; "
+      "endcase; endproperty\n"
+      "  property p_thr; @(posedge clk) a throughout (b ##1 c); endproperty\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0110011110, cv = "
+      "10'b1011010011, dv = 10'b0111100101, sv = 10'b0011001100;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; cv <= cv << "
+      "1; dv <= dv << 1; sv <= sv << 1; end\n"
+      "  logic a, b, c, d, sel;\n"
+      "  assign a = av[0]; assign b = bv[0]; assign c = cv[0]; assign d = "
+      "dv[0]; assign sel = sv[0];\n"
+      "  ifc i0(clk);\n"
+      "  assign i0.a = a; assign i0.b = b; assign i0.c = c; assign i0.d = d; "
+      "assign i0.sel = sel;\n"
+      "  property m_local; bit v; @(posedge clk) (a, v = b) |=> (c == v); "
+      "endproperty\n"
+      "  property m_clk; @(posedge clk) a ##1 @(posedge clk) b; endproperty\n"
+      "  property m_or; @(posedge clk) (a ##1 b) or (c ##2 d); endproperty\n"
+      "  property m_and; @(posedge clk) (a ##1 b) and (c ##1 d); endproperty\n"
+      "  property m_int; @(posedge clk) (a ##[1:2] b) intersect (c ##2 d); "
+      "endproperty\n"
+      "  property m_node; @(posedge clk) a |=> @(posedge clk) b; endproperty\n"
+      "  property m_fm; bit v; @(posedge clk) first_match(a ##[1:2] b, v = c) "
+      "|=> (d == v); endproperty\n"
+      "  property m_case; @(posedge clk) case (sel) 1'b0: a; default: b; "
+      "endcase; endproperty\n"
+      "  property m_thr; @(posedge clk) a throughout (b ##1 c); endproperty\n"
+      "  int fi[9], fm[9];\n"
+      "  assert property (i0.p_local) else fi[0]++;   assert property "
+      "(m_local) else fm[0]++;\n"
+      "  assert property (i0.p_clk) else fi[1]++;     assert property (m_clk) "
+      "else fm[1]++;\n"
+      "  assert property (i0.p_or) else fi[2]++;      assert property (m_or) "
+      "else fm[2]++;\n"
+      "  assert property (i0.p_and) else fi[3]++;     assert property (m_and) "
+      "else fm[3]++;\n"
+      "  assert property (i0.p_int) else fi[4]++;     assert property (m_int) "
+      "else fm[4]++;\n"
+      "  assert property (i0.p_case) else fi[5]++;    assert property (m_case) "
+      "else fm[5]++;\n"
+      "  assert property (i0.p_thr) else fi[6]++;     assert property (m_thr) "
+      "else fm[6]++;\n"
+      "  assert property (i0.p_node) else fi[7]++;    assert property (m_node) "
+      "else fm[7]++;\n"
+      "  assert property (i0.p_fm) else fi[8]++;      assert property (m_fm) "
+      "else fm[8]++;\n"
+      "  initial #98 for (int i = 0; i < 9; i++) $display(\"%0d: ifc=%0d "
+      "mod=%0d\", i, fi[i], fm[i]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out,
+            "0: ifc=1 mod=1\n1: ifc=5 mod=5\n2: ifc=2 mod=2\n"
+            "3: ifc=8 mod=8\n4: ifc=7 mod=7\n5: ifc=3 mod=3\n"
+            "6: ifc=8 mod=8\n7: ifc=2 mod=2\n8: ifc=2 mod=2\n");
+}
+
 }  // namespace
