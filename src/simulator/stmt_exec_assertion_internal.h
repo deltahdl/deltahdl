@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/class_object.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
@@ -27,28 +28,50 @@ struct Stmt;
 // process stands inside are part of. The report's event runs after the process
 // has moved on or suspended, with the context holding whatever ran last, so
 // the process and its named scopes are recorded when the report is queued and
-// stood back up around the report, then put back as they were.
+// stood back up around the report, then put back as they were. §8.6: an
+// assertion in a class method stands in the object the method was called on
+// and in the class declaring the method, whose methods and properties its
+// action block names by their bare names (§8.13), so both are recorded too and
+// stand for the length of the report.
 struct PendingReportScope {
   Process* proc = nullptr;
   std::vector<std::string_view> named_scopes;
+  ClassObject* this_obj = nullptr;
+  const ClassTypeInfo* method_class = nullptr;
 
   static PendingReportScope Capture(const SimContext& ctx) {
-    return {ctx.CurrentProcess(), ctx.ActiveNamedScopes()};
+    return {ctx.CurrentProcess(), ctx.ActiveNamedScopes(), ctx.CurrentThis(),
+            ctx.CurrentMethodClass()};
+  }
+
+  bool InClassMethod() const {
+    return this_obj != nullptr || method_class != nullptr;
   }
 
   // Stands the captured scopes up in the captured process's place, keeping
   // in `saved` what Restore puts back: the process that was current, and
   // the captured process's own scopes, which the switch brought in with it
   // and which it keeps, the report's standing in their place only until
-  // the report is done.
+  // the report is done. `saved` also keeps the object and class stood up for
+  // a report in a class method, which Restore takes down again.
   void Install(SimContext& ctx, PendingReportScope& saved) const {
     saved.proc = ctx.CurrentProcess();
     ctx.SetCurrentProcess(proc);
     saved.named_scopes = ctx.ActiveNamedScopes();
     Replace(ctx, named_scopes);
+    saved.this_obj = this_obj;
+    saved.method_class = method_class;
+    if (InClassMethod()) {
+      ctx.PushThis(this_obj);
+      ctx.PushMethodClass(method_class);
+    }
   }
 
   static void Restore(SimContext& ctx, const PendingReportScope& saved) {
+    if (saved.InClassMethod()) {
+      ctx.PopMethodClass();
+      ctx.PopThis();
+    }
     Replace(ctx, saved.named_scopes);
     ctx.SetCurrentProcess(saved.proc);
   }

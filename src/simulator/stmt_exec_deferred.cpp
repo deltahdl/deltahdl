@@ -204,7 +204,9 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
 static SimCoroutine ConcurrentAssertActionCoroutine(
     const Stmt* action, std::vector<std::string_view> named_scopes,
     const InstanceBindings* bindings, SimContext& ctx, Arena& arena) {
-  PendingReportScope scope{ctx.CurrentProcess(), std::move(named_scopes)};
+  PendingReportScope scope;
+  scope.proc = ctx.CurrentProcess();
+  scope.named_scopes = std::move(named_scopes);
   PendingReportScope saved;
   scope.Install(ctx, saved);
   ctx.AssertionSamples().SetInstanceBindings(bindings);

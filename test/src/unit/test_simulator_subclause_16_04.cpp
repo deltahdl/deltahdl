@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "common/arena.h"
@@ -315,6 +316,70 @@ TEST(AssertionStatementSim, EachDeferredReportCarriesItsOwnByValueActual) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §16.4 and §8.6: a deferred assertion in a class method is queued when the
+// method runs, and its action block, run later in the Reactive region, calls
+// the methods of the object the method was called on and reaches its
+// properties. c.chk(-1) fails and c.chk(2) passes, so ff and pp each run once,
+// and so does the else branch's `this.n++`; the module function's assertion
+// beside them fails once.
+TEST(DeferredAssertionSim, AClassMethodsDeferredActionRunsOnItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  int f = 0, p = 0, n = 0;\n"
+      "  function void ff(); f++; endfunction\n"
+      "  function void pp(); p++; endfunction\n"
+      "  function void chk(int x);\n"
+      "    a: assert #0 (x > 0) pp(); else ff();\n"
+      "    b: assert #0 (x > 0) else this.n++;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int fs = 0;\n"
+      "  function void ffs(); fs++; endfunction\n"
+      "  function void chk_static(int x);\n"
+      "    a: assert #0 (x > 0) else ffs();\n"
+      "  endfunction\n"
+      "  C c = new;\n"
+      "  initial begin\n"
+      "    #10 c.chk(-1);\n"
+      "    #10 c.chk(2);\n"
+      "    #10 chk_static(-3);\n"
+      "    #5 $display(\"f=%0d p=%0d n=%0d fs=%0d\", c.f, c.p, c.n, fs);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f=1 p=1 n=1 fs=1\n");
+}
+
+// The same called from an always procedure, which resumes at each change of
+// trig: val is -1 at the first and 2 at the second.
+TEST(DeferredAssertionSim, AClassMethodsDeferredActionFromAnAlwaysProcedure) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  int f = 0, p = 0;\n"
+      "  function void ff(); f++; endfunction\n"
+      "  function void pp(); p++; endfunction\n"
+      "  function void chk(int x);\n"
+      "    a: assert #0 (x > 0) pp(); else ff();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic trig = 0;\n"
+      "  int val = 0;\n"
+      "  C c = new;\n"
+      "  always @(trig) c.chk(val);\n"
+      "  initial begin\n"
+      "    #10 val = -1; trig = 1;\n"
+      "    #10 val = 2; trig = 0;\n"
+      "    #5 $display(\"f=%0d p=%0d\", c.f, c.p);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "f=1 p=1\n");
 }
 
 }  // namespace
