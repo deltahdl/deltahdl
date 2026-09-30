@@ -516,4 +516,36 @@ TEST(SampledValueExplicitClock, ChangedAndStableCompareTheClocksTick) {
   EXPECT_EQ(out, "OUT changed 1 stable 0\nOUT changed 1 stable 0\n");
 }
 
+// §16.9.3 with §16.5.1: $past at the first tick of its clock has no prior tick
+// and returns the default sampled value, x for the uninitialized d, when the
+// member is reached through a virtual interface or through a class handle's
+// virtual interface, no property naming it through the instance; the second
+// tick returns the value sampled at the first in both.
+TEST(SampledValuePast, ThroughAVirtualInterfaceTheFirstTickIsTheDefault) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface bus(input logic clk); logic [7:0] d; endinterface\n"
+      "class Mon;\n"
+      "  virtual bus vif;\n"
+      "  function new(virtual bus v); vif = v; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic clk = 0; always #5 clk = ~clk;\n"
+      "  bus b(clk);\n"
+      "  virtual bus vif;\n"
+      "  Mon m;\n"
+      "  initial begin\n"
+      "    vif = b; m = new(b);\n"
+      "    b.d = 1;\n"
+      "    @(negedge clk) b.d = 2;\n"
+      "  end\n"
+      "  always @(posedge clk)\n"
+      "    $display(\"%0t v=%b c=%b\", $time, $past(vif.d), $past(m.vif.d));\n"
+      "  initial #18 $finish;\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("5 v=xxxxxxxx c=xxxxxxxx\n15 v=00000001 c=00000001\n"),
+            std::string::npos);
+}
+
 }  // namespace

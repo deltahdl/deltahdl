@@ -342,6 +342,9 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
   RegisterChildInstancePath(saved_prefix, child_prefix, child, ctx_);
   inst_prefix_ = child_prefix;
+  if (child.resolved->is_interface) {
+    interface_instance_prefixes_.push_back(child_prefix);
+  }
   // §23.9: the names a declaration initializer writes resolve within the
   // instance the declaration sits in. That initializer is evaluated here,
   // before any process exists to carry the instance, so the context is told

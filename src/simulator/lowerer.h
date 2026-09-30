@@ -328,6 +328,11 @@ class Lowerer {
   std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
+  // §25.9: the prefix of each interface instance, whose variables a virtual
+  // interface can reach whatever name the reading expression spells.
+  std::vector<std::string> interface_instance_prefixes_;
+  void EnrollInterfaceMembers(std::string_view name,
+                              const std::string& scope_prefix);
   // The instance output ports whose connection carries their module path
   // delays (RtlirContAssign::module_path_port), so that an assignment inside
   // the instance driving one of them does not carry them a second time.

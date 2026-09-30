@@ -488,6 +488,24 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   return MakeLogic4Vec(arena, 1);
 }
 
+// §16.5.2: "In an assertion, the sampled value is the only valid value of a
+// variable during a clock tick", and §16.5.1 puts no condition on where the
+// variable is declared, so a variable a property reaches across an instance
+// boundary reads the value sampled for this time slot exactly as one the
+// module declares itself. The store answers nothing outside a clocked
+// concurrent assertion's property and nothing for a variable no such property
+// reads, so every other hierarchical read is the live read it was.
+static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
+  const Logic4Vec* sampled =
+      ctx.AssertionSamples().ReadWithinProperty(&var, ctx.CurrentTime());
+  Logic4Vec val = sampled != nullptr ? *sampled : var.value;
+  // §11.8.1: the operand's signedness is its declaration's, whatever the value
+  // stored in it carried, as EvalIdentifier derives it for a simple name:
+  // `logic w` set to the signed literal 1 and read as `a.w` read -1.
+  val.is_signed = var.is_signed;
+  return val;
+}
+
 // §25.9: a component referenced through a virtual interface redirects to the
 // bound interface instance. Referencing a component of an unbound (null or
 // uninitialized) virtual interface is a fatal runtime error. Returns true and
@@ -523,8 +541,8 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   if (!inner.empty()) field = inner;
   auto* tv =
       ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
-  out = tv ? tv->value : MakeLogic4Vec(arena, 1);
-  if (tv != nullptr) out.is_signed = tv->is_signed;  // §25.9: as declared.
+  // §16.5.1 with §25.9: sampled within a property, and signed as declared.
+  out = tv ? ReadReferencedVariable(*tv, ctx) : MakeLogic4Vec(arena, 1);
   return true;
 }
 
@@ -677,24 +695,6 @@ static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
   out = ResolveClassFieldChain(caller, nullptr,
                                resolved.substr(kThisPrefix.size()), ctx, arena);
   return true;
-}
-
-// §16.5.2: "In an assertion, the sampled value is the only valid value of a
-// variable during a clock tick", and §16.5.1 puts no condition on where the
-// variable is declared, so a variable a property reaches across an instance
-// boundary reads the value sampled for this time slot exactly as one the
-// module declares itself. The store answers nothing outside a clocked
-// concurrent assertion's property and nothing for a variable no such property
-// reads, so every other hierarchical read is the live read it was.
-static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
-  const Logic4Vec* sampled =
-      ctx.AssertionSamples().ReadWithinProperty(&var, ctx.CurrentTime());
-  Logic4Vec val = sampled != nullptr ? *sampled : var.value;
-  // §11.8.1: the operand's signedness is its declaration's, whatever the value
-  // stored in it carried, as EvalIdentifier derives it for a simple name:
-  // `logic w` set to the signed literal 1 and read as `a.w` read -1.
-  val.is_signed = var.is_signed;
-  return val;
 }
 
 // Whether the path `expr` starts at no variable or array, so a select after it

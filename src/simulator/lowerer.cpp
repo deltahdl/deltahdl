@@ -475,6 +475,26 @@ void Lowerer::RecordSubroutineAssertionSampleScopes(const RtlirModule* mod) {
   }
 }
 
+// §25.9 with §16.5.1: a dotted name that names no variable, `vif.d` or
+// `m.vif.d`, reaches a member through a virtual interface bound only as the
+// design runs, so the member it ends in is enrolled in every interface
+// instance declaring it, whichever the handle comes to name.
+// The instances are named from the top, and the scope reading the name,
+// `scope_prefix`, is restored for the names after it.
+void Lowerer::EnrollInterfaceMembers(std::string_view name,
+                                     const std::string& scope_prefix) {
+  auto dot = name.rfind('.');
+  if (dot == std::string_view::npos) return;
+  std::string_view member = name.substr(dot + 1);
+  ctx_.SetLoweringInstancePrefix("");
+  for (const std::string& prefix : interface_instance_prefixes_) {
+    if (auto* var = ctx_.FindVariable(prefix + std::string(member))) {
+      ctx_.AssertionSamples().Register(var, ctx_.GetArena());
+    }
+  }
+  ctx_.SetLoweringInstancePrefix(scope_prefix);
+}
+
 void Lowerer::RegisterDesignAssertionSampling() {
   // §23.6 makes a hierarchical name an ordinary way to reach a variable, and
   // §16.5.1 puts no condition on where the variable a property reads is
@@ -494,6 +514,8 @@ void Lowerer::RegisterDesignAssertionSampling() {
     for (const auto& name : scope.names) {
       if (auto* var = ctx_.FindVariable(name)) {
         ctx_.AssertionSamples().Register(var, ctx_.GetArena());
+      } else {
+        EnrollInterfaceMembers(name, scope.inst_prefix);
       }
       // §16.6: a queue the property reads an element of is enrolled whole, so
       // the element read at a tick is the one sampled for it.
