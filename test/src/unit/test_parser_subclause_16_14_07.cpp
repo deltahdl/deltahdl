@@ -199,4 +199,34 @@ TEST(AssertionParsing, InferredClockAndDisableTogether) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.14.7 with §16.8: a formal that writes no type takes the data type of the
+// formal before it, so `e` after `shortint d` is a shortint, and a
+// $inferred_clock default on it is rejected in a sequence's port list as in a
+// property's.
+TEST(AssertionParsing, InferredClockDefaultOnACarriedDataTypeIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(shortint d = 3, e = $inferred_clock);\n"
+      "    1'b1 ##d 1'b1;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            2, "16.14.7"));
+}
+
+// `untyped` and `event` end the carried type, so a $inferred_clock default on
+// a formal after either stands, the data type before them notwithstanding.
+TEST(AssertionParsing, InferredClockDefaultAfterUntypedOrEventIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(shortint d = 3, untyped e = $inferred_clock,\n"
+              "             event f = $inferred_clock, g = $inferred_clock);\n"
+              "    @(e) 1'b1 ##d 1'b1;\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
 }  // namespace

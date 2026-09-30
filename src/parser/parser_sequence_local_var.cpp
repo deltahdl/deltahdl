@@ -322,6 +322,11 @@ struct SequencePortScan {
   // untyped, cleared by `untyped` and by a type the keyword alone does not
   // name, which a `[` or a type identifier after it shows.
   TokenKind carry_type_kw = TokenKind::kEof;
+  // §16.14.7: whether the type in force for the formals that follow admits a
+  // $inferred_clock default, which only an untyped or `event` formal does. A
+  // data type, written or carried from an earlier formal (§16.8), or
+  // `sequence`, does not.
+  bool clock_default_allowed = true;
 
   void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
     if (!item_saw_local) return;
@@ -398,7 +403,10 @@ struct SequencePortScan {
       item_saw_explicit_type = true;
       user_typed = true;
     }
-    if (user_typed) carry_type_kw = TokenKind::kEof;
+    if (user_typed) {
+      carry_type_kw = TokenKind::kEof;
+      clock_default_allowed = false;
+    }
     item->prop_formals.push_back(name_tok.text);
     item->prop_formal_type_kw.push_back(carry_type_kw);
     // §16.8.2: whether this formal is a local variable formal argument, which
@@ -440,11 +448,14 @@ struct SequencePortScan {
       carry_type_kw =
           LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
       item_saw_explicit_type = true;
+      clock_default_allowed = false;
       return true;
     }
     if (item_saw_local || !IsDisallowedLocalVarTypeKw(kind)) return false;
     lexer.Next();
     carry_type_kw = kind == TokenKind::kKwUntyped ? TokenKind::kEof : kind;
+    clock_default_allowed =
+        kind == TokenKind::kKwUntyped || kind == TokenKind::kKwEvent;
     return true;
   }
 
@@ -474,9 +485,8 @@ struct SequencePortScan {
 
   // §16.14.7: a system function that opens the current formal's default value
   // (it directly follows `=`). $inferred_clock may only default an untyped or
-  // event formal; a formal that supplied an explicit data type is neither, so
-  // that default is rejected (`event`, not a data type here, leaves
-  // item_saw_explicit_type false and is correctly accepted). An inferred
+  // event formal, so on any other, whatever its type was written or carried
+  // from, that default is rejected (clock_default_allowed). An inferred
   // clocking or disable function shall also be the entire default value
   // expression: a following token that is neither the formal separator ',' nor
   // the closing ')' means it is only part of a larger expression.
@@ -490,7 +500,7 @@ struct SequencePortScan {
                                               ? InferredDefault::kClock
                                               : InferredDefault::kDisable;
     }
-    if (fn == "$inferred_clock" && item_saw_explicit_type) {
+    if (fn == "$inferred_clock" && !clock_default_allowed) {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
                  "formal argument",
