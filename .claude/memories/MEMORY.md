@@ -37,9 +37,9 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
 - [A shall outranks an example and a can](shall-outranks-examples-and-can.md) — §1.5 and §1.10 settle a clash inside the standard; only two equal requirements go to a person.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
-- [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag, or whether suite or UVM library code was legal, in its own edition.
+- [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
 - [No local paths in code or workflows](no-local-paths-in-code-or-workflows.md) — code, tests, scripts and workflows say `IEEE 1800-2023`; the path `~/IEEE 1800-2023.pdf` is written only under .claude/.
-- [A library is not a standard](a-library-is-not-a-standard.md) — a construct the UVM library or sv-tests writes against 1800-2023 is reported, checked in 1800-2023, 1800-2017 and 1800.2-2020, never held for a person.
+- [A library is not a standard](a-library-is-not-a-standard.md) — a construct the UVM library or sv-tests writes against 1800-2023 is reported, checked in 1800-2023 and 1800.2-2020, never held for a person.
 - [The LRM's text is copyrighted](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
 - [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
@@ -95,7 +95,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
 - [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there; never a name the reader must already know.
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out; never append round after round.
-- [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and all three standards (1800-2023, 1800-2017, 1800.2-2020, with the clauses citing or paralleling the rule) leave the question open; order and priority never qualify.
+- [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and both standards (1800-2023 and 1800.2-2020, with the clauses citing or paralleling the rule) leave the question open; order and priority never qualify.
 
 ## Tasks
 

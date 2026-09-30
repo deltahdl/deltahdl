@@ -1,6 +1,6 @@
 ---
 name: a-question-the-rules-answer-is-not-a-decision
-description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the standards (1800-2023, 1800-2017, 1800.2-2020, and the clauses that cite or parallel the rule) already answer the question; if one does, act on it"
+description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the standards (1800-2023 and 1800.2-2020, and the clauses that cite or parallel the rule) already answer the question; if one does, act on it"
 metadata:
   node_type: memory
   type: feedback
@@ -20,9 +20,9 @@ the original one depends on answers them.
 
 **How to apply:** Before writing a question for a person, test it against each
 reminder and against the blocked-by links. For a question of what the language
-allows, read the rule in all three standards: `~/IEEE 1800-2023.pdf`, the same
-rule in `~/IEEE 1800-2017.pdf` per [[the-2017-edition]], and
-`~/IEEE 1800.2-2020.pdf`; write what each says into the issue, pages included.
+allows, read the rule in both standards, `~/IEEE 1800-2023.pdf` and
+`~/IEEE 1800.2-2020.pdf`, and write what each says into the issue, pages
+included; the 2017 edition is no source of truth ([[the-2017-edition]]).
 Read beyond the clause itself too: the clause that states the parallel rule
 for a sibling construct, and every clause that cites this one, often settle
 a reading the clause alone leaves open, as §16.3's grant for immediate
