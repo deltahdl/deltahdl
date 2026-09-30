@@ -23,6 +23,7 @@
 #include "simulator/process.h"
 #include "simulator/property_attempts_internal.h"
 #include "simulator/property_clocks.h"
+#include "simulator/property_instance_clocks.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
@@ -839,6 +840,7 @@ PropertyTreeState* CreatePropertyTreeState(
   const ActualsByFormal kNoActuals;
   Collection collection{*state, ctx, arena, kNoActuals, {}};
   if (!CollectSequences(root, collection, 0)) return nullptr;
+  RegisterInstanceBodyClocks(root, state->clocks, ctx, arena);
   InstallClockWatchers(state->clocks, ctx, arena);
   // §16.14.5: the step the watchers are installed at is read as a tick of
   // the leading clock, the one an attempt begins at, unless another of the

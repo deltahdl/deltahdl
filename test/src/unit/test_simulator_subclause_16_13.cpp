@@ -203,4 +203,59 @@ TEST(MulticlockSequences, AClockNamedByAPathTicksAsItsSignalDoes) {
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 4u);
 }
 
+// §16.14.5 with §16.13.1: an assertion on an instance of a property whose
+// body names a second clock begins its attempts at its leading clock alone.
+// The interface's port clk falls from x at 0, a tick of the second clock
+// before the leading clock has risen, and no attempt begins there, so the
+// instance fails as often as the same property declared in the module.
+TEST(MulticlockSequences, AnInstancesSecondClockTickingFirstBeginsNoAttempt) {
+  SimFixture f;
+  auto* fi = RunAndFindVar(
+      "interface ifc(input logic clk);\n"
+      "  logic a, b;\n"
+      "  property p_clk; @(posedge clk) a ##1 @(negedge clk) b; endproperty\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0110011110;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  logic a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  ifc i0(clk);\n"
+      "  assign i0.a = a; assign i0.b = b;\n"
+      "  property m_clk; @(posedge clk) a ##1 @(negedge clk) b; endproperty\n"
+      "  int fi = 0, fm = 0;\n"
+      "  assert property (i0.p_clk) else fi++;\n"
+      "  assert property (m_clk) else fm++;\n"
+      "endmodule\n",
+      f, "fi");
+  ASSERT_NE(fi, nullptr);
+  EXPECT_EQ(fi->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 5u);
+}
+
+// The same for an instance with actuals, whose body's sequence the actuals
+// are substituted into: clk falls from x at 0, a tick of the property's second
+// clock before its leading clock has risen, and the instance fails as often as
+// the sequence written into the assertion.
+TEST(MulticlockSequences,
+     AnInstanceWithActualsBeginsNoAttemptAtItsSecondClock) {
+  SimFixture f;
+  auto* fi = RunAndFindVar(
+      "module t;\n"
+      "  logic clk; initial begin clk = 0; repeat (20) #5 clk = ~clk; end\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0110011110;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  logic a, b; assign a = av[0]; assign b = bv[0];\n"
+      "  property pm(x, y); @(posedge clk) x ##1 @(negedge clk) y; "
+      "endproperty\n"
+      "  int fi = 0, fm = 0;\n"
+      "  assert property (pm(a, b)) else fi++;\n"
+      "  assert property (@(posedge clk) a ##1 @(negedge clk) b) else fm++;\n"
+      "endmodule\n",
+      f, "fi");
+  ASSERT_NE(fi, nullptr);
+  EXPECT_EQ(fi->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 6u);
+}
+
 }  // namespace
