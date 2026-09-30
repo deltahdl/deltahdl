@@ -20,6 +20,7 @@
 #include "simulator/evaluation_internal.h"
 #include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
+#include "simulator/process.h"
 #include "simulator/property_attempts_internal.h"
 #include "simulator/property_clocks.h"
 #include "simulator/sequence_flatten.h"
@@ -839,6 +840,13 @@ PropertyTreeState* CreatePropertyTreeState(
   Collection collection{*state, ctx, arena, kNoActuals, {}};
   if (!CollectSequences(root, collection, 0)) return nullptr;
   InstallClockWatchers(state->clocks, ctx, arena);
+  // §16.14.5: the step the watchers are installed at is read as a tick of
+  // the leading clock, the one an attempt begins at, unless another of the
+  // property's clocks is what woke its process there (§16.13.1).
+  Process* proc = ctx.CurrentProcess();
+  if (proc != nullptr && WokenByAnotherClock(state->clocks, proc->woken_by)) {
+    state->clocks.installed_at = PropertyClocks::kNever;
+  }
   return state;
 }
 

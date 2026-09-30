@@ -44,4 +44,9 @@ void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
 // where the property is on one clock.
 uint32_t ClocksTicked(const PropertyClocks& clocks, SimTime now);
 
+// Whether `woke`, the event that resumed the property's process, is an event
+// of one of its clocks other than the leading one and of no event of the
+// leading clock.
+bool WokenByAnotherClock(const PropertyClocks& clocks, const EventExpr& woke);
+
 }  // namespace delta

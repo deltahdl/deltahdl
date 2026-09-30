@@ -115,6 +115,24 @@ void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
   }
 }
 
+bool WokenByAnotherClock(const PropertyClocks& clocks, const EventExpr& woke) {
+  if (woke.signal == nullptr || clocks.clocks.empty()) return false;
+  auto names = [&woke](const std::vector<EventExpr>& clock) {
+    for (const EventExpr& ev : clock) {
+      if (ev.edge == woke.edge && ev.signal != nullptr &&
+          ev.signal->text == woke.signal->text) {
+        return true;
+      }
+    }
+    return false;
+  };
+  if (names(clocks.clocks[0])) return false;
+  for (size_t i = 1; i < clocks.clocks.size(); ++i) {
+    if (names(clocks.clocks[i])) return true;
+  }
+  return false;
+}
+
 uint32_t ClocksTicked(const PropertyClocks& clocks, SimTime now) {
   if (!clocks.multiclock) return ~0u;
   uint32_t ticked = now == clocks.installed_at ? 1u : 0u;

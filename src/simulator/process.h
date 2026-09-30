@@ -208,6 +208,9 @@ struct Process {
   // §16.12.4 and §16.12.5: likewise for each property of operands under or
   // and and.
   std::unordered_map<const Stmt*, PropertyTreeState*> property_tree_states;
+  // §9.4.2: the event of the process's last event control that resumed it,
+  // where that was an edge or a named event; one with no signal otherwise.
+  EventExpr woken_by;
   // §16.14.6: the procedural assertion queue of each concurrent assertion
   // embedded in this process, keyed by the statement; filled as the process
   // reaches the statement and drained by the statement's monitor process at

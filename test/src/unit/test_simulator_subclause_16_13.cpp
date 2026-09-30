@@ -156,4 +156,24 @@ TEST(MulticlockSequences, ANamedEventClocksASubsequenceAsASignalEdgeDoes) {
   EXPECT_EQ(g.ctx.FindVariable("leading")->value.ToUint64(), 2u);
 }
 
+// §16.13.1 with §16.14.5: an attempt begins at a tick of the leading clock
+// alone. nclk is ~clk and rises at 0, from x to 1, before clk has risen at
+// all; the cover's ten attempts begin at clk's rises at 5, 15, ..., 95 and
+// each matches at the next rise of nclk, 10, 20, ..., 100, where an attempt
+// begun at 0 would match at 10 as well.
+TEST(MulticlockSequences, AnotherClockTickingFirstBeginsNoAttempt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic nclk; assign nclk = ~clk;\n"
+      "  bit a = 1, b = 1;\n"
+      "  int hits = 0;\n"
+      "  cover property (@(posedge clk) a ##1 @(posedge nclk) b) hits++;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 10u);
+}
+
 }  // namespace

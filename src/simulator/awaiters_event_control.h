@@ -308,25 +308,28 @@ struct EventAwaiter {
   // §9.4.2.3: an `iff` qualifier on the operand gates that resume, so a trigger
   // arriving while the condition is false leaves the process suspended and the
   // watcher armed for the next one.
-  static void AttachEventVarWatcher(Variable* var, const Expr* iff_cond,
+  static void AttachEventVarWatcher(Variable* var, const EventExpr& ev,
                                     std::coroutine_handle<> h,
                                     ResumeTarget target,
                                     const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &target.ctx;
     auto* proc = target.proc;
-    var->AddWatcher([h, iff_cond, proc, ctx_ptr, consumed]() mutable {
-      if (proc && !proc->active) return true;
-      // A sibling operand of the same event control already resumed this
-      // await; the coroutine has moved on, so retire this stale watcher.
-      if (*consumed) return true;
-      if (proc && proc->is_suspended) return false;
-      if (iff_cond &&
-          !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
-        return false;
-      *consumed = true;
-      ResumeMaybeReactive(h, proc, *ctx_ptr);
-      return true;
-    });
+    const Expr* iff_cond = ev.iff_condition;
+    var->AddWatcher(
+        [h, iff_cond, woke = ev, proc, ctx_ptr, consumed]() mutable {
+          if (proc && !proc->active) return true;
+          // A sibling operand of the same event control already resumed this
+          // await; the coroutine has moved on, so retire this stale watcher.
+          if (*consumed) return true;
+          if (proc && proc->is_suspended) return false;
+          if (iff_cond &&
+              !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
+            return false;
+          *consumed = true;
+          if (proc) proc->woken_by = woke;
+          ResumeMaybeReactive(h, proc, *ctx_ptr);
+          return true;
+        });
   }
 
   // Arms an edge-sensitive watcher on a value-carrying variable, delegating
@@ -353,7 +356,7 @@ struct EventAwaiter {
     Logic4Snapshot prev;
     prev.Capture(var->value);
     var->AddWatcher([h, var, prev, edge = ev.edge, iff_cond = ev.iff_condition,
-                     ctx_ptr, proc, consumed]() mutable {
+                     woke = ev, ctx_ptr, proc, consumed]() mutable {
       if (proc && !proc->active) return true;
       // Another operand of the same `@(a or b)` event control already resumed
       // this await; retire this stale sibling so it cannot re-fire the handle.
@@ -362,6 +365,7 @@ struct EventAwaiter {
       var->prev_value = prev;
       bool fired = HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
                                    ResumeTarget{*ctx_ptr, proc});
+      if (proc && fired) proc->woken_by = woke;
       prev.Capture(var->value);
       if (fired) *consumed = true;
       return fired;
@@ -375,6 +379,7 @@ struct EventAwaiter {
     // that the first to fire retires the rest, even when several operands name
     // the same signal (e.g. `posedge clk or negedge clk`).
     auto consumed = std::make_shared<bool>(false);
+    if (proc) proc->woken_by = EventExpr{};
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       if (ev.signal->kind != ExprKind::kIdentifier &&
@@ -388,8 +393,7 @@ struct EventAwaiter {
         continue;
       }
       if (var->is_event) {
-        AttachEventVarWatcher(var, ev.iff_condition, h, ResumeTarget{ctx, proc},
-                              consumed);
+        AttachEventVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
         continue;
       }
       AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
