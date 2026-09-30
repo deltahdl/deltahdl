@@ -72,6 +72,26 @@ void ReportEventFormalReference(DiagEngine& diag, const ModuleItem* item,
 
 }  // namespace
 
+// §16.8.2: the type of a local variable formal argument shall be one of the
+// types allowed in §16.6. The formal-type categories that §16.8.1 permits for
+// an ordinary (non-local) formal — `sequence`, `event`, `property`, and the
+// keyword `untyped` — are not among the §16.6 data types, so specifying one of
+// them as the type of a `local` formal is illegal (the illegal example in
+// §16.8.2 rejects `local event e` on exactly these grounds). These keywords are
+// recognised head-on so the diagnostic names the real problem (a disallowed
+// type) rather than being mistaken for a missing type.
+bool IsDisallowedLocalVarTypeKw(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwEvent:
+    case TokenKind::kKwSequence:
+    case TokenKind::kKwProperty:
+    case TokenKind::kKwUntyped:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   // §16.7: only the literal `##[ [-]INTLIT : [-]INTLIT ]` form is checked
   // here. Symbolic bounds need full constant evaluation and are deferred to

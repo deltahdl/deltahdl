@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -284,20 +286,24 @@ TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->prop_formal_defaults.size(), 5u);
-  ASSERT_EQ(item->prop_formal_has_default.size(), 5u);
-  EXPECT_FALSE(item->prop_formal_has_default[0]);
-  EXPECT_TRUE(item->prop_formal_has_default[1]);
-  EXPECT_TRUE(item->prop_formal_has_default[3]);
-  EXPECT_EQ(item->prop_formal_defaults[0], nullptr);
-  ASSERT_NE(item->prop_formal_defaults[1], nullptr);
-  EXPECT_EQ(item->prop_formal_defaults[1]->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(item->prop_formal_defaults[1]->text, "b");
-  ASSERT_NE(item->prop_formal_defaults[2], nullptr);
-  EXPECT_EQ(item->prop_formal_defaults[2]->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(item->prop_formal_defaults[3], nullptr);
-  ASSERT_NE(item->prop_formal_defaults[4], nullptr);
-  EXPECT_NE(item->prop_formal_defaults[4]->property_actual, nullptr);
+  // One letter per formal: '-' for no default recorded, 'I' an identifier,
+  // 'L' a literal, 'P' a property expression; and whether each has one.
+  std::string recorded;
+  for (const Expr* def : item->prop_formal_defaults) {
+    if (def == nullptr) {
+      recorded += '-';
+    } else if (def->property_actual != nullptr) {
+      recorded += 'P';
+    } else if (def->kind == ExprKind::kIdentifier) {
+      recorded += def->text == "b" ? 'I' : '?';
+    } else {
+      recorded += def->kind == ExprKind::kIntegerLiteral ? 'L' : '?';
+    }
+  }
+  std::string marked;
+  for (bool has : item->prop_formal_has_default) marked += has ? '1' : '0';
+  EXPECT_EQ(recorded, "-IL-P");
+  EXPECT_EQ(marked, "01111");
 }
 
 }  // namespace
