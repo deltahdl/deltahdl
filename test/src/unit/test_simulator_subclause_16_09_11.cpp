@@ -280,4 +280,63 @@ TEST(SequenceComposition, TriggeredAppliesToASequenceFormalsInstanceActual) {
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 1u);
 }
 
+// §16.9.11 with §16.13.5 and §16.16: a sequence declared without a clock takes
+// the clock of the context applying `triggered` to it, here posedge clk, from
+// a clockless sequence the assertion reads and from the assertion itself, so
+// its end points are the rises its matches end at, from 15 on: r's attempts
+// from 15 to 85 match, eight, and the assertion's from 15 to 95, nine.
+TEST(SequenceComposition, AClocklessSequenceTakesTheClockOfItsContext) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  int c1 = 0, c2 = 0;\n"
+      "  sequence e; 1 ##1 1; endsequence\n"
+      "  sequence r; e.triggered ##1 1; endsequence\n"
+      "  cover property (@(posedge clk) r) c1++;\n"
+      "  cover property (@(posedge clk) e.triggered) c2++;\n"
+      "  initial #97 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c1=8 c2=9\n"), std::string::npos);
+}
+
+// §16.9.11 with §16.13.5: an instance with arguments of a sequence declared
+// without a clock, `sub_plain(1).triggered`, takes the clock of the context
+// applying the method as a named sequence does.
+TEST(SequenceComposition, AClocklessInstanceTakesTheClockOfItsContext) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  int c1 = 0;\n"
+      "  sequence sub_plain(x); x ##1 1; endsequence\n"
+      "  sequence r; sub_plain(1).triggered ##1 1; endsequence\n"
+      "  cover property (@(posedge clk) r) c1++;\n"
+      "  initial #97 $display(\"c1=%0d\", c1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c1=8\n"), std::string::npos);
+}
+
+// §16.9.11 with §16.13.5: a sequence declared without a clock read by
+// `triggered` in contexts on two clocks ends in each on that context's clock,
+// its matches ending at the rises of 15 to 95 in the one and at the falls of
+// 20 to 90 in the others, two contexts on the falls sharing their ends.
+TEST(SequenceComposition, EachContextClockGivesAClocklessSequenceItsEnds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  int c1 = 0, c2 = 0, c3 = 0;\n"
+      "  sequence e; 1 ##1 1; endsequence\n"
+      "  cover property (@(posedge clk) e.triggered) c1++;\n"
+      "  cover property (@(negedge clk) e.triggered) c2++;\n"
+      "  cover property (@(negedge clk) e.triggered) c3++;\n"
+      "  initial #97 $display(\"c1=%0d c2=%0d c3=%0d\", c1, c2, c3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c1=9 c2=8 c3=8\n"), std::string::npos);
+}
+
 }  // namespace

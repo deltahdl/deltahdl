@@ -108,6 +108,21 @@ bool DeclaredNameTables::ConsumeSequenceMatch(std::string_view ep_name,
   return true;
 }
 
+void DeclaredNameTables::RecordEndpointLocals(
+    std::string_view ep_name, uint64_t at, std::vector<MatchLocals> matches) {
+  EndpointMatches& entry = endpoint_locals_[std::string(ep_name)];
+  entry.at = at;
+  entry.matches = std::move(matches);
+}
+
+const std::vector<DeclaredNameTables::MatchLocals>*
+DeclaredNameTables::EndpointLocals(std::string_view ep_name,
+                                   uint64_t at) const {
+  auto it = endpoint_locals_.find(std::string(ep_name));
+  if (it == endpoint_locals_.end() || it->second.at != at) return nullptr;
+  return &it->second.matches;
+}
+
 void DeclaredNameTables::RegisterRealVariable(std::string_view name) {
   real_vars_.insert(name);
 }

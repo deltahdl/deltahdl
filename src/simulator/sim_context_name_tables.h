@@ -25,9 +25,11 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
+#include "common/types.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -81,6 +83,18 @@ class DeclaredNameTables {
   // the context.
   bool ConsumeSequenceMatch(std::string_view ep_name, uint64_t matched_ticks,
                             uint64_t now);
+
+  // §16.10: the locals of one attempt of a monitored sequence that matched,
+  // each under its name, which a read of `triggered` on the instance hands to
+  // the reading attempt's locals passed to it as entire actuals.
+  using MatchLocals = std::vector<std::pair<std::string_view, Logic4Vec>>;
+  // The locals of every attempt that matched at `at` of the monitor firing the
+  // end point `ep_name`; EndpointLocals answers null where none was recorded
+  // at `at`.
+  void RecordEndpointLocals(std::string_view ep_name, uint64_t at,
+                            std::vector<MatchLocals> matches);
+  const std::vector<MatchLocals>* EndpointLocals(std::string_view ep_name,
+                                                 uint64_t at) const;
 
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
@@ -316,6 +330,12 @@ class DeclaredNameTables {
   std::unordered_map<const Expr*, std::string_view> sequence_instance_eps_;
   // §16.13.5: the time step each end point's match was last read as matched.
   std::unordered_map<std::string_view, uint64_t> sequence_match_reads_;
+  // §16.10: see RecordEndpointLocals.
+  struct EndpointMatches {
+    uint64_t at = 0;
+    std::vector<MatchLocals> matches;
+  };
+  std::unordered_map<std::string, EndpointMatches> endpoint_locals_;
 
   std::unordered_set<std::string_view> real_vars_;
 

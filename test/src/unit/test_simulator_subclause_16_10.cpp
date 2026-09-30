@@ -180,4 +180,63 @@ TEST(PropertyLocals, EachAttemptHoldsItsOwnCopy) {
   ExpectPropertyCounts("(1, x = v) |-> ##2 (v == x + 2)", 8, 0);
 }
 
+// The source the cases of a local flowing out of `triggered` share: clk rises
+// at 5, 15, ..., 95, and cnt counts its falls, so at the rise of 15 + 10k it is
+// k + 1. `decls` declares the sequences, and c1 and c2 count the attempts of
+// seq_a and seq_b, printed at 97.
+std::string RunTriggeredFlowCase(const std::string& decls) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  int cnt = 0;\n"
+      "  always @(negedge clk) cnt <= cnt + 1;\n"
+      "  int c1 = 0, c2 = 0;\n" +
+          decls +
+          "  cover property (@(posedge clk) seq_a) c1++;\n"
+          "  cover property (@(posedge clk) seq_b) c2++;\n"
+          "  initial #97 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+          "endmodule\n",
+      f);
+}
+
+// §16.10: a local passed as an entire actual to an instance to which
+// `triggered` is applied, the whole Boolean, flows out of it with the value
+// the instance's match assigned, as it does from the plain instance: v1 holds
+// the cnt of the tick before, which cnt exceeds by two a tick later, at each
+// attempt from 15 to 85. A match item of the operand reads the value, and v2,
+// passed to nothing, is the reading sequence's alone.
+TEST(SequenceLocals, ALocalFlowsOutOfTriggered) {
+  std::string out = RunTriggeredFlowCase(
+      "  sequence sub(lv, src); @(posedge clk) (1, lv = src) ##1 1;\n"
+      "  endsequence\n"
+      "  sequence seq_a; int v1, v2;\n"
+      "    (sub(v1, cnt).triggered, v2 = v1) ##1 (cnt == v2 + 2);\n"
+      "  endsequence\n"
+      "  sequence seq_b; int v1;\n"
+      "    sub(v1, cnt) ##1 (cnt == v1 + 2);\n"
+      "  endsequence\n");
+  EXPECT_NE(out.find("c1=8 c2=8\n"), std::string::npos);
+}
+
+// §16.10: where two matches of the instance end at the tick `triggered` is
+// read at, each flows its own value, the one begun a tick before and the one
+// begun two before, so a read wanting either finds it: cnt two past v1 from
+// the attempt of 15, and three past from the attempt of 25, the first with
+// two matches ending at it. The instance's own local w, passed to nothing,
+// stays in it.
+TEST(SequenceLocals, EachMatchEndingAtTheTickFlowsItsOwnValue) {
+  std::string out = RunTriggeredFlowCase(
+      "  sequence sub(lv, src); bit w;\n"
+      "    @(posedge clk) (1, lv = src, w = 1) ##[1:2] w;\n"
+      "  endsequence\n"
+      "  sequence seq_a; int v1;\n"
+      "    sub(v1, cnt + 0).triggered ##1 (cnt == v1 + 2);\n"
+      "  endsequence\n"
+      "  sequence seq_b; int v1;\n"
+      "    sub(v1, cnt + 0).triggered ##1 (cnt == v1 + 3);\n"
+      "  endsequence\n");
+  EXPECT_NE(out.find("c1=8 c2=7\n"), std::string::npos);
+}
+
 }  // namespace

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -18,7 +19,9 @@
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sequence_flatten.h"
+#include "simulator/sequence_local_flow.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
@@ -65,6 +68,10 @@ struct LinearAttempt {
   // coincident with the crossing where there is one and the next one
   // otherwise, so the first tick of the new clock counts no wait.
   bool crossed_zero = false;
+  // §16.10: which of the matches ending at this tick the operand reading
+  // `triggered` hands its locals on from, an attempt going on per match; a
+  // pick other than the first marks a copy made for its match.
+  uint32_t flow_pick = 0;
 };
 
 // §16.13.1: whether the clock the operand at `pos` is evaluated on ticked at
@@ -204,9 +211,12 @@ class AttemptLocalsScope {
 
 // One operand of an attempt at this tick: the initialization items run before
 // the Boolean is read, the Boolean is read over the attempt's locals, and the
-// other match items run where it holds. Reports whether it held.
+// locals flowing out of it and the other match items take their values where
+// it holds. Reports whether it held.
 bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
                  SimContext& ctx, Arena& arena) {
+  uint32_t pick = attempt.flow_pick;
+  attempt.flow_pick = 0;
   AttemptLocalsScope scope(body.locals, attempt, ctx);
   const std::vector<SeqMatchAssign>& items = body.match_items[attempt.pos];
   for (const SeqMatchAssign& item : items) {
@@ -215,6 +225,7 @@ bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
   if (!EvalExpr(body.operands[attempt.pos], ctx, arena).IsTruthy()) {
     return false;
   }
+  TakeFlowedLocals(body.operands[attempt.pos], pick, ctx, arena);
   for (const SeqMatchAssign& item : items) {
     if (!item.init) scope.Assign(item, arena);
   }
@@ -233,6 +244,9 @@ bool WithinDelay(const SeqCycleDelay& delay, uint32_t waited) {
 
 void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
                   std::vector<LinearAttempt>& carry) {
+  // A copy made for one match ending at this tick is carried by the attempt
+  // it was copied from.
+  if (attempt.flow_pick != 0) return;
   if (attempt.waited >= delay.max) return;
   if (delay.max == SeqCycleDelay::kUnbounded && attempt.waited > delay.min) {
     attempt.waited = delay.min;
@@ -269,14 +283,23 @@ struct TickStep {
   SimContext& ctx;
   Arena& arena;
   bool matched = false;
+  // §16.10: where not null, the locals of each attempt that matched at this
+  // tick, for a monitor whose end point hands them on.
+  std::vector<std::vector<Logic4Vec>>* ended = nullptr;
 };
+
+// The sequence matched at this tick with the attempt's locals as they stand.
+void MatchAt(TickStep& step, const LinearAttempt& attempt) {
+  step.matched = true;
+  if (step.ended != nullptr) step.ended->push_back(attempt.locals);
+}
 
 // The attempt's operand has matched at this tick: the sequence ends here where
 // it was the last, and otherwise an attempt at the next operand begins its
 // wait here with the locals as written.
 void EndOperand(TickStep& step, LinearAttempt& advanced) {
   if (advanced.pos + 1 == step.body.operands.size()) {
-    step.matched = true;
+    MatchAt(step, advanced);
     return;
   }
   LinearAttempt next{advanced.pos + 1, 0, advanced.locals};
@@ -397,6 +420,25 @@ bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
   return true;
 }
 
+// §16.10: an attempt about to read an operand that hands locals on from
+// several matches ending at this tick goes on as one attempt per match, the
+// copies for the matches after the first read next.
+void ForkPerFlowedMatch(TickStep& step, const LinearAttempt& attempt) {
+  if (attempt.repeating || attempt.flow_pick != 0 ||
+      !OperandClockTicked(step.body, attempt.pos, step.ctx) ||
+      !WithinDelay(step.body.delays[attempt.pos], attempt.waited)) {
+    return;
+  }
+  const std::vector<DeclaredNameTables::MatchLocals>* matches =
+      FlowedMatches(step.body.operands[attempt.pos], step.ctx);
+  if (matches == nullptr) return;
+  for (uint32_t i = 1; i < matches->size(); ++i) {
+    LinearAttempt copy = attempt;
+    copy.flow_pick = i;
+    step.pending.push_back(std::move(copy));
+  }
+}
+
 void StepAttempt(TickStep& step, LinearAttempt attempt) {
   // §16.13.1: an attempt at an operand on a clock that did not tick at this
   // time step waits as it is for a tick of that clock.
@@ -407,7 +449,7 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   const SeqCycleDelay& delay = step.body.delays[attempt.pos];
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
   if (!ThroughoutHolds(step, attempt)) return;
-  if (EndsAsTrailingEmpty(step, attempt)) step.matched = true;
+  if (EndsAsTrailingEmpty(step, attempt)) MatchAt(step, attempt);
   if (attempt.repeating) {
     if (rep.kind == SeqRepetition::Kind::kConsecutive) {
       StepConsecutive(step, attempt, rep);
@@ -426,9 +468,10 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   CarryAttempt(std::move(attempt), delay, step.carry);
 }
 
-bool AdvanceLinearAttempts(const LinearSequence& body,
-                           std::vector<LinearAttempt>& active, SimContext& ctx,
-                           Arena& arena, bool begin_attempt) {
+bool AdvanceLinearAttempts(
+    const LinearSequence& body, std::vector<LinearAttempt>& active,
+    SimContext& ctx, Arena& arena, bool begin_attempt,
+    std::vector<std::vector<Logic4Vec>>* ended = nullptr) {
   std::vector<LinearAttempt> pending;
   pending.reserve(active.size() + 1);
   for (LinearAttempt attempt : active) {
@@ -450,9 +493,11 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
   }
   std::vector<LinearAttempt> carry;
   TickStep step{body, pending, carry, ctx, arena};
+  step.ended = ended;
   while (!pending.empty()) {
     LinearAttempt attempt = std::move(pending.back());
     pending.pop_back();
+    ForkPerFlowedMatch(step, attempt);
     StepAttempt(step, std::move(attempt));
   }
   active = std::move(carry);
@@ -730,6 +775,31 @@ void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
   }
 }
 
+// §16.10: whether the monitor keeps the locals of its matching attempts for
+// its end point to hand on, as it does for one chain holding locals, which is
+// the shape an instance with a local passed to it flattens to.
+bool KeepsMatchLocals(const LinearSequence& body) {
+  return !body.locals.empty() && !body.first_match &&
+         body.alternatives.empty() && body.conjuncts.empty() &&
+         body.intersects.empty();
+}
+
+// One tick of a monitor keeping its matching attempts' locals: the chain's
+// attempts advance, and the locals of each that matched are recorded under
+// the end point at this time step, each by its name.
+bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
+                          const std::string& ep_name, SimContext& ctx,
+                          Arena& arena) {
+  std::vector<std::vector<Logic4Vec>> ended;
+  if (!AdvanceLinearAttempts(body, active.body.linear, ctx, arena, true,
+                             &ended)) {
+    return false;
+  }
+  ctx.RecordEndpointLocals(ep_name, ctx.CurrentTime().ticks,
+                           NamedMatchLocals(body.locals, ended));
+  return true;
+}
+
 }  // namespace
 
 SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
@@ -740,14 +810,16 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   active.alternatives.resize(body.alternatives.size());
   std::vector<const Expr*> past_sites;
   CollectPastDirectedSites(body, past_sites);
+  bool keeps_locals = KeepsMatchLocals(body);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
     for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // each advance adds beside the ones in flight.
-    if (AdvanceBody(body, active, ctx, arena)) {
-      FireSequenceEndpoint(ctx, ep_name);
-    }
+    bool matched = keeps_locals
+                       ? AdvanceKeepingLocals(body, active, ep_name, ctx, arena)
+                       : AdvanceBody(body, active, ctx, arena);
+    if (matched) FireSequenceEndpoint(ctx, ep_name);
   }
 }
 

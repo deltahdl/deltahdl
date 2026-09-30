@@ -24,6 +24,11 @@ struct RtlirContAssign;
 struct RtlirUdpInst;
 struct PackageDecl;
 struct RtlirDesign;
+struct Expr;
+
+// §16.9.11: a clock and the reads of `triggered` of one sequence in contexts
+// on it, each by the sequence's name as the read writes it.
+using ClockReads = std::pair<std::vector<EventExpr>, std::vector<const Expr*>>;
 struct RtlirModule;
 struct RtlirProcess;
 struct AssocArrayObject;
@@ -135,7 +140,18 @@ class Lowerer {
   // clocking event of its own, recording its argument's sample at each tick
   // of that event (lowerer_sampled_clocks.cpp).
   void LowerSampledClockMonitors(const Stmt* body);
-  void LowerSequenceMonitor(const ModuleItem* seq, std::string_view ep_name);
+  // `context_clock`, where not null, is the clock of the context applying
+  // `triggered` to the sequence, which a sequence declared without a clock
+  // takes (§16.9.11).
+  void LowerSequenceMonitor(const ModuleItem* seq, std::string_view ep_name,
+                            const std::vector<EventExpr>* context_clock);
+  // §16.9.11: the monitor of the named sequence `seq`, on `first_clock` where
+  // it is declared without a clock, and, so declared, one more for each clock
+  // of `further`, whose end point the reads grouped under that clock, `e` as
+  // each writes it, take.
+  void LowerNamedSequenceMonitor(const ModuleItem* seq,
+                                 const std::vector<EventExpr>* first_clock,
+                                 const std::vector<ClockReads>& further);
   // Lowers `cls` and binds it under its bare name. `scope_items` are the items
   // of the scope the class is declared in -- the compilation unit's function
   // and task declarations, a package's items or a module's function
