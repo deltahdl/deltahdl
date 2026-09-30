@@ -132,7 +132,7 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   // specified, and the only procedural code among them is an always or an
   // initial procedure: a task, a function, a class method and a final
   // procedure are not on it.
-  if (always_or_initial_depth_ == 0) {
+  if (always_or_initial_depth_ == 0 && cover_pass_statement_depth_ == 0) {
     diag_.Error(loc,
                 "a concurrent assertion statement in procedural code shall be "
                 "in an always or an initial procedure",
@@ -607,7 +607,9 @@ ModuleItem* Parser::ParseCoverProperty() {
   Expect(TokenKind::kRParen, Subclause("16.14.3"));
 
   if (!Check(TokenKind::kSemicolon)) {
+    ++cover_pass_statement_depth_;
     item->assert_pass_stmt = ParseStmt();
+    --cover_pass_statement_depth_;
   } else {
     Expect(TokenKind::kSemicolon, Subclause("16.14.3"));
   }

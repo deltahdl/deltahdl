@@ -293,6 +293,22 @@ TEST(ConcurrentAssertionPlacement, InAFinalProcedureIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
 }
 
+// §16.14.3 has a rule of its own against a concurrent assertion statement in a
+// cover statement's pass statement, which the elaborator reports, so the
+// placement report above is not made a second time for the same statement.
+TEST(ConcurrentAssertionPlacement, InACoverPassStatementIsLeftToItsOwnRule) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  cover property (@(posedge clk) x)\n"
+      "    assert property (@(posedge clk) x);\n"
+      "endmodule\n");
+  for (const auto& diag : r.diags) {
+    EXPECT_EQ(diag.message.find(kPlacementMessage), std::string::npos)
+        << diag.message;
+  }
+}
+
 // The two procedures the list names, the statement nested in a block of each.
 TEST(ConcurrentAssertionPlacement, InAnAlwaysOrAnInitialProcedureIsAccepted) {
   auto r = Parse(

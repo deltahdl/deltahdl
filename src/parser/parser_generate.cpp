@@ -9,6 +9,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
+#include "parser/parser_type_name_scope.h"
 
 namespace delta {
 

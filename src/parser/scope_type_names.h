@@ -27,8 +27,8 @@ namespace delta {
 // admits udp_declaration only as a description at the outermost level: neither
 // A.1.11's package_item and package_or_generate_item_declaration nor A.1.9's
 // class_item lists it. Parser::TypeNameScope::NamesAddedSoFar in
-// src/parser/parser.h is what fills those entries, and it answers with the type
-// names and the nettype names alone.
+// src/parser/parser_type_name_scope.h is what fills those entries, and it
+// answers with the type names and the nettype names alone.
 //
 // A name is held as a view into the source text the lexer read it out of, which
 // SourceManager owns for as long as the run lasts. Carrying one from the parse

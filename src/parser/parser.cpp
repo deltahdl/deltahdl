@@ -17,6 +17,7 @@
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "parser/parser_token_skips.h"
+#include "parser/parser_type_name_scope.h"
 
 namespace delta {
 

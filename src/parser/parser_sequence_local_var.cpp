@@ -53,6 +53,23 @@ bool IsWholeInstanceActual(const ModuleItem* item, SourceLoc loc) {
   return false;
 }
 
+// §16.8.1 rule b): a formal of type `event` is referenced only where an
+// event_expression may be written. The clocking events are consumed before the
+// sequence body scan reaches an identifier, so a reference to one read there
+// stands in the sequence_expr; one after `.` or `::` names a member instead.
+void ReportEventFormalReference(DiagEngine& diag, const ModuleItem* item,
+                                const Token& tok, bool after_select) {
+  if (after_select || !IsEventFormalOf(item, tok.text) ||
+      IsWholeInstanceActual(item, tok.loc)) {
+    return;
+  }
+  diag.Error(tok.loc,
+             "formal argument '" + std::string(tok.text) +
+                 "' of type event is referenced where no event expression may "
+                 "be written",
+             Subclause("16.8.1"));
+}
+
 }  // namespace
 
 void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
@@ -631,17 +648,7 @@ void Parser::ScanSequenceBody(ModuleItem* item) {
     }
     if (Check(TokenKind::kIdentifier)) {
       auto tok = Consume();
-      // §16.8.1 rule b): a formal of type `event` is referenced only where an
-      // event_expression may be written. The clocking events are consumed
-      // above, so a reference reaching here stands in the sequence_expr.
-      if (!after_select && IsEventFormalOf(item, tok.text) &&
-          !IsWholeInstanceActual(item, tok.loc)) {
-        diag_.Error(tok.loc,
-                    "formal argument '" + std::string(tok.text) +
-                        "' of type event is referenced where no event "
-                        "expression may be written",
-                    Subclause("16.8.1"));
-      }
+      ReportEventFormalReference(diag_, item, tok, after_select);
       after_select = false;
       item->prop_instance_refs.push_back(tok.text);
       continue;

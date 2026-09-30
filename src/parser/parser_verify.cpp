@@ -15,6 +15,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_type_name_scope.h"
 
 namespace delta {
 
