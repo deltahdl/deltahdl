@@ -67,7 +67,13 @@ void WatchEvent(PropertyClocks& clocks, WatchedEvent watched,
   Variable* var = SignalOf(ev, ctx);
   if (var == nullptr) return;
   clocks.was_true[watched.slot] = EvalExpr(ev.signal, ctx, arena).IsTruthy();
-  var->AddWatcher([&clocks, watched, &ev, &ctx, &arena]() {
+  var->AddWatcher([&clocks, watched, &ev, &ctx, &arena, var]() {
+    // §15.5.1: a named event holds no value that changes; each trigger is
+    // what `@(ev)` waits for, and so a tick of the clock.
+    if (var->is_event) {
+      clocks.ticked_at[watched.clock] = ctx.CurrentTime();
+      return false;
+    }
     bool now = EvalExpr(ev.signal, ctx, arena).IsTruthy();
     bool was = clocks.was_true[watched.slot];
     clocks.was_true[watched.slot] = now;

@@ -117,4 +117,43 @@ TEST(MulticlockSequences, ABareNamedClockIsTheParenthesisedOnesEvent) {
   EXPECT_EQ(bare.last_pass, 50u);
 }
 
+// §16.13.1 with §15.5.1: a named event is a clock of a multiclocked sequence as
+// an edge of a signal is, each trigger a tick. ne is triggered at every fall
+// of clk and nclk is ~clk, so @(ne) and @(posedge nclk) tick at the same
+// instants, and a sequence gives the same matches on either, whether the
+// event clocks its second subsequence or its first.
+std::string EventClockSource(const std::string& second_clock,
+                             const std::string& leading_clock) {
+  return "module t;\n"
+         "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+         "  logic nclk; assign nclk = ~clk;\n"
+         "  bit [0:9] av = 10'b1010010000, bv = 10'b0110011010;\n"
+         "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+         "  always @(negedge clk) av <= av << 1;\n"
+         "  always @(posedge clk) bv <= bv << 1;\n"
+         "  event ne; always @(negedge clk) -> ne;\n"
+         "  int second = 0, leading = 0;\n"
+         "  cover property (@(posedge clk) a ##1 @(" +
+         second_clock +
+         ") b) second++;\n"
+         "  cover property (@(" +
+         leading_clock +
+         ") b ##1 @(posedge clk) a) leading++;\n"
+         "endmodule\n";
+}
+
+TEST(MulticlockSequences, ANamedEventClocksASubsequenceAsASignalEdgeDoes) {
+  SimFixture f;
+  auto* second = RunAndFindVar(EventClockSource("ne", "ne"), f, "second");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("leading")->value.ToUint64(), 2u);
+  SimFixture g;
+  auto* edge = RunAndFindVar(EventClockSource("posedge nclk", "posedge nclk"),
+                             g, "second");
+  ASSERT_NE(edge, nullptr);
+  EXPECT_EQ(edge->value.ToUint64(), 2u);
+  EXPECT_EQ(g.ctx.FindVariable("leading")->value.ToUint64(), 2u);
+}
+
 }  // namespace
