@@ -360,6 +360,18 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 
   RegisterProcessClassType(ctx_, arena_);
   LowerAliases(mod);
+  LowerModuleProcesses(mod);
+
+  // §14.3: the block's clock and signals are variables of this module, so it is
+  // registered once they exist. AttachDesignClocking arms the watchers when the
+  // whole design has been lowered.
+  LowerClockingBlocks(mod);
+  RegisterGenBlockMembers(mod);
+
+  LowerChildModules(mod);
+}
+
+void Lowerer::LowerModuleProcesses(const RtlirModule* mod) {
   uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;
   // §17.7.3: a checker's statements sensitive to changes and its continuous
   // assignments are scheduled in the Reactive region, as a program's are.
@@ -379,14 +391,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& udp_inst : mod->udp_insts) {
     LowerUdpInst(udp_inst, mod->is_program);
   }
-
-  // §14.3: the block's clock and signals are variables of this module, so it is
-  // registered once they exist. AttachDesignClocking arms the watchers when the
-  // whole design has been lowered.
-  LowerClockingBlocks(mod);
-  RegisterGenBlockMembers(mod);
-
-  LowerChildModules(mod);
 }
 
 // §16.5.1: the variables a concurrent assertion's property reads are enrolled

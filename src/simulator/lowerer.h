@@ -100,6 +100,10 @@ class Lowerer {
   // names the instance inst_prefix_ names creates them by. Defined in
   // src/simulator/lowerer_child.cpp beside the child lowering that shares it.
   void LowerAliases(const RtlirModule* mod);
+  // Lowers the processes, continuous assignments, bidirectional switches and
+  // UDP instances of `mod`; a program's or a checker's processes and
+  // continuous assignments are scheduled in the Reactive region.
+  void LowerModuleProcesses(const RtlirModule* mod);
   // Creates the storage a variable declaration states, keyed under `name`.
   // `name` is the name the storage is reachable by, which is the declared name
   // at the top of the hierarchy and the instance-prefixed form under an
