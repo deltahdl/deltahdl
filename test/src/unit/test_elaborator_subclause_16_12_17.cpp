@@ -270,7 +270,7 @@ TEST(RecursivePropertyRestrictions, NotThroughParenthesesOnRecursiveRejected) {
 TEST(RecursivePropertyRestrictions, DisableIffInRecursivePropertyRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic b);\n"
       "  property illegal_recursion_3(p);\n"
       "    disable iff (b)\n"
       "    p and (1'b1 |=> illegal_recursion_3(p));\n"
@@ -289,7 +289,7 @@ TEST(RecursivePropertyRestrictions, DisableIffInRecursivePropertyRejected) {
 TEST(RecursivePropertyRestrictions, DisableIffInNonRecursivePropertyAllowed) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic b);\n"
       "  property prop_always(p);\n"
       "    p and (1'b1 |=> prop_always(p));\n"
       "  endproperty\n"

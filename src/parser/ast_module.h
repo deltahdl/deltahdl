@@ -308,6 +308,24 @@ struct ClockingSignalDecl {
 // A bound written as the name of a formal argument of the declaring sequence
 // is kept by name until §16.8's instantiation supplies the actual, an
 // elaboration-time constant or `$`, that the flattening reads it as.
+// §23.9 with §16.8 and §16.12: a name the property_spec of a concurrent
+// assertion, or the body of a named sequence or property, reads without a
+// hierarchical path, and where the read stands.
+struct AssertionRead {
+  std::string_view name;
+  SourceLoc loc;
+};
+
+// §16.8: an identifier written as the whole of a positional actual argument
+// of an instance in such a text: the name of what is instantiated, the
+// position of the argument, the identifier and where it stands.
+struct AssertionInstanceArg {
+  std::string_view callee;
+  size_t index = 0;
+  std::string_view name;
+  SourceLoc loc;
+};
+
 struct SeqCycleDelay {
   static constexpr uint32_t kUnbounded = UINT32_MAX;
   uint32_t min = 1;
@@ -693,6 +711,16 @@ struct ModuleItem {
   // variable declared in the body (a single declaration with N comma-
   // separated names produces N entries).
   std::vector<std::string_view> prop_seq_assert_vars;
+
+  // §23.9, §16.8 and §16.10, for a concurrent assertion statement and a
+  // sequence or property declaration: what the parser's scan of the text
+  // records, the names it reads, the names it declares as local variables of
+  // a user-defined type, the names it writes in a cycle delay or a repetition
+  // bound, and the identifiers it passes whole as actuals to instances.
+  std::vector<AssertionRead> assertion_reads;
+  std::vector<std::string_view> assertion_local_names;
+  std::vector<std::string_view> assertion_const_names;
+  std::vector<AssertionInstanceArg> assertion_instance_args;
 
   std::vector<EventExpr> clocking_event;
 

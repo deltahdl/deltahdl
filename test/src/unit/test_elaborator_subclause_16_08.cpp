@@ -179,4 +179,55 @@ TEST(NamedSequenceDeclaration, SelfRecursiveSequenceIsError) {
       "cyclic dependency among named sequences involving \"sr\"", 3, "16.8"));
 }
 
+// §16.8: a formal referenced in a cycle delay range or a repetition bound
+// takes an actual that is an elaboration-time constant. The clause's own
+// delay_example: `a1` binds the constants 3 and 2 and `$`, and is legal;
+// `a2_illegal` binds the variables z and d to min and delay1, and each is
+// reported where the instance names it.
+TEST(NamedSequenceDeclaration, VariableActualForADelayOrRepetitionFormal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit x, y;\n"
+      "  int z, d;\n"
+      "  sequence delay_example(x, y, min, max, delay1);\n"
+      "    x ##delay1 y[*min:max];\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) delay_example(x, y, 3, $, 2));\n"
+      "  a2_illegal: assert property (@(posedge clk)\n"
+      "    delay_example(x, y, z, $, d));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the actual argument 'z' bound to the formal "
+                            "'min' of sequence 'delay_example' is not an "
+                            "elaboration-time constant",
+                            10, "16.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the actual argument 'd' bound to the formal "
+                            "'delay1' of sequence 'delay_example' is not an "
+                            "elaboration-time constant",
+                            10, "16.8"));
+}
+
+// §16.8 negative sibling: a parameter is an elaboration-time constant, so
+// binding one where the delay_example's a2_illegal binds a variable is legal.
+TEST(NamedSequenceDeclaration, ParameterActualForADelayFormalIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit x, y;\n"
+      "  parameter int P = 2;\n"
+      "  sequence delay_example(x, y, min, max, delay1);\n"
+      "    x ##delay1 y[*min:max];\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) delay_example(x, y, P, $, P));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

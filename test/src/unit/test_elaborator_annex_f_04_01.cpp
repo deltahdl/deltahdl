@@ -57,7 +57,7 @@ TEST(PropertyRewrite, ArgArityMismatchSurfacesAsNotLegal) {
 TEST(PropertyRewrite, FlattenedFormIllegalMakesSourceIllegalFromSource) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -82,7 +82,7 @@ TEST(PropertyRewrite, FlattenedFormIllegalMakesSourceIllegalFromSource) {
 TEST(PropertyRewrite, FlattenedFormLegalKeepsSourceLegalFromSource) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b, r2);\n"
       "  property leaf;\n"
       "    @(posedge clk) a |-> b;\n"
       "  endproperty\n"
@@ -132,7 +132,7 @@ TEST(PropertyRewrite,
      FlattenedFormNestsDisableIffThroughChainedInstancesFromSource) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -159,7 +159,7 @@ TEST(PropertyRewrite,
      FlattenedFormCollectsDisableIffFromSiblingInstancesFromSource) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2, c, d);\n"
       "  property l1;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"

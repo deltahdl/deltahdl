@@ -1,8 +1,13 @@
 #include "elaborator/concurrent_assertion_expr.h"
 
+#include <string>
 #include <string_view>
+#include <unordered_set>
 
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 
 namespace delta {
@@ -43,7 +48,73 @@ std::string_view FindChandleRef(const Expr* e, const RtlirModule* mod) {
   return {};
 }
 
+// The class a variable of the module holds a handle to, or nullptr where the
+// variable is none or its class is not one the unit declares.
+const ClassDecl* HandleClass(std::string_view name, const RtlirModule* mod,
+                             const CompilationUnit* unit) {
+  if (name.empty() || mod == nullptr || unit == nullptr) return nullptr;
+  for (const auto& v : mod->variables) {
+    if (v.name != name) continue;
+    if (v.class_type_name.empty()) return nullptr;
+    return FindClassDecl(v.class_type_name, unit);
+  }
+  return nullptr;
+}
+
+// Whether `cls`, or a class it extends (§8.13), declares `member` without
+// `static`. False where no class on the chain declares it, so a name this
+// cannot place is never reported.
+bool DeclaresNonStaticMember(const ClassDecl* cls, std::string_view member,
+                             const CompilationUnit* unit) {
+  std::unordered_set<const ClassDecl*> seen;
+  while (cls != nullptr && seen.insert(cls).second) {
+    for (const ClassMember* m : cls->members) {
+      std::string_view name = m->method != nullptr ? m->method->name : m->name;
+      if (name == member) return !m->is_static;
+    }
+    cls = cls->base_class.empty() ? nullptr
+                                  : FindClassDecl(cls->base_class, unit);
+  }
+  return false;
+}
+
+// Recursively searches an assertion expression for `h.m`, a property read or
+// a method called through a handle `h` to an object, where `m` is a non-static
+// member of the handle's class. Writes `h.m` to `out` for the first one.
+bool FindNonStaticMemberRef(const Expr* e, const RtlirModule* mod,
+                            const CompilationUnit* unit, std::string& out) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution &&
+      e->lhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
+      e->rhs != nullptr && e->rhs->kind == ExprKind::kIdentifier &&
+      DeclaresNonStaticMember(HandleClass(e->lhs->text, mod, unit),
+                              e->rhs->text, unit)) {
+    out = std::string(e->lhs->text) + "." + std::string(e->rhs->text);
+    return true;
+  }
+  const Expr* children[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  for (const Expr* c : children) {
+    if (FindNonStaticMemberRef(c, mod, unit, out)) return true;
+  }
+  for (const Expr* a : e->args) {
+    if (FindNonStaticMemberRef(a, mod, unit, out)) return true;
+  }
+  for (const Expr* el : e->elements) {
+    if (FindNonStaticMemberRef(el, mod, unit, out)) return true;
+  }
+  return false;
+}
+
 }  // namespace
+
+std::string ConcurrentAssertionExprReferencedNonStaticMember(
+    const Expr* body, const RtlirModule* mod, const CompilationUnit* unit) {
+  std::string out;
+  FindNonStaticMemberRef(body, mod, unit, out);
+  return out;
+}
 
 std::string_view ConcurrentAssertionExprReferencedChandle(
     const Expr* body, const RtlirModule* mod) {

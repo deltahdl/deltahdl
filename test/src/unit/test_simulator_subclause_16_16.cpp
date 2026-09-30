@@ -101,4 +101,35 @@ TEST(ClockResolutionRun, WithoutADefaultAnInstanceDeterminesTheClock) {
   EXPECT_EQ(out, "e1 at 30\ne2 at 30\ne3 at 30\n$finish at time 40\n");
 }
 
+// §16.16 (f) with §16.12: a property declared in an interface with its own
+// clocking event is instantiated by the hierarchical name of an interface
+// instance, `i0.low`, and takes that event as the assertion's clock; its
+// body reads the instance's own clock and signal, so i0 and i1, bound to
+// different patterns, fail at different ticks: i0 where av holds 0, three
+// times, and i1 where bv does, five.
+TEST(ClockResolutionRun, AnInterfacePropertyInstancedByPathTakesItsClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc(input logic clk);\n"
+      "  logic sig;\n"
+      "  property low; @(posedge clk) !sig; endproperty\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1101001111, bv = 10'b0000011111;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  ifc i0(clk), i1(clk);\n"
+      "  assign i0.sig = !av[0];\n"
+      "  assign i1.sig = !bv[0];\n"
+      "  int f0 = 0, f1 = 0;\n"
+      "  assert property (i0.low) else f0++;\n"
+      "  assert property (i1.low) else f1++;\n"
+      "  initial #98 $display(\"f0=%0d f1=%0d\", f0, f1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "f0=3 f1=5\n");
+}
+
 }  // namespace

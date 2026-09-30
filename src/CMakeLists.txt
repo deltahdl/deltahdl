@@ -73,6 +73,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/expr_parser.cpp
     parser/expr_substitute.cpp
     parser/parser_property_spec.cpp
+    parser/parser_assertion_reads.cpp
     parser/expr_parser_aux.cpp
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
@@ -110,6 +111,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_items_formals.cpp
     elaborator/elaborator_items_params.cpp
     elaborator/property_instance.cpp
+    elaborator/interface_property_instance.cpp
+    elaborator/assertion_name_rules.cpp
     elaborator/semantic_leading_clocks.cpp
     elaborator/procedural_concurrent_assertion.cpp
     elaborator/interface_syntax.cpp

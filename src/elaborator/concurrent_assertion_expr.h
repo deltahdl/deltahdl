@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace delta {
 
+struct CompilationUnit;
 struct Expr;
 struct RtlirModule;
 
@@ -32,6 +34,15 @@ bool AutomaticVariableReferenceAllowed(
 // §16.6: expressions shall not reference non-static class properties or
 // methods.
 bool NonStaticClassMemberReferenceAllowed();
+
+// §16.6: applies the non-static member prohibition to a real
+// concurrent-assertion body. Walks `body` for a property read or a method
+// called through a class handle variable of `mod`, `h.m`, where the handle's
+// class, or a class it extends, declares `m` without `static`, and returns
+// "h.m" for the first one; returns an empty string when there is none. The
+// elaboration driver reports the error.
+std::string ConcurrentAssertionExprReferencedNonStaticMember(
+    const Expr* body, const RtlirModule* mod, const CompilationUnit* unit);
 
 // §16.6: expressions shall not reference variables of chandle type.
 bool ChandleVariableReferenceAllowed();

@@ -90,6 +90,30 @@ void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
   }
 }
 
+// §16.6: an expression appearing in a concurrent assertion shall not reference
+// a non-static class property or method. Reads the same two bodies the chandle
+// check reads and reports the first `h.m` once.
+void CheckConcurrentAssertionNoNonStaticMember(const ModuleItem* item,
+                                               const RtlirModule* mod,
+                                               const CompilationUnit* unit,
+                                               DiagEngine& diag) {
+  const Expr* bodies[] = {item->assert_expr, item->body != nullptr
+                                                 ? item->body->assert_expr
+                                                 : nullptr};
+  for (const Expr* b : bodies) {
+    std::string ref =
+        ConcurrentAssertionExprReferencedNonStaticMember(b, mod, unit);
+    if (!ref.empty()) {
+      diag.Error(item->loc,
+                 "concurrent assertion expression references non-static "
+                 "class member \"" +
+                     ref + "\"",
+                 Subclause("16.6"));
+      return;
+    }
+  }
+}
+
 bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
   return item->body != nullptr && item->body->is_deferred;
 }
@@ -503,6 +527,53 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
   }
 }
 
+// §16.12.1 with §16.12: the first operand of a property-building operator in
+// the tree under `node` that instantiates a named property carrying a disable
+// iff clause, its own or one flattened in from a property it instantiates, as
+// the property's name; empty where there is none. The root is no operand, so
+// an instance standing as the whole property_spec is legal and not reported.
+static std::string_view DisableIffOperand(const PropertyExprNode* node,
+                                          const PropertyRegistry& registry,
+                                          int depth) {
+  if (node == nullptr || depth > 64) return {};
+  bool is_operator = node->kind != PropertyExprNode::Kind::kBoolean &&
+                     node->kind != PropertyExprNode::Kind::kSequence;
+  for (const PropertyExprNode* operand : node->operands) {
+    if (operand == nullptr) continue;
+    if (is_operator && operand->kind == PropertyExprNode::Kind::kBoolean) {
+      const ModuleItem* decl = InstantiatedDecl(
+          operand->boolean, ModuleItemKind::kPropertyDecl, registry);
+      if (decl != nullptr && registry.FlattenedDisableIffCount(decl) > 0) {
+        return decl->name;
+      }
+    }
+    std::string_view hit = DisableIffOperand(operand, registry, depth + 1);
+    if (!hit.empty()) return hit;
+  }
+  return {};
+}
+
+// §16.12.1: reports DisableIffOperand's find in `root` at `loc`, naming the
+// declaration it stands in where `in` names one. A name the parser's scan
+// already reported as the operand of a prefix operator is skipped.
+static void ReportDisableIffOperand(const PropertyExprNode* root,
+                                    const PropertyRegistry& registry,
+                                    SourceLoc loc, const ModuleItem* in,
+                                    DiagEngine& diag) {
+  std::string_view name = DisableIffOperand(root, registry, 0);
+  if (name.empty()) return;
+  std::string msg = "property \"" + std::string(name) +
+                    "\" has a disable iff clause and cannot be used as an "
+                    "operand of a property operator";
+  if (in != nullptr) {
+    for (std::string_view reported : in->prop_negated_instance_refs) {
+      if (reported == name) return;
+    }
+    msg += " in \"" + std::string(in->name) + "\"";
+  }
+  diag.Error(loc, msg, Subclause("16.12.1"));
+}
+
 void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
                                           const PropertyRegistry& registry,
                                           Arena& arena) {
@@ -530,6 +601,8 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
                 Subclause("16.12"));
   }
   CheckPropertyOperandInstances(item);
+  ReportDisableIffOperand(item->prop_body_tree, property_registry_, item->loc,
+                          item, diag_);
   // §16.10: a formal-argument name may not be redeclared as a body local.
   ValidateNoFormalShadowedByBodyLocal(item);
   // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
@@ -591,6 +664,11 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                              arena_);
   }
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
+  CheckConcurrentAssertionNoNonStaticMember(item, mod, unit_, diag_);
+  if (item->body != nullptr) {
+    ReportDisableIffOperand(item->body->assert_property, property_registry_,
+                            item->loc, nullptr, diag_);
+  }
   // §16.12.22: the sequences the property_spec uses as properties and as
   // antecedents, a sequential property standing as the whole spec included.
   if (item->body != nullptr) {

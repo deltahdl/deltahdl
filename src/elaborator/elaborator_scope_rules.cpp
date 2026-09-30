@@ -11,6 +11,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_name_rules.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -743,6 +744,13 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
+  ReportAssertionUnresolved(decl, declared, diag_);
+  ReportNonConstantBoundActuals(
+      decl,
+      [this](std::string_view n) {
+        return var_types_.count(n) != 0 && const_names_.count(n) == 0;
+      },
+      diag_);
   ReportSubroutineUnresolved(decl->items, declared, unit_, pkg_provided_names_,
                              diag_);
 

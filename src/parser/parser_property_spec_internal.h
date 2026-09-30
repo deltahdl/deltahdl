@@ -84,6 +84,11 @@ struct ParserPropertySpecHelpers {
   // nothing consumed, where the body opens with anything else. Defined in
   // src/parser/parser_assert.cpp beside the statements.
   static ModuleItem* TryParseAlwaysConcurrentAssertion(Parser& p);
+  // §23.9, §16.8 and §16.10: records on `item` what the text from the current
+  // token to `end` reads, declares, bounds with and passes to instances,
+  // leaving the lexer where it was. Defined in
+  // src/parser/parser_assertion_reads.cpp.
+  static void RecordAssertionReads(Parser& p, ModuleItem* item, TokenKind end);
 };
 
 }  // namespace delta

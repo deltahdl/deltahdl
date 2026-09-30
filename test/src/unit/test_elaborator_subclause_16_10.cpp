@@ -81,4 +81,30 @@ TEST(LocalVariableElaboration, FreshBodyLocalAlongsideFormalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.10: the local variables declared in a sequence are not visible where the
+// sequence is instantiated. The clause's own example: `seq1` instantiates
+// `sub_seq1` and then reads `v1`, which only `sub_seq1` declares, so the read
+// resolves to nothing and names the local it cannot reach.
+TEST(LocalVariableElaboration, InstantiatedSequencesLocalIsNotVisible) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, c, do1;\n"
+      "  int data_in, data_out;\n"
+      "  sequence sub_seq1;\n"
+      "    int v1;\n"
+      "    (a ##1 !a, v1 = data_in) ##1 !b[*0:$] ##1 b && (data_out == v1);\n"
+      "  endsequence\n"
+      "  sequence seq1;\n"
+      "    c ##1 sub_seq1 ##1 (do1 == v1);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'v1' is a local variable of sequence 'sub_seq1' "
+                            "and is not visible outside its body",
+                            10, "16.10"));
+}
+
 }  // namespace

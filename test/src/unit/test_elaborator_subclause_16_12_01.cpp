@@ -51,7 +51,7 @@ TEST(PropertyInstantiation, RejectedWhenSubstitutionWouldBeIllegal) {
 TEST(PropertyInstantiation, DisableIffPropertyRejectedAsOperandOfPropertyOp) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -74,7 +74,7 @@ TEST(PropertyInstantiation, DisableIffPropertyRejectedAsOperandOfPropertyOp) {
 TEST(PropertyInstantiation, PropertyWithoutDisableIffAcceptedAsOperand) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) a |-> b;\n"
       "  endproperty\n"
@@ -95,7 +95,7 @@ TEST(PropertyInstantiation, PropertyWithoutDisableIffAcceptedAsOperand) {
 TEST(PropertyInstantiation, DisableIffPropertyAcceptedAsTopLevelInstance) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -116,7 +116,7 @@ TEST(PropertyInstantiation,
      DisableIffPropertyRejectedAsStrongEventuallyOperand) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -138,7 +138,7 @@ TEST(PropertyInstantiation,
 TEST(PropertyInstantiation, DisableIffPropertyRejectedAsInfixUntilOperand) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -161,7 +161,7 @@ TEST(PropertyInstantiation,
      PropertyWithoutDisableIffAcceptedAsInfixUntilOperand) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) a |-> b;\n"
       "  endproperty\n"
@@ -185,7 +185,7 @@ TEST(PropertyInstantiation,
      PropertyRejectedAsOperandWhenDisableIffFromFlattening) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property mid;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -314,6 +314,64 @@ TEST(PropertyInstantiation, AnInstanceOfAnUnclockedPropertyIsReported) {
                             "event",
                             6, "16.16"));
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
+}
+
+// §16.12 forbids nesting disable iff clauses, through instantiation among
+// others, and §16.12.1 names the case: an instance used as an operand of any
+// property-building operator may not carry one. `p1 and b` in an assertion
+// statement puts `p1`, which carries one, under `and`.
+TEST(PropertyInstantiation, DisableIffPropertyRejectedAsAndOperandInAssertion) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, rst;\n"
+      "  property p1; disable iff (rst) a |=> b; endproperty\n"
+      "  assert property (@(posedge clk) p1 and b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"p1\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator",
+                            5, "16.12.1"));
+}
+
+// §16.12.1 holds for every property-building operator, and `and` in a named
+// property's body is one as the prefix operators are.
+TEST(PropertyInstantiation, DisableIffPropertyRejectedAsAndOperandInDecl) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, rst;\n"
+      "  property leaf; disable iff (rst) a |=> b; endproperty\n"
+      "  property outer;\n"
+      "    @(posedge clk) leaf and b;\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"leaf\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator in \"outer\"",
+                            5, "16.12.1"));
+}
+
+// §16.12.1 negative sibling: the same instance standing as the whole
+// property_spec of the assertion is no operand, and is accepted.
+TEST(PropertyInstantiation, DisableIffPropertyAcceptedAsWholeAssertionSpec) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, rst;\n"
+      "  property p1; @(posedge clk) disable iff (rst) a |=> b; endproperty\n"
+      "  assert property (p1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

@@ -57,6 +57,64 @@ TEST(ConcurrentAssertionBooleanExpr, UnreferencedChandleDoesNotTripAssertRule) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.6: an expression in a concurrent assertion shall not reference a
+// non-static class property, and `h.v` through a module's class handle is one,
+// read here both directly and as the argument of a sampled value function.
+TEST(ConcurrentAssertionBooleanExpr, NonStaticClassPropertyRejectedEndToEnd) {
+  ElabFixture f;
+  Elaborate(
+      "class H; bit v = 1; endclass\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  H h = new;\n"
+      "  assert property (@(posedge clk) $past(h.v) || h.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assertion expression references "
+                            "non-static class member \"h.v\"",
+                            5, "16.6"));
+}
+
+// §16.6 names methods beside properties: a call of a non-static method
+// through the handle is as illegal as a read of a non-static property.
+TEST(ConcurrentAssertionBooleanExpr, NonStaticClassMethodRejectedEndToEnd) {
+  ElabFixture f;
+  Elaborate(
+      "class H;\n"
+      "  bit v;\n"
+      "  function bit get(); return v; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  H h = new;\n"
+      "  assert property (@(posedge clk) h.get());\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assertion expression references "
+                            "non-static class member \"h.get\"",
+                            8, "16.6"));
+}
+
+// §16.6 negative sibling: the prohibition is on non-static members, so a
+// static property, read through the handle or by the class scope, and one
+// inherited from a base class, are accepted.
+TEST(ConcurrentAssertionBooleanExpr, StaticClassPropertyAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "class B; static bit s; endclass\n"
+      "class H extends B; static bit v; endclass\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  H h = new;\n"
+      "  assert property (@(posedge clk) h.v || H::v || h.s);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ConcurrentAssertionBooleanExpr,
      OverallResultMustBeCastCompatibleWithIntegral) {
   EXPECT_TRUE(ConcurrentAssertionExprTypeIsAcceptable(true));

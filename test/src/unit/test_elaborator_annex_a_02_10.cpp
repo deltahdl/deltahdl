@@ -9,7 +9,7 @@ namespace {
 TEST(AssertionDeclElaboration, PropertyDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  property p;\n"
       "    @(posedge clk) a |-> b;\n"
       "  endproperty\n"
@@ -35,7 +35,7 @@ TEST(AssertionDeclElaboration, PropertyDeclWithPortsElaborates) {
 TEST(AssertionDeclElaboration, SequenceDeclElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  sequence s;\n"
       "    @(posedge clk) a ##1 b;\n"
       "  endsequence\n"
@@ -61,7 +61,7 @@ TEST(AssertionDeclElaboration, SequenceDeclWithPortsElaborates) {
 TEST(AssertionDeclElaboration, AssertPropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  assert property (@(posedge clk) a |-> b);\n"
       "endmodule\n",
       f);
@@ -72,7 +72,7 @@ TEST(AssertionDeclElaboration, AssertPropertyElaborates) {
 TEST(AssertionDeclElaboration, AssumePropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  assume property (@(posedge clk) a |-> b);\n"
       "endmodule\n",
       f);
@@ -83,7 +83,7 @@ TEST(AssertionDeclElaboration, AssumePropertyElaborates) {
 TEST(AssertionDeclElaboration, CoverPropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  cover property (@(posedge clk) a |-> b);\n"
       "endmodule\n",
       f);
@@ -94,7 +94,7 @@ TEST(AssertionDeclElaboration, CoverPropertyElaborates) {
 TEST(AssertionDeclElaboration, CoverSequenceElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  cover sequence (@(posedge clk) a ##1 b);\n"
       "endmodule\n",
       f);
@@ -105,7 +105,7 @@ TEST(AssertionDeclElaboration, CoverSequenceElaborates) {
 TEST(AssertionDeclElaboration, RestrictPropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  restrict property (@(posedge clk) a |-> b);\n"
       "endmodule\n",
       f);
@@ -116,7 +116,7 @@ TEST(AssertionDeclElaboration, RestrictPropertyElaborates) {
 TEST(AssertionDeclElaboration, PropertyDeclWithAssertElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  property p;\n"
       "    @(posedge clk) a |-> b;\n"
       "  endproperty\n"
@@ -130,7 +130,7 @@ TEST(AssertionDeclElaboration, PropertyDeclWithAssertElaborates) {
 TEST(AssertionDeclElaboration, SequenceDeclWithCoverElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  sequence s;\n"
       "    @(posedge clk) a ##1 b;\n"
       "  endsequence\n"
@@ -146,7 +146,7 @@ TEST(AssertionDeclElaboration, SequenceDeclWithCoverElaborates) {
 TEST(AssertionDeclElaboration, PropertyAndSequenceDeclsTogether) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic a, b);\n"
       "  default clocking @(posedge clk); endclocking\n"
       "  property p; a; endproperty\n"
       "  sequence s; b; endsequence\n"
@@ -161,7 +161,7 @@ TEST(AssertionDeclElaboration, PropertyAndSequenceDeclsTogether) {
 TEST(AssertionDeclElaboration, AllFiveConcurrentAssertionsElaborate) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b, c, d, e);\n"
       "  assert property (@(posedge clk) a);\n"
       "  assume property (@(posedge clk) b);\n"
       "  cover property (@(posedge clk) c);\n"
@@ -176,7 +176,7 @@ TEST(AssertionDeclElaboration, AllFiveConcurrentAssertionsElaborate) {
 TEST(AssertionDeclElaboration, AssertPropertyWithDisableIffElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  assert property (\n"
       "    @(posedge clk) disable iff (rst) a |-> b);\n"
       "endmodule\n",
@@ -188,7 +188,7 @@ TEST(AssertionDeclElaboration, AssertPropertyWithDisableIffElaborates) {
 TEST(AssertionDeclElaboration, NamedAssertPropertyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, a, b);\n"
       "  my_assert: assert property (@(posedge clk) a |-> b);\n"
       "endmodule\n",
       f);

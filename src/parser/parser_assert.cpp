@@ -492,6 +492,8 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
 
   Expect(TokenKind::kKwProperty, Subclause("16.14"));
   Expect(TokenKind::kLParen, Subclause("16.14"));
+  ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
+                                                  TokenKind::kRParen);
   // Annex F.5.3.1 defines an assume property statement's satisfaction as the
   // assert property statement's, and §16.14.2 has a simulator check an
   // assumption as it checks an assertion, so the clocked boolean form is read
@@ -573,6 +575,8 @@ ModuleItem* Parser::ParseCoverProperty() {
   }
 
   Expect(TokenKind::kLParen, Subclause("16.14.3"));
+  ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
+                                                  TokenKind::kRParen);
   // Annex F.5.3.1 defines a cover property statement's satisfaction over the
   // same words as an assert property statement's, and §16.14.3 runs its pass
   // statement once per successful evaluation, so the clocked boolean form is
@@ -643,6 +647,8 @@ ModuleItem* Parser::ParseRestrictProperty() {
   Expect(TokenKind::kKwRestrict, Subclause("16.14.4"));
   Expect(TokenKind::kKwProperty, Subclause("16.14.4"));
   Expect(TokenKind::kLParen, Subclause("16.14.4"));
+  ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
+                                                  TokenKind::kRParen);
   // §16.2 has a simulator not check a restrict property, and §16.14.4 says the
   // statement is not verified in simulation, so its spec is skipped without
   // the §16.14 non-evaluation report the other concurrent assertions draw

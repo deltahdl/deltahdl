@@ -7,6 +7,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 
 namespace delta {
@@ -534,6 +535,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
   }
 
   Expect(TokenKind::kSemicolon, Subclause("16.8"));
+  ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
+                                                  TokenKind::kKwEndsequence);
 
   // §16.16(b1): a sequence_expr may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking

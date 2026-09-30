@@ -107,7 +107,7 @@ TEST(RecursivePropertyRestrictionEnforcement,
      DisableIffInRecursivePropertyRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic rst);\n"
       "  property rec(p);\n"
       "    disable iff (rst)\n"
       "    p and (1'b1 |=> rec(p));\n"

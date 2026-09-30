@@ -14,7 +14,7 @@ namespace {
 TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, r2, a, b);\n"
       "  property bad;\n"
       "    @(posedge clk) disable iff (r1) disable iff (r2) a |-> b;\n"
       "  endproperty\n"
@@ -32,7 +32,7 @@ TEST(PropertyDeclarationElaboration,
      DisableIffNestingViaInstantiationRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -50,7 +50,7 @@ TEST(PropertyDeclarationElaboration,
 TEST(PropertyDeclarationElaboration, SingleDisableIffNotFlaggedAsNested) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, rst, a, b);\n"
       "  property ok;\n"
       "    @(posedge clk) disable iff (rst) a |-> b;\n"
       "  endproperty\n"
@@ -68,7 +68,7 @@ TEST(PropertyDeclarationElaboration,
      DisableIffNestingViaChainedInstantiationRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -92,7 +92,7 @@ TEST(PropertyDeclarationElaboration,
      TwoSiblingDisableIffLeavesUnderOneRootRejected) {
   ElabFixture f;
   Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2, c, d);\n"
       "  property l1;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -116,7 +116,7 @@ TEST(PropertyDeclarationElaboration,
      IndependentSingleDisableIffPropertiesAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b, r2, c, d);\n"
       "  property p1;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"
@@ -135,7 +135,7 @@ TEST(PropertyDeclarationElaboration,
 TEST(PropertyDeclarationElaboration, SingleDisableIffViaInstantiationAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m(input logic clk, r1, a, b);\n"
       "  property leaf;\n"
       "    @(posedge clk) disable iff (r1) a |-> b;\n"
       "  endproperty\n"

@@ -896,6 +896,8 @@ ModuleItem* Parser::ParsePropertyDecl() {
   }
 
   Expect(TokenKind::kSemicolon, Subclause("16.12"));
+  ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
+                                                  TokenKind::kKwEndproperty);
 
   // §16.16(b1): a property_spec may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
