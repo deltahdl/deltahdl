@@ -717,10 +717,7 @@ bool NamesAnotherClock(const LinearSequence& body) {
     for (size_t i = 0; i < clock.size(); ++i) {
       const EventExpr& a = clock[i];
       const EventExpr& b = body.clock[i];
-      if (a.edge != b.edge || a.signal == nullptr || b.signal == nullptr ||
-          a.signal->text != b.signal->text) {
-        return true;
-      }
+      if (a.edge != b.edge || !SamePath(a.signal, b.signal)) return true;
     }
   }
   return false;

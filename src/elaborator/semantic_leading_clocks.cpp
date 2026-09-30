@@ -5,20 +5,22 @@
 #include "elaborator/property_instance.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
 namespace {
 
 // Whether two clocking events are identical: the same edge over the same
-// spelling of the signal. §16.16.1 has two clocks of one value that are
+// spelling of the signal, its whole path included (§23.6). §16.16.1 has two
+// clocks of one value that are
 // written differently be not identical.
 bool SameClock(const EventExpr& a, const EventExpr& b) {
   if (a.edge != b.edge) return false;
   if (a.signal == nullptr || b.signal == nullptr) {
     return a.signal == b.signal;
   }
-  return a.signal->text == b.signal->text && a.signal->kind == b.signal->kind;
+  return SamePath(a.signal, b.signal);
 }
 
 void AddOnce(std::vector<EventExpr>& set, const EventExpr& ev) {

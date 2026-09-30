@@ -130,14 +130,11 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
 // formals ahead of the check, and there are none to substitute.
 //
 // §16.13: `ev` appended to `clock` unless an event of the same edge over a
-// signal of the same spelling is there.
+// signal of the same spelling, its whole path included (§23.6), is there.
 void AppendClockOnce(std::vector<EventExpr>& clock, const EventExpr& ev) {
   if (ev.signal == nullptr) return;
   for (const EventExpr& have : clock) {
-    if (have.edge == ev.edge && have.signal != nullptr &&
-        have.signal->text == ev.signal->text) {
-      return;
-    }
+    if (have.edge == ev.edge && SamePath(have.signal, ev.signal)) return;
   }
   clock.push_back(ev);
 }

@@ -47,4 +47,18 @@ ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
   return actuals;
 }
 
+bool SamePath(const Expr* a, const Expr* b) {
+  if (a == nullptr || b == nullptr || a->kind != b->kind) return false;
+  if (a->kind == ExprKind::kMemberAccess) {
+    return a->is_scope_resolution == b->is_scope_resolution &&
+           SamePath(a->lhs, b->lhs) && SamePath(a->rhs, b->rhs);
+  }
+  if (a->kind == ExprKind::kSelect) {
+    return a->index_end == nullptr && b->index_end == nullptr &&
+           SamePath(a->base, b->base) && SamePath(a->index, b->index);
+  }
+  if (a->kind == ExprKind::kIntegerLiteral) return a->int_val == b->int_val;
+  return a->text == b->text && a->scope_prefix == b->scope_prefix;
+}
+
 }  // namespace delta

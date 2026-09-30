@@ -26,4 +26,10 @@ Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
 ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
                             const Expr* instance);
 
+// §23.6: whether two expressions name the same object by the same spelling:
+// an identifier by its text and scope prefix, a member access, `i0.clk`, whose
+// own text is empty, by the whole path, and a select of a constant index by
+// its base and index; any other expression of the same kind by its text.
+bool SamePath(const Expr* a, const Expr* b);
+
 }  // namespace delta

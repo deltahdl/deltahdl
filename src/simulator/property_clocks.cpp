@@ -6,8 +6,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -18,14 +18,13 @@ namespace delta {
 namespace {
 
 // Whether two clocks are the same event: the same edges over signals of
-// the same spelling.
+// the same spelling, their whole paths included (§23.6).
 bool SameClock(const std::vector<EventExpr>& a,
                const std::vector<EventExpr>& b) {
   if (a.size() != b.size()) return false;
   for (size_t i = 0; i < a.size(); ++i) {
     if (a[i].edge != b[i].edge) return false;
-    if (a[i].signal == nullptr || b[i].signal == nullptr) return false;
-    if (a[i].signal->text != b[i].signal->text) return false;
+    if (!SamePath(a[i].signal, b[i].signal)) return false;
   }
   return true;
 }
@@ -120,8 +119,7 @@ bool WokenByAnotherClock(const PropertyClocks& clocks, const EventExpr& woke) {
   if (woke.signal == nullptr || clocks.clocks.empty()) return false;
   auto names = [&woke](const std::vector<EventExpr>& clock) {
     for (const EventExpr& ev : clock) {
-      if (ev.edge == woke.edge && ev.signal != nullptr &&
-          ev.signal->text == woke.signal->text) {
+      if (ev.edge == woke.edge && SamePath(ev.signal, woke.signal)) {
         return true;
       }
     }

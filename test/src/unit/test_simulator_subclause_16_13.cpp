@@ -259,4 +259,31 @@ TEST(MulticlockSequences,
   EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 6u);
 }
 
+// §16.13.1 with §23.6: two clocks whose signals are named by paths through two
+// instances are two clocks, however alike their edges. i0 is bound to clk and
+// i1 to nclk, and b is 1 at nclk's rises and 0 at clk's, so the sequence
+// matches where its second subsequence waits for i1's clock, ten times by the
+// end of the run as the plain twin does, and would never match were it taken
+// to stay on i0's.
+TEST(MulticlockSequences, ClocksNamedByPathsThroughTwoInstancesAreTwoClocks) {
+  SimFixture f;
+  auto* path = RunAndFindVar(
+      "interface ifc(input logic clk);\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic nclk; assign nclk = ~clk;\n"
+      "  bit a = 1, b = 1;\n"
+      "  initial begin #7; repeat (18) #5 b = ~b; end\n"
+      "  ifc i0(clk), i1(nclk);\n"
+      "  int c1 = 0, c2 = 0;\n"
+      "  cover property (@(posedge i0.clk) a ##1 @(posedge i1.clk) b) c1++;\n"
+      "  cover property (@(posedge clk) a ##1 @(posedge nclk) b) c2++;\n"
+      "endmodule\n",
+      f, "c1");
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 10u);
+}
+
 }  // namespace
