@@ -638,7 +638,7 @@ def test_rejection_naming_the_clause_the_file_name_opens_with_evaluates_as_a_pas
     result, ok = _evaluate_rejection_of_file(
         rst,
         _write_expected_rejection(
-            tmp_path, "uvm-random uvm", "18.6.3--behavior-of-randomization-methods_5.sv",
+            tmp_path, "uvm-random", "18.6.3--behavior-of-randomization-methods_5.sv",
         ),
         1,
         "x.sv:1:1: error: randomize() is built in and cannot be overridden"
@@ -653,7 +653,7 @@ def test_rejection_elsewhere_than_the_clause_the_file_name_opens_with_does_not_e
     result, ok = _evaluate_rejection_of_file(
         rst,
         _write_expected_rejection(
-            tmp_path, "uvm-random uvm", "18.6.3--behavior-of-randomization-methods_5.sv",
+            tmp_path, "uvm-random", "18.6.3--behavior-of-randomization-methods_5.sv",
         ),
         1,
         "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
@@ -667,7 +667,7 @@ def test_the_clause_the_file_name_opens_with_reaches_the_result(
     result, _ = _evaluate_rejection_of_file(
         rst,
         _write_expected_rejection(
-            tmp_path, "uvm-random uvm", "18.8--disabling-random-variables-with-rand_mode_5.sv",
+            tmp_path, "uvm-random", "18.8--disabling-random-variables-with-rand_mode_5.sv",
         ),
         1,
         "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
@@ -696,6 +696,50 @@ def test_rejection_under_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass
         "18.5.10",
     )
     assert (ok, result["status"]) == (1, "pass")
+
+
+def _write_uvm_file_the_suite_expects_accepted(tmp_path: Path) -> Path:
+    sv = tmp_path / "chapter-16" / "16.2--assert-uvm.sv"
+    sv.parent.mkdir(parents=True)
+    sv.write_text(
+        "/*\n:name: assert_test_uvm\n:tags: uvm uvm-assertions\n*/\n"
+        "module m; endmodule\n"
+    )
+    return sv
+
+
+def test_a_uvm_file_rejected_under_10_9_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_rejection_of_file(
+        rst,
+        _write_uvm_file_the_suite_expects_accepted(tmp_path),
+        1,
+        "uvm_lru_cache.svh:206:10: error: an assignment pattern holds at"
+        " least one expression (§10.9)\n",
+    )
+    assert (ok, result["status"], result["should_fail"]) == (1, "pass", True)
+
+
+def test_a_uvm_file_accepted_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_rejection_of_file(
+        rst, _write_uvm_file_the_suite_expects_accepted(tmp_path), 0, "",
+    )
+    assert (ok, result["status"]) == (0, "fail")
+
+
+def test_a_uvm_file_rejected_under_its_own_tag_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_rejection_of_file(
+        rst,
+        _write_uvm_file_the_suite_expects_accepted(tmp_path),
+        1,
+        "16.2--assert-uvm.sv:3:1: error: bad assertion (§16.2)\n",
+    )
+    assert (ok, result["status"], result["clause"]) == (0, "fail", "10.9")
 
 
 def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(

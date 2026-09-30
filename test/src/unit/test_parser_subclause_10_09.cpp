@@ -53,21 +53,15 @@ TEST(AssignmentPatternParsing, PositionalFourElements) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
-TEST(AssignmentPatternParsing, EmptyAssignmentPattern) {
+TEST(AssignmentPatternParsing, EmptyAssignmentPatternRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    x = '{};\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(rhs->elements.size(), 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "assignment pattern needs at least one expression", 3, "10.9"));
 }
 
 TEST(AssignmentPatternParsing, ReplicationMultipleElements) {

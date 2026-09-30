@@ -216,7 +216,13 @@ Expr* Parser::ParseAssignmentPattern() {
   pat->kind = ExprKind::kAssignmentPattern;
   pat->range.start = loc;
 
+  // §10.9: every alternative of Syntax 10-5 writes at least one expression
+  // between `'{` and `}`. An empty queue or dynamic array is written `{}`, the
+  // empty unpacked array concatenation of §10.10.
   if (Check(TokenKind::kRBrace)) {
+    diag_.Error(CurrentLoc(),
+                "assignment pattern needs at least one expression",
+                Subclause("10.9"));
     Consume();
     return pat;
   }

@@ -252,6 +252,10 @@ _RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED: dict[str, str] = {
     "21.2--write.sv": "6.21",
 }
 
+_RULE_BROKEN_BY_LIBRARY_THE_SUITE_EXPECTS_ACCEPTED: dict[str, str] = {
+    "uvm": "10.9",
+}
+
 _CLAUSE_OF_FILE = (
     _CLAUSE_OF_MISTAGGED_FILE
     | _RULE_OF_FILE_TAGGED_BY_FEATURE
@@ -259,16 +263,27 @@ _CLAUSE_OF_FILE = (
 )
 
 
+def _rule_broken_by_library(metadata: dict[str, str]) -> str:
+    for tag in metadata.get("tags", "").split():
+        if tag in _RULE_BROKEN_BY_LIBRARY_THE_SUITE_EXPECTS_ACCEPTED:
+            return _RULE_BROKEN_BY_LIBRARY_THE_SUITE_EXPECTS_ACCEPTED[tag]
+    return ""
+
+
 def expects_rejection(metadata: dict[str, str], name: str) -> bool:
     return (
         bool(metadata.get("should_fail_because"))
         or name in _RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED
+        or bool(_rule_broken_by_library(metadata))
     )
 
 
 def tagged_clause(metadata: dict[str, str], name: str) -> str:
     if name in _CLAUSE_OF_FILE:
         return _CLAUSE_OF_FILE[name]
+    library_rule = _rule_broken_by_library(metadata)
+    if library_rule:
+        return library_rule
     tags = metadata.get("tags", "").split()
     if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
         return tags[0]

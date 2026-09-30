@@ -16,14 +16,14 @@ def test_returns_nothing_when_the_file_carries_no_tag_and_no_clause_prefix(
 def test_returns_nothing_when_the_first_tag_names_no_clause_and_the_name_no_prefix(
     rst: ModuleType,
 ) -> None:
-    assert rst.tagged_clause({"tags": "uvm-random uvm"}, "randomize_5.sv") == ""
+    assert rst.tagged_clause({"tags": "uvm-random"}, "randomize_5.sv") == ""
 
 
 def test_returns_the_file_name_prefix_when_the_first_tag_names_no_clause(
     rst: ModuleType,
 ) -> None:
     assert rst.tagged_clause(
-        {"tags": "uvm-random uvm"},
+        {"tags": "uvm-random"},
         "18.6.3--behavior-of-randomization-methods_5.sv",
     ) == "18.6.3"
 
@@ -37,7 +37,7 @@ def test_returns_the_first_tag_over_a_different_file_name_prefix(
 def test_returns_nothing_for_a_number_the_name_does_not_close_with_two_dashes(
     rst: ModuleType,
 ) -> None:
-    assert rst.tagged_clause({"tags": "uvm"}, "18.6.3-randomize.sv") == ""
+    assert rst.tagged_clause({"tags": "uvm-random"}, "18.6.3-randomize.sv") == ""
 
 
 def test_a_tag_the_suite_numbers_as_1800_2017_does_names_the_1800_2023_subclause(
@@ -191,3 +191,31 @@ def test_a_file_tagged_on_the_construct_its_undeclared_name_stands_in_is_judged_
     rst: ModuleType, name: str, tag: str,
 ) -> None:
     assert rst.tagged_clause({"tags": tag}, name) == "23.9"
+
+
+@pytest.mark.parametrize("tags, name", [
+    ("uvm uvm-assertions", "16.2--assert-uvm.sv"),
+    ("uvm-random uvm", "18.6.3--behavior-of-randomization-methods_5.sv"),
+])
+def test_a_file_compiled_behind_the_uvm_library_is_judged_by_10_9(
+    rst: ModuleType, tags: str, name: str,
+) -> None:
+    assert rst.tagged_clause({"tags": tags}, name) == "10.9"
+
+
+def test_a_file_compiled_behind_the_uvm_library_is_expected_rejected(
+    rst: ModuleType,
+) -> None:
+    assert rst.expects_rejection({"tags": "uvm uvm-assertions"}, "16.2--assert-uvm.sv")
+
+
+def test_a_file_compiled_behind_the_uvm_1_2_library_is_not_expected_rejected(
+    rst: ModuleType,
+) -> None:
+    assert not rst.expects_rejection({"tags": "uvm-1.2"}, "uvm-1.2--test.sv")
+
+
+def test_a_file_compiled_behind_the_uvm_1_2_library_keeps_its_file_name_prefix(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause({"tags": "uvm-1.2"}, "18.5--x.sv") == "18.5"

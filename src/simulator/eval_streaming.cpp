@@ -506,8 +506,6 @@ Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena) {
 
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);
-
   std::vector<Logic4Vec> parts;
   uint32_t total_width = 0;
   for (auto* elem : expr->elements) {

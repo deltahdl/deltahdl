@@ -54,11 +54,12 @@ TEST(AssignmentPatternSimulation, SingleElement) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-TEST(AssignmentPatternSimulation, EmptyPattern) {
+TEST(AssignmentPatternSimulation, EmptyPatternRejectedBeforeEvaluation) {
   SimFixture f;
-  auto* expr = ParseExprFrom("'{}", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 0u);
+  ParseExprFrom("'{}", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern needs at least one expression",
+                            1, "10.9"));
 }
 
 TEST(AssignmentPatternSimulation, SizedLiterals) {
