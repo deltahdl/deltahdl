@@ -231,4 +231,49 @@ TEST(ClockResolutionParse, ASequenceWithoutALeadingClockRecordsNone) {
   EXPECT_TRUE(s->seq_linear.operands.empty());
 }
 
+// §16.16 (f) with §9.4 Syntax 9-4: a clocking_event written without
+// parentheses is `@` and a name, and a sequence declared with one keeps it as
+// its leading clocking event as it keeps `@(e)`.
+TEST(ClockResolutionParse, ASequenceKeepsABareNamedLeadingClock) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  event e;\n"
+      "  sequence s;\n"
+      "    @e a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* s = NamedSequence(r, "s");
+  ASSERT_NE(s, nullptr);
+  ASSERT_EQ(s->seq_clock.size(), 1u);
+  EXPECT_EQ(s->seq_clock[0].edge, Edge::kNone);
+  ASSERT_NE(s->seq_clock[0].signal, nullptr);
+  EXPECT_EQ(s->seq_clock[0].signal->text, "e");
+  EXPECT_EQ(s->seq_linear.operands.size(), 2u);
+}
+
+// The bare form's clock is the name alone, so a parenthesised operand after it
+// is the body's first operand rather than the arguments of a call to `e`.
+TEST(ClockResolutionParse, ABareNamedLeadingClockEndsAtTheName) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  event e;\n"
+      "  sequence s;\n"
+      "    @e (a) ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* s = NamedSequence(r, "s");
+  ASSERT_NE(s, nullptr);
+  ASSERT_EQ(s->seq_clock.size(), 1u);
+  ASSERT_NE(s->seq_clock[0].signal, nullptr);
+  EXPECT_EQ(s->seq_clock[0].signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(s->seq_clock[0].signal->text, "e");
+  EXPECT_EQ(s->seq_linear.operands.size(), 2u);
+}
+
 }  // namespace

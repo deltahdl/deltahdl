@@ -152,4 +152,54 @@ TEST(SequenceFirstMatch, EachAttemptKeepsItsOwnEarliestMatch) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
+// §16.9.8 with §16.12.7: as an antecedent, first_match(a ##[1:3] b) ends each
+// attempt at its earliest match. a is 1 at ticks 0 and 4, b at 1, 2, 5 and 6
+// and c at 1 and 5, so a ##[1:3] b ends at 1 and 2 from tick 0 and at 5 and
+// 6 from tick 4. `|-> c` over the first ends alone holds at every attempt,
+// ten passes; over every end it fails at 2 and 6, eight and two.
+std::string FirstMatchAntecedentSource(const std::string& antecedent) {
+  return "module t;\n"
+         "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+         "  bit [0:9] av = 10'b1000100000, bv = 10'b0110011000,\n"
+         "            cv = 10'b0100010000;\n"
+         "  bit a, b, c;\n"
+         "  assign a = av[0]; assign b = bv[0]; assign c = cv[0];\n"
+         "  always @(negedge clk) begin\n"
+         "    av <= av << 1; bv <= bv << 1; cv <= cv << 1;\n"
+         "  end\n"
+         "  int p = 0, f = 0;\n"
+         "  sequence s; first_match(a ##[1:3] b); endsequence\n"
+         "  assert property (@(posedge clk) " +
+         antecedent +
+         " |-> c) p++; else f++;\n"
+         "endmodule\n";
+}
+
+TEST(FirstMatchAntecedent, TheConsequentIsCheckedAtTheEarliestEndOnly) {
+  SimFixture f;
+  auto* p = RunAndFindVar(
+      FirstMatchAntecedentSource("first_match(a ##[1:3] b)"), f, "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), 0u);
+}
+
+TEST(FirstMatchAntecedent, ANamedFirstMatchSequenceEndsAtItsFirstMatch) {
+  SimFixture f;
+  auto* p = RunAndFindVar(FirstMatchAntecedentSource("s"), f, "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), 0u);
+}
+
+// The control: without first_match every end of the antecedent begins a
+// consequent, and the ends at 2 and 6, where c is 0, fail.
+TEST(FirstMatchAntecedent, EveryEndOfAPlainAntecedentBeginsAConsequent) {
+  SimFixture f;
+  auto* p = RunAndFindVar(FirstMatchAntecedentSource("(a ##[1:3] b)"), f, "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->value.ToUint64(), 8u);
+  EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), 2u);
+}
+
 }  // namespace

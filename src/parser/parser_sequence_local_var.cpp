@@ -1,4 +1,6 @@
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "common/diagnostic.h"
@@ -27,6 +29,28 @@ bool TryParsePlainDecimal(std::string_view text, uint64_t& out) {
   }
   out = v;
   return true;
+}
+
+bool IsEventFormalOf(const ModuleItem* item, std::string_view name) {
+  for (size_t i = 0; i < item->prop_formals.size(); ++i) {
+    if (item->prop_formals[i] == name) {
+      return item->prop_formal_type_kw[i] == TokenKind::kKwEvent;
+    }
+  }
+  return false;
+}
+
+// §16.8: an identifier written as the whole actual of an instance is bound to
+// the instantiated declaration's formal, so what may be written there is what
+// that formal admits, an event_expression where it is typed `event`.
+bool IsWholeInstanceActual(const ModuleItem* item, SourceLoc loc) {
+  for (const auto& arg : item->assertion_instance_args) {
+    if (arg.loc.file_id == loc.file_id && arg.loc.line == loc.line &&
+        arg.loc.column == loc.column) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -568,6 +592,12 @@ void Parser::ScanSequenceClockEvent(ModuleItem* item) {
   // (a non-leading or additional `@(...)`) can be recognized.
   ++item->decl_clock_event_count;
   Consume();  // '@'
+  // §16.16: `@name` writes the clocking event as one identifier, an
+  // event_expression position as the parenthesized group is.
+  if (Check(TokenKind::kIdentifier)) {
+    item->prop_instance_refs.push_back(Consume().text);
+    return;
+  }
   ScanClockEventGroupForLocals(lexer_, diag_, item);
 }
 
@@ -577,6 +607,9 @@ void Parser::ScanSequenceClockEvent(ModuleItem* item) {
 // sequence_instance reference scan the §16.8 cycle rule needs.
 void Parser::ScanSequenceBody(ModuleItem* item) {
   bool in_decl_prefix = true;
+  // Whether the token before stands for a member or a scope selection, `.` or
+  // `::`, so an identifier after it names a member rather than a formal.
+  bool after_select = false;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
       HarvestAssertionVariableDecl(item);
@@ -597,9 +630,23 @@ void Parser::ScanSequenceBody(ModuleItem* item) {
       continue;
     }
     if (Check(TokenKind::kIdentifier)) {
-      item->prop_instance_refs.push_back(Consume().text);
+      auto tok = Consume();
+      // §16.8.1 rule b): a formal of type `event` is referenced only where an
+      // event_expression may be written. The clocking events are consumed
+      // above, so a reference reaching here stands in the sequence_expr.
+      if (!after_select && IsEventFormalOf(item, tok.text) &&
+          !IsWholeInstanceActual(item, tok.loc)) {
+        diag_.Error(tok.loc,
+                    "formal argument '" + std::string(tok.text) +
+                        "' of type event is referenced where no event "
+                        "expression may be written",
+                    Subclause("16.8.1"));
+      }
+      after_select = false;
+      item->prop_instance_refs.push_back(tok.text);
       continue;
     }
+    after_select = Check(TokenKind::kDot) || Check(TokenKind::kColonColon);
     Consume();
   }
 }

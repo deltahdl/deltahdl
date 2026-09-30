@@ -845,7 +845,7 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
       clock = p.ParseEventList();
       ok = p.Match(TokenKind::kRParen);
     } else {
-      clock.push_back(p.ParseSingleEvent());
+      clock.push_back(p.ParseNamedClockingEvent());
     }
   }
   SimpleSpecBody body;

@@ -152,29 +152,6 @@ struct ParserStmtHelpers {
     }
     return step;
   }
-
-  // §9.4 Syntax 9-4: a clocking_event written without parentheses is `@` and
-  // a ps_identifier or hierarchical_identifier -- a name whose parts are joined
-  // by periods, with a bit-select allowed ahead of each period -- and not an
-  // expression. Read as an expression, it took in what the controlled statement
-  // opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
-  // guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
-  static Expr* ParseClockingEventName(Parser& p) {
-    Token first = p.CurrentToken();
-    if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$root") {
-      p.Consume();
-    } else {
-      first = p.ExpectIdentifier(Subclause("9.4.2"));
-    }
-    Expr* name = p.ParseMemberAccessChain(first);
-    while (p.AtSelectBracket()) {
-      name = p.ParseSelectExpr(name);
-      while (p.Check(TokenKind::kDot) || p.Check(TokenKind::kColonColon)) {
-        name = p.MakeMemberAccess(name);
-      }
-    }
-    return name;
-  }
 };
 
 static CaseQualifier TokenToCaseQualifier(TokenKind tk) {
@@ -685,6 +662,38 @@ Stmt* Parser::ParseDelayStmt() {
   return stmt;
 }
 
+// §9.4 Syntax 9-4: a clocking_event written without parentheses is `@` and a
+// ps_identifier or hierarchical_identifier -- a name whose parts are joined by
+// periods, with a bit-select allowed ahead of each period -- and not an
+// expression. Read as an expression, it took in what the controlled statement
+// opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
+// guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
+EventExpr Parser::ParseNamedClockingEvent() {
+  EventExpr ev;
+  Token first = CurrentToken();
+  // §14.14 has the $global_clock system function refer to the event of the
+  // effective global clocking declaration, and §16.5.2 writes it after `@`
+  // with no parentheses around it.
+  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$global_clock") {
+    ev.signal = ParseSystemCall();
+    return ev;
+  }
+  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$root") {
+    Consume();
+  } else {
+    first = ExpectIdentifier(Subclause("9.4.2"));
+  }
+  Expr* name = ParseMemberAccessChain(first);
+  while (AtSelectBracket()) {
+    name = ParseSelectExpr(name);
+    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+      name = MakeMemberAccess(name);
+    }
+  }
+  ev.signal = name;
+  return ev;
+}
+
 Stmt* Parser::ParseEventControlStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kEventControl;
@@ -701,9 +710,7 @@ Stmt* Parser::ParseEventControlStmt() {
     }
     Expect(TokenKind::kRParen, Subclause("9.4.2"));
   } else {
-    EventExpr ev;
-    ev.signal = ParserStmtHelpers::ParseClockingEventName(*this);
-    stmt->events.push_back(ev);
+    stmt->events.push_back(ParseNamedClockingEvent());
   }
   stmt->body = ParseStmt();
   return stmt;

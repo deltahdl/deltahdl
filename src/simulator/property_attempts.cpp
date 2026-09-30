@@ -553,7 +553,10 @@ bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
   if (begin) state.attempt = NewSequenceAttempt(body, sc.arena);
   SequenceStep step =
       StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena);
-  if (step == SequenceStep::kFailed || step == SequenceStep::kMatchedLast) {
+  // §16.9.8: of a first_match antecedent's matches only those ending at the
+  // earliest tick count, so the attempt ends with its first match.
+  if (step == SequenceStep::kFailed || step == SequenceStep::kMatchedLast ||
+      (body.first_match && Matched(step))) {
     state.antecedent_done = true;
   }
   if (!Matched(step)) return false;

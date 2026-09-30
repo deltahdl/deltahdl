@@ -420,6 +420,11 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   item->always_kind = kind;
   item->loc = CurrentLoc();
   Consume();
+  struct DepthGuard {
+    int& d;
+    explicit DepthGuard(int& d) : d(d) { ++d; }
+    ~DepthGuard() { --d; }
+  } guard(always_or_initial_depth_);
 
   if (kind == AlwaysKind::kAlways) {
     ModuleItem* statement =
@@ -463,6 +468,11 @@ ModuleItem* Parser::ParseInitialBlock() {
   item->kind = ModuleItemKind::kInitialBlock;
   item->loc = CurrentLoc();
   Consume();
+  struct DepthGuard {
+    int& d;
+    explicit DepthGuard(int& d) : d(d) { ++d; }
+    ~DepthGuard() { --d; }
+  } guard(always_or_initial_depth_);
   item->body = ParseStmt();
   return item;
 }

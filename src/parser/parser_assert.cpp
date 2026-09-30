@@ -128,6 +128,16 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
 // is reported and skipped.
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   SourceLoc loc = CurrentLoc();
+  // §16.14 lists the places a concurrent assertion statement may be
+  // specified, and the only procedural code among them is an always or an
+  // initial procedure: a task, a function, a class method and a final
+  // procedure are not on it.
+  if (always_or_initial_depth_ == 0) {
+    diag_.Error(loc,
+                "a concurrent assertion statement in procedural code shall be "
+                "in an always or an initial procedure",
+                Subclause("16.14"));
+  }
   bool sequence = Match(TokenKind::kKwSequence);
   if (!sequence) Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
   Stmt* stmt = ParseProceduralPropertySpec(kind, loc, Subclause("16.14.6"));
@@ -383,7 +393,7 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
       events = ParseEventList();
       if (!Match(TokenKind::kRParen)) ok = false;
     } else {
-      events.push_back(ParseSingleEvent());
+      events.push_back(ParseNamedClockingEvent());
     }
   }
   SimpleSpecBody body;

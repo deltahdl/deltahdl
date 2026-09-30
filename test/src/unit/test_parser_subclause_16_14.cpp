@@ -239,4 +239,74 @@ TEST(ConcurrentAssertionEvaluationReporting, ClockedBooleanAssertIsEvaluated) {
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
+// §16.14 lists where a concurrent assertion statement may be specified, and
+// the only procedural code among them is an always or an initial procedure.
+// A class method, a task or function and a final procedure are not in the
+// list, so the statement written in one is reported where it stands.
+constexpr const char* kPlacementMessage =
+    "a concurrent assertion statement in procedural code shall be in an "
+    "always or an initial procedure";
+
+TEST(ConcurrentAssertionPlacement, InAClassMethodIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x; int f;\n"
+      "  class C;\n"
+      "    task run();\n"
+      "      assert property (@(posedge clk) x) else f++;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 5, "16.14"));
+}
+
+TEST(ConcurrentAssertionPlacement, InAModuleTaskIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  task run();\n"
+      "    assume property (@(posedge clk) x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
+}
+
+TEST(ConcurrentAssertionPlacement, InAModuleFunctionIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  function void chk();\n"
+      "    cover property (@(posedge clk) x);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
+}
+
+TEST(ConcurrentAssertionPlacement, InAFinalProcedureIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  final begin\n"
+      "    cover sequence (@(posedge clk) x);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
+}
+
+// The two procedures the list names, the statement nested in a block of each.
+TEST(ConcurrentAssertionPlacement, InAnAlwaysOrAnInitialProcedureIsAccepted) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  always @(posedge clk) begin\n"
+      "    if (x) assert property (x);\n"
+      "  end\n"
+      "  always_ff @(posedge clk) cover property (x);\n"
+      "  initial begin\n"
+      "    assert property (@(posedge clk) x);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

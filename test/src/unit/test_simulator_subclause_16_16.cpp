@@ -101,6 +101,53 @@ TEST(ClockResolutionRun, WithoutADefaultAnInstanceDeterminesTheClock) {
   EXPECT_EQ(out, "e1 at 30\ne2 at 30\ne3 at 30\n$finish at time 40\n");
 }
 
+// §16.16 (f) with §9.4 Syntax 9-4: a sequence whose leading clocking event is
+// written as a bare name, `@clk`, is declared with that event, which an
+// instance with no default clocking takes: every edge of clk, so a is sampled
+// 1 at 20 and b 1 at 25, and a ##1 b matches once, at 25.
+TEST(ClockResolutionRun, ASequenceClockedByABareNameTakesThatClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Design("module m(input logic a, b, clk);\n"
+             "  sequence s4;\n"
+             "    @clk a ##1 b;\n"
+             "  endsequence\n"
+             "  e4: cover property (s4) $display(\"e4 at %0d\", $time);\n"
+             "endmodule\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "e4 at 25\n$finish at time 40\n");
+}
+
+// §9.4 Syntax 9-4: the clocking event of an assertion written as a bare
+// name ends at the name, so `@clk (a) ##1 b` is clocked by every edge of clk
+// and opens with the operand (a), rather than waiting on a call `clk(a)`.
+TEST(ClockResolutionRun, AnAssertionsBareNamedClockEndsAtTheName) {
+  SimFixture f;
+  std::string out = RunCapture(Design("module m(input logic a, b, clk);\n"
+                                      "  e5: cover property (@clk (a) ##1 b)\n"
+                                      "    $display(\"e5 at %0d\", $time);\n"
+                                      "endmodule\n"),
+                               f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "e5 at 25\n$finish at time 40\n");
+}
+
+// The same for a named property declared with a bare named clock.
+TEST(ClockResolutionRun, APropertysBareNamedClockEndsAtTheName) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Design("module m(input logic a, b, clk);\n"
+             "  property q6;\n"
+             "    @clk (a) ##1 b;\n"
+             "  endproperty\n"
+             "  e6: cover property (q6) $display(\"e6 at %0d\", $time);\n"
+             "endmodule\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "e6 at 25\n$finish at time 40\n");
+}
+
 // §16.16 (f) with §16.12: a property declared in an interface with its own
 // clocking event is instantiated by the hierarchical name of an interface
 // instance, `i0.low`, and takes that event as the assertion's clock; its

@@ -721,11 +721,13 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   // §16.8: a sequence declared without a clock inherits one from the sequence
   // or assertion that instantiates it, so a body without a leading `@` is
   // captured as well, with no clock of its own.
+  // §9.4 Syntax 9-4: the clock is `@(event_expression)` or `@` and a name.
   if (ok && Match(TokenKind::kAt)) {
-    ok = Match(TokenKind::kLParen);
-    if (ok) {
+    if (Match(TokenKind::kLParen)) {
       clock = ParseEventList();
       ok = Match(TokenKind::kRParen);
+    } else {
+      clock.push_back(ParseNamedClockingEvent());
     }
   }
   // §16.16 (f): the clocking event the body opens with is the sequence's own
@@ -776,8 +778,12 @@ bool Parser::ParseSequenceTermInto(ModuleItem* item) {
   uint32_t errors = diag_.ErrorCount() + diag_.SuppressedErrorCount();
   bool was_in_sequence_body = in_sequence_body_;
   in_sequence_body_ = true;
-  bool ok = ParserSeqLinearHelpers::ParseLinearSeqIntersection(
-      *this, item->seq_linear);
+  // §16.9.8: `first_match ( sequence_expr [, match_items] )` is a term of its
+  // own, the antecedent of an implication among them.
+  bool ok = Check(TokenKind::kKwFirstMatch)
+                ? ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item)
+                : ParserSeqLinearHelpers::ParseLinearSeqIntersection(
+                      *this, item->seq_linear);
   in_sequence_body_ = was_in_sequence_body;
   if (diag_.ErrorCount() + diag_.SuppressedErrorCount() != errors) ok = false;
   if (!ok || item->seq_linear.operands.empty()) {

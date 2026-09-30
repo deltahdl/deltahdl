@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -65,6 +66,28 @@ TEST(AssertionSemanticsParsing, FirstMatchWithMultipleSequenceMatchItems) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
+// §16.9.8 with §16.12.7: `first_match(seq)` is a sequence_expr, so it stands
+// as the antecedent of an implication, read into the implication's sequence
+// with its first_match mark rather than leaving the spec unread.
+TEST(AssertionSemanticsParsing, FirstMatchAsTheAntecedentOfAnImplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  assert property (@(posedge clk) first_match(a ##[1:3] b) |-> c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* item = r.cu->modules[0]->items.back();
+  ASSERT_EQ(item->kind, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item->body, nullptr);
+  const PropertyExprNode* tree = item->body->assert_property;
+  ASSERT_NE(tree, nullptr);
+  EXPECT_EQ(tree->kind, PropertyExprNode::Kind::kImplication);
+  ASSERT_NE(tree->sequence, nullptr);
+  EXPECT_TRUE(tree->sequence->seq_linear.first_match);
+  EXPECT_EQ(tree->sequence->seq_linear.operands.size(), 2u);
 }
 
 }  // namespace

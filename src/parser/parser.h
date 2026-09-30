@@ -738,6 +738,9 @@ class Parser {
 
   std::vector<EventExpr> ParseEventList();
   EventExpr ParseSingleEvent();
+  // §9.4 Syntax 9-4: a clocking_event written without parentheses, `@name`,
+  // the name read alone rather than as an expression.
+  EventExpr ParseNamedClockingEvent();
 
   std::string_view ParseDottedPath();
   // Consume the next token when it is the one asked for, and report it
@@ -930,6 +933,12 @@ class Parser {
   }
 
   bool in_generate_region_ = false;
+
+  // §16.14: how many always or initial procedures the statement being parsed
+  // stands in, which are the only procedural code a concurrent assertion
+  // statement may be specified in. ParseAlwaysBlock and ParseInitialBlock
+  // count it and ParseProceduralConcurrentAssertLike reads it.
+  int always_or_initial_depth_ = 0;
 
   // §H.2: true while the formal argument list of a DPI import declaration is
   // being parsed. Leaving a packed range unspecified is a relaxation granted to

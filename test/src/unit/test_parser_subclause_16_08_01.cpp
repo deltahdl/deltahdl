@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -77,6 +78,75 @@ TEST(TypedSequenceFormalSyntax, UserDefinedTypeTypedFormalAccepted) {
               "  typedef logic [3:0] nibble_t;\n"
               "  sequence s(nibble_t x);\n"
               "    x[0] ##1 x[1];\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
+// §16.8.1 rule b): every reference to a formal of type `event` stands where an
+// event_expression may be written. The operands of `##` and of `!` are a
+// sequence and a Boolean, so `x` breaks the rule at its first reference.
+TEST(TypedSequenceFormalSyntax, EventFormalReferencedAsBooleanRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_ev(event ev, event x);\n"
+      "    @(ev) x ##2 !x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "formal argument 'x' of type event is referenced "
+                            "where no event expression may be written",
+                            3, "16.8.1"));
+}
+
+// §16.8 carries a type to every formal after it up to the next type, so `x`
+// written with no type of its own after `event ev` is an `event` too.
+TEST(TypedSequenceFormalSyntax, EventTypeCarriedToFollowingFormalRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_ev(event ev,\n"
+      "                x);\n"
+      "    @(ev) x ##2 !x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "formal argument 'x' of type event is referenced "
+                            "where no event expression may be written",
+                            4, "16.8.1"));
+}
+
+// The `untyped` keyword ends the carry-over, so the same body is legal.
+TEST(TypedSequenceFormalSyntax, UntypedFormalAfterEventFormalAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s_ev(event ev, untyped x);\n"
+              "    @(ev) x ##2 !x;\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
+// `@ev` writes the clocking event as a bare identifier, which is an
+// event_expression position as `@(ev)` is.
+TEST(TypedSequenceFormalSyntax, EventFormalAsBareClockingEventAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a;\n"
+              "  sequence s(event ev);\n"
+              "    @ev a ##1 !a;\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
+// An event formal passed whole as the actual of an instance is bound to the
+// instantiated sequence's formal, whose own references rule b) governs there.
+TEST(TypedSequenceFormalSyntax, EventFormalPassedWholeToAnInstanceAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a;\n"
+              "  sequence inner(event e);\n"
+              "    @(e) a;\n"
+              "  endsequence\n"
+              "  sequence s(event ev);\n"
+              "    inner(ev) ##1 a;\n"
               "  endsequence\n"
               "endmodule\n"));
 }
