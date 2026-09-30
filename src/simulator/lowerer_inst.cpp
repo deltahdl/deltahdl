@@ -426,12 +426,14 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
 // variable, `cb.a`, stands for that variable in the checker's assertions,
 // which read what the block sampled rather than a sample of the formal; the
 // block is found by its name in the instance holding the checker when read.
-static void BindCheckerClockvarFormal(const RtlirPortBinding& binding,
+static void BindCheckerClockvarFormal(const RtlirModuleInst& inst,
+                                      const RtlirPortBinding& binding,
                                       const std::string& parent_prefix,
                                       const std::string& formal_name,
                                       SimContext& ctx) {
   const Expr* actual = binding.connection;
-  if (actual->kind != ExprKind::kMemberAccess || actual->is_scope_resolution ||
+  if (inst.resolved == nullptr || !inst.resolved->is_checker ||
+      actual->kind != ExprKind::kMemberAccess || actual->is_scope_resolution ||
       actual->lhs->kind != ExprKind::kIdentifier) {
     return;
   }
@@ -477,11 +479,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     }
 
     if (binding.direction == Direction::kInput) {
-      if (inst.resolved != nullptr && inst.resolved->is_checker) {
-        BindCheckerClockvarFormal(
-            binding, inst_prefix_,
-            inst_prefix_ + inst_seg + std::string(binding.port_name), ctx_);
-      }
+      BindCheckerClockvarFormal(
+          inst, binding, inst_prefix_,
+          inst_prefix_ + inst_seg + std::string(binding.port_name), ctx_);
       RtlirContAssign ca;
       ca.lhs = local_id;
       ca.rhs = binding.connection;
