@@ -58,6 +58,7 @@ std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              Arena& arena) {
   ActualsByFormal actuals = BindActuals(seq->prop_formals, instance);
   std::vector<EventExpr> clock;
+  clock.reserve(seq->seq_clock.size());
   for (const EventExpr& ev : seq->seq_clock) {
     clock.push_back(SubstituteClockEvent(ev, actuals, arena));
   }

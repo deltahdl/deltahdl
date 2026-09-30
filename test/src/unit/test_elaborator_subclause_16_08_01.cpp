@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/typed_sequence_formal.h"
@@ -119,53 +120,55 @@ TEST(TypedSequenceFormal, EventTypedFormalRejectsEdgeIdentifierActual) {
       /*actual_combined_with_edge_identifier=*/true));
 }
 
-// The process a static concurrent assertion is lowered to, an always_ff under
-// §16.14.5, or nullptr where the module holds none.
-const RtlirProcess* AssertionProcess(const RtlirModule* mod) {
-  for (const auto& p : mod->processes) {
-    if (p.kind == RtlirProcessKind::kAlwaysFF) return &p;
-  }
-  return nullptr;
-}
-
-// The clocking event of the one assertion in `src`, checked to be the single
-// event posedge clk.
-void ExpectClockedOnPosedgeClk(const std::string& src) {
+// The clocking events the process of the static concurrent assertion in `src`
+// wakes on, an always_ff under §16.14.5, each written as its edge keyword and
+// its signal's name; empty where the source does not elaborate cleanly.
+std::vector<std::string> AssertionWakeEvents(const std::string& src) {
   ElabFixture f;
-  auto* design = ElaborateSrc(src, f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-  const RtlirProcess* p = AssertionProcess(design->top_modules[0]);
-  ASSERT_NE(p, nullptr);
-  ASSERT_EQ(p->sensitivity.size(), 1u);
-  EXPECT_EQ(p->sensitivity[0].edge, Edge::kPosedge);
-  ASSERT_NE(p->sensitivity[0].signal, nullptr);
-  EXPECT_EQ(p->sensitivity[0].signal->text, "clk");
+  RtlirDesign* design = ElaborateSrc(src, f, "t");
+  std::vector<std::string> events;
+  if (design == nullptr || f.has_errors || design->top_modules.empty()) {
+    return events;
+  }
+  for (const RtlirProcess& p : design->top_modules[0]->processes) {
+    if (p.kind != RtlirProcessKind::kAlwaysFF) continue;
+    for (const EventExpr& ev : p.sensitivity) {
+      std::string edge = ev.edge == Edge::kPosedge   ? "posedge "
+                         : ev.edge == Edge::kNegedge ? "negedge "
+                                                     : "";
+      events.push_back(
+          edge + std::string(ev.signal != nullptr ? ev.signal->text : ""));
+    }
+  }
+  return events;
 }
 
 // §16.8.1 (b) with §16.16 (f): an assertion whose property_spec is an instance
 // of a sequence clocked by an event formal is clocked by the formal's actual,
 // so s_ev(posedge clk, a) is clocked on posedge clk and not on the formal ev.
 TEST(TypedSequenceFormal, AnInstancesClockTakesTheEventFormalsActual) {
-  ExpectClockedOnPosedgeClk(
-      "module t;\n"
-      "  logic clk, a;\n"
-      "  sequence s_ev(event ev, untyped x); @(ev) x ##2 !x; endsequence\n"
-      "  cover property (s_ev(posedge clk, a));\n"
-      "endmodule\n");
+  EXPECT_EQ(
+      AssertionWakeEvents(
+          "module t;\n"
+          "  logic clk, a;\n"
+          "  sequence s_ev(event ev, untyped x); @(ev) x ##2 !x; endsequence\n"
+          "  cover property (s_ev(posedge clk, a));\n"
+          "endmodule\n"),
+      std::vector<std::string>{"posedge clk"});
 }
 
 // §16.8 and §16.8.1 (c) with §16.16 (f): a data-typed formal under an edge in
 // the clock stands for its actual, so s_ev2(clk, a) with `@(posedge sig)` is
 // clocked on posedge clk.
 TEST(TypedSequenceFormal, AnInstancesClockTakesTheSignalFormalsActual) {
-  ExpectClockedOnPosedgeClk(
-      "module t;\n"
-      "  logic clk, a;\n"
-      "  sequence s_ev2(reg sig, x); @(posedge sig) x ##2 !x; endsequence\n"
-      "  cover property (s_ev2(clk, a));\n"
-      "endmodule\n");
+  EXPECT_EQ(
+      AssertionWakeEvents(
+          "module t;\n"
+          "  logic clk, a;\n"
+          "  sequence s_ev2(reg sig, x); @(posedge sig) x ##2 !x; endsequence\n"
+          "  cover property (s_ev2(clk, a));\n"
+          "endmodule\n"),
+      std::vector<std::string>{"posedge clk"});
 }
 
 }  // namespace
