@@ -1953,6 +1953,7 @@ jobs:
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
+    name: clang-tidy-src-shard-${{ matrix.shard }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1971,12 +1972,12 @@ jobs:
         uses: actions/cache@v5
         with:
           key: >-
-            ctcache-src-${{
+            ctcache-src-${{ matrix.shard }}-${{
             hashFiles('etc/clang_tidy/src.yml') }}-${{
             github.sha }}
           path: .ctcache
           restore-keys: |
-            ctcache-src-
+            ctcache-src-${{ matrix.shard }}-
       # BUILD_TESTING off because this job lints src/ and nothing under src/
       # includes a googletest header. CMakeLists.txt:38-40 turns it on by
       # default and adds test/, whose CMakeLists.txt fetches googletest while
@@ -1990,12 +1991,26 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       # run-clang-tidy takes its positional argument as a Python regular
       # expression and searches it against each absolute path in
-      # compile_commands.json, so the selection is written as one pattern over
-      # those paths: every .cpp outside the test tree, which is what this
-      # configuration lints. The negative lookahead keeps the exclusion on
+      # compile_commands.json, so this shard's slice is named as an alternation
+      # of the paths awk left it. The slice is drawn from every .cpp outside the
+      # test tree, which is what this configuration lints; the exclusion is on
       # /test/ rather than on any directory the sources happen to sit in today.
-      - name: Run clang-tidy (src)
+      # Only the dot is escaped: nothing else a path holds here means anything
+      # to the regular expression engine, and $ anchors the match at the end so
+      # no longer path can carry a slice member as a prefix.
+      - name: >-
+          Run clang-tidy (src, shard ${{ matrix.shard }}/${{
+          strategy.job-total }})
         run: |
+          regex=$(jq -r '.[].file' build/compile_commands.json \
+            | grep -v '/test/' \
+            | grep '\.cpp$' \
+            | sort \
+            | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
+              "$SHARD_SLICE" \
+            | sed 's/\./\\./g' \
+            | sed 's/$/$/' \
+            | paste -sd'|')
           run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
@@ -2003,7 +2018,11 @@ jobs:
             -extra-arg=-ferror-limit=0 \
             -extra-arg=-w \
             -warnings-as-errors='*' \
-            '^(?!.*/test/).*\.cpp$'
+            "($regex)"
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
