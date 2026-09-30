@@ -481,7 +481,12 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   DiagnoseMissingNonAnsiPortDirection(port, decl->is_non_ansi_ports, ctx.diag);
   TrackNonAnsiPortType(decl, port, ctx);
 
-  bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
+  // §17.2: a checker formal is no port, and one of a type §6.7.1 gives no
+  // net -- a string, a real, an event -- holds its actual as a variable does.
+  bool port_is_var =
+      (!port.data_type.is_net && !port.data_type.is_interconnect) ||
+      (decl->decl_kind == ModuleDeclKind::kChecker &&
+       !PortDataTypeIsJudgedByNetRules(port.data_type));
   if (port.default_value) {
     ValidatePortAssignment(port, port_is_var, decl->is_non_ansi_ports,
                            ctx.typedefs, ctx.diag);
@@ -505,9 +510,13 @@ static void FoldPortConstant(Arena& arena, const ScopeMap& scope,
                              Expr*& value) {
   if (value == nullptr) return;
   // A literal is already scope-independent, so leave it untouched; this also
-  // avoids truncating a wide (>64-bit) literal through the 64-bit fold. Only
+  // avoids truncating a wide (>64-bit) literal through the 64-bit fold, a
+  // string literal of more than eight characters among them (§5.9). Only
   // name-bearing expressions need to be pinned to the defining scope.
-  if (value->kind == ExprKind::kIntegerLiteral) return;
+  if (value->kind == ExprKind::kIntegerLiteral ||
+      value->kind == ExprKind::kStringLiteral) {
+    return;
+  }
   auto v = ConstEvalInt(value, scope);
   if (!v) return;
   auto* lit = arena.Create<Expr>();

@@ -31,6 +31,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
@@ -95,6 +96,12 @@ class DeclaredNameTables {
                             std::vector<MatchLocals> matches);
   const std::vector<MatchLocals>* EndpointLocals(std::string_view ep_name,
                                                  uint64_t at) const;
+
+  // §17.3: the actuals a checker instance binds to its formals, by formal
+  // name, registered under the instance's prefix, `c.`; CheckerActuals answers
+  // null for a prefix naming no checker instance.
+  void RegisterCheckerActuals(std::string inst_prefix, ActualsByFormal actuals);
+  const ActualsByFormal* CheckerActuals(const std::string& inst_prefix) const;
 
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
@@ -336,6 +343,8 @@ class DeclaredNameTables {
     std::vector<MatchLocals> matches;
   };
   std::unordered_map<std::string, EndpointMatches> endpoint_locals_;
+  // §17.3: see RegisterCheckerActuals.
+  std::unordered_map<std::string, ActualsByFormal> checker_actuals_;
 
   std::unordered_set<std::string_view> real_vars_;
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/checker_instance_scheduling.h"
 #include "simulator/checker_variable_randomization.h"
 
@@ -187,6 +188,45 @@ TEST(CheckerVariableRandomization, SolveAtObservedWithCurrentValues) {
 // Observed region.
 TEST(CheckerVariableRandomization, UnsuccessfulFailureSurfacesInObserved) {
   EXPECT_EQ(AssumptionFailureRegionAfterUnsuccessfulSolve(), Region::kObserved);
+}
+
+// §17.7.2: a free checker variable takes, at each clocking event of the
+// assume set, a value satisfying the assumptions, so neither the assumption
+// on it nor an assertion of the same condition fails at any of the five
+// posedges, in a checker and in a checker instantiated inside another whose
+// formal is the parent's. The free variable took no value from the
+// assumptions, which failed at every posedge (and at three of B1's).
+TEST(CheckerVariableRandomization, FreeVariableSatisfiesItsAssumptions) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit r;\n"
+      "  int pass = 0, fail = 0;\n"
+      "  m1: assume property (@(posedge clk) r == 1'b1);\n"
+      "  a1: assert property (@(posedge clk) r) pass++; else fail++;\n"
+      "endchecker\n"
+      "checker c2(logic bclk, logic x);\n"
+      "  rand bit m;\n"
+      "  u1: assume property (@(posedge bclk) m == x);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge bclk) m == x) pass++; else fail++;\n"
+      "endchecker\n"
+      "checker c1(logic fclk, logic a);\n"
+      "  c2 B1(fclk, a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  c1 F1(clk, a);\n"
+      "  initial begin #12 a = 0; #20 a = 1; #20 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("F1.B1.pass")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("F1.B1.fail")->value.ToUint64(), 0u);
 }
 
 }  // namespace

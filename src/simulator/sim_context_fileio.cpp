@@ -521,9 +521,14 @@ void SimContext::SetEventTriggered(std::string_view name) {
 }
 
 bool SimContext::IsEventTriggered(std::string_view name) const {
-  auto vit = variables_.find(name);
-  if (vit != variables_.end())
-    return vit->second->triggered_ticks == scheduler_.CurrentTime().ticks;
+  // §23.9: a name read in an instance is the instance's own first, an end
+  // point of the instance's sequence among them (§16.13.6).
+  std::string local = ActiveInstancePrefix() + std::string(name);
+  for (std::string_view key : {std::string_view(local), name}) {
+    auto vit = variables_.find(key);
+    if (vit != variables_.end())
+      return vit->second->triggered_ticks == scheduler_.CurrentTime().ticks;
+  }
   auto it = event_triggered_.find(name);
   if (it == event_triggered_.end()) return false;
   return it->second == scheduler_.CurrentTime().ticks;

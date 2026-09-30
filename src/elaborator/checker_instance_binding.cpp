@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
@@ -75,6 +76,16 @@ ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,
     if (value) formals.emplace_back(port.name, *value);
   }
   return formals;
+}
+
+std::vector<std::string_view> CheckerFreeVariables(const ModuleDecl* decl) {
+  std::vector<std::string_view> free;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->is_rand) {
+      free.push_back(item->name);
+    }
+  }
+  return free;
 }
 
 }  // namespace delta

@@ -372,11 +372,8 @@ struct RtlirContAssign {
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
-
   bool from_nonresistive_switch = false;
-
   bool from_resistive_switch = false;
-
   Expr* data_input = nullptr;
 
   // §28.6: the two terminals of a three-state gate, kept because Table 28-5
@@ -749,6 +746,8 @@ struct RtlirModule {
   // elaboration-time constant, with their values, which its generate
   // constructs test (§27.5); empty for every other module.
   std::vector<std::pair<std::string_view, int64_t>> constant_formals;
+  // §17.7.2: a checker's free variables, those it declares `rand`.
+  std::vector<std::string_view> free_variables;
   std::vector<ModuleItem*> function_decls;
   // §27.4 with §13.4: the subroutines declared in the module's named generate
   // block instances, each with the instance it belongs to, which

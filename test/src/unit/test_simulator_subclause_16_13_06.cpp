@@ -115,4 +115,30 @@ TEST(SequenceMethods, AnActualThatNeverMatchesLeavesTheFormalsTriggeredFalse) {
   EXPECT_EQ(e4.ends, 0u);
 }
 
+// §16.13.6 with §23.9: a sequence declared in an instantiated module has an
+// end point of its own in each instance, which `triggered` read in the
+// instance sees: each of u and w counts the ends of a ##1 a at 15 and 25 of
+// its own a, u's high from 2 to 32 and w's never. The instance's sequence had
+// no monitor, and its end point was never reached.
+TEST(SequenceMethods, TriggeredInAnInstanceReadsItsOwnEndPoint) {
+  SimFixture f;
+  auto* u_hits = RunAndFindVar(
+      "module child(input logic a, input logic clk);\n"
+      "  int hits = 0;\n"
+      "  sequence s; @(posedge clk) a ##1 a; endsequence\n"
+      "  always @(posedge clk) #0 if (s.triggered) hits = hits + 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0, a = 0, never = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  child u(a, clk);\n"
+      "  child w(never, clk);\n"
+      "  initial begin #2 a = 1; #30 a = 0; #20 $finish; end\n"
+      "endmodule\n",
+      f, "u.hits");
+  ASSERT_NE(u_hits, nullptr);
+  EXPECT_EQ(u_hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("w.hits")->value.ToUint64(), 0u);
+}
+
 }  // namespace

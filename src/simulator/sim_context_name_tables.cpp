@@ -27,6 +27,7 @@
 #include "common/packed_range.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
@@ -106,6 +107,17 @@ bool DeclaredNameTables::ConsumeSequenceMatch(std::string_view ep_name,
   }
   sequence_match_reads_[ep_name] = now;
   return true;
+}
+
+void DeclaredNameTables::RegisterCheckerActuals(std::string inst_prefix,
+                                                ActualsByFormal actuals) {
+  checker_actuals_[std::move(inst_prefix)] = std::move(actuals);
+}
+
+const ActualsByFormal* DeclaredNameTables::CheckerActuals(
+    const std::string& inst_prefix) const {
+  auto it = checker_actuals_.find(inst_prefix);
+  return it == checker_actuals_.end() ? nullptr : &it->second;
 }
 
 void DeclaredNameTables::RecordEndpointLocals(

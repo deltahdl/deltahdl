@@ -315,9 +315,19 @@ void Lowerer::LowerChildBody(const RtlirModule* mod) {
   // read them, as LowerModule orders the top's.
   LowerAliases(mod);
   uint32_t child_block_id = mod->is_program ? next_program_block_id_++ : 0;
-  LowerProcesses(mod->processes, mod->is_program, child_block_id);
+  // §16.13.6: the instance's sequences are monitored as the top's are, so a
+  // `triggered` read in the instance, a checker's among them, sees their end
+  // points.
+  LowerSequenceMonitors(mod);
+  LowerFreeVariableSolver(mod);
+  // §17.7.3: a checker's statements sensitive to changes and its continuous
+  // assignments are scheduled in the Reactive region, as a program's are.
+  bool reactive = mod->is_program || mod->is_checker;
+  lowering_checker_ = mod->is_checker;
+  LowerProcesses(mod->processes, reactive, child_block_id);
+  lowering_checker_ = false;
   for (const auto& ca : mod->assigns) {
-    LowerContAssign(ca, mod->is_program);
+    LowerContAssign(ca, reactive);
   }
   for (const auto& sw : mod->bidir_switches) {
     LowerBidirSwitch(sw, mod->is_program);

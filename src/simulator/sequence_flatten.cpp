@@ -124,12 +124,15 @@ std::string_view RenamedLocal(std::string_view name, int instance,
 // `$` for no upper bound, or the elaboration-time constant §16.8 requires of
 // it, evaluated here as a parameter or a literal is. An actual that answers no
 // known value leaves the bound as it was, which is the parser's default of 1.
-void ResolveDelayBound(uint32_t& bound, std::string_view formal,
+void ResolveDelayBound(uint32_t& bound, std::string_view& formal,
                        const ActualsByFormal& actuals, SimContext& ctx,
                        Arena& arena) {
   if (formal.empty()) return;
   auto it = actuals.find(formal);
   if (it == actuals.end() || it->second == nullptr) return;
+  // A name no actual here binds is left for an enclosing scope's to settle,
+  // a checker's formal among them (§17.3).
+  formal = {};
   const Expr* actual = it->second;
   if (actual->kind == ExprKind::kIdentifier && actual->text == "$") {
     bound = SeqCycleDelay::kUnbounded;
@@ -144,8 +147,6 @@ SeqCycleDelay ResolveDelay(SeqCycleDelay delay, const ActualsByFormal& actuals,
                            SimContext& ctx, Arena& arena) {
   ResolveDelayBound(delay.min, delay.min_formal, actuals, ctx, arena);
   ResolveDelayBound(delay.max, delay.max_formal, actuals, ctx, arena);
-  delay.min_formal = {};
-  delay.max_formal = {};
   return delay;
 }
 
@@ -772,10 +773,41 @@ int OperandClockIndex(const LinearSequence& body, size_t pos) {
                                                : 0;
 }
 
+namespace {
+
+// §17.3: a delay bound written as the name of a formal of the checker the
+// sequence stands in takes that formal's actual, `##n` with n bound to 2
+// being `##2` and `##[1:n]` with n bound to `$` being `##[1:$]`, as a sequence
+// formal's bound takes its actual (§16.8).
+void ResolveCheckerFormalDelays(LinearSequence& seq,
+                                const ActualsByFormal& actuals, SimContext& ctx,
+                                Arena& arena) {
+  for (SeqCycleDelay& delay : seq.delays) {
+    delay = ResolveDelay(delay, actuals, ctx, arena);
+  }
+  for (auto* list : {&seq.intersects, &seq.conjuncts, &seq.alternatives}) {
+    for (LinearSequence& inner : *list) {
+      ResolveCheckerFormalDelays(inner, actuals, ctx, arena);
+    }
+  }
+  for (auto& entry : seq.nested) {
+    LinearSequence inner = *entry.second;
+    ResolveCheckerFormalDelays(inner, actuals, ctx, arena);
+    entry.second = std::make_shared<const LinearSequence>(std::move(inner));
+  }
+}
+
+}  // namespace
+
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
   out = LinearSequence{};
-  return Flatten(seq, ctx, arena, out, 0);
+  bool flattened = Flatten(seq, ctx, arena, out, 0);
+  if (const ActualsByFormal* checker =
+          ctx.CheckerActuals(ctx.ActiveInstancePrefix())) {
+    ResolveCheckerFormalDelays(out, *checker, ctx, arena);
+  }
+  return flattened;
 }
 
 const LinearSequence* NestedOperand(const LinearSequence& body, size_t pos) {

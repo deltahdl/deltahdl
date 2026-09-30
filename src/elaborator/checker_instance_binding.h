@@ -46,4 +46,8 @@ ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,
                                               const BoundCheckerFormals& bound,
                                               const ScopeMap& scope);
 
+// §17.7.2: the free variables of the checker `decl`, those it declares
+// `rand`.
+std::vector<std::string_view> CheckerFreeVariables(const ModuleDecl* decl);
+
 }  // namespace delta

@@ -221,7 +221,8 @@ static void CopySample(const Logic4Vec& src, Logic4Vec& dst, Arena& arena) {
 }
 
 void AssertionSampleStore::Register(const Variable* var, Arena& arena) {
-  if (var == nullptr || entries_.count(var) != 0) return;
+  if (var == nullptr || entries_.count(var) != 0 || excluded_.count(var) != 0)
+    return;
   Entry entry;
   CopySample(var->value, entry.default_value, arena);
   // Before the first Refill the only value there is to read is the default one,

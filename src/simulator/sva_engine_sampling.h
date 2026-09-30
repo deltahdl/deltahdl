@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -230,6 +231,10 @@ class AssertionSampleStore {
   // Enrolling the same variable twice keeps the first default.
   void Register(const Variable* var, Arena& arena);
 
+  // §17.7.2: the sampled value of a free checker variable is its current
+  // value, so `var` is never enrolled and a read of it answers the live value.
+  void ExcludeFromSampling(const Variable* var) { excluded_.insert(var); }
+
   // §16.6: "Elements of dynamic arrays, queues, and associative arrays that
   // are sampled for assertion expression evaluation may get removed from the
   // array or the array may get resized before the assertion expression is
@@ -264,7 +269,7 @@ class AssertionSampleStore {
   // rule a variable read asks about, so a reader consults it and keeps the live
   // value whenever it answers nothing.
   const Logic4Vec* ReadWithinProperty(const Variable* var, SimTime t) const {
-    if (!evaluating_property_) return nullptr;
+    if (!evaluating_property_ && !procedure_reads_sampled_) return nullptr;
     if (!reading_defaults_) return Read(var, t);
     auto it = entries_.find(var);
     return it == entries_.end() ? nullptr : &it->second.default_value;
@@ -276,6 +281,11 @@ class AssertionSampleStore {
   // statements, and every procedure around the assertion, read live values.
   void SetEvaluatingProperty(bool on) { evaluating_property_ = on; }
   bool EvaluatingProperty() const { return evaluating_property_; }
+
+  // §17.5: a checker's always_ff reads sampled values in every expression of
+  // its body, the condition of an immediate assertion in it among them, so a
+  // read answers a sampled value while such a body runs as well.
+  void SetProcedureReadsSampled(bool on) { procedure_reads_sampled_ = on; }
 
   // §16.14.6.1: the values the instance of a procedural concurrent assertion
   // being evaluated saved when it was queued, which a read of one of their
@@ -376,7 +386,9 @@ class AssertionSampleStore {
     uint64_t recorded_at = UINT64_MAX;
   };
   std::unordered_map<SiteKey, SiteHistory, SiteKeyHash> tick_history_;
+  std::unordered_set<const Variable*> excluded_;
   bool evaluating_property_ = false;
+  bool procedure_reads_sampled_ = false;
   bool reading_defaults_ = false;
   uint32_t clock_ticks_ = ~0u;
 };

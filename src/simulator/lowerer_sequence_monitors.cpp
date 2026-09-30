@@ -390,6 +390,14 @@ void Lowerer::LowerSequenceMonitor(
   ScheduleProcess(p, ctx_);
 }
 
+// §16.13.6 with §23.9: the event of an end point `ep_name` the monitor fires
+// and `triggered` reads, declared in the instance being lowered.
+void Lowerer::CreateEndPoint(std::string_view ep_name) {
+  const auto* key =
+      arena_.Create<std::string>(inst_prefix_ + std::string(ep_name));
+  ctx_.CreateVariable(*key, 1)->is_event = true;
+}
+
 void Lowerer::LowerNamedSequenceMonitor(
     const ModuleItem* seq, const std::vector<EventExpr>* first_clock,
     const std::vector<ClockReads>& further) {
@@ -398,7 +406,7 @@ void Lowerer::LowerNamedSequenceMonitor(
   for (const ClockReads& reads : further) {
     auto* ep_name = arena_.Create<std::string>(
         "__seq_" + std::string(seq->name) + "@" + std::to_string(next_id_));
-    ctx_.CreateVariable(*ep_name, 1)->is_event = true;
+    CreateEndPoint(*ep_name);
     LowerSequenceMonitor(seq, *ep_name, &reads.first);
     for (const Expr* read : reads.second) {
       ctx_.RegisterSequenceInstanceEndpoint(read, *ep_name);
@@ -419,8 +427,7 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
     auto* name =
         arena_.Create<std::string>("actual@" + std::to_string(next_id_));
     auto* ep_name = arena_.Create<std::string>("__seq_" + *name);
-    auto* ep_var = ctx_.CreateVariable(*ep_name, 1);
-    ep_var->is_event = true;
+    CreateEndPoint(*ep_name);
     ctx_.RegisterSequenceInstanceEndpoint(actual, *ep_name);
     LowerSequenceMonitor(ActualAsSequence(actual, *name, arena_), *ep_name,
                          nullptr);
@@ -430,8 +437,7 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
     auto* name = arena_.Create<std::string>(std::string(instance->callee) +
                                             "@" + std::to_string(next_id_));
     auto* ep_name = arena_.Create<std::string>("__seq_" + *name);
-    auto* ep_var = ctx_.CreateVariable(*ep_name, 1);
-    ep_var->is_event = true;
+    CreateEndPoint(*ep_name);
     ctx_.RegisterSequenceInstanceEndpoint(instance, *ep_name);
     LowerSequenceMonitor(InstanceAsSequence(triggered, *name, arena_), *ep_name,
                          context.OfInstance(instance));
@@ -476,7 +482,10 @@ void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
       // variables_ keys by string_view, so the key's backing string must
       // outlive the map; intern it in the arena. A local std::string would
       // dangle and make every later FindVariable("__seq_<name>") miss.
-      auto* stored = ctx.GetArena().Create<std::string>(std::move(ep_name));
+      // §23.9: the end point is declared in the instance being built, so
+      // each instance of a module has one of its own.
+      auto* stored = ctx.GetArena().Create<std::string>(
+          ctx.ActiveInstancePrefix() + ep_name);
       auto* ep_var = ctx.CreateVariable(*stored, 1);
       ep_var->is_event = true;
     }

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/checker_scheduling_semantics.h"
 #include "simulator/scheduler.h"
@@ -99,6 +100,33 @@ TEST(CheckerSchedulingSemantics,
   EXPECT_EQ(HomeRegionForCheckerStatement(
                 CheckerStatementKind::kCheckerVariableNonblocking),
             Scheduler::ReactiveSetDualOf(Region::kNBA));
+}
+
+// §17.7.3's my_check example over a real run: the checker's always_ff runs
+// in the Reactive region, after the Observed region fires the end point of
+// the checker's sequence a ##1 a, so `s.triggered` read there is 1 at 15 and
+// at 25, where the sequence ends, and hits counts both. It read 0 at every
+// tick: the checker's sequence had no monitor and its always_ff ran in the
+// Active region.
+TEST(CheckerSchedulingSemantics, AlwaysFfReadsTheCheckersSequenceEndPoint) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "checker chk(logic a, logic clk);\n"
+      "  sequence s; @(posedge clk) a ##1 a; endsequence\n"
+      "  bit t;\n"
+      "  int hits = 0;\n"
+      "  always_ff @(posedge clk) t <= s.triggered;\n"
+      "  always_ff @(posedge clk) if (s.triggered) hits <= hits + 1;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(a, clk);\n"
+      "  initial begin #2 a = 1; #30 a = 0; #20 $finish; end\n"
+      "endmodule\n",
+      f, "c.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
 }  // namespace

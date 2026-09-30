@@ -108,9 +108,14 @@ static std::vector<const Expr*> CollectPastDirectedSites(const Stmt* body) {
   return sites;
 }
 
+// `reads_sampled`: §17.5 has every expression of a checker's always_ff but its
+// event control read sampled values, so the body runs with the sample store
+// answering its reads; such a procedure holds no timing control of its own,
+// so the body completes before any other process runs.
 static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             const std::vector<EventExpr>& sens,
-                                            SimContext& ctx, Arena& arena) {
+                                            bool reads_sampled, SimContext& ctx,
+                                            Arena& arena) {
   std::vector<const Expr*> past_sites = CollectPastDirectedSites(body);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, sens, arena};
@@ -120,7 +125,9 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
     // §16.4.2: resuming after suspending on this event control is a deferred
     // assertion flush point; discard reports pending from before the suspend.
     ctx.FlushPendingDeferredReports();
+    ctx.AssertionSamples().SetProcedureReadsSampled(reads_sampled);
     auto result = co_await ExecStmt(body, ctx, arena);
+    ctx.AssertionSamples().SetProcedureReadsSampled(false);
     if (result != StmtResult::kDone) break;
   }
 }
@@ -349,13 +356,19 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterModuleDpiImports(mod, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
+  LowerFreeVariableSolver(mod);
 
   RegisterProcessClassType(ctx_, arena_);
   LowerAliases(mod);
   uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;
-  LowerProcesses(mod->processes, mod->is_program, program_block_id);
+  // §17.7.3: a checker's statements sensitive to changes and its continuous
+  // assignments are scheduled in the Reactive region, as a program's are.
+  bool reactive = mod->is_program || mod->is_checker;
+  lowering_checker_ = mod->is_checker;
+  LowerProcesses(mod->processes, reactive, program_block_id);
+  lowering_checker_ = false;
   for (const auto& ca : mod->assigns) {
-    LowerContAssign(ca, mod->is_program);
+    LowerContAssign(ca, reactive);
   }
   for (const auto& sw : mod->bidir_switches) {
     LowerBidirSwitch(sw, mod->is_program);
@@ -452,6 +465,17 @@ static void CollectProceduralAssertionReadNames(
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   if (proc.body == nullptr) return;
   RecordAssertionSampleScope(proc.body);
+  // §17.5: every name a checker's always_ff reads is read sampled.
+  if (lowering_checker_ && proc.kind == RtlirProcessKind::kAlwaysFF) {
+    AssertionSampleScope scope;
+    scope.inst_prefix = inst_prefix_;
+    std::unordered_set<std::string> names;
+    ForEachStmtReadExpr(proc.body, [&names](const Expr* e) {
+      CollectSampledOperandNames(e, names);
+    });
+    scope.names.assign(names.begin(), names.end());
+    assertion_sample_scopes_.push_back(std::move(scope));
+  }
 }
 
 void Lowerer::RecordAssertionSampleScope(const Stmt* body) {
@@ -576,7 +600,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
       p->kind = ProcessKind::kInitial;
-      if (from_program) {
+      // A checker's processes are reactive as a program's are (§17.7.3),
+      // but only a program's initial procedures end its run (§24.7).
+      if (program_block_id != 0) {
         ctx_.RegisterProgramInitial(program_block_id, p);
         p->coro =
             MakeProgramInitialCoroutine(proc.body, ctx_, arena_).Release();
@@ -592,12 +618,12 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
         p->coro =
             MakeAlwaysSensCoroutine(
                 proc.body, ImplicitListEvents(proc.sensitivity, ctx_, arena_),
-                ctx_, arena_)
+                false, ctx_, arena_)
                 .Release();
       } else if (!proc.sensitivity.empty()) {
-        p->coro =
-            MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
-                .Release();
+        p->coro = MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, false,
+                                          ctx_, arena_)
+                      .Release();
       } else {
         p->coro = MakeAlwaysCoroutine(proc.body, ctx_, arena_).Release();
       }
@@ -616,9 +642,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       // loop instead made it re-fire on its own nonblocking-assign updates and
       // spin forever.
       p->kind = ProcessKind::kAlwaysFF;
-      p->coro =
-          MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
-              .Release();
+      p->coro = MakeAlwaysSensCoroutine(proc.body, proc.sensitivity,
+                                        lowering_checker_, ctx_, arena_)
+                    .Release();
       break;
     case RtlirProcessKind::kFinal:
       p->kind = ProcessKind::kFinal;

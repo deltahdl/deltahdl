@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -10,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -55,13 +57,29 @@ static bool IsDrivableOutputConnection(ExprKind k) {
          k == ExprKind::kStreamingConcat || k == ExprKind::kMemberAccess;
 }
 
-static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
+// The data type of the port `binding` connects, kImplicit where the
+// instance names no such port.
+static DataTypeKind BoundPortType(const RtlirModuleInst& inst,
+                                  const RtlirPortBinding& binding) {
+  DataTypeKind type = DataTypeKind::kImplicit;
+  for (const RtlirPort& port : inst.resolved->ports) {
+    if (port.name == binding.port_name) type = port.type_kind;
+  }
+  return type;
+}
+
+// §6.16 and §6.17: a string and an event have no width, and a port of either
+// type is connected all the same.
+static bool IsConnectablePortBinding(const RtlirModuleInst& inst,
+                                     const RtlirPortBinding& binding) {
   if (!binding.connection) return false;
-  if (binding.width == 0) return false;
-  return binding.direction == Direction::kInput ||
-         binding.direction == Direction::kOutput ||
-         binding.direction == Direction::kInout ||
-         binding.direction == Direction::kRef;
+  DataTypeKind type = BoundPortType(inst, binding);
+  bool has_value = binding.width != 0 || type == DataTypeKind::kString ||
+                   type == DataTypeKind::kEvent;
+  return has_value && (binding.direction == Direction::kInput ||
+                       binding.direction == Direction::kOutput ||
+                       binding.direction == Direction::kInout ||
+                       binding.direction == Direction::kRef);
 }
 
 static Expr* MakeLocalPortId(std::string_view port_name, Arena& arena) {
@@ -443,6 +461,15 @@ static void BindCheckerClockvarFormal(const RtlirModuleInst& inst,
       std::string(actual->rhs->text));
 }
 
+// §6.16: the width the connection to an input port is evaluated and written
+// at, the port's own, or none for a string port, which holds as many
+// characters as its connection gives it.
+static uint32_t InputPortAssignWidth(const RtlirPortBinding& binding,
+                                     const std::string& port_name,
+                                     SimContext& ctx) {
+  return ctx.IsStringVariable(port_name) ? 0 : binding.width;
+}
+
 // The port side of `binding`, qualified with the instance's segment: its port
 // expression where the header wrote one, else the port's own name.
 static Expr* LocalPortExpr(const RtlirPortBinding& binding,
@@ -453,6 +480,20 @@ static Expr* LocalPortExpr(const RtlirPortBinding& binding,
   return MakeLocalPortId(inst_seg + std::string(binding.port_name), arena);
 }
 
+// §17.3: the actuals a checker instance binds to its formals, registered under
+// the instance for its assertions to take a delay bound written as a formal's
+// name from (sequence_flatten.cpp).
+static void RecordCheckerActuals(const RtlirModuleInst& inst,
+                                 const std::string& inst_prefix,
+                                 SimContext& ctx) {
+  if (!inst.resolved->is_checker) return;
+  ActualsByFormal actuals;
+  for (const RtlirPortBinding& binding : inst.port_bindings) {
+    actuals[binding.port_name] = binding.connection;
+  }
+  ctx.RegisterCheckerActuals(inst_prefix, std::move(actuals));
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -461,31 +502,34 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   // connection (.a == .a(a)) resolves to the child's own same-named port and
   // self-assigns instead of propagating.
   std::string inst_seg = std::string(inst.inst_name) + ".";
+  RecordCheckerActuals(inst, inst_prefix_ + inst_seg, ctx_);
   std::unordered_map<std::string_view, std::string_view> inout_joins;
   for (const auto& binding : inst.port_bindings) {
     if (TryAliasInterfacePort(inst, binding)) continue;
-    if (!IsConnectablePortBinding(binding)) continue;
+    if (!IsConnectablePortBinding(inst, binding)) continue;
     if (LowerArrayPortBinding(inst, binding, inst_seg, from_program)) continue;
 
     Expr* local_id = LocalPortExpr(binding, inst_seg, arena_);
 
     // An inout or ref port shares its connection's storage
-    // (JoinInoutPortBinding).
+    // (JoinInoutPortBinding), and so does an event port, whose connection is
+    // triggered rather than assigned (§15.5).
     if (binding.direction == Direction::kInout ||
-        binding.direction == Direction::kRef) {
+        binding.direction == Direction::kRef ||
+        BoundPortType(inst, binding) == DataTypeKind::kEvent) {
       JoinInoutPortBinding(binding, {ctx_, arena_, inst_prefix_ + inst_seg,
                                      inst_prefix_, inout_joins});
       continue;
     }
 
     if (binding.direction == Direction::kInput) {
-      BindCheckerClockvarFormal(
-          inst, binding, inst_prefix_,
-          inst_prefix_ + inst_seg + std::string(binding.port_name), ctx_);
+      std::string port_name =
+          inst_prefix_ + inst_seg + std::string(binding.port_name);
+      BindCheckerClockvarFormal(inst, binding, inst_prefix_, port_name, ctx_);
       RtlirContAssign ca;
       ca.lhs = local_id;
       ca.rhs = binding.connection;
-      ca.width = binding.width;
+      ca.width = InputPortAssignWidth(binding, port_name, ctx_);
       // §32.4.4: this assignment is the path an interconnect delay is annotated
       // along -- from the signal the parent connected to the port of the
       // instance -- so it carries the two names the annotator placed the delay

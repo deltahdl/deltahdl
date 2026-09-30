@@ -343,7 +343,10 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
                       NetSpec{.is_signed = port.is_signed})
             ->resolved;
   } else {
-    v = ctx.CreateVariable(name, port.width);
+    // §6.16: a string holds as many characters as it is given, so its storage
+    // takes no fixed width, as a string variable declared in the body does.
+    v = ctx.CreateVariable(
+        name, port.type_kind == DataTypeKind::kString ? 0 : port.width);
   }
   // §23.3.3.2, Table 6-7: an unconnected variable input reads as its type's
   // default rather than as whatever the storage happens to hold. A 4-state
@@ -365,6 +368,9 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
     v->value = init;
   }
   if (port.is_signed) v->is_signed = true;
+  // §6.16: a port of type string holds a string, read and written as a
+  // string variable declared in the body is.
+  if (port.type_kind == DataTypeKind::kString) ctx.RegisterStringVariable(name);
   // §11.5.1: "The actual bit that is accessed by an address is, in part,
   // determined by the declaration" -- port.width says how many bits the port
   // has rather than which bit an index names, because `[8:1]` and `[1:8]` are

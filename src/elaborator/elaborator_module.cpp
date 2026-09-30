@@ -539,6 +539,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     mod->constant_formals = CheckerConstantFormals(
         decl, std::exchange(pending_checker_actuals_, {}),
         BuildParamScope(mod));
+    mod->free_variables = CheckerFreeVariables(decl);
   }
 
   // §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared

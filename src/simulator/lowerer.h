@@ -149,6 +149,8 @@ class Lowerer {
   // it is declared without a clock, and, so declared, one more for each clock
   // of `further`, whose end point the reads grouped under that clock, `e` as
   // each writes it, take.
+  void CreateEndPoint(std::string_view ep_name);
+  void LowerFreeVariableSolver(const RtlirModule* mod);
   void LowerNamedSequenceMonitor(const ModuleItem* seq,
                                  const std::vector<EventExpr>* first_clock,
                                  const std::vector<ClockReads>& further);
@@ -328,6 +330,9 @@ class Lowerer {
   std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
+  // §17.5: the processes being lowered are a checker's, whose always_ff
+  // procedures read sampled values.
+  bool lowering_checker_ = false;
   // §25.9: the prefix of each interface instance, whose variables a virtual
   // interface can reach whatever name the reading expression spells.
   std::vector<std::string> interface_instance_prefixes_;

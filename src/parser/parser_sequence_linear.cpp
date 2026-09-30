@@ -44,15 +44,24 @@ struct ParserSeqLinearHelpers {
   }
 
   // §16.7: a delay owed before a group and the delay the group's chain opens
-  // with add, unbounded where either is.
+  // with add, unbounded where either is. A delay of 0 adds nothing, so the
+  // other stands as written, a bound named by a formal among it (§16.8), and
+  // `##n b` keeps n for the instantiation to supply.
   static SeqCycleDelay AddSeqDelays(const SeqCycleDelay& a,
                                     const SeqCycleDelay& b) {
+    if (IsNoDelay(a)) return b;
     SeqCycleDelay sum;
     sum.min = a.min + b.min;
     bool unbounded = a.max == SeqCycleDelay::kUnbounded ||
                      b.max == SeqCycleDelay::kUnbounded;
     sum.max = unbounded ? SeqCycleDelay::kUnbounded : a.max + b.max;
     return sum;
+  }
+
+  // A delay of exactly 0 ticks, written with no formal's name.
+  static bool IsNoDelay(const SeqCycleDelay& delay) {
+    return delay.min == 0 && delay.max == 0 && delay.min_formal.empty() &&
+           delay.max_formal.empty();
   }
 
   // One bound of §16.7's cycle_delay_range as the linear monitor reads it: an
