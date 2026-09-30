@@ -221,10 +221,14 @@ def test_junit_xml_structure(tmp_path: Path) -> None:
     ) == ("testsuite", "2", "0")
 
 
-def _make_argv_recording_binary(tmp_path: Path, record: Path) -> Path:
+def _make_argv_recording_binary(
+    tmp_path: Path, record: Path, exit_code: int = 0, stderr: str = "",
+) -> Path:
     binary = tmp_path / "deltahdl"
+    report = f"printf '%s\\n' '{stderr}' >&2\n" if stderr else ""
     binary.write_text(
-        f"#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> {record}\nexit 0\n"
+        f"#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> {record}\n"
+        f"{report}exit {exit_code}\n"
     )
     binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
     return binary
@@ -247,7 +251,11 @@ def _make_uvm_suite(tmp_path: Path) -> tuple[Path, Path, Path]:
 def test_a_uvm_tagged_file_is_handed_the_suite_library(tmp_path: Path) -> None:
     test_dir, uvm_pkg, src = _make_uvm_suite(tmp_path)
     record = tmp_path / "argv.txt"
-    binary = _make_argv_recording_binary(tmp_path, record)
+    binary = _make_argv_recording_binary(
+        tmp_path, record, 1,
+        "uvm_lru_cache.svh:206:10: error: assignment pattern needs at least"
+        " one expression (§10.9)",
+    )
     result = _run_over_tree(test_dir, binary)
     alpha = str(test_dir / "chapter-5" / "alpha.sv")
     argv = [
