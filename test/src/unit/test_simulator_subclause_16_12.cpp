@@ -202,4 +202,96 @@ TEST(PropertyEvaluation, APackagePropertyIsInstantiatedByImportAndByScope) {
   EXPECT_EQ(out, "9 1 9 1 9 1\n");
 }
 
+// Asserts `pk::<inst>` on posedge clk from a module that does not import pk,
+// whose declarations are `pkg`, with a high at the rises of 15 and 45 and b
+// at 25 alone, and prints the passes and the failures.
+std::string RunPackagePropertyWithoutImport(const std::string& pkg,
+                                            const std::string& inst) {
+  SimFixture f;
+  return RunCapture(
+      "package pk;\n" + pkg +
+          "endpackage\n"
+          "module t;\n"
+          "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+          "  bit [0:9] av = 10'b0100100000, bv = 10'b0010000000;\n"
+          "  bit a, b; assign a = av[0]; assign b = bv[0];\n"
+          "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+          "  int p = 0, f = 0;\n"
+          "  assert property (@(posedge clk) pk::" +
+          inst +
+          ") p++; else f++;\n"
+          "  initial #98 $display(\"p=%0d f=%0d\", p, f);\n"
+          "endmodule\n",
+      f);
+}
+
+// §16.12 with §26.3: the body of a package's property names the package's
+// own sequence in the package's scope, so `s2(x, y)` is that sequence where
+// the property is instantiated through the package scope from a module
+// that imports nothing. The attempt of 15 holds, that of 45 fails at 55,
+// and the other eight hold vacuously.
+TEST(PropertyEvaluation, APackagePropertyInstantiatesItsPackagesSequence) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  sequence s2(x, y); x ##1 y; endsequence\n"
+                "  property p2(x, y); x |-> s2(x, y); endproperty\n",
+                "p2(a, b)"),
+            "p=9 f=1\n");
+}
+
+// §16.12 with §26.3: so is a sequence of the package with no formals, named
+// in the property's body without parentheses; `s1` holds at every attempt.
+TEST(PropertyEvaluation, APackagePropertyNamesItsPackagesSequenceBare) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  sequence s1; 1; endsequence\n"
+                "  property p1(x); x |-> s1; endproperty\n",
+                "p1(a)"),
+            "p=10 f=0\n");
+}
+
+// §16.8 with §26.3: a formal of a package's property named as one of the
+// package's sequences is the formal inside the property's body, so `s2`
+// there is the actual a.
+TEST(PropertyEvaluation, APackagePropertysFormalHidesItsPackagesSequence) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  sequence s2(x, y); x ##1 y; endsequence\n"
+                "  property p3(s2, y); s2 |=> y; endproperty\n",
+                "p3(a, b)"),
+            "p=9 f=1\n");
+}
+
+// §16.10 with §26.3: a local variable of a package's sequence named as one
+// of the package's sequences is the local inside the sequence's body, so
+// `s1` there holds the value assigned to it.
+TEST(PropertyEvaluation, APackageSequencesLocalHidesItsPackagesSequence) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  sequence s1; 0; endsequence\n"
+                "  sequence s3(x, y); bit s1; (x, s1 = 1) ##1 "
+                "({s1, y} == 2'b11); endsequence\n"
+                "  property p4(x, y); x |-> s3(x, y); endproperty\n",
+                "p4(a, b)"),
+            "p=9 f=1\n");
+}
+
+// §16.12 with §26.3: so is a local variable of a package's property, and
+// the package's parameter it is assigned is the package's.
+TEST(PropertyEvaluation, APackagePropertysLocalHidesItsPackagesSequence) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  localparam int K = 1;\n"
+                "  sequence s1; 0; endsequence\n"
+                "  property p5(x, y); bit s1; (x, s1 = K) |=> (s1 && y); "
+                "endproperty\n",
+                "p5(a, b)"),
+            "p=9 f=1\n");
+}
+
+// §16.12 with §26.3: a function of the package that a property's body calls
+// by its bare name is the package's.
+TEST(PropertyEvaluation, APackagePropertyCallsItsPackagesFunction) {
+  EXPECT_EQ(RunPackagePropertyWithoutImport(
+                "  function automatic bit id(bit v); return v; endfunction\n"
+                "  property p6(x, y); x |=> id(y); endproperty\n",
+                "p6(a, b)"),
+            "p=9 f=1\n");
+}
+
 }  // namespace

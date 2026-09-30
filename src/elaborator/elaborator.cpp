@@ -20,6 +20,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -438,6 +439,11 @@ void Elaborator::RunPreElaborationValidations() {
   ApplyClassMethodAutomaticDefault();
 
   DefaultPackageTaskFuncLifetimes();
+
+  // Before any module's registry takes the packages' sequences and
+  // properties, so that each instantiates its package's own by the name the
+  // package scope gives it.
+  ResolvePackageAssertionNames(unit_, arena_);
 
   ValidatePackageCycleDelays(unit_, diag_);
 

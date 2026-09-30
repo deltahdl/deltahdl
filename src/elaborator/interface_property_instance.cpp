@@ -3,10 +3,10 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
-#include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_body_slots.h"
 #include "elaborator/property_rewrite.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -47,24 +47,6 @@ void CollectFreeNames(const Expr* e,
   for (const Expr* el : e->elements) CollectFreeNames(el, out);
 }
 
-Expr* InstanceMember(std::string_view inst, std::string_view name,
-                     SourceLoc loc, Arena& arena) {
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = inst;
-  base->range.start = loc;
-  auto* member = arena.Create<Expr>();
-  member->kind = ExprKind::kIdentifier;
-  member->text = name;
-  member->range.start = loc;
-  auto* access = arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = base;
-  access->rhs = member;
-  access->range.start = loc;
-  return access;
-}
-
 // The member of instance `inst` that stands for each of `names`, for a
 // substitution to put in their places.
 ActualsByFormal InstanceMembers(
@@ -72,60 +54,9 @@ ActualsByFormal InstanceMembers(
     SourceLoc loc, Arena& arena) {
   ActualsByFormal members;
   for (std::string_view name : names) {
-    members[name] = InstanceMember(inst, name, loc, arena);
+    members[name] = MemberOf(inst, name, loc, arena);
   }
   return members;
-}
-
-// Each expression slot of a list of clocking events, the signal and the iff
-// condition of each.
-template <typename Fn>
-void ForEachEventSlot(std::vector<EventExpr>& events, const Fn& fn) {
-  for (EventExpr& ev : events) {
-    fn(ev.signal);
-    fn(ev.iff_condition);
-  }
-}
-
-// Each expression slot of the match items of one operand.
-template <typename Fn>
-void ForEachItemSlot(std::vector<SeqMatchAssign>& items, const Fn& fn) {
-  for (SeqMatchAssign& item : items) {
-    fn(item.rhs);
-    fn(item.call);
-  }
-}
-
-// Each expression slot of a sequence body, those of its intersects,
-// conjuncts and alternatives included, for a substitution to replace.
-template <typename Fn>
-void ForEachBodySlot(SeqLinearBody& body, const Fn& fn) {
-  for (Expr*& operand : body.operands) fn(operand);
-  for (auto& items : body.match_items) ForEachItemSlot(items, fn);
-  ForEachItemSlot(body.first_match_items, fn);
-  for (SeqLocalDecl& local : body.locals) fn(local.init);
-  for (SeqThroughout& guard : body.throughouts) fn(guard.cond);
-  for (auto& clock : body.clocks) ForEachEventSlot(clock, fn);
-  ForEachEventSlot(body.clock_out, fn);
-  for (SeqLinearBody& inner : body.intersects) ForEachBodySlot(inner, fn);
-  for (SeqLinearBody& inner : body.conjuncts) ForEachBodySlot(inner, fn);
-  for (SeqLinearBody& inner : body.alternatives) ForEachBodySlot(inner, fn);
-}
-
-// The names a sequence body declares as its local variables, which are no
-// members of the interface.
-void CollectBodyLocals(const SeqLinearBody& body,
-                       std::unordered_set<std::string_view>& out) {
-  for (const SeqLocalDecl& local : body.locals) out.insert(local.name);
-  for (const SeqLinearBody& inner : body.intersects) {
-    CollectBodyLocals(inner, out);
-  }
-  for (const SeqLinearBody& inner : body.conjuncts) {
-    CollectBodyLocals(inner, out);
-  }
-  for (const SeqLinearBody& inner : body.alternatives) {
-    CollectBodyLocals(inner, out);
-  }
 }
 
 // A copy of the property tree under `node` whose nodes and sequences are the
@@ -139,36 +70,6 @@ PropertyExprNode* CopyTree(const PropertyExprNode* node, Arena& arena) {
     operand = CopyTree(operand, arena);
   }
   return copy;
-}
-
-// Each expression slot of the tree under `node`, its sequences' included.
-template <typename Fn>
-void ForEachTreeSlot(PropertyExprNode* node, const Fn& fn) {
-  fn(node->boolean);
-  fn(node->range_min);
-  fn(node->range_max);
-  for (auto& values : node->case_values) {
-    for (Expr*& value : values) fn(value);
-  }
-  ForEachEventSlot(node->clock, fn);
-  if (node->sequence != nullptr) {
-    ForEachBodySlot(node->sequence->seq_linear, fn);
-    ForEachEventSlot(node->sequence->seq_clock, fn);
-  }
-  for (PropertyExprNode* operand : node->operands) {
-    ForEachTreeSlot(operand, fn);
-  }
-}
-
-// The locals the sequences of the tree under `node` declare.
-void CollectTreeLocals(const PropertyExprNode* node,
-                       std::unordered_set<std::string_view>& out) {
-  if (node->sequence != nullptr) {
-    CollectBodyLocals(node->sequence->seq_linear, out);
-  }
-  for (const PropertyExprNode* operand : node->operands) {
-    CollectTreeLocals(operand, out);
-  }
 }
 
 // §16.12 with §23.6: the tree of `decl`'s body as instance `inst` of its
