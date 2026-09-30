@@ -491,4 +491,29 @@ TEST(SampledValueExplicitClock, ThePriorPointIsTheClocksTickNotTheLastCall) {
   EXPECT_EQ(out, "OUT rose 1 fell 1\nOUT rose 1 fell 1\n");
 }
 
+// The same for $changed and $stable: at 9 and at 19 s is 1 where the tick of
+// 5, and then of 15, sampled it at 0, so $changed is 1 and $stable 0 both
+// times, where comparing with the call's previous evaluation, which also read
+// 1, would answer 0 and 1 the second time.
+TEST(SampledValueExplicitClock, ChangedAndStableCompareTheClocksTick) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  logic s = 0;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 2; i++) begin\n"
+      "      #8 s = 1;\n"
+      "      #1 $display(\"OUT changed %0d stable %0d\", "
+      "$changed(s, @(posedge clk)), $stable(s, @(posedge clk)));\n"
+      "      #1 s = 0;\n"
+      "    end\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "OUT changed 1 stable 0\nOUT changed 1 stable 0\n");
+}
+
 }  // namespace
