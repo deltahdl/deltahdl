@@ -443,15 +443,29 @@ const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
 bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth);
 
-// The operand at `j` of the flattened body of the instance `op`, appended to
-// `out` with the actuals substituted: its delay, the one written before the
-// instance added to the first operand's, its clock and its match items, or,
-// §16.8.1 (a), where it is a formal of type sequence, the sequence bound to
-// it expanded in its place with those.
-bool AppendInstanceOperand(const LinearSequence& body, size_t j,
-                           const InstanceOperand& op,
-                           const ActualsByFormal& actuals, SimContext& ctx,
-                           Arena& arena, LinearSequence& out, int depth) {
+// One instance being expanded: the instance, the flattened body of the
+// sequence it instantiates, its actuals bound to that sequence's formals, and
+// what the expansion runs in, the depth of the instance among them.
+struct Expansion {
+  const InstanceOperand& op;
+  const LinearSequence& body;
+  const ActualsByFormal& actuals;
+  SimContext& ctx;
+  Arena& arena;
+  int depth;
+};
+
+// The operand at `j` of the flattened body of the instance `x.op`, appended
+// to `out` with the actuals substituted: its delay, the one written before
+// the instance added to the first operand's, its clock and its match items,
+// or, §16.8.1 (a), where it is a formal of type sequence, the sequence bound
+// to it expanded in its place with those.
+bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
+  const LinearSequence& body = x.body;
+  const InstanceOperand& op = x.op;
+  const ActualsByFormal& actuals = x.actuals;
+  SimContext& ctx = x.ctx;
+  Arena& arena = x.arena;
   Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
   SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
   if (j == 0) delay = AddDelays(op.before, delay);
@@ -464,7 +478,7 @@ bool AppendInstanceOperand(const LinearSequence& body, size_t j,
       SubstituteMatchItems(body.match_items[j], actuals, arena);
   if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
     if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
-                        ctx, arena, out, depth + 1)) {
+                        ctx, arena, out, x.depth + 1)) {
       return false;
     }
     auto& last_items = out.match_items.back();
@@ -508,11 +522,10 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   // a formal of type sequence expanding to the operands of its actual.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
+  const Expansion expansion{op, body, actuals, ctx, arena, depth};
   for (size_t j = 0; j < body.operands.size(); ++j) {
     begins.push_back(out.operands.size());
-    if (!AppendInstanceOperand(body, j, op, actuals, ctx, arena, out, depth)) {
-      return false;
-    }
+    if (!AppendInstanceOperand(expansion, j, out)) return false;
     ends.push_back(out.operands.size() - 1);
   }
   // §16.9.9: a throughout of the instantiated body spans the operands its
