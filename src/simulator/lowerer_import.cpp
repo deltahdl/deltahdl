@@ -64,6 +64,29 @@ static bool IsPackageSubroutine(const ModuleItem* item) {
          item->method_class.empty();
 }
 
+// §11.12 with §26.3: an imported let is referenced by its bare name, as an
+// imported function is, and so, §16.8 and §16.12, are an imported named
+// sequence and property; a declaration of the importing scope keeps the name.
+static void ImportNamedDeclaration(ModuleItem* item, SimContext& ctx) {
+  switch (item->kind) {
+    case ModuleItemKind::kLetDecl:
+      if (!ctx.FindLetDecl(item->name)) ctx.RegisterLetDecl(item->name, item);
+      return;
+    case ModuleItemKind::kSequenceDecl:
+      if (!ctx.FindSequenceDecl(item->name)) {
+        ctx.RegisterSequenceDecl(item->name, item);
+      }
+      return;
+    case ModuleItemKind::kPropertyDecl:
+      if (!ctx.FindPropertyDecl(item->name)) {
+        ctx.RegisterPropertyDecl(item->name, item);
+      }
+      return;
+    default:
+      return;
+  }
+}
+
 void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
     // §26.5: a declaration of the importing scope, or an earlier import, has
@@ -80,20 +103,8 @@ void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
     if (!ctx_.FindFunction(item->name)) {
       ctx_.RegisterFunction(item->name, item);
     }
-  } else if (item->kind == ModuleItemKind::kLetDecl) {
-    // §11.12 with §26.3: an imported let is referenced by its bare name, as an
-    // imported function is; a declaration of the importing scope keeps it.
-    if (!ctx_.FindLetDecl(item->name)) ctx_.RegisterLetDecl(item->name, item);
-  } else if (item->kind == ModuleItemKind::kSequenceDecl) {
-    // §16.8 and §16.12 with §26.3: and so are an imported named sequence and
-    // property.
-    if (!ctx_.FindSequenceDecl(item->name)) {
-      ctx_.RegisterSequenceDecl(item->name, item);
-    }
-  } else if (item->kind == ModuleItemKind::kPropertyDecl) {
-    if (!ctx_.FindPropertyDecl(item->name)) {
-      ctx_.RegisterPropertyDecl(item->name, item);
-    }
+  } else {
+    ImportNamedDeclaration(item, ctx_);
   }
 }
 

@@ -238,4 +238,28 @@ TEST(NamedSequenceInstance, APackageSequenceIsInstantiatedByImportAndByScope) {
   EXPECT_EQ(out, "p=9 f=1 p2=9 f2=1\n");
 }
 
+// §16.8 with §26.3: a package sequence with no formals is named through the
+// package scope with no parentheses, `pk::s`, as it is declared. As the
+// consequent of `|->` it starts at the antecedent's tick and matches at the
+// next, so every attempt holds; read as a Boolean the two attempts whose
+// antecedent holds, at 15 and 45, would fail.
+TEST(NamedSequenceInstance, APackageSequenceIsNamedThroughTheScopeAlone) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  sequence s; 1'b1 ##1 1'b1; endsequence\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000;\n"
+      "  bit a; assign a = av[0];\n"
+      "  always @(negedge clk) av <= av << 1;\n"
+      "  int p = 0, f = 0;\n"
+      "  assert property (@(posedge clk) a |-> pk::s) p++; else f++;\n"
+      "  initial #98 $display(\"p=%0d f=%0d\", p, f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p=10 f=0\n");
+}
+
 }  // namespace
