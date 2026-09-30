@@ -101,4 +101,20 @@ TEST(MulticlockSequences, TheSameClockNamedAgainChangesNothing) {
   EXPECT_EQ(plain.last_pass, 25u);
 }
 
+// §16.13.1 with §9.4 Syntax 9-4: `@clk1` and `@(clk1)` are one clocking event,
+// every change of clk1, at 12, 20, 27, 35, 45, 50, 57, 65, 72 and 78. Of the
+// attempts where sig0 holds, from 5, 15, 45 and 65, only the one from 45 finds
+// sig1 at the next change, 50; the bare form is read and evaluated as the
+// parenthesised one is.
+TEST(MulticlockSequences, ABareNamedClockIsTheParenthesisedOnesEvent) {
+  MulticlockCounts paren = CountsOfMulticlock("sig0 ##1 @(clk1) sig1");
+  EXPECT_EQ(paren.passes, 1u);
+  EXPECT_EQ(paren.fails, 7u);
+  EXPECT_EQ(paren.last_pass, 50u);
+  MulticlockCounts bare = CountsOfMulticlock("sig0 ##1 @clk1 sig1");
+  EXPECT_EQ(bare.passes, 1u);
+  EXPECT_EQ(bare.fails, 7u);
+  EXPECT_EQ(bare.last_pass, 50u);
+}
+
 }  // namespace

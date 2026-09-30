@@ -504,14 +504,18 @@ struct ParserSeqLinearHelpers {
     body.clocks.push_back(clock);
   }
 
-  // §16.13.1: `@(event_list)` before an operand, the clock the operands
-  // from it on are evaluated on; answers false where the event is
-  // malformed, and leaves `clock` as it was where none is written.
+  // §16.13.1: `@(event_list)` or, §9.4 Syntax 9-4, `@name` before an
+  // operand, the clock the operands from it on are evaluated on; answers
+  // false where the event is malformed, and leaves `clock` as it was where
+  // none is written.
   static bool ParseOperandClock(Parser& p, std::vector<EventExpr>& clock) {
     // §16.13.3: of two clocking events juxtaposed the second nullifies the
     // first, so the last written is the one in force.
     while (p.Match(TokenKind::kAt)) {
-      if (!p.Match(TokenKind::kLParen)) return false;
+      if (!p.Match(TokenKind::kLParen)) {
+        clock = {p.ParseNamedClockingEvent()};
+        continue;
+      }
       clock = p.ParseEventList();
       if (!p.Match(TokenKind::kRParen) || clock.empty()) return false;
     }

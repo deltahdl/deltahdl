@@ -38,6 +38,32 @@ TEST(MulticlockParsing, AClockAfterADelayIsRecordedOnTheOperandsAfterIt) {
   EXPECT_EQ(body.clocks[1][0].signal->text, "clk1");
 }
 
+// §16.13.1 with §9.4 Syntax 9-4: the clock before a later operand may be
+// written as a bare name, `@clk1`, and is recorded as `@(clk1)` would be,
+// with no edge.
+TEST(MulticlockParsing,
+     ABareNamedClockAfterADelayIsRecordedAsTheOperandsClock) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk0) sig0 ##1 @clk1 sig1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  const PropertyExprNode* root = item->body->assert_property;
+  ASSERT_NE(root, nullptr);
+  ASSERT_NE(root->sequence, nullptr);
+  const SeqLinearBody& body = root->sequence->seq_linear;
+  ASSERT_EQ(body.operands.size(), 2u);
+  ASSERT_EQ(body.clocks.size(), 2u);
+  ASSERT_EQ(body.clocks[1].size(), 1u);
+  EXPECT_EQ(body.clocks[1][0].edge, Edge::kNone);
+  ASSERT_NE(body.clocks[1][0].signal, nullptr);
+  EXPECT_EQ(body.clocks[1][0].signal->text, "clk1");
+}
+
 // §16.13.1: a sequence naming no clock of its own records none, and stays
 // the sequential property the assertion carries as one.
 TEST(MulticlockParsing, ASequenceOnOneClockRecordsNoClocks) {

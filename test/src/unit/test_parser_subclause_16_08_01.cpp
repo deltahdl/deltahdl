@@ -58,9 +58,10 @@ TEST(TypedSequenceFormalSyntax, IntegralTypedFormalAccepted) {
 TEST(TypedSequenceFormalSyntax, BareFormalAfterTypedInheritsType) {
   // §16.8.1: an untyped formal following a data type must spell `untyped`;
   // absent that keyword a bare identifier inherits the preceding type. Here
-  // `shortint` applies to both `delay1` and `delay2`, while `max` (before any
-  // type) and `min` (there is no type before it) stay untyped. The parser must
-  // accept this shared-type shape without demanding a type on every formal.
+  // `shortint` applies to `delay1` and, carried by §16.8 to every formal after
+  // it, to `delay2` and `min`, while `max`, before any type, stays untyped. The
+  // parser must accept this shared-type shape without demanding a type on every
+  // formal.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence d(max, shortint delay1, delay2, min);\n"
