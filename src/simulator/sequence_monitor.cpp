@@ -468,10 +468,12 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   CarryAttempt(std::move(attempt), delay, step.carry);
 }
 
-bool AdvanceLinearAttempts(
-    const LinearSequence& body, std::vector<LinearAttempt>& active,
-    SimContext& ctx, Arena& arena, bool begin_attempt,
-    std::vector<std::vector<Logic4Vec>>* ended = nullptr) {
+// The attempts one tick reads: those in flight, a tick of each one's wait
+// counted, and a fresh one where `begin_attempt` says the tick begins one.
+std::vector<LinearAttempt> TickPending(const LinearSequence& body,
+                                       const std::vector<LinearAttempt>& active,
+                                       SimContext& ctx, Arena& arena,
+                                       bool begin_attempt) {
   std::vector<LinearAttempt> pending;
   pending.reserve(active.size() + 1);
   for (LinearAttempt attempt : active) {
@@ -491,15 +493,28 @@ bool AdvanceLinearAttempts(
   if (begin_attempt) {
     pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
   }
-  std::vector<LinearAttempt> carry;
-  TickStep step{body, pending, carry, ctx, arena};
-  step.ended = ended;
-  while (!pending.empty()) {
-    LinearAttempt attempt = std::move(pending.back());
-    pending.pop_back();
+  return pending;
+}
+
+// Steps every attempt the tick holds pending, those kept for the next tick
+// left in its carry.
+void StepPending(TickStep& step) {
+  while (!step.pending.empty()) {
+    LinearAttempt attempt = std::move(step.pending.back());
+    step.pending.pop_back();
     ForkPerFlowedMatch(step, attempt);
     StepAttempt(step, std::move(attempt));
   }
+}
+
+bool AdvanceLinearAttempts(const LinearSequence& body,
+                           std::vector<LinearAttempt>& active, SimContext& ctx,
+                           Arena& arena, bool begin_attempt) {
+  std::vector<LinearAttempt> pending =
+      TickPending(body, active, ctx, arena, begin_attempt);
+  std::vector<LinearAttempt> carry;
+  TickStep step{body, pending, carry, ctx, arena};
+  StepPending(step);
   active = std::move(carry);
   return step.matched;
 }
@@ -790,11 +805,16 @@ bool KeepsMatchLocals(const LinearSequence& body) {
 bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
                           const std::string& ep_name, SimContext& ctx,
                           Arena& arena) {
+  std::vector<LinearAttempt>& linear = active.body.linear;
+  std::vector<LinearAttempt> pending =
+      TickPending(body, linear, ctx, arena, true);
+  std::vector<LinearAttempt> carry;
   std::vector<std::vector<Logic4Vec>> ended;
-  if (!AdvanceLinearAttempts(body, active.body.linear, ctx, arena, true,
-                             &ended)) {
-    return false;
-  }
+  TickStep step{body, pending, carry, ctx, arena};
+  step.ended = &ended;
+  StepPending(step);
+  linear = std::move(carry);
+  if (!step.matched) return false;
   ctx.RecordEndpointLocals(ep_name, ctx.CurrentTime().ticks,
                            NamedMatchLocals(body.locals, ended));
   return true;

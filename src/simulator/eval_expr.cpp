@@ -584,9 +584,8 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
 // §16.9.11, §16.13.5 and §16.13.6: whether the expression applies
 // `triggered` or `matched` to a sequence instance with arguments, `e2(ready,
 // proc1, proc2).triggered`, to a sequence actual, the identifier carrying it
-// standing where the formal of `subseq.triggered` stood, or to a sequence
-// declared without a clock read in a context on a clock other than the one
-// its own end point is on, which the lowering gave an end point of its own.
+// standing where the formal of `subseq.triggered` stood, or to a name the
+// lowering gave an end point of its own for the clock of its context.
 static bool ReadsAMonitorEndPoint(const Expr* expr, SimContext& ctx) {
   if (expr->lhs == nullptr || expr->rhs == nullptr ||
       (expr->rhs->text != "triggered" && expr->rhs->text != "matched")) {

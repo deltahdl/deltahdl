@@ -436,6 +436,10 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
     LowerSequenceMonitor(InstanceAsSequence(triggered, *name, arena_), *ep_name,
                          context.OfInstance(instance));
   }
+  auto lower_named = [&](const ModuleItem* seq) {
+    LowerNamedSequenceMonitor(seq, context.FirstClockOf(seq->name),
+                              context.FurtherClocksOf(seq->name));
+  };
   std::vector<const ModuleItem*> waiting(mod->sequence_decls.begin(),
                                          mod->sequence_decls.end());
   std::unordered_set<std::string_view> made;
@@ -446,16 +450,12 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
         deferred.push_back(seq);
         continue;
       }
-      LowerNamedSequenceMonitor(seq, context.FirstClockOf(seq->name),
-                                context.FurtherClocksOf(seq->name));
+      lower_named(seq);
       made.insert(seq->name);
     }
     if (deferred.size() == waiting.size()) {
       // A cycle: the rest are made in declaration order.
-      for (const ModuleItem* seq : deferred) {
-        LowerNamedSequenceMonitor(seq, context.FirstClockOf(seq->name),
-                                  context.FurtherClocksOf(seq->name));
-      }
+      for (const ModuleItem* seq : deferred) lower_named(seq);
       break;
     }
     waiting = std::move(deferred);

@@ -284,15 +284,16 @@ TEST(SequenceComposition, TriggeredAppliesToASequenceFormalsInstanceActual) {
 // the clock of the context applying `triggered` to it, here posedge clk, from
 // a clockless sequence the assertion reads and from the assertion itself, so
 // its end points are the rises its matches end at, from 15 on: r's attempts
-// from 15 to 85 match, eight, and the assertion's from 15 to 95, nine.
+// from 15 to 85 match, eight, and the assertion's from 15 to 95, nine. r,
+// declared first, has its monitor made after e's, which it reads.
 TEST(SequenceComposition, AClocklessSequenceTakesTheClockOfItsContext) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
       "  int c1 = 0, c2 = 0;\n"
-      "  sequence e; 1 ##1 1; endsequence\n"
       "  sequence r; e.triggered ##1 1; endsequence\n"
+      "  sequence e; 1 ##1 1; endsequence\n"
       "  cover property (@(posedge clk) r) c1++;\n"
       "  cover property (@(posedge clk) e.triggered) c2++;\n"
       "  initial #97 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
