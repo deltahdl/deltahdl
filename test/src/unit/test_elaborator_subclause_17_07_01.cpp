@@ -138,6 +138,31 @@ TEST(CheckerVariableAssignment, HierarchicalReadOfCheckerVariableRejected) {
       "hierarchical reference into a checker is not permitted", 7, "23.6"));
 }
 
+// §17.7.1 marks `wire x = my_check.a;` illegal: a net declaration assignment
+// reading an instantiated checker's variable through its hierarchical name is
+// the same reference as the continuous assignment above, and so is a variable
+// declaration's initializer.
+TEST(CheckerVariableAssignment, HierarchicalReadInADeclarationRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk;\n"
+      "  bit a;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  chk my_check();\n"
+      "  wire x = my_check.a;\n"
+      "  logic y = my_check.a;\n"
+      "endmodule\n",
+      f, "m");
+  // As above, §23.6 is the rule the report names.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 6, "23.6"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 7, "23.6"));
+}
+
 // §17.7.1: the left-hand-side position of the same rule — targeting an
 // instantiated checker's variable through its hierarchical name on the
 // left-hand side of a continuous assignment is illegal, a distinct assignment

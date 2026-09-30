@@ -14,6 +14,7 @@
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "common/source_loc.h"
+#include "elaborator/checker_instance_binding.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_child_type_params.h"
@@ -21,6 +22,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -814,6 +816,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   inst.is_nested_decl = nested_module_decls_.find(item->inst_module) !=
                         nested_module_decls_.end();
   auto* child_decl = FindModuleInScope(item->inst_module);
+  if (!child_decl) child_decl = PackageCheckerNamedBy(item, mod, unit_);
   if (!child_decl) {
     if (!ReportConfigRuleBindingNothing(unit_, item, diag_))
       ReportUnknownModule(item, diag_);
@@ -890,7 +893,12 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   // took there over the names declared so far.
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
+    nested_default_clock_ = DefaultClockingEvent(mod);
     BeginNestedDeclScope(child_decl, CaptureCurrentScopeNames());
+  }
+  if (child_decl->decl_kind == ModuleDeclKind::kChecker) {
+    pending_checker_actuals_ =
+        BindCheckerActuals(item, child_decl, parent_scope);
   }
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);

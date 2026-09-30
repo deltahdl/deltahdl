@@ -187,6 +187,9 @@ std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()
   for (const auto& [name, width] : non_ansi_partial_ports_) scope.insert(name);
   for (const auto& [name, type] : interface_inst_types_) scope.insert(name);
   for (const auto& [name, type] : typedefs_) scope.insert(name);
+  // §14.3 with §23.9: a clocking block's name is declared in its scope, so a
+  // checker declared there names it as a clocking event (§17.2, §14.10).
+  for (const auto& [name, signals] : clocking_signals_) scope.insert(name);
   return scope;
 }
 

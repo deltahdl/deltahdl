@@ -3,6 +3,7 @@
 #include "elaborator/covergroup_in_checker.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -93,6 +94,29 @@ TEST(CovergroupInChecker, CovergroupInCheckerBodyElaboratesAndIsCarried) {
     }
   }
   EXPECT_TRUE(carries_covergroup);
+}
+
+// §17.6: a covergroup shall not be instantiated in a procedural block of a
+// checker, whatever lifetime its declaration is written with; the instance at
+// the checker's own level beside it is legal.
+TEST(CovergroupInChecker, InstanceInACheckerProcedureIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(logic a, logic clk);\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    cp: coverpoint a;\n"
+      "  endgroup\n"
+      "  cg cg_body = new();\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    automatic cg cg_1 = new();\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "covergroup 'cg' cannot be instantiated in a "
+                            "procedure of a checker",
+                            7, "17.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

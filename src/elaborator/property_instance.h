@@ -75,7 +75,8 @@ void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
 
 // §14.12: the clocking event of the default clocking of `mod`, declared
 // inline or named by a default clocking statement, among the clocking blocks
-// elaborated so far; empty where it has none.
+// elaborated so far, or else the one it inherits as a nested declaration from
+// the scope it is declared in; empty where it has neither.
 std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod);
 
 // §16.16 (b): a boolean that is a member access of two identifiers naming a

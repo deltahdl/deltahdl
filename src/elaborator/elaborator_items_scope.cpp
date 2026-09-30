@@ -45,6 +45,7 @@ ScopeMap Elaborator::BuildParamScope(
   // read only by an expression written in that block or in one nested inside
   // it. Entering it under its bare name for every expression in the module
   // would fold it into expressions that cannot name it at all.
+  for (const auto& [name, value] : mod->constant_formals) scope[name] = value;
   for (const auto& p : mod->params) {
     if (!p.is_resolved) continue;
     if (!ParamVisibleFromScopes(p.gen_block_prefix, scopes)) continue;

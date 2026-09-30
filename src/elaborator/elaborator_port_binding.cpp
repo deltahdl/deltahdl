@@ -304,14 +304,17 @@ static DataTypeKind ConnectedSignalKind(const PortBindCtx& ctx,
 // nettype reference, so it is skipped here. §6.22.2: a user-defined (typedef)
 // type's compatibility turns on its resolved structure, which the single
 // DataTypeKind does not carry, so a named type on either side defers rather
-// than raising a false incompatibility.
+// than raising a false incompatibility. §17.2: a checker's formal of type
+// event takes any event expression, a plain signal among them, which is no
+// assignment at all.
 static void CheckExplicitConnAssignCompatible(
     const PortBindCtx& ctx, const Expr* conn_expr, const RtlirPort& port,
     std::string_view binding_port_name) {
   DataTypeKind port_kind = NormalizeForCompatibility(port.type_kind);
   if (port_kind == DataTypeKind::kImplicit ||
       port_kind == DataTypeKind::kNamed ||
-      ctx.nettype_net_names.count(conn_expr->text) != 0)
+      ctx.nettype_net_names.count(conn_expr->text) != 0 ||
+      (ctx.child_is_checker && port_kind == DataTypeKind::kEvent))
     return;
   DataTypeKind sig_kind = ConnectedSignalKind(ctx, conn_expr->text);
   if (sig_kind == DataTypeKind::kImplicit || sig_kind == DataTypeKind::kNamed)
@@ -637,9 +640,15 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   const RtlirPortBinding& binding = bind.binding;
   const RtlirPort* port = bind.child_port;
 
-  const PortBindCtx kPortCtx{
-      diag_,      scope.item, scope.parent_mod,    nettype_net_names_,
-      var_types_, net_names_, interconnect_names_, interface_inst_types_};
+  const PortBindCtx kPortCtx{diag_,
+                             scope.item,
+                             scope.parent_mod,
+                             nettype_net_names_,
+                             var_types_,
+                             net_names_,
+                             interconnect_names_,
+                             interface_inst_types_,
+                             scope.inst.resolved->is_checker};
 
   CheckExplicitIdentifierOrInterfacePort(kPortCtx, conn_expr, port,
                                          binding.port_name);

@@ -89,6 +89,9 @@ struct PortBindCtx {
   const std::unordered_set<std::string_view>& interconnect_names;
   const std::unordered_map<std::string_view, std::string_view>&
       interface_inst_types;
+  // §17.3: the instance is of a checker, whose formals take their actuals as
+  // a sequence's or property's do rather than as a module's ports.
+  bool child_is_checker = false;
 };
 
 int NetTypeGroup(NetType t);

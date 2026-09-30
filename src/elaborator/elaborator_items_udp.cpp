@@ -12,6 +12,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/checker_procedure_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/disable_iff_resolution.h"
@@ -19,6 +20,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/interface_property_instance.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -750,6 +752,8 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateHierRefIntoChecker(decl);
   ValidateFreeCheckerVariableAssignments(decl);
   ValidateCheckerVariableInitialAssignment(decl);
+  ValidateCheckerProcedureCovergroups(decl, diag_);
+  ValidateCheckerAssignmentCalls(decl, diag_);
   ValidateHierRefIntoProgram(decl);
   ValidateProgramSubroutineCall(decl);
   ValidateProgramWideSpaceAccess(decl);
@@ -801,6 +805,7 @@ void Elaborator::InstantiateImplicitNestedModules(
     // snapshot ElaborateItems took there is what BeginNestedDeclScope prefers.
     BeginNestedDeclScope(nested_decl, CaptureCurrentScopeNames());
     nested_default_disable_iff_ = mod->default_disable_iff;
+    nested_default_clock_ = DefaultClockingEvent(mod);
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
     config_inst_path_ = std::move(saved_config_path);
@@ -856,6 +861,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   if (mod->default_disable_iff == nullptr) {
     mod->default_disable_iff = inherited_default_disable_iff_;
   }
+  mod->inherited_default_clock = inherited_default_clock_;
 
   // §13.4.3: make this scope's functions available to the constant-expression
   // folder so a parameter/localparam initialized from a constant function call

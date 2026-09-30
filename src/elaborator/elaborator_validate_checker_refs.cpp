@@ -103,6 +103,14 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
                     "hierarchical reference into a checker is not permitted",
                     Subclause("23.6"));
     }
+    // §17.7.1's `wire x = my_check.a;`: a net or variable declaration's
+    // initializer is an assignment outside the checker too.
+    bool is_decl = item->kind == ModuleItemKind::kNetDecl ||
+                   item->kind == ModuleItemKind::kVarDecl;
+    if (is_decl && ExprRefersToChecker(item->init_expr, checker_inst_names_))
+      diag_.Error(item->loc,
+                  "hierarchical reference into a checker is not permitted",
+                  Subclause("23.6"));
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForCheckerRef(item->body, checker_inst_names_, diag_);

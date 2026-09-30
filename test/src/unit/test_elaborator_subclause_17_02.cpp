@@ -183,4 +183,23 @@ TEST(CheckerDeclaration, CheckerInstantiatedInsideCheckerIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §17.2 bars a checker from its enclosing scope's automatic variables,
+// dynamic variables' members and fork-join blocks' elements alone, so a
+// checker declared in a module names the module's clocking block, `@(cb)` a
+// clocking event as §14.10 has it.
+TEST(CheckerDeclaration, CheckerInAModuleNamesTheModulesClockingBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  clocking cb @(posedge clk); input a; endclocking\n"
+      "  checker chk(logic x);\n"
+      "    a1: assert property (@(cb) x);\n"
+      "  endchecker\n"
+      "  chk k(a);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

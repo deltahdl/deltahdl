@@ -94,4 +94,29 @@ TEST(DefaultClockingSim, EachModuleCountsItsOwnDefaultClocking) {
   EXPECT_EQ(out, "t 5\nm 10\n$finish at time 25\n");
 }
 
+// §14.12 extends a default clocking to the checkers declared in its scope,
+// and §17.2 has such a checker's assertions written without a clock take it:
+// `assert property (x)` in the checker is clocked by posedge clk, a low from
+// 12 to 32 failing it at 15 and 25 of the five ticks. The checker had no
+// default clocking of its own, and the assertion was rejected as unclocked.
+TEST(DefaultClockingSim, ANestedCheckersAssertionTakesTheDefaultClock) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  checker chk(logic x);\n"
+      "    int pass = 0, fail = 0;\n"
+      "    a1: assert property (x) pass++; else fail++;\n"
+      "  endchecker\n"
+      "  chk c(a);\n"
+      "  initial begin #12 a = 0; #20 a = 1; #20 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
+}
+
 }  // namespace

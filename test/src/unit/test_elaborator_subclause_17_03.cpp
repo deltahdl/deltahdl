@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/checker_instantiation.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -113,6 +114,23 @@ TEST(CheckerInstantiation, ConstCastOrAutomaticActualRestrictsFormalUsage) {
       /*actual_has_const_cast_or_automatic_value=*/true,
       /*formal_used_in_continuous_assignment=*/true,
       /*formal_used_in_procedural_code=*/true));
+}
+
+// §17.2 and §17.3: a checker formal of type event takes any event expression,
+// a plain signal among them, its actual substituted rather than assigned, so
+// §23.3.3's assignment compatibility, a module port's rule, does not apply.
+TEST(CheckerInstantiation, APlainSignalBindsAnEventFormal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(logic a, event clk);\n"
+      "  a1: assert property (@clk a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  chk c(a, clk);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

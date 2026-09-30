@@ -9,6 +9,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/checker_instance_binding.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
@@ -518,6 +519,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // contains, other than its own nested declarations, inherit none.
   inherited_default_disable_iff_ = nested_default_disable_iff_;
   nested_default_disable_iff_ = nullptr;
+  inherited_default_clock_ = std::exchange(nested_default_clock_, {});
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it
@@ -533,6 +535,11 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
   ElaborateParamPortList(decl, params, mod);
+  if (decl->decl_kind == ModuleDeclKind::kChecker) {
+    mod->constant_formals = CheckerConstantFormals(
+        decl, std::exchange(pending_checker_actuals_, {}),
+        BuildParamScope(mod));
+  }
 
   // §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared
   // with no parameter port list declares its value parameters among its

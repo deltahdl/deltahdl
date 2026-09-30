@@ -241,7 +241,7 @@ std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
       return item->clocking_event;
     }
   }
-  return {};
+  return mod->inherited_default_clock;
 }
 
 }  // namespace delta

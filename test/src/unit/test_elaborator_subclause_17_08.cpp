@@ -3,6 +3,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/function_in_checker.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -86,6 +87,39 @@ TEST(FunctionInChecker, AssignmentRhsCallRejectedOnEligibilityViolation) {
   EXPECT_FALSE(CheckerVariableAssignmentFunctionCallAllowed(
       FunctionArgKind::kInput, /*is_automatic=*/true,
       /*preserves_no_state=*/false, /*has_no_side_effects=*/false));
+}
+
+// §17.8 with §16.6: a function called on the right-hand side of a checker
+// variable assignment shall have no output, inout or ref argument, a const
+// ref being allowed. Calls of f, g and h, which have one each, are reported
+// in nonblocking and blocking assignments; k, whose ref is const, and the
+// input-only p are not.
+TEST(FunctionInChecker, WritingArgumentCallOnAssignmentRhsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(logic a, logic clk);\n"
+      "  bit z, w, v, t, u, q;\n"
+      "  function automatic bit f(input bit x, output bit o);\n"
+      "    o = ~x; return x;\n"
+      "  endfunction\n"
+      "  function automatic bit g(inout bit io); return io; endfunction\n"
+      "  function automatic bit h(ref bit r); return r; endfunction\n"
+      "  function automatic bit k(input bit x, const ref bit c);\n"
+      "    return x & c;\n"
+      "  endfunction\n"
+      "  function bit p(bit x); return x; endfunction\n"
+      "  always_ff @(posedge clk) z <= f(a, t);\n"
+      "  always_ff @(posedge clk) w <= g(u) | k(a, q);\n"
+      "  always_comb v = h(q) ^ p(a);\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "function 'f' has an output",
+                            12, "17.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "function 'g' has an output",
+                            13, "17.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "function 'h' has an output",
+                            14, "17.8"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

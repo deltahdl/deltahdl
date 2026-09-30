@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -740,6 +741,14 @@ struct RtlirModule {
   // which §16.14.7's $inferred_disable returns within its scope; nullptr
   // where the module declares none.
   Expr* default_disable_iff = nullptr;
+  // §14.12: the clocking event of the default clocking of the scope a nested
+  // declaration is declared in, which extends to it where it declares none;
+  // empty for every other module.
+  std::vector<EventExpr> inherited_default_clock;
+  // §17.2 and §17.9: a checker's formals whose actual or default is an
+  // elaboration-time constant, with their values, which its generate
+  // constructs test (§27.5); empty for every other module.
+  std::vector<std::pair<std::string_view, int64_t>> constant_formals;
   std::vector<ModuleItem*> function_decls;
   // §27.4 with §13.4: the subroutines declared in the module's named generate
   // block instances, each with the instance it belongs to, which

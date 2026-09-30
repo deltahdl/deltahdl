@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "common/source_loc.h"
+#include "elaborator/checker_instance_binding.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
@@ -242,6 +243,13 @@ class ElaboratorData {
   // instance, into which the default does not extend.
   Expr* nested_default_disable_iff_ = nullptr;
   Expr* inherited_default_disable_iff_ = nullptr;
+  // §14.12: likewise the event of the scope's default clocking, which extends
+  // to the modules, interfaces and checkers declared in the scope.
+  std::vector<EventExpr> nested_default_clock_;
+  std::vector<EventExpr> inherited_default_clock_;
+  // §17.3: the formals the checker instance being elaborated binds, with the
+  // constant values of their actuals, taken by Elaborator::ElaborateModule.
+  BoundCheckerFormals pending_checker_actuals_;
 
   std::unordered_set<std::string_view> declared_names_;
   // §23.9: the declared names of each elaborated module scope, keyed by the
