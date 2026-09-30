@@ -700,6 +700,7 @@ struct RtlirModule {
   bool has_param_port_list = false;
   bool is_program = false;
   bool is_interface = false;
+  bool is_checker = false;
   std::vector<ResolvedAttribute> attrs;
   // Annex E.4 to E.7: the delay mode the last directive before this module
   // selected, in force where the module was declared or, for a module parsed

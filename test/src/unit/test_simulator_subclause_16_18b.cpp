@@ -82,4 +82,20 @@ TEST(ClockingBlockAssertionRun, ThePropertiesOfBothBlocksAreEquivalent) {
             kExpected);
 }
 
+// §16.18 with §17.3: a checker's formal stands for the actual bound to it, so
+// the assertion of a checker whose formal is bound to the clocking block
+// variable cb_with_input.a reads the block's sample, as the clause's a3 does,
+// and passes at 25 and 35.
+TEST(ClockingBlockAssertionRun, ACheckerFormalBoundToABlockVariableReadsIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "checker chk(logic x, logic c);\n"
+      "  a1: assert property (@(posedge c) x)\n"
+      "    $display(\"passed at %0d\", $time); else;\n"
+      "endchecker\n" +
+          Design("  chk k(cb_with_input.a, clk);\n"),
+      f);
+  EXPECT_EQ(out, "passed at 25\npassed at 35\n$finish at time 60\n");
+}
+
 }  // namespace

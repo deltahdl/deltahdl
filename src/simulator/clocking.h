@@ -127,6 +127,12 @@ const struct ClockingBlock* ResolveClockingBlockOf(const Expr* block_expr,
 bool TryClockvarMemberAccess(std::string_view base_name,
                              std::string_view field_name, SimContext& ctx,
                              Arena& arena, Logic4Vec& out);
+// §16.18 with §17.3: a checker formal bound to a clocking block variable
+// stands for it, so read within a concurrent assertion's property it yields
+// what the block sampled, as the variable itself does. True with `out` filled
+// where `formal` is one so bound (ClockingManager::BindCheckerFormal).
+bool TryCheckerFormalClockvar(const Variable* formal, SimContext& ctx,
+                              Arena& arena, Logic4Vec& out);
 bool TryClockvarPathRead(const Expr* expr, SimContext& ctx, Arena& arena,
                          Logic4Vec& out);
 
@@ -312,6 +318,13 @@ class ClockingManager {
                         std::string_view signal_name, ClockingValue value);
   const ClockingValue* EdgeSample(std::string_view block_name,
                                   std::string_view signal_name) const;
+  // §16.18 with §17.3: the checker formal `formal` is bound to `field` of the
+  // block registered as `block_name`, if that names one when it is read; the
+  // formal is null for any other variable.
+  void BindCheckerFormal(const Variable* formal, std::string block_name,
+                         std::string field);
+  const std::pair<std::string, std::string>* CheckerFormal(
+      const Variable* formal) const;
 
  private:
   using SampleKey = std::pair<std::string, std::string>;
@@ -368,6 +381,7 @@ class ClockingManager {
   // §14.15: the variable holding each input clockvar's sampled value, which
   // an event control on the clockvar watches (CreateSampleVariables).
   std::unordered_map<SampleKey, Variable*, PairHash> sample_vars_;
+  std::unordered_map<const Variable*, SampleKey> checker_formals_;
 };
 
 }  // namespace delta

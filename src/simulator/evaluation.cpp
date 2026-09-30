@@ -14,6 +14,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/eval_array_compare.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_instance_task.h"
@@ -219,9 +220,13 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   // now. The store answers nothing for a variable no such assertion reads and
   // nothing at all outside such an evaluation, so every other read of a
   // variable in the design is the live read it was before.
+  // §16.18 with §17.3: a checker formal bound to a clocking block variable
+  // reads what the block sampled, as the variable does, and no sample of it.
   const Logic4Vec* sampled =
       ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
-  if (sampled != nullptr) val = *sampled;
+  if (sampled != nullptr && !TryCheckerFormalClockvar(var, ctx, arena, val)) {
+    val = *sampled;
+  }
   MarkDeclaredKinds(val, kinds_name, *var, ctx);
   // An object's signedness is fixed by its own declaration; it is never
   // inherited from a value that flowed in from elsewhere (e.g. across a

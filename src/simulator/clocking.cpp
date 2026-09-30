@@ -865,6 +865,26 @@ bool TryClockvarMemberAccess(std::string_view base_name,
                       out);
 }
 
+void ClockingManager::BindCheckerFormal(const Variable* formal,
+                                        std::string block_name,
+                                        std::string field) {
+  checker_formals_[formal] = {std::move(block_name), std::move(field)};
+}
+
+const std::pair<std::string, std::string>* ClockingManager::CheckerFormal(
+    const Variable* formal) const {
+  auto it = checker_formals_.find(formal);
+  return it == checker_formals_.end() ? nullptr : &it->second;
+}
+
+bool TryCheckerFormalClockvar(const Variable* formal, SimContext& ctx,
+                              Arena& arena, Logic4Vec& out) {
+  auto* mgr = ctx.GetClockingManager();
+  const auto* bound = mgr != nullptr ? mgr->CheckerFormal(formal) : nullptr;
+  if (bound == nullptr) return false;
+  return ReadClockvar(mgr->Find(bound->first), bound->second, ctx, arena, out);
+}
+
 // §25.5.5 and §25.9.1 with §14.13: a clockvar reached through a path to its
 // interface instance, `vif.sb.a` or a port's `b1.sb.a`, reads what that
 // block sampled (ResolveClockingBlockOf). Only a path spelling the block's
