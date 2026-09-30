@@ -18,6 +18,7 @@ struct BindDirective;
 struct ClassMember;
 struct PropertyExprNode;
 struct DataType;
+struct EventExpr;
 
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
@@ -127,6 +128,10 @@ struct Expr {
   // the node is an identifier standing in the argument's place, and the
   // substitution of the actuals for the formals reads the tree.
   PropertyExprNode* property_actual = nullptr;
+  // §16.9.3: for a call of a sampled value function written with a clocking
+  // event, `$rose(req, @(posedge clk))`, that event, at whose ticks the
+  // argument is sampled; nullptr where none is written.
+  const std::vector<EventExpr>* sampled_clock = nullptr;
 
   // kTypeRef only: the data_type the node stands for, read by ParseDataType.
   // It is set on `type(data_type)`, whose text keeps only the type's name, so

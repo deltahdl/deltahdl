@@ -327,6 +327,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/property_attempts.cpp
     simulator/property_instance_lookup.cpp
     simulator/property_vacuity.cpp
+    simulator/lowerer_sampled_clocks.cpp
     simulator/property_clocks.cpp
     simulator/property_instance_clocks.cpp
     simulator/property_finish.cpp

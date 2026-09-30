@@ -131,6 +131,10 @@ class Lowerer {
   // sequences and of the instances with arguments its bodies apply
   // `triggered` to. Defined in src/simulator/lowerer_sequence_monitors.cpp.
   void LowerSequenceMonitors(const RtlirModule* mod);
+  // §16.9.3: a process for each value change function in `body` given a
+  // clocking event of its own, recording its argument's sample at each tick
+  // of that event (lowerer_sampled_clocks.cpp).
+  void LowerSampledClockMonitors(const Stmt* body);
   void LowerSequenceMonitor(const ModuleItem* seq, std::string_view ep_name);
   // Lowers `cls` and binds it under its bare name. `scope_items` are the items
   // of the scope the class is declared in -- the compilation unit's function

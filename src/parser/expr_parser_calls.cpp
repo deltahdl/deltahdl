@@ -4,6 +4,7 @@
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "parser/display_format_check.h"
 #include "parser/parser.h"
 
@@ -42,12 +43,16 @@ void Parser::ParseSysClockingEventArg(Expr* call) {
                 Subclause("16.9.3"));
   }
   Consume();
+  // §16.9.3: the event is the function's own clock, kept on the call, written
+  // in parentheses or, §9.4 Syntax 9-4, as a bare name.
+  auto* clock = arena_.Create<std::vector<EventExpr>>();
   if (Match(TokenKind::kLParen)) {
-    ParseEventList();
+    *clock = ParseEventList();
     Expect(TokenKind::kRParen, Subclause("16.9.3"));
   } else {
-    Consume();
+    clock->push_back(ParseNamedClockingEvent());
   }
+  call->sampled_clock = clock;
 }
 
 // Parses the comma-separated argument list, appending each argument (or

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/assertion.h"
 #include "simulator/sim_context.h"
@@ -387,6 +389,106 @@ TEST(SampledValueSim, PastOfAnIndexedBitInALoopReadsThatBitsPast) {
       f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0b0101u);
+}
+
+// §16.9.3 (printed pages 415 and 417) and §20.12: a value change function
+// given a clocking event compares the sampled value of its argument now with
+// the one at the most recent strictly prior tick of that event. s is set to 1
+// at the rise of 5 and read one time unit after the rise of 15, where it was
+// already 1, and set to 0 at the rise of 25 and read after the rise of 35,
+// where it was already 0, so neither call sees a change.
+TEST(SampledValueExplicitClock, ProceduralValueChangeComparesTheClocksTicks) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic s = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin\n"
+      "    @(posedge clk); s = 1;\n"
+      "    @(posedge clk); #1;\n"
+      "    $display(\"OUT rose %0d fell %0d\", $rose(s, @(posedge clk)), "
+      "$fell(s, @(posedge clk)));\n"
+      "    @(posedge clk); s = 0;\n"
+      "    @(posedge clk); #1;\n"
+      "    $display(\"OUT rose %0d fell %0d\", $rose(s, @(posedge clk)), "
+      "$fell(s, @(posedge clk)));\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "OUT rose 0 fell 0\nOUT rose 0 fell 0\n");
+}
+
+// The same with $fell called first and $stable after it: s falls at the rise
+// of 5 and is read after the rise of 15, where it was already 0, so $fell and
+// $rose are 0 and $stable 1, whichever call the process makes first.
+TEST(SampledValueExplicitClock, ProceduralFellStableAndRoseAgree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic s = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin\n"
+      "    @(posedge clk); s = 0;\n"
+      "    @(posedge clk); #1;\n"
+      "    $display(\"OUT fell %0d rose %0d stable %0d\", $fell(s, @(posedge "
+      "clk)), $rose(s, @(posedge clk)), $stable(s, @(posedge clk)));\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "OUT fell 0 rose 0 stable 1\n");
+}
+
+// §16.9.3: in an assertion, a clocking event given to a sampled value function
+// is the one its samples are taken at, whatever the assertion's own clock.
+// req is high for the clk cycles from 15 and from 35; clk2 rises at 20, 40, 60
+// and 80, so under posedge clk $rose(req) holds twice, and
+// $rose(req, @(posedge clk2)), comparing req at clk2's ticks, holds once.
+TEST(SampledValueExplicitClock, AnAssertionsFunctionSamplesAtItsOwnClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic clk2 = 0; initial begin #10; repeat (9) #10 clk2 = ~clk2; end\n"
+      "  bit [0:9] rv = 10'b0101000000;\n"
+      "  bit req; assign req = rv[0];\n"
+      "  always @(negedge clk) rv <= rv << 1;\n"
+      "  int c1 = 0, c2 = 0;\n"
+      "  cover property (@(posedge clk) $rose(req)) c1++;\n"
+      "  cover property (@(posedge clk) $rose(req, @(posedge clk2))) c2++;\n"
+      "  initial #98 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "c1=2 c2=1\n");
+}
+
+// The prior point is the clocking event's tick and not the call's previous
+// evaluation. One call site, evaluated twice by the loop, reads s after it
+// rose and u after it fell since the last rise of clk, at 9 and at 19, and
+// both times answers 1: at 19 the tick of 15 had sampled s at 0 and u at 1,
+// where the evaluation at 9 had read s at 1 and u at 0.
+TEST(SampledValueExplicitClock, ThePriorPointIsTheClocksTickNotTheLastCall) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  logic s = 0, u = 1;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 2; i++) begin\n"
+      "      #8 s = 1; u = 0;\n"
+      "      #1 $display(\"OUT rose %0d fell %0d\", $rose(s, @(posedge clk)), "
+      "$fell(u, @(posedge clk)));\n"
+      "      #1 s = 0; u = 1;\n"
+      "    end\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "OUT rose 1 fell 1\nOUT rose 1 fell 1\n");
 }
 
 }  // namespace

@@ -692,6 +692,19 @@ static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
                                        const Logic4Vec& now_val) {
   auto& samples = ctx.AssertionSamples();
   bool is_past = IsPastSampledFunction(name);
+  // §16.9.3 (printed pages 415 and 417): given a clocking event of its own, a
+  // value change function compares the sampled value now with the one at the
+  // most recent strictly prior tick of that event, which the call site's
+  // monitor records (Lowerer::LowerSampledClockMonitors), and before the
+  // first such tick with the default sampled value.
+  if (!is_past && expr->sampled_clock != nullptr) {
+    const Logic4Vec* prior =
+        samples.PastValue(SampleSite{expr, 0, ctx.CurrentTime().ticks}, 1);
+    Logic4Vec prev_val = prior != nullptr
+                             ? *prior
+                             : EvalDefaultSampledArg(expr->args[0], ctx, arena);
+    return ValueChangeAnswer(name, now_val, prev_val, arena);
+  }
   uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
   SampleSite site{expr, ArgumentVariant(expr->args[0], ctx, arena),
                   ctx.CurrentTime().ticks};

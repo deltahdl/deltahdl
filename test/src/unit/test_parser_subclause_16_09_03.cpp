@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -105,6 +108,47 @@ TEST(AssertionParsing, PastInProceduralAssignment) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §16.9.3: the clocking event a value change function is given is the one its
+// argument is sampled at, so the call keeps it, written in parentheses with an
+// edge or, §9.4 Syntax 9-4, as a bare name.
+TEST(AssertionParsing, ValueChangeFunctionKeepsItsParenthesisedClock) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, s, x;\n"
+      "  initial x = $rose(s, @(posedge clk));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const Stmt* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  ASSERT_NE(stmt->rhs->sampled_clock, nullptr);
+  ASSERT_EQ(stmt->rhs->sampled_clock->size(), 1u);
+  const EventExpr& ev = (*stmt->rhs->sampled_clock)[0];
+  EXPECT_EQ(ev.edge, Edge::kPosedge);
+  ASSERT_NE(ev.signal, nullptr);
+  EXPECT_EQ(ev.signal->text, "clk");
+}
+
+TEST(AssertionParsing, ValueChangeFunctionKeepsItsBareNamedClock) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, s, x;\n"
+      "  initial x = $fell(s, @clk);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const Stmt* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  ASSERT_NE(stmt->rhs->sampled_clock, nullptr);
+  ASSERT_EQ(stmt->rhs->sampled_clock->size(), 1u);
+  const EventExpr& ev = (*stmt->rhs->sampled_clock)[0];
+  EXPECT_EQ(ev.edge, Edge::kNone);
+  ASSERT_NE(ev.signal, nullptr);
+  EXPECT_EQ(ev.signal->text, "clk");
 }
 
 }  // namespace

@@ -468,7 +468,10 @@ void Lowerer::RecordAssertionSampleScope(const Stmt* body) {
 
 void Lowerer::RecordSubroutineAssertionSampleScopes(const RtlirModule* mod) {
   for (const ModuleItem* func : mod->function_decls) {
-    for (const Stmt* s : func->func_body_stmts) RecordAssertionSampleScope(s);
+    for (const Stmt* s : func->func_body_stmts) {
+      RecordAssertionSampleScope(s);
+      LowerSampledClockMonitors(s);
+    }
   }
 }
 
@@ -528,6 +531,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // exist yet. A process naming none records nothing, which is every process in
   // a design that uses neither.
   RecordAssertionSampleScope(proc);
+  LowerSampledClockMonitors(proc.body);
   // §18.14.1: a static process is seeded with the next value from the
   // initialization RNG of the enclosing instance. Lowering happens before any
   // thread runs, so the active stream here is the initialization RNG of the
