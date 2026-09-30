@@ -26,7 +26,7 @@ namespace delta {
 // A package's entry and a class's entry leave `udps` empty, because A.1.2
 // admits udp_declaration only as a description at the outermost level: neither
 // A.1.11's package_item and package_or_generate_item_declaration nor A.1.9's
-// class_item lists it. Parser::TypeNameScope::NamesAddedSoFar in
+// class_item lists it. TypeNameScope::NamesAddedSoFar in
 // src/parser/parser_type_name_scope.h is what fills those entries, and it
 // answers with the type names and the nettype names alone.
 //

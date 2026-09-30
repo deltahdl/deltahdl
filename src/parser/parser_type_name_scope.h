@@ -49,7 +49,7 @@ namespace delta {
 // that scope visible in every design element of the unit, which is what
 // leaving the outermost set alone gives, and it is why the built-in class
 // names the constructor seeds stay visible throughout.
-class Parser::TypeNameScope {
+class TypeNameScope {
  public:
   explicit TypeNameScope(Parser& p)
       : parser_(p),

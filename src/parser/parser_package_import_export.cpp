@@ -4,7 +4,6 @@
 #include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
-#include "parser/parser_type_name_scope.h"
 #include "parser/scope_type_names.h"
 
 namespace delta {

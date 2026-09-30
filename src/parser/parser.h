@@ -27,6 +27,10 @@
 
 namespace delta {
 
+// §23.9: restores Parser::known_types_ and known_nettypes_ when a scope
+// closes; defined in parser/parser_type_name_scope.h.
+class TypeNameScope;
+
 class Parser {
  public:
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
@@ -53,7 +57,7 @@ class Parser {
   // and class entries are what §26.3's import declaration and §8.13's extends
   // clause put back, and they are kept past their scope's closing keyword for
   // exactly that reason, so they are carried whole. known_udps_ is the whole
-  // compilation-unit scope already: TypeNameScope below saves and restores
+  // compilation-unit scope already: TypeNameScope saves and restores
   // known_types_ and known_nettypes_ alone, and nothing else narrows it.
   void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
     AdoptTypeNames(names.own);
@@ -69,6 +73,7 @@ class Parser {
  private:
   // Shared gate/UDP instance-tail parser (see parser_instance_internal.h).
   friend void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name);
+  friend class TypeNameScope;
   // File-local CPD-dedup helpers (defined static in their respective TUs).
   friend struct ParserStmtHelpers;
   friend struct ParserPortHelpers;
@@ -808,9 +813,6 @@ class Parser {
   std::unordered_map<std::string_view, ScopeTypeNames> package_types_;
   std::unordered_map<std::string_view, ScopeTypeNames> class_types_;
 
-  // §23.9: restores known_types_ and known_nettypes_ when a scope closes;
-  // defined in parser/parser_type_name_scope.h.
-  class TypeNameScope;
   ModuleDecl* current_module_ = nullptr;
   PackageDecl* current_package_ = nullptr;
   CompilationUnit* current_compilation_unit_ = nullptr;
