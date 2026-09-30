@@ -421,4 +421,29 @@ TEST(SequenceDeclaration, AFormalsDefaultActualIsRecorded) {
   EXPECT_NE(item->prop_formal_defaults[4]->property_actual, nullptr);
 }
 
+// §16.8 with §9.4.2: an event formal's default may be any event expression,
+// one with an `iff` guard among them. The scan reads past it to the formal
+// that follows, `untyped` so that the event type does not carry to it, which
+// is harvested as the port list's second formal with its own default, and
+// raises nothing.
+TEST(SequenceDeclaration, TheScanReadsPastAGuardedEventDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, en, a;\n"
+      "  sequence s(event e = posedge clk iff en, untyped x = a);\n"
+      "    @(e) x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formals.size(), 2u);
+  EXPECT_EQ(item->prop_formals[0], "e");
+  EXPECT_EQ(item->prop_formals[1], "x");
+  ASSERT_EQ(item->prop_formal_defaults.size(), 2u);
+  ASSERT_NE(item->prop_formal_defaults[1], nullptr);
+  EXPECT_EQ(item->prop_formal_defaults[1]->text, "a");
+}
+
 }  // namespace
