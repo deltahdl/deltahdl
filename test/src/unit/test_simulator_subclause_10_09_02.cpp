@@ -424,4 +424,23 @@ TEST(StructPatternSimulation,
   EXPECT_EQ(out, "2 2 5 8 1\n");
 }
 
+// §10.9.2 with §7.5: an item for a member declared as a dynamic array gives
+// it the elements the item lists, whether placed by name or by position.
+TEST(StructAssignmentPatternRun, AnItemFillsADynamicArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int a; byte data[]; } h_t;\n"
+      "module t;\n"
+      "  h_t z, y;\n"
+      "  initial begin\n"
+      "    z = '{a: 3, data: '{7, 8, 9}};\n"
+      "    y = '{4, '{5, 6}};\n"
+      "    $display(\"%0d %0d %0d | %0d %0d %0d\", z.a, z.data.size(),\n"
+      "             z.data[2], y.a, y.data.size(), y.data[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 3 9 | 4 2 6\n");
+}
+
 }  // namespace

@@ -26,6 +26,11 @@ QueueObject* DynMemberQueue(const Logic4Vec& handle);
 // a member holding the zero handle reads as; shared, so never written.
 QueueObject* DynMemberEmpty(const StructFieldInfo& field);
 
+// A new empty array of the elements the dynamic member `field` declares, for
+// a value of the member to be given, under a new handle `handle` receives.
+QueueObject* NewDynMember(const StructFieldInfo& field, Logic4Vec& handle,
+                          Arena& arena);
+
 // The elements a write to the dynamic member `field`, held at bit `offset` of
 // the structure value `holder`, goes to: a copy of those its handle names,
 // none for the zero handle, under a new handle `holder` is given there.

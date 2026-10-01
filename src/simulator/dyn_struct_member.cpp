@@ -49,6 +49,14 @@ QueueObject* DynMemberEmpty(const StructFieldInfo& field) {
   return slot.get();
 }
 
+QueueObject* NewDynMember(const StructFieldInfo& field, Logic4Vec& handle,
+                          Arena& arena) {
+  auto& table = Table();
+  handle = MakeLogic4VecVal(arena, field.width, table.size());
+  table.push_back(EmptyOf(field));
+  return table.back().get();
+}
+
 QueueObject* DynMemberForWrite(Logic4Vec& holder, uint32_t offset,
                                const StructFieldInfo& field, Arena& arena) {
   const QueueObject* held =

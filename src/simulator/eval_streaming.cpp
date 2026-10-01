@@ -697,6 +697,19 @@ static std::optional<Logic4Vec> EvalArrayMemberPattern(
 
 Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
                                 SimContext& ctx, Arena& arena) {
+  // §10.9.2 with §7.5: the item of a dynamic array member, a pattern or an
+  // initializer, gives it the elements the item lists, held under a new
+  // handle, which is the member's value.
+  if (field.is_dynamic) {
+    Logic4Vec handle;
+    QueueObject* q = NewDynMember(field, handle, arena);
+    std::vector<Logic4Vec> elems;
+    CollectQueueElements(elem, ctx, arena, elems);
+    SizeAndOwnQueueElements(*q, elems, arena);
+    q->elements = std::move(elems);
+    q->AssignFreshIds();
+    return handle;
+  }
   const Expr* pattern = UnwrapTypedPattern(elem);
   if (field.nested != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
     return EvalStructPatternValue(pattern, field.nested, ctx, arena);
@@ -780,16 +793,7 @@ void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
                          uint32_t base, SimContext& ctx, Arena& arena) {
   if (layout.is_union) return;
   for (const auto& f : layout.fields) {
-    if (f.default_expr != nullptr && f.is_dynamic) {
-      // §7.2.2 with §7.5: a dynamic member starts holding the elements its
-      // initializer lists.
-      QueueObject* q = DynMemberForWrite(value, base + f.bit_offset, f, arena);
-      std::vector<Logic4Vec> elems;
-      CollectQueueElements(f.default_expr, ctx, arena, elems);
-      SizeAndOwnQueueElements(*q, elems, arena);
-      q->elements = std::move(elems);
-      q->AssignFreshIds();
-    } else if (f.default_expr != nullptr) {
+    if (f.default_expr != nullptr) {
       Logic4Vec v = EvalStructMemberValue(f.default_expr, f, ctx, arena);
       DepositBitField(value, base + f.bit_offset, MemberBits(v, f.width, arena),
                       f.width);
