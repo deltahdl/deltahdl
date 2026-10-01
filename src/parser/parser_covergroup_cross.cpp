@@ -5,7 +5,6 @@
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_covergroup.h"
-#include "parser/ast_expr.h"
 #include "parser/parser.h"
 #include "parser/parser_covergroup_internal.h"
 #include "parser/parser_type_name_scope.h"
@@ -177,29 +176,37 @@ void Parser::ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state) {
   known_types_.insert("CrossQueueType");
   while (!Check(TokenKind::kRBrace) && !Check(TokenKind::kKwEndgroup) &&
          !AtEnd()) {
-    ParseAttributes();
-    CrossBodyItem item;
-    if (Check(TokenKind::kKwFunction)) {
-      item.kind = CrossBodyItemKind::kFunction;
-      item.function = ParseFunctionDecl();
-      cross.body.push_back(item);
-      continue;
-    }
-    if (IsOptionKeyword(CurrentToken())) {
-      item.kind = CrossBodyItemKind::kOption;
-      if (ParseItemLevelOption(item.option, state, CovItemLevel::kCross)) {
-        cross.body.push_back(item);
-        ExpectCoverageItemEnd();
-      } else {
-        SkipCoverageItemTail();
-      }
-      continue;
-    }
-    item.kind = CrossBodyItemKind::kBinsSelection;
-    if (ParseBinsSelection(item.bins)) cross.body.push_back(item);
+    ParseCrossBodyItem(cross, state);
   }
   Expect(TokenKind::kRBrace, Subclause("A.2.11"));
   Match(TokenKind::kSemicolon);
+}
+
+// A.2.11 cross_body_item, positioned on its first token: a
+// function_declaration, or a bins_selection_or_option with its ';'. The item
+// joins the cross's body where it was read whole.
+void Parser::ParseCrossBodyItem(CoverCrossDecl& cross,
+                                CovergroupBodyState& state) {
+  ParseAttributes();
+  CrossBodyItem item;
+  if (Check(TokenKind::kKwFunction)) {
+    item.kind = CrossBodyItemKind::kFunction;
+    item.function = ParseFunctionDecl();
+    cross.body.push_back(item);
+    return;
+  }
+  if (IsOptionKeyword(CurrentToken())) {
+    item.kind = CrossBodyItemKind::kOption;
+    if (ParseItemLevelOption(item.option, state, CovItemLevel::kCross)) {
+      cross.body.push_back(item);
+      ExpectCoverageItemEnd();
+    } else {
+      SkipCoverageItemTail();
+    }
+    return;
+  }
+  item.kind = CrossBodyItemKind::kBinsSelection;
+  if (ParseBinsSelection(item.bins)) cross.body.push_back(item);
 }
 
 // A.2.11 bins_selection: `bins_keyword name = select_expression [ iff ( ... )

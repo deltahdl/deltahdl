@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -413,6 +412,7 @@ class Parser {
   // and record each item it names.
   void ValidateCrossItemList(std::vector<CrossItem>& items);
   void ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state);
+  void ParseCrossBodyItem(CoverCrossDecl& cross, CovergroupBodyState& state);
   bool ParseBinsSelection(BinsSelection& bins);
   SelectExpression* NewSelectExpression(SelectExpressionKind kind,
                                         SourceLoc loc);

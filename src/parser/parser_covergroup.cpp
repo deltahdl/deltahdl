@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -26,10 +28,9 @@ bool IsCoverpointOrCross(TokenKind k) {
 const Expr* FindNamedIdentifier(const Expr* e,
                                 const std::vector<std::string_view>& names) {
   if (e == nullptr) return nullptr;
-  if (e->kind == ExprKind::kIdentifier) {
-    for (std::string_view name : names) {
-      if (e->text == name) return e;
-    }
+  if (e->kind == ExprKind::kIdentifier &&
+      std::find(names.begin(), names.end(), e->text) != names.end()) {
+    return e;
   }
   for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
                             e->false_expr, e->base, e->index, e->index_end}) {
