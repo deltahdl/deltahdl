@@ -439,7 +439,7 @@ void Parser::ParseOutOfBlockConstraint(
     ExternalConstraintBlock ext{
         class_name, constraint_name, loc,  is_initial, is_extends,
         is_final,   is_static,       body, scope_items};
-    unit->external_constraints.push_back(std::move(ext));
+    unit->external_constraints.push_back(ext);
   }
 }
 
