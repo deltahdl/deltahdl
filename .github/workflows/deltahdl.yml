@@ -9,11 +9,12 @@ concurrency:
 # the next shard, and a target registered anywhere but last in
 # test/CMakeLists.txt, which 7 of the 200 commits before this one did, sent
 # most of every slice to a shard whose ccache or ctcache had never held it.
-# The price is evenness: of the 3,271 unit-test targets, eighteen shards get
-# 158 to 198 by hash where position would give 181 or 182. The hash is a
-# polynomial over the printable ASCII a target name or path is made of, kept
-# below 2^53 so every awk computes it exactly, and s is added to 0 so a shard
-# spelled '07' compares as the number 7.
+# The price is evenness: of the 3,271 unit-test targets, the eighteen shards
+# of a build job get 158 to 198 by hash where position would give 181 or 182,
+# and the twenty of unit-test-coverage 149 to 183 where it would give 163 or
+# 164. The hash is a polynomial over the printable ASCII a target name or path
+# is made of, kept below 2^53 so every awk computes it exactly, and s is added
+# to 0 so a shard spelled '07' compares as the number 7.
 env:
   SHARD_SLICE: >-
     BEGIN { for (c = 32; c < 127; c++) ord[sprintf("%c", c)] = c }
@@ -2131,7 +2132,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17', '18']
+                '10', '11', '12', '13', '14', '15', '16']
   copy-paste-src:
     runs-on: ubuntu-latest
     steps:
@@ -3091,7 +3092,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17']
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
