@@ -84,4 +84,41 @@ TEST(GetRandstateRun, TheStateOfTheProcessIsReadMovedAndReplayed) {
   EXPECT_EQ(out, "1 1 1 4\n");
 }
 
+// 18.13.4 and 18.13.5 with 8.4: get_randstate() and set_randstate() are methods
+// of the object any handle expression yields, so the state of an object held in
+// another's property is read through that property and installed again, and
+// the four draws after it replay.
+TEST(GetRandstateRun, TheStateIsReadAndReplayedThroughAHeldHandle) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Packet;\n"
+      "    rand bit [15:0] payload;\n"
+      "  endclass\n"
+      "  class Holder;\n"
+      "    Packet inner;\n"
+      "    function new(); inner = new; endfunction\n"
+      "  endclass\n"
+      "  Holder h;\n"
+      "  string s;\n"
+      "  int i, k, replayed = 0;\n"
+      "  bit [15:0] sa[4];\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    s = h.inner.get_randstate();\n"
+      "    for (i = 0; i < 4; i++) begin\n"
+      "      k = h.inner.randomize(); sa[i] = h.inner.payload;\n"
+      "    end\n"
+      "    h.inner.set_randstate(s);\n"
+      "    for (i = 0; i < 4; i++) begin\n"
+      "      k = h.inner.randomize();\n"
+      "      if (h.inner.payload == sa[i]) replayed++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", s.len() > 0, replayed);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4\n");
+}
+
 }  // namespace

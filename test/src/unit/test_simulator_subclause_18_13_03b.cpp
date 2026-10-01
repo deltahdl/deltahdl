@@ -88,4 +88,30 @@ TEST(SrandomRun, TheProcessSeedIsItsOwn) {
   EXPECT_EQ(out, "4 1\n");
 }
 
+// 18.13.3 with 8.4: srandom() is a method of the object any handle expression
+// yields, so two elements of an array of handles seeded alike draw the same
+// four values.
+TEST(SrandomRun, AnArrayElementIsSeeded) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class Packet;\n"
+      "    rand bit [15:0] payload;\n"
+      "  endclass\n"
+      "  Packet arr[2];\n"
+      "  int i, k, same = 0;\n"
+      "  initial begin\n"
+      "    arr[0] = new; arr[1] = new;\n"
+      "    arr[0].srandom(5); arr[1].srandom(5);\n"
+      "    for (i = 0; i < 4; i++) begin\n"
+      "      k = arr[0].randomize(); k = arr[1].randomize();\n"
+      "      if (arr[0].payload == arr[1].payload) same++;\n"
+      "    end\n"
+      "    $display(\"%0d\", same);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
 }  // namespace

@@ -11,9 +11,9 @@
 // leaves data at the 99 written before the next randomize();
 // word_align.constraint_mode(0) lets an in-line addr == 3 be solved;
 // std::randomize(v) with a range constrains the scope variable v to it;
-// two objects seeded alike through srandom draw the same addr; a randcase
-// whose second branch weighs 0 takes the first; and a randsequence runs
-// its productions in order.
+// two objects in the same state seeded alike through srandom draw the
+// same addr; a randcase whose second branch weighs 0 takes the first; and
+// a randsequence runs its productions in order.
 class Bus;
   rand bit [15:0] addr;
   rand bit [31:0] data;
@@ -41,6 +41,7 @@ module constrained_random_overview;
     bus.word_align.constraint_mode(1);
     ok = std::randomize(v) with { v inside {[10:12]}; };
     $display("std::randomize: v in [10:12] holds %0d", ok && v >= 10 && v <= 12);
+    bus.data.rand_mode(1);
     bus.srandom(42);
     other.srandom(42);
     void'(bus.randomize());

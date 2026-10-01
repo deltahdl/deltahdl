@@ -3,6 +3,8 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -35,8 +37,8 @@ TEST(RandomizeMethodRun, TheVirtualMethodRandomizesTheObjectsOwnClass) {
                      "module t;\n"
                      "  int success = 0, held = 0, evens = 0;\n"
                      "  initial begin\n"
-                     "    Framed fr = new;\n"
-                     "    Packet handle = fr;\n"
+                     "    static Framed fr = new;\n"
+                     "    static Packet handle = fr;\n"
                      "    repeat (32) begin\n"
                      "      if (handle.randomize()) success++;\n"
                      "      if (fr.size < 64) held++;\n"
@@ -61,7 +63,7 @@ TEST(RandomizeMethodRun, ADerivedClassCanRenderTheConstraintsUnsatisfiable) {
                      "module t;\n"
                      "  int success;\n"
                      "  initial begin\n"
-                     "    Oversized ov = new;\n"
+                     "    static Oversized ov = new;\n"
                      "    ov.size = 5;\n"
                      "    success = ov.randomize();\n"
                      "    $display(\"%0d %0d\", success, ov.size);\n"
@@ -69,6 +71,91 @@ TEST(RandomizeMethodRun, ADerivedClassCanRenderTheConstraintsUnsatisfiable) {
                      "endmodule\n",
                  f);
   EXPECT_EQ(out, "0 5\n");
+}
+
+// 18.6.1 with 8.4: randomize() is a method of the object any handle expression
+// yields, so an element of an array of handles, a handle held in another
+// object's property and a handle a function returns are each randomized: every
+// call returns 1 and leaves the object's size below 64.
+TEST(RandomizeMethodRun, AnyHandleExpressionNamesTheObjectRandomized) {
+  SimFixture f;
+  std::string out =
+      RunCapture(std::string(kPackets) +
+                     "class Holder;\n"
+                     "  Packet inner;\n"
+                     "  function new(); inner = new; endfunction\n"
+                     "endclass\n"
+                     "module t;\n"
+                     "  Packet arr[2];\n"
+                     "  Holder h;\n"
+                     "  Packet made;\n"
+                     "  function automatic Packet make();\n"
+                     "    made = new;\n"
+                     "    made.size = 200;\n"
+                     "    return made;\n"
+                     "  endfunction\n"
+                     "  int r1, r2, r3;\n"
+                     "  initial begin\n"
+                     "    arr[1] = new;\n"
+                     "    arr[1].size = 200;\n"
+                     "    h = new;\n"
+                     "    h.inner.size = 200;\n"
+                     "    r1 = arr[1].randomize();\n"
+                     "    r2 = h.inner.randomize();\n"
+                     "    r3 = make().randomize();\n"
+                     "    $display(\"%0d %0d %0d %0d %0d %0d\", r1, r2, r3,\n"
+                     "             arr[1].size < 64, h.inner.size < 64,\n"
+                     "             made.size < 64);\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f);
+  EXPECT_EQ(out, "1 1 1 1 1 1\n");
+}
+
+// 18.6.1 with 18.7: the same receivers take an inline constraint, which names
+// the members of the object randomized.
+TEST(RandomizeMethodRun, AnyHandleExpressionTakesAnInlineConstraint) {
+  SimFixture f;
+  std::string out =
+      RunCapture(std::string(kPackets) +
+                     "class Holder;\n"
+                     "  Packet inner;\n"
+                     "  function new(); inner = new; endfunction\n"
+                     "endclass\n"
+                     "module t;\n"
+                     "  Packet arr[1];\n"
+                     "  Holder h;\n"
+                     "  int r1, r2;\n"
+                     "  initial begin\n"
+                     "    arr[0] = new;\n"
+                     "    h = new;\n"
+                     "    r1 = arr[0].randomize() with { size == 7; };\n"
+                     "    r2 = h.inner.randomize() with { size == 9; };\n"
+                     "    $display(\"%0d %0d %0d %0d\", r1, r2, arr[0].size,\n"
+                     "             h.inner.size);\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f);
+  EXPECT_EQ(out, "1 1 7 9\n");
+}
+
+// 8.4 with 18.6.1: a call through a handle expression that holds null is
+// illegal, and it is reported at the call as a call through a named null
+// handle is.
+TEST(RandomizeMethodRun, ANullHandleExpressionIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kPackets) +
+                                  "module t;\n"
+                                  "  Packet arr[1];\n"
+                                  "  int r = 5;\n"
+                                  "  initial r = arr[0].randomize();\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'randomize' called through a null handle",
+                            15, "8.4"));
 }
 
 }  // namespace

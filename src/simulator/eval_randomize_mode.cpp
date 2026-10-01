@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -313,6 +314,48 @@ bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// 18.6.1 and 18.13 with 8.4: randomize(), srandom(), get_randstate() and
+// set_randstate() are methods of the object whatever handle expression yields
+// it -- an element of an array of handles, a handle held in another object's
+// property, a function's result -- so a receiver that names no handle variable
+// is evaluated for the handle it holds. Null when the call is no
+// `expr.method(...)` or the handle is null; §8.4 makes the call through a null
+// handle illegal, and it is reported here as through a named one.
+ClassObject* ExprReceiverObject(const Expr* expr, std::string_view method,
+                                SimContext& ctx, Arena& arena) {
+  const Expr* callee = expr->lhs;
+  if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
+      callee->is_scope_resolution || callee->lhs == nullptr ||
+      callee->rhs == nullptr || callee->rhs->kind != ExprKind::kIdentifier ||
+      callee->rhs->text != method) {
+    return nullptr;
+  }
+  uint64_t handle = EvalExpr(callee->lhs, ctx, arena).ToUint64();
+  if (handle == kNullClassHandle) {
+    ctx.GetDiag().Error(
+        callee->rhs->range.start,
+        "method '" + std::string(method) + "' called through a null handle",
+        Subclause("8.4"));
+    return nullptr;
+  }
+  ClassObject* obj = ctx.GetClassObject(handle);
+  return (obj != nullptr && obj->type != nullptr) ? obj : nullptr;
+}
+
+// The object a call of the object method `method` runs on: the one a handle
+// variable names, resolved by the key ExtractHandleMethodCallParts answers, or
+// the one any other receiver expression evaluates to. Null when the call is
+// no call of `method` or reaches no object.
+ClassObject* ObjectMethodReceiver(const Expr* expr, std::string_view method,
+                                  SimContext& ctx, Arena& arena) {
+  MethodCallParts parts;
+  if (ExtractHandleMethodCallParts(expr, arena, parts)) {
+    return parts.method_name == method ? ResolveRandomizeTarget(ctx, parts)
+                                       : nullptr;
+  }
+  return ExprReceiverObject(expr, method, ctx, arena);
+}
+
 }  // namespace
 
 // §26.3 admits a package-qualified handle as the receiver of randomize(),
@@ -322,11 +365,9 @@ bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts) &&
-      !BareRandomizeInMethod(expr, ctx, parts))
-    return false;
-  if (parts.method_name != "randomize") return false;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  ClassObject* obj = BareRandomizeInMethod(expr, ctx, parts)
+                         ? ResolveRandomizeTarget(ctx, parts)
+                         : ObjectMethodReceiver(expr, "randomize", ctx, arena);
   if (!obj) return false;
 
   // 18.11: a randomize() argument list names the object properties that make up
@@ -555,10 +596,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
                           Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
-  if (parts.method_name != "srandom") return false;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  ClassObject* obj = ObjectMethodReceiver(expr, "srandom", ctx, arena);
   if (!obj) return false;
 
   // §18.13.3: srandom() seeds the object's own RNG with the given seed. The
@@ -577,10 +615,7 @@ bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
 
 bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
-  if (parts.method_name != "get_randstate") return false;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  ClassObject* obj = ObjectMethodReceiver(expr, "get_randstate", ctx, arena);
   if (!obj) return false;
 
   // §18.13.4: return the object's current RNG state as a string. The state is
@@ -593,10 +628,7 @@ bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
 
 bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
-  if (parts.method_name != "set_randstate") return false;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  ClassObject* obj = ObjectMethodReceiver(expr, "set_randstate", ctx, arena);
   if (!obj) return false;
 
   // §18.13.5: install the given string as the object's RNG internal state,
