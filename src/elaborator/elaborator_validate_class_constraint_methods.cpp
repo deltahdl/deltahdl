@@ -612,11 +612,19 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
 
   // 18.5.1: an external constraint block shall appear in the same scope as its
   // class declaration and after that class declaration. The block is paired
-  // with the class of its own scope; flag a block that precedes the end of its
-  // class declaration.
+  // with the class of its own scope; flag a block whose scope declares no class
+  // of that name, and a block that precedes the end of its class declaration.
   for (const auto& ext : unit_->external_constraints) {
     const ClassDecl* target = ExternalBlockClass(unit_, ext);
-    if (target == nullptr) continue;
+    if (target == nullptr) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' shall "
+                      "appear in the scope that declares class '{}'",
+                      ext.class_name, ext.constraint_name, ext.class_name),
+          Subclause("18.5.1"));
+      continue;
+    }
     if (LocStrictlyBefore(ext.loc, target->range.end)) {
       diag_.Error(
           ext.loc,

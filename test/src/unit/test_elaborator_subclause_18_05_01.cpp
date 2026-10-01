@@ -92,6 +92,44 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
                             2, "18.5.1"));
 }
 
+// 18.5.1: the block shall appear in the scope of its class declaration, so a
+// block naming a class that its scope never declares is an error.
+TEST(ExternalConstraintBlocks, BlockForUndeclaredClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("constraint D::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'D::c' shall appear in "
+                            "the scope that declares class 'D'",
+                            1, "18.5.1"));
+}
+
+// 18.5.1: a block in one package does not complete a class another package
+// declares; the package holding the block declares no such class.
+TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package other;\n"
+             "  class D;\n"
+             "    rand int x;\n"
+             "    constraint c;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "package pkg;\n"
+             "  constraint D::c { x > 0; }\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'D::c' shall appear in "
+                            "the scope that declares class 'D'",
+                            8, "18.5.1"));
+}
+
 // 18.5.1: a constraint block of the same name as a prototype in the same class
 // declaration is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
