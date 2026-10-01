@@ -178,4 +178,34 @@ TEST(SequenceProperty, BareSequenceInCoverIsStrong) {
   EXPECT_EQ(passes->value.ToUint64(), 1u);
 }
 
+// The count of pass statements run, the final blocks included, by the
+// cover `directive` over the sequence s, b ##1 c on clk, named as its whole
+// spec.
+uint64_t NamedSequenceCoverPasses(const std::string& directive) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      SequencePropertySource("  sequence s; @(posedge clk) b ##1 c; "
+                             "endsequence\n"
+                             "  c: " +
+                             directive + " (s) passes++;\n"),
+      f, "passes");
+  if (passes == nullptr) return 0;
+  f.ctx.RunFinalBlocks();
+  return passes->value.ToUint64();
+}
+
+// §16.12.2: a cover whose spec is the name of a sequence alone evaluates
+// the sequence as strong, as one written in the statement is, so the
+// attempt from 4, unfinished when the run ends, is no success then either:
+// the pass statement runs once, at 3, and not again in the final blocks.
+TEST(SequenceProperty, NamedSequenceInCoverPropertyIsStrong) {
+  EXPECT_EQ(NamedSequenceCoverPasses("cover property"), 1u);
+}
+
+// §16.12.2: the same for a cover sequence, whose pass statement runs once
+// per match: the attempt from 4, unfinished when the run ends, is no match.
+TEST(SequenceProperty, NamedSequenceInCoverSequenceIsStrong) {
+  EXPECT_EQ(NamedSequenceCoverPasses("cover sequence"), 1u);
+}
+
 }  // namespace

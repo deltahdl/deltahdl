@@ -287,6 +287,18 @@ Stmt* NewInstanceStmt(const ModuleItem* item, Arena& arena) {
   return stmt;
 }
 
+// §16.12.2: the statement `stmt` is given the sequential property the
+// instance `instance` of a named sequence is, its sequence_expr read as
+// strong in a cover, where no sequence operator is written, and as the
+// statement was marked otherwise.
+void GiveSequenceProperty(Stmt* stmt, Expr* instance, Arena& arena) {
+  stmt->assert_property = arena.Create<PropertyExprNode>();
+  stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
+  stmt->assert_property->sequence = SequenceInstanceBody(instance, arena);
+  stmt->assert_property->strong =
+      stmt->kind == StmtKind::kCoverImmediate || stmt->assert_strong;
+}
+
 // §16.13.4: an instance of a named sequence standing as the whole
 // property_spec, `assert property (mult_s)`, is the sequential property the
 // sequence is, evaluated on the clock the sequence is declared with.
@@ -296,10 +308,7 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
   // clock to determine, the default clocking's or none.
   auto* stmt = NewInstanceStmt(item, arena);
   stmt->assert_expr = item->assert_expr;
-  stmt->assert_property = arena.Create<PropertyExprNode>();
-  stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
-  stmt->assert_property->sequence =
-      SequenceInstanceBody(item->assert_expr, arena);
+  GiveSequenceProperty(stmt, item->assert_expr, arena);
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
@@ -447,11 +456,7 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
     // §16.12.2 and §16.13.4: `@(negedge clk) s2` is the sequential property
     // the sequence s2 is, evaluated on the clock written.
-    stmt->assert_property = arena.Create<PropertyExprNode>();
-    stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
-    stmt->assert_property->sequence = SequenceInstanceBody(instance, arena);
-    stmt->assert_property->strong =
-        stmt->kind == StmtKind::kCoverImmediate || stmt->assert_strong;
+    GiveSequenceProperty(stmt, instance, arena);
     return;
   }
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl ||
