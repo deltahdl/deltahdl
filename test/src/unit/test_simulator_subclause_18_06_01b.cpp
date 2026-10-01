@@ -4,7 +4,6 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 
