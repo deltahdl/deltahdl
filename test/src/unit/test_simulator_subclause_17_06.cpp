@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <iostream>
+#include <sstream>
+#include <streambuf>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -37,6 +41,42 @@ TEST(CheckerCovergroup, SampledFromASequenceMatchItem) {
       f, "c.hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
+
+// §17.6 with §19.3: a covergroup declared in a checker is instantiated per
+// checker instance and sampled there, by an explicit sample() from an
+// always_ff and by its own clocking event alike.
+TEST(CheckerCovergroup, InstanceSampledExplicitlyAndByItsEvent) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "checker chk(logic a, logic clk);\n"
+          "  covergroup cg;\n"
+          "    cp: coverpoint a { bins lo = {1'b0}; bins hi = {1'b1}; }\n"
+          "  endgroup\n"
+          "  covergroup cge @(posedge clk);\n"
+          "    cp: coverpoint a { bins lo = {1'b0}; bins hi = {1'b1}; }\n"
+          "  endgroup\n"
+          "  cg cg_1 = new();\n"
+          "  cge cg_2 = new();\n"
+          "  always_ff @(posedge clk) cg_1.sample();\n"
+          "  final $display(\"cov=%0d %0d\", $rtoi(cg_1.get_inst_coverage()),\n"
+          "                 $rtoi(cg_2.get_inst_coverage()));\n"
+          "endchecker\n"
+          "module top;\n"
+          "  logic clk = 0, a = 1;\n"
+          "  always #5 clk = ~clk;\n"
+          "  chk c(a, clk);\n"
+          "  initial begin #12 a = 0; #20 a = 1; #20 $finish; end\n"
+          "endmodule\n",
+          f),
+      "$finish at time 52\n");
+  // The final procedure reports, run as the end of simulation runs it.
+  std::ostringstream reported;
+  std::streambuf* old_buf = std::cout.rdbuf(reported.rdbuf());
+  f.ctx.RunFinalBlocks();
+  std::cout.rdbuf(old_buf);
+  EXPECT_EQ(reported.str(), "cov=100 100\n");
 }
 
 }  // namespace

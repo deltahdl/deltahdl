@@ -36,6 +36,7 @@
 #include "simulator/cover_results.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/file_monitor.h"
 #include "simulator/net.h"
 #include "simulator/output_log.h"
@@ -237,8 +238,7 @@ class SimContext : public DeclaredNameTables,
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
-  // §26.3 with §13.3: EnterSubroutineScope for `func`'s package, answering
-  // `func` back.
+  // §26.3, §13.3: EnterSubroutineScope for `func`'s package; answers `func`.
   const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
   // §13.4.2: a static function's frame is the one PopStaticScope retained
   // under StaticFrameKey the last time the function returned.
@@ -733,12 +733,11 @@ class SimContext : public DeclaredNameTables,
 
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
-
-  // The run's live coverage database. §19.9's predefined coverage system
-  // tasks/functions ($set_coverage_db_name, $load_coverage_db, $get_coverage)
-  // operate on it. An externally injected database (SetCoverageDB) takes
-  // precedence; otherwise one is made on first use and owned by this context.
+  // The run's coverage database for §19.9's tasks: the one SetCoverageDB
+  // injected, or else one this context makes on first use and owns.
   class CoverageDB& CoverageData();
+  // §19.3: the covergroup instances the run's variables hold.
+  CovergroupTable& Covergroups();
 
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val);
   const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const;
@@ -939,6 +938,7 @@ class SimContext : public DeclaredNameTables,
   std::unique_ptr<ClockingManager> owned_clocking_manager_;
   class CoverageDB* coverage_db_ = nullptr;
   std::unique_ptr<class CoverageDB> owned_coverage_db_;
+  std::unique_ptr<CovergroupTable> covergroups_;
   std::string_view disable_target_;
   std::unordered_map<std::string, std::vector<Process*>> named_scope_map_;
   std::unordered_map<std::string, std::vector<Process*>> outermost_scope_map_;

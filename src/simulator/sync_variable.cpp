@@ -7,6 +7,7 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
@@ -68,6 +69,8 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
     CreateSemaphoreForVar(name, var, v, ctx, arena);
   } else if (var.class_type_name == "mailbox") {
     CreateMailboxForVar(name, var, v, ctx, arena);
+  } else if (var.covergroup != nullptr && InitIsNew(var)) {
+    CreateCovergroupForVar(name, var, ctx, arena);
   }
 }
 

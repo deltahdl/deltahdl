@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -256,6 +257,30 @@ TEST(Coverage, IgnoreTransitionBinExcludedFromCoverage) {
   db.Sample(g, {{"s", 2}});
 
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
+}
+
+// §19.5.5: a value an ignore_bins names is excluded from coverage, and a bin
+// of the coverpoint left holding no value is removed: v[1] goes, leaving
+// three bins, of which sampling 1 and 2 covers one.
+TEST(CovergroupInstanceSim, IgnoreBinsFromDeclarationRemoveValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] v; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint v { bins v[] = {[0:3]}; ignore_bins ig = {1}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    v = 1; c.sample();\n"
+          "    v = 2; c.sample();\n"
+          "    void'(c.get_inst_coverage(n, t));\n"
+          "    $display(\"n=%0d t=%0d\", n, t);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=3\n");
 }
 
 }  // namespace

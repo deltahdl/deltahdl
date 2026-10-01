@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -285,6 +286,50 @@ TEST(AutoBinCreation, DefaultBinSuppressesAutoBins) {
   dflt.kind = CoverBinKind::kDefault;
   cp.bins.push_back(dflt);
   EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// §19.5.3: a coverpoint with no bins gets automatic bins, one per value of a
+// two-bit expression since 4 is under auto_bin_max. Sampling 0 and 2 covers
+// two of the four.
+TEST(CovergroupInstanceSim, AutomaticBinsFromDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v;\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 0; c.sample();\n"
+                       "    v = 2; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=4\n");
+}
+
+// §19.5.3: the automatic bins of a signed coverpoint span its signed range,
+// so an int coverpoint's 64 bins take -5 into one of them; an unlabelled
+// coverpoint of an expression gets its automatic bins too, v ^ 3 sampling 3.
+TEST(CovergroupInstanceSim, SignedAndExpressionCoverpointsAutomaticBins) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int i; bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint i;\n"
+                       "    coverpoint v ^ 2'b11;\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    i = -5; v = 0; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=68\n");
 }
 
 }  // namespace

@@ -11,6 +11,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_array_shape.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
@@ -21,6 +22,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -897,6 +899,12 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetVariableTypeInfo(item, var);
+  var.covergroup = DeclaredCovergroup(item->data_type, mod);
+  if (var.covergroup != nullptr &&
+      var.covergroup->event.kind == CoverageEventKind::kClocking) {
+    AddCovergroupEventProcess(item->name, *var.covergroup, item->loc, mod,
+                              arena_);
+  }
 
   ElaborateUnpackedDims(
       item, td_array_dims_,

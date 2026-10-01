@@ -338,6 +338,9 @@ struct RtlirVariable {
   // and `pool #(string, int) p`: the actuals the lowerer binds on the object
   // the variable's `new` constructs. Null for a variable of any other type.
   const DataType* class_data_type = nullptr;
+  // §19.3: the declaration of the covergroup the variable's type names, whose
+  // instance a `new` of the variable builds; null for any other type.
+  const CovergroupDecl* covergroup = nullptr;
   std::string_view enum_type_name;
   std::vector<ResolvedAttribute> attrs;
 

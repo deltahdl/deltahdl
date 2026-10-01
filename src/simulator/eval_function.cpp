@@ -14,6 +14,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_assoc_class_handles.h"
@@ -672,6 +673,7 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (TryEvalSemaphoreMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalMailboxMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalCovergroupMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalEventTriggeredCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefMethodCall(expr, ctx, arena, out)) return true;

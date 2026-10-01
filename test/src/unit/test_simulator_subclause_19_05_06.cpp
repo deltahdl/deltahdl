@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -279,6 +281,33 @@ TEST(Coverage, IllegalTransitionBinExcludedFromCoverage) {
 TEST(Coverage, NonMatchingSequenceRaisesNoIllegalTransitionViolation) {
   // The 9 diverges from the expected 6, so the sequence never completes.
   ExpectIllegalTransitionOutcome({4, 5, 9}, 0u, 0u);
+}
+
+// §19.5.6: a sampled value an illegal_bins holds is a run-time error, reported
+// at the sample() that took it, and the run goes on; the legal value sampled
+// first draws nothing.
+TEST(CovergroupInstanceSim, IllegalBinHitIsRunTimeError) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [3:0] v;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins ok = {[4:9]}; illegal_bins bad "
+                       "= {1, 2, 3}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 5; c.sample();\n"
+                       "    v = 2; c.sample();\n"
+                       "    $display(\"done\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "done\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sampled value 2 of coverpoint 'v' falls in an "
+                            "illegal bin",
+                            9, "19.5.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

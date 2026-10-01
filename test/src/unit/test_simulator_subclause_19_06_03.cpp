@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -140,6 +142,35 @@ TEST(Coverage, IllegalPrecedenceHoldsWhenAlsoIgnoredAndInOtherCrossBin) {
   EXPECT_EQ(CoverageDB::ClassifyCrossSample({1, 1}, illegal, ignored,
                                             /*also_in_other_cross_bin=*/true),
             CrossSampleOutcome::kIllegalError);
+}
+
+// §19.6.3: a sampled product an illegal_bins selection of a cross covers is a
+// run-time error. The selection's intersect set names the covergroup formal
+// `bad`, given 3 by new(3), so <0, 1> is legal and <0, 3> is reported. The
+// unlabelled cross of the same coverpoints holds no selection and adds none.
+TEST(CovergroupInstanceSim, IllegalCrossProductIsRunTimeError) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] x, y;\n"
+                       "  covergroup zz (int bad);\n"
+                       "    coverpoint x; coverpoint y; cross x, y;\n"
+                       "    xy: cross x, y { illegal_bins illegal = binsof(y) "
+                       "intersect {bad}; }\n"
+                       "  endgroup\n"
+                       "  zz c = new(3);\n"
+                       "  initial begin\n"
+                       "    x = 0; y = 1; c.sample();\n"
+                       "    y = 3; c.sample();\n"
+                       "    $display(\"done\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "done\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sampled values of cross 'xy' fall in its illegal "
+                            "bins 'illegal'",
+                            10, "19.6.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

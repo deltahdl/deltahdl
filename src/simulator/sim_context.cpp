@@ -52,6 +52,11 @@ CoverageDB& SimContext::CoverageData() {
   return *owned_coverage_db_;
 }
 
+CovergroupTable& SimContext::Covergroups() {
+  if (!covergroups_) covergroups_ = std::make_unique<CovergroupTable>();
+  return *covergroups_;
+}
+
 ClockingManager& SimContext::AcquireClockingManager() {
   // A manager installed from outside is the run's, the way an installed DPI
   // registry is: §14's blocks, their events and their sampled values all have

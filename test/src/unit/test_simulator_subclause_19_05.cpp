@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -241,6 +242,27 @@ TEST(Coverage, DefaultBinExcludedFromCoverage) {
   // the coverpoint below 100%.
   db.Sample(g, {{"x", 0}});
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(&g->coverpoints[0]), 100.0);
+}
+
+// §19.5: a default bin catches the values no other bin holds and is not
+// counted toward coverage, so sampling 2 leaves both counted bins uncovered.
+TEST(CovergroupInstanceSim, DefaultBinFromDeclarationNotCounted) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins a = {0}; bins b = {1}; bins "
+                       "others = default; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 2; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=0 t=2\n");
 }
 
 }  // namespace

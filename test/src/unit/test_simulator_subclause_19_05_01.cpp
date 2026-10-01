@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -293,6 +294,33 @@ TEST(Coverage, PerBinIffGuard) {
   g->coverpoints[0].bins[0].iff_guard_value = true;
   db.Sample(g, {{"v", 5}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
+}
+
+// §19.5.1: `[]` makes one bin per value of the range list, and `[N]` spreads
+// the values over N bins, B = 3 / 2 = 1 to each but the last, which takes the
+// rest. A `$` bound stands for the end of the coverpoint's values, 15 above
+// and 0 below. Sampling 1, 4 and 15 hits b[1], f[0] and top of the seven bins.
+TEST(CovergroupInstanceSim, ArrayAndFixedCountBinsFromDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [3:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v {\n"
+                       "      bins b[] = {[1:3]}; bins f[2] = {4, 5, 6};\n"
+                       "      bins top = {[14:$]}; bins bot = {[$:0]};\n"
+                       "    }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 1; c.sample();\n"
+                       "    v = 4; c.sample();\n"
+                       "    v = 15; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=3 t=7\n");
 }
 
 }  // namespace

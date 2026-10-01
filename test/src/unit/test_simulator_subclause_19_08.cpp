@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_coverage_point_setup.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -326,6 +327,54 @@ TEST(Coverage, SetInstNameOverwrites) {
   CoverageDB::SetInstName(g, "first");
   CoverageDB::SetInstName(g, "second");
   EXPECT_EQ(g->options.name, "second");
+}
+
+// §19.3 and §19.8: `new` on a covergroup declared in a module builds an
+// instance with the declaration's coverpoint and bins, sample() counts the
+// coverpoint's value into them, and get_coverage() and get_inst_coverage()
+// report the instance, the latter's ref-int pair the covered and defined bins.
+// One of the two bins is hit, so each reads 50.
+TEST(CovergroupInstanceSim, SampleAndCoverageMethodsOnModuleInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 0; c.sample();\n"
+                       "    v = 1; c.sample();\n"
+                       "    $display(\"cov=%0.2f\", c.get_coverage());\n"
+                       "    $display(\"inst=%0.2f\", c.get_inst_coverage());\n"
+                       "    c.get_inst_coverage(n, t);\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "cov=50.00\ninst=50.00\nn=1 t=2\n");
+}
+
+// §19.8: stop() makes a triggered sample() record nothing until start()
+// resumes collection.
+TEST(CovergroupInstanceSim, StopAndStartControlCollection) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    c.stop(); v = 0; c.sample();\n"
+                 "    $display(\"stopped=%0.2f\", c.get_inst_coverage());\n"
+                 "    c.start(); v = 3; c.sample();\n"
+                 "    $display(\"started=%0.2f\", c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "stopped=0.00\nstarted=50.00\n");
 }
 
 }  // namespace

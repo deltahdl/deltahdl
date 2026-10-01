@@ -128,6 +128,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
     elaborator/covergroup_rules.cpp
+    elaborator/covergroup_variables.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_binding.cpp
     elaborator/procedural_checker_instance.cpp
@@ -368,6 +369,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
+    simulator/covergroup_instance.cpp
     simulator/dpi_binding.cpp
     simulator/dpi_c_call.cpp
     simulator/dpi_c_type.cpp
