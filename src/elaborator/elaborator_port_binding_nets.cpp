@@ -13,6 +13,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -337,6 +338,16 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     BindWildcardPorts(kScope);
   } else {
     BindTrailingInputPorts(kScope);
+  }
+  // §17.4: the formals a static checker instance leaves to a context value
+  // function's default take the default clocking and the default disable iff
+  // of the scope; a procedural instance's take its procedure's, which
+  // Elaborator::AddProcedure fills.
+  if (inst.resolved->is_checker && !item->inst_in_procedure) {
+    FillInferredCheckerDefaults(
+        inst,
+        {DefaultClockingEvent(parent_mod), parent_mod->default_disable_iff},
+        arena_);
   }
 
   // §23.3.3 shared port-binding context for the post-bind connectivity checks.

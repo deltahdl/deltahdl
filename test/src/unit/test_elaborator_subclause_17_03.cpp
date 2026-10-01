@@ -215,4 +215,32 @@ TEST(ProceduralCheckerInstantiation, AnUnknownNameIsReported) {
                             "23.3.2"));
 }
 
+// §17.3: a checker shall not be instantiated in a fork-join, fork-join_any
+// or fork-join_none block, a block nested in the fork among its statements;
+// one standing after the join is a procedural checker instance as usual.
+TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(logic a, logic clk);\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk, a;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      chk c1(a, clk);\n"
+      "      begin chk c2(a, clk); end\n"
+      "    join_none\n"
+      "    chk c3(a, clk);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  const char* kMessage =
+      "a checker shall not be instantiated in a fork-join, fork-join_any or "
+      "fork-join_none block";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "17.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 9, "17.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 11, "17.3"));
+}
+
 }  // namespace

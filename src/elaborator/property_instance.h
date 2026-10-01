@@ -12,6 +12,7 @@ namespace delta {
 
 class PropertyRegistry;
 struct RtlirModule;
+struct RtlirModuleInst;
 
 // §16.12.1 and §16.13.4: what an instance of a named property or sequence,
 // written as a name or a call, gives the assertion that stands it as its
@@ -72,6 +73,16 @@ struct InferredAtInstance {
 // written as a call from here on, its actuals holding what was inferred.
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
                           const InferredAtInstance& inferred, Arena& arena);
+
+// §17.4 with §16.14.7: the same at a checker instance `inst`: each formal it
+// leaves to a $inferred_clock default is bound to the clocking event, written
+// as the actual of an event formal is, and each it leaves to a
+// $inferred_disable default to the disable condition, so that the formals
+// take the context of the instantiation; a $inferred_clock default where no
+// clock is inferred is left as it stands.
+void FillInferredCheckerDefaults(RtlirModuleInst& inst,
+                                 const InferredAtInstance& inferred,
+                                 Arena& arena);
 
 // §14.12: the clocking event of the default clocking of `mod`, declared
 // inline or named by a default clocking statement, among the clocking blocks

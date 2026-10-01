@@ -10,8 +10,9 @@
 namespace delta {
 
 // §17.3: the checker instantiations the procedure body `body` holds, each a
-// procedural checker instance, in source order.
-std::vector<Stmt*> CheckerInstantiationsIn(Stmt* body);
+// procedural checker instance, in source order; one inside a fork block,
+// where none may stand, is reported and left out.
+std::vector<Stmt*> CheckerInstantiationsIn(Stmt* body, DiagEngine& diag);
 
 // §17.3: whether the instantiation `item`, standing in a procedure of `mod`,
 // is elaborated as a procedural checker instance of `child`, the design

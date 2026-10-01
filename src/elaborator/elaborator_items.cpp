@@ -25,6 +25,7 @@
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -715,13 +716,15 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   ElaborateProceduralConcurrentAssertions(item, mod, property_registry_, arena_,
                                           diag_);
   std::vector<ProceduralCheckerSite> sites;
-  for (Stmt* stmt : CheckerInstantiationsIn(item->body)) {
+  for (Stmt* stmt : CheckerInstantiationsIn(item->body, diag_)) {
     ModuleItem* inst = stmt->decl_item;
     ModuleDecl* child = FindModuleInScope(inst->inst_module);
     if (child == nullptr) child = PackageCheckerNamedBy(inst, mod, unit_);
     if (!AdmitProceduralCheckerInstance(inst, child, mod, diag_)) continue;
     ElaborateModuleInst(inst, mod);
     mod->children.back().is_procedural = true;
+    FillInferredCheckerDefaults(mod->children.back(),
+                                InferredInProcedure(item, mod), arena_);
     sites.push_back({stmt, ScopedName(inst->inst_name)});
   }
   bool infers = kind != RtlirProcessKind::kInitial;

@@ -189,6 +189,27 @@ static Expr* InferredActual(InferredDefault kind,
   return nullptr;
 }
 
+// The inferred function the default actual `e` calls, kNone where it calls
+// neither.
+static InferredDefault InferredDefaultCalled(const Expr* e) {
+  if (e == nullptr || e->kind != ExprKind::kSystemCall) {
+    return InferredDefault::kNone;
+  }
+  if (e->callee == "$inferred_clock") return InferredDefault::kClock;
+  if (e->callee == "$inferred_disable") return InferredDefault::kDisable;
+  return InferredDefault::kNone;
+}
+
+void FillInferredCheckerDefaults(RtlirModuleInst& inst,
+                                 const InferredAtInstance& inferred,
+                                 Arena& arena) {
+  for (RtlirPortBinding& binding : inst.port_bindings) {
+    Expr* actual = InferredActual(InferredDefaultCalled(binding.connection),
+                                  inferred, arena);
+    if (actual != nullptr) binding.connection = actual;
+  }
+}
+
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
                           const InferredAtInstance& inferred, Arena& arena) {
   if (instance == nullptr || decl == nullptr || !HasInferredDefault(decl)) {

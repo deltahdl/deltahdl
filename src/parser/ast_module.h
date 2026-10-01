@@ -538,6 +538,9 @@ struct ModuleItem {
   // checker_instantiation writes one name_of_instance, and the elaborator,
   // which knows what the cell is, reads this to hold a checker to it.
   bool inst_continues_list = false;
+  // §17.3: the instantiation stands in procedural code, a checker
+  // instantiation read as a statement.
+  bool inst_in_procedure = false;
   Expr* inst_range_left = nullptr;
   Expr* inst_range_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> inst_dims;

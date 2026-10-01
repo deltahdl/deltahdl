@@ -339,6 +339,11 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
       registry, arena, diag);
 }
 
+InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
+                                       const RtlirModule* mod) {
+  return ContextOf(InferredProcedureClock(procedure, mod), mod).at_instance;
+}
+
 void ElaborateSubroutineConcurrentAssertions(ModuleItem* subroutine,
                                              const RtlirModule* mod,
                                              const PropertyRegistry& registry,

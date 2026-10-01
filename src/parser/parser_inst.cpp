@@ -94,6 +94,7 @@ Stmt* Parser::ParseCheckerInstantiationStmt() {
   }
   std::vector<Stmt*> stmts;
   for (ModuleItem* item : items) {
+    item->inst_in_procedure = true;
     auto* stmt = arena_.Create<Stmt>();
     stmt->kind = StmtKind::kCheckerInstantiation;
     stmt->range.start = item->loc;

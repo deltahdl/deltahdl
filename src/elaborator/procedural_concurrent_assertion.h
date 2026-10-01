@@ -1,5 +1,7 @@
 #pragma once
 
+#include "elaborator/property_instance.h"
+
 namespace delta {
 
 class Arena;
@@ -26,6 +28,13 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
                                              const RtlirModule* mod,
                                              const PropertyRegistry& registry,
                                              Arena& arena, DiagEngine& diag);
+
+// §16.14.7: what an instance written in the procedure `procedure` of `mod`
+// takes for $inferred_clock and $inferred_disable: the clock the procedure
+// gives (§16.14.6), or the default clocking behind it, and the module's
+// default disable iff.
+InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
+                                       const RtlirModule* mod);
 
 // §16.17: the same for the expect statements of the task or function
 // `subroutine`, which §16.17 has appear wherever a wait statement can; a
