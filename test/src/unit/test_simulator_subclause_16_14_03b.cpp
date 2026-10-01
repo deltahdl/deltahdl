@@ -147,6 +147,53 @@ TEST(CoverStatementRun, ACoverSequencesPassStatementRunsForEveryMatch) {
   EXPECT_EQ(record->matched, 4u);
 }
 
+// A module around the named sequence e given, as
+// test/src/e2e/subroutine_on_match.sv is: clk rises at 5, 15, ..., so that
+// tick n is at 10n - 5, c is high at tick 21 and d at ticks 22 and 23, so
+// the attempt of tick 21 of c ##[1:2] d matches at 22 and again at 23 and
+// no attempt is left in flight when the run ends at 300.
+std::string NamedSequenceCoverSource(const std::string& sequence) {
+  return "module t;\n"
+         "  logic clk = 0; int tick = 1, hits = 0; logic c, d;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign c = tick inside {21};\n"
+         "  assign d = tick inside {22, 23};\n"
+         "  sequence e; @(posedge clk) " +
+         sequence +
+         "; endsequence\n"
+         "  cover sequence (e) hits++;\n"
+         "  initial #300 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.14.3: a cover sequence of an instance of a named sequence counts every
+// match of an attempt as the same sequence written in the statement does,
+// the named sequence's own clock being no bar to the attempt of tick 21
+// matching at 23 after it matched at 22.
+TEST(CoverStatementRun, ACoverOfANamedSequenceInstanceCountsEveryMatch) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(NamedSequenceCoverSource("c ##[1:2] d"), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  const ConcurrentCoverResult* record = TheRecord(f);
+  ASSERT_NE(record, nullptr);
+  EXPECT_EQ(record->attempted, 30u);
+  EXPECT_EQ(record->matched, 2u);
+}
+
+// §16.14.3 with §16.11: the subroutine call attached to the named sequence
+// a cover sequence instantiates runs at each match of an attempt, at ticks
+// 22 and 23 for the attempt of tick 21.
+TEST(CoverStatementRun, ANamedSequencesAttachedCallRunsAtEveryCoveredMatch) {
+  SimFixture f;
+  std::string out = RunCapture(
+      NamedSequenceCoverSource("(c ##[1:2] d, $display(\"end %0d\", tick))"),
+      f);
+  EXPECT_EQ(out, "end 22\nend 23\n$finish at time 300\n");
+}
+
 // §16.14.3: a match that completes after the disable condition occurred is
 // not counted: with rst high across 65, the attempt of 45 matches at 55
 // alone, and the attempt of 65 is an attempt still.

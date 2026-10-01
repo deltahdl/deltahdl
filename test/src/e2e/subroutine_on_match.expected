@@ -7,7 +7,7 @@ second at tick 31
 note at tick 31
 k by value = 40, by reference = 41
 $finish at time 450
-cover sequence subroutine_on_match (line 65): attempted 45, matched 2
-cover sequence subroutine_on_match.every_end (line 66): attempted 45, matched 2
-cover sequence subroutine_on_match (line 68): attempted 45, matched 1
-cover sequence subroutine_on_match (line 69): attempted 45, matched 1
+cover sequence subroutine_on_match (line 69): attempted 45, matched 2
+cover sequence subroutine_on_match (line 70): attempted 45, matched 2
+cover sequence subroutine_on_match (line 71): attempted 45, matched 1
+cover sequence subroutine_on_match (line 72): attempted 45, matched 1

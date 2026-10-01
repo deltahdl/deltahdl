@@ -57,6 +57,7 @@ struct PropertyTreeState {
   // first, and the time step the tree last advanced at.
   PropertyClocks clocks;
   SimTime advanced_at{PropertyClocks::kNever};
+  bool every_match = false;
 };
 
 namespace {
@@ -474,8 +475,10 @@ Tri StepSequence(const PropertyExprNode* node, NodeState& state,
                  StepContext& sc, bool begin) {
   const LinearSequence& body = BodyOf(sc.tree, node);
   if (begin) state.attempt = NewSequenceAttempt(body, sc.arena);
-  return FromStep(
-      StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena));
+  SequenceStep step =
+      StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena);
+  state.matches_again = step == SequenceStep::kMatched;
+  return FromStep(step);
 }
 
 Tri StepJunction(const PropertyExprNode* node, NodeState& state,
@@ -834,8 +837,9 @@ PropertyVerdict VerdictOf(const PropertyExprNode* root,
 
 PropertyTreeState* CreatePropertyTreeState(
     const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
-    SimContext& ctx, Arena& arena) {
+    bool every_match, SimContext& ctx, Arena& arena) {
   auto* state = arena.Create<PropertyTreeState>();
+  state->every_match = every_match;
   // §17.3: a checker's assertion reads the event, sequence or property bound
   // to a formal in the formal's place, as a property instance's body does.
   const ActualsByFormal kActuals =
@@ -856,6 +860,16 @@ PropertyTreeState* CreatePropertyTreeState(
     state->clocks.installed_at = PropertyClocks::kNever;
   }
   return state;
+}
+
+// §16.14.3: whether the attempt under `root`, its tree one sequence that
+// matched at this tick, is kept in flight for the matches it can still
+// reach, a cover sequence counting each.
+static bool MatchesAgain(const PropertyTreeState& state,
+                         const NodeState& root) {
+  return state.every_match &&
+         state.root->kind == PropertyExprNode::Kind::kSequence &&
+         root.verdict == Tri::kTrue && root.matches_again;
 }
 
 // The attempts of one tick: the first `advanced`, already stepped at this
@@ -879,8 +893,12 @@ static void StepAttempts(StepContext& sc, size_t beginning, size_t advanced,
     samples.SetInstanceBindings(nullptr);
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
-    } else {
-      tick.verdicts.push_back(VerdictOf(state.root, *state.attempts[i]));
+      continue;
+    }
+    tick.verdicts.push_back(VerdictOf(state.root, *state.attempts[i]));
+    if (MatchesAgain(state, *state.attempts[i])) {
+      state.attempts[i]->verdict = Tri::kPending;
+      kept.push_back(state.attempts[i]);
     }
   }
   state.attempts = std::move(kept);

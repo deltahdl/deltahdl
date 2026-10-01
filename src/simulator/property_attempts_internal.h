@@ -40,6 +40,9 @@ struct NodeState {
   // read there alone.
   const InstanceBindings* bindings = nullptr;
   LinearSequenceAttempt* attempt = nullptr;
+  // §16.14.3: whether the sequence's attempt, matched at this tick, may
+  // match again at a later one.
+  bool matches_again = false;
   std::vector<NodeState*> operands;
   std::vector<NodeState*> consequents;
   bool spawn_next = false;

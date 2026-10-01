@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "parser/ast_module.h"
@@ -25,6 +26,12 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
                                           std::string ep_name, SimContext& ctx,
                                           Arena& arena);
+
+// §16.13.6 with §23.6: the end point of the sequence a hierarchical name
+// `u.s` selects, the event `u.__seq_s` the monitor of the sequence s fires in
+// the instance u; empty where the name has no dot or selects no instance's
+// sequence.
+std::string HierarchicalEndPoint(std::string_view path, SimContext& ctx);
 
 // §16.12.2: one attempt of a sequence begun at one tick, kept apart from the
 // others as first_match keeps them, for a property that reads the sequence

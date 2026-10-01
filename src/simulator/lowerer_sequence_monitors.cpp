@@ -16,6 +16,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
+#include "simulator/assertion_read_names.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -399,6 +400,17 @@ void Lowerer::LowerSequenceMonitor(
   // matched where a property holds it, which tells the clocks apart; the
   // monitor, on the one clock, does not.
   if (NamesAnotherClock(body)) return;
+  // §16.5.1: the monitor reads its operands' sampled values, so the names the
+  // sequence reads are enrolled as an assertion's are.
+  std::unordered_set<std::string> names;
+  ForEachLinearSequenceExpr(
+      body, [&names](const Expr* e) { CollectSampledOperandNames(e, names); });
+  if (!names.empty()) {
+    AssertionSampleScope scope;
+    scope.inst_prefix = inst_prefix_;
+    scope.names.assign(names.begin(), names.end());
+    assertion_sample_scopes_.push_back(std::move(scope));
+  }
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kAlways;
   p->id = next_id_++;

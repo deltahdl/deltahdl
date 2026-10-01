@@ -23,6 +23,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
+#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
@@ -51,7 +52,13 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
       }
       seq_adds.insert(ep_name);
       seq_removes.insert(name);
+      continue;
     }
+    // §16.13.6 with §23.6: a sequence named through the instance hierarchy,
+    // `u.s`, is waited on through the end point of the sequence s declared
+    // in the instance u, which s's monitor there fires.
+    std::string ep_name = HierarchicalEndPoint(name, ctx);
+    if (!ep_name.empty()) seq_adds.insert(ep_name);
   }
   for (const auto& r : seq_removes) reads.erase(r);
   for (auto& a : seq_adds) reads.insert(a);

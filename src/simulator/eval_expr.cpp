@@ -28,6 +28,7 @@
 #include "simulator/eval_string.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
+#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -371,20 +372,44 @@ static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
                                   ctx.CurrentTime().ticks);
 }
 
-// §16.9.11 and §16.13.5: `triggered` and `matched` on the named sequence
-// `base_name`, the first true at the time step of the match alone and the
+// §16.9.11 and §16.13.5: `triggered` and `matched` on the end point
+// `ep_name`, the first true at the time step of the match alone and the
 // second storing a match until the first tick of the reading clock after
 // it; false where `field_name` names neither.
-static bool TrySequenceEndPointMethod(std::string_view base_name,
-                                      std::string_view field_name,
-                                      SimContext& ctx, Arena& arena,
-                                      Logic4Vec& out) {
+static bool TryEndPointMethod(std::string_view ep_name,
+                              std::string_view field_name, SimContext& ctx,
+                              Arena& arena, Logic4Vec& out) {
   if (field_name != "triggered" && field_name != "matched") return false;
-  std::string ep_name = std::string("__seq_") + std::string(base_name);
   bool reached = field_name == "matched" ? SequenceMatched(ep_name, ctx)
                                          : ctx.IsEventTriggered(ep_name);
   out = MakeLogic4VecVal(arena, 1, reached ? 1u : 0u);
   return true;
+}
+
+// The same on the named sequence `base_name`, whose end point the instance
+// reading it declares.
+static bool TrySequenceEndPointMethod(std::string_view base_name,
+                                      std::string_view field_name,
+                                      SimContext& ctx, Arena& arena,
+                                      Logic4Vec& out) {
+  return TryEndPointMethod("__seq_" + std::string(base_name), field_name, ctx,
+                           arena, out);
+}
+
+// §16.13.6 with §23.6: `triggered` or `matched` applied to a sequence named
+// through the instance hierarchy, `u.s.triggered`, reads the end point of the
+// sequence s declared in the instance u, which s's monitor in u fires under
+// u's prefix; false where the name selects no instance's sequence.
+static bool TryHierarchicalSequenceMethod(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, Logic4Vec& out) {
+  if (expr->lhs == nullptr || expr->rhs == nullptr ||
+      expr->lhs->kind != ExprKind::kMemberAccess) {
+    return false;
+  }
+  std::string ep_name =
+      HierarchicalEndPoint(HierarchicalReferenceName(expr->lhs), ctx);
+  if (ep_name.empty()) return false;
+  return TryEndPointMethod(ep_name, expr->rhs->text, ctx, arena, out);
 }
 
 // pseudo-methods. Returns true and fills `out` when `field_name` named one of
@@ -641,6 +666,7 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
 static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
   if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
+  if (TryHierarchicalSequenceMethod(expr, ctx, arena, out)) return true;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return true;
   // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-
   // free form, or any queue receiver) reorders in place; yield a void result.

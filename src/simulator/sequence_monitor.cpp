@@ -25,6 +25,7 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
@@ -783,6 +784,16 @@ bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
 
 }  // namespace
 
+std::string HierarchicalEndPoint(std::string_view path, SimContext& ctx) {
+  size_t dot = path.rfind('.');
+  if (dot == std::string_view::npos) return {};
+  std::string ep_name = std::string(path.substr(0, dot)) + ".__seq_" +
+                        std::string(path.substr(dot + 1));
+  const Variable* ep = ctx.FindVariable(ep_name);
+  if (ep == nullptr || !ep->is_event) return {};
+  return ep_name;
+}
+
 SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
                                           std::string ep_name, SimContext& ctx,
@@ -794,12 +805,20 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   bool keeps_locals = KeepsMatchLocals(body);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
+    // §16.13.6: the end point's triggered status is set in the Observed
+    // region of the tick, after the time step's Active region has read it,
+    // and the sequence reads its operands there as §16.5.1 samples them.
+    co_await RegionAwaiter{ctx, Region::kObserved};
+    auto& samples = ctx.AssertionSamples();
+    bool outer_evaluating_property = samples.EvaluatingProperty();
+    samples.SetEvaluatingProperty(true);
     for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // each advance adds beside the ones in flight.
     bool matched = keeps_locals
                        ? AdvanceKeepingLocals(body, active, ep_name, ctx, arena)
                        : AdvanceBody(body, active, ctx, arena);
+    samples.SetEvaluatingProperty(outer_evaluating_property);
     if (matched) FireSequenceEndpoint(ctx, ep_name);
   }
 }

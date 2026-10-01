@@ -101,11 +101,12 @@ bool DeclaredNameTables::ConsumeSequenceMatch(std::string_view ep_name,
                                               uint64_t now) {
   if (matched_ticks == UINT64_MAX || matched_ticks > now) return false;
   auto it = sequence_match_reads_.find(ep_name);
-  if (it != sequence_match_reads_.end() && it->second >= matched_ticks &&
-      it->second != now) {
-    return false;
+  if (it == sequence_match_reads_.end()) {
+    sequence_match_reads_.emplace(ep_name, now);
+    return true;
   }
-  sequence_match_reads_[ep_name] = now;
+  if (it->second >= matched_ticks && it->second != now) return false;
+  it->second = now;
   return true;
 }
 

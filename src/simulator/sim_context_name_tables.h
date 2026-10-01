@@ -20,6 +20,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -80,8 +82,7 @@ class DeclaredNameTables {
   // until the first tick of the reading sequence's clock after the match:
   // whether the end point named `ep_name`, last reached at `matched_ticks`
   // (kNever for never), is matched as read at `now`, a read at a time step
-  // consuming the match for the time steps after it. `ep_name` must outlive
-  // the context.
+  // consuming the match for the time steps after it.
   bool ConsumeSequenceMatch(std::string_view ep_name, uint64_t matched_ticks,
                             uint64_t now);
 
@@ -335,8 +336,9 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::unordered_map<std::string_view, ModuleItem*> property_decls_;
   std::unordered_map<const Expr*, std::string_view> sequence_instance_eps_;
-  // §16.13.5: the time step each end point's match was last read as matched.
-  std::unordered_map<std::string_view, uint64_t> sequence_match_reads_;
+  // §16.13.5: the time step each end point's match was last read as matched,
+  // under a copy of the end point's name, the reader's being free to go.
+  std::map<std::string, uint64_t, std::less<>> sequence_match_reads_;
   // §16.10: see RecordEndpointLocals.
   struct EndpointMatches {
     uint64_t at = 0;

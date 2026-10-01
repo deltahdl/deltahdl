@@ -116,7 +116,7 @@ TEST(SequenceMethods, AnActualThatNeverMatchesLeavesTheFormalsTriggeredFalse) {
 }
 
 // §16.13.6 with §23.9: a sequence declared in an instantiated module has an
-// end point of its own in each instance, which `triggered` read in the
+// end point of its own in each instance, which `triggered` waited on in the
 // instance sees: each of u and w counts the ends of a ##1 a at 15 and 25 of
 // its own a, u's high from 2 to 32 and w's never. The instance's sequence had
 // no monitor, and its end point was never reached.
@@ -126,7 +126,11 @@ TEST(SequenceMethods, TriggeredInAnInstanceReadsItsOwnEndPoint) {
       "module child(input logic a, input logic clk);\n"
       "  int hits = 0;\n"
       "  sequence s; @(posedge clk) a ##1 a; endsequence\n"
-      "  always @(posedge clk) #0 if (s.triggered) hits = hits + 1;\n"
+      "  initial forever begin\n"
+      "    wait (s.triggered);\n"
+      "    hits = hits + 1;\n"
+      "    @(posedge clk);\n"
+      "  end\n"
       "endmodule\n"
       "module top;\n"
       "  logic clk = 0, a = 0, never = 0;\n"
@@ -139,6 +143,71 @@ TEST(SequenceMethods, TriggeredInAnInstanceReadsItsOwnEndPoint) {
   ASSERT_NE(u_hits, nullptr);
   EXPECT_EQ(u_hits->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("w.hits")->value.ToUint64(), 0u);
+}
+
+// §16.13.6 with §23.6: `triggered` read through a hierarchical name, u.s,
+// reads the end point of the sequence s of the instance the name selects, a
+// wait on it resuming there: u's s ends at 15 and 25, its v1 high from 2 to
+// 22, and w's s, its v1 never high, ends nowhere, so the waits on u.s resume
+// twice, the last at 25, and those on w.s never.
+TEST(SequenceMethods, TriggeredThroughAHierarchicalNameReadsThatInstances) {
+  SimFixture f;
+  auto* u_hits = RunAndFindVar(
+      "module m(input logic clk, input logic v1);\n"
+      "  logic v2 = 1;\n"
+      "  sequence s; @(posedge clk) v1 ##1 v2; endsequence\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic clk = 0, a = 0, never = 0;\n"
+      "  int u_hits = 0, w_hits = 0, last = 0;\n"
+      "  m u(clk, a);\n"
+      "  m w(clk, never);\n"
+      "  initial forever begin\n"
+      "    wait (u.s.triggered);\n"
+      "    u_hits++;\n"
+      "    last = $time;\n"
+      "    #1;\n"
+      "  end\n"
+      "  initial forever begin\n"
+      "    wait (w.s.triggered);\n"
+      "    w_hits++;\n"
+      "    #1;\n"
+      "  end\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin #2 a = 1; #20 a = 0; #30 $finish; end\n"
+      "endmodule\n",
+      f, "u_hits");
+  ASSERT_NE(u_hits, nullptr);
+  EXPECT_EQ(u_hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
+  EXPECT_EQ(f.ctx.FindVariable("w_hits")->value.ToUint64(), 0u);
+}
+
+// §16.13.6: the triggered status of a sequence is set in the Observed region
+// of the time step its end point is reached at and persists to the end of the
+// time step: s ends at 15 and 25, so a process waking at those posedges reads
+// `s.triggered` in the Active region, before the status is set, and counts
+// none, while a wait on it resumes after the Observed region and counts both.
+TEST(SequenceMethods, TriggeredIsSetInTheObservedRegion) {
+  SimFixture f;
+  auto* active_hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, v1 = 0, v2 = 1;\n"
+      "  int active_hits = 0, waited_hits = 0;\n"
+      "  sequence s; @(posedge clk) v1 ##1 v2; endsequence\n"
+      "  always @(posedge clk) if (s.triggered) active_hits++;\n"
+      "  initial forever begin\n"
+      "    wait (s.triggered);\n"
+      "    waited_hits++;\n"
+      "    @(posedge clk);\n"
+      "  end\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin #2 v1 = 1; #20 v1 = 0; #30 $finish; end\n"
+      "endmodule\n",
+      f, "active_hits");
+  ASSERT_NE(active_hits, nullptr);
+  EXPECT_EQ(active_hits->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("waited_hits")->value.ToUint64(), 2u);
 }
 
 }  // namespace

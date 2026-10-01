@@ -575,7 +575,7 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
   PropertyTreeState*& state = proc->property_tree_states[stmt];
   if (state == nullptr) {
     state = CreatePropertyTreeState(stmt->assert_property, stmt->assert_clock,
-                                    ctx, arena);
+                                    stmt->cover_sequence, ctx, arena);
     if (state == nullptr) return;
     auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
     p->kind = ProcessKind::kFinal;

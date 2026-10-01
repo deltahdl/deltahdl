@@ -104,4 +104,38 @@ TEST(MatchedEndPoint, AReadConsumesTheStoredMatch) {
   EXPECT_EQ(ends.ends, 0u);
 }
 
+// §16.13.5: each match is consumed by the first read after it, however long
+// the sequence's name: a ##1 a matches at 25 and 85 on clk, so the reads at
+// the ticks of sysclk find it at 40 and 88 alone, and none of 56, 72, 104
+// and 120 reads a match already consumed.
+TEST(MatchedEndPoint, AReadConsumesTheMatchOfASequenceWithALongName) {
+  SimFixture f;
+  auto* reads = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, sysclk = 0, a = 0;\n"
+      "  int reads = 0, last_read = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always #8 sysclk = ~sysclk;\n"
+      "  sequence a_sequence_named_past_the_small_string_buffer;\n"
+      "    @(posedge clk) a ##1 a;\n"
+      "  endsequence\n"
+      "  always @(posedge sysclk)\n"
+      "    if (a_sequence_named_past_the_small_string_buffer.matched) begin\n"
+      "      reads++;\n"
+      "      last_read = $time;\n"
+      "    end\n"
+      "  initial begin\n"
+      "    #12 a = 1;\n"
+      "    #20 a = 0;\n"
+      "    #40 a = 1;\n"
+      "    #20 a = 0;\n"
+      "    #30 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "reads");
+  ASSERT_NE(reads, nullptr);
+  EXPECT_EQ(reads->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last_read")->value.ToUint64(), 88u);
+}
+
 }  // namespace

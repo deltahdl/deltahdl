@@ -22,10 +22,13 @@ struct PropertyTreeState;
 // flattened; nullptr where an operand's sequence is not one the monitor
 // reads. §16.13: `leading_clock` is the assertion's clocking event, on
 // which every attempt begins, the clocks its sequences name beside being
-// told apart from it by watchers on their signals.
+// told apart from it by watchers on their signals. §16.14.3: `every_match`
+// keeps an attempt of a tree that is one sequence in flight past a match
+// while it can match again, so that each later match is a verdict too, as
+// a cover sequence counts every match of an attempt.
 PropertyTreeState* CreatePropertyTreeState(
     const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
-    SimContext& ctx, Arena& arena);
+    bool every_match, SimContext& ctx, Arena& arena);
 
 // The verdict of one attempt: whether the property held, and, where it did,
 // whether because of vacuity, which §16.14.3 counts apart: an implication
