@@ -94,4 +94,11 @@ class ClassConstraintValidator {
 void ValidateInlineUniqueGroups(const Expr* call, const ClassDecl* cls,
                                 const CompilationUnit* unit, DiagEngine& diag);
 
+// 18.5.4 with 18.7: checks the inline uniqueness groups of every randomize()
+// with call in the unit against the class of the object it randomizes, found
+// from the static type of the receiver in the scope the call stands in.
+// Defined in elaborator_validate_inline_unique.cpp.
+void ValidateInlineUniqueReceivers(const CompilationUnit* unit,
+                                   DiagEngine& diag);
+
 }  // namespace delta

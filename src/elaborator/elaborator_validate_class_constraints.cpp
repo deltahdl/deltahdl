@@ -8,12 +8,10 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_helpers.h"
-#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -402,45 +400,6 @@ void ValidateInlineUniqueGroups(const Expr* call, const ClassDecl* cls,
                        BuildClassPropertyMap(cls, unit), unit, diag);
 }
 
-// 18.7: whether `call` is randomize() called on the object a method runs on,
-// as `randomize()` or `this.randomize()`.
-static bool IsSelfRandomizeCall(const Expr* call) {
-  const Expr* callee = call->lhs;
-  if (callee == nullptr) return false;
-  if (callee->kind == ExprKind::kIdentifier) {
-    return callee->text == "randomize";
-  }
-  return callee->kind == ExprKind::kMemberAccess && callee->lhs != nullptr &&
-         callee->rhs != nullptr && callee->lhs->kind == ExprKind::kIdentifier &&
-         callee->lhs->text == "this" &&
-         callee->rhs->kind == ExprKind::kIdentifier &&
-         callee->rhs->text == "randomize";
-}
-
-static void CheckSelfInlineUniqueInExpr(const Expr* e, const ClassDecl* cls,
-                                        const CompilationUnit* unit,
-                                        DiagEngine& diag) {
-  if (e == nullptr) return;
-  if (e->kind == ExprKind::kCall && IsSelfRandomizeCall(e)) {
-    ValidateInlineUniqueGroups(e, cls, unit, diag);
-  }
-  ForEachExprChild(e, [&](const Expr* child) {
-    CheckSelfInlineUniqueInExpr(child, cls, unit, diag);
-  });
-}
-
-static void CheckSelfInlineUniqueInStmt(const Stmt* s, const ClassDecl* cls,
-                                        const CompilationUnit* unit,
-                                        DiagEngine& diag) {
-  if (s == nullptr) return;
-  ForEachChildExpr(s, [&](const Expr* e) {
-    CheckSelfInlineUniqueInExpr(e, cls, unit, diag);
-  });
-  ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckSelfInlineUniqueInStmt(sub, cls, unit, diag);
-  });
-}
-
 void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
     const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
@@ -448,21 +407,13 @@ void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
     if (m->kind == ClassMemberKind::kConstraint) {
       ValidateUniqueGroups(m, properties, unit_, diag_);
     }
-    // 18.7: an inline constraint block of randomize() called on the object a
-    // method runs on names that object's members, so its groups are checked
-    // against this class.
-    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
-      for (const Stmt* st : m->method->func_body_stmts) {
-        CheckSelfInlineUniqueInStmt(st, cls, unit_, diag_);
-      }
-      CheckSelfInlineUniqueInStmt(m->method->body, cls, unit_, diag_);
-    }
   }
 }
 
 void ClassConstraintValidator::ValidateUniqueConstraints() {
   for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassUniqueConstraints(cls);
+  ValidateInlineUniqueReceivers(unit_, diag_);
 }
 
 // 18.5.9: the restrictions that apply to solve...before variable ordering:

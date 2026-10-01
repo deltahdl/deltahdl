@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -245,6 +247,326 @@ TEST(UniqueMemberForms, InlineRandMembersAccepted) {
              "  C c = new;\n"
              "  initial void'(c.randomize() with { unique {a, b}; });\n"
              "endmodule\n"));
+}
+
+// 18.5.4 with 18.7: the receiver of randomize() with may be any expression
+// that yields a handle, and its group is checked against the class of that
+// handle: an element of an array of handles, a handle property reached
+// through one or more other handles or through its class, and the handle a
+// method or a static method returns.
+TEST(UniqueMemberForms, InlineRandcMemberThroughReceiverExpressionRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "  static C inst;\n"
+             "  function C self(); return this; endfunction\n"
+             "  static function C make(); return inst; endfunction\n"
+             "endclass\n"
+             "class W;\n"
+             "  C sub;\n"
+             "endclass\n"
+             "class V;\n"
+             "  W w;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C o[2][2];\n"
+             "  initial begin\n"
+             "    W w;\n"
+             "    V vv;\n"
+             "    void'(o[0][1].randomize() with { unique {a, b}; });\n"
+             "    void'(w.sub.randomize() with { unique {a, b}; });\n"
+             "    void'(o[1][0].self().randomize() with { unique {a, b}; });\n"
+             "    void'(C::inst.randomize() with { unique {a, b}; });\n"
+             "    void'(C::make().randomize() with { unique {a, b}; });\n"
+             "    void'(vv.w.sub.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
+  for (uint32_t line : {19u, 20u, 21u, 22u, 23u, 24u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7: a method of another class may randomize an object through
+// a handle of its own -- a local, an argument, a property of its class or of a
+// class it extends -- in a class nested in another, and in a body written out
+// of the class's block, which names the same members (8.24); a method of a
+// subclass may randomize its own object through super.
+TEST(UniqueMemberForms, InlineRandcMemberThroughMethodHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "class B;\n"
+             "  C inherited;\n"
+             "endclass\n"
+             "class H extends B;\n"
+             "  C p;\n"
+             "  extern function int later();\n"
+             "  function int go(C arg);\n"
+             "    C x;\n"
+             "    return x.randomize() with { unique {a, b}; }\n"
+             "         + arg.randomize() with { unique {a, b}; }\n"
+             "         + p.randomize() with { unique {a, b}; }\n"
+             "         + inherited.randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "endclass\n"
+             "function int H::later();\n"
+             "  return p.randomize() with { unique {a, b}; };\n"
+             "endfunction\n"
+             "class Outer;\n"
+             "  class Inner;\n"
+             "    function int go(C h);\n"
+             "      return h.randomize() with { unique {a, b}; };\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endclass\n"
+             "class E extends C;\n"
+             "  function int go();\n"
+             "    return super.randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 7u);
+  for (uint32_t line : {13u, 14u, 15u, 16u, 20u, 25u, 31u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7: neither clause limits where the call stands, so a call in
+// a module's function or task, in a procedure of a generate block, in a
+// declaration's initializer or in a package's function is checked as one in
+// an initial block is.
+TEST(UniqueMemberForms, InlineRandcMemberOutsideModuleProcedureRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "package p;\n"
+             "  C g;\n"
+             "  function int f();\n"
+             "    return g.randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module m(input logic clk);\n"
+             "  C c = new;\n"
+             "  int r = c.randomize() with { unique {a, b}; };\n"
+             "  function int f(C arg);\n"
+             "    return arg.randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "  task t();\n"
+             "    void'(c.randomize() with { unique {a, b}; });\n"
+             "  endtask\n"
+             "  if (1) begin : g\n"
+             "    C d;\n"
+             "    initial void'(d.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "  case (1)\n"
+             "    1: begin : k\n"
+             "      initial void'(c.randomize() with { unique {a, b}; });\n"
+             "    end\n"
+             "  endcase\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
+  for (uint32_t line : {8u, 13u, 15u, 18u, 22u, 26u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.7: the receiver's name resolves in the innermost scope declaring it, so a
+// method's local handle of a class whose b is rand hides the module's handle
+// of a class whose b is randc, and the group is accepted; a name the method
+// does not redeclare still reaches the module's handle.
+TEST(UniqueMemberForms, InlineReceiverResolvesInInnermostScope) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "class D;\n"
+             "  rand bit [1:0] a;\n"
+             "  rand bit [1:0] b;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C x;\n"
+             "  C y;\n"
+             "  class H;\n"
+             "    function int go();\n"
+             "      D x;\n"
+             "      return x.randomize() with { unique {a, b}; }\n"
+             "           + y.randomize() with { unique {a, b}; };\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 16,
+      "18.5.4"));
+}
+
+// 18.5.4 with 18.12: a group of rand members is accepted whatever the
+// receiver -- a handle in another instance, one named upward through its
+// module, the handle an array method yields -- and so is a group of the scope
+// randomize, whose names are the calling scope's variables, written with or
+// without std::.
+TEST(UniqueMemberForms, InlineRandGroupAcceptedWhateverTheReceiver) {
+  EXPECT_TRUE(
+      ElabOk("class D;\n"
+             "  rand bit [1:0] a;\n"
+             "  rand bit [1:0] b;\n"
+             "endclass\n"
+             "module child;\n"
+             "  D d = new;\n"
+             "  initial void'(m.x.randomize() with { unique {a, b}; });\n"
+             "endmodule\n"
+             "module m;\n"
+             "  D x;\n"
+             "  D q[$];\n"
+             "  bit [1:0] v;\n"
+             "  bit [1:0] w;\n"
+             "  child u();\n"
+             "  initial begin\n"
+             "    void'(u.d.randomize() with { unique {a, b}; });\n"
+             "    void'(q.pop_front().randomize() with { unique {a, b}; });\n"
+             "    void'(std::randomize(v, w) with { unique {v, w}; });\n"
+             "    void'(randomize(v, w) with { unique {v, w}; });\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// 18.5.4 with 18.7 and 6.18: a typedef of a class names that class, so a
+// handle declared through one -- of the compilation unit, through another
+// typedef, of a module, or of the class holding the handle -- is a handle of
+// that class; a forward typedef of the class leaves a handle declared with the
+// class's own name as it was.
+TEST(UniqueMemberForms, InlineRandcMemberThroughTypedefHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("typedef class C;\n"
+             "class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "typedef C CT;\n"
+             "typedef CT CT2;\n"
+             "class W;\n"
+             "  typedef C T;\n"
+             "  T sub;\n"
+             "endclass\n"
+             "module m;\n"
+             "  typedef C MT;\n"
+             "  MT y;\n"
+             "  initial begin\n"
+             "    CT2 x;\n"
+             "    W w;\n"
+             "    C z;\n"
+             "    void'(x.randomize() with { unique {a, b}; });\n"
+             "    void'(y.randomize() with { unique {a, b}; });\n"
+             "    void'(w.sub.randomize() with { unique {a, b}; });\n"
+             "    void'(z.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+  for (uint32_t line : {19u, 20u, 21u, 22u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7 and 23.6: a hierarchical name reaches a handle in another
+// instance -- a child, a child's child, or an element of an array of
+// instances -- and the group is checked against that handle's class.
+TEST(UniqueMemberForms, InlineRandcMemberThroughInstanceHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "module leaf;\n"
+             "  C d;\n"
+             "endmodule\n"
+             "module mid;\n"
+             "  C d;\n"
+             "  leaf v();\n"
+             "endmodule\n"
+             "module m;\n"
+             "  mid u();\n"
+             "  mid ua[2] ();\n"
+             "  initial begin\n"
+             "    void'(u.d.randomize() with { unique {a, b}; });\n"
+             "    void'(u.v.d.randomize() with { unique {a, b}; });\n"
+             "    void'(ua[1].d.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+  for (uint32_t line : {16u, 17u, 18u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7 and 26.3: a package variable is reached as p::g, or by its
+// bare name through a wildcard or an explicit import, and the group is
+// checked against its class.
+TEST(UniqueMemberForms, InlineRandcMemberThroughPackageHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "package p;\n"
+             "  C g;\n"
+             "  C h;\n"
+             "endpackage\n"
+             "package q;\n"
+             "  C k;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import p::*;\n"
+             "  import q::k;\n"
+             "  initial begin\n"
+             "    void'(p::g.randomize() with { unique {a, b}; });\n"
+             "    void'(h.randomize() with { unique {a, b}; });\n"
+             "    void'(k.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+  for (uint32_t line : {16u, 17u, 18u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
 }
 
 }  // namespace

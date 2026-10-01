@@ -451,6 +451,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_array_shape.cpp
     elaborator/elaborator_validate_class_array_index.cpp
     elaborator/elaborator_validate_class_constraints.cpp
+    elaborator/elaborator_validate_inline_unique.cpp
+    elaborator/elaborator_class_lookup.cpp
     elaborator/elaborator_validate_class_constraint_methods.cpp
     elaborator/elaborator_validate_class_handles.cpp
     elaborator/elaborator_validate_class_inheritance.cpp
