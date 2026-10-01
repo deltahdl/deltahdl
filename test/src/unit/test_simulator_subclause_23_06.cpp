@@ -175,4 +175,27 @@ TEST(HierarchicalNames, ReadOfAnUnsignedVariableByHierarchicalNameIsUnsigned) {
       "1 1 -3 -5\n");
 }
 
+// §23.6: an element select of an array named from $root reads and writes
+// the top's array, never the like-named one of the instance running it: sub
+// sets its own arr[1] to 0, writes 0 into top's arr[0] by the rooted name,
+// and reads top's arr[1], which stays 1.
+TEST(HierarchicalNames, RootHeadedArrayElementIsTheTopsElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  logic arr [1:0] = '{1, 1};\n"
+                       "  initial begin\n"
+                       "    arr[1] = 0;\n"
+                       "    $root.top.arr[0] = 0;\n"
+                       "    #1 $display(\"%0d %0d %0d\", $root.top.arr[1],\n"
+                       "                $root.top.arr[0], arr[0]);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic arr [1:0] = '{1, 1};\n"
+                       "  sub c();\n"
+                       "endmodule\n",
+                       f),
+            "1 0 1\n");
+}
+
 }  // namespace

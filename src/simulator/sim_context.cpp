@@ -794,6 +794,13 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
 // all. The bare key stays the answer for an array of the enclosing scope, so
 // a name that resolved before still does.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
+  // §23.6: a name written from $root is absolute, as FindVariable reads it.
+  constexpr std::string_view kRootPrefix = "$root.";
+  if (name.starts_with(kRootPrefix)) {
+    auto it =
+        array_infos_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
+    return it == array_infos_.end() ? nullptr : &it->second;
+  }
   for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->arrays.find(name);

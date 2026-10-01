@@ -326,8 +326,9 @@ std::string RootedReferenceKey(const Expr* expr);
 Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx);
 // The key the unpacked array an element select stands on is held under: a
 // bare or package-scoped name's (ScopedOrBareTargetKey), or a hierarchical
-// name's, `u.b` for the array b of instance u (§23.6). Empty for a base of
-// any other shape. Defined in eval_hierarchical_name.cpp.
+// name's, `u.b` for the array b of instance u (§23.6), with `$root.` kept
+// ahead of a name $root heads. Empty for a base of any other shape. Defined
+// in eval_hierarchical_name.cpp.
 std::string_view ArrayRootKey(const Expr* base, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);

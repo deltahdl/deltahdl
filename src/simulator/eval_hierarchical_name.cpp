@@ -7,6 +7,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "parser/ast_expr.h"
@@ -92,6 +93,14 @@ Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx) {
 }
 
 std::string_view ArrayRootKey(const Expr* base, Arena& arena) {
+  // A name $root heads keeps the head, for the array and its elements to be
+  // read from the top of the design (SimContext::FindArrayInfo).
+  if (base != nullptr &&
+      (base->kind == ExprKind::kIdentifier ||
+       (base->kind == ExprKind::kMemberAccess && !base->is_scope_resolution))) {
+    std::string rooted = RootedReferenceKey(base);
+    if (!rooted.empty()) return *arena.Create<std::string>(std::move(rooted));
+  }
   std::string_view key = ScopedOrBareTargetKey(base, arena);
   if (!key.empty() || base == nullptr ||
       base->kind != ExprKind::kMemberAccess || base->is_scope_resolution) {
