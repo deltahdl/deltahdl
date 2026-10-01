@@ -216,6 +216,8 @@ class Elaborator : public ElaboratorClassRules {
   bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
+  // §16.14.6, §17.3: a procedure's process, its assertions and checkers first.
+  void AddProcedure(ModuleItem* item, RtlirModule* mod, RtlirProcessKind kind);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);
   // Third-level dispatch for the §16 assertion/sequence/property/clocking
@@ -915,8 +917,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateProgramWideSpaceAccess(const ModuleDecl* decl);
 
   void ValidateProgramWideSpaceAccessInPackageAndCuScopes();
-
-  ModuleItem* FindCuScopeItem(std::string_view name) const;
 
   void ApplyBindDirectives(RtlirModule* top);
   // §23.11: the invariant context carried through the bind hierarchy walk --

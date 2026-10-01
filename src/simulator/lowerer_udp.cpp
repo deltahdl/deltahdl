@@ -26,7 +26,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"

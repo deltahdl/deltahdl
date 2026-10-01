@@ -475,13 +475,6 @@ void Elaborator::RegisterCuScopeItems() {
   all_cu_param_scope_ = cu_param_scope_;
 }
 
-ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
-  for (auto* item : unit_->cu_items) {
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
 std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
     std::string_view name) const {
   // A cell clause of a config an instance was handed to is the nearer rule for

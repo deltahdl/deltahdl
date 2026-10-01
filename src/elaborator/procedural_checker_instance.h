@@ -4,7 +4,6 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 

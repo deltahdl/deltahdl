@@ -310,6 +310,10 @@ class Lowerer {
   // §17.3: gives each process the assertions of the instances its checker
   // instantiations name, once every instance has been lowered.
   void LinkCheckerInstantiations();
+  // §17.3: lowers the body of the child instance `child`, whose prefix is
+  // inst_prefix_, as a procedural checker root where it is a procedural
+  // checker instance outside any other.
+  void LowerChildBodyUnderCheckerRoot(const RtlirModuleInst& child);
   void LowerChildModules(const RtlirModule* mod);
   // One instance of LowerChildModules: its module's declarations, port
   // connections, processes and instances, all under the instance's name
