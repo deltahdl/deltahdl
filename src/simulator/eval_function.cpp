@@ -43,20 +43,41 @@ namespace delta {
 // indeterminate, and lets an implementation issue an error -- this one does,
 // at the call, so that the 0 the call then yields is not read as a valid
 // value. True where the static method was found and `info` names it.
-static bool ResolveThroughNullHandle(const MethodCallParts& parts,
+static bool ResolveStaticThroughNull(std::string_view method_name,
                                      std::string_view class_type,
                                      SimContext& ctx,
                                      InstanceMethodInfo& info) {
   const ClassTypeInfo* cls = ctx.FindClassType(class_type);
   if (cls == nullptr) return false;
   for (const auto* t = cls; t != nullptr; t = t->parent) {
-    auto it = t->methods.find(std::string(parts.method_name));
+    auto it = t->methods.find(std::string(method_name));
     if (it == t->methods.end()) continue;
-    if (!it->second->is_static_method) break;
+    if (!it->second->is_static_method) return false;
+    info.obj = nullptr;
     info.method = it->second;
     info.owner = t;
     return true;
   }
+  return false;
+}
+
+void ReportNullHandleCall(std::string_view method_name, SourceLoc loc,
+                          SimContext& ctx) {
+  ctx.GetDiag().Error(
+      loc,
+      "method '" + std::string(method_name) + "' called through a null handle",
+      Subclause("8.4"));
+}
+
+// The named-handle form of the rule above: a static method is found through
+// the handle's declared class, and any other is reported naming the handle.
+static bool ResolveThroughNullHandle(const MethodCallParts& parts,
+                                     std::string_view class_type,
+                                     SimContext& ctx,
+                                     InstanceMethodInfo& info) {
+  if (ResolveStaticThroughNull(parts.method_name, class_type, ctx, info))
+    return true;
+  if (ctx.FindClassType(class_type) == nullptr) return false;
   if (!parts.loc.IsValid()) return false;
   ctx.GetDiag().Error(parts.loc,
                       "method '" + std::string(parts.method_name) +
@@ -110,7 +131,10 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
                                   std::string_view method_name, SimContext& ctx,
                                   InstanceMethodInfo& info) {
   info.obj = obj;
-  if (obj == nullptr) return false;
+  // §8.10: a static method is the declared class's and runs with no object, so
+  // a receiver holding null still names it.
+  if (obj == nullptr)
+    return ResolveStaticThroughNull(method_name, declared_class, ctx, info);
   auto* declared_type = ctx.FindClassType(declared_class);
   info.method = ResolveNonVirtualFromDeclared(method_name, declared_type, info);
   if (!info.method)

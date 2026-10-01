@@ -623,7 +623,12 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   }
   InstanceMethodInfo info;
   info.obj = ctx.GetClassObject(handle.ToUint64());
-  if (info.obj == nullptr) return false;
+  // §8.4: a call through the null handle a call answered is reported, once,
+  // since this arm owns the receiver and no later one evaluates it again.
+  if (info.obj == nullptr) {
+    ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
+    return false;
+  }
   info.method = ResolveMethodOnObject(info.obj, access->rhs->text, &info.owner);
   if (info.method == nullptr) return false;
   // Run as a method called through a variable is: a static one in class scope

@@ -136,22 +136,33 @@ bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 
 bool ResolveAssocElementMethod(const Expr* access, SimContext& ctx,
-                               Arena& arena, InstanceMethodInfo& info) {
+                               Arena& arena, InstanceMethodInfo& info,
+                               bool report_null) {
   const Expr* sel = nullptr;
   std::string_view class_type;
   if (!SplitMemberOfSelect(access, sel) ||
       HandleArrayOfSelect(sel, ctx, arena, class_type) == nullptr) {
     return false;
   }
-  return ResolveMethodByDeclaredClass(ElementObject(sel, ctx, arena),
-                                      class_type, access->rhs->text, ctx, info);
+  ClassObject* obj = ElementObject(sel, ctx, arena);
+  if (ResolveMethodByDeclaredClass(obj, class_type, access->rhs->text, ctx,
+                                   info)) {
+    return true;
+  }
+  if (obj == nullptr && report_null) {
+    ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
+  }
+  return false;
 }
 
 bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
   InstanceMethodInfo info;
-  if (!ResolveAssocElementMethod(expr->lhs, ctx, arena, info)) return false;
+  if (!ResolveAssocElementMethod(expr->lhs, ctx, arena, info,
+                                 /*report_null=*/true)) {
+    return false;
+  }
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

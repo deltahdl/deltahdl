@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 
 namespace delta {
@@ -208,12 +209,21 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
 // virtual by the object and one it holds non-virtually by the declared class,
 // and §8.26.9 resolves an interface-class handle by the object. Shared with
 // the containers of handles (eval_assoc_class_handles.h), whose element has no
-// variable to name it by. False for a null `obj` or a method the object's
-// class does not have. Defined in eval_function.cpp.
+// variable to name it by. For a null `obj`, §8.10 still finds a static method
+// of the declared class, which runs with no object; false for any other method
+// through null, or a method the object's class does not have. Defined in
+// eval_function.cpp.
 bool ResolveMethodByDeclaredClass(ClassObject* obj,
                                   std::string_view declared_class,
                                   std::string_view method_name, SimContext& ctx,
                                   InstanceMethodInfo& info);
+
+// §8.4: reports at `loc` a call of `method_name` through a handle expression
+// that holds null -- an element, a handle held in a property, a call's result
+// -- where a named handle's report names the handle. Defined in
+// eval_function.cpp.
+void ReportNullHandleCall(std::string_view method_name, SourceLoc loc,
+                          SimContext& ctx);
 // Runs the method ResolveInstanceMethod answered, `expr` the call whose
 // actuals bind its formals: a static method in class scope (§8.10), an
 // instance method on the object with the method's defining class as the

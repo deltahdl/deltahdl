@@ -48,8 +48,11 @@ bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
 // eval_instance_task.cpp), which runs the task as a coroutine so §13.3's
 // delays are consumed; resolved by the evaluator alone, `aa["k"].run();` ran
 // on the synchronous interpreter and dropped its `#10`.
+// §8.4: an element that holds null is reported when `report_null` asks, which
+// the call below does and the task enable, which falls to it, does not.
 bool ResolveAssocElementMethod(const Expr* access, SimContext& ctx,
-                               Arena& arena, InstanceMethodInfo& info);
+                               Arena& arena, InstanceMethodInfo& info,
+                               bool report_null);
 
 // `expr` as `m[k].f(...)`, the method ResolveAssocElementMethod names run
 // with the call's actuals; the method-call evaluator (TryDispatchMethodOrLet

@@ -14,10 +14,12 @@
 #include <unordered_map>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array_handles.h"
@@ -184,6 +186,23 @@ static bool ResolveMethodOnStaticHandle(const Expr* access, SimContext& ctx,
                                       call);
 }
 
+// Whether `base` is `owner.p` for an object `owner` whose class declares the
+// scalar property `p` with a class type, so that the null it holds is a null
+// handle (§8.4).
+static bool HeldHandleProperty(const Expr* base, SimContext& ctx,
+                               Arena& arena) {
+  if (base->kind != ExprKind::kMemberAccess || base->is_scope_resolution ||
+      base->lhs == nullptr || base->rhs == nullptr ||
+      base->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const ClassObject* owner =
+      ctx.GetClassObject(EvalExpr(base->lhs, ctx, arena).ToUint64());
+  if (owner == nullptr || owner->type == nullptr) return false;
+  return !PropertyClassName(owner, owner->type, base->rhs->text, ctx).empty() &&
+         !PropertyIsArray(owner->type, base->rhs->text, ctx);
+}
+
 // §8.6 (printed page 183): an object's task is enabled through any handle to
 // it, and a handle is what any expression of a class type yields -- a
 // method's result, `c.self().t(...)`, a property of an element's object,
@@ -209,8 +228,8 @@ static bool ResolveMethodOnStaticHandle(const Expr* access, SimContext& ctx,
 // resolves a call's receiver through this for the same reasons, in the same
 // place after its shaped arms.
 static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
-                                         Arena& arena,
-                                         InstanceMethodInfo& call) {
+                                         Arena& arena, InstanceMethodInfo& call,
+                                         bool report_null) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
       access->is_scope_resolution || access->lhs == nullptr ||
       access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
@@ -225,6 +244,18 @@ static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
   if (SelectsElementQueue(access->lhs, ctx, arena)) return false;
   ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
+  // §8.4: a base holding null is reported when `report_null` asks -- the
+  // expression evaluator's arm does, and a task enable's resolution does not,
+  // since an enable it declines falls to that arm (ExecCallStmtExpr) -- and
+  // only where the base is a handle property of a live object
+  // (HeldHandleProperty): a base of any other shape, a generate block's
+  // instance `blk[1]` among them, evaluates to 0 and is no handle at all.
+  if (obj == nullptr) {
+    if (report_null && HeldHandleProperty(access->lhs, ctx, arena)) {
+      ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
+    }
+    return false;
+  }
   return ResolveMethodByDeclaredClass(obj, {}, access->rhs->text, ctx, call);
 }
 
@@ -248,7 +279,10 @@ bool TryEvalMethodOnEvaluatedBase(const Expr* expr, SimContext& ctx,
     return false;
   }
   InstanceMethodInfo info;
-  if (!ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, info)) return false;
+  if (!ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, info,
+                                    /*report_null=*/true)) {
+    return false;
+  }
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }
@@ -273,9 +307,9 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
       return ResolveMethodByParts(parts, ctx, call) ||
              ResolveMethodOnStaticHandle(expr, ctx, arena, call);
     }
-    return ResolveElementObjectMethod(expr, ctx, arena, call) ||
-           ResolveAssocElementMethod(expr, ctx, arena, call) ||
-           ResolveMethodOnEvaluatedBase(expr, ctx, arena, call);
+    return ResolveElementObjectMethod(expr, ctx, arena, call, false) ||
+           ResolveAssocElementMethod(expr, ctx, arena, call, false) ||
+           ResolveMethodOnEvaluatedBase(expr, ctx, arena, call, false);
   }
   if (expr->kind != ExprKind::kIdentifier) return false;
   return ResolveMethodOnRunningObject(expr->text, ctx, call);
@@ -315,12 +349,17 @@ static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
   }
   MethodCallParts parts;
   if (ExtractHandleMethodCallParts(expr, arena, parts)) {
+    // §8.4: an enable through a named null handle is declined here without a
+    // report, as ResolveThroughNullHandle declines with no location, and is
+    // reported once by the expression evaluator the enable then falls to
+    // (ExecCallStmtExpr); reported here too, it was reported twice.
+    parts.loc = SourceLoc{};
     return ResolveMethodByParts(parts, ctx, call) ||
            ResolveMethodOnStaticHandle(expr->lhs, ctx, arena, call);
   }
-  return ResolveElementObjectMethod(expr->lhs, ctx, arena, call) ||
-         ResolveAssocElementMethod(expr->lhs, ctx, arena, call) ||
-         ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, call);
+  return ResolveElementObjectMethod(expr->lhs, ctx, arena, call, false) ||
+         ResolveAssocElementMethod(expr->lhs, ctx, arena, call, false) ||
+         ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, call, false);
 }
 
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,

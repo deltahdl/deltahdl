@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -332,10 +331,7 @@ ClassObject* ExprReceiverObject(const Expr* expr, std::string_view method,
   }
   uint64_t handle = EvalExpr(callee->lhs, ctx, arena).ToUint64();
   if (handle == kNullClassHandle) {
-    ctx.GetDiag().Error(
-        callee->rhs->range.start,
-        "method '" + std::string(method) + "' called through a null handle",
-        Subclause("8.4"));
+    ReportNullHandleCall(method, callee->rhs->range.start, ctx);
     return nullptr;
   }
   ClassObject* obj = ctx.GetClassObject(handle);

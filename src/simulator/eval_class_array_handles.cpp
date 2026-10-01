@@ -209,7 +209,8 @@ static bool SelectsAHandleElement(const Expr* sel, SimContext& ctx,
 }
 
 bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
-                                Arena& arena, InstanceMethodInfo& info) {
+                                Arena& arena, InstanceMethodInfo& info,
+                                bool report_null) {
   const Expr* sel = SelectOfMemberAccess(access);
   std::string_view declared;
   if (sel == nullptr || !SelectsAHandleElement(sel, ctx, arena, declared))
@@ -218,15 +219,24 @@ bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
   // addressing no element answering the null handle, which resolves no
   // method.
   ClassObject* obj = ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
-  return ResolveMethodByDeclaredClass(obj, declared, access->rhs->text, ctx,
-                                      info);
+  if (ResolveMethodByDeclaredClass(obj, declared, access->rhs->text, ctx,
+                                   info)) {
+    return true;
+  }
+  if (obj == nullptr && report_null) {
+    ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
+  }
+  return false;
 }
 
 bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out) {
   if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
   InstanceMethodInfo info;
-  if (!ResolveElementObjectMethod(expr->lhs, ctx, arena, info)) return false;
+  if (!ResolveElementObjectMethod(expr->lhs, ctx, arena, info,
+                                  /*report_null=*/true)) {
+    return false;
+  }
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

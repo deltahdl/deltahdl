@@ -453,6 +453,123 @@ TEST(ClassSim, StaticMethodCalledThroughANullHandleRuns) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
 }
 
+// The class the null-receiver cases below call through: an instance function,
+// an instance task and a static function, and a holder of one of its objects.
+const char* const kNullReceiverClasses =
+    "class C;\n"
+    "  int v = 5;\n"
+    "  function int get(); return v; endfunction\n"
+    "  task put(); v = 9; endtask\n"
+    "  static function int seven(); return 7; endfunction\n"
+    "endclass\n"
+    "class H;\n"
+    "  C inner;\n"
+    "endclass\n";
+
+// How many diagnostics the run reported whose message holds `text`.
+static int CountReports(const SimFixture& f, std::string_view text) {
+  int n = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find(text) != std::string::npos) ++n;
+  }
+  return n;
+}
+
+// §8.4: the rule holds whatever expression holds the null handle, so a call
+// through an element of an array of handles that holds none is reported at the
+// call, as one through a named null handle is.
+TEST(ClassSim, MethodCalledThroughANullArrayElementIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  int r = 99;\n"
+                                  "  C arr[1];\n"
+                                  "  initial r = arr[0].get();\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'get' called through a null handle", 13,
+                            "8.4"));
+}
+
+// §8.4: a task enabled through a null handle held in another object's property
+// is reported once, at the enable.
+TEST(ClassSim, TaskEnabledThroughANullHeldHandleIsReportedOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  H h;\n"
+                                  "  initial begin\n"
+                                  "    h = new;\n"
+                                  "    h.inner.put();\n"
+                                  "  end\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'put' called through a null handle", 14,
+                            "8.4"));
+  EXPECT_EQ(CountReports(f, "called through a null handle"), 1);
+}
+
+// §8.4: a task enabled through a named null handle is reported once, as a
+// function called through one is.
+TEST(ClassSim, TaskEnabledThroughANamedNullHandleIsReportedOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  C n;\n"
+                                  "  initial n.put();\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'put' called through the null handle 'n'",
+                            12, "8.4"));
+  EXPECT_EQ(CountReports(f, "called through the null handle"), 1);
+}
+
+// §8.4: a call through the null handle a function returns is reported too.
+TEST(ClassSim, MethodCalledThroughANullReturnedHandleIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  int r = 99;\n"
+                                  "  function automatic C none();\n"
+                                  "    return null;\n"
+                                  "  endfunction\n"
+                                  "  initial r = none().get();\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'get' called through a null handle", 15,
+                            "8.4"));
+}
+
+// §8.10: a static method is callable through an element of an array of handles
+// that holds none, as through a named null handle, so nothing is reported and
+// the method runs.
+TEST(ClassSim, StaticMethodCalledThroughANullArrayElementRuns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  int r = 99;\n"
+                                  "  C arr[1];\n"
+                                  "  initial r = arr[0].seven();\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
+}
+
 // Elaborates, lowers and runs `src` clean, then reads the value the run left
 // in `r` and the width `$bits` reported into `w`. A property that folded to
 // its base type's one bit truncates the value written through it and reports
