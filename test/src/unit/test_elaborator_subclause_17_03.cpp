@@ -235,7 +235,7 @@ TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
       "  end\n"
       "endmodule\n",
       f, "top");
-  const char* kMessage =
+  const char* const kMessage =
       "a checker shall not be instantiated in a fork-join, fork-join_any or "
       "fork-join_none block";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "17.3"));
