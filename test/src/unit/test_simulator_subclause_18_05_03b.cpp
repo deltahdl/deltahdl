@@ -219,4 +219,30 @@ TEST(SetMembershipRun, ARealInsideASetOfValuesAndRangesTakesOne) {
   EXPECT_EQ(out, "0 1\n");
 }
 
+// §18.4.1 with §11.4.13: a tolerance range in the set, `[2.0 +/- 0.25]`,
+// absolute, or `[10.0 +%- 5.0]`, a percentage of its centre, is drawn within
+// the range it gives.
+TEST(SetMembershipRun, ARealInsideAToleranceRangeIsDrawnWithinIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand real b;\n"
+      "  constraint c { b inside {[2.0 +/- 0.25], [10.0 +%- 5.0]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (40) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      if (!((c.b >= 1.75 && c.b <= 2.25) ||\n"
+      "            (c.b >= 9.5 && c.b <= 10.5))) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace
