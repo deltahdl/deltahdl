@@ -250,6 +250,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_class_new.cpp
     simulator/eval_class_params.cpp
     simulator/eval_function.cpp
+    simulator/eval_null_handle.cpp
     simulator/eval_function_ref_checks.cpp
     simulator/eval_function_hier.cpp
     simulator/eval_call_result.cpp

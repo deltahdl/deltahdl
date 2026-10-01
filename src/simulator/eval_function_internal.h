@@ -218,10 +218,26 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
                                   std::string_view method_name, SimContext& ctx,
                                   InstanceMethodInfo& info);
 
+// §8.10: the static method `method_name` of the class `class_type` or a base
+// of it, reached through a handle that refers to no object, into `info` with
+// no object. False where the class names none, or where the nearest method of
+// the name is an instance method. Defined in eval_null_handle.cpp.
+bool ResolveStaticThroughNull(std::string_view method_name,
+                              std::string_view class_type, SimContext& ctx,
+                              InstanceMethodInfo& info);
+
+// §8.4 with §8.10: a call through the named handle `parts` names, which holds
+// null: the static method its declared class `class_type` reaches, or else a
+// report at the call naming the handle, made only where `parts.loc` is valid.
+// Defined in eval_null_handle.cpp.
+bool ResolveThroughNullHandle(const MethodCallParts& parts,
+                              std::string_view class_type, SimContext& ctx,
+                              InstanceMethodInfo& info);
+
 // §8.4: reports at `loc` a call of `method_name` through a handle expression
 // that holds null -- an element, a handle held in a property, a call's result
 // -- where a named handle's report names the handle. Defined in
-// eval_function.cpp.
+// eval_null_handle.cpp.
 void ReportNullHandleCall(std::string_view method_name, SourceLoc loc,
                           SimContext& ctx);
 // Runs the method ResolveInstanceMethod answered, `expr` the call whose
