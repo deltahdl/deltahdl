@@ -728,11 +728,8 @@ bool IsPastDirectedCall(const Expr* e) {
 
 void CollectPastDirectedSites(const LinearSequence& body,
                               std::vector<const Expr*>& sites) {
-  ForEachLinearSequenceExpr(body, [&sites](const Expr* e) {
-    ForEachSubExpr(e, [&sites](const Expr* sub) {
-      if (IsPastDirectedCall(sub)) sites.push_back(sub);
-    });
-  });
+  ForEachLinearSequenceExpr(
+      body, [&sites](const Expr* e) { CollectPastDirectedSites(e, sites); });
 }
 
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
@@ -783,6 +780,12 @@ bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
 }
 
 }  // namespace
+
+void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites) {
+  ForEachSubExpr(e, [&sites](const Expr* sub) {
+    if (IsPastDirectedCall(sub)) sites.push_back(sub);
+  });
+}
 
 std::string HierarchicalEndPoint(std::string_view path, SimContext& ctx) {
   size_t dot = path.rfind('.');

@@ -18,7 +18,6 @@
 #include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
-#include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts_internal.h"
@@ -61,20 +60,6 @@ struct PropertyTreeState {
 };
 
 namespace {
-
-// §16.9.3: the sampled value functions the tree's booleans and sequences
-// hold, sampled at every tick as a procedure's are.
-bool IsPastDirectedCall(const Expr* e) {
-  if (e->kind != ExprKind::kSystemCall) return false;
-  return e->callee == "$past" || e->callee == "$rose" || e->callee == "$fell" ||
-         e->callee == "$stable" || e->callee == "$changed";
-}
-
-void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites) {
-  ForEachSubExpr(e, [&sites](const Expr* sub) {
-    if (IsPastDirectedCall(sub)) sites.push_back(sub);
-  });
-}
 
 // §16.12.14: marks the states of the abort `node` in the attempt under
 // `state`, in flight at the time step the condition became true at.

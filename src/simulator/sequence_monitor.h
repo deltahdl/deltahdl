@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/instance_bindings.h"
@@ -26,6 +27,11 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
                                           std::string ep_name, SimContext& ctx,
                                           Arena& arena);
+
+// §16.9.3: the sampled value functions `e` holds, appended to `sites`, so
+// that the history each looks back through is sampled at every tick of the
+// clock it is read on whether or not an attempt reads it there.
+void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites);
 
 // §16.13.6 with §23.6: the end point of the sequence a hierarchical name
 // `u.s` selects, the event `u.__seq_s` the monitor of the sequence s fires in
