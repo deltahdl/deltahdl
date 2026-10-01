@@ -103,6 +103,15 @@ bool TryArrayPatternEquality(const Expr* expr, SimContext& ctx, Arena& arena,
 
 namespace {
 
+// Whether `a` and `b`, of one width, agree at every bit known in both.
+bool KnownBitsMatch(const Logic4Vec& a, const Logic4Vec& b) {
+  for (uint32_t w = 0; w < a.nwords && w < b.nwords; ++w) {
+    uint64_t known = ~(a.words[w].bval | b.words[w].bval);
+    if (((a.words[w].aval ^ b.words[w].aval) & known) != 0) return false;
+  }
+  return true;
+}
+
 // Whether `layout`, or a structure nested in it, holds a dynamic member.
 bool HoldsDynamicMember(const StructTypeInfo& layout) {
   for (const auto& f : layout.fields) {
@@ -182,11 +191,16 @@ bool TryDynamicStructEquality(const Expr* expr, SimContext& ctx, Arena& arena,
   Logic4Vec a = OwnRhsWords(EvalExpr(expr->lhs, ctx, arena), arena);
   Logic4Vec b = OwnRhsWords(EvalExpr(expr->rhs, ctx, arena), arena);
   bool equal = DynamicMembersEqual(*layout, 0, a, b, arena);
-  // §11.4.5: an unknown bit makes == answer x, which the comparison of the
-  // values themselves gives; === compares it as it stands.
-  if (logical_eq && (!a.IsKnown() || !b.IsKnown())) return false;
-  equal = equal && SameBits(a, b);
   bool is_eq = expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq;
+  // §11.4.5: == answers x where no known bit differs but one is unknown, and
+  // === compares an unknown bit as it stands.
+  if (logical_eq && equal && KnownBitsMatch(a, b) &&
+      (!a.IsKnown() || !b.IsKnown())) {
+    out = MakeLogic4Vec(arena, 1);
+    out.words[0] = {1, 1};
+    return true;
+  }
+  equal = equal && SameBits(a, b);
   out = MakeLogic4VecVal(arena, 1, is_eq == equal ? 1 : 0);
   return true;
 }

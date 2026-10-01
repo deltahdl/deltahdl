@@ -276,4 +276,26 @@ TEST(AggregateEqualityRun, CaseEqualityAndPropertiesCompareTheElements) {
   EXPECT_EQ(out, "1 0 1\n");
 }
 
+// §11.2.2 with §11.4.5: a dynamic member of a nested structure is compared by
+// its elements too, and a member holding an unknown bit makes == answer x
+// where === still compares it as it stands.
+TEST(AggregateEqualityRun, NestedDynamicMembersAndUnknownBitsCompare) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { byte data[]; } in_t;\n"
+      "typedef struct { logic l; in_t in; } out_t;\n"
+      "module t;\n"
+      "  out_t x, y;\n"
+      "  initial begin\n"
+      "    x.in.data = new[1]; x.in.data[0] = 2;\n"
+      "    y.in.data = new[1]; y.in.data[0] = 2;\n"
+      "    $display(\"%b %0d\", x == y, x === y);\n"
+      "    x.l = 1; y.l = 1;\n"
+      "    $display(\"%0d\", x == y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x 1\n1\n");
+}
+
 }  // namespace
