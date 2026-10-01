@@ -580,23 +580,42 @@ void ClassConstraintValidator::ValidateConstraintInheritance() {
   }
 }
 
+// 18.5.1 with 26.2: the class an external constraint block completes, which
+// shares the block's scope: one of the compilation unit's classes for a block
+// at compilation-unit scope, one of the package's for a block in a package.
+// Null when that scope declares no class of the name the block gives.
+static ClassDecl* ExternalBlockClass(const CompilationUnit* unit,
+                                     const ExternalConstraintBlock& ext) {
+  if (ext.package_name.empty()) {
+    for (auto* cls : unit->classes) {
+      if (cls->name == ext.class_name) return cls;
+    }
+    return nullptr;
+  }
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != ext.package_name) continue;
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kClassDecl &&
+          item->class_decl != nullptr &&
+          item->class_decl->name == ext.class_name) {
+        return item->class_decl;
+      }
+    }
+  }
+  return nullptr;
+}
+
 void ClassConstraintValidator::ValidateExternalConstraints() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassExternalConstraints(cls);
   }
 
   // 18.5.1: an external constraint block shall appear in the same scope as its
-  // class declaration and after that class declaration. The block and the
-  // top-level class share a scope here; flag a block that precedes the end of
-  // its class declaration.
+  // class declaration and after that class declaration. The block is paired
+  // with the class of its own scope; flag a block that precedes the end of its
+  // class declaration.
   for (const auto& ext : unit_->external_constraints) {
-    const ClassDecl* target = nullptr;
-    for (const auto* cls : unit_->classes) {
-      if (cls->name == ext.class_name) {
-        target = cls;
-        break;
-      }
-    }
+    const ClassDecl* target = ExternalBlockClass(unit_, ext);
     if (target == nullptr) continue;
     if (LocStrictlyBefore(ext.loc, target->range.end)) {
       diag_.Error(
@@ -634,11 +653,8 @@ static void CompleteOneExternalConstraint(ClassDecl* cls,
 
 void ClassConstraintValidator::CompleteExternalConstraints() {
   for (const auto& ext : unit_->external_constraints) {
-    for (auto* cls : unit_->classes) {
-      if (cls->name != ext.class_name) continue;
-      CompleteOneExternalConstraint(cls, ext);
-      break;
-    }
+    ClassDecl* cls = ExternalBlockClass(unit_, ext);
+    if (cls != nullptr) CompleteOneExternalConstraint(cls, ext);
   }
 }
 

@@ -323,7 +323,9 @@ static std::string_view UniqueMemberBaseName(const Expr* e) {
 // member shall be of integral or real type — for an array member, its leaf
 // element type. Reject a member that denotes no variable (so the group is a
 // well-formed set of variables) and a member whose resolved type is plainly
-// neither integral nor real. The type check resolves a plain local identifier —
+// neither integral nor real, and, as no randc variable shall appear in the
+// group, a member that names a randc variable. The type check resolves a plain
+// local identifier —
 // or the base array of a select — against the class property map (walking the
 // base-class chain); a member-access-qualified or unresolved reference is left
 // alone, keeping the check conservative so it never flags a legitimate integral
@@ -345,6 +347,11 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
   if (base.empty()) return;
   auto it = properties.find(base);
   if (it == properties.end()) return;
+  if (it->second->is_randc) {
+    diag_.Error(mem->range.start,
+                "a uniqueness constraint member shall not be a randc variable",
+                Subclause("18.5.4"));
+  }
   if (!IsSolveOrderableType(it->second->data_type)) {
     diag_.Error(mem->range.start,
                 "a uniqueness constraint member shall be of integral or "

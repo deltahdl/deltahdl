@@ -98,20 +98,21 @@ TEST(ConstraintUnique, SingleMemberHasNoEffect) {
   EXPECT_EQ(RunAndGet(src, "ra"), 4u);
 }
 
-// 18.5.4: no randc variable shall appear in the group. A group that names a
-// randc member (18.4.2) is illegal and makes randomization fail.
-TEST(ConstraintUnique, RandcMemberFails) {
+// 18.5.4: no randc variable shall appear in the group. The elaborator rejects
+// a class constraint naming one; a group in an inline constraint that names a
+// randc member (18.4.2) reaches the solver, which finds it illegal and makes
+// randomization fail.
+TEST(ConstraintUnique, InlineRandcMemberFails) {
   const char* src =
       "class C;\n"
       "  rand byte a;\n"
       "  randc byte b;\n"
-      "  constraint u { unique {a, b}; }\n"
       "endclass\n"
       "module t;\n"
       "  int ok;\n"
       "  initial begin\n"
       "    static C o = new;\n"
-      "    ok = o.randomize();\n"
+      "    ok = o.randomize() with { unique {a, b}; };\n"
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);

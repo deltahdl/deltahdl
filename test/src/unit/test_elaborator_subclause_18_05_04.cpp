@@ -134,4 +134,42 @@ TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
                             4, "18.5.4"));
 }
 
+// 18.5.4: no randc variable shall appear in the group, so a group naming a
+// randc variable beside a rand one is rejected at the randc member.
+TEST(UniqueMemberForms, RandcMemberRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  randc bit [1:0] a;\n"
+             "  rand bit [1:0] b;\n"
+             "  constraint u { unique {b, a}; }\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a uniqueness constraint member shall not be "
+                            "a randc variable",
+                            4, "18.5.4"));
+}
+
+// 18.5.4: an inherited randc variable is as much a randc variable of the
+// group as one the class declares itself.
+TEST(UniqueMemberForms, InheritedRandcMemberRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class B;\n"
+             "  randc bit [2:0] a;\n"
+             "endclass\n"
+             "class C extends B;\n"
+             "  rand bit [2:0] b[2];\n"
+             "  constraint u { unique {b, a}; }\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a uniqueness constraint member shall not be "
+                            "a randc variable",
+                            6, "18.5.4"));
+}
+
 }  // namespace

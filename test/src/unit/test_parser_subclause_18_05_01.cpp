@@ -82,6 +82,31 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
   EXPECT_EQ(r.cu->external_constraints.front().constraint_name, "proto2");
 }
 
+// 18.5.1 with 26.2: the block shares its scope with the class it completes,
+// so the parser records the package that declares it, and no package for the
+// block at compilation-unit scope.
+TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsItsPackage) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    constraint proto1;\n"
+      "  endclass\n"
+      "  constraint C::proto1 { x > 0; }\n"
+      "endpackage\n"
+      "class D;\n"
+      "  rand int y;\n"
+      "  constraint proto1;\n"
+      "endclass\n"
+      "constraint D::proto1 { y > 0; }\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->external_constraints.size(), 2u);
+  EXPECT_EQ(r.cu->external_constraints[0].class_name, "C");
+  EXPECT_EQ(r.cu->external_constraints[0].package_name, "pkg");
+  EXPECT_EQ(r.cu->external_constraints[1].class_name, "D");
+  EXPECT_EQ(r.cu->external_constraints[1].package_name, "");
+}
+
 // 18.5.1: an external constraint block completes the prototype with the
 // relations in its body. The parser captures each top-level relation so that
 // elaboration can attach them to the prototype; a block with two relations

@@ -70,6 +70,28 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
                             1, "18.5.1"));
 }
 
+// 18.5.1: the block shall follow its class in the scope that declares both,
+// a package included, so a block placed ahead of its class inside a package is
+// an error there too.
+TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  constraint C::proto2 { x >= 0; }\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    extern constraint proto2;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::proto2' shall "
+                            "appear after the declaration of class 'C'",
+                            2, "18.5.1"));
+}
+
 // 18.5.1: a constraint block of the same name as a prototype in the same class
 // declaration is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {

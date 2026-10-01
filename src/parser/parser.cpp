@@ -447,7 +447,10 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
                                 is_final,
                                 is_static,
                                 std::move(body->constraint_exprs),
-                                std::move(body->constraint_soft_exprs)};
+                                std::move(body->constraint_soft_exprs),
+                                current_package_ != nullptr
+                                    ? current_package_->name
+                                    : std::string_view{}};
     unit->external_constraints.push_back(std::move(ext));
   }
 }

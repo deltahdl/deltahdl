@@ -120,6 +120,10 @@ struct ExternalConstraintBlock {
   // to the prototype as its own soft constraints, whose priority (18.5.13.1)
   // is the prototype's place in the class.
   std::vector<Expr*> constraint_soft_exprs;
+  // 18.5.1 with 26.2: the package that declares the block, empty for a block
+  // at compilation-unit scope. The block shares this scope with the class it
+  // completes, so the class is looked up among the package's classes.
+  std::string_view package_name;
 };
 
 struct CompilationUnit {

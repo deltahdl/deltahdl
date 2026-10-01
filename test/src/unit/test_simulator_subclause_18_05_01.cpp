@@ -80,4 +80,39 @@ TEST(ExternalConstraintBlocksRun, AnUncompletedImplicitPrototypeIsEmpty) {
   EXPECT_EQ(RunCapture(kSrc, f), "64 1\n$finish at time 0\n");
 }
 
+// 18.5.1 with 26.2: an external block declared in a package completes the
+// prototype of the package's class, as a block at compilation-unit scope does
+// the compilation unit's. The compilation unit declares a C of its own, whose
+// prototype the package's block, naming C in another scope, leaves empty, so
+// its x stays free while the package's x lands in 70..75.
+TEST(ExternalConstraintBlocksRun, ABlockInAPackageCompletesThePackagesClass) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint proto1;\n"
+      "endclass\n"
+      "package pkg;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    constraint proto1;\n"
+      "  endclass\n"
+      "  constraint C::proto1 { x inside {[70:75]}; }\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int in_range = 0, outside = 0;\n"
+      "  initial begin\n"
+      "    static pkg::C p = new;\n"
+      "    static C c = new;\n"
+      "    repeat (32) begin\n"
+      "      if (p.randomize() && p.x inside {[70:75]}) in_range++;\n"
+      "      void'(c.randomize());\n"
+      "      if (!(c.x inside {[70:75]})) outside++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", in_range, outside > 0);\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  EXPECT_EQ(RunCapture(src, f), "32 1\n");
+}
+
 }  // namespace
