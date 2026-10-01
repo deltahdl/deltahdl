@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -83,6 +84,49 @@ bool EnumerateInsideItems(const std::vector<Expr*>& elements,
   return true;
 }
 
+// §18.4.1 with §11.4.13: `rel`, a real variable inside a set of reals, which
+// lies in the closed interval between a single range's bounds, drawn as the
+// two comparisons bound it, or takes a value or a value within a range of any
+// other set, drawn as a distribution of its items. False for a set with a `$`
+// bound.
+static bool TryRealSetMembership(const Expr* rel, std::vector<RandInfo>& rands,
+                                 RandomizeCtx& rc, ConstraintExpr& out) {
+  if (std::any_of(
+          rel->elements.begin(), rel->elements.end(), [](const Expr* item) {
+            return item->kind == ExprKind::kSelect && item->index != nullptr &&
+                   item->index_end != nullptr &&
+                   (IsDollarBound(item->index) ||
+                    IsDollarBound(item->index_end));
+          })) {
+    return false;
+  }
+  const Expr* range = rel->elements.size() == 1 ? rel->elements[0] : nullptr;
+  // Any other set, values and tolerance ranges among it, is drawn from as
+  // a distribution of its items is.
+  if (range == nullptr || range->kind != ExprKind::kSelect ||
+      range->index == nullptr || range->index_end == nullptr ||
+      range->op == TokenKind::kPlusSlashMinus ||
+      range->op == TokenKind::kPlusPercentMinus) {
+    return BuildRealSetDist(rel, rc, out);
+  }
+  auto compare = [&](TokenKind op, Expr* bound) {
+    auto* e = rc.arena.Create<Expr>();
+    e->kind = ExprKind::kBinary;
+    e->range = rel->range;
+    e->op = op;
+    e->lhs = rel->lhs;
+    e->rhs = bound;
+    return e;
+  };
+  auto* both = rc.arena.Create<Expr>();
+  both->kind = ExprKind::kBinary;
+  both->range = rel->range;
+  both->op = TokenKind::kAmpAmp;
+  both->lhs = compare(TokenKind::kGtEq, range->index);
+  both->rhs = compare(TokenKind::kLtEq, range->index_end);
+  return TryConjunctionConstraint(both, rands, rc, out, /*fold=*/true);
+}
+
 // 18.5.4: `x inside { ... }` over a rand variable and items free of random
 // variables is a set membership the solver draws a member of, which a
 // domain as wide as an int's needs: a draw tried against the relation
@@ -97,35 +141,8 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
       AnyRefsRandVar(rel->elements, rands)) {
     return false;
   }
-  // §18.4.1 with §11.4.13: a real variable inside a range of reals lies in
-  // the closed interval between its bounds, which the solver draws from as
-  // the two comparisons bound it; its values are no set to enumerate.
-  if (FindRand(rands, rel->lhs->text)->var.is_real) {
-    const Expr* range = rel->elements.size() == 1 ? rel->elements[0] : nullptr;
-    if (range == nullptr || range->kind != ExprKind::kSelect ||
-        range->index == nullptr || range->index_end == nullptr ||
-        range->op == TokenKind::kPlusSlashMinus ||
-        range->op == TokenKind::kPlusPercentMinus ||
-        IsDollarBound(range->index) || IsDollarBound(range->index_end)) {
-      return false;
-    }
-    auto compare = [&](TokenKind op, Expr* bound) {
-      auto* e = rc.arena.Create<Expr>();
-      e->kind = ExprKind::kBinary;
-      e->range = rel->range;
-      e->op = op;
-      e->lhs = rel->lhs;
-      e->rhs = bound;
-      return e;
-    };
-    auto* both = rc.arena.Create<Expr>();
-    both->kind = ExprKind::kBinary;
-    both->range = rel->range;
-    both->op = TokenKind::kAmpAmp;
-    both->lhs = compare(TokenKind::kGtEq, range->index);
-    both->rhs = compare(TokenKind::kLtEq, range->index_end);
-    return TryConjunctionConstraint(both, rands, rc, out, /*fold=*/true);
-  }
+  if (FindRand(rands, rel->lhs->text)->var.is_real)
+    return TryRealSetMembership(rel, rands, rc, out);
   std::vector<int64_t> values;
   if (!EnumerateInsideItems(rel->elements, rc.obj, rc, values)) return false;
   out.kind = ConstraintKind::kSetMembership;

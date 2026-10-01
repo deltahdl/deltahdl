@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
@@ -268,8 +270,10 @@ void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc) {
   for (const auto* lvl = rc.obj->type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
     for (const ClassMember* m : lvl->decl->members) {
-      if (m->kind == ClassMemberKind::kProperty && (m->is_rand || m->is_randc))
-        AddObjectSizedMember(m, lvl, rands, rc);
+      if (m->kind != ClassMemberKind::kProperty || !(m->is_rand || m->is_randc))
+        continue;
+      AddObjectSizedMember(m, lvl, rands, rc);
+      AddRandStructDynamicElements(m, lvl, rands, rc);
     }
   }
 }
@@ -344,6 +348,26 @@ void WriteQueues(
   }
 }
 
+// §18.4: the elements drawn for the rand dynamic members of rand unpacked
+// structures, each written into the copy of its member's elements the
+// structure is given to hold, one copy per member.
+void WriteStructDynamicElements(
+    ClassObject* obj,
+    const std::vector<std::pair<const RandInfo*, Logic4Vec>>& elements,
+    Arena& arena) {
+  std::unordered_map<std::string, QueueObject*> copies;
+  for (const auto& [ri, lv] : elements) {
+    QueueObject*& copy = copies[ri->array_base];
+    Logic4Vec& whole = obj->properties.at(ri->struct_base);
+    if (copy == nullptr) {
+      copy = DynMemberForWrite(whole, ri->struct_offset, *ri->dyn_field, arena);
+      obj->properties[std::string(ri->level->name) + "::" + ri->struct_base] =
+          whole;
+    }
+    copy->elements.at(static_cast<size_t>(ri->array_index)) = lv;
+  }
+}
+
 }  // namespace
 
 // 18.6.1: write each solved value back to the object, keeping the bare and
@@ -354,17 +378,21 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
                      ConstraintSolver& solver, Arena& arena) {
   std::unordered_map<std::string, int64_t> sizes;
   std::unordered_map<std::string, std::vector<Logic4Vec>> queues;
+  std::vector<std::pair<const RandInfo*, Logic4Vec>> struct_elements;
   for (auto& ri : rands) {
     if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
     if (BeyondDrawnSize(ri, sizes)) continue;
     Logic4Vec lv = SolvedValue(ri, solver, arena);
-    if (!ri.in_queue) {
+    if (ri.dyn_field != nullptr) {
+      struct_elements.emplace_back(&ri, lv);
+    } else if (!ri.in_queue) {
       WriteSolvedValue(obj, ri, lv);
     } else if (!ri.var.is_array_size) {
       queues[ri.array_base].push_back(lv);
     }
   }
   WriteQueues(obj, queues);
+  WriteStructDynamicElements(obj, struct_elements, arena);
 }
 
 }  // namespace delta

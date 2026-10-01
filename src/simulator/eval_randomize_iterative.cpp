@@ -84,9 +84,15 @@ Expr* IndexLiteral(int64_t value, const Expr* like, Arena& arena) {
 
 // Whether `e` is a single-index select of the iterated array.
 bool SelectsArray(const Expr* e, const ForeachInstance& inst) {
-  return e->kind == ExprKind::kSelect && e->index_end == nullptr &&
-         e->base != nullptr && e->base->kind == ExprKind::kIdentifier &&
-         e->base->text == inst.array && e->index != nullptr;
+  if (e->kind != ExprKind::kSelect || e->index_end != nullptr ||
+      e->base == nullptr || e->index == nullptr) {
+    return false;
+  }
+  if (e->base->kind == ExprKind::kIdentifier)
+    return e->base->text == inst.array;
+  // §18.4: a member of a structure, `h1.data`, by its dotted path.
+  return e->base->kind == ExprKind::kMemberAccess &&
+         HierarchicalReferenceName(e->base) == inst.array;
 }
 
 // Whether `e` is written over literals alone, so that it reads the same
@@ -182,22 +188,24 @@ std::string LeafKey(const Expr* e, std::string_view array, size_t dims,
   return key;
 }
 
-// §18.5.7.1: every combination of the indices the dimensions of `array` the
-// header of `ref` names declare, outermost first, extending `index`, into
-// `out`; a dimension the header leaves unnamed is not iterated.
+// §18.5.7.1: every combination of the indices the dimensions of an array
+// the header of `ref` names declare, each from its low bound `los` and of
+// its size `sizes`, outermost first, extending `index`, into `out`; a
+// dimension the header leaves unnamed is not iterated.
 void IndexCombinations(const ConstraintForeachRef& ref,
-                       const ClassTypeInfo::PropertyInfo& array,
+                       const std::vector<uint32_t>& los,
+                       const std::vector<uint32_t>& sizes,
                        std::vector<int64_t>& index,
                        std::vector<std::vector<int64_t>>& out) {
   size_t dim = index.size();
-  if (dim == ref.loop_vars.size() || dim == array.dim_sizes.size()) {
+  if (dim == ref.loop_vars.size() || dim == sizes.size()) {
     out.push_back(index);
     return;
   }
-  uint32_t count = ref.loop_vars[dim].empty() ? 1 : array.dim_sizes[dim];
+  uint32_t count = ref.loop_vars[dim].empty() ? 1 : sizes[dim];
   for (uint32_t i = 0; i < count; ++i) {
-    index.push_back(array.dim_los[dim] + static_cast<int64_t>(i));
-    IndexCombinations(ref, array, index, out);
+    index.push_back(los[dim] + static_cast<int64_t>(i));
+    IndexCombinations(ref, los, sizes, index, out);
     index.pop_back();
   }
 }
@@ -224,7 +232,7 @@ void AppendMultiForeachInstances(const ConstraintForeachRef& ref,
                                  RandomizeCtx& rc, std::vector<Expr*>& out) {
   std::vector<int64_t> index;
   std::vector<std::vector<int64_t>> combinations;
-  IndexCombinations(ref, array, index, combinations);
+  IndexCombinations(ref, array.dim_los, array.dim_sizes, index, combinations);
   size_t dims = array.dim_sizes.size();
   auto leaf = [&](const Expr* n) -> Expr* {
     std::string key = LeafKey(n, ref.array_name, dims, rc);
@@ -238,6 +246,26 @@ void AppendMultiForeachInstances(const ConstraintForeachRef& ref,
       out.push_back(
           RewriteExpr(RewriteExpr(rel, instance, rc.arena), leaf, rc.arena));
     }
+  }
+}
+
+// §18.7 with §18.5.7.1: the relations of `ref`, whose header names a loop
+// variable for each of several dimensions of the array `info` of the scope
+// containing an inline constraint's call, instanced once per combination of
+// the indices those dimensions declare, each loop variable read as its index
+// and the elements read as state, appended to `out`.
+void AppendStateMultiForeachInstances(const ConstraintForeachRef& ref,
+                                      const ArrayInfo& info, RandomizeCtx& rc,
+                                      std::vector<Expr*>& out) {
+  std::vector<int64_t> index;
+  std::vector<std::vector<int64_t>> combinations;
+  IndexCombinations(ref, info.dim_los, info.dim_sizes, index, combinations);
+  for (const auto& combination : combinations) {
+    auto instance = [&](const Expr* n) {
+      return LoopIndexLiteral(n, ref, combination, rc.arena);
+    };
+    for (const Expr* rel : ref.body)
+      out.push_back(RewriteExpr(rel, instance, rc.arena));
   }
 }
 
@@ -318,6 +346,28 @@ bool AppendAssocForeachInstances(const ConstraintForeachRef& ref,
       out.push_back(RewriteExpr(rel, instance, rc.arena));
   }
   return any;
+}
+
+// §18.4 with §18.5.7.1: the elements of the rand dynamic array member of a
+// rand structure a foreach over its member name `name` iterates, `h1.data`
+// for `data`, the path received in `path`; false where no element of the
+// solve is one.
+bool StructDynamicElements(std::string_view name, std::vector<RandInfo>& rands,
+                           IteratedElements& out, std::string_view& path) {
+  uint32_t count = 0;
+  for (const auto& ri : rands) {
+    std::string_view base = ri.array_base;
+    if (ri.dyn_field == nullptr || base.size() <= name.size() ||
+        base.substr(base.size() - name.size()) != name ||
+        base[base.size() - name.size() - 1] != '.') {
+      continue;
+    }
+    path = ri.array_base;
+    ++count;
+  }
+  out.lo = 0;
+  out.count = count;
+  return count > 0;
 }
 
 // §18.4 with §18.5.7.1: the elements of the rand queue `name`, the element
@@ -567,6 +617,10 @@ bool IteratedOf(const ConstraintForeachRef& ref,
     out.element_array = ref.array_name;
     return true;
   }
+  if (StructDynamicElements(ref.array_name, rands, out.elems,
+                            out.element_array)) {
+    return true;
+  }
   return StateArrayElements(ref.array_name, rc, out.elems);
 }
 
@@ -584,6 +638,14 @@ void AddForeachConstraint(const ConstraintForeachRef& ref,
   }
   if (array == nullptr &&
       AppendAssocForeachInstances(ref, rands, rc, instances)) {
+    AddInstances(instances, rands, rc, block);
+    return;
+  }
+  const ArrayInfo* state =
+      array == nullptr ? rc.ctx.FindArrayInfo(ref.array_name) : nullptr;
+  if (state != nullptr && state->dim_sizes.size() >= 2 &&
+      ref.loop_vars.size() >= 2) {
+    AppendStateMultiForeachInstances(ref, *state, rc, instances);
     AddInstances(instances, rands, rc, block);
     return;
   }

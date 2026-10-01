@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/constraint_solver.h"
@@ -93,6 +94,36 @@ bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
       DistBound value = EvalDistBound(item.value, rc);
       w.value = value.integral;
       w.real_value = value.real;
+    }
+    out.dist_weights.push_back(w);
+  }
+  return true;
+}
+
+bool BuildRealSetDist(const Expr* rel, RandomizeCtx& rc, ConstraintExpr& out) {
+  out.kind = ConstraintKind::kDist;
+  out.var_name = std::string(rel->lhs->text);
+  ConstraintEvalScope scope(rc.obj, rc.ctx);
+  for (const Expr* item : rel->elements) {
+    DistWeight w;
+    w.is_range = item->kind == ExprKind::kSelect && item->index != nullptr &&
+                 item->index_end != nullptr;
+    if (!w.is_range) {
+      DistBound value = EvalDistBound(item, rc);
+      w.value = value.integral;
+      w.real_value = value.real;
+    } else if (item->op == TokenKind::kPlusSlashMinus ||
+               item->op == TokenKind::kPlusPercentMinus) {
+      ToleranceEnds(EvalDistBound(item->index, rc),
+                    EvalDistBound(item->index_end, rc),
+                    item->op == TokenKind::kPlusPercentMinus, w);
+    } else {
+      DistBound lo = EvalDistBound(item->index, rc);
+      DistBound hi = EvalDistBound(item->index_end, rc);
+      w.lo = lo.integral;
+      w.hi = hi.integral;
+      w.real_lo = lo.real;
+      w.real_hi = hi.real;
     }
     out.dist_weights.push_back(w);
   }

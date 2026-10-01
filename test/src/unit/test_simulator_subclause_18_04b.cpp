@@ -441,4 +441,34 @@ TEST(RandPackedStructRun, AModuleTypedefsRandMembersAreRandomized) {
   EXPECT_EQ(out, "0 77\n");
 }
 
+// §18.4: a member a rand unpacked structure's type declares rand that is a
+// dynamic array has its elements randomized, as §18.4's packet example has
+// data, the foreach over it constraining each, its size kept.
+TEST(RandPackedStructRun, ARandDynamicMemberHasItsElementsRandomized) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class P;\n"
+      "  typedef struct {\n"
+      "    rand int addr;\n"
+      "    rand byte data[] = {1, 2, 3, 4};\n"
+      "  } header;\n"
+      "  rand header h1;\n"
+      "  constraint c { h1.addr inside {[7:9]};\n"
+      "                 foreach (h1.data[i]) h1.data[i] inside {[20:30]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok, bad = 0;\n"
+      "  initial begin\n"
+      "    static P p = new;\n"
+      "    ok = p.randomize();\n"
+      "    foreach (p.h1.data[i]) if (!(p.h1.data[i] inside {[20:30]})) "
+      "bad++;\n"
+      "    $display(\"%0d %0d %0d %0d\", ok, p.h1.data.size(), bad,\n"
+      "             p.h1.addr inside {[7:9]});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 0 1\n");
+}
+
 }  // namespace

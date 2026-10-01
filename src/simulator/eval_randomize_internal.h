@@ -21,6 +21,8 @@
 
 namespace delta {
 
+struct StructFieldInfo;
+
 // Shared between eval_randomize.cpp, which randomizes a single object, and
 // eval_randomize_joint.cpp, which randomizes an object tree in one solve.
 
@@ -114,6 +116,9 @@ struct RandInfo {
   // which the member is written back; empty for any other variable.
   std::string struct_base;
   uint32_t struct_offset = 0;
+  // §18.4: for an element of a rand dynamic array member of such a structure,
+  // the member, whose elements the element is written back into.
+  const StructFieldInfo* dyn_field = nullptr;
 };
 
 // §18.4: the random variables of the rand member `m` of `level` where it is
@@ -148,6 +153,14 @@ struct RandomizeCtx {
   // back (eval_randomize_custom.cpp).
   std::unordered_map<std::string, Variable*> trial_locals = {};
 };
+
+// §18.4: the random variables of the elements of each rand dynamic array
+// member of the rand unpacked structure member `m` of `level`, as the object
+// of `rc` holds them, named `h1.data[0]` on, their count kept. Defined in
+// eval_randomize_struct.cpp.
+void AddRandStructDynamicElements(const ClassMember* m,
+                                  const ClassTypeInfo* level,
+                                  std::vector<RandInfo>& out, RandomizeCtx& rc);
 
 // 18.5.8: one active random object taking part in a joint solve, paired with
 // the dotted path prefix under which its variables and constraints are named in
@@ -344,6 +357,12 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
 bool EnumerateInsideItems(const std::vector<Expr*>& elements,
                           ClassObject* owner, RandomizeCtx& rc,
                           std::vector<int64_t>& out);
+
+// §18.4.1 with §11.4.13: the set membership `rel`, a rand real variable
+// inside a set of real values and ranges, as the distribution of its items,
+// each weighted 1, a range across its whole width, so that each draw takes a
+// value or a value within a range. Defined in eval_randomize_dist.cpp.
+bool BuildRealSetDist(const Expr* rel, RandomizeCtx& rc, ConstraintExpr& out);
 
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
                          ConstraintExpr& out);

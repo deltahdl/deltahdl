@@ -127,4 +127,31 @@ TEST(InlineConstraintsRun, AForeachIteratesAQueueOfTheCallersScope) {
   EXPECT_EQ(out, "0\n");
 }
 
+// §18.7 with §18.5.7.1: a foreach in an inline block naming a loop variable
+// per dimension of a multidimensional array of the calling scope iterates
+// every element, as state: none of the four banned values is drawn.
+TEST(InlineConstraintsRun, AForeachIteratesAMultidimensionalCallersArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  bit [3:0] banned [2][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (40) begin\n"
+      "      if (c.randomize() with {\n"
+      "            foreach (banned[i, j]) x != banned[i][j]; x < 6; } != 1)\n"
+      "        bad++;\n"
+      "      if (c.x inside {1, 2, 3, 4} || c.x >= 6) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace

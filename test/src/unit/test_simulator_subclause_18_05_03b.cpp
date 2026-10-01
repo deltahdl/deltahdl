@@ -193,4 +193,30 @@ TEST(SetMembershipRun, ARealInsideARealRangeIsDrawnWithinIt) {
   EXPECT_EQ(RunAndGet(kSrc, "bad"), uint64_t{0});
 }
 
+// §18.4.1 with §11.4.13: a real variable inside a set of real values and
+// ranges takes one of the values or a value within one of the ranges, each
+// item drawn in turn.
+TEST(SetMembershipRun, ARealInsideASetOfValuesAndRangesTakesOne) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; rand real b; constraint c { b inside {1.5, 2.5, [3.0:3.5]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0, ones = 0, twos = 0, ranged = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (60) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      if (c.b == 1.5) ones++;\n"
+      "      else if (c.b == 2.5) twos++;\n"
+      "      else if (c.b >= 3.0 && c.b <= 3.5) ranged++;\n"
+      "      else bad++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, ones > 0 && twos > 0 && ranged > 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1\n");
+}
+
 }  // namespace
