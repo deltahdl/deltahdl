@@ -71,6 +71,12 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 // rather than the text itself, a string being of any length.
 inline constexpr uint32_t kStringMemberHandleWidth = 64;
 
+// §7.2 with §7.5: the width a member of an unpacked structure declared as a
+// dynamic array takes in the structure's packed value, which holds a handle
+// to the member's elements (DynMemberQueue in
+// src/simulator/dyn_struct_member.h), their count being of no fixed size.
+inline constexpr uint32_t kDynamicMemberHandleWidth = 64;
+
 struct StructMember;
 uint32_t EvalStructMemberWidth(const StructMember& m);
 // §7.2 with §7.4.2: the number of elements an unpacked array member of a
@@ -78,12 +84,20 @@ uint32_t EvalStructMemberWidth(const StructMember& m);
 // member that is no array, or whose dimensions do not fold. A member takes
 // EvalStructMemberWidth bits per element.
 uint32_t UnpackedMemberCount(const StructMember& m);
+// §7.2 with §7.5: whether the member is declared as a dynamic array, its one
+// unpacked dimension `[]`.
+bool IsDynamicArrayMember(const StructMember& m);
+// The bits a member takes in its structure's packed value: a dynamic array
+// member's handle, else EvalStructMemberWidth bits per element of it.
+uint32_t StructMemberStorageWidth(const StructMember& m);
 // The bounds of a one-dimensional unpacked array member, left first, the size
 // form `[n]` as [0:n-1]. False for a member of none or of several dimensions,
 // or one whose bounds do not fold.
 bool UnpackedMemberBounds(const StructMember& m, int64_t* left, int64_t* right);
 uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs);
+uint32_t StructMemberStorageWidth(const StructMember& m,
+                                  const TypedefMap& typedefs);
 
 uint32_t TaggedUnionTagWidth(const DataType& dtype);
 uint32_t TaggedUnionTagBitOffset(const DataType& dtype);

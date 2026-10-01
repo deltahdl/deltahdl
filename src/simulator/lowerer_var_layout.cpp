@@ -65,7 +65,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
 
   uint32_t offset = total_width;
   for (const auto& m : dtype->struct_members) {
-    uint32_t fw = EvalStructMemberWidth(m) * UnpackedMemberCount(m);
+    uint32_t fw = StructMemberStorageWidth(m);
     uint32_t field_off = 0;
     if (!info->is_union) {
       offset -= fw;
@@ -80,6 +80,12 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     // an unpacked structure of it has randomized.
     fi.is_rand = m.is_rand;
     fi.is_randc = m.is_randc;
+    // §7.2 with §7.5: a dynamic array member holds a handle to its elements,
+    // each EvalStructMemberWidth bits wide.
+    if (IsDynamicArrayMember(m)) {
+      fi.is_dynamic = true;
+      fi.dyn_elem_width = EvalStructMemberWidth(m);
+    }
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
       fi.elem_count = UnpackedMemberCount(m);
@@ -101,7 +107,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
 static uint32_t AggregateTypeWidth(const DataType* dtype) {
   uint32_t total = 0;
   for (const auto& m : dtype->struct_members) {
-    uint32_t w = EvalStructMemberWidth(m) * UnpackedMemberCount(m);
+    uint32_t w = StructMemberStorageWidth(m);
     if (dtype->kind == DataTypeKind::kUnion) {
       total = std::max(total, w);
     } else {

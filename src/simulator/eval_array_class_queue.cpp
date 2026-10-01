@@ -20,6 +20,7 @@
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -347,8 +348,16 @@ static QueueObject* MethodResultQueue(const Expr* base, SimContext& ctx,
 // was a fresh one that nothing kept, so the element written into it was lost.
 QueueObject* FindWrittenQueueOfBase(const Expr* base, SimContext& ctx,
                                     Arena& arena, ClassObject** owner) {
-  if (base == nullptr || base->kind != ExprKind::kSelect)
+  if (base == nullptr || base->kind != ExprKind::kSelect) {
+    // §7.2 with §7.5: a dynamic member of a structure is written through a
+    // copy the structure is given to hold.
+    if (QueueObject* member =
+            ResolveStructDynMember(base, ctx, arena, /*write=*/true)) {
+      if (owner != nullptr) *owner = nullptr;
+      return member;
+    }
     return FindQueueOfBase(base, ctx, arena, owner);
+  }
   if (owner != nullptr) *owner = nullptr;
   return ElementQueueOfSelect(base, ctx, arena, /*allocate=*/true);
 }
@@ -374,6 +383,11 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
     return nullptr;
   }
   if (base->is_scope_resolution) return ScopeResolvedQueueProperty(base, ctx);
+  // §7.2 with §7.5: a member of a structure declared as a dynamic array.
+  if (QueueObject* member =
+          ResolveStructDynMember(base, ctx, arena, /*write=*/false)) {
+    return member;
+  }
   ClassObject* obj = HandleSideObject(base->lhs, ctx, arena);
   // §25.3 with §23.6: `i.q` names the queue the instance i, of an interface
   // or a module, declares, held under the instance's prefix.

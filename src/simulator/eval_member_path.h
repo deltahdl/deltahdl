@@ -11,6 +11,7 @@ struct ClassObject;
 struct ClassTypeInfo;
 struct Expr;
 struct Logic4Vec;
+struct QueueObject;
 class SimContext;
 struct StructFieldInfo;
 struct StructTypeInfo;
@@ -77,6 +78,14 @@ struct PackedMemberBits {
 // property the member occupies, into `out`; false for any other expression.
 bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
                               SimContext& ctx, PackedMemberBits& out);
+
+// §7.2 with §7.5: where `access` names a member of an unpacked structure
+// declared as a dynamic array, `m.data` or `p.h.data`, its elements: to read,
+// the array the member holds, an empty one where it holds none; with
+// `write`, a copy the member is given to hold in their place
+// (DynMemberForWrite). Null for an access of any other member.
+QueueObject* ResolveStructDynMember(const Expr* access, SimContext& ctx,
+                                    Arena& arena, bool write);
 
 // §7.2: the member of a structure a member access names, the same roots as
 // ResolveStructArrayMember takes, whatever the member's type; null where the

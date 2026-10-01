@@ -504,4 +504,63 @@ TEST(StructType, UnpackedMembersStartAtTheirTypesDefaults) {
   EXPECT_EQ(out, "xxxx 0 [] xxxx x\nz01x 5 [s]\n");
 }
 
+// §7.2: a member of an unpacked structure may be a dynamic array, sized by
+// new[] and written and read element by element through the member.
+TEST(UnpackedStructDynamicMember, ADynamicMemberIsSizedWrittenAndRead) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int a; byte data[]; } h_t;\n"
+      "module t;\n"
+      "  h_t w;\n"
+      "  initial begin\n"
+      "    w.data = new[3];\n"
+      "    w.data[1] = 9;\n"
+      "    w.a = 5;\n"
+      "    $display(\"%0d %0d %0d %0d\", w.data.size(), w.data[1], w.data[0],\n"
+      "             w.a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 9 0 5\n");
+}
+
+// §7.2.2: a dynamic member's declared initial value is every variable's of
+// the structure, a module's and a class property's alike.
+TEST(UnpackedStructDynamicMember, ADynamicMembersInitializerIsTaken) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int a = 7; byte data[] = {1, 2, 3, 4}; } h_t;\n"
+      "class P; h_t h; endclass\n"
+      "module t;\n"
+      "  h_t m;\n"
+      "  initial begin\n"
+      "    static P p = new;\n"
+      "    $display(\"%0d %0d %0d | %0d %0d %0d\", m.a, m.data.size(),\n"
+      "             m.data[3], p.h.a, p.h.data.size(), p.h.data[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 4 4 | 7 4 3\n");
+}
+
+// §7.2: assigning a structure assigns each of its members, so the copy
+// holds its own dynamic member, which a later write to the source leaves.
+TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { byte data[]; } h_t;\n"
+      "module t;\n"
+      "  h_t x, y;\n"
+      "  initial begin\n"
+      "    x.data = new[2];\n"
+      "    x.data[0] = 4;\n"
+      "    y = x;\n"
+      "    x.data[0] = 6;\n"
+      "    $display(\"%0d %0d %0d\", y.data.size(), y.data[0], x.data[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 4 6\n");
+}
+
 }  // namespace

@@ -35,10 +35,10 @@ bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
   const StructTypeInfo* layout = PropertyLayout(m->name, level, ctx);
   if (layout == nullptr || layout->is_packed || layout->is_union) return false;
   for (const StructFieldInfo& field : layout->fields) {
-    // A member of no integral layout -- an array, a nested aggregate -- is
-    // no variable of the structure's bits.
+    // A member of no integral layout -- an array, fixed or dynamic, or a
+    // nested aggregate -- is no variable of the structure's bits.
     if (!(field.is_rand || field.is_randc) || field.width == 0 ||
-        field.elem_count != 0 || field.nested != nullptr) {
+        field.elem_count != 0 || field.is_dynamic || field.nested != nullptr) {
       continue;
     }
     RandInfo info;

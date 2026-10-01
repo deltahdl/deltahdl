@@ -11,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
@@ -356,6 +357,29 @@ bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
   if (field == nullptr) return false;
   out.width = field->width;
   return true;
+}
+
+QueueObject* ResolveStructDynMember(const Expr* access, SimContext& ctx,
+                                    Arena& arena, bool write) {
+  std::string_view name;
+  std::string path;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      !MemberChainPath(access, name, path)) {
+    return nullptr;
+  }
+  StructRoot root;
+  if (!FindStructRoot(name, path, ctx, root)) return nullptr;
+  uint32_t offset = 0;
+  const StructFieldInfo* field = ResolveStructField(root.info, path, &offset);
+  if (field == nullptr || !field->is_dynamic) return nullptr;
+  if (!write) {
+    QueueObject* held = DynMemberQueue(
+        ExtractBitField(arena, *root.value, offset, field->width));
+    return held != nullptr ? held : DynMemberEmpty(*field);
+  }
+  QueueObject* copy = DynMemberForWrite(*root.value, offset, *field, arena);
+  if (root.var != nullptr) root.var->NotifyWatchers();
+  return copy;
 }
 
 const StructFieldInfo* ResolveStructMember(const Expr* access,

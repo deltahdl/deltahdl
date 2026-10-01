@@ -5,6 +5,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -13,12 +14,15 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/struct_string_member.h"
 
@@ -776,7 +780,16 @@ void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
                          uint32_t base, SimContext& ctx, Arena& arena) {
   if (layout.is_union) return;
   for (const auto& f : layout.fields) {
-    if (f.default_expr != nullptr) {
+    if (f.default_expr != nullptr && f.is_dynamic) {
+      // §7.2.2 with §7.5: a dynamic member starts holding the elements its
+      // initializer lists.
+      QueueObject* q = DynMemberForWrite(value, base + f.bit_offset, f, arena);
+      std::vector<Logic4Vec> elems;
+      CollectQueueElements(f.default_expr, ctx, arena, elems);
+      SizeAndOwnQueueElements(*q, elems, arena);
+      q->elements = std::move(elems);
+      q->AssignFreshIds();
+    } else if (f.default_expr != nullptr) {
       Logic4Vec v = EvalStructMemberValue(f.default_expr, f, ctx, arena);
       DepositBitField(value, base + f.bit_offset, MemberBits(v, f.width, arena),
                       f.width);

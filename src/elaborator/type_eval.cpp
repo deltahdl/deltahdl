@@ -172,13 +172,27 @@ uint32_t EvalStructMemberWidth(const StructMember& m,
   return EvalStructMemberWidth(m);
 }
 
+bool IsDynamicArrayMember(const StructMember& m) {
+  return m.unpacked_dims.size() == 1 && m.unpacked_dims[0] == nullptr;
+}
+
+uint32_t StructMemberStorageWidth(const StructMember& m) {
+  if (IsDynamicArrayMember(m)) return kDynamicMemberHandleWidth;
+  return EvalStructMemberWidth(m) * UnpackedMemberCount(m);
+}
+
+uint32_t StructMemberStorageWidth(const StructMember& m,
+                                  const TypedefMap& typedefs) {
+  if (IsDynamicArrayMember(m)) return kDynamicMemberHandleWidth;
+  return EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m);
+}
+
 static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   if (dtype.struct_members.empty()) return 0;
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
     for (const auto& m : dtype.struct_members) {
-      max_w =
-          std::max(max_w, EvalStructMemberWidth(m) * UnpackedMemberCount(m));
+      max_w = std::max(max_w, StructMemberStorageWidth(m));
     }
 
     if (dtype.is_tagged && dtype.is_packed)
@@ -187,7 +201,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   }
   uint32_t total = 0;
   for (const auto& m : dtype.struct_members) {
-    total += EvalStructMemberWidth(m) * UnpackedMemberCount(m);
+    total += StructMemberStorageWidth(m);
   }
   return total;
 }
@@ -198,8 +212,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
     for (const auto& m : dtype.struct_members) {
-      max_w = std::max(
-          max_w, EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m));
+      max_w = std::max(max_w, StructMemberStorageWidth(m, typedefs));
     }
     if (dtype.is_tagged && dtype.is_packed)
       max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
@@ -207,7 +220,7 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
   }
   uint32_t total = 0;
   for (const auto& m : dtype.struct_members) {
-    total += EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m);
+    total += StructMemberStorageWidth(m, typedefs);
   }
   return total;
 }

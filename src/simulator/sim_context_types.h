@@ -81,6 +81,11 @@ struct StructFieldInfo {
   // rand variable of an unpacked structure randomizes it.
   bool is_rand = false;
   bool is_randc = false;
+  // §7.2 with §7.5: whether the member is a dynamic array, whose bits hold a
+  // handle to its elements (src/simulator/dyn_struct_member.h), each
+  // `dyn_elem_width` bits wide and of the member's type_kind and signing.
+  bool is_dynamic = false;
+  uint32_t dyn_elem_width = 0;
   // §7.2.1: the layout of this field's own type when it is itself a struct or
   // union, so a nested member is reachable by its dotted path. Null for
   // scalars.

@@ -879,7 +879,7 @@ static QueueObject* QueueOfAssignTarget(const Expr* lhs, SimContext& ctx,
       lhs->kind != ExprKind::kMemberAccess) {
     return nullptr;
   }
-  return FindQueueOfBase(lhs, ctx, arena, owner);
+  return FindWrittenQueueOfBase(lhs, ctx, arena, owner);
 }
 
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {

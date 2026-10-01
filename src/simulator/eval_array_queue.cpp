@@ -17,6 +17,7 @@
 #include "simulator/eval_array_internal.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
@@ -249,15 +250,19 @@ static QueueCall ResolveQueueCall(const Expr* expr, SimContext& ctx,
   }
   call.receiver = access->lhs;
   call.method = access->rhs->text;
+  bool writes =
+      IsQueueMutator(call.method) || IsQueueOrderingMethod(call.method);
   // §7.8.7 with §7.10: a method that changes the queue writes the element it
   // is called on, so `aq["a"].push_back(3)` allocates aq["a"] where the array
   // holds no such entry; a method that only reads it allocates nothing.
   if (access->lhs->kind == ExprKind::kSelect) {
-    bool writes =
-        IsQueueMutator(call.method) || IsQueueOrderingMethod(call.method);
     call.queue = ElementQueueOfSelect(access->lhs, ctx, arena, writes);
     if (call.queue != nullptr) return call;
   }
+  // §7.2 with §7.5: likewise a method that changes a dynamic member of a
+  // structure changes a copy the structure is given to hold.
+  call.queue = ResolveStructDynMember(access->lhs, ctx, arena, writes);
+  if (call.queue != nullptr) return call;
   call.queue = FindQueueOfBase(access->lhs, ctx, arena, &call.owner);
   return call;
 }
