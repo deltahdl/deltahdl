@@ -563,4 +563,26 @@ TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
   EXPECT_EQ(out, "2 4 6\n");
 }
 
+// §7.2 with §7.5: a dynamic member never written holds no element, and the
+// queue methods a dynamic array shares grow it, a copy taken before the
+// growth keeping the elements it was taken with.
+TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { byte data[]; } h_t;\n"
+      "module t;\n"
+      "  h_t e, c;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", e.data.size());\n"
+      "    e.data = new[1];\n"
+      "    c = e;\n"
+      "    e.data.push_back(4);\n"
+      "    $display(\"%0d %0d %0d\", e.data.size(), e.data[1], "
+      "c.data.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n2 4 1\n");
+}
+
 }  // namespace
