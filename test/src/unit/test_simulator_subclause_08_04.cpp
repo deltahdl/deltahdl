@@ -552,6 +552,48 @@ TEST(ClassSim, MethodCalledThroughANullReturnedHandleIsReported) {
                             "8.4"));
 }
 
+// §8.4: an entry of an associative array of handles that holds null is a null
+// handle like any other, and a call through it is reported at the call.
+TEST(ClassSim, MethodCalledThroughANullAssociativeEntryIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  int r = 99;\n"
+                                  "  C aa[string];\n"
+                                  "  initial begin\n"
+                                  "    aa[\"k\"] = null;\n"
+                                  "    r = aa[\"k\"].get();\n"
+                                  "  end\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'get' called through a null handle", 15,
+                            "8.4"));
+  EXPECT_EQ(CountReports(f, "called through a null handle"), 1);
+}
+
+// §8.10: a static method is callable through such an entry, so nothing is
+// reported and the method runs.
+TEST(ClassSim, StaticMethodCalledThroughANullAssociativeEntryRuns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
+                                  "module m;\n"
+                                  "  int r = 99;\n"
+                                  "  C aa[string];\n"
+                                  "  initial begin\n"
+                                  "    aa[\"k\"] = null;\n"
+                                  "    r = aa[\"k\"].seven();\n"
+                                  "  end\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
+}
+
 // §8.10: a static method is callable through an element of an array of handles
 // that holds none, as through a named null handle, so nothing is reported and
 // the method runs.
