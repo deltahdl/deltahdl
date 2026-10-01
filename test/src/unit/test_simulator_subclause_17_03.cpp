@@ -377,15 +377,21 @@ constexpr const char* kCountingChecker =
     "endchecker\n";
 
 // The successes and failures `scope`'s counters hold once `module` has run
-// over kCountingChecker.
-std::pair<uint64_t, uint64_t> CheckerCounts(const std::string& module,
-                                            const std::string& scope) {
+// over `checker`.
+std::pair<uint64_t, uint64_t> CountsOver(const std::string& checker,
+                                         const std::string& module,
+                                         const std::string& scope) {
   SimFixture f;
-  auto* pass =
-      RunAndFindVar(std::string(kCountingChecker) + module, f, scope + ".pass");
+  auto* pass = RunAndFindVar(checker + module, f, scope + ".pass");
   if (pass == nullptr) return {~0ull, ~0ull};
   return {pass->value.ToUint64(),
           f.ctx.FindVariable(scope + ".fail")->value.ToUint64()};
+}
+
+// The same over kCountingChecker.
+std::pair<uint64_t, uint64_t> CheckerCounts(const std::string& module,
+                                            const std::string& scope) {
+  return CountsOver(kCountingChecker, module, scope);
 }
 
 // §17.3: a checker instantiated under an if in an always procedure is a
@@ -621,6 +627,61 @@ TEST(ProceduralCheckerInstance, AStaticBesideTheSavedAutomaticIsSampled) {
                           "endmodule\n",
                           "c"),
             std::make_pair(3ull, 2ull));
+}
+
+// A module reaching `inst` at each of the posedges 5 to 45 with the
+// automatic k at 0 to 4 in turn, where k[0] is 1 at 15 and 35 alone.
+std::string ReachedWithAnAutomatic(const std::string& inst) {
+  return "module top;\n"
+         "  logic clk = 0;\n"
+         "  int n = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always @(posedge clk) begin\n"
+         "    automatic int k = n;\n"
+         "    n <= n + 1;\n"
+         "    " +
+         inst +
+         "\n"
+         "  end\n"
+         "  initial #52 $finish;\n"
+         "endmodule\n";
+}
+
+// §17.3 with §16.14.6.1: a sequence of the checker reads the saved k[0] at
+// every tick of an attempt: the attempts queued at 15 and 35 hold it at 1
+// through the next tick and succeed, those at 5, 25 and 45 fail at once.
+TEST(ProceduralCheckerInstance, ASequenceReadsTheSavedActualAtEachTick) {
+  EXPECT_EQ(CountsOver("checker chk(logic a, logic clk);\n"
+                       "  int pass = 0, fail = 0;\n"
+                       "  a1: assert property (@(posedge clk) a ##1 a)\n"
+                       "    pass++; else fail++;\n"
+                       "endchecker\n",
+                       ReachedWithAnAutomatic("chk c(k[0], clk);"), "c"),
+            std::make_pair(2ull, 3ull));
+}
+
+// §17.3 with §16.14.6.1: so does each operand of a property's or, the
+// formal substituted in both: the odd k satisfy the second operand at once.
+TEST(ProceduralCheckerInstance, EachOperandOfAnOrReadsTheSavedActual) {
+  EXPECT_EQ(CountsOver("checker chk(logic a, logic clk);\n"
+                       "  int pass = 0, fail = 0;\n"
+                       "  a1: assert property (@(posedge clk) (a ##1 a) or a)\n"
+                       "    pass++; else fail++;\n"
+                       "endchecker\n",
+                       ReachedWithAnAutomatic("chk c(k[0], clk);"), "c"),
+            std::make_pair(2ull, 3ull));
+}
+
+// §17.3: an event actual is substituted as a static instance's is, beside
+// the saved one, so the instance ticks on posedge clk and judges k[0].
+TEST(ProceduralCheckerInstance, AnEventActualBesideTheSavedOneClocksIt) {
+  EXPECT_EQ(
+      CountsOver("checker chk(logic a, event ev);\n"
+                 "  int pass = 0, fail = 0;\n"
+                 "  a1: assert property (@ev a) pass++; else fail++;\n"
+                 "endchecker\n",
+                 ReachedWithAnAutomatic("chk c(k[0], posedge clk);"), "c"),
+      std::make_pair(2ull, 3ull));
 }
 
 // §16.14.6.1: a const cast in the actual is saved as it stands when the

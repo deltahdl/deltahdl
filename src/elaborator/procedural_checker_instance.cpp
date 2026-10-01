@@ -37,10 +37,9 @@ void AppendLoopLocals(const Stmt& s, std::vector<std::string_view>& locals) {
 // or fork-join_none block, so one a fork statement encloses, `in_fork`, is
 // reported and left out. `locals` are the variables the enclosing blocks
 // and loops declare before `s`.
-void CollectCheckerInstantiations(Stmt* s, bool in_fork,
-                                  std::vector<std::string_view> locals,
-                                  std::vector<CheckerInstantiationSite>& out,
-                                  DiagEngine& diag) {
+void CollectCheckerInstantiations(
+    Stmt* s, bool in_fork, std::vector<std::string_view> locals,
+    std::vector<CheckerInstantiationInProcedure>& out, DiagEngine& diag) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kCheckerInstantiation && in_fork) {
     diag.Error(s->range.start,
@@ -63,9 +62,9 @@ void CollectCheckerInstantiations(Stmt* s, bool in_fork,
 
 }  // namespace
 
-std::vector<CheckerInstantiationSite> CheckerInstantiationsIn(
+std::vector<CheckerInstantiationInProcedure> CheckerInstantiationsIn(
     Stmt* body, DiagEngine& diag) {
-  std::vector<CheckerInstantiationSite> out;
+  std::vector<CheckerInstantiationInProcedure> out;
   CollectCheckerInstantiations(body, false, {}, out, diag);
   return out;
 }

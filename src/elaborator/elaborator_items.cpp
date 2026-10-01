@@ -716,7 +716,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   ElaborateProceduralConcurrentAssertions(item, mod, property_registry_, arena_,
                                           diag_);
   std::vector<ProceduralCheckerSite> sites;
-  for (CheckerInstantiationSite& site :
+  for (CheckerInstantiationInProcedure& site :
        CheckerInstantiationsIn(item->body, diag_)) {
     ModuleItem* inst = site.stmt->decl_item;
     ModuleDecl* child = FindModuleInScope(inst->inst_module);
