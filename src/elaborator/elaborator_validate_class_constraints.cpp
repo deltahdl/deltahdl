@@ -8,10 +8,12 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -318,6 +320,28 @@ static std::string_view UniqueMemberBaseName(const Expr* e) {
              : std::string_view{};
 }
 
+// 18.5.4 and 18.5.9: a variable named in a uniqueness group or a solve...before
+// ordering shall be of integral or real type. Reject the types that are plainly
+// neither -- strings, events, chandles, virtual interfaces, void, and class
+// handles. A typedef name is left alone (its underlying type is assumed
+// orderable), keeping the check conservative so it never flags a legitimate
+// integral or real variable.
+static bool IsSolveOrderableTypeFree(const DataType& dt,
+                                     const CompilationUnit* unit) {
+  switch (dt.kind) {
+    case DataTypeKind::kString:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kVirtualInterface:
+    case DataTypeKind::kVoid:
+      return false;
+    case DataTypeKind::kNamed:
+      return FindClassDecl(dt.type_name, unit) == nullptr;
+    default:
+      return true;
+  }
+}
+
 // 18.5.4 / footnote 13: the range_list of a uniqueness constraint shall contain
 // only expressions that denote singular or array variables, and each such
 // member shall be of integral or real type — for an array member, its leaf
@@ -331,16 +355,16 @@ static std::string_view UniqueMemberBaseName(const Expr* e) {
 // alone, keeping the check conservative so it never flags a legitimate integral
 // or real variable. The integral-or-real test is the same one solve...before
 // ordering uses.
-void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
+static void ValidateOneUniqueConstraintMember(
     const Expr* mem,
-    const std::unordered_map<std::string_view, const ClassMember*>&
-        properties) {
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    const CompilationUnit* unit, DiagEngine& diag) {
   if (mem == nullptr) return;
   if (!UniqueMemberDenotesVariable(mem)) {
-    diag_.Error(mem->range.start,
-                "a uniqueness constraint member shall denote a singular "
-                "or array variable",
-                Subclause("18.5.4"));
+    diag.Error(mem->range.start,
+               "a uniqueness constraint member shall denote a singular "
+               "or array variable",
+               Subclause("18.5.4"));
     return;
   }
   std::string_view base = UniqueMemberBaseName(mem);
@@ -348,26 +372,90 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
   auto it = properties.find(base);
   if (it == properties.end()) return;
   if (it->second->is_randc) {
-    diag_.Error(mem->range.start,
-                "a uniqueness constraint member shall not be a randc variable",
-                Subclause("18.5.4"));
+    diag.Error(mem->range.start,
+               "a uniqueness constraint member shall not be a randc variable",
+               Subclause("18.5.4"));
   }
-  if (!IsSolveOrderableType(it->second->data_type)) {
-    diag_.Error(mem->range.start,
-                "a uniqueness constraint member shall be of integral or "
-                "real type",
-                Subclause("18.5.4"));
+  if (!IsSolveOrderableTypeFree(it->second->data_type, unit)) {
+    diag.Error(mem->range.start,
+               "a uniqueness constraint member shall be of integral or "
+               "real type",
+               Subclause("18.5.4"));
   }
+}
+
+// Checks every member of each uniqueness group `block` holds.
+static void ValidateUniqueGroups(
+    const ClassMember* block,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  for (const auto& group : block->constraint_unique_refs) {
+    for (const Expr* mem : group)
+      ValidateOneUniqueConstraintMember(mem, properties, unit, diag);
+  }
+}
+
+void ValidateInlineUniqueGroups(const Expr* call, const ClassDecl* cls,
+                                const CompilationUnit* unit, DiagEngine& diag) {
+  if (call->inline_constraint == nullptr) return;
+  ValidateUniqueGroups(call->inline_constraint,
+                       BuildClassPropertyMap(cls, unit), unit, diag);
+}
+
+// 18.7: whether `call` is randomize() called on the object a method runs on,
+// as `randomize()` or `this.randomize()`.
+static bool IsSelfRandomizeCall(const Expr* call) {
+  const Expr* callee = call->lhs;
+  if (callee == nullptr) return false;
+  if (callee->kind == ExprKind::kIdentifier) {
+    return callee->text == "randomize";
+  }
+  return callee->kind == ExprKind::kMemberAccess && callee->lhs != nullptr &&
+         callee->rhs != nullptr && callee->lhs->kind == ExprKind::kIdentifier &&
+         callee->lhs->text == "this" &&
+         callee->rhs->kind == ExprKind::kIdentifier &&
+         callee->rhs->text == "randomize";
+}
+
+static void CheckSelfInlineUniqueInExpr(const Expr* e, const ClassDecl* cls,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kCall && IsSelfRandomizeCall(e)) {
+    ValidateInlineUniqueGroups(e, cls, unit, diag);
+  }
+  ForEachExprChild(e, [&](const Expr* child) {
+    CheckSelfInlineUniqueInExpr(child, cls, unit, diag);
+  });
+}
+
+static void CheckSelfInlineUniqueInStmt(const Stmt* s, const ClassDecl* cls,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  if (s == nullptr) return;
+  ForEachChildExpr(s, [&](const Expr* e) {
+    CheckSelfInlineUniqueInExpr(e, cls, unit, diag);
+  });
+  ForEachChildStmt(s, [&](const Stmt* sub) {
+    CheckSelfInlineUniqueInStmt(sub, cls, unit, diag);
+  });
 }
 
 void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
     const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
   for (const auto* m : cls->members) {
-    if (m->kind != ClassMemberKind::kConstraint) continue;
-    for (const auto& group : m->constraint_unique_refs) {
-      for (const Expr* mem : group)
-        ValidateOneUniqueConstraintMember(mem, properties);
+    if (m->kind == ClassMemberKind::kConstraint) {
+      ValidateUniqueGroups(m, properties, unit_, diag_);
+    }
+    // 18.7: an inline constraint block of randomize() called on the object a
+    // method runs on names that object's members, so its groups are checked
+    // against this class.
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
+      for (const Stmt* st : m->method->func_body_stmts) {
+        CheckSelfInlineUniqueInStmt(st, cls, unit_, diag_);
+      }
+      CheckSelfInlineUniqueInStmt(m->method->body, cls, unit_, diag_);
     }
   }
 }
@@ -375,26 +463,6 @@ void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
 void ClassConstraintValidator::ValidateUniqueConstraints() {
   for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassUniqueConstraints(cls);
-}
-
-// 18.5.9: a variable named in a solve...before ordering shall be of integral or
-// real type. Reject the types that are plainly neither — strings, events,
-// chandles, virtual interfaces, void, and class handles. A typedef name is left
-// alone (its underlying type is assumed orderable), keeping the check
-// conservative so it never flags a legitimate integral or real variable.
-bool ClassConstraintValidator::IsSolveOrderableType(const DataType& dt) const {
-  switch (dt.kind) {
-    case DataTypeKind::kString:
-    case DataTypeKind::kEvent:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kVirtualInterface:
-    case DataTypeKind::kVoid:
-      return false;
-    case DataTypeKind::kNamed:
-      return FindClassDecl(dt.type_name, unit_) == nullptr;
-    default:
-      return true;
-  }
 }
 
 // 18.5.9: the restrictions that apply to solve...before variable ordering:
@@ -507,25 +575,7 @@ struct SolveBeforeOrdering {
 };
 
 // 18.5.9: resolve one solve...before entry and emit the rand/randc and
-// integral/real-type diagnostics for it. The orderability check mirrors
-// ClassConstraintValidator::IsSolveOrderableType, kept here as a free helper so
-// the check needs no validator instance.
-static bool IsSolveOrderableTypeFree(const DataType& dt,
-                                     const CompilationUnit* unit) {
-  switch (dt.kind) {
-    case DataTypeKind::kString:
-    case DataTypeKind::kEvent:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kVirtualInterface:
-    case DataTypeKind::kVoid:
-      return false;
-    case DataTypeKind::kNamed:
-      return FindClassDecl(dt.type_name, unit) == nullptr;
-    default:
-      return true;
-  }
-}
-
+// integral/real-type diagnostics for it.
 static void CheckSolveBeforeEntry(
     const ConstraintSolveBeforeEntry& e, const SourceLoc& loc,
     const std::unordered_map<std::string_view, const ClassMember*>& properties,

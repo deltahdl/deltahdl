@@ -9,10 +9,8 @@
 // b and c drawn from 4 to 6 beside an excluded held to 5 by another
 // constraint, so neither takes 5 and the two split 4 and 6 between them;
 // the Lone names a single member beside a relation fixing it, which the
-// group leaves alone; the Reals draw two reals from the same two values
-// and never alike; and an inline group naming the Cyclic's randc is
-// illegal and refuses randomize(), as a class constraint naming it fails
-// elaboration.
+// group leaves alone; and the Reals draw two reals from the same two
+// values and never alike.
 class Trio;
   rand int a;
   rand int b;
@@ -45,19 +43,13 @@ class Reals;
   constraint u { unique {r1, r2}; }
 endclass
 
-class Cyclic;
-  rand bit [1:0] p;
-  randc bit [1:0] q;
-endclass
-
 module uniqueness_constraints;
-  int distinct = 0, split = 0, fixed = 0, apart = 0, refused = 0;
+  int distinct = 0, split = 0, fixed = 0, apart = 0;
   initial begin
     static Trio tr = new;
     static Excluding ex = new;
     static Lone lo = new;
     static Reals rl = new;
-    static Cyclic cy = new;
     repeat (64) begin
       void'(tr.randomize());
       if (tr.a != tr.b && tr.b != tr.c && tr.a != tr.c &&
@@ -82,8 +74,6 @@ module uniqueness_constraints;
       if (rl.r1 != rl.r2 && rl.r1 + rl.r2 == 3.0) apart++;
     end
     $display("two real members never draw alike: %0d of 64", apart);
-    if (cy.randomize() with { unique {p, q}; } == 0) refused = 1;
-    $display("a group holding a randc refuses randomize(): %0d", refused);
     $finish;
   end
 endmodule

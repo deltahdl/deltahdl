@@ -196,6 +196,49 @@ TEST(ExternalConstraintBlocks,
                             10, "18.5.1"));
 }
 
+// 18.5.1: a class in a generate block is held to the same rule, whichever
+// generate construct holds it: an if's else branch, a loop or a case item.
+TEST(ExternalConstraintBlocks, ExplicitPrototypeInGenerateClassNeedsBlock) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  if (0) begin : a\n"
+             "  end else begin : b\n"
+             "    class C;\n"
+             "      rand int x;\n"
+             "      extern constraint p;\n"
+             "    endclass\n"
+             "  end\n"
+             "  for (genvar i = 0; i < 1; i++) begin : l\n"
+             "    class D;\n"
+             "      rand int y;\n"
+             "      extern constraint q;\n"
+             "    endclass\n"
+             "  end\n"
+             "  case (1)\n"
+             "    1: begin : k\n"
+             "      class E;\n"
+             "        rand int z;\n"
+             "        extern constraint r;\n"
+             "      endclass\n"
+             "    end\n"
+             "  endcase\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'p' in class 'C' "
+                            "has no external constraint block",
+                            6, "18.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'q' in class 'D' "
+                            "has no external constraint block",
+                            12, "18.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'r' in class 'E' "
+                            "has no external constraint block",
+                            19, "18.5.1"));
+}
+
 // 18.5.1: a block completes the class of its own scope only, so the block a
 // package gives its C leaves the explicit prototype of the compilation unit's
 // C without one.

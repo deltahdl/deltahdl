@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
@@ -305,6 +306,26 @@ static void CheckRandomizeArgVisibility(
   }
 }
 
+// 18.5.4 with 18.7: the uniqueness groups of randomize() with called through a
+// handle name members of the handle's class, so they are checked against it.
+// This walk is where a module procedure's handles are known by class, which is
+// why the check rides on it.
+static void CheckInlineUniqueThroughHandle(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* recv = e->lhs;
+  if (e->inline_constraint == nullptr || recv == nullptr ||
+      recv->kind != ExprKind::kMemberAccess || recv->is_scope_resolution ||
+      recv->lhs == nullptr || recv->rhs == nullptr ||
+      recv->rhs->kind != ExprKind::kIdentifier ||
+      recv->rhs->text != "randomize") {
+    return;
+  }
+  const ClassDecl* cls = HandleClassOfBase(recv->lhs, var_types, unit);
+  if (cls != nullptr) ValidateInlineUniqueGroups(e, cls, unit, diag);
+}
+
 static void CheckVisibilityExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -319,6 +340,7 @@ static void CheckVisibilityExpr(
   }
   if (e->kind == ExprKind::kCall) {
     CheckRandomizeArgVisibility(e, var_types, unit, diag);
+    CheckInlineUniqueThroughHandle(e, var_types, unit, diag);
   }
   CheckVisibilityExpr(e->lhs, var_types, unit, diag);
   CheckVisibilityExpr(e->rhs, var_types, unit, diag);

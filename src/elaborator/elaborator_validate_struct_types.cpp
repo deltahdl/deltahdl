@@ -234,12 +234,33 @@ static void AppendClassAndNested(const ClassDecl* cls,
 }
 
 static void AppendClassDecls(const std::vector<ModuleItem*>& items,
+                             std::vector<const ClassDecl*>& out);
+
+// Appends the classes of the generate blocks a generate construct holds: a
+// loop's or a branch's own block, the else branch chained after it, and each
+// case item's block.
+static void AppendGenerateClassDecls(const ModuleItem* item,
+                                     std::vector<const ClassDecl*>& out) {
+  for (; item != nullptr; item = item->gen_else) {
+    AppendClassDecls(item->gen_body, out);
+    for (const auto& case_item : item->gen_case_items) {
+      AppendClassDecls(case_item.body, out);
+    }
+  }
+}
+
+// Appends the classes declared among `items`, with those of every generate
+// block the items hold, since A.1.11 makes class_declaration a
+// package_or_generate_item_declaration.
+static void AppendClassDecls(const std::vector<ModuleItem*>& items,
                              std::vector<const ClassDecl*>& out) {
   for (const auto* item : items) {
-    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+    if (item == nullptr) continue;
+    if (item->kind == ModuleItemKind::kClassDecl &&
         item->class_decl != nullptr) {
       AppendClassAndNested(item->class_decl, out);
     }
+    AppendGenerateClassDecls(item, out);
   }
 }
 

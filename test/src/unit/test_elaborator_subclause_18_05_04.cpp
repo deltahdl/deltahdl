@@ -172,4 +172,79 @@ TEST(UniqueMemberForms, InheritedRandcMemberRejected) {
                             6, "18.5.4"));
 }
 
+// 18.5.4 with 18.7: an inline constraint block holds a uniqueness constraint as
+// a class's constraint block does, so the ban on a randc member reaches the
+// group of randomize() with called through a handle in a module, whether the
+// handle is declared in the module or in the procedure.
+TEST(UniqueMemberForms, InlineRandcMemberThroughHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c = new;\n"
+             "  initial begin\n"
+             "    C d;\n"
+             "    d = new;\n"
+             "    void'(c.randomize() with { unique {a, b}; });\n"
+             "    void'(d.randomize() with { unique {b, a}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 10,
+      "18.5.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 11,
+      "18.5.4"));
+}
+
+// 18.5.4 with 18.7: the same holds for randomize() with called on the object
+// itself in one of its methods, with or without this.
+TEST(UniqueMemberForms, InlineRandcMemberInMethodRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "  function int f();\n"
+             "    return randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "  function int g();\n"
+             "    return this.randomize() with { unique {b, a}; };\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 5,
+      "18.5.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 8,
+      "18.5.4"));
+}
+
+// 18.5.4 with 18.7: an inline group of rand members of the receiver's class is
+// accepted wherever randomize() with is called.
+TEST(UniqueMemberForms, InlineRandMembersAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  rand bit [1:0] b;\n"
+             "  function int f();\n"
+             "    return randomize() with { unique {a, b}; };\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c = new;\n"
+             "  initial void'(c.randomize() with { unique {a, b}; });\n"
+             "endmodule\n"));
+}
+
 }  // namespace

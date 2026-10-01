@@ -1,12 +1,10 @@
 #pragma once
 
-#include <string_view>
-#include <unordered_map>
-
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 
@@ -19,8 +17,8 @@ namespace delta {
 // engine, so they form a unit of their own rather than further members of the
 // elaborator. The per-class rules walk every class the unit declares, in a
 // module, interface, program, checker or package as well as at the top of a
-// file (AllClassDecls in elaborator_helpers.h); the external-block rules read
-// the compilation unit's own classes, the scope an external block shares.
+// file (AllClassDecls in elaborator_helpers.h); the external-block rules pair
+// each block with the class of the scope it shares with it.
 class ClassConstraintValidator {
  public:
   ClassConstraintValidator(const CompilationUnit* unit,
@@ -49,18 +47,11 @@ class ClassConstraintValidator {
   // expressions that denote singular or array variables.
   void ValidateUniqueConstraints();
   void ValidateOneClassUniqueConstraints(const ClassDecl* cls);
-  // 18.5.5: one member of a uniqueness constraint's variable group -- it shall
-  // denote a singular or array variable, of integral or real type.
-  void ValidateOneUniqueConstraintMember(
-      const Expr* mem,
-      const std::unordered_map<std::string_view, const ClassMember*>&
-          properties);
 
   // 18.5.9: a solve...before ordering constraint may name only rand variables
   // (never randc), each integral or real, with no circular dependency.
   void ValidateSolveBeforeConstraints();
   void ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls);
-  bool IsSolveOrderableType(const DataType& dt) const;
 
   // 18.5.13.1: a soft constraint may be specified only on a random variable;
   // it may not be specified for a randc variable.
@@ -95,5 +86,12 @@ class ClassConstraintValidator {
   const TypedefMap& typedefs_;
   DiagEngine& diag_;
 };
+
+// 18.5.4 with 18.7: checks each member of the uniqueness groups in the inline
+// constraint block of `call`, a randomize() with call on an object of class
+// `cls`, as the groups of the class's own constraint blocks are checked. Does
+// nothing for a call without an inline block.
+void ValidateInlineUniqueGroups(const Expr* call, const ClassDecl* cls,
+                                const CompilationUnit* unit, DiagEngine& diag);
 
 }  // namespace delta
