@@ -503,7 +503,9 @@ static std::vector<std::string> HandleKeys(const ClassObject* obj,
   if (array == nullptr) return {name};
   std::vector<std::string> keys;
   int64_t lo = array->is_dynamic ? 0 : array->array_lo;
-  for (uint32_t i = 0; i < ClassArraySize(obj, *array); ++i)
+  uint32_t size = ClassArraySize(obj, *array);
+  keys.reserve(size);
+  for (uint32_t i = 0; i < size; ++i)
     keys.push_back(ClassArrayElementKey(name, lo + i));
   return keys;
 }
