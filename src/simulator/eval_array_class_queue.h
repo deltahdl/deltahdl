@@ -7,6 +7,7 @@
 namespace delta {
 
 struct QueueObject;
+struct ClassMember;
 struct ClassObject;
 struct ClassTypeInfo;
 struct Expr;
@@ -31,6 +32,12 @@ class Arena;
 // with one dimension IsQueueDim answers for.
 QueueObject* ClassQueueProperty(ClassObject* obj, const ClassTypeInfo* from,
                                 std::string_view name, SimContext& ctx);
+
+// §8.5/§7.10: whether the property declaration `member` of `declaring` is a
+// queue, its one unpacked dimension `[$]` or `[$:N]`, written on it or on the
+// typedef its type names.
+bool IsQueuePropertyDecl(const ClassMember* member,
+                         const ClassTypeInfo* declaring, SimContext& ctx);
 
 // §8.7: builds the queue the property `name` of the level `info` of `obj`
 // declares and fills it from the declaration's initializer `init`, an

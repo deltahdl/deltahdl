@@ -242,6 +242,11 @@ struct ClassTypeInfo {
   // static_properties it is mutable so a const ClassTypeInfo* can update it.
   mutable std::unordered_map<std::string, bool> static_constraint_active;
 
+  // §18.8: the rand_mode() state of each random variable this class declares
+  // static, which is static as well: set through one instance, it holds in
+  // every instance. Keyed and defaulted as ClassObject::rand_active is.
+  mutable std::unordered_map<std::string, bool> static_rand_active;
+
   // §18.4.2: when a randc variable is declared static, its cyclic state is
   // static as well — a single permutation sequence is shared by every instance
   // of the declaring class, so randomize() advances that one sequence no matter

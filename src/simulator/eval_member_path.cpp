@@ -341,6 +341,24 @@ const StructTypeInfo* ContainerElementLayout(const Expr* base,
   return obj != nullptr ? PropertyStructLayout(obj, path, ctx) : nullptr;
 }
 
+bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
+                              SimContext& ctx, std::string_view& prop,
+                              uint32_t& offset, uint32_t& width) {
+  std::string path;
+  if (access == nullptr || obj == nullptr ||
+      access->kind != ExprKind::kMemberAccess ||
+      !MemberChainPath(access, prop, path)) {
+    return false;
+  }
+  const StructTypeInfo* info = PropertyStructLayout(obj, prop, ctx);
+  if (info == nullptr || !info->is_packed) return false;
+  offset = 0;
+  const StructFieldInfo* field = ResolveStructField(info, path, &offset);
+  if (field == nullptr) return false;
+  width = field->width;
+  return true;
+}
+
 const StructFieldInfo* ResolveStructMember(const Expr* access,
                                            SimContext& ctx) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess)

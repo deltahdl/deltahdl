@@ -2,15 +2,21 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_randomize_internal.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 
@@ -29,9 +35,27 @@ namespace {
 // below alone admits any.
 constexpr int64_t kMaxDynamicElements = 256;
 
-// Whether `e` is the size method of a dynamic array property of the class
-// `type`, `A.size` or `A.size()`, filling `array` with the property's name.
-bool IsSizeCall(const Expr* e, const ClassTypeInfo* type,
+// §18.4: the rand member named `name` the class chain from `type` declares
+// as a queue, and the class declaring it in `level`; null for any other name.
+const ClassMember* QueueMember(const ClassTypeInfo* type, std::string_view name,
+                               SimContext& ctx, const ClassTypeInfo*& level) {
+  for (const auto* t = type; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const ClassMember* m : t->decl->members) {
+      if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
+      if (!(m->is_rand || m->is_randc) || !IsQueuePropertyDecl(m, t, ctx))
+        return nullptr;
+      level = t;
+      return m;
+    }
+  }
+  return nullptr;
+}
+
+// Whether `e` is the size method of a dynamic array or queue property of the
+// class `type`, `A.size` or `A.size()`, filling `array` with the property's
+// name.
+bool IsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx,
                 std::string_view& array) {
   const Expr* access = e;
   if (e->kind == ExprKind::kCall) {
@@ -46,18 +70,24 @@ bool IsSizeCall(const Expr* e, const ClassTypeInfo* type,
     return false;
   }
   const auto* prop = FindClassArrayProperty(type, access->lhs->text);
-  if (prop == nullptr || !prop->is_dynamic) return false;
+  const ClassTypeInfo* level = nullptr;
+  if ((prop == nullptr || !prop->is_dynamic) &&
+      QueueMember(type, access->lhs->text, ctx, level) == nullptr) {
+    return false;
+  }
   array = access->lhs->text;
   return true;
 }
 
-// Whether `e` holds a size call of a dynamic array property of `type`
-// anywhere within it.
-bool HoldsSizeCall(const Expr* e, const ClassTypeInfo* type) {
+// Whether `e` holds a size call of a dynamic array or queue property of
+// `type` anywhere within it.
+bool HoldsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx) {
   if (e == nullptr) return false;
   std::string_view array;
-  if (IsSizeCall(e, type, array)) return true;
-  auto holds = [type](const Expr* sub) { return HoldsSizeCall(sub, type); };
+  if (IsSizeCall(e, type, ctx, array)) return true;
+  auto holds = [type, &ctx](const Expr* sub) {
+    return HoldsSizeCall(sub, type, ctx);
+  };
   return std::any_of(e->args.begin(), e->args.end(), holds) ||
          std::any_of(e->elements.begin(), e->elements.end(), holds) ||
          holds(e->lhs) || holds(e->rhs) || holds(e->base) || holds(e->index) ||
@@ -110,16 +140,19 @@ bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
   return constrained;
 }
 
-// The random variables of the rand member `m`, a dynamic array declared at
-// `level`: the size variable where the size is constrained, and one
-// variable per element up to the largest size admitted, or up to the size
-// the object holds where it is not.
+// The random variables of the rand member `m`, a dynamic array or, with
+// `in_queue`, a queue declared at `level` holding `held` elements: the size
+// variable where the size is constrained, and one variable per element up to
+// the largest size admitted, or up to the size the object holds where it is
+// not.
 void AddDynamicArray(const ClassMember* m, const ClassTypeInfo* level,
-                     const ClassTypeInfo::PropertyInfo& array,
-                     std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+                     int64_t held, bool in_queue, std::vector<RandInfo>& rands,
+                     RandomizeCtx& rc) {
   RandInfo element = BuildRandMember(m, level, rc.ctx);
+  element.in_queue = in_queue;
   rands.push_back(SizeVariable(m->name, level));
-  auto count = static_cast<int64_t>(ClassArraySize(rc.obj, array));
+  rands.back().in_queue = in_queue;
+  int64_t count = held;
   if (FoldSizeConstraints(rands.back(), rands, rc)) {
     count =
         std::clamp<int64_t>(rands.back().var.max_val, 0, kMaxDynamicElements);
@@ -136,6 +169,31 @@ void AddDynamicArray(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
+// §18.4: the random variables of the rand member `m` declared at `level`
+// as the associative array `aa`: one per element it holds, named by its key,
+// `m[5]` or `m["a"]`.
+void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
+                      const AssocArrayObject& aa, std::vector<RandInfo>& rands,
+                      RandomizeCtx& rc) {
+  RandInfo element = BuildRandMember(m, level, rc.ctx);
+  element.in_assoc = true;
+  element.array_base = element.name;
+  auto add = [&](std::string name) {
+    RandInfo elem = element;
+    elem.name = std::move(name);
+    elem.var.name = elem.name;
+    rands.push_back(std::move(elem));
+  };
+  for (const auto& [key, value] : aa.int_data) {
+    add(ClassArrayElementKey(m->name, key));
+    rands.back().int_key = key;
+  }
+  for (const auto& [key, value] : aa.str_data) {
+    add(std::string(m->name) + "[\"" + key + "\"]");
+    rands.back().str_key = key;
+  }
+}
+
 }  // namespace
 
 const Expr* ResolveArraySizes(const Expr* rel, RandomizeCtx& rc) {
@@ -145,12 +203,12 @@ const Expr* ResolveArraySizes(const Expr* rel, RandomizeCtx& rc) {
   auto it = cache.find(rel);
   if (it != cache.end()) return it->second != nullptr ? it->second : rel;
   Expr* resolved = nullptr;
-  if (HoldsSizeCall(rel, type)) {
+  if (HoldsSizeCall(rel, type, rc.ctx)) {
     resolved = RewriteExpr(
         rel,
         [type, &rc](const Expr* n) -> Expr* {
           std::string_view array;
-          if (!IsSizeCall(n, type, array)) return nullptr;
+          if (!IsSizeCall(n, type, rc.ctx, array)) return nullptr;
           return IdentifierExpr(ClassArraySizeKey(array), n, rc.arena);
         },
         rc.arena);
@@ -165,10 +223,108 @@ void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc) {
     for (const ClassMember* m : lvl->decl->members) {
       if (m->kind != ClassMemberKind::kProperty || !(m->is_rand || m->is_randc))
         continue;
+      // §18.4: an associative array has its elements randomized, its keys
+      // and so its size left as they are.
+      if (IsAssocPropertyDecl(m, lvl, rc.ctx)) {
+        AssocArrayObject* aa = ClassAssocProperty(rc.obj, lvl, m->name, rc.ctx);
+        if (aa != nullptr && !m->is_static)
+          AddAssocElements(m, lvl, *aa, rands, rc);
+        continue;
+      }
+      // §18.4: a queue is randomized as a dynamic array is, resized at its
+      // back to the size the constraints draw.
+      if (IsQueuePropertyDecl(m, lvl, rc.ctx)) {
+        QueueObject* queue = ClassQueueProperty(rc.obj, lvl, m->name, rc.ctx);
+        if (queue == nullptr || m->is_static) continue;
+        AddDynamicArray(m, lvl, static_cast<int64_t>(queue->elements.size()),
+                        /*in_queue=*/true, rands, rc);
+        continue;
+      }
       const auto* array = FindClassArrayProperty(lvl, m->name);
       if (array == nullptr || !array->is_dynamic) continue;
-      AddDynamicArray(m, lvl, *array, rands, rc);
+      // §18.4: randomize() allocates no class object, so an array of handles
+      // is resized alone: the handles up to the new size are kept and the
+      // elements added are null.
+      if (IsClassHandleMember(m, rc.ctx)) {
+        rands.push_back(SizeVariable(m->name, lvl));
+        if (!FoldSizeConstraints(rands.back(), rands, rc)) rands.pop_back();
+        continue;
+      }
+      AddDynamicArray(m, lvl,
+                      static_cast<int64_t>(ClassArraySize(rc.obj, *array)),
+                      /*in_queue=*/false, rands, rc);
     }
+  }
+}
+
+// 18.4: whether `ri` is an element of a dynamic array beyond the size the
+// solve drew for it, recorded in `sizes` under the array's name by the size
+// variable, which precedes the elements; the array is resized to that size,
+// so the element is dropped rather than written.
+static bool BeyondDrawnSize(
+    const RandInfo& ri, const std::unordered_map<std::string, int64_t>& sizes) {
+  if (ri.array_base.empty() || ri.var.is_array_size) return false;
+  auto it = sizes.find(ri.array_base);
+  return it != sizes.end() && ri.array_index >= it->second;
+}
+
+// 18.6.1: write each solved value back to the object, keeping the bare and
+// scoped ("Class::name") property aliases in sync so member reads see it. A
+// dynamic array's size is written under its key, which sizes the array
+// (18.4), ahead of its elements.
+void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
+                     ConstraintSolver& solver, Arena& arena) {
+  std::unordered_map<std::string, int64_t> sizes;
+  std::unordered_map<std::string, std::vector<Logic4Vec>> queues;
+  for (auto& ri : rands) {
+    if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
+    if (BeyondDrawnSize(ri, sizes)) continue;
+    Logic4Vec lv = SolvedValue(ri, solver, arena);
+    // 18.6.3: a static random variable is a single storage shared by every
+    // instance of the class, so a successful randomize() must publish the drawn
+    // value to that class-wide cell — not to a private per-object copy. Writing
+    // it to the instance map would shadow the shared storage for this object
+    // and leave the other instances observing the old value, contradicting the
+    // rule that each randomize() changes the variable in every class instance.
+    // A non-static variable keeps its per-object storage (with the scoped
+    // alias).
+    if (ri.in_queue) {
+      if (!ri.var.is_array_size) queues[ri.array_base].push_back(lv);
+    } else if (ri.in_assoc) {
+      // §18.4: the element lands under the key it was drawn for.
+      auto aa = obj->assoc_properties.find(ri.array_base);
+      if (aa == obj->assoc_properties.end() || aa->second == nullptr) continue;
+      if (aa->second->is_string_key) {
+        aa->second->str_data[ri.str_key] = lv;
+      } else {
+        aa->second->int_data[ri.int_key] = lv;
+      }
+    } else if (!ri.struct_base.empty()) {
+      // §18.4: a member of a rand unpacked structure lands in its bits of the
+      // value the property holds, the other members left as they were.
+      auto whole = obj->properties.find(ri.struct_base);
+      if (whole == obj->properties.end() ||
+          whole->second.width < ri.struct_offset + ri.var.width) {
+        continue;
+      }
+      DepositBitField(whole->second, ri.struct_offset, lv, ri.var.width);
+      obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] =
+          whole->second;
+    } else if (ri.is_static && ri.level != nullptr) {
+      ri.level->static_properties[ri.name] = lv;
+    } else {
+      obj->properties[ri.name] = lv;
+      obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
+    }
+  }
+  // §18.4: a queue holds the elements drawn, as many as its size, resized at
+  // its back.
+  for (auto& [base, elements] : queues) {
+    auto it = obj->queue_properties.find(base);
+    if (it == obj->queue_properties.end() || it->second == nullptr) continue;
+    it->second->elements = std::move(elements);
+    it->second->AssignFreshIds();
+    ++it->second->generation;
   }
 }
 

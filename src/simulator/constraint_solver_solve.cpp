@@ -236,7 +236,13 @@ void ConstraintSolver::ApplyDirectConstraints(
       SeedHonoredSoft(*c.inner, extra);
       return;
     }
-    ApplyConcreteConstraint(c, values_, rng_, HoldsStateValue(c.var_name));
+    // 18.4.2: a randc variable takes the next value of its permutation,
+    // which DrawRandcVariables draws among the values the constraint admits.
+    auto vit = variables_.find(c.var_name);
+    bool randc = vit != variables_.end() && vit->second.enabled &&
+                 vit->second.qualifier == RandQualifier::kRandc;
+    ApplyConcreteConstraint(c, values_, rng_,
+                            HoldsStateValue(c.var_name) || randc);
   };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -723,6 +729,7 @@ void ConstraintSolver::SeedAttempt(
   HoldArraySizes(sizes);
   DrawRandcVariables(variables_, values_, gen_randc);
   DrawArraySizeVariables(variables_, values_, gen);
+  SeedEnumerableVariables(extra, enumerated_);
 }
 
 // 18.5.13.1: once as many draws have failed as the pass tries before it
@@ -750,7 +757,8 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     return GenerateRandRealValue(var);
   };
   std::unordered_map<std::string, int64_t> randc_drawn;
-  auto gen_randc = RandcOncePerSolve(randc_drawn);
+  auto gen_randc = RandcOncePerSolve(randc_drawn, extra);
+  enumerated_.clear();
   // 18.5.11: when random variables are used as function arguments, the implied
   // priority is solved in layers — the higher-priority variables first, each
   // layer committed as state variables to the next without backtracking. This

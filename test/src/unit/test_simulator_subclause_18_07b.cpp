@@ -73,4 +73,33 @@ TEST(InlineConstraintsRun, ARestrictedBlockResolvesOnlyTheListedNames) {
   EXPECT_EQ(out, "32 32\n");
 }
 
+// §18.7 with §18.5.7.1: a foreach in an inline block may iterate an array of
+// the scope containing the call, which no property of the object names; its
+// elements are state, so none of the banned 1 to 3 is drawn and the other
+// relation of the block still holds.
+TEST(InlineConstraintsRun, AForeachIteratesAnArrayOfTheCallersScope) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  bit [3:0] banned[3] = '{1, 2, 3};\n"
+      "  int bad = 0;\n"
+      "  bit [5:0] seen = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (80) begin\n"
+      "      if (c.randomize() with {\n"
+      "            foreach (banned[i]) x != banned[i]; x < 6; } != 1) bad++;\n"
+      "      if (c.x inside {1, 2, 3} || c.x >= 6) bad++;\n"
+      "      else seen[c.x] = 1;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, seen);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 49\n");
+}
+
 }  // namespace

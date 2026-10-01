@@ -138,4 +138,31 @@ TEST(ScopeRandomizeWithRun, TwoRelationsOverTwoIntArgumentsHold) {
   EXPECT_EQ(out, "32 32\n");
 }
 
+// §18.12.1: inside a class method the scope randomize may name a property of
+// the object, bare, beside a local, and its block may read the method's
+// formal: p is drawn within lim to lim + 2 and q is twice it.
+TEST(ScopeRandomizeRun, APropertyNamedInAMethodIsRandomized) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  int p;\n"
+      "  int bad = 0;\n"
+      "  function void go(int lim);\n"
+      "    int q;\n"
+      "    if (std::randomize(p, q) with {\n"
+      "          p inside {[lim:lim + 2]}; q == p * 2; } != 1) bad++;\n"
+      "    if (!(p >= lim && p <= lim + 2 && q == p * 2)) bad++;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static K k = new;\n"
+      "    repeat (10) k.go(40);\n"
+      "    $display(\"%0d %0d\", k.bad, k.p >= 40 && k.p <= 42);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1\n");
+}
+
 }  // namespace

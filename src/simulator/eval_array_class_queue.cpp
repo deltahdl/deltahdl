@@ -273,6 +273,11 @@ const ClassTypeInfo* StaticQueuePropertyClass(const Expr* base,
 
 }  // namespace
 
+bool IsQueuePropertyDecl(const ClassMember* member,
+                         const ClassTypeInfo* declaring, SimContext& ctx) {
+  return QueuePropertyDim(member, declaring, ctx) != nullptr;
+}
+
 QueueObject* ClassQueueProperty(ClassObject* obj, const ClassTypeInfo* from,
                                 std::string_view name, SimContext& ctx) {
   return ResolveOn(obj, from, name, ctx, nullptr);

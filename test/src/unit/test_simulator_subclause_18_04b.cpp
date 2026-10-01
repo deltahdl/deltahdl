@@ -214,4 +214,175 @@ TEST(RandomVariableRun, ARealBesideARandcIsDrawn) {
             "8\n");
 }
 
+// §18.4: a rand packed structure is one integral random variable, and a
+// constraint on one of its members constrains that member's bits of it: hi
+// is held at A and lo drawn from 1 to 3, so the whole lies in A1 to A3.
+TEST(RandPackedStructRun, AConstraintOnAMemberConstrainsItsBits) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct packed { bit [3:0] hi; bit [3:0] lo; } ps_t;\n"
+      "class C;\n"
+      "  rand ps_t p;\n"
+      "  constraint c { p.hi == 4'hA; p.lo inside {[1:3]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [3:0] seen = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (40) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      if (c.p < 8'hA1 || c.p > 8'hA3) bad++;\n"
+      "      else seen[c.p.lo] = 1;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, seen);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 14\n");
+}
+
+// §18.4: the size of a rand queue may be constrained; the queue is resized at
+// its back to the size the constraint gives and every element randomized, so
+// five entries become three, each within the range its foreach gives.
+TEST(RandQueueRun, AConstrainedSizeResizesTheQueue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand byte q[$];\n"
+      "  constraint s { q.size() == 3; }\n"
+      "  constraint v { foreach (q[i]) q[i] inside {[1:9]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok, bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (5) c.q.push_back(42);\n"
+      "    ok = c.randomize();\n"
+      "    foreach (c.q[i]) if (!(c.q[i] inside {[1:9]})) bad++;\n"
+      "    $display(\"%0d %0d %0d\", ok, c.q.size(), bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 3 0\n");
+}
+
+// §18.4: a rand queue whose size no constraint names keeps its size, and its
+// elements are randomized.
+TEST(RandQueueRun, AnUnconstrainedSizeIsKept) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand byte q[$];\n"
+      "  constraint v { foreach (q[i]) q[i] inside {[1:9]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok, bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (4) c.q.push_back(42);\n"
+      "    ok = c.randomize();\n"
+      "    foreach (c.q[i]) if (!(c.q[i] inside {[1:9]})) bad++;\n"
+      "    $display(\"%0d %0d %0d\", ok, c.q.size(), bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 0\n");
+}
+
+// §18.4: randomize() allocates no class object: grown by its size
+// constraint, a rand dynamic array of handles keeps the objects it held,
+// their contents randomized, and its elements added are null.
+TEST(RandQueueRun, AnArrayOfHandlesKeepsItsObjectsAndAddsNulls) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class L;\n"
+      "  rand bit [7:0] v;\n"
+      "  constraint k { v inside {[1:9]}; }\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand L arr[];\n"
+      "  constraint s { arr.size == 4; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    static L first;\n"
+      "    c.arr = new[2];\n"
+      "    c.arr[0] = new; c.arr[1] = new;\n"
+      "    c.arr[0].v = 200; c.arr[1].v = 200;\n"
+      "    first = c.arr[0];\n"
+      "    ok = c.randomize();\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", ok, c.arr.size(),\n"
+      "             c.arr[0] == first && c.arr[1] != null,\n"
+      "             c.arr[2] == null && c.arr[3] == null,\n"
+      "             c.arr[0].v inside {[1:9]} && c.arr[1].v inside {[1:9]});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 4 1 1 1\n");
+}
+
+// §18.4: a rand unpacked structure has the members its typedef marks rand
+// solved with the object's other random variables, and the members it does
+// not mark keep their values: addr is drawn from 7 to 9, crc stays 77.
+TEST(RandPackedStructRun, ARandUnpackedStructRandomizesItsRandMembers) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class P;\n"
+      "  typedef struct {\n"
+      "    rand int addr;\n"
+      "    int crc;\n"
+      "    rand bit [3:0] tag;\n"
+      "  } header;\n"
+      "  rand header h1;\n"
+      "  constraint c { h1.addr inside {[7:9]}; h1.tag == 4'h5; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static P p = new;\n"
+      "    p.h1.crc = 77;\n"
+      "    repeat (10) begin\n"
+      "      if (p.randomize() != 1) bad++;\n"
+      "      if (!(p.h1.addr inside {[7:9]}) || p.h1.tag != 4'h5) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, p.h1.crc);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 77\n");
+}
+
+// §18.4: an associative array declared rand has every element randomized,
+// its size and its keys left as they are: the two entries written before the
+// call are drawn within the range the foreach over their keys gives.
+TEST(RandQueueRun, AnAssociativeArrayRandomizesItsElementsKeepingItsKeys) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [7:0] m[string];\n"
+      "  rand bit [7:0] n[int];\n"
+      "  constraint c { foreach (m[k]) m[k] inside {[30:40]};\n"
+      "                 foreach (n[k]) n[k] == k + 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.m[\"a\"] = 1; c.m[\"b\"] = 2;\n"
+      "    c.n[5] = 0; c.n[9] = 0;\n"
+      "    ok = c.randomize();\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", ok, c.m.num(),\n"
+      "             c.m.exists(\"a\") && c.m.exists(\"b\"),\n"
+      "             c.m[\"a\"] inside {[30:40]} && c.m[\"b\"] inside "
+      "{[30:40]},\n"
+      "             c.n[5], c.n[9]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 1 1 6 10\n");
+}
+
 }  // namespace

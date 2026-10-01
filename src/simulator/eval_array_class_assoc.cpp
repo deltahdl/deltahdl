@@ -466,6 +466,11 @@ AssocArrayObject* ScopeResolvedAssocProperty(const Expr* base,
 
 }  // namespace
 
+bool IsAssocPropertyDecl(const ClassMember* member,
+                         const ClassTypeInfo* declaring, SimContext& ctx) {
+  return DeclaresAssocProperty(member, declaring, ctx);
+}
+
 AssocArrayObject* ClassAssocProperty(ClassObject* obj,
                                      const ClassTypeInfo* from,
                                      std::string_view name, SimContext& ctx) {

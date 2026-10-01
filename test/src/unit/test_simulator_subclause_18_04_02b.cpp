@@ -107,4 +107,63 @@ TEST(RandcModifierRun, AStaticRandcSharesOneSequenceAcrossInstances) {
   EXPECT_EQ(out, "1\n");
 }
 
+// §18.4.2: a randc variable whose constraint narrows its domain cycles
+// through the values the constraint admits, so twelve calls over the six of
+// [10:15] give each exactly twice, none twice within one cycle of six.
+TEST(RandcCycleRun, AConstrainedDomainIsCycledWithoutRepeats) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  randc bit [3:0] y;\n"
+      "  constraint r { y inside {[10:15]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [15:0] seen;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (2) begin\n"
+      "      seen = 0;\n"
+      "      repeat (6) begin\n"
+      "        if (c.randomize() != 1 || c.y < 10 || seen[c.y]) bad++;\n"
+      "        seen[c.y] = 1;\n"
+      "      end\n"
+      "      if (seen != 16'hFC00) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
+// §18.4.2: when the constraints change, the permutation is recomputed: after
+// lo becomes 5 the next three calls give 5, 6 and 7 in some order, whatever
+// the two calls before the change drew.
+TEST(RandcCycleRun, AChangedConstraintRecomputesThePermutation) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  randc bit [2:0] y;\n"
+      "  int lo = 0;\n"
+      "  constraint c { y >= lo; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [7:0] seen = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (2) void'(c.randomize());\n"
+      "    c.lo = 5;\n"
+      "    repeat (3) begin\n"
+      "      if (c.randomize() != 1 || c.y < 5 || seen[c.y]) bad++;\n"
+      "      seen[c.y] = 1;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, seen);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 224\n");
+}
+
 }  // namespace

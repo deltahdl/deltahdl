@@ -17,6 +17,7 @@
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -129,13 +130,14 @@ Expr* Instance(const Expr* e, const ForeachInstance& inst) {
 }
 
 // 18.5.7.1: the relations `ref` instances over `count` elements of the array
-// `array` from the index `lo`, one instance of each relation of the
+// it iterates from the index `lo`, a select of `array` at an element's index
+// read as the element's variable, one instance of each relation of the
 // constraint_set per element in index order, built once per class and count
 // and kept on the class. A header naming more than one loop variable
 // iterates a dimension the object does not model, and instances nothing.
 const std::vector<Expr*>& ForeachInstances(const ConstraintForeachRef& ref,
-                                           int64_t lo, uint32_t count,
-                                           RandomizeCtx& rc) {
+                                           std::string_view array, int64_t lo,
+                                           uint32_t count, RandomizeCtx& rc) {
   auto& cached = rc.obj->type->foreach_instances[&ref];
   if (cached.count == count && !cached.relations.empty()) {
     return cached.relations;
@@ -146,16 +148,82 @@ const std::vector<Expr*>& ForeachInstances(const ConstraintForeachRef& ref,
     return cached.relations;
   }
   for (uint32_t i = 0; i < count; ++i) {
-    ForeachInstance inst{ref.loop_vars[0],
-                         ref.array_name,
-                         lo + static_cast<int64_t>(i),
-                         lo,
-                         count,
-                         rc};
+    ForeachInstance inst{
+        ref.loop_vars[0], array, lo + static_cast<int64_t>(i), lo, count, rc};
     for (const Expr* rel : ref.body)
       cached.relations.push_back(Instance(rel, inst));
   }
   return cached.relations;
+}
+
+// §18.5.7.1: the leaf key, `m[1][2]`, a select chain of the array `array`
+// of `dims` unpacked dimensions reads where every index is written over
+// literals; empty for any other expression.
+std::string LeafKey(const Expr* e, std::string_view array, size_t dims,
+                    RandomizeCtx& rc) {
+  std::vector<const Expr*> indices;
+  while (e != nullptr && e->kind == ExprKind::kSelect &&
+         e->index_end == nullptr && e->index != nullptr) {
+    indices.push_back(e->index);
+    e = e->base;
+  }
+  if (e == nullptr || e->kind != ExprKind::kIdentifier || e->text != array ||
+      indices.size() != dims) {
+    return {};
+  }
+  std::string key(array);
+  for (auto it = indices.rbegin(); it != indices.rend(); ++it) {
+    if (!IsLiteralExpr(*it)) return {};
+    Logic4Vec value = EvalExpr(*it, rc.ctx, rc.arena);
+    key = ClassArrayElementKey(
+        key, value.is_signed ? SignExtend(value.ToUint64(), value.width)
+                             : static_cast<int64_t>(value.ToUint64()));
+  }
+  return key;
+}
+
+// §18.5.7.1: the relations of `ref`, whose header names a loop variable for
+// each of several dimensions of the array property `array`, instanced once
+// per combination of the indices those dimensions declare, outermost first,
+// each loop variable read as its index and each select of a leaf element as
+// the element's variable, appended to `out`. A dimension the header leaves
+// unnamed is not iterated.
+void AppendMultiForeachInstances(const ConstraintForeachRef& ref,
+                                 const ClassTypeInfo::PropertyInfo& array,
+                                 size_t dim, std::vector<int64_t>& index,
+                                 RandomizeCtx& rc, std::vector<Expr*>& out) {
+  size_t dims = array.dim_sizes.size();
+  if (dim == ref.loop_vars.size() || dim == dims) {
+    auto instance = [&](const Expr* n) -> Expr* {
+      for (size_t d = 0; d < index.size(); ++d) {
+        if (n->kind == ExprKind::kIdentifier && !ref.loop_vars[d].empty() &&
+            n->text == ref.loop_vars[d]) {
+          return IndexLiteral(index[d], n, rc.arena);
+        }
+      }
+      return nullptr;
+    };
+    auto leaf = [&](const Expr* n) -> Expr* {
+      std::string key = LeafKey(n, ref.array_name, dims, rc);
+      return key.empty() ? nullptr : IdentifierExpr(key, n, rc.arena);
+    };
+    for (const Expr* rel : ref.body) {
+      out.push_back(
+          RewriteExpr(RewriteExpr(rel, instance, rc.arena), leaf, rc.arena));
+    }
+    return;
+  }
+  if (ref.loop_vars[dim].empty()) {
+    index.push_back(array.dim_los[dim]);
+    AppendMultiForeachInstances(ref, array, dim + 1, index, rc, out);
+    index.pop_back();
+    return;
+  }
+  for (uint32_t i = 0; i < array.dim_sizes[dim]; ++i) {
+    index.push_back(array.dim_los[dim] + static_cast<int64_t>(i));
+    AppendMultiForeachInstances(ref, array, dim + 1, index, rc, out);
+    index.pop_back();
+  }
 }
 
 // 18.5.7.1: the elements of the array `array` a foreach iterates: the rand
@@ -181,6 +249,84 @@ IteratedElements ElementsOf(const ClassTypeInfo::PropertyInfo& array,
   if (array.is_dynamic && FindRand(rands, ClassArraySizeKey(array.name)))
     out.size_var = ClassArraySizeKey(array.name);
   return out;
+}
+
+// §18.4 with §18.5.7.1: the relations of `ref`, a foreach over the rand
+// associative array it names, instanced once per key the array holds, the
+// loop variable read as the key and the select of the array at it as the
+// element's variable, appended to `out`; false where the array holds no
+// element of the solve.
+bool AppendAssocForeachInstances(const ConstraintForeachRef& ref,
+                                 std::vector<RandInfo>& rands, RandomizeCtx& rc,
+                                 std::vector<Expr*>& out) {
+  if (ref.loop_vars.size() != 1 || ref.loop_vars[0].empty()) return false;
+  std::string_view var = ref.loop_vars[0];
+  bool any = false;
+  for (const auto& ri : rands) {
+    if (!ri.in_assoc || ri.array_base != ref.array_name) continue;
+    any = true;
+    bool string_key = ri.name.size() > ref.array_name.size() + 1 &&
+                      ri.name[ref.array_name.size() + 1] == '"';
+    auto key = [&](const Expr* like) -> Expr* {
+      if (!string_key) return IndexLiteral(ri.int_key, like, rc.arena);
+      std::string text = "\"" + ri.str_key + "\"";
+      auto* literal = rc.arena.Create<Expr>();
+      literal->kind = ExprKind::kStringLiteral;
+      literal->range = like->range;
+      literal->text = {rc.arena.AllocString(text.data(), text.size()),
+                       text.size()};
+      return literal;
+    };
+    auto instance = [&](const Expr* n) -> Expr* {
+      if (n->kind == ExprKind::kSelect && n->index_end == nullptr &&
+          n->base != nullptr && n->base->kind == ExprKind::kIdentifier &&
+          n->base->text == ref.array_name && n->index != nullptr &&
+          n->index->kind == ExprKind::kIdentifier && n->index->text == var) {
+        return IdentifierExpr(ri.name, n, rc.arena);
+      }
+      if (n->kind == ExprKind::kIdentifier && n->text == var) return key(n);
+      return nullptr;
+    };
+    for (const Expr* rel : ref.body)
+      out.push_back(RewriteExpr(rel, instance, rc.arena));
+  }
+  return any;
+}
+
+// §18.4 with §18.5.7.1: the elements of the rand queue `name`, the element
+// variables AddDynamicArrayVariables made for it from index 0, and the size
+// variable where a randomize() solves its size; false where it made none.
+bool QueueElements(std::string_view name, std::vector<RandInfo>& rands,
+                   IteratedElements& out) {
+  uint32_t count = 0;
+  for (const auto& ri : rands) {
+    if (ri.in_queue && ri.array_base == name && !ri.var.is_array_size) ++count;
+  }
+  if (count == 0) return false;
+  out.lo = 0;
+  out.count = count;
+  if (FindRand(rands, ClassArraySizeKey(name)) != nullptr)
+    out.size_var = ClassArraySizeKey(name);
+  return true;
+}
+
+// §18.7 with §18.5.7.1: the elements of an array no property of the object
+// names, one of the scope containing an inline constraint's call, which a
+// foreach iterates as state: a fixed array of one unpacked dimension from
+// its low index, or a queue or dynamic array from 0. False for any other
+// name.
+bool StateArrayElements(std::string_view name, RandomizeCtx& rc,
+                        IteratedElements& out) {
+  if (const QueueObject* queue = rc.ctx.FindQueue(name)) {
+    out.lo = 0;
+    out.count = static_cast<uint32_t>(queue->elements.size());
+    return true;
+  }
+  const ArrayInfo* info = rc.ctx.FindArrayInfo(name);
+  if (info == nullptr || info->dim_sizes.size() >= 2) return false;
+  out.lo = info->lo;
+  out.count = info->size;
+  return true;
 }
 
 // 18.5.7.2: the operand a reduction method named `method` joins the elements
@@ -363,10 +509,41 @@ void AddForeachConstraints(const ClassMember* m, std::vector<RandInfo>& rands,
   for (const auto& ref : m->constraint_foreach_refs) {
     if (ref.body.empty()) continue;
     const auto* array = FindClassArrayProperty(rc.obj->type, ref.array_name);
-    if (array == nullptr) continue;
-    IteratedElements elems = ElementsOf(*array, rands, rc);
-    ForeachBuild build{ForeachInstances(ref, elems.lo, elems.count, rc),
-                       ref.body.size(), elems, block.enabled};
+    if (array != nullptr && array->dim_sizes.size() >= 2 &&
+        ref.loop_vars.size() >= 2) {
+      std::vector<int64_t> index;
+      std::vector<Expr*> instances;
+      AppendMultiForeachInstances(ref, *array, 0, index, rc, instances);
+      for (const Expr* rel : instances) {
+        block.constraints.push_back(
+            TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
+      }
+      continue;
+    }
+    std::vector<Expr*> assoc;
+    if (array == nullptr &&
+        AppendAssocForeachInstances(ref, rands, rc, assoc)) {
+      for (const Expr* rel : assoc) {
+        block.constraints.push_back(
+            TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
+      }
+      continue;
+    }
+    IteratedElements elems;
+    bool rand_queue =
+        array == nullptr && QueueElements(ref.array_name, rands, elems);
+    if (array != nullptr) {
+      elems = ElementsOf(*array, rands, rc);
+    } else if (!rand_queue && !StateArrayElements(ref.array_name, rc, elems)) {
+      continue;
+    }
+    // A state array's elements are read as written, `banned[1]`, a select
+    // of it being no element variable of the object.
+    std::string_view element_array =
+        array != nullptr || rand_queue ? ref.array_name : "";
+    ForeachBuild build{
+        ForeachInstances(ref, element_array, elems.lo, elems.count, rc),
+        ref.body.size(), elems, block.enabled};
     if (!elems.size_var.empty()) {
       for (size_t rel = 0; rel < ref.body.size(); ++rel)
         block.constraints.push_back(SizedForeach(build, rel, rands, rc));

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -17,6 +18,8 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
@@ -116,6 +119,10 @@ RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
   info.var.qualifier =
       m->is_randc ? RandQualifier::kRandc : RandQualifier::kRand;
   uint32_t width = EvalTypeWidth(m->data_type);
+  // §18.4: a member of a named type, a packed structure's typedef among them,
+  // is as wide as that type, one integral variable of its bits.
+  if (width == 0 && m->data_type.kind == DataTypeKind::kNamed)
+    width = ctx.FindTypeWidth(m->data_type.type_name);
   info.var.width = width == 0 ? 32 : width;
   // 18.3: confine an enum-typed random variable to its named-constant set.
   PopulateEnumDomain(m, level, ctx, info.var);
@@ -155,6 +162,27 @@ RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
 
 namespace {
 
+// §18.5.7.1: one random variable per leaf element of an array member of
+// several unpacked dimensions, from the dimension `dim` onward under the key
+// `key`, each named by its declared index in every dimension, `m[1][2]`, as
+// the object holds the element.
+void AddRandLeaves(const RandInfo& info,
+                   const ClassTypeInfo::PropertyInfo& array, size_t dim,
+                   const std::string& key, std::vector<RandInfo>& out) {
+  if (dim == array.dim_sizes.size()) {
+    RandInfo elem = info;
+    elem.name = key;
+    elem.var.name = key;
+    elem.array_base = info.name;
+    out.push_back(std::move(elem));
+    return;
+  }
+  for (uint32_t i = 0; i < array.dim_sizes[dim]; ++i) {
+    AddRandLeaves(info, array, dim + 1,
+                  ClassArrayElementKey(key, array.dim_los[dim] + i), out);
+  }
+}
+
 // 18.4: the random variables of one rand/randc data member. 18.5.7: a member
 // declared as an array is one random variable per element, each named as its
 // element's key and drawn over the element type's range, so that an
@@ -163,11 +191,23 @@ namespace {
 // being the object's rather than the class's.
 void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
                    SimContext& ctx, std::vector<RandInfo>& out) {
+  // §18.4: a queue's variables are added by AddDynamicArrayVariables, their
+  // count being the object's, as are an associative array's, and a
+  // structure's by AddRandStructMembers.
+  if (IsQueuePropertyDecl(m, level, ctx) ||
+      IsAssocPropertyDecl(m, level, ctx) ||
+      AddRandStructMembers(m, level, ctx, out)) {
+    return;
+  }
   const auto* array = FindClassArrayProperty(level, m->name);
   if (array != nullptr && array->is_dynamic) return;
   RandInfo info = BuildRandMember(m, level, ctx);
   if (array == nullptr) {
     out.push_back(std::move(info));
+    return;
+  }
+  if (array->dim_sizes.size() >= 2) {
+    AddRandLeaves(info, *array, 0, info.name, out);
     return;
   }
   for (uint32_t i = 0; i < array->array_size; ++i) {
@@ -436,8 +476,12 @@ static void PrepareRandVariables(
     bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
                                            : IsObjectRandActive(obj, ri.name);
     if (!active) {
-      auto pit = obj->properties.find(ri.name);
-      if (pit != obj->properties.end())
+      // 18.6.3: a static variable holds its value in the class-wide cell.
+      const auto& held = ri.is_static && ri.level != nullptr
+                             ? ri.level->static_properties
+                             : obj->properties;
+      auto pit = held.find(ri.name);
+      if (pit != held.end())
         ri.var.value = ri.var.ValueFromBits(pit->second.ToUint64());
       ri.var.enabled = false;
     }
@@ -461,15 +505,27 @@ static bool RandomizeRandObjectMembers(
   bool solved = true;
   for (const auto& name : object_members) {
     if (!IsObjectRandActive(obj, name)) continue;
-    auto it = obj->properties.find(name);
-    if (it == obj->properties.end()) continue;
-    uint64_t handle = it->second.ToUint64();
-    if (handle == kNullClassHandle) continue;
-    ClassObject* sub = ctx.GetClassObject(handle);
-    if (!sub) continue;
-    if (!RandomizeObject(sub, ctx, arena, {expr, nullptr, nullptr, false},
-                         visited))
-      solved = false;
+    // §18.4: the objects an array of handles holds, up to the size the
+    // solve left it, are randomized each as a handle member's is.
+    std::vector<std::string> keys{name};
+    if (const auto* array = FindClassArrayProperty(obj->type, name)) {
+      keys.clear();
+      for (uint32_t i = 0; i < ClassArraySize(obj, *array); ++i) {
+        keys.push_back(ClassArrayElementKey(
+            name, (array->is_dynamic ? 0 : array->array_lo) + i));
+      }
+    }
+    for (const auto& key : keys) {
+      auto it = obj->properties.find(key);
+      if (it == obj->properties.end()) continue;
+      uint64_t handle = it->second.ToUint64();
+      if (handle == kNullClassHandle) continue;
+      ClassObject* sub = ctx.GetClassObject(handle);
+      if (sub != nullptr &&
+          !RandomizeObject(sub, ctx, arena, {expr, nullptr, nullptr, false},
+                           visited))
+        solved = false;
+    }
   }
   return solved;
 }
@@ -479,6 +535,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
                      std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return false;
   if (!visited.insert(obj).second) return true;
+  InvokePreRandomize(obj, call.expr, ctx, arena);
 
   // 18.6.3: seed from the object's own RNG so randomize() draws a fresh result
   // each call while staying reproducible from the object's starting state.
@@ -498,7 +555,6 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   if (call.inline_block != nullptr)
     AddInlineConstraintBlock(call, rands, rc, solver);
   PrepareRandVariables(obj, rands, call.inline_random, solver);
-  RegisterPreRandomize(obj, call.expr, ctx, arena, solver);
 
   bool solved = solver.SolveWith({});
   // 18.6.2: post_randomize() must observe the new values as assigned to the
@@ -538,15 +594,18 @@ void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
 // elements, so the states its elements were given on their own are dropped
 // for the member's.
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
+  // §18.8: a static variable's state is held by its declaring class.
+  const ClassTypeInfo* owner = StaticRandOwner(obj, name);
+  auto& modes = owner != nullptr ? owner->static_rand_active : obj->rand_active;
   std::string prefix = std::string(name) + "[";
-  for (auto it = obj->rand_active.begin(); it != obj->rand_active.end();) {
+  for (auto it = modes.begin(); it != modes.end();) {
     if (it->first.compare(0, prefix.size(), prefix) == 0) {
-      it = obj->rand_active.erase(it);
+      it = modes.erase(it);
     } else {
       ++it;
     }
   }
-  obj->rand_active[std::string(name)] = active;
+  modes[std::string(name)] = active;
 }
 
 // 18.5.11: gather the identifiers a constraint relation names, partitioned by
@@ -613,6 +672,7 @@ static ConstraintExpr TranslateUnguarded(const Expr* rel,
 ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold) {
   rel = ResolveArraySizes(rel, rc);
+  rel = PackedMembersAsSelects(rel, rands, rc);
   ConstraintExpr ce = TranslateUnguarded(rel, rands, rc, fold);
   AttachConstraintGuard(
       rel, [&rands](const Expr* e) { return RefsRandVar(e, rands); }, rc.obj,
@@ -661,26 +721,24 @@ std::string_view InlineRandomArgName(const Expr* arg) {
 }
 
 // 18.6.2: pre_randomize() is invoked by randomize() before any new random value
-// is computed. Register it as the solver's pre hook, which fires ahead of the
-// solve. The method is resolved on the object's actual (dynamic) class: because
-// randomize() is virtual, an override in the dynamic type is reached even
-// through a base-class handle, so pre_randomize() appears to behave virtually.
-// A derived class that does not itself declare pre_randomize() resolves to the
-// inherited one, which is the effect of automatically invoking
-// super.pre_randomize().
-void RegisterPreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
-                          Arena& arena, ConstraintSolver& solver) {
+// is computed, so it runs ahead of the constraints' translation too: a state
+// variable it writes is what they read. The method is resolved on the
+// object's actual (dynamic) class: because randomize() is virtual, an override
+// in the dynamic type is reached even through a base-class handle, so
+// pre_randomize() appears to behave virtually. A derived class that does not
+// itself declare pre_randomize() resolves to the inherited one, which is the
+// effect of automatically invoking super.pre_randomize().
+void InvokePreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
+                        Arena& arena) {
   const ClassTypeInfo* owner = nullptr;
   if (ModuleItem* pre =
           obj->ResolveMethodForType("pre_randomize", obj->type, &owner)) {
     // Run the body with its defining class as the enclosing scope so an
     // unqualified member resolves to that level (§8.15) and a super call inside
     // an override walks one level up, mirroring an ordinary method dispatch.
-    solver.SetPreRandomize([pre, obj, owner, expr, &ctx, &arena] {
-      ctx.PushMethodClass(owner);
-      ExecInstanceMethodCall(pre, obj, expr, ctx, arena);
-      ctx.PopMethodClass();
-    });
+    ctx.PushMethodClass(owner);
+    ExecInstanceMethodCall(pre, obj, expr, ctx, arena);
+    ctx.PopMethodClass();
   }
 }
 
@@ -722,45 +780,6 @@ Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
   // negative number rather than as its unsigned bit pattern.
   lv.is_signed = ri.var.is_signed;
   return lv;
-}
-
-// 18.4: whether `ri` is an element of a dynamic array beyond the size the
-// solve drew for it, recorded in `sizes` under the array's name by the size
-// variable, which precedes the elements; the array is resized to that size,
-// so the element is dropped rather than written.
-static bool BeyondDrawnSize(
-    const RandInfo& ri, const std::unordered_map<std::string, int64_t>& sizes) {
-  if (ri.array_base.empty() || ri.var.is_array_size) return false;
-  auto it = sizes.find(ri.array_base);
-  return it != sizes.end() && ri.array_index >= it->second;
-}
-
-// 18.6.1: write each solved value back to the object, keeping the bare and
-// scoped ("Class::name") property aliases in sync so member reads see it. A
-// dynamic array's size is written under its key, which sizes the array
-// (18.4), ahead of its elements.
-void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
-                     ConstraintSolver& solver, Arena& arena) {
-  std::unordered_map<std::string, int64_t> sizes;
-  for (auto& ri : rands) {
-    if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
-    if (BeyondDrawnSize(ri, sizes)) continue;
-    Logic4Vec lv = SolvedValue(ri, solver, arena);
-    // 18.6.3: a static random variable is a single storage shared by every
-    // instance of the class, so a successful randomize() must publish the drawn
-    // value to that class-wide cell — not to a private per-object copy. Writing
-    // it to the instance map would shadow the shared storage for this object
-    // and leave the other instances observing the old value, contradicting the
-    // rule that each randomize() changes the variable in every class instance.
-    // A non-static variable keeps its per-object storage (with the scoped
-    // alias).
-    if (ri.is_static && ri.level != nullptr) {
-      ri.level->static_properties[ri.name] = lv;
-    } else {
-      obj->properties[ri.name] = lv;
-      obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
-    }
-  }
 }
 
 TokenKind MirrorComparison(TokenKind op) {

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -5,12 +6,14 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
@@ -85,26 +88,56 @@ static void AddSoftDistConstraints(const ClassMember* m, RandomizeCtx& rc,
 }
 
 // 18.5.4: build each captured uniqueness constraint as a kUnique solver
-// constraint. Each range_list member that names an active rand variable is
-// resolved to that solver variable; the solver then requires the named
-// variables to hold pairwise-distinct values, enforces the no-randc and
-// equivalent-type restrictions on the group, and treats a group of fewer than
-// two known members as having no effect. A member the solver does not model as
-// its own variable (e.g. an array slice, whose elements the scalar solver does
-// not draw individually) is left out of the group, mirroring the lenient
-// treatment of unknown references elsewhere in the translation.
+// constraint. Each range_list member is resolved to the solver variables it
+// names: a singular rand variable, a whole unpacked array as every element of
+// it, and a select or a slice of one, `a[2]` or `a[2:3]`, as the elements it
+// selects; the solver then requires the named variables to hold
+// pairwise-distinct values, enforces the no-randc and equivalent-type
+// restrictions on the group, and treats a group of fewer than two known
+// members as having no effect. A member naming no variable of the solve is
+// left out of the group, mirroring the lenient treatment of unknown
+// references elsewhere in the translation.
+static void AddUniqueMember(const Expr* item, std::vector<RandInfo>& rands,
+                            RandomizeCtx& rc, std::vector<std::string>& out) {
+  if (item == nullptr) return;
+  if (item->kind == ExprKind::kIdentifier) {
+    if (FindRand(rands, item->text)) {
+      out.push_back(std::string(item->text));
+      return;
+    }
+    for (const auto& ri : rands) {
+      if (ri.array_base == item->text && !ri.var.is_array_size)
+        out.push_back(ri.name);
+    }
+    return;
+  }
+  if (item->kind != ExprKind::kSelect || item->base == nullptr ||
+      item->base->kind != ExprKind::kIdentifier || item->index == nullptr) {
+    return;
+  }
+  auto bound = [&rc](const Expr* e) {
+    ConstraintEvalScope scope(rc.obj, rc.ctx);
+    Logic4Vec v = EvalExpr(e, rc.ctx, rc.arena);
+    return v.is_signed ? SignExtend(v.ToUint64(), v.width)
+                       : static_cast<int64_t>(v.ToUint64());
+  };
+  int64_t lo = bound(item->index);
+  int64_t hi = item->index_end != nullptr ? bound(item->index_end) : lo;
+  if (lo > hi) std::swap(lo, hi);
+  for (int64_t i = lo; i <= hi; ++i) {
+    std::string name = ClassArrayElementKey(item->base->text, i);
+    if (FindRand(rands, name)) out.push_back(name);
+  }
+}
+
 static void AddUniqueConstraints(const ClassMember* m,
-                                 std::vector<RandInfo>& rands,
+                                 std::vector<RandInfo>& rands, RandomizeCtx& rc,
                                  ConstraintBlock& block) {
   for (const auto& group : m->constraint_unique_refs) {
     ConstraintExpr ce;
     ce.kind = ConstraintKind::kUnique;
-    for (const Expr* item : group) {
-      if (item != nullptr && item->kind == ExprKind::kIdentifier &&
-          FindRand(rands, item->text)) {
-        ce.unique_vars.push_back(std::string(item->text));
-      }
-    }
+    for (const Expr* item : group)
+      AddUniqueMember(item, rands, rc, ce.unique_vars);
     ce.ref_vars = ce.unique_vars;
     block.constraints.push_back(std::move(ce));
   }
@@ -211,7 +244,7 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   AddDisableSoftDirectives(m, block);
   AddSoftConstraints(m, rands, rc, block);
   AddSoftDistConstraints(m, rc, block);
-  AddUniqueConstraints(m, rands, block);
+  AddUniqueConstraints(m, rands, rc, block);
   AddSolveBeforeOrderings(m, rands, solver);
   AddFunctionArgPriorities(m, rands, solver);
 

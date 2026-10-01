@@ -97,4 +97,30 @@ TEST(RandModeRun, AnArrayElementIsNamedByItsIndex) {
   EXPECT_EQ(out, "32 1 0 0\n");
 }
 
+// §18.8: the rand_mode state of a static random variable is static too: set
+// inactive through a, it is inactive through b, whose randomize() then holds
+// the 99 written through a; a nonstatic variable beside it keeps a state per
+// instance.
+TEST(RandModeRun, AStaticVariablesModeIsSharedByEveryInstance) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  static rand bit [7:0] s;\n"
+      "  rand bit [7:0] n;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C a = new, b = new;\n"
+      "    a.s = 99;\n"
+      "    a.s.rand_mode(0);\n"
+      "    a.n.rand_mode(0);\n"
+      "    void'(b.randomize());\n"
+      "    $display(\"%0d %0d %0d\", b.s.rand_mode(), b.s == 99,\n"
+      "             b.n.rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 1\n");
+}
+
 }  // namespace

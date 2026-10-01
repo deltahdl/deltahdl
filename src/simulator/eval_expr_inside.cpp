@@ -9,6 +9,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -125,9 +126,12 @@ static void CollectMultiDimSetLeaves(const ArrayInfo& info, size_t d,
 // fixed arrays, and (by full descent through every dimension) multidimensional
 // fixed arrays. An associative array contributed no value, so `3 inside {m}`
 // with m["a"] = 3 answered 0.
-static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
-                                      std::vector<Logic4Vec>& out) {
+bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
+                               std::vector<Logic4Vec>& out) {
   if (elem->kind != ExprKind::kIdentifier) return false;
+  // §8.5 with §7.6: an array property of the object in scope, which hides a
+  // like-named array of the enclosing module.
+  if (PropertyArrayElements(elem, ctx, ctx.GetArena(), out)) return true;
   if (CollectQueueOrAssocValues(elem->text, ctx, out)) return true;
   if (auto* info = ctx.FindArrayInfo(elem->text)) {
     if (info->dim_sizes.size() >= 2) {

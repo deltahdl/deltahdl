@@ -332,6 +332,11 @@ Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx);
 std::string_view ArrayRootKey(const Expr* base, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
+// §11.4.13: where the set member `elem` names an unpacked array, its elements
+// down to singular values, appended to `out` in index order; answers whether
+// it named one. Defined in eval_expr_inside.cpp.
+bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
+                               std::vector<Logic4Vec>& out);
 // Evaluates `lhs inside { elem }` for one set member, returning 1 for a match,
 // 0 for a definite mismatch, and 2 when the comparison is ambiguous (x). Shared
 // with the case-inside statement path so both apply the same §11.4.6/§11.4.13

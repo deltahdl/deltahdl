@@ -101,7 +101,28 @@ struct RandInfo {
   // neither.
   std::string array_base;
   int64_t array_index = 0;
+  // §18.4: the variable is the size or an element of a rand member declared
+  // as a queue, which the object holds as a queue rather than under keys.
+  bool in_queue = false;
+  // §18.4: for an element of a rand member declared as an associative array,
+  // the key it is held under, an integer or, for a string index, `str_key`.
+  bool in_assoc = false;
+  int64_t int_key = 0;
+  std::string str_key;
+  // §18.4: for a rand member of a rand unpacked structure property, the
+  // property's name and the member's lowest bit in the value it holds, into
+  // which the member is written back; empty for any other variable.
+  std::string struct_base;
+  uint32_t struct_offset = 0;
 };
+
+// §18.4: the random variables of the rand member `m` of `level` where it is
+// an unpacked structure: one per integral member its typedef declares rand or
+// randc, named `h1.addr`, its other members keeping their values. False,
+// adding nothing, where `m` holds no unpacked structure of a typedef the
+// class chain declares. Defined in eval_randomize_struct.cpp.
+bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
+                          SimContext& ctx, std::vector<RandInfo>& out);
 
 // State threaded through the randomize() build helpers; bundled to keep helper
 // parameter lists small.
@@ -152,6 +173,16 @@ struct JointVarScope {
 // A copy of an expression with the nodes `rewrite` answers for replaced by
 // its answer, the others copied over their rewritten children; a node the
 // rewrite answers null for is copied (eval_randomize_iterative.cpp).
+// §18.4: a rand packed structure is one integral random variable, so a
+// member of it the relation `rel` names, `p.hi`, is rewritten as the
+// part-select of the bits the member occupies, `p[7:4]`, which the solver
+// reads off the variable; a rand member of a rand unpacked structure,
+// `h1.addr`, is rewritten as the identifier of its own variable. Defined in
+// eval_randomize_membership.cpp.
+const Expr* PackedMembersAsSelects(const Expr* rel,
+                                   std::vector<RandInfo>& rands,
+                                   RandomizeCtx& rc);
+
 using ExprRewrite = std::function<Expr*(const Expr*)>;
 Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena);
 // An identifier node spelling `text`, the text held by the arena, placed
@@ -282,6 +313,11 @@ void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
 Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
                       Arena& arena);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
+// §18.8: the class declaring the random variable `name` of `obj`, an
+// element or the size named by its member's key, where the declaration is
+// static, so that the class holds its rand_mode() state; null otherwise.
+const ClassTypeInfo* StaticRandOwner(const ClassObject* obj,
+                                     std::string_view name);
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name);
 void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
                          Arena& arena);
@@ -332,8 +368,8 @@ const ClassMember* FindNamedProperty(const ClassTypeInfo* type, SimContext& ctx,
                                      std::string_view name,
                                      const ClassTypeInfo** out_level);
 std::string_view InlineRandomArgName(const Expr* arg);
-void RegisterPreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
-                          Arena& arena, ConstraintSolver& solver);
+void InvokePreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
+                        Arena& arena);
 ClassObject* ResolveRandomizeTarget(SimContext& ctx,
                                     const MethodCallParts& parts);
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,

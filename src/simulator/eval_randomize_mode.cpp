@@ -19,6 +19,7 @@
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -160,16 +161,33 @@ static bool ExtractScopedModeParts(const Expr* expr, std::string_view method,
 // 18.8: report whether a random variable is active on this object. Every
 // rand/randc variable is active when the object is created, so an absent entry
 // means active; an explicit entry records the last rand_mode() setting.
+const ClassTypeInfo* StaticRandOwner(const ClassObject* obj,
+                                     std::string_view name) {
+  std::string_view base = name.substr(0, name.find_first_of("[."));
+  for (const auto* t = obj->type; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const ClassMember* m : t->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == base)
+        return m->is_static ? t : nullptr;
+    }
+  }
+  return nullptr;
+}
+
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name) {
-  auto it = obj->rand_active.find(std::string(name));
-  if (it != obj->rand_active.end()) return it->second;
+  // §18.8: a static variable's state is held by its declaring class.
+  const ClassTypeInfo* owner = StaticRandOwner(obj, name);
+  const auto& modes =
+      owner != nullptr ? owner->static_rand_active : obj->rand_active;
+  auto it = modes.find(std::string(name));
+  if (it != modes.end()) return it->second;
   // 18.5.7/18.8: an element of a rand member declared as an array, and the
   // size of one declared as a dynamic array, is named by its key, while
   // rand_mode() is called on the member, so each takes the member's state.
   auto bracket = name.find_first_of("[.");
   if (bracket == std::string_view::npos) return true;
-  auto base = obj->rand_active.find(std::string(name.substr(0, bracket)));
-  return base == obj->rand_active.end() ? true : base->second;
+  auto base = modes.find(std::string(name.substr(0, bracket)));
+  return base == modes.end() ? true : base->second;
 }
 
 // 18.6.2: post_randomize() is invoked by randomize() after the new random
@@ -432,6 +450,33 @@ void WriteBackScopeSolved(const std::vector<Variable*>& targets,
   }
 }
 
+// 18.12: the variables the arguments of the scope randomize call `expr`
+// name, each into `targets` with its name in `names`; false where an
+// argument is no identifier naming one. 18.12 with §8.6: a property of the
+// object a method runs on, named bare, is a variable visible in the method's
+// scope; it is solved through a stand-in holding its value, recorded in
+// `properties` with the property it is written back to.
+static bool ResolveScopeTargets(
+    const Expr* expr, SimContext& ctx, Arena& arena,
+    std::vector<Variable*>& targets, std::vector<std::string>& names,
+    std::vector<std::pair<Variable*, FieldTarget>>& properties) {
+  for (const Expr* arg : expr->args) {
+    if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
+    Variable* var = ctx.FindVariable(arg->text);
+    if (var == nullptr) {
+      FieldTarget field = ResolveBarePropertyTarget(arg->text, ctx);
+      if (!field.HasDeposit()) return false;
+      var = arena.Create<Variable>();
+      var->value = EvalExpr(arg, ctx, arena);
+      var->is_signed = var->value.is_signed;
+      properties.emplace_back(var, field);
+    }
+    targets.push_back(var);
+    names.emplace_back(arg->text);
+  }
+  return true;
+}
+
 bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (!IsScopeRandomizeForm(expr, ctx)) return false;
@@ -442,13 +487,9 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // so defer to ordinary dispatch rather than misfire.
   std::vector<Variable*> targets;
   std::vector<std::string> names;
-  for (const Expr* arg : expr->args) {
-    if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
-    Variable* var = ctx.FindVariable(arg->text);
-    if (var == nullptr) return false;
-    targets.push_back(var);
-    names.emplace_back(arg->text);
-  }
+  std::vector<std::pair<Variable*, FieldTarget>> properties;
+  if (!ResolveScopeTargets(expr, ctx, arena, targets, names, properties))
+    return false;
 
   // 18.12: called with no argument, the scope randomize does not change the
   // value of any variable and instead checks its constraints: every
@@ -498,7 +539,11 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // variables to valid values, in which case each drawn value is written back;
   // otherwise it returns 0. 18.6.3: on failure the variables retain their
   // previous values, so nothing is written back.
-  if (ok) WriteBackScopeSolved(targets, names, solver, arena);
+  if (ok) {
+    WriteBackScopeSolved(targets, names, solver, arena);
+    for (const auto& [stand_in, field] : properties)
+      WriteResolvedField(field, stand_in->value, ctx, arena);
+  }
   out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);
   return true;
 }

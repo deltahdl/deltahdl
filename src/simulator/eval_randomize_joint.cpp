@@ -543,22 +543,21 @@ void PrepareJointRandVariables(std::vector<RandInfo>& rands,
 }
 
 // 18.6.2: pre_randomize() runs on the object and on all of its random object
-// members before any new value is computed. Each is resolved on its dynamic
-// class so an override is reached and an absent one inherits the base method.
-void RegisterJointPreRandomize(const std::vector<JointObject>& objects,
-                               const Expr* expr, SimContext& ctx, Arena& arena,
-                               ConstraintSolver& solver) {
-  solver.SetPreRandomize([&objects, expr, &ctx, &arena] {
-    for (const auto& jo : objects) {
-      const ClassTypeInfo* owner = nullptr;
-      if (ModuleItem* pre = jo.obj->ResolveMethodForType(
-              "pre_randomize", jo.obj->type, &owner)) {
-        ctx.PushMethodClass(owner);
-        ExecInstanceMethodCall(pre, jo.obj, expr, ctx, arena);
-        ctx.PopMethodClass();
-      }
+// members before any new value is computed, and so before the constraints are
+// translated, a state variable one writes being what they read. Each is
+// resolved on its dynamic class so an override is reached and an absent one
+// inherits the base method.
+void InvokeJointPreRandomize(const std::vector<JointObject>& objects,
+                             const Expr* expr, SimContext& ctx, Arena& arena) {
+  for (const auto& jo : objects) {
+    const ClassTypeInfo* owner = nullptr;
+    if (ModuleItem* pre = jo.obj->ResolveMethodForType("pre_randomize",
+                                                       jo.obj->type, &owner)) {
+      ctx.PushMethodClass(owner);
+      ExecInstanceMethodCall(pre, jo.obj, expr, ctx, arena);
+      ctx.PopMethodClass();
     }
-  });
+  }
 }
 
 // Write each solved value back to the object that owns the variable. 18.6.3: as
@@ -583,6 +582,7 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
                          const std::vector<JointObject>& objects,
                          const ClassMember* inline_block) {
   ClassObject* root = objects.front().obj;
+  InvokeJointPreRandomize(objects, expr, ctx, arena);
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(root)());
   ConstraintSolver solver(seed);
   RandomizeCtx rc{root, ctx, arena};
@@ -604,7 +604,6 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   }
 
   PrepareJointRandVariables(rands, solver);
-  RegisterJointPreRandomize(objects, expr, ctx, arena, solver);
 
   bool solved = solver.SolveWith({});
   if (solved) {

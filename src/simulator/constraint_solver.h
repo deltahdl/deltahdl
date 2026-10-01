@@ -676,7 +676,35 @@ class ConstraintSolver {
   bool RandcValueAdmissible(const std::string& name,
                             const std::vector<ConstraintExpr>& extra) const;
   std::function<int64_t(RandVariable&)> RandcOncePerSolve(
-      std::unordered_map<std::string, int64_t>& drawn);
+      std::unordered_map<std::string, int64_t>& drawn,
+      const std::vector<ConstraintExpr>& extra);
+  // 18.4.2: draws the randc variable `var`'s next value from the values the
+  // hard constraints naming it and no other active random variable admit,
+  // `extra` among them, into `out`: one its permutation has not yet taken,
+  // the history beginning a new permutation once every such value has been
+  // taken or once one already taken is refused, the constraints having
+  // changed. False, drawing nothing, where no such constraint names it, its
+  // domain is too wide to enumerate or no value is admitted.
+  bool DrawAdmissibleRandc(RandVariable& var,
+                           const std::vector<ConstraintExpr>& extra,
+                           int64_t& out);
+  // The values of `var`'s domain, enumerable where it holds at most a few
+  // thousand, that every hard constraint naming it and no other active
+  // random variable admits, `extra` among them, into `out`; false where no
+  // such constraint names it, or, with `need_custom`, none of them is one the
+  // solver tries rather than folds, or the domain is too wide, or nothing is
+  // admitted.
+  bool OwnAdmissibleValues(const RandVariable& var,
+                           const std::vector<ConstraintExpr>& extra,
+                           bool need_custom, std::vector<int64_t>& out);
+  // 18.5: seeds each active, not cyclic, not yet drawn variable that a
+  // constraint the solver only tries narrows alone, `x % 7 == 3` or a
+  // member's bits of a packed structure, with a value drawn uniformly from
+  // the values OwnAdmissibleValues gives, enumerated once per solve into
+  // `enumerated`, which a draw over the whole domain finds as good as never.
+  void SeedEnumerableVariables(
+      const std::vector<ConstraintExpr>& extra,
+      std::unordered_map<std::string, std::vector<int64_t>>& enumerated);
   void PruneRefusedRandcValues(std::unordered_map<std::string, int64_t>& drawn,
                                const std::vector<ConstraintExpr>& extra) const;
 
@@ -873,6 +901,9 @@ class ConstraintSolver {
   // (or the whole soft set is satisfiable together with the hard constraints),
   // so that path is left byte-identical to the 18.5.13 behavior.
   std::unordered_set<const ConstraintExpr*> dropped_soft_;
+  // 18.5: the admissible values SeedEnumerableVariables enumerated in the
+  // solve in progress, per variable, empty for one it does not enumerate.
+  std::unordered_map<std::string, std::vector<int64_t>> enumerated_;
 
   // 18.5.13.2: the soft constraints discarded by a 'disable soft' directive for
   // the current solve. Distinct from dropped_soft_, which the priority

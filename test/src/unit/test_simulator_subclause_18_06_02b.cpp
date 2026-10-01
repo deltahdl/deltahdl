@@ -146,4 +146,32 @@ TEST(PrePostRandomizeRun, AValuePostRandomizeAssignsIsWhatTheCallerReads) {
   EXPECT_EQ(out, "1 5\n");
 }
 
+// §18.6.2: pre_randomize() is invoked before the new random values are
+// computed, so the state variable it writes is what the constraints read in
+// that call: each call moves lo to the next hundred, and x follows it.
+TEST(PrePostRandomizeRun, AStateWrittenByPreRandomizeIsWhatTheCallReads) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand int x;\n"
+      "  int lo, calls = 0;\n"
+      "  constraint c { x inside {[lo:lo + 1]}; }\n"
+      "  function void pre_randomize(); calls++; lo = calls * 100; "
+      "endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    for (int i = 1; i <= 5; i++) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      if (!(c.x inside {[i * 100:i * 100 + 1]})) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, c.calls);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 5\n");
+}
+
 }  // namespace

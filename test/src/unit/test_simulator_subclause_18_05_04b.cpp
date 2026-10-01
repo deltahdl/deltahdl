@@ -78,4 +78,31 @@ TEST(UniquenessConstraintsRun, AGroupOfOneMemberHasNoEffect) {
   EXPECT_EQ(out, "32\n");
 }
 
+// §18.5.4: a slice of an unpacked array in a unique group adds each element
+// it selects, so b, a[2] and a[3] take pairwise distinct values; with a[2]
+// held at 1 and b at 1 forcing a[3] to 0, a draw sharing a value is refused.
+TEST(UniqueConstraintRun, ASliceContributesEachElementItSelects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [1:0] a[5];\n"
+      "  rand bit [1:0] b;\n"
+      "  constraint u { unique {b, a[2:3]}; }\n"
+      "  constraint r { a[2] == 1; b == 1 -> a[3] == 0; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C k = new;\n"
+      "    repeat (30) begin\n"
+      "      if (k.randomize() != 1) bad++;\n"
+      "      if (k.b == k.a[2] || k.b == k.a[3] || k.a[2] == k.a[3]) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace

@@ -1,14 +1,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 
@@ -42,6 +45,15 @@ bool EnumerateInsideItem(const Expr* elem, RandomizeCtx& rc,
                          std::vector<int64_t>& out) {
   bool is_range = elem->kind == ExprKind::kSelect && elem->index != nullptr &&
                   elem->index_end != nullptr;
+  // §11.4.13: an unpacked array adds each of its elements to the set.
+  std::vector<Logic4Vec> members;
+  if (!is_range && CollectUnpackedSetMembers(elem, rc.ctx, members)) {
+    for (const Logic4Vec& m : members) {
+      out.push_back(m.is_signed ? SignExtend(m.ToUint64(), m.width)
+                                : static_cast<int64_t>(m.ToUint64()));
+    }
+    return out.size() <= kMaxEnumeratedMembers;
+  }
   if (!is_range) {
     out.push_back(ConstantOperand(elem, rc));
     return true;
@@ -85,6 +97,35 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
       AnyRefsRandVar(rel->elements, rands)) {
     return false;
   }
+  // §18.4.1 with §11.4.13: a real variable inside a range of reals lies in
+  // the closed interval between its bounds, which the solver draws from as
+  // the two comparisons bound it; its values are no set to enumerate.
+  if (FindRand(rands, rel->lhs->text)->var.is_real) {
+    const Expr* range = rel->elements.size() == 1 ? rel->elements[0] : nullptr;
+    if (range == nullptr || range->kind != ExprKind::kSelect ||
+        range->index == nullptr || range->index_end == nullptr ||
+        range->op == TokenKind::kPlusSlashMinus ||
+        range->op == TokenKind::kPlusPercentMinus ||
+        IsDollarBound(range->index) || IsDollarBound(range->index_end)) {
+      return false;
+    }
+    auto compare = [&](TokenKind op, Expr* bound) {
+      auto* e = rc.arena.Create<Expr>();
+      e->kind = ExprKind::kBinary;
+      e->range = rel->range;
+      e->op = op;
+      e->lhs = rel->lhs;
+      e->rhs = bound;
+      return e;
+    };
+    auto* both = rc.arena.Create<Expr>();
+    both->kind = ExprKind::kBinary;
+    both->range = rel->range;
+    both->op = TokenKind::kAmpAmp;
+    both->lhs = compare(TokenKind::kGtEq, range->index);
+    both->rhs = compare(TokenKind::kLtEq, range->index_end);
+    return TryConjunctionConstraint(both, rands, rc, out, /*fold=*/true);
+  }
   std::vector<int64_t> values;
   if (!EnumerateInsideItems(rel->elements, rc.obj, rc, values)) return false;
   out.kind = ConstraintKind::kSetMembership;
@@ -92,6 +133,50 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.set_values = std::move(values);
   out.ref_vars.push_back(out.var_name);
   return true;
+}
+
+const Expr* PackedMembersAsSelects(const Expr* rel,
+                                   std::vector<RandInfo>& rands,
+                                   RandomizeCtx& rc) {
+  auto literal = [&rc](uint32_t value, const Expr* like) {
+    auto* e = rc.arena.Create<Expr>();
+    e->kind = ExprKind::kIntegerLiteral;
+    e->range = like->range;
+    e->int_val = value;
+    std::string text = std::to_string(value);
+    e->text = {rc.arena.AllocString(text.data(), text.size()), text.size()};
+    return e;
+  };
+  return RewriteExpr(
+      rel,
+      [&](const Expr* n) -> Expr* {
+        // §18.4: a rand member of a rand unpacked structure is a variable of
+        // its own, `h1.addr`.
+        if (n->kind == ExprKind::kMemberAccess && n->lhs != nullptr &&
+            n->rhs != nullptr && n->lhs->kind == ExprKind::kIdentifier &&
+            n->rhs->kind == ExprKind::kIdentifier) {
+          std::string member =
+              std::string(n->lhs->text) + "." + std::string(n->rhs->text);
+          if (FindRand(rands, member) != nullptr)
+            return IdentifierExpr(member, n, rc.arena);
+        }
+        std::string_view prop;
+        uint32_t offset = 0;
+        uint32_t width = 0;
+        if (n->kind != ExprKind::kMemberAccess ||
+            !PropertyPackedMemberBits(n, rc.obj, rc.ctx, prop, offset, width) ||
+            width == 0 || FindRand(rands, prop) == nullptr) {
+          return nullptr;
+        }
+        auto* select = rc.arena.Create<Expr>();
+        select->kind = ExprKind::kSelect;
+        select->range = n->range;
+        select->base = IdentifierExpr(prop, n, rc.arena);
+        select->index = literal(offset + width - 1, n);
+        select->index_end = literal(offset, n);
+        return select;
+      },
+      rc.arena);
 }
 
 bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,

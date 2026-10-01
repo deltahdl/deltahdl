@@ -289,4 +289,29 @@ TEST(ForeachIterativeConstraintsRun, TheLoopVariableShadowsAProperty) {
   EXPECT_EQ(out, "1 2 3 100\n");
 }
 
+// §18.5.7.1: a foreach naming two loop variables binds each to one dimension
+// of a two-dimensional array and iterates every element, so each of the six
+// is constrained to its own value 10 * i + j + 1.
+TEST(ForeachConstraintRun, TwoLoopVariablesIterateBothDimensions) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [7:0] m[2][3];\n"
+      "  constraint c { foreach (m[i, j]) m[i][j] == 10 * i + j + 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok, bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    ok = c.randomize();\n"
+      "    for (int i = 0; i < 2; i++)\n"
+      "      for (int j = 0; j < 3; j++)\n"
+      "        if (c.m[i][j] != 10 * i + j + 1) bad++;\n"
+      "    $display(\"%0d %0d %0d\", ok, bad, c.m[1][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 13\n");
+}
+
 }  // namespace

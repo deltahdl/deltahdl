@@ -79,6 +79,12 @@ AssocArrayObject* ClassAssocProperty(ClassObject* obj,
                                      const ClassTypeInfo* from,
                                      std::string_view name, SimContext& ctx);
 
+// §8.5/§7.8: whether the property declaration `member` of `declaring` is an
+// associative array, its one unpacked dimension an index type or a type
+// parameter of the class.
+bool IsAssocPropertyDecl(const ClassMember* member,
+                         const ClassTypeInfo* declaring, SimContext& ctx);
+
 // The associative array the bare name `name` designates where it is written:
 // the declared array SimContext::FindAssocArray knows under the name, else --
 // where no variable, queue or fixed array of the name shadows it -- the

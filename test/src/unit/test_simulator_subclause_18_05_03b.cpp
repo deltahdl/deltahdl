@@ -139,4 +139,58 @@ TEST(DistributionRun, ARealRangeKeepsItsWeightUnderABound) {
   EXPECT_EQ(out, "0 1 1\n");
 }
 
+// §18.5.3 with §11.4.13: an unpacked array as an operand of inside adds its
+// elements to the set, so the constraint admits the array's values alone,
+// none of which is the 0 the variable starts at.
+TEST(SetMembershipRun, AnArrayOperandContributesItsElements) {
+  const std::string kSrc =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  bit [7:0] allowed[4] = '{11, 22, 33, 44};\n"
+      "  constraint c { x inside {allowed}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [3:0] seen = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (80) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      case (c.x)\n"
+      "        11: seen[0] = 1; 22: seen[1] = 1;\n"
+      "        33: seen[2] = 1; 44: seen[3] = 1;\n"
+      "        default: bad++;\n"
+      "      endcase\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "bad"), uint64_t{0});
+  EXPECT_EQ(RunAndGet(kSrc, "seen"), uint64_t{15});
+}
+
+// §18.4.1 with §18.5.3: a real variable constrained inside a range of reals,
+// the clause's real_constraint_c shape beside a real distribution, is drawn
+// within the closed interval, never at an integer outside it.
+TEST(SetMembershipRun, ARealInsideARealRangeIsDrawnWithinIt) {
+  const std::string kSrc =
+      "class C;\n"
+      "  rand real a;\n"
+      "  rand real b;\n"
+      "  constraint ca { a dist { -100.0 := 5, [0.70:1.43] :/ 1 }; }\n"
+      "  constraint cb { b inside {[3.30:3.65]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (50) begin\n"
+      "      if (c.randomize() != 1) bad++;\n"
+      "      if (!(c.a == -100.0 || (c.a >= 0.70 && c.a <= 1.43))) bad++;\n"
+      "      if (!(c.b >= 3.30 && c.b <= 3.65)) bad++;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "bad"), uint64_t{0});
+}
+
 }  // namespace
