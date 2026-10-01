@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/class_object.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
@@ -32,16 +33,19 @@ struct Stmt;
 // assertion in a class method stands in the object the method was called on
 // and in the class declaring the method, whose methods and properties its
 // action block names by their bare names (§8.13), so both are recorded too and
-// stand for the length of the report.
+// stand for the length of the report. §17.3: an assertion of a procedural
+// checker instance is evaluated in the checker's instance while the
+// procedure's process runs it, so the instance it stood in is recorded too.
 struct PendingReportScope {
   Process* proc = nullptr;
   std::vector<std::string_view> named_scopes;
   ClassObject* this_obj = nullptr;
   const ClassTypeInfo* method_class = nullptr;
+  InstancePrefixOverrideState prefix_override;
 
-  static PendingReportScope Capture(const SimContext& ctx) {
+  static PendingReportScope Capture(SimContext& ctx) {
     return {ctx.CurrentProcess(), ctx.ActiveNamedScopes(), ctx.CurrentThis(),
-            ctx.CurrentMethodClass()};
+            ctx.CurrentMethodClass(), ctx.InstancePrefixOverride()};
   }
 
   bool InClassMethod() const {
@@ -61,6 +65,8 @@ struct PendingReportScope {
     Replace(ctx, named_scopes);
     saved.this_obj = this_obj;
     saved.method_class = method_class;
+    saved.prefix_override = ctx.InstancePrefixOverride();
+    ctx.InstancePrefixOverride() = prefix_override;
     if (InClassMethod()) {
       ctx.PushThis(this_obj);
       ctx.PushMethodClass(method_class);
@@ -73,6 +79,7 @@ struct PendingReportScope {
       ctx.PopThis();
     }
     Replace(ctx, saved.named_scopes);
+    ctx.InstancePrefixOverride() = saved.prefix_override;
     ctx.SetCurrentProcess(saved.proc);
   }
 

@@ -81,6 +81,9 @@ bool Parser::IsBlockVarDeclStartCore() {
     return is_decl;
   }
   if (!Check(TokenKind::kIdentifier)) return false;
+  // §17.3: `pkg::chk c(a);` is a checker instantiation, which no
+  // data_declaration spells: a declarator takes no port-connection list.
+  if (AtCheckerInstantiationStmt()) return false;
   // A.2.2.1 lets a data_type be a type_identifier behind a package_scope or a
   // class_scope, and A.2.8 admits any data_declaration as a block item, so an
   // identifier followed by `::` opens a declaration whether or not the leading

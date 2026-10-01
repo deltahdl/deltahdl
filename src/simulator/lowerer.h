@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "common/types.h"
 // GenBlockConsts, the §27.4 loop-index values a lowered thread carries.
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_stmt.h"
 
@@ -31,6 +33,7 @@ struct Expr;
 using ClockReads = std::pair<std::vector<EventExpr>, std::vector<const Expr*>>;
 struct RtlirModule;
 struct RtlirProcess;
+struct ProceduralCheckerAssertion;
 struct AssocArrayObject;
 struct QueueObject;
 struct ClassDecl;
@@ -296,6 +299,17 @@ class Lowerer {
   // Registers into the run's SpecifyManager everything RecordSpecifyScope
   // gathered, once every module has been lowered.
   void RegisterDesignTiming();
+  // §17.3: where `proc` is a static assertion of a procedural checker
+  // instance, or of a checker nested in one, it is kept for the procedure
+  // instantiating the instance to queue rather than lowered as a process;
+  // answers whether it was.
+  bool KeepProceduralCheckerAssertion(const RtlirProcess& proc);
+  // §17.3: records the checker instantiations `proc`, lowered as `p`, holds,
+  // each with the instance it names.
+  void RecordCheckerInstantiations(const RtlirProcess& proc, Process* p);
+  // §17.3: gives each process the assertions of the instances its checker
+  // instantiations name, once every instance has been lowered.
+  void LinkCheckerInstantiations();
   void LowerChildModules(const RtlirModule* mod);
   // One instance of LowerChildModules: its module's declarations, port
   // connections, processes and instances, all under the instance's name
@@ -343,6 +357,22 @@ class Lowerer {
   // §17.5: the processes being lowered are a checker's, whose always_ff
   // procedures read sampled values.
   bool lowering_checker_ = false;
+  // §17.3: the prefix of the procedural checker instance being lowered, the
+  // outermost one where checkers nest, and empty outside one.
+  std::string procedural_checker_root_;
+  // §17.3: the static assertions kept by KeepProceduralCheckerAssertion,
+  // under the prefix of their procedural checker instance.
+  std::unordered_map<std::string,
+                     std::vector<const ProceduralCheckerAssertion*>>
+      procedural_checker_assertions_;
+  // §17.3: each process holding a checker instantiation, with the statement
+  // and the prefix of the instance it names, for LinkCheckerInstantiations.
+  struct CheckerInstantiationLink {
+    Process* process = nullptr;
+    const Stmt* stmt = nullptr;
+    std::string inst_prefix;
+  };
+  std::vector<CheckerInstantiationLink> checker_instantiation_links_;
   // §25.9: the prefix of each interface instance, whose variables a virtual
   // interface can reach whatever name the reading expression spells.
   std::vector<std::string> interface_instance_prefixes_;

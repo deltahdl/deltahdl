@@ -132,6 +132,11 @@ ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §16.3 immediate assertion, including its deferred forms (defined in
 // stmt_exec_deferred.cpp); reached from the statement dispatcher.
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §17.3: a checker instantiation reached in procedural code, which queues or
+// reports the static assertions of its procedural checker instance (defined
+// in stmt_exec_deferred.cpp).
+ExecTask ExecCheckerInstantiation(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena);
 // §16.17: the expect statement, which blocks the process until the single
 // evaluation of its property it starts at the next clocking event succeeds
 // or fails, and runs its action block after the Observed region that

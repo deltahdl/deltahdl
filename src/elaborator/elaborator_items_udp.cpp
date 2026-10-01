@@ -12,6 +12,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/checker_instance_binding.h"
 #include "elaborator/checker_procedure_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
@@ -23,6 +24,7 @@
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -342,44 +344,6 @@ void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
   }
   if (child->decl_kind == ModuleDeclKind::kProgram) {
     tables.program_inst_names.insert(item->inst_name);
-  }
-}
-
-// A.4.1 writes four instantiation forms, and three of them are one form under
-// three identifier classes: `module_instantiation`, `interface_instantiation`
-// and `program_instantiation` each read
-// `<identifier> [ parameter_value_assignment ] hierarchical_instance
-// { , hierarchical_instance } ;`. The fourth is deliberately narrower --
-//
-//     checker_instantiation ::=
-//         ps_checker_identifier name_of_instance
-//         ( [ list_of_checker_port_connections ] ) ;
-//
-// -- and what it leaves out is the parameter value assignment and the
-// `{ , hierarchical_instance }` after the first instance. A checker takes its
-// arguments through the ports that connection list fills (§17.3), so an
-// override written before the instance name names nothing the declaration has;
-// and one instantiation names one instance of it. Parsed by the one path all
-// four forms share, an override was read as the parameter value assignment of
-// the other three and carried to a declaration that has no parameters for it
-// to override, and `chk c1(a), c2(b);` was read as the other three's list and
-// elaborated as two instances, both silently.
-void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
-                          DiagEngine& diag) {
-  if (child->decl_kind != ModuleDeclKind::kChecker) return;
-  if (!item->inst_params.empty()) {
-    diag.Error(item->loc,
-               std::format("checker '{}' cannot be instantiated with a "
-                           "parameter value assignment",
-                           item->inst_module),
-               Subclause("A.4.1.4"));
-  }
-  if (item->inst_continues_list) {
-    diag.Error(item->loc,
-               std::format("checker '{}' is instantiated one instance to an "
-                           "instantiation; '{}' after a ',' is a second",
-                           item->inst_module, item->inst_name),
-               Subclause("A.4.1.4"));
   }
 }
 

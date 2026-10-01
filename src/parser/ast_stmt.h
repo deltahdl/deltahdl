@@ -53,7 +53,9 @@ enum class StmtKind : uint8_t {
   kBlockItemDecl,
   kCycleDelay,
   kExpect,
-
+  // §17.3: a checker_instantiation standing in procedural code, a
+  // procedural checker instance; decl_item holds the instantiation.
+  kCheckerInstantiation,
 };
 
 enum class Edge : uint8_t {

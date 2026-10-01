@@ -170,6 +170,36 @@ void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, ev);
 }
 
+// The queue of the statement `stmt` and the monitor that evaluates it in
+// the instance `inst_prefix` names, marked as carrying a concurrent
+// assertion so that its wake at the clocking event lands in the Observed
+// region.
+ProceduralAssertionState* StartMonitor(const Stmt* stmt,
+                                       std::string_view inst_prefix,
+                                       SimContext& ctx, Arena& arena) {
+  auto* state = arena.Create<ProceduralAssertionState>();
+  state->stmt = stmt;
+  auto* monitor = CreateAssertionChildProcess(ctx, arena, Region::kActive);
+  monitor->inst_prefix = inst_prefix;
+  monitor->is_concurrent_clocked = true;
+  state->monitor = monitor;
+  monitor->coro = MonitorCoroutine(stmt, state, ctx, arena).Release();
+  ScheduleAssertionChildStart(monitor, Region::kActive, ctx);
+  return state;
+}
+
+// Places one pending instance, saving `bindings`, in the queue `state`.
+void PlaceInstance(ProceduralAssertionState* state,
+                   const InstanceBindings* bindings, SimContext& ctx,
+                   Arena& arena) {
+  if (!state->reached) {
+    state->reached = true;
+    state->named_scopes = ctx.ActiveNamedScopes();
+  }
+  state->pending.push_back(bindings);
+  ScheduleMaturing(state, ctx, arena);
+}
+
 }  // namespace
 
 void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
@@ -177,23 +207,27 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
   std::vector<const Stmt*> statements;
   CollectQueuedAssertions(body, statements);
   for (const Stmt* stmt : statements) {
-    auto* state = arena.Create<ProceduralAssertionState>();
-    state->stmt = stmt;
-    proc->procedural_assertions[stmt] = state;
     // The monitor stands in the procedure's instance and generate blocks, as
-    // the attempt of a static assertion stands in its process's, and it is
-    // marked as carrying a concurrent assertion so that its wake at the
-    // clocking event lands in the Observed region.
-    auto* monitor = CreateAssertionChildProcess(ctx, arena, Region::kActive);
-    monitor->inst_prefix = proc->inst_prefix;
-    monitor->gen_prefixes = proc->gen_prefixes;
-    monitor->gen_block_name = proc->gen_block_name;
-    monitor->program_block_id = proc->program_block_id;
-    monitor->is_concurrent_clocked = true;
-    state->monitor = monitor;
-    monitor->coro = MonitorCoroutine(stmt, state, ctx, arena).Release();
-    ScheduleAssertionChildStart(monitor, Region::kActive, ctx);
+    // the attempt of a static assertion stands in its process's.
+    ProceduralAssertionState* state =
+        StartMonitor(stmt, proc->inst_prefix, ctx, arena);
+    proc->procedural_assertions[stmt] = state;
+    state->monitor->gen_prefixes = proc->gen_prefixes;
+    state->monitor->gen_block_name = proc->gen_block_name;
+    state->monitor->program_block_id = proc->program_block_id;
   }
+}
+
+const ProceduralCheckerAssertion* StartProceduralCheckerAssertion(
+    const Stmt* stmt, std::string_view inst_prefix, SimContext& ctx,
+    Arena& arena) {
+  auto* assertion = arena.Create<ProceduralCheckerAssertion>();
+  assertion->stmt = stmt;
+  assertion->inst_prefix = inst_prefix;
+  if (stmt->is_concurrent_clocked) {
+    assertion->state = StartMonitor(stmt, inst_prefix, ctx, arena);
+  }
+  return assertion;
 }
 
 bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
@@ -202,14 +236,17 @@ bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
   if (proc == nullptr) return false;
   auto it = proc->procedural_assertions.find(stmt);
   if (it == proc->procedural_assertions.end()) return false;
-  ProceduralAssertionState* state = it->second;
-  if (!state->reached) {
-    state->reached = true;
-    state->named_scopes = ctx.ActiveNamedScopes();
-  }
-  state->pending.push_back(CaptureInstanceBindings(stmt, ctx, arena));
-  ScheduleMaturing(state, ctx, arena);
+  PlaceInstance(it->second, CaptureInstanceBindings(stmt, ctx, arena), ctx,
+                arena);
   return true;
+}
+
+void EnqueueProceduralCheckerAssertion(
+    const ProceduralCheckerAssertion& assertion, SimContext& ctx,
+    Arena& arena) {
+  ctx.CurrentProcess()->procedural_assertions.emplace(assertion.stmt,
+                                                      assertion.state);
+  PlaceInstance(assertion.state, nullptr, ctx, arena);
 }
 
 void FlushProceduralAssertionQueue(Process& proc) {

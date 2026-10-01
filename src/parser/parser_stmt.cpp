@@ -277,6 +277,7 @@ Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
     case TokenKind::kKwExpect:
       return ParseExpectStmt();
     default:
+      if (AtCheckerInstantiationStmt()) return ParseCheckerInstantiationStmt();
       return ParseAssignmentOrExprStmt();
   }
 }

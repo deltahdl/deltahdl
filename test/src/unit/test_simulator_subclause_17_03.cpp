@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+
 #include "fixture_simulator.h"
 #include "simulator/checker_instance_scheduling.h"
 
@@ -362,6 +366,189 @@ TEST(CheckerInstanceScheduling, APropertyActualReadsItsOwnInstance) {
   EXPECT_EQ(pass->value.ToUint64(), 5u);
   EXPECT_EQ(f.ctx.FindVariable("u2.c.pass")->value.ToUint64(), 0u);
   EXPECT_EQ(f.ctx.FindVariable("u2.c.fail")->value.ToUint64(), 5u);
+}
+
+// The checker the procedural-instance cases share: one static concurrent
+// assertion of a on clk, counting its successes and failures.
+constexpr const char* kCountingChecker =
+    "checker chk(logic a, logic clk);\n"
+    "  int pass = 0, fail = 0;\n"
+    "  a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
+    "endchecker\n";
+
+// The successes and failures `scope`'s counters hold once `module` has run
+// over kCountingChecker.
+std::pair<uint64_t, uint64_t> CheckerCounts(const std::string& module,
+                                            const std::string& scope) {
+  SimFixture f;
+  auto* pass =
+      RunAndFindVar(std::string(kCountingChecker) + module, f, scope + ".pass");
+  if (pass == nullptr) return {~0ull, ~0ull};
+  return {pass->value.ToUint64(),
+          f.ctx.FindVariable(scope + ".fail")->value.ToUint64()};
+}
+
+// §17.3: a checker instantiated under an if in an always procedure is a
+// procedural checker instance, its static concurrent assertion queued each
+// time the statement is reached: clk rises at 5 to 45, en is low from 22 to
+// 42, so the posedges at 25 and 35 queue nothing, and a, low from 12 to 32,
+// fails at 15 alone.
+TEST(ProceduralCheckerInstance, ItsAssertionIsQueuedWhenTheStatementIsReached) {
+  EXPECT_EQ(CheckerCounts("module top;\n"
+                          "  logic clk = 0, a = 1, en = 1;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  always @(posedge clk) begin\n"
+                          "    if (en) chk c(a, clk);\n"
+                          "  end\n"
+                          "  initial begin #12 a = 0; #10 en = 0; #10 a = 1; "
+                          "#10 en = 1; #10 $finish; end\n"
+                          "endmodule\n",
+                          "c"),
+            std::make_pair(2ull, 1ull));
+}
+
+// §17.3: reached once, after the posedge at 5 in an initial procedure, the
+// instance queues one evaluation, which the tick at 5 begins; the failures
+// a's low stretch would give later are never attempted.
+TEST(ProceduralCheckerInstance, ReachedOnceItIsEvaluatedOnce) {
+  EXPECT_EQ(CheckerCounts("module top;\n"
+                          "  logic clk = 0, a = 1;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  initial begin\n"
+                          "    @(posedge clk);\n"
+                          "    chk c(a, clk);\n"
+                          "  end\n"
+                          "  initial begin #12 a = 0; #20 a = 1; #20 $finish; "
+                          "end\n"
+                          "endmodule\n",
+                          "c"),
+            std::make_pair(1ull, 0ull));
+}
+
+// §17.3: a static instance of the same checker beside the procedural one is
+// monitored at every posedge, and two procedural instances in one procedure
+// keep their own queues: p1 and p2 are reached at every posedge but 25, s
+// and p1 see a, s failing at 15 and 25 and p1 at 15 alone, and p2 sees b,
+// low at 35 and 45.
+TEST(ProceduralCheckerInstance, EachInstanceKeepsItsOwnAssertion) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      std::string(kCountingChecker) +
+          "module top;\n"
+          "  logic clk = 0, a = 1, b = 1, en = 1;\n"
+          "  always #5 clk = ~clk;\n"
+          "  chk s(a, clk);\n"
+          "  always @(posedge clk) begin\n"
+          "    if (en) begin chk p1(a, clk); chk p2(b, clk); end\n"
+          "  end\n"
+          "  initial begin #12 a = 0; #10 en = 0; #10 a = 1; en = 1; b = 0;\n"
+          "    #20 $finish; end\n"
+          "endmodule\n",
+      f, "s.pass");
+  ASSERT_NE(pass, nullptr);
+  auto value = [&f](const char* name) {
+    return f.ctx.FindVariable(name)->value.ToUint64();
+  };
+  EXPECT_EQ(value("s.pass"), 3u);
+  EXPECT_EQ(value("s.fail"), 2u);
+  EXPECT_EQ(value("p1.pass"), 3u);
+  EXPECT_EQ(value("p1.fail"), 1u);
+  EXPECT_EQ(value("p2.pass"), 2u);
+  EXPECT_EQ(value("p2.fail"), 2u);
+}
+
+// §17.3: everything in a procedural checker but its static assertions exists
+// at every time step, so its always_ff counts all five posedges while its
+// assertion, queued at the three where en is high, sees sum sampled at 0, 1
+// and 4.
+TEST(ProceduralCheckerInstance, ItsOtherContentsRunAtEveryStep) {
+  SimFixture f;
+  auto* sum = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  int sum = 0, pass = 0, fail = 0;\n"
+      "  always_ff @(posedge clk) sum <= sum + 1;\n"
+      "  p1: assert property (@(posedge clk) sum < 3) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, en = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) begin\n"
+      "    if (en) chk c(clk);\n"
+      "  end\n"
+      "  initial begin #22 en = 0; #20 en = 1; #10 $finish; end\n"
+      "endmodule\n",
+      f, "c.sum");
+  ASSERT_NE(sum, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("c.pass")->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 1u);
+}
+
+// §17.3 with §16.4.1: a static deferred assertion of a procedural checker is
+// added to the pending deferred assertion report each time the statement is
+// reached, at the posedges 5 to 35, its action calling the checker's own
+// functions: a != b holds at 5 and 25 and fails at 15 and 35.
+TEST(ProceduralCheckerInstance, ItsDeferredAssertionIsReportedWhenReached) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(logic a, b);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  function void inc_pass(); pass++; endfunction\n"
+      "  function void inc_fail(); fail++; endfunction\n"
+      "  a1: assert #0 (a != b) inc_pass(); else inc_fail();\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1, b = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) begin\n"
+      "    chk c(a, b);\n"
+      "  end\n"
+      "  initial begin #10 a = 0; #10 b = 1; #10 a = 1; #10 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
+}
+
+// §17.3: an interface's always procedure may instantiate a checker too: a
+// fails at 15 and 25 and holds at the other three posedges.
+TEST(ProceduralCheckerInstance, AnInterfacesProcedureInstantiatesOne) {
+  EXPECT_EQ(CheckerCounts("interface ifc(input logic clk);\n"
+                          "  logic a = 1;\n"
+                          "  always @(posedge clk) begin\n"
+                          "    chk k(a, clk);\n"
+                          "  end\n"
+                          "endinterface\n"
+                          "module top;\n"
+                          "  logic clk = 0;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  ifc i(clk);\n"
+                          "  initial begin #12 i.a = 0; #20 i.a = 1; #20 "
+                          "$finish; end\n"
+                          "endmodule\n",
+                          "i.k"),
+            std::make_pair(3ull, 2ull));
+}
+
+// §17.3: a checker statically instantiated inside a procedural one has its
+// static assertions treated as procedural ones, queued when the top-level
+// ancestor's instantiation is reached, as in the first case.
+TEST(ProceduralCheckerInstance, ANestedStaticInstanceFollowsItsAncestor) {
+  EXPECT_EQ(CheckerCounts("checker outer(logic a, logic clk);\n"
+                          "  chk i(a, clk);\n"
+                          "endchecker\n"
+                          "module top;\n"
+                          "  logic clk = 0, a = 1, en = 1;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  always @(posedge clk) begin\n"
+                          "    if (en) outer o(a, clk);\n"
+                          "  end\n"
+                          "  initial begin #12 a = 0; #10 en = 0; #10 a = 1; "
+                          "#10 en = 1; #10 $finish; end\n"
+                          "endmodule\n",
+                          "o.i"),
+            std::make_pair(2ull, 1ull));
 }
 
 }  // namespace

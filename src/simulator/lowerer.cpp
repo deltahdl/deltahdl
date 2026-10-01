@@ -167,7 +167,8 @@ void ScheduleProcess(Process* proc, SimContext& ctx) {
 void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
                              bool from_program, uint32_t program_block_id) {
   for (const auto& proc : procs) {
-    if (proc.kind != RtlirProcessKind::kInitial)
+    if (proc.kind != RtlirProcessKind::kInitial &&
+        !KeepProceduralCheckerAssertion(proc))
       LowerProcess(proc, from_program, program_block_id);
   }
   for (const auto& proc : procs) {
@@ -661,6 +662,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // by monitors of their own, armed on their clocking events before the
   // procedure runs.
   StartProceduralAssertionMonitors(p, proc.body, ctx_, arena_);
+  RecordCheckerInstantiations(proc, p);
   ScheduleProcess(p, ctx_);
 }
 
@@ -909,6 +911,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterClassTypeAliases(design, ctx_, arena_);
 
   AttachDesignClocking();
+  LinkCheckerInstantiations();
 
   RegisterDesignAssertionSampling();
 

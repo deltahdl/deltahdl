@@ -21,6 +21,7 @@
 #include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
@@ -858,6 +859,28 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   const Stmt* action = JudgeAssertion(stmt, ctx, arena);
   if (action != nullptr) co_return co_await ExecStmt(action, ctx, arena);
+  co_return StmtResult::kDone;
+}
+
+// §17.3: reaching the instantiation places a pending instance of each static
+// concurrent assertion of the procedural checker instance in the procedural
+// assertion queue of the process, and adds each static deferred assertion to
+// the process's pending deferred assertion reports, as a procedural one
+// standing at the instantiation would be; the deferred one is evaluated, and
+// its report later run, in the checker's instance.
+ExecTask ExecCheckerInstantiation(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  const auto& assertions =
+      ctx.CurrentProcess()->checker_instance_assertions[stmt];
+  for (const ProceduralCheckerAssertion* assertion : assertions) {
+    if (assertion->state != nullptr) {
+      EnqueueProceduralCheckerAssertion(*assertion, ctx, arena);
+      continue;
+    }
+    InstancePrefixOverride in_checker(ctx.InstancePrefixOverride(),
+                                      assertion->inst_prefix);
+    co_await ExecImmediateAssert(assertion->stmt, ctx, arena);
+  }
   co_return StmtResult::kDone;
 }
 

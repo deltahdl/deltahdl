@@ -537,6 +537,10 @@ class Parser {
   void ParseScopedTypeOrInst(const Token& name_tok,
                              std::vector<ModuleItem*>& items);
   bool LooksLikeScopedInstTail();
+  // §17.3: whether a statement opens with a checker_instantiation, and the
+  // statement read from it.
+  bool AtCheckerInstantiationStmt();
+  Stmt* ParseCheckerInstantiationStmt();
   // True where the tokens after the leading identifier are one more identifier
   // and a semicolon and nothing else, which is the shape §6.18's undeclared
   // type_identifier and a port-list-less instantiation share.

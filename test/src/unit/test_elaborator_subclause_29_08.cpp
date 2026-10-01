@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"

@@ -56,6 +56,58 @@ void PublishInstances(std::vector<ModuleItem*>* extra_items,
 
 }  // namespace
 
+// §17.3 with A.6.10: a checker_instantiation is a procedural assertion
+// statement, a ps_checker_identifier followed by the name of the instance
+// and its parenthesized port connections, the shape
+// LooksLikeScopedInstTail answers for the tokens after the checker's name;
+// no other statement opens with two names and a parenthesis.
+bool Parser::AtCheckerInstantiationStmt() {
+  if (!CheckIdentifier()) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (Match(TokenKind::kColonColon) && CheckIdentifier()) Consume();
+  bool is_inst = LooksLikeScopedInstTail();
+  lexer_.RestorePos(saved);
+  return is_inst;
+}
+
+// §17.3: a checker may be instantiated wherever a concurrent assertion may
+// appear, which in procedural code §16.14 limits to an always or an initial
+// procedure. The instantiation is read as the module-item one is; a list of
+// instances, which a checker_instantiation does not admit, is kept whole in
+// an unnamed block for the elaborator to report as it reports one written
+// as a module item.
+Stmt* Parser::ParseCheckerInstantiationStmt() {
+  SourceLoc loc = CurrentLoc();
+  if (always_or_initial_depth_ == 0) {
+    diag_.Error(loc,
+                "a checker instantiation in procedural code shall be in an "
+                "always or an initial procedure",
+                Subclause("17.3"));
+  }
+  std::vector<ModuleItem*> items;
+  auto name_tok = Consume();
+  if (Check(TokenKind::kColonColon)) {
+    ParseScopedTypeOrInst(name_tok, items);
+  } else {
+    ParseModuleInstList(name_tok, &items);
+  }
+  std::vector<Stmt*> stmts;
+  for (ModuleItem* item : items) {
+    auto* stmt = arena_.Create<Stmt>();
+    stmt->kind = StmtKind::kCheckerInstantiation;
+    stmt->range.start = item->loc;
+    stmt->decl_item = item;
+    stmts.push_back(stmt);
+  }
+  if (stmts.size() == 1) return stmts.front();
+  auto* block = arena_.Create<Stmt>();
+  block->kind = StmtKind::kBlock;
+  block->range.start = loc;
+  block->stmts = std::move(stmts);
+  return block;
+}
+
 ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
   return ParseModuleInstList(module_tok, nullptr);
 }

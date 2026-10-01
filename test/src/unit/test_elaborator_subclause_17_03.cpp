@@ -2,6 +2,7 @@
 
 #include "elaborator/checker_instantiation.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -131,6 +132,71 @@ TEST(CheckerInstantiation, APlainSignalBindsAnEventFormal) {
       "endmodule\n",
       f, "top");
   EXPECT_FALSE(f.has_errors);
+}
+
+// §17.3: only a checker may stand where a concurrent assertion may, so a
+// module instantiated in an always procedure is refused.
+TEST(ProceduralCheckerInstantiation, AModuleCannotBeInstantiatedInAProcedure) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf(input logic a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk, a;\n"
+      "  always @(posedge clk) begin\n"
+      "    leaf l(a);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'leaf' is not a checker, and only a checker may "
+                            "be instantiated in procedural code",
+                            6, "17.3"));
+}
+
+// §17.3: a checker shall not be instantiated in a procedure of another
+// checker.
+TEST(ProceduralCheckerInstantiation, NotInAProcedureOfAnotherChecker) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker inner(logic a, logic clk);\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endchecker\n"
+      "checker outer(logic a, logic clk);\n"
+      "  initial begin\n"
+      "    inner i(a, clk);\n"
+      "  end\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk, a;\n"
+      "  outer o(a, clk);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker 'inner' shall not be instantiated in a "
+                            "procedure of another checker",
+                            6, "17.3"));
+}
+
+// A.4.1.4: a checker instantiated in a procedure is held to the one instance
+// a checker_instantiation names, as one written as a module item is.
+TEST(ProceduralCheckerInstantiation, OneInstanceToAnInstantiation) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(logic a, logic clk);\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk, a, b;\n"
+      "  always @(posedge clk) begin\n"
+      "    chk c1(a, clk), c2(b, clk);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker 'chk' is instantiated one instance to an "
+                            "instantiation; 'c2' after a ',' is a second",
+                            7, "A.4.1.4"));
 }
 
 }  // namespace

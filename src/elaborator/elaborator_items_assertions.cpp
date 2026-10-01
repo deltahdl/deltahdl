@@ -747,6 +747,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // assertion, modeled as an implicit always_comb procedure.
   if (IsStaticDeferredAssertion(item)) {
     AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
+    mod->processes.back().is_static_assertion = true;
     return;
   }
   // §16.14.5: a static concurrent assertion outside procedural code uses
@@ -756,6 +757,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // each leading clock edge.
   if (item->body != nullptr && !item->sensitivity.empty()) {
     AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
+    mod->processes.back().is_static_assertion = true;
     // §16.5: the process just added carries a concurrent assertion's property.
     // The mark is taken from the statement the parser built for that property
     // rather than set outright, so the one place that decides what a concurrent

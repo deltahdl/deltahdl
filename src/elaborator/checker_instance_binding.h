@@ -23,6 +23,13 @@ ModuleDecl* PackageCheckerNamedBy(const ModuleItem* item,
                                   const RtlirModule* mod,
                                   const CompilationUnit* unit);
 
+// A.4.1.4: an instance of the checker `child` takes no parameter value
+// assignment, and one instantiation names one instance of it; `item`
+// breaking either is reported. An instance of any other design element is
+// left alone.
+void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
+                          DiagEngine& diag);
+
 // The formals an instance of a checker binds, each with the value of its
 // actual in the instantiating scope where that actual is an elaboration-time
 // constant.

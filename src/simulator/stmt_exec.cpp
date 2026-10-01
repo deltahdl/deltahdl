@@ -795,6 +795,8 @@ static ExecTask ExecStmtDispatch(const Stmt* stmt, SimContext& ctx,
       return ExecImmediateAssert(stmt, ctx, arena);
     case StmtKind::kExpect:
       return ExecExpect(stmt, ctx, arena);
+    case StmtKind::kCheckerInstantiation:
+      return ExecCheckerInstantiation(stmt, ctx, arena);
     case StmtKind::kForce:
     case StmtKind::kAssign:
       return ExecTask::Immediate(ExecForceOrAssignImpl(stmt, ctx, arena));

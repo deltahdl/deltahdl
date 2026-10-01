@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/checker_instance_binding.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -22,6 +23,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
+#include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -722,26 +724,49 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       .arena = arena_,
       .diag = diag_,
       .global_clocking_event = module_global_clocking_event_};
+  // §17.3: each checker the procedure instantiates is a procedural checker
+  // instance, elaborated as a child instance is and marked as one; the
+  // process keeps the statement and the instance's name, by which the run
+  // finds the instance when the statement is reached.
+  auto elaborate_checker_instances = [this, item, mod] {
+    std::vector<ProceduralCheckerSite> sites;
+    for (Stmt* stmt : CheckerInstantiationsIn(item->body)) {
+      ModuleItem* inst = stmt->decl_item;
+      ModuleDecl* child = FindModuleInScope(inst->inst_module);
+      if (child == nullptr) child = PackageCheckerNamedBy(inst, mod, unit_);
+      if (!AdmitProceduralCheckerInstance(inst, child, mod, diag_)) continue;
+      ElaborateModuleInst(inst, mod);
+      mod->children.back().is_procedural = true;
+      sites.push_back({stmt, ScopedName(inst->inst_name)});
+    }
+    return sites;
+  };
   switch (item->kind) {
-    case ModuleItemKind::kInitialBlock:
+    case ModuleItemKind::kInitialBlock: {
       ElaborateProceduralConcurrentAssertions(item, mod, property_registry_,
                                               arena_, diag_);
+      auto sites = elaborate_checker_instances();
       AddProcess(RtlirProcessKind::kInitial, item, mod, kNoInferenceEnv);
+      mod->processes.back().checker_instances = std::move(sites);
       return true;
+    }
     case ModuleItemKind::kFinalBlock:
       AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv);
       return true;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
-    case ModuleItemKind::kAlwaysLatchBlock:
+    case ModuleItemKind::kAlwaysLatchBlock: {
       // §16.14.6: the concurrent assertions the procedure embeds take their
       // clock from it, or from the default clocking, before the process is
       // built over its body.
       ElaborateProceduralConcurrentAssertions(item, mod, property_registry_,
                                               arena_, diag_);
+      auto sites = elaborate_checker_instances();
       AddProcess(MapAlwaysKind(item->always_kind), item, mod, kEnv);
+      mod->processes.back().checker_instances = std::move(sites);
       return true;
+    }
     case ModuleItemKind::kGenerateIf:
     case ModuleItemKind::kGenerateCase:
     case ModuleItemKind::kGenerateFor:

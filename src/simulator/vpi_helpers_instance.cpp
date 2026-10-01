@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"

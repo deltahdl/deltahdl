@@ -109,6 +109,7 @@ struct WaitForkState {
 struct ClassObject;
 struct ClassTypeInfo;
 struct ProceduralAssertionState;
+struct ProceduralCheckerAssertion;
 struct PropertyTreeState;
 struct SequencePropertyState;
 
@@ -221,6 +222,12 @@ struct Process {
   // its leading clocking event (procedural_assertion.h).
   std::unordered_map<const Stmt*, ProceduralAssertionState*>
       procedural_assertions;
+  // §17.3: the static assertions of the procedural checker instance each
+  // checker instantiation this process holds names, keyed by the statement
+  // and queued or reported each time the process reaches it.
+  std::unordered_map<const Stmt*,
+                     std::vector<const ProceduralCheckerAssertion*>>
+      checker_instance_assertions;
   // §16.17: the verdict of the expect statement this process is blocked
   // on, `expect_decided` once the evaluation succeeded or failed and
   // `expect_holds` which of the two, written where the attempt concludes

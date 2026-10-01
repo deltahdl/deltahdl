@@ -127,6 +127,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/covergroup_in_checker.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_binding.cpp
+    elaborator/procedural_checker_instance.cpp
     elaborator/covergroup_inheritance.cpp
     elaborator/cross_bin_with_covergroup.cpp
     elaborator/cross_automatic_types.cpp
@@ -322,6 +323,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer.cpp
     simulator/lowerer_always_comb.cpp
     simulator/lowerer_child.cpp
+    simulator/lowerer_procedural_checker.cpp
     simulator/lowerer_clocking.cpp
     simulator/lowerer_contassign.cpp
     simulator/lowerer_bidir_switch.cpp

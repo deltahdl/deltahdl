@@ -18,6 +18,7 @@
 #include "elaborator/gen_block_members.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"

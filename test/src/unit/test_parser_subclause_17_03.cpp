@@ -2,6 +2,9 @@
 
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -143,6 +146,106 @@ TEST_F(VerifyParseTest, CheckerInstantiationPackageScopedIdentifier) {
     endmodule
   )");
   EXPECT_FALSE(diag_.HasErrors());
+}
+
+// The statement the always or initial procedure of the last module holds
+// first, the first of its block's statements where its body is a block.
+const Stmt* FirstProcedureStmt(const CompilationUnit* unit,
+                               ModuleItemKind kind) {
+  if (unit == nullptr || unit->modules.empty()) return nullptr;
+  for (const ModuleItem* item : unit->modules.back()->items) {
+    if (item->kind != kind || item->body == nullptr) continue;
+    const Stmt* body = item->body;
+    if (body->kind != StmtKind::kBlock) return body;
+    return body->stmts.empty() ? nullptr : body->stmts.front();
+  }
+  return nullptr;
+}
+
+// §17.3: a checker may be instantiated wherever a concurrent assertion may
+// appear, in an always procedure among those places, so the branch of an if
+// may be one: the statement carries the instantiation, the checker's name,
+// the instance's and its two ordered actuals.
+TEST_F(VerifyParseTest, CheckerInstantiationAsTheBranchOfAnIf) {
+  auto* unit = Parse(R"(
+    checker chk(logic a, logic clk);
+      a1: assert property (@(posedge clk) a);
+    endchecker
+    module m;
+      logic clk, a, en;
+      always @(posedge clk) begin
+        if (en) chk c(a, clk);
+      end
+    endmodule
+  )");
+  EXPECT_FALSE(diag_.HasErrors());
+  const Stmt* branch = FirstProcedureStmt(unit, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(branch, nullptr);
+  ASSERT_EQ(branch->kind, StmtKind::kIf);
+  const Stmt* inst = branch->then_branch;
+  ASSERT_NE(inst, nullptr);
+  ASSERT_EQ(inst->kind, StmtKind::kCheckerInstantiation);
+  ASSERT_NE(inst->decl_item, nullptr);
+  EXPECT_EQ(inst->decl_item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(inst->decl_item->inst_module, "chk");
+  EXPECT_EQ(inst->decl_item->inst_name, "c");
+  EXPECT_EQ(inst->decl_item->inst_ports.size(), 2u);
+}
+
+// §17.3: the same in an initial procedure, an item of its block after an
+// event control, the checker named through a package scope.
+TEST_F(VerifyParseTest, PackageScopedCheckerInstantiationInAnInitialBlock) {
+  auto* unit = Parse(R"(
+    module m;
+      logic clk, a;
+      initial begin
+        p::chk c(.a(a), .clk(clk));
+        @(posedge clk);
+      end
+    endmodule
+  )");
+  EXPECT_FALSE(diag_.HasErrors());
+  const Stmt* inst = FirstProcedureStmt(unit, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(inst, nullptr);
+  ASSERT_EQ(inst->kind, StmtKind::kCheckerInstantiation);
+  ASSERT_NE(inst->decl_item, nullptr);
+  EXPECT_EQ(inst->decl_item->inst_scope, "p");
+  EXPECT_EQ(inst->decl_item->inst_module, "chk");
+  EXPECT_EQ(inst->decl_item->inst_name, "c");
+}
+
+// §17.3 with §16.14: of procedural code, a concurrent assertion may appear
+// only in an always or an initial procedure, so a checker instantiated in a
+// task is reported.
+TEST_F(VerifyParseTest, CheckerInstantiationInATaskIsRejected) {
+  Parse(R"(
+    module m;
+      logic clk, a;
+      task t;
+        chk c(a, clk);
+      endtask
+    endmodule
+  )");
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "a checker instantiation in procedural code shall "
+                            "be in an always or an initial procedure",
+                            5, "17.3"));
+}
+
+// §17.3 with §16.14: a final procedure is not among those places either.
+TEST_F(VerifyParseTest, CheckerInstantiationInAFinalProcedureIsRejected) {
+  Parse(R"(
+    module m;
+      logic clk, a;
+      final begin
+        chk c(a, clk);
+      end
+    endmodule
+  )");
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "a checker instantiation in procedural code shall "
+                            "be in an always or an initial procedure",
+                            5, "17.3"));
 }
 
 }  // namespace

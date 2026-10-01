@@ -433,7 +433,14 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   inst_prefix_ = child_prefix;
   ctx_.SetLoweringInstancePrefix(inst_prefix_);
 
+  // §17.3: a procedural checker instance's static assertions, and those of
+  // the checkers nested in it, are kept for the procedure to queue.
+  std::string saved_root = procedural_checker_root_;
+  if (child.is_procedural && saved_root.empty()) {
+    procedural_checker_root_ = child_prefix;
+  }
   LowerChildBody(child.resolved);
+  procedural_checker_root_ = std::move(saved_root);
 
   inst_prefix_ = saved_prefix;
   ctx_.SetLoweringInstancePrefix(inst_prefix_);

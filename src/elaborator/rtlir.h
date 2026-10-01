@@ -12,12 +12,12 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/rtlir_element_shape.h"
+#include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
-#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -348,21 +348,6 @@ struct RtlirVariable {
   SourceLoc loc;
 };
 
-// §28.8: one bidirectional pass switch -- tran, rtran, or a tranif0, tranif1,
-// rtranif0 or rtranif1 -- between two bidirectional terminals, with the
-// control terminal and the turn-on and turn-off delays of the enabled forms.
-// Unlike every other gate it drives neither terminal from the other, so it is
-// no continuous assignment: the run joins the two nets it connects while it
-// conducts.
-struct RtlirBidirSwitch {
-  GateKind kind = GateKind::kTran;
-  Expr* terminal_a = nullptr;
-  Expr* terminal_b = nullptr;
-  Expr* control = nullptr;
-  Expr* turn_on_delay = nullptr;
-  Expr* turn_off_delay = nullptr;
-};
-
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
@@ -410,48 +395,28 @@ struct RtlirContAssign {
   GenBlockPrefixes gen_block_prefixes;
 };
 
-// §29.8: one instance of a user-defined primitive, and what drives its output
-// terminal. A gate instance lowers to an RtlirContAssign carrying a synthesized
-// expression, and a primitive instance cannot, for two reasons. §29.3.4 defines
-// the output as a table lookup rather than an operator, and §29.5 gives a
-// sequential primitive a current state which "is considered equivalent to the
-// current output value" and which an expression has nowhere to keep. So the
-// instance carries the declaration it names, and the simulator evaluates that
-// declaration's table against the input terminals, holding one UdpEvalState per
-// instance for the length of the run.
-//
-// The terminals are split the way §29.8 writes them -- "udp_instance ::= [
-// name_of_instance ] ( output_terminal , input_terminal { , input_terminal } )"
-// -- so `inputs` already stands in the order UdpEvalState indexes a table row
-// by, and nothing downstream has to work out which terminal is the output.
-//
-// Two delays and no third, because §29.8 rules that "Only two delays may be
-// specified because z is not supported for UDPs". RtlirContAssign carries a
-// third for the switches that need one.
-struct RtlirUdpInst {
-  const UdpDecl* decl = nullptr;
-  // §29.8: "The instance name is optional, just as for gates." Empty where the
-  // source wrote none, which is why it cannot be what identifies the instance.
-  std::string_view name;
-  // Where the primitive's name stands, which is the position a report about
-  // this instance carries.
-  SourceLoc loc;
-  Expr* output = nullptr;
-  std::vector<Expr*> inputs;
-  uint8_t drive_strength0 = 0;
-  uint8_t drive_strength1 = 0;
-  Expr* delay = nullptr;
-  Expr* delay_fall = nullptr;
-  GenBlockConsts gen_block_consts;
-  GenBlockPrefixes gen_block_prefixes;
-};
-
 struct RtlirAlias {
   std::vector<Expr*> nets;
 };
 
+// §17.3: a checker instantiated in procedural code, a procedural checker
+// instance: the statement that instantiates it and the name its instance
+// carries in the module, the generate prefix included, as
+// RtlirModuleInst::inst_name has it.
+struct ProceduralCheckerSite {
+  const Stmt* stmt = nullptr;
+  std::string_view inst_name;
+};
+
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
+  // §16.4.3 and §16.14.5: true where this process carries a static assertion,
+  // deferred or concurrent, rather than a procedure the source wrote. §17.3
+  // queues such an assertion of a procedural checker instance each time the
+  // instantiation is reached rather than running it as a process.
+  bool is_static_assertion = false;
+  // §17.3: the checker instantiations this procedure holds.
+  std::vector<ProceduralCheckerSite> checker_instances;
   // §16.5: true where this process carries a concurrent assertion's property
   // rather than a procedure the source wrote. §16.14.5 gives such an assertion
   // `always` semantics and the elaborator models it as kAlwaysFF, so the kind
@@ -661,6 +626,9 @@ struct RtlirModuleInst {
   // inner module". A module declared elsewhere and merely instantiated here
   // gets no such visibility, which is the §23.9 module boundary.
   bool is_nested_decl = false;
+  // §17.3: a procedural checker instance, instantiated by a statement of a
+  // procedure rather than by a module item.
+  bool is_procedural = false;
 };
 
 struct RtlirImport {

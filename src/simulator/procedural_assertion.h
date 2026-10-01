@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -45,6 +46,34 @@ struct ProceduralAssertionState {
   uint64_t ticked_at = ~static_cast<uint64_t>(0);
   std::vector<std::string_view> named_scopes;
 };
+
+// §17.3: one static assertion of a procedural checker instance, which the
+// procedure instantiating the checker queues or reports each time it reaches
+// the instantiation, where a static checker runs it as a process of its own.
+// `state` is the queue a concurrent one keeps, and nullptr for a deferred
+// one; `inst_prefix` is the checker's instance, which the statement's names,
+// its action block's among them, resolve in.
+struct ProceduralCheckerAssertion {
+  const Stmt* stmt = nullptr;
+  ProceduralAssertionState* state = nullptr;
+  std::string inst_prefix;
+};
+
+// §17.3: the static assertion `stmt` of the procedural checker instance
+// `inst_prefix` names, a concurrent one given the queue and the monitor that
+// evaluates it in that instance, armed before the first clock tick as
+// StartProceduralAssertionMonitors arms one.
+const ProceduralCheckerAssertion* StartProceduralCheckerAssertion(
+    const Stmt* stmt, std::string_view inst_prefix, SimContext& ctx,
+    Arena& arena);
+
+// §17.3 with §16.14.6: places one pending instance of the concurrent
+// `assertion` in the procedural assertion queue of the current process, so
+// that the process's flush points reach it as they reach the assertions it
+// embeds; the checker's formals are variables of the checker, read at each
+// tick, so the instance saves no value.
+void EnqueueProceduralCheckerAssertion(
+    const ProceduralCheckerAssertion& assertion, SimContext& ctx, Arena& arena);
 
 // §16.14.6: starts, for each concurrent assertion embedded in `body` that
 // carries a leading clocking event, the monitor process that evaluates the
