@@ -383,6 +383,13 @@ struct RandVariable {
   bool is_static = false;
   std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
 
+  // 18.4.2: the values the constraints admitted when the permutation in
+  // progress began, which DrawAdmissibleRandc compares each call's against so
+  // that a change of the constraints recomputes the permutation; shared as
+  // shared_randc_state is, or held per solver where that is null.
+  std::vector<int64_t> randc_domain;
+  std::shared_ptr<std::vector<int64_t>> shared_randc_domain;
+
   // 18.6.3: a random variable declared static is shared by every instance of
   // the class in which it is declared, so the instances name one storage cell
   // rather than one apiece. When is_static is set, shared_value holds that one
@@ -697,6 +704,15 @@ class ConstraintSolver {
   bool OwnAdmissibleValues(const RandVariable& var,
                            const std::vector<ConstraintExpr>& extra,
                            bool need_custom, std::vector<int64_t>& out);
+  // Whether `c` is a hard constraint naming the variable `name` and no other
+  // active random variable, which decides alone whether a value is one the
+  // variable may take.
+  bool ConstrainsAlone(const ConstraintExpr& c, const std::string& name) const;
+  // The values of `domain` every constraint of `own` admits for the variable
+  // `name`, the solve's values otherwise as they stand.
+  std::vector<int64_t> AdmittedValues(
+      const std::string& name, const std::vector<const ConstraintExpr*>& own,
+      const std::vector<int64_t>& domain);
   // 18.5: seeds each active, not cyclic, not yet drawn variable that a
   // constraint the solver only tries narrows alone, `x % 7 == 3` or a
   // member's bits of a packed structure, with a value drawn uniformly from

@@ -450,16 +450,22 @@ void WriteBackScopeSolved(const std::vector<Variable*>& targets,
   }
 }
 
-// 18.12: the variables the arguments of the scope randomize call `expr`
-// name, each into `targets` with its name in `names`; false where an
-// argument is no identifier naming one. 18.12 with §8.6: a property of the
-// object a method runs on, named bare, is a variable visible in the method's
-// scope; it is solved through a stand-in holding its value, recorded in
-// `properties` with the property it is written back to.
-static bool ResolveScopeTargets(
-    const Expr* expr, SimContext& ctx, Arena& arena,
-    std::vector<Variable*>& targets, std::vector<std::string>& names,
-    std::vector<std::pair<Variable*, FieldTarget>>& properties) {
+// 18.12: the variables a scope randomize call names, each with its name; and,
+// 18.12 with §8.6, each stand-in for a property of the object a method runs
+// on, named bare, with the property the value drawn for it is written back
+// to.
+struct ScopeTargets {
+  std::vector<Variable*> vars;
+  std::vector<std::string> names;
+  std::vector<std::pair<Variable*, FieldTarget>> properties;
+};
+
+// 18.12: the variables the arguments of the scope randomize call `expr` name,
+// into `out`; false where an argument is no identifier naming one. A property
+// named bare is a variable visible in the method's scope, solved through a
+// stand-in holding its value.
+static bool ResolveScopeTargets(const Expr* expr, SimContext& ctx, Arena& arena,
+                                ScopeTargets& out) {
   for (const Expr* arg : expr->args) {
     if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
     Variable* var = ctx.FindVariable(arg->text);
@@ -469,10 +475,10 @@ static bool ResolveScopeTargets(
       var = arena.Create<Variable>();
       var->value = EvalExpr(arg, ctx, arena);
       var->is_signed = var->value.is_signed;
-      properties.emplace_back(var, field);
+      out.properties.emplace_back(var, field);
     }
-    targets.push_back(var);
-    names.emplace_back(arg->text);
+    out.vars.push_back(var);
+    out.names.emplace_back(arg->text);
   }
   return true;
 }
@@ -485,11 +491,10 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // be assigned random values. Resolve each to a live scope variable; a
   // non-identifier argument is not a form this scope randomize path services,
   // so defer to ordinary dispatch rather than misfire.
-  std::vector<Variable*> targets;
-  std::vector<std::string> names;
-  std::vector<std::pair<Variable*, FieldTarget>> properties;
-  if (!ResolveScopeTargets(expr, ctx, arena, targets, names, properties))
-    return false;
+  ScopeTargets scope;
+  if (!ResolveScopeTargets(expr, ctx, arena, scope)) return false;
+  std::vector<Variable*>& targets = scope.vars;
+  std::vector<std::string>& names = scope.names;
 
   // 18.12: called with no argument, the scope randomize does not change the
   // value of any variable and instead checks its constraints: every
@@ -541,7 +546,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // previous values, so nothing is written back.
   if (ok) {
     WriteBackScopeSolved(targets, names, solver, arena);
-    for (const auto& [stand_in, field] : properties)
+    for (const auto& [stand_in, field] : scope.properties)
       WriteResolvedField(field, stand_in->value, ctx, arena);
   }
   out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);

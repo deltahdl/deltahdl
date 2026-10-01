@@ -1,11 +1,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -135,46 +135,64 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   return true;
 }
 
+namespace {
+
+// A decimal literal of `value`, standing where `like` does.
+Expr* BitLiteral(uint32_t value, const Expr* like, Arena& arena) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->range = like->range;
+  e->int_val = value;
+  std::string text = std::to_string(value);
+  e->text = {arena.AllocString(text.data(), text.size()), text.size()};
+  return e;
+}
+
+// §18.4: the variable of its own a rand member of a rand unpacked structure,
+// `h1.addr`, is solved as; null for any other expression.
+Expr* StructMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
+                           Arena& arena) {
+  if (n->kind != ExprKind::kMemberAccess || n->lhs == nullptr ||
+      n->rhs == nullptr || n->lhs->kind != ExprKind::kIdentifier ||
+      n->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  std::string member =
+      std::string(n->lhs->text) + "." + std::string(n->rhs->text);
+  return FindRand(rands, member) != nullptr ? IdentifierExpr(member, n, arena)
+                                            : nullptr;
+}
+
+// §18.4: the part-select, `p[7:4]`, of the bits a member of a rand packed
+// structure, `p.hi`, occupies; null for any other expression.
+Expr* PackedMemberSelect(const Expr* n, std::vector<RandInfo>& rands,
+                         RandomizeCtx& rc) {
+  PackedMemberBits bits;
+  if (n->kind != ExprKind::kMemberAccess ||
+      !PropertyPackedMemberBits(n, rc.obj, rc.ctx, bits) || bits.width == 0 ||
+      FindRand(rands, bits.prop) == nullptr) {
+    return nullptr;
+  }
+  auto* select = rc.arena.Create<Expr>();
+  select->kind = ExprKind::kSelect;
+  select->range = n->range;
+  select->base = IdentifierExpr(bits.prop, n, rc.arena);
+  select->index = BitLiteral(bits.offset + bits.width - 1, n, rc.arena);
+  select->index_end = BitLiteral(bits.offset, n, rc.arena);
+  return select;
+}
+
+}  // namespace
+
 const Expr* PackedMembersAsSelects(const Expr* rel,
                                    std::vector<RandInfo>& rands,
                                    RandomizeCtx& rc) {
-  auto literal = [&rc](uint32_t value, const Expr* like) {
-    auto* e = rc.arena.Create<Expr>();
-    e->kind = ExprKind::kIntegerLiteral;
-    e->range = like->range;
-    e->int_val = value;
-    std::string text = std::to_string(value);
-    e->text = {rc.arena.AllocString(text.data(), text.size()), text.size()};
-    return e;
-  };
   return RewriteExpr(
       rel,
       [&](const Expr* n) -> Expr* {
-        // §18.4: a rand member of a rand unpacked structure is a variable of
-        // its own, `h1.addr`.
-        if (n->kind == ExprKind::kMemberAccess && n->lhs != nullptr &&
-            n->rhs != nullptr && n->lhs->kind == ExprKind::kIdentifier &&
-            n->rhs->kind == ExprKind::kIdentifier) {
-          std::string member =
-              std::string(n->lhs->text) + "." + std::string(n->rhs->text);
-          if (FindRand(rands, member) != nullptr)
-            return IdentifierExpr(member, n, rc.arena);
-        }
-        std::string_view prop;
-        uint32_t offset = 0;
-        uint32_t width = 0;
-        if (n->kind != ExprKind::kMemberAccess ||
-            !PropertyPackedMemberBits(n, rc.obj, rc.ctx, prop, offset, width) ||
-            width == 0 || FindRand(rands, prop) == nullptr) {
-          return nullptr;
-        }
-        auto* select = rc.arena.Create<Expr>();
-        select->kind = ExprKind::kSelect;
-        select->range = n->range;
-        select->base = IdentifierExpr(prop, n, rc.arena);
-        select->index = literal(offset + width - 1, n);
-        select->index_end = literal(offset, n);
-        return select;
+        if (Expr* member = StructMemberVariable(n, rands, rc.arena))
+          return member;
+        return PackedMemberSelect(n, rands, rc);
       },
       rc.arena);
 }

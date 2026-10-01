@@ -257,6 +257,10 @@ struct ClassTypeInfo {
   mutable std::unordered_map<std::string,
                              std::shared_ptr<std::unordered_set<int64_t>>>
       static_randc_history;
+  // §18.4.2: the values each such member's constraints admitted when its
+  // permutation began (RandVariable::shared_randc_domain), shared likewise.
+  mutable std::unordered_map<std::string, std::shared_ptr<std::vector<int64_t>>>
+      static_randc_domain;
 
   std::unordered_map<std::string, uint64_t> enum_members;
 
@@ -474,6 +478,10 @@ struct ClassObject {
   // is created lazily the first time its member is randomized.
   std::unordered_map<std::string, std::shared_ptr<std::unordered_set<int64_t>>>
       randc_history;
+  // §18.4.2: the values each randc member's constraints admitted when its
+  // permutation began, per object as randc_history is.
+  std::unordered_map<std::string, std::shared_ptr<std::vector<int64_t>>>
+      randc_domain;
 
   // §7.3.2 with §8.5: the tag each property of a tagged union type holds,
   // keyed by the property's name, and the tag of a member that is itself a

@@ -64,13 +64,19 @@ const StructTypeInfo* ContainerElementLayout(const Expr* base, SimContext& ctx);
 bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
 
-// §7.2.1 with §8.5: where `access`, `p.hi` or `p.a.b`, names a member of the
-// packed structure property `prop` the class of `obj` declares, the bits of
-// the property the member occupies, from its lowest bit `offset` and
-// `width` wide; false for any other expression.
+// §7.2.1 with §8.5: the bits a member of a packed structure property
+// occupies: the property, the member's lowest bit and its width.
+struct PackedMemberBits {
+  std::string_view prop;
+  uint32_t offset = 0;
+  uint32_t width = 0;
+};
+
+// §7.2.1 with §8.5: where `access`, `p.hi` or `p.a.b`, names a member of a
+// packed structure property the class of `obj` declares, the bits of the
+// property the member occupies, into `out`; false for any other expression.
 bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
-                              SimContext& ctx, std::string_view& prop,
-                              uint32_t& offset, uint32_t& width);
+                              SimContext& ctx, PackedMemberBits& out);
 
 // §7.2: the member of a structure a member access names, the same roots as
 // ResolveStructArrayMember takes, whatever the member's type; null where the

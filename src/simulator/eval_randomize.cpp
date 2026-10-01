@@ -450,6 +450,11 @@ static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
                                  : &obj->randc_history[ri.name];
   if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
   ri.var.shared_randc_state = *slot;
+  std::shared_ptr<std::vector<int64_t>>* domain =
+      (ri.is_static && ri.level) ? &ri.level->static_randc_domain[ri.name]
+                                 : &obj->randc_domain[ri.name];
+  if (!*domain) *domain = std::make_shared<std::vector<int64_t>>();
+  ri.var.shared_randc_domain = *domain;
 }
 
 // Hand each collected random variable to the solver, active or held.
@@ -489,6 +494,30 @@ static void PrepareRandVariables(
   }
 }
 
+// The keys the handles the rand object-handle member `name` of `obj` holds
+// are kept under: its own name, or, §18.4, those of the elements an array of
+// handles holds, up to the size the solve left it.
+static std::vector<std::string> HandleKeys(const ClassObject* obj,
+                                           const std::string& name) {
+  const auto* array = FindClassArrayProperty(obj->type, name);
+  if (array == nullptr) return {name};
+  std::vector<std::string> keys;
+  int64_t lo = array->is_dynamic ? 0 : array->array_lo;
+  for (uint32_t i = 0; i < ClassArraySize(obj, *array); ++i)
+    keys.push_back(ClassArrayElementKey(name, lo + i));
+  return keys;
+}
+
+// The object the handle `obj` holds under `key` refers to; null where it
+// holds none or a null handle.
+static ClassObject* HeldObject(const ClassObject* obj, const std::string& key,
+                               SimContext& ctx) {
+  auto it = obj->properties.find(key);
+  if (it == obj->properties.end()) return nullptr;
+  uint64_t handle = it->second.ToUint64();
+  return handle == kNullClassHandle ? nullptr : ctx.GetClassObject(handle);
+}
+
 // 18.6.1: recurse into each non-null rand object-handle member so its own
 // random members are randomized as well.
 //
@@ -505,22 +534,8 @@ static bool RandomizeRandObjectMembers(
   bool solved = true;
   for (const auto& name : object_members) {
     if (!IsObjectRandActive(obj, name)) continue;
-    // §18.4: the objects an array of handles holds, up to the size the
-    // solve left it, are randomized each as a handle member's is.
-    std::vector<std::string> keys{name};
-    if (const auto* array = FindClassArrayProperty(obj->type, name)) {
-      keys.clear();
-      for (uint32_t i = 0; i < ClassArraySize(obj, *array); ++i) {
-        keys.push_back(ClassArrayElementKey(
-            name, (array->is_dynamic ? 0 : array->array_lo) + i));
-      }
-    }
-    for (const auto& key : keys) {
-      auto it = obj->properties.find(key);
-      if (it == obj->properties.end()) continue;
-      uint64_t handle = it->second.ToUint64();
-      if (handle == kNullClassHandle) continue;
-      ClassObject* sub = ctx.GetClassObject(handle);
+    for (const auto& key : HandleKeys(obj, name)) {
+      ClassObject* sub = HeldObject(obj, key, ctx);
       if (sub != nullptr &&
           !RandomizeObject(sub, ctx, arena, {expr, nullptr, nullptr, false},
                            visited))

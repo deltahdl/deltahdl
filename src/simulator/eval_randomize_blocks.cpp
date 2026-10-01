@@ -97,24 +97,23 @@ static void AddSoftDistConstraints(const ClassMember* m, RandomizeCtx& rc,
 // members as having no effect. A member naming no variable of the solve is
 // left out of the group, mirroring the lenient treatment of unknown
 // references elsewhere in the translation.
-static void AddUniqueMember(const Expr* item, std::vector<RandInfo>& rands,
+// A whole member named in a unique group: the variable `name` names, or each
+// element of the array it names.
+static void AddUniqueName(std::string_view name, std::vector<RandInfo>& rands,
+                          std::vector<std::string>& out) {
+  if (FindRand(rands, name)) {
+    out.push_back(std::string(name));
+    return;
+  }
+  for (const auto& ri : rands) {
+    if (ri.array_base == name && !ri.var.is_array_size) out.push_back(ri.name);
+  }
+}
+
+// A select or a slice of an array named in a unique group, `a[2]` or
+// `a[2:3]`: each element of the array it selects.
+static void AddUniqueSelect(const Expr* item, std::vector<RandInfo>& rands,
                             RandomizeCtx& rc, std::vector<std::string>& out) {
-  if (item == nullptr) return;
-  if (item->kind == ExprKind::kIdentifier) {
-    if (FindRand(rands, item->text)) {
-      out.push_back(std::string(item->text));
-      return;
-    }
-    for (const auto& ri : rands) {
-      if (ri.array_base == item->text && !ri.var.is_array_size)
-        out.push_back(ri.name);
-    }
-    return;
-  }
-  if (item->kind != ExprKind::kSelect || item->base == nullptr ||
-      item->base->kind != ExprKind::kIdentifier || item->index == nullptr) {
-    return;
-  }
   auto bound = [&rc](const Expr* e) {
     ConstraintEvalScope scope(rc.obj, rc.ctx);
     Logic4Vec v = EvalExpr(e, rc.ctx, rc.arena);
@@ -127,6 +126,18 @@ static void AddUniqueMember(const Expr* item, std::vector<RandInfo>& rands,
   for (int64_t i = lo; i <= hi; ++i) {
     std::string name = ClassArrayElementKey(item->base->text, i);
     if (FindRand(rands, name)) out.push_back(name);
+  }
+}
+
+static void AddUniqueMember(const Expr* item, std::vector<RandInfo>& rands,
+                            RandomizeCtx& rc, std::vector<std::string>& out) {
+  if (item == nullptr) return;
+  if (item->kind == ExprKind::kIdentifier) {
+    AddUniqueName(item->text, rands, out);
+  } else if (item->kind == ExprKind::kSelect && item->base != nullptr &&
+             item->base->kind == ExprKind::kIdentifier &&
+             item->index != nullptr) {
+    AddUniqueSelect(item, rands, rc, out);
   }
 }
 

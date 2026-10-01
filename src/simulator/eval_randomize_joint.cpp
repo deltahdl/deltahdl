@@ -521,6 +521,11 @@ void BindJointRandcHistory(RandInfo& ri) {
                                  : &ri.owner->randc_history[ri.member];
   if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
   ri.var.shared_randc_state = *slot;
+  std::shared_ptr<std::vector<int64_t>>* domain =
+      (ri.is_static && ri.level) ? &ri.level->static_randc_domain[ri.member]
+                                 : &ri.owner->randc_domain[ri.member];
+  if (!*domain) *domain = std::make_shared<std::vector<int64_t>>();
+  ri.var.shared_randc_domain = *domain;
 }
 
 // Hand each joint random variable to the solver. 18.8 / 18.5.8 rule c: a

@@ -7,6 +7,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/constraint_solver.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"

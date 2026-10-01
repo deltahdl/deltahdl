@@ -112,68 +112,87 @@ static bool EnumeratedDomain(const RandVariable& var,
   return true;
 }
 
-bool ConstraintSolver::OwnAdmissibleValues(
-    const RandVariable& var, const std::vector<ConstraintExpr>& extra,
-    bool need_custom, std::vector<int64_t>& out) {
-  // The hard constraints naming the variable and no other active random
-  // variable, which decide alone whether a value is one it may take.
-  std::vector<const ConstraintExpr*> own;
-  bool custom = false;
-  auto collect = [&](const ConstraintExpr& c) {
-    if (c.kind == ConstraintKind::kSoft || !ConstraintNames(c, var.name))
-      return;
-    std::vector<std::string> named;
-    CollectNamed(c, named);
-    for (const auto& name : named) {
-      auto vit = variables_.find(name);
-      if (name != var.name && vit != variables_.end() && vit->second.enabled)
-        return;
-    }
-    own.push_back(&c);
-    custom = custom || c.kind == ConstraintKind::kCustom;
-  };
-  for (const auto& block : blocks_) {
-    if (!block.enabled) continue;
-    for (const auto& c : block.constraints) collect(c);
-  }
-  for (const auto& c : extra) collect(c);
-  std::vector<int64_t> domain;
-  if (own.empty() || (need_custom && !custom) || !EnumeratedDomain(var, domain))
+bool ConstraintSolver::ConstrainsAlone(const ConstraintExpr& c,
+                                       const std::string& name) const {
+  if (c.kind == ConstraintKind::kSoft || !ConstraintNames(c, name))
     return false;
-  auto saved = values_.find(var.name);
+  std::vector<std::string> named;
+  CollectNamed(c, named);
+  return std::none_of(named.begin(), named.end(), [&](const std::string& n) {
+    auto vit = variables_.find(n);
+    return n != name && vit != variables_.end() && vit->second.enabled;
+  });
+}
+
+std::vector<int64_t> ConstraintSolver::AdmittedValues(
+    const std::string& name, const std::vector<const ConstraintExpr*>& own,
+    const std::vector<int64_t>& domain) {
+  auto saved = values_.find(name);
   bool had = saved != values_.end();
   int64_t saved_value = had ? saved->second : 0;
-  out.clear();
+  std::vector<int64_t> out;
   for (int64_t v : domain) {
-    values_[var.name] = v;
+    values_[name] = v;
     if (std::all_of(own.begin(), own.end(), [&](const ConstraintExpr* c) {
           return EvalConstraint(*c);
         }))
       out.push_back(v);
   }
   if (had) {
-    values_[var.name] = saved_value;
+    values_[name] = saved_value;
   } else {
-    values_.erase(var.name);
+    values_.erase(name);
   }
+  return out;
+}
+
+bool ConstraintSolver::OwnAdmissibleValues(
+    const RandVariable& var, const std::vector<ConstraintExpr>& extra,
+    bool need_custom, std::vector<int64_t>& out) {
+  // The domain is judged first, as the constraints a wide one is held to are
+  // never enumerated.
+  std::vector<int64_t> domain;
+  if (!EnumeratedDomain(var, domain)) return false;
+  std::vector<const ConstraintExpr*> own;
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (ConstrainsAlone(c, var.name)) own.push_back(&c);
+    }
+  }
+  for (const auto& c : extra) {
+    if (ConstrainsAlone(c, var.name)) own.push_back(&c);
+  }
+  bool custom =
+      std::any_of(own.begin(), own.end(), [](const ConstraintExpr* c) {
+        return c->kind == ConstraintKind::kCustom;
+      });
+  if (own.empty() || (need_custom && !custom)) return false;
+  out = AdmittedValues(var.name, own, domain);
   return !out.empty();
 }
 
 bool ConstraintSolver::DrawAdmissibleRandc(
     RandVariable& var, const std::vector<ConstraintExpr>& extra, int64_t& out) {
   std::vector<int64_t> admissible;
-  if (!OwnAdmissibleValues(var, extra, /*need_custom=*/false, admissible))
-    return false;
   std::unordered_set<int64_t>& history =
       var.shared_randc_state ? *var.shared_randc_state : var.randc_history;
-  // A value of the permutation in progress that the constraints now refuse
-  // shows they have changed, so the permutation is recomputed.
-  std::unordered_set<int64_t> admitted(admissible.begin(), admissible.end());
-  for (int64_t v : history) {
-    if (admitted.count(v) == 0) {
+  std::vector<int64_t>& began =
+      var.shared_randc_domain ? *var.shared_randc_domain : var.randc_domain;
+  if (!OwnAdmissibleValues(var, extra, /*need_custom=*/false, admissible)) {
+    // Constraints that no longer narrow the variable alone end the
+    // permutation they began.
+    if (!began.empty()) {
       history.clear();
-      break;
+      began.clear();
     }
+    return false;
+  }
+  // Constraints admitting other values than when the permutation began have
+  // changed, so the permutation is recomputed.
+  if (began != admissible) {
+    history.clear();
+    began = admissible;
   }
   std::vector<int64_t> fresh;
   for (int64_t v : admissible) {

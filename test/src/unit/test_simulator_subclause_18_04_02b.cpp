@@ -166,4 +166,32 @@ TEST(RandcCycleRun, AChangedConstraintRecomputesThePermutation) {
   EXPECT_EQ(out, "0 224\n");
 }
 
+// §18.4.2: a constraint turned off changes the constraints too, so the
+// permutation the constrained draws began ends, and the next four calls over
+// the whole of a 2-bit domain give each of its four values once.
+TEST(RandcCycleRun, AConstraintTurnedOffRestartsThePermutation) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  randc bit [1:0] y;\n"
+      "  constraint c { y inside {[0:1]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [3:0] seen = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (2) void'(c.randomize());\n"
+      "    c.c.constraint_mode(0);\n"
+      "    repeat (4) begin\n"
+      "      if (c.randomize() != 1 || seen[c.y]) bad++;\n"
+      "      seen[c.y] = 1;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, seen);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 15\n");
+}
+
 }  // namespace

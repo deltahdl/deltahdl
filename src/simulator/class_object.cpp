@@ -330,6 +330,10 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
     copy->randc_history[member] =
         std::make_shared<std::unordered_set<int64_t>>(*history);
   }
+  for (const auto& [member, domain] : randc_domain) {
+    copy->randc_domain[member] =
+        std::make_shared<std::vector<int64_t>>(*domain);
+  }
   return copy;
 }
 

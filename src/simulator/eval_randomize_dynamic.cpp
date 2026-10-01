@@ -140,19 +140,28 @@ bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
   return constrained;
 }
 
-// The random variables of the rand member `m`, a dynamic array or, with
-// `in_queue`, a queue declared at `level` holding `held` elements: the size
+// A rand member declared as a dynamic array or a queue: its declaration, the
+// class declaring it, the elements the object holds, and whether it is a
+// queue.
+struct DynamicMember {
+  const ClassMember* decl = nullptr;
+  const ClassTypeInfo* level = nullptr;
+  int64_t held = 0;
+  bool in_queue = false;
+};
+
+// The random variables of the rand dynamic array or queue `member`: the size
 // variable where the size is constrained, and one variable per element up to
 // the largest size admitted, or up to the size the object holds where it is
 // not.
-void AddDynamicArray(const ClassMember* m, const ClassTypeInfo* level,
-                     int64_t held, bool in_queue, std::vector<RandInfo>& rands,
+void AddDynamicArray(const DynamicMember& member, std::vector<RandInfo>& rands,
                      RandomizeCtx& rc) {
-  RandInfo element = BuildRandMember(m, level, rc.ctx);
-  element.in_queue = in_queue;
-  rands.push_back(SizeVariable(m->name, level));
-  rands.back().in_queue = in_queue;
-  int64_t count = held;
+  const ClassMember* m = member.decl;
+  RandInfo element = BuildRandMember(m, member.level, rc.ctx);
+  element.in_queue = member.in_queue;
+  rands.push_back(SizeVariable(m->name, member.level));
+  rands.back().in_queue = member.in_queue;
+  int64_t count = member.held;
   if (FoldSizeConstraints(rands.back(), rands, rc)) {
     count =
         std::clamp<int64_t>(rands.back().var.max_val, 0, kMaxDynamicElements);
@@ -194,6 +203,44 @@ void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
+// The random variables of the rand member `m` of `lvl` whose count is the
+// object's rather than the class's, where it is one.
+void AddObjectSizedMember(const ClassMember* m, const ClassTypeInfo* lvl,
+                          std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+  // §18.4: an associative array has its elements randomized, its keys and so
+  // its size left as they are.
+  if (IsAssocPropertyDecl(m, lvl, rc.ctx)) {
+    AssocArrayObject* aa = ClassAssocProperty(rc.obj, lvl, m->name, rc.ctx);
+    if (aa != nullptr && !m->is_static)
+      AddAssocElements(m, lvl, *aa, rands, rc);
+    return;
+  }
+  // §18.4: a queue is randomized as a dynamic array is, resized at its back to
+  // the size the constraints draw.
+  if (IsQueuePropertyDecl(m, lvl, rc.ctx)) {
+    QueueObject* queue = ClassQueueProperty(rc.obj, lvl, m->name, rc.ctx);
+    if (queue != nullptr && !m->is_static) {
+      AddDynamicArray(
+          {m, lvl, static_cast<int64_t>(queue->elements.size()), true}, rands,
+          rc);
+    }
+    return;
+  }
+  const auto* array = FindClassArrayProperty(lvl, m->name);
+  if (array == nullptr || !array->is_dynamic) return;
+  // §18.4: randomize() allocates no class object, so an array of handles is
+  // resized alone: the handles up to the new size are kept and the elements
+  // added are null.
+  if (IsClassHandleMember(m, rc.ctx)) {
+    rands.push_back(SizeVariable(m->name, lvl));
+    if (!FoldSizeConstraints(rands.back(), rands, rc)) rands.pop_back();
+    return;
+  }
+  AddDynamicArray(
+      {m, lvl, static_cast<int64_t>(ClassArraySize(rc.obj, *array)), false},
+      rands, rc);
+}
+
 }  // namespace
 
 const Expr* ResolveArraySizes(const Expr* rel, RandomizeCtx& rc) {
@@ -221,38 +268,8 @@ void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc) {
   for (const auto* lvl = rc.obj->type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
     for (const ClassMember* m : lvl->decl->members) {
-      if (m->kind != ClassMemberKind::kProperty || !(m->is_rand || m->is_randc))
-        continue;
-      // §18.4: an associative array has its elements randomized, its keys
-      // and so its size left as they are.
-      if (IsAssocPropertyDecl(m, lvl, rc.ctx)) {
-        AssocArrayObject* aa = ClassAssocProperty(rc.obj, lvl, m->name, rc.ctx);
-        if (aa != nullptr && !m->is_static)
-          AddAssocElements(m, lvl, *aa, rands, rc);
-        continue;
-      }
-      // §18.4: a queue is randomized as a dynamic array is, resized at its
-      // back to the size the constraints draw.
-      if (IsQueuePropertyDecl(m, lvl, rc.ctx)) {
-        QueueObject* queue = ClassQueueProperty(rc.obj, lvl, m->name, rc.ctx);
-        if (queue == nullptr || m->is_static) continue;
-        AddDynamicArray(m, lvl, static_cast<int64_t>(queue->elements.size()),
-                        /*in_queue=*/true, rands, rc);
-        continue;
-      }
-      const auto* array = FindClassArrayProperty(lvl, m->name);
-      if (array == nullptr || !array->is_dynamic) continue;
-      // §18.4: randomize() allocates no class object, so an array of handles
-      // is resized alone: the handles up to the new size are kept and the
-      // elements added are null.
-      if (IsClassHandleMember(m, rc.ctx)) {
-        rands.push_back(SizeVariable(m->name, lvl));
-        if (!FoldSizeConstraints(rands.back(), rands, rc)) rands.pop_back();
-        continue;
-      }
-      AddDynamicArray(m, lvl,
-                      static_cast<int64_t>(ClassArraySize(rc.obj, *array)),
-                      /*in_queue=*/false, rands, rc);
+      if (m->kind == ClassMemberKind::kProperty && (m->is_rand || m->is_randc))
+        AddObjectSizedMember(m, lvl, rands, rc);
     }
   }
 }
@@ -268,6 +285,71 @@ static bool BeyondDrawnSize(
   return it != sizes.end() && ri.array_index >= it->second;
 }
 
+namespace {
+
+// §18.4: an element of a rand associative array lands under the key it was
+// drawn for.
+void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
+                       const Logic4Vec& lv) {
+  auto aa = obj->assoc_properties.find(ri.array_base);
+  if (aa == obj->assoc_properties.end() || aa->second == nullptr) return;
+  if (aa->second->is_string_key) {
+    aa->second->str_data[ri.str_key] = lv;
+  } else {
+    aa->second->int_data[ri.int_key] = lv;
+  }
+}
+
+// §18.4: a member of a rand unpacked structure lands in its bits of the value
+// the property holds, the other members left as they were.
+void WriteStructMember(ClassObject* obj, const RandInfo& ri,
+                       const Logic4Vec& lv) {
+  auto whole = obj->properties.find(ri.struct_base);
+  if (whole == obj->properties.end() ||
+      whole->second.width < ri.struct_offset + ri.var.width) {
+    return;
+  }
+  DepositBitField(whole->second, ri.struct_offset, lv, ri.var.width);
+  obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] =
+      whole->second;
+}
+
+// The value `lv` drawn for `ri`, written where the variable is held.
+void WriteSolvedValue(ClassObject* obj, const RandInfo& ri,
+                      const Logic4Vec& lv) {
+  if (ri.in_assoc) {
+    WriteAssocElement(obj, ri, lv);
+  } else if (!ri.struct_base.empty()) {
+    WriteStructMember(obj, ri, lv);
+  } else if (ri.is_static && ri.level != nullptr) {
+    // 18.6.3: a static random variable is a single storage shared by every
+    // instance of the class, so a successful randomize() must publish the
+    // drawn value to that class-wide cell, not to a private per-object copy,
+    // which would shadow the shared storage for this object and leave the
+    // other instances observing the old value.
+    ri.level->static_properties[ri.name] = lv;
+  } else {
+    obj->properties[ri.name] = lv;
+    obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
+  }
+}
+
+// §18.4: each rand queue holds the elements drawn for it, as many as its
+// size, resized at its back.
+void WriteQueues(
+    ClassObject* obj,
+    std::unordered_map<std::string, std::vector<Logic4Vec>>& queues) {
+  for (auto& [base, elements] : queues) {
+    auto it = obj->queue_properties.find(base);
+    if (it == obj->queue_properties.end() || it->second == nullptr) continue;
+    it->second->elements = std::move(elements);
+    it->second->AssignFreshIds();
+    ++it->second->generation;
+  }
+}
+
+}  // namespace
+
 // 18.6.1: write each solved value back to the object, keeping the bare and
 // scoped ("Class::name") property aliases in sync so member reads see it. A
 // dynamic array's size is written under its key, which sizes the array
@@ -280,52 +362,13 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
     if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
     if (BeyondDrawnSize(ri, sizes)) continue;
     Logic4Vec lv = SolvedValue(ri, solver, arena);
-    // 18.6.3: a static random variable is a single storage shared by every
-    // instance of the class, so a successful randomize() must publish the drawn
-    // value to that class-wide cell — not to a private per-object copy. Writing
-    // it to the instance map would shadow the shared storage for this object
-    // and leave the other instances observing the old value, contradicting the
-    // rule that each randomize() changes the variable in every class instance.
-    // A non-static variable keeps its per-object storage (with the scoped
-    // alias).
-    if (ri.in_queue) {
-      if (!ri.var.is_array_size) queues[ri.array_base].push_back(lv);
-    } else if (ri.in_assoc) {
-      // §18.4: the element lands under the key it was drawn for.
-      auto aa = obj->assoc_properties.find(ri.array_base);
-      if (aa == obj->assoc_properties.end() || aa->second == nullptr) continue;
-      if (aa->second->is_string_key) {
-        aa->second->str_data[ri.str_key] = lv;
-      } else {
-        aa->second->int_data[ri.int_key] = lv;
-      }
-    } else if (!ri.struct_base.empty()) {
-      // §18.4: a member of a rand unpacked structure lands in its bits of the
-      // value the property holds, the other members left as they were.
-      auto whole = obj->properties.find(ri.struct_base);
-      if (whole == obj->properties.end() ||
-          whole->second.width < ri.struct_offset + ri.var.width) {
-        continue;
-      }
-      DepositBitField(whole->second, ri.struct_offset, lv, ri.var.width);
-      obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] =
-          whole->second;
-    } else if (ri.is_static && ri.level != nullptr) {
-      ri.level->static_properties[ri.name] = lv;
-    } else {
-      obj->properties[ri.name] = lv;
-      obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
+    if (!ri.in_queue) {
+      WriteSolvedValue(obj, ri, lv);
+    } else if (!ri.var.is_array_size) {
+      queues[ri.array_base].push_back(lv);
     }
   }
-  // §18.4: a queue holds the elements drawn, as many as its size, resized at
-  // its back.
-  for (auto& [base, elements] : queues) {
-    auto it = obj->queue_properties.find(base);
-    if (it == obj->queue_properties.end() || it->second == nullptr) continue;
-    it->second->elements = std::move(elements);
-    it->second->AssignFreshIds();
-    ++it->second->generation;
-  }
+  WriteQueues(obj, queues);
 }
 
 }  // namespace delta
