@@ -379,6 +379,7 @@ static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
 static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (TryArrayPatternEquality(expr, ctx, arena, out)) return true;
+  if (TryDynamicStructEquality(expr, ctx, arena, out)) return true;
   if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq)
     return false;
   if (!expr->lhs || !expr->rhs) return false;

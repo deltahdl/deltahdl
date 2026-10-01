@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -227,6 +229,51 @@ TEST(AggregateExprSim, ArrayPassedToFunction) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
+// §11.2.2 with §7.5: unpacked structures compare member by member, a dynamic
+// array member by the elements it holds, however each structure came to hold
+// them; one differing element, or one more, makes them unequal.
+TEST(AggregateEqualityRun, StructuresCompareADynamicMemberByItsElements) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int a; byte data[]; } h_t;\n"
+      "module t;\n"
+      "  h_t x, y, w;\n"
+      "  initial begin\n"
+      "    x.a = 1; x.data = new[2]; x.data[0] = 5;\n"
+      "    y.a = 1; y.data = new[2]; y.data[0] = 5;\n"
+      "    w = y; w.data.push_back(0);\n"
+      "    $display(\"%0d %0d %0d\", x == y, x != y, x == w);\n"
+      "    y.data[1] = 3;\n"
+      "    $display(\"%0d %0d\", x == y, x != y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 0\n0 1\n");
+}
+
+// §11.2.2 with §11.4.5: the case equality operators compare the dynamic
+// member by its elements too, and so does a comparison of two class
+// properties holding the structure.
+TEST(AggregateEqualityRun, CaseEqualityAndPropertiesCompareTheElements) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int a; byte data[]; } h_t;\n"
+      "class P; h_t h; endclass\n"
+      "module t;\n"
+      "  h_t x, y;\n"
+      "  initial begin\n"
+      "    static P p = new, q = new;\n"
+      "    x.a = 1; x.data = new[2]; x.data[0] = 5;\n"
+      "    y.a = 1; y.data = new[2]; y.data[0] = 5;\n"
+      "    p.h = x;\n"
+      "    q.h.a = 1; q.h.data = new[2]; q.h.data[0] = 5;\n"
+      "    $display(\"%0d %0d %0d\", x === y, x !== y, p.h == q.h);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1\n");
 }
 
 }  // namespace

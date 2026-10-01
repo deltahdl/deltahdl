@@ -16,4 +16,14 @@ struct Expr;
 bool TryArrayPatternEquality(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);
 
+// §11.2.2 with §7.5: `expr`, an equality `==`, `!=`, `===` or `!==` between
+// two unpacked structures holding a dynamic array member -- variables, class
+// properties or members -- compared member by member into `out`, the dynamic
+// member by the elements it holds rather than the handle naming them. False,
+// with `out` left alone, where `expr` is no such comparison or, for `==` and
+// `!=`, a member compared holds an unknown bit, which the comparison of the
+// values themselves answers.
+bool TryDynamicStructEquality(const Expr* expr, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out);
+
 }  // namespace delta

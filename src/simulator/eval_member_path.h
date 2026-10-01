@@ -79,6 +79,11 @@ struct PackedMemberBits {
 bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
                               SimContext& ctx, PackedMemberBits& out);
 
+// §7.2: the layout of the structure the operand `e` holds: a variable's by
+// its name, a class property's or a member's that is itself a structure by
+// the member path reaching it; null for any other operand.
+const StructTypeInfo* StructLayoutOfOperand(const Expr* e, SimContext& ctx);
+
 // §7.2 with §7.5: where `access` names a member of an unpacked structure
 // declared as a dynamic array, `m.data` or `p.h.data`, its elements: to read,
 // the array the member holds, an empty one where it holds none; with

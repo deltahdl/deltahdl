@@ -359,6 +359,29 @@ bool PropertyPackedMemberBits(const Expr* access, const ClassObject* obj,
   return true;
 }
 
+const StructTypeInfo* StructLayoutOfOperand(const Expr* e, SimContext& ctx) {
+  if (e == nullptr) return nullptr;
+  if (e->kind == ExprKind::kIdentifier) return StructLayoutOfName(e->text, ctx);
+  std::string_view name;
+  std::string path;
+  if (e->kind != ExprKind::kMemberAccess || !MemberChainPath(e, name, path))
+    return nullptr;
+  // §8.5: a class property holding a structure, `p.h` or `this.h`.
+  if (path.find('.') == std::string::npos) {
+    Variable* var = ctx.FindVariable(name);
+    ClassObject* obj = name == "this" ? ctx.CurrentThis() : nullptr;
+    if (var != nullptr && !ctx.GetVariableClassType(name).empty())
+      obj = ctx.GetClassObject(var->value.ToUint64());
+    if (obj != nullptr) return PropertyStructLayout(obj, path, ctx);
+  }
+  StructRoot root;
+  if (!FindStructRoot(name, path, ctx, root)) return nullptr;
+  if (path.empty()) return root.info;
+  uint32_t offset = 0;
+  const StructFieldInfo* field = ResolveStructField(root.info, path, &offset);
+  return field != nullptr ? field->nested : nullptr;
+}
+
 QueueObject* ResolveStructDynMember(const Expr* access, SimContext& ctx,
                                     Arena& arena, bool write) {
   std::string_view name;
