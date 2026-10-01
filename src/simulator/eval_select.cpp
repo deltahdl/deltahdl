@@ -189,6 +189,12 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
     return true;
   }
   out = elem->value;
+  // §16.5.1 with §16.6: within a concurrent assertion's property the element
+  // reads its sampled value, as EvalIdentifier reads a variable's.
+  if (const Logic4Vec* sampled =
+          ctx.AssertionSamples().ReadWithinProperty(elem, ctx.CurrentTime())) {
+    out = *sampled;
+  }
   // As EvalIdentifier reads a variable: an element's signedness is its
   // declaration's, never the value's that was last written into it, so
   // `d[0] = 4'sd9` on `logic [3:0] d [2]` reads back 9.
@@ -254,6 +260,11 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   auto* elem = ctx.FindVariable(compound);
   if (elem) {
     out = elem->value;
+    // §16.5.1 with §16.6: as TryArrayElementSelect reads a single dimension's.
+    if (const Logic4Vec* sampled = ctx.AssertionSamples().ReadWithinProperty(
+            elem, ctx.CurrentTime())) {
+      out = *sampled;
+    }
     out.is_signed = elem->is_signed;
     return true;
   }

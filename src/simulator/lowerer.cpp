@@ -504,58 +504,6 @@ void Lowerer::RecordSubroutineAssertionSampleScopes(const RtlirModule* mod) {
   }
 }
 
-// §25.9 with §16.5.1: a dotted name that names no variable, `vif.d` or
-// `m.vif.d`, reaches a member through a virtual interface bound only as the
-// design runs, so the member it ends in is enrolled in every interface
-// instance declaring it, whichever the handle comes to name.
-// The instances are named from the top, and the scope reading the name,
-// `scope_prefix`, is restored for the names after it.
-void Lowerer::EnrollInterfaceMembers(std::string_view name,
-                                     const std::string& scope_prefix) {
-  auto dot = name.rfind('.');
-  if (dot == std::string_view::npos) return;
-  std::string_view member = name.substr(dot + 1);
-  ctx_.SetLoweringInstancePrefix("");
-  for (const std::string& prefix : interface_instance_prefixes_) {
-    if (auto* var = ctx_.FindVariable(prefix + std::string(member))) {
-      ctx_.AssertionSamples().Register(var, ctx_.GetArena());
-    }
-  }
-  ctx_.SetLoweringInstancePrefix(scope_prefix);
-}
-
-void Lowerer::RegisterDesignAssertionSampling() {
-  // §23.6 makes a hierarchical name an ordinary way to reach a variable, and
-  // §16.5.1 puts no condition on where the variable a property reads is
-  // declared, so `u.req` is enrolled exactly as a name the module declares
-  // itself. That is why this runs after every module is lowered rather than
-  // beside the process that named it: Lowerer::LowerChildModules creates an
-  // instance's variables after the enclosing module's processes are lowered, so
-  // a name resolved where it was found reached nothing and the read fell back
-  // to the live value §16.5.1 exists to stop reading.
-  //
-  // Each name is resolved through SimContext::FindVariable under its own
-  // instance prefix, which is the lookup the process body will make: no process
-  // is executing here, so the prefix is the one SetLoweringInstancePrefix last
-  // set, and the enrolled Variable* is therefore the one the read will find.
-  for (const auto& scope : assertion_sample_scopes_) {
-    ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
-    for (const auto& name : scope.names) {
-      if (auto* var = ctx_.FindVariable(name)) {
-        ctx_.AssertionSamples().Register(var, ctx_.GetArena());
-      } else {
-        EnrollInterfaceMembers(name, scope.inst_prefix);
-      }
-      // §16.6: a queue the property reads an element of is enrolled whole, so
-      // the element read at a tick is the one sampled for it.
-      if (auto* queue = ctx_.FindQueue(name)) {
-        ctx_.AssertionSamples().RegisterQueue(queue, ctx_.GetArena());
-      }
-    }
-  }
-  ctx_.SetLoweringInstancePrefix("");
-}
-
 void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                            uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();

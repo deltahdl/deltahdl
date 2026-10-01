@@ -367,4 +367,48 @@ TEST(ConcurrentAssertionSampling, ConstCastReadsTheCurrentValueAtTheTick) {
   EXPECT_EQ(misses->value.ToUint64(), 0u);
 }
 
+// §16.5.1 with §16.6: an element of a fixed-size unpacked array is read at
+// its Preponed value too. The always procedure flips arr[3] at each posedge
+// before the Observed region, so the five ticks sample 1, 0, 1, 0, 1 where
+// the values standing at them are 0, 1, 0, 1, 0. The [2:5] bounds make the
+// element's name its declared index rather than its offset.
+TEST(ConcurrentAssertionSampling, AnArrayElementReadsItsPreponedValue) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  logic arr [2:5] = '{1, 1, 1, 1};\n"
+      "  int pass = 0, fail = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) arr[3] = ~arr[3];\n"
+      "  a1: assert property (@(posedge clk) arr[3]) pass++; else fail++;\n"
+      "  initial #52 $finish;\n"
+      "endmodule\n",
+      f, "pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("fail")->value.ToUint64(), 2u);
+}
+
+// §16.5.1 with §16.6: so is an element of an array of two unpacked
+// dimensions, read through a select of each.
+TEST(ConcurrentAssertionSampling,
+     AMultidimensionalElementReadsItsPreponedValue) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  logic arr [1:0][1:0] = '{'{1, 1}, '{1, 1}};\n"
+      "  int pass = 0, fail = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) arr[1][0] = ~arr[1][0];\n"
+      "  a1: assert property (@(posedge clk) arr[1][0]) pass++; else fail++;\n"
+      "  initial #52 $finish;\n"
+      "endmodule\n",
+      f, "pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("fail")->value.ToUint64(), 2u);
+}
+
 }  // namespace

@@ -393,6 +393,7 @@ class Lowerer {
   std::vector<std::string> interface_instance_prefixes_;
   void EnrollInterfaceMembers(std::string_view name,
                               const std::string& scope_prefix);
+  void EnrollArrayElements(const std::string& name);
   // The instance output ports whose connection carries their module path
   // delays (RtlirContAssign::module_path_port), so that an assignment inside
   // the instance driving one of them does not carry them a second time.
