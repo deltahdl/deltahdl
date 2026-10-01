@@ -308,6 +308,7 @@ static std::vector<std::pair<const ClassDecl*, const std::vector<ModuleItem*>*>>
 ClassesWithScopes(const CompilationUnit* unit) {
   std::vector<std::pair<const ClassDecl*, const std::vector<ModuleItem*>*>>
       classes;
+  classes.reserve(unit->classes.size());
   for (const auto* cls : unit->classes)
     classes.emplace_back(cls, &unit->cu_items);
   auto add_scoped = [&](const std::vector<ModuleItem*>& items) {

@@ -47,12 +47,34 @@ bool Contains(const Names& names, auto value) {
   return std::find(names.begin(), names.end(), value) != names.end();
 }
 
-// The names a covergroup body reads: its own formals, which shadow the names
-// of the scope it is declared in, and then those names.
+// §19.5: the names a covergroup's coverpoints go by, each one's label or,
+// unlabelled, the variable its expression names.
+std::unordered_set<std::string_view> CoverpointNames(const CovergroupDecl& cg) {
+  std::unordered_set<std::string_view> names;
+  for (const CoverageSpecOrOption& item : cg.items) {
+    if (item.kind != CoverageSpecKind::kCoverPoint) continue;
+    const CoverPointDecl& cp = *item.cover_point;
+    if (!cp.label.empty()) {
+      names.insert(cp.label);
+    } else if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
+      names.insert(cp.expr->text);
+    }
+  }
+  return names;
+}
+
+// The names a covergroup body reads: its own coverpoints; its formals, which
+// shadow the names of the scope it is declared in; and then those names.
 class CovergroupScope {
  public:
   CovergroupScope(const CovergroupDecl& cg, const CovergroupTypeOf& type_of)
-      : cg_(cg), type_of_(type_of) {}
+      : cg_(cg), type_of_(type_of), coverpoints_(CoverpointNames(cg)) {}
+
+  std::string_view Name() const { return cg_.name; }
+
+  bool IsCoverpoint(std::string_view name) const {
+    return coverpoints_.count(name) != 0;
+  }
 
   std::optional<DataTypeKind> TypeOf(std::string_view name) const {
     for (const FunctionArg& formal : cg_.formals) {
@@ -76,6 +98,7 @@ class CovergroupScope {
  private:
   const CovergroupDecl& cg_;
   const CovergroupTypeOf& type_of_;
+  std::unordered_set<std::string_view> coverpoints_;
 };
 
 // §19.5: a coverpoint whose explicit data type is real, or which has none and
@@ -112,30 +135,12 @@ void CheckRealCoverpoint(const CoverPointDecl& cp, DiagEngine& diag) {
   }
 }
 
-// §19.5: the names a covergroup's coverpoints go by, each one's label or,
-// unlabelled, the variable its expression names.
-std::unordered_set<std::string_view> CoverpointNames(const CovergroupDecl& cg) {
-  std::unordered_set<std::string_view> names;
-  for (const CoverageSpecOrOption& item : cg.items) {
-    if (item.kind != CoverageSpecKind::kCoverPoint) continue;
-    const CoverPointDecl& cp = *item.cover_point;
-    if (!cp.label.empty()) {
-      names.insert(cp.label);
-    } else if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
-      names.insert(cp.expr->text);
-    }
-  }
-  return names;
-}
-
 // §19.6: each cross item is a coverpoint of the covergroup or a variable, and a
 // variable crossed directly is integral.
-void CheckCrossItems(const CovergroupDecl& cg, const CoverCrossDecl& cross,
-                     const std::unordered_set<std::string_view>& coverpoints,
-                     const CovergroupScope& scope,
+void CheckCrossItems(const CoverCrossDecl& cross, const CovergroupScope& scope,
                      const CovergroupDeclared& declared, DiagEngine& diag) {
   for (const CrossItem& item : cross.items) {
-    if (coverpoints.count(item.name) != 0) continue;
+    if (scope.IsCoverpoint(item.name)) continue;
     if (auto type = scope.TypeOf(item.name)) {
       if (IsRealType(*type)) {
         diag.Error(item.loc,
@@ -150,7 +155,7 @@ void CheckCrossItems(const CovergroupDecl& cg, const CoverCrossDecl& cross,
     diag.Error(item.loc,
                std::format("cross item '{}' is neither a coverpoint of "
                            "covergroup '{}' nor a variable",
-                           item.name, cg.name),
+                           item.name, scope.Name()),
                Subclause("19.6"));
   }
 }
@@ -224,15 +229,13 @@ void ValidateCovergroup(const CovergroupDecl& cg,
                         const CovergroupTypeOf& type_of,
                         const CovergroupDeclared& declared, DiagEngine& diag) {
   CovergroupScope scope(cg, type_of);
-  std::unordered_set<std::string_view> coverpoints = CoverpointNames(cg);
   for (const CoverageSpecOrOption& item : cg.items) {
     if (item.kind == CoverageSpecKind::kCoverPoint) {
       if (IsRealCoverpoint(*item.cover_point, scope)) {
         CheckRealCoverpoint(*item.cover_point, diag);
       }
     } else if (item.kind == CoverageSpecKind::kCoverCross) {
-      CheckCrossItems(cg, *item.cover_cross, coverpoints, scope, declared,
-                      diag);
+      CheckCrossItems(*item.cover_cross, scope, declared, diag);
     }
   }
 }
