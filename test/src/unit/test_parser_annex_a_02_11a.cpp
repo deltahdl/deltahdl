@@ -172,9 +172,9 @@ TEST(CovergroupDeclParsing, ErrorUnclosedPortList) {
       "  covergroup cg(ref int x;\n"
       "  endgroup\n"
       "endmodule\n");
-  // The unclosed formal list scans to the end of the source, so the ';' that
-  // ends the covergroup declaration is demanded at EOF, on line 5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 5, "19.3"));
+  // The formal list is read as a tf_port_list, so the ';' standing where its
+  // ')' was due is reported on line 2.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCoverPointMissingSemicolon) {
@@ -198,10 +198,10 @@ TEST(CovergroupDeclParsing, ErrorCoverPointUnclosedBinsBlock) {
       "      bins a = {0};\n"
       "  endgroup\n"
       "endmodule\n");
-  // The unclosed coverpoint body swallows 'endgroup', so the covergroup runs
-  // out of source at line 7.
+  // No bins item opens with 'endgroup', so the body's missing '}' is reported
+  // there, on line 5.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected 'endgroup', got EOF", 7, "19.3"));
+      ReportedError(r.diags, "expected '}', got 'endgroup'", 5, "A.2.11"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
@@ -214,10 +214,10 @@ TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
       "      bins sel = binsof(cp1);\n"
       "  endgroup\n"
       "endmodule\n");
-  // The unclosed cross body swallows 'endgroup', so the covergroup runs out of
-  // source at line 9.
+  // No cross body item opens with 'endgroup', so the body's missing '}' is
+  // reported there, on line 7.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected 'endgroup', got EOF", 9, "19.3"));
+      ReportedError(r.diags, "expected '}', got 'endgroup'", 7, "A.2.11"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossMissingSemicolon) {
@@ -276,9 +276,10 @@ TEST(CovergroupDeclParsing, ErrorBinsofMissingCloseParen) {
       "    }\n"
       "  endgroup\n"
       "endmodule\n");
-  // The unbalanced paren is reported where the cross body closes, on line 7.
+  // The missing ')' is reported at the ';' on line 6, where binsof's operand
+  // ends and its ')' was due.
   EXPECT_TRUE(
-      ReportedError(r.diags, "missing ')' in covergroup item", 7, "19.3"));
+      ReportedError(r.diags, "missing ')' in covergroup item", 6, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, MultipleCovergroupDecls) {
@@ -584,7 +585,7 @@ TEST(CovergroupDeclParsing, CoverCross_BareIffGuardIsRejected) {
       "  covergroup cg;\n"
       "    a: coverpoint x;\n"
       "    b: coverpoint y;\n"
-      "    cross a, b iff en {\n"
+      "    cross a, b iff {\n"
       "      bins s = binsof(a);\n"
       "    }\n"
       "  endgroup\n"
@@ -592,6 +593,9 @@ TEST(CovergroupDeclParsing, CoverCross_BareIffGuardIsRejected) {
   EXPECT_TRUE(ReportedError(r.diags,
                             "a coverage guard is written 'iff ( expression )'",
                             5, "A.2.11"));
+  // The guard's omitted expression is not read out of the body that follows,
+  // so the bins selection in it is still read whole.
+  EXPECT_EQ(r.diags.size(), 1u);
 }
 
 // cross_body holds bins_selection, `bins_keyword bin_identifier =
@@ -621,11 +625,14 @@ TEST(CovergroupDeclParsing, BinsSelection_ArrayInCrossIsRejected) {
       "    b: coverpoint y;\n"
       "    cross a, b {\n"
       "      bins s[] = binsof(a);\n"
+      "      bins t[2] = binsof(b);\n"
       "    }\n"
       "  endgroup\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "a cross bin is not an array", 6, "A.2.11"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "a cross bin is not an array", 7, "A.2.11"));
 }
 
 // select_expression has no `default` form.
@@ -704,6 +711,159 @@ TEST(CovergroupDeclParsing, BinsOrOptions_WildcardTransitionAndSizedValue) {
               "    }\n"
               "  endgroup\n"
               "endmodule\n"));
+}
+
+// coverage_option names its member after the '.', and a '.' standing alone
+// names none.
+TEST(CovergroupDeclParsing, CoverageOption_DotWithoutMemberIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    option. = 3;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a coverage option is set as 'option.member = value'", 3,
+      "A.2.11"));
+}
+
+// coverage_spec_or_option is a cover_point, a cover_cross or a
+// coverage_option: a label that introduces neither keyword, a data type with
+// no label after it and an empty ';' are none of them.
+TEST(CovergroupDeclParsing, CovergroupItem_OtherThanSpecOrOptionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  covergroup cg;\n"
+      "    lbl : a;\n"
+      "    int x;\n"
+      "    ;\n"
+      "    coverpoint a;\n"
+      "  endgroup\n"
+      "endmodule\n");
+  for (int line : {4, 5, 6}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "a covergroup item is a coverpoint, a cross or a coverage "
+        "option",
+        line, "A.2.11"));
+  }
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+// bins_or_empty holds `{ attribute_instance } { bins_or_options ; }`: an
+// empty ';', a 'wildcard' with no bins_keyword and a bare expression are not
+// bins_or_options.
+TEST(CovergroupDeclParsing, BinsOrOptions_OtherThanBinsOrOptionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  covergroup cg;\n"
+      "    coverpoint a {\n"
+      "      bins b = {1};;\n"
+      "      wildcard a;\n"
+      "      a;\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  for (int line : {5, 6, 7}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "a coverpoint body item is a bins declaration or a coverage "
+        "option",
+        line, "A.2.11"));
+  }
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+// cross_body holds cross_body_items, each a function_declaration or a
+// bins_selection_or_option followed by ';': an empty ';' and a bare
+// expression are neither.
+TEST(CovergroupDeclParsing,
+     CrossBodyItem_OtherThanSelectionOrOptionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b;\n"
+      "  covergroup cg;\n"
+      "    cross a, b {\n"
+      "      bins s = binsof(a);;\n"
+      "      a;\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  for (int line : {5, 6}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "a cross body item is a bins selection, a coverage option or "
+        "a function declaration",
+        line, "A.2.11"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
+// A '}' ends a coverpoint body even where an item breaks off before it: the
+// bins missing its '=' is reported at the '}', and the body still closes
+// there.
+TEST(CovergroupDeclParsing, BinsOrOptions_BrokenItemBeforeCloseBrace) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  covergroup cg;\n"
+      "    coverpoint a { bins b }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=' in bins declaration", 4, "19.5.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// bins_selection writes '=' between its name and its select_expression.
+TEST(CovergroupDeclParsing, BinsSelection_MissingEqualsIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b;\n"
+      "  covergroup cg;\n"
+      "    cross a, b {\n"
+      "      bins s binsof(a);\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=' in bins declaration", 5, "19.5.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// Each item of a coverpoint or cross body ends with ';'. Where one is missing
+// before the next item, whatever kind of item that is, the next item is still
+// read; where it is missing before anything else, the parse reads past it to
+// the next ';'. Line 10 carries two reports: the option's ';', due where the
+// bins opens, and that bins' own, due at `a`.
+TEST(CovergroupDeclParsing, BodyItem_MissingSemicolonBeforeEachItemKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b;\n"
+      "  covergroup cg;\n"
+      "    coverpoint a {\n"
+      "      bins b1 = {1}\n"
+      "      bins b2 = {2}\n"
+      "      wildcard bins b3 = {3}\n"
+      "      (* note *) bins b4 = {4}\n"
+      "      option.weight = 2\n"
+      "      bins b5 = {5} a b;\n"
+      "    }\n"
+      "    cross a, b {\n"
+      "      bins s = binsof(a)\n"
+      "      function int f();\n"
+      "        return 0;\n"
+      "      endfunction\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  for (int line : {6, 7, 8, 9, 10, 14}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags, "missing ';' in covergroup item", line, "19.3"));
+  }
+  EXPECT_EQ(r.diags.size(), 7u);
 }
 
 }  // namespace

@@ -230,6 +230,10 @@ struct ClassMember {
   // embedded inheritance form `covergroup extends base ;`, the
   // covergroup_identifier of the base covergroup. Empty otherwise.
   std::string_view covergroup_extends_base;
+
+  // kCovergroup: the embedded covergroup's declaration as A.2.11 gives it
+  // (ast_covergroup.h), which §19.4 reads in the scope of the class.
+  CovergroupDecl* covergroup = nullptr;
 };
 
 struct InterfaceRef {

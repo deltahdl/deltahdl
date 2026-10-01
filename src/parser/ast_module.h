@@ -247,6 +247,7 @@ struct ImportItem {
 
 struct ModuleItem;
 struct ClassDecl;
+struct CovergroupDecl;
 
 struct GenerateCaseItem {
   std::vector<Expr*> patterns;
@@ -788,6 +789,10 @@ struct ModuleItem {
   // `covergroup extends base ;`, the covergroup_identifier of the base
   // covergroup being extended. Empty for a covergroup that is not derived.
   std::string_view covergroup_extends_base;
+
+  // kCovergroupDecl: the declaration as A.2.11 gives it -- formals, coverage
+  // event, coverpoints, crosses and options (ast_covergroup.h).
+  CovergroupDecl* covergroup = nullptr;
 };
 
 enum class ModuleDeclKind : uint8_t {

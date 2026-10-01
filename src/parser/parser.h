@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -16,6 +15,7 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -30,6 +30,9 @@ namespace delta {
 // §23.9: restores Parser::known_types_ and known_nettypes_ when a scope
 // closes; defined in parser/parser_type_name_scope.h.
 class TypeNameScope;
+// §19.3: the state a covergroup body is read with; defined in
+// parser/parser_covergroup_internal.h.
+struct CovergroupBodyState;
 
 // A.1.11: the report on an item an anonymous program does not admit.
 inline constexpr char kAnonymousProgramItemsMessage[] =
@@ -357,43 +360,69 @@ class Parser {
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void RejectDerivedCovergroupTail();
   void RejectNamedCovergroupExtends();
-  // Scan state shared by the tf_port-style formal-list scanners
-  // (ParseCovergroupFormalList / ParseSampleFormalList). A single
-  // classification step is performed by StepTfPortFormalScan.
-  struct TfPortFormalScan {
-    int depth = 1;
-    std::string_view pending;
-    SourceLoc pending_loc;
-    bool have_pending = false;
-    bool in_default = false;
-  };
-  void StepTfPortFormalScan(TfPortFormalScan& st,
-                            const std::function<void()>& flush,
-                            const std::function<bool()>& reject_direction);
-  void ParseCovergroupFormalList(std::vector<std::string>& names);
-  void ParseSampleFormalList(const std::vector<std::string>& covergroup_formals,
-                             std::vector<std::string>& sample_names);
-  void ParseBlockEventExpression();
-  void ParseHierarchicalBtfIdentifier();
+  // The syntactic level a coverage option or bins item stands at inside a
+  // covergroup body (§19.7, Table 19-2); the covergroup level itself takes
+  // every instance option.
+  enum class CovItemLevel : uint8_t { kCoverpoint, kCross };
+  void ParseCoverageFormalList(std::vector<FunctionArg>& args,
+                               std::string_view output_message,
+                               Subclause subclause);
+  void ParseCovergroupFormals(CovergroupBodyState& state);
+  void ParseCoverageEvent(CovergroupBodyState& state);
+  void ParseSampleFunctionEvent(CovergroupBodyState& state);
+  void ParseBlockEventExpression(std::vector<BlockEventTerm>& terms);
+  void ParseHierarchicalBtfIdentifier(std::vector<std::string_view>& path);
+  void ParseCovergroupItem(CovergroupBodyState& state);
+  void ParseLabelledCoverageSpec(CovergroupBodyState& state,
+                                 const DataType* data_type);
+  void RejectCovergroupItem();
+  bool ParseCoverageOption(CoverageOption& option);
+  void ParseCovergroupOption(CovergroupBodyState& state);
+  bool ParseItemLevelOption(CoverageOption& option,
+                            const CovergroupBodyState& state,
+                            CovItemLevel level);
+  void RejectFormalInTypeOption(const CoverageOption& option,
+                                const CovergroupBodyState& state);
+  void TakeCoverageName(CovergroupBodyState& state, std::string_view name,
+                        SourceLoc loc);
   bool IdentifierOpensCoverageLabel();
-  void ParseCoverpointDataType();
+  bool IdentifierOpensCoverPointWith();
+  DataType ParseCoverpointDataType();
   bool BraceOpensCoverpointBody();
-  void ParseCoverpointHead();
-  void ParseCoverageIffGuard();
-  // §19.7: skip one covergroup-body item. `seen_options` accumulates the
-  // covergroup-level coverage options already assigned in this definition so a
-  // repeated assignment of the same option can be flagged as an error.
-  void SkipCovergroupOptionAssignment(
-      const std::vector<std::string>& sample_formals,
-      std::unordered_set<std::string>& seen_options);
-  void SkipUnlabelledCoverpointItem();
-  void SkipLabelledCoverpointItem();
-  void SkipCovergroupItem(const std::vector<std::string>& sample_formals,
-                          std::unordered_set<std::string>& seen_options);
+  Expr* ParseCoverpointHead();
+  Expr* ParseCoverageIffGuard();
+  void ParseCoverPoint(CovergroupBodyState& state, std::string_view label,
+                       SourceLoc label_loc, const DataType* data_type);
+  bool OpensCoverageBodyItem();
+  void SkipCoverageItemTail();
+  void ExpectCoverageItemEnd();
+  void ExpectCoverageCloseParen();
+  bool ParseBinsOrOptions(BinsOrOptions& bins, CovergroupBodyState& state);
+  void ParseBinsValue(BinsOrOptions& bins);
+  void ParseCovergroupRangeList(std::vector<CovergroupValueRange>& ranges);
+  CovergroupValueRange ParseCovergroupValueRange();
+  bool AtTransRepetition();
+  TransRangeList ParseTransRangeList();
+  void ParseTransList(std::vector<TransSet>& sets);
+  void CheckTransitionBins(const BinsOrOptions& bins);
+  void ParseCoverCross(CovergroupBodyState& state, std::string_view label,
+                       SourceLoc label_loc);
   // §19.6: consume a cross's list_of_cross_items (positioned just after the
   // `cross` keyword) up to the optional `iff`/body, enforcing that it names at
-  // least two bare cover_point/variable identifiers and no direct expressions.
-  void ValidateCrossItemList();
+  // least two bare cover_point/variable identifiers and no direct expressions,
+  // and record each item it names.
+  void ValidateCrossItemList(std::vector<CrossItem>& items);
+  void ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state);
+  bool ParseBinsSelection(BinsSelection& bins);
+  SelectExpression* NewSelectExpression(SelectExpressionKind kind,
+                                        SourceLoc loc);
+  SelectExpression* ParseSelectExpression();
+  SelectExpression* ParseSelectConjunction();
+  SelectExpression* ParseSelectPostfix();
+  SelectExpression* ParseSelectPrimary();
+  SelectExpression* ParseSelectCondition();
+  void ParseSelectMatches(SelectExpression& select);
+  bool IdentifierIsCrossName();
 
   ModuleItem* ParseSpecifyBlock();
   void ParseSpecparamDecl(std::vector<ModuleItem*>& items);

@@ -623,6 +623,7 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
       // §19.4.1: carry the extended base covergroup name onto the class member
       // so a derived embedded covergroup can be recognized in class scope.
       member->covergroup_extends_base = temp[0]->covergroup_extends_base;
+      member->covergroup = temp[0]->covergroup;
     }
     members.push_back(member);
     return true;

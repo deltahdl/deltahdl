@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
 
@@ -321,6 +323,35 @@ TEST_F(VerifyParseTest, GetInstCoverageAtCrossLevelIsError) {
                             "coverage option 'option.get_inst_coverage' may "
                             "not be specified at the cross level",
                             7, "19.7"));
+}
+
+// §19.7.1: a type option is set with a constant expression, and a covergroup
+// formal takes its value only when an instance is built, so a type option
+// naming one -- at the covergroup, coverpoint or cross level, and as an
+// operand or a function's argument -- is an error; an instance option may name
+// it.
+TEST_F(VerifyParseTest, TypeOptionNamingCovergroupFormalIsError) {
+  Parse(R"(
+    module m;
+      bit v;
+      bit w;
+      covergroup cg (int k);
+        option.weight = k;
+        type_option.weight = k;
+        type_option.goal = $clog2(k);
+        a: coverpoint v { type_option.goal = k + 1; }
+        b: coverpoint w;
+        x: cross a, b { type_option.weight = k; }
+      endgroup
+    endmodule
+  )");
+  EXPECT_EQ(diag_.ErrorCount(), 4u);
+  for (uint32_t line : {7u, 8u, 9u, 11u}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              "a type option is set with a constant "
+                              "expression; covergroup formal 'k' is not one",
+                              line, "19.7.1"));
+  }
 }
 
 }  // namespace

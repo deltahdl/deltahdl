@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -145,6 +146,56 @@ TEST(CoverPointParsing, CoverpointWithTransitionListBins) {
       endgroup
     endmodule
   )"));
+}
+
+// §19.5: an unlabelled coverpoint over a single variable takes the variable's
+// name, and the clause's own example marks a label equal to that name as
+// invalid; a later label differing from it, and a label naming the variable
+// an earlier coverpoint covers under another name, are accepted.
+TEST_F(VerifyParseTest, CoverpointLabelEqualToImplicitNameIsError) {
+  Parse(R"(
+    module m;
+      covergroup cg (ref int x, ref int y, input int c);
+        coverpoint x;
+        x: coverpoint y;
+        b: coverpoint y;
+        cx: coverpoint x;
+        option.weight = c;
+      endgroup
+    endmodule
+  )");
+  EXPECT_EQ(diag_.ErrorCount(), 1u);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "the name 'x' already names a coverpoint or "
+                            "cross of covergroup 'cg'",
+                            5, "19.5"));
+}
+
+// §19.5 and §19.6: a coverpoint's name and a cross's name share the
+// covergroup's scope, so two labels alike, or a cross label equal to a
+// coverpoint's, each repeat a name already taken.
+TEST_F(VerifyParseTest, RepeatedCoverpointOrCrossLabelIsError) {
+  Parse(R"(
+    module m;
+      bit [1:0] v;
+      bit [1:0] w;
+      covergroup cg;
+        a: coverpoint v;
+        a: coverpoint w;
+        b: coverpoint w;
+        b: cross a, v;
+      endgroup
+    endmodule
+  )");
+  EXPECT_EQ(diag_.ErrorCount(), 2u);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "the name 'a' already names a coverpoint or "
+                            "cross of covergroup 'cg'",
+                            7, "19.5"));
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "the name 'b' already names a coverpoint or "
+                            "cross of covergroup 'cg'",
+                            9, "19.5"));
 }
 
 }  // namespace
