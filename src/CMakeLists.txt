@@ -127,6 +127,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/checker_instantiation.cpp
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
+    elaborator/covergroup_rules.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_binding.cpp
     elaborator/procedural_checker_instance.cpp

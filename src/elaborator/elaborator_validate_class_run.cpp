@@ -16,6 +16,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ValidateEmbeddedCovergroupAssign();
 
+  ValidateEmbeddedCovergroupRules();
+
   ValidateDerivedCovergroupBase();
 
   ValidateConstClassProperties();

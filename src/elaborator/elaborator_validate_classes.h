@@ -89,6 +89,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateOneClassDefaultKeyword(const ClassDecl* cls);
 
   void ValidateEmbeddedCovergroupAssign();
+  void ValidateEmbeddedCovergroupRules();
   void ValidateDerivedCovergroupBase();
 
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);

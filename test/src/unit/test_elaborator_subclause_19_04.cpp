@@ -409,4 +409,37 @@ TEST(EmbeddedCovergroup, AssignInARandsequenceCodeBlockOutsideNewMethodError) {
                             8, "19.4"));
 }
 
+// §19.4 forbids the assignment wherever the enclosing class is declared: in a
+// module, and in a package, as well as at compilation-unit scope.
+TEST(EmbeddedCovergroup, AssignOutsideNewInScopedClassError) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  class D;\n"
+      "    bit w;\n"
+      "    covergroup dg; coverpoint w; endgroup\n"
+      "    function new(); endfunction\n"
+      "    function void make(); dg = new; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class C;\n"
+      "    bit v;\n"
+      "    covergroup cg; coverpoint v; endgroup\n"
+      "    function new(); cg = new; endfunction\n"
+      "    function void make(); cg = new; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'dg' shall only be assigned "
+                            "inside the new() method of its class",
+                            6, "19.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            14, "19.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

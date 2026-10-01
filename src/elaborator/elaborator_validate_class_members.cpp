@@ -12,9 +12,11 @@
 #include <optional>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/covergroup_rules.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
@@ -299,11 +301,44 @@ static void CheckClassMethodsForCovergroupAssign(
   }
 }
 
+// Every class of the unit with the declarations of the scope it is declared
+// in: the unit's own items for a class at compilation-unit scope, or the items
+// of the module, interface, program, checker or package that declares it.
+static std::vector<std::pair<const ClassDecl*, const std::vector<ModuleItem*>*>>
+ClassesWithScopes(const CompilationUnit* unit) {
+  std::vector<std::pair<const ClassDecl*, const std::vector<ModuleItem*>*>>
+      classes;
+  for (const auto* cls : unit->classes)
+    classes.emplace_back(cls, &unit->cu_items);
+  auto add_scoped = [&](const std::vector<ModuleItem*>& items) {
+    for (const auto* item : items) {
+      if (item->kind == ModuleItemKind::kClassDecl) {
+        classes.emplace_back(item->class_decl, &items);
+      }
+    }
+  };
+  for (const auto* scopes :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* scope : *scopes) add_scoped(scope->items);
+  }
+  for (const auto* pkg : unit->packages) add_scoped(pkg->items);
+  return classes;
+}
+
+// §19.4 holds wherever the class is declared.
 void ElaboratorClassRules::ValidateEmbeddedCovergroupAssign() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto& [cls, scope_items] : ClassesWithScopes(unit_)) {
     std::unordered_set<std::string_view> cg_names = CollectCovergroupNames(cls);
     if (cg_names.empty()) continue;
     CheckClassMethodsForCovergroupAssign(cls, cg_names, diag_);
+  }
+}
+
+// §19.5 and §19.6 hold of an embedded covergroup as of one a module declares,
+// its names read from its class and the scope that declares the class.
+void ElaboratorClassRules::ValidateEmbeddedCovergroupRules() {
+  for (const auto& [cls, scope_items] : ClassesWithScopes(unit_)) {
+    ValidateEmbeddedCovergroups(cls, *scope_items, unit_, diag_);
   }
 }
 

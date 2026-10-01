@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_name_rules.h"
+#include "elaborator/covergroup_rules.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -741,6 +742,10 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                   n);
   };
 
+  // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
+  // the variables it may name are the ones a bare read may: the module's
+  // covergroups are checked against the same predicate.
+  ValidateModuleCovergroups(decl, var_types_, declared, diag_);
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
