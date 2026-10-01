@@ -100,25 +100,35 @@ TEST(ConstraintUnique, SingleMemberHasNoEffect) {
 
 // 18.5.4: no randc variable shall appear in the group. The elaborator rejects
 // a group naming one wherever it can tell the class of the object randomized,
-// in a class constraint and in an inline constraint called through a handle
-// or on the object itself. Called through an element of an array of handles,
-// the group reaches the solver, which finds it illegal and makes randomization
-// fail.
+// in a class constraint and in an inline constraint called through a handle in
+// a module procedure or on the object itself. Called through a handle local to
+// a method of another class, the group reaches the solver, which finds it
+// illegal and makes randomization fail; the same call with b rand succeeds.
 TEST(ConstraintUnique, InlineRandcMemberFails) {
-  const char* src =
-      "class C;\n"
-      "  rand byte a;\n"
-      "  randc byte b;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int ok;\n"
-      "  C o[1];\n"
-      "  initial begin\n"
-      "    o[0] = new;\n"
-      "    ok = o[0].randomize() with { unique {a, b}; };\n"
-      "  end\n"
-      "endmodule\n";
-  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+  auto design = [](const char* b_qualifier) {
+    return std::string(
+               "class C;\n"
+               "  rand byte a;\n  ") +
+           b_qualifier +
+           " byte b;\n"
+           "endclass\n"
+           "class H;\n"
+           "  function int go();\n"
+           "    C x;\n"
+           "    x = new;\n"
+           "    return x.randomize() with { unique {a, b}; };\n"
+           "  endfunction\n"
+           "endclass\n"
+           "module t;\n"
+           "  int ok;\n"
+           "  initial begin\n"
+           "    static H h = new;\n"
+           "    ok = h.go();\n"
+           "  end\n"
+           "endmodule\n";
+  };
+  EXPECT_EQ(RunAndGet(design("randc"), "ok"), 0u);
+  EXPECT_EQ(RunAndGet(design("rand"), "ok"), 1u);
 }
 
 // 18.5.4: all members of the group shall be of equivalent type. A byte and an
