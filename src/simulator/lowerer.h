@@ -14,6 +14,7 @@
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -304,6 +305,13 @@ class Lowerer {
   // instantiating the instance to queue rather than lowered as a process;
   // answers whether it was.
   bool KeepProceduralCheckerAssertion(const RtlirProcess& proc);
+  // §17.3 with §16.14.6.1: where `inst`, lowered under inst_prefix_, is a
+  // procedural checker instance, records under its prefix `child_prefix` the
+  // actuals ProceduralActualInInstantiatingScope rewrites, for its
+  // assertions to read in their formals' place, and enrols the names they
+  // read as sampled.
+  void RecordProceduralCheckerActuals(const RtlirModuleInst& inst,
+                                      const std::string& child_prefix);
   // §17.3: records the checker instantiations `proc`, lowered as `p`, holds,
   // each with the instance it names.
   void RecordCheckerInstantiations(const RtlirProcess& proc, Process* p);
@@ -364,6 +372,9 @@ class Lowerer {
   // §17.3: the prefix of the procedural checker instance being lowered, the
   // outermost one where checkers nest, and empty outside one.
   std::string procedural_checker_root_;
+  // §17.3: the actuals RecordProceduralCheckerActuals recorded, under the
+  // prefix of their procedural checker instance.
+  std::unordered_map<std::string, ActualsByFormal> procedural_checker_actuals_;
   // §17.3: the static assertions kept by KeepProceduralCheckerAssertion,
   // under the prefix of their procedural checker instance.
   std::unordered_map<std::string,

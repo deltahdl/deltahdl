@@ -716,16 +716,18 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   ElaborateProceduralConcurrentAssertions(item, mod, property_registry_, arena_,
                                           diag_);
   std::vector<ProceduralCheckerSite> sites;
-  for (Stmt* stmt : CheckerInstantiationsIn(item->body, diag_)) {
-    ModuleItem* inst = stmt->decl_item;
+  for (CheckerInstantiationSite& site :
+       CheckerInstantiationsIn(item->body, diag_)) {
+    ModuleItem* inst = site.stmt->decl_item;
     ModuleDecl* child = FindModuleInScope(inst->inst_module);
     if (child == nullptr) child = PackageCheckerNamedBy(inst, mod, unit_);
     if (!AdmitProceduralCheckerInstance(inst, child, mod, diag_)) continue;
     ElaborateModuleInst(inst, mod);
     mod->children.back().is_procedural = true;
+    mod->children.back().procedure_locals = std::move(site.locals);
     FillInferredCheckerDefaults(mod->children.back(),
                                 InferredInProcedure(item, mod), arena_);
-    sites.push_back({stmt, ScopedName(inst->inst_name)});
+    sites.push_back({site.stmt, ScopedName(inst->inst_name)});
   }
   bool infers = kind != RtlirProcessKind::kInitial;
   const ProcessBuildEnv kEnv{arena_, diag_, infers ? &func_decls_ : nullptr,

@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/assertion_body_slots.h"
@@ -11,6 +12,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 #include "simulator/assertion_read_names.h"
+#include "simulator/expr_walk.h"
 
 namespace delta {
 
@@ -93,6 +95,39 @@ Expr* ActualInInstantiatingScope(Expr* actual, const std::string& parent_prefix,
   ForEachTreeSlot(copy->property_actual,
                   [&kQ](Expr*& e) { e = Qualified(e, kQ); });
   return copy;
+}
+
+Expr* ProceduralActualInInstantiatingScope(
+    Expr* actual, const std::string& parent_prefix,
+    const std::vector<std::string_view>& locals, Arena& arena) {
+  if (actual == nullptr || actual->property_actual != nullptr ||
+      IsEventActual(actual)) {
+    return nullptr;
+  }
+  std::unordered_set<std::string_view> bare(locals.begin(), locals.end());
+  bool saved = false;
+  ForEachSubExpr(actual, [&](const Expr* sub) {
+    saved = saved || (sub->kind == ExprKind::kCast && sub->text == "const") ||
+            (sub->kind == ExprKind::kIdentifier && sub->scope_prefix.empty() &&
+             bare.count(sub->text) != 0);
+  });
+  if (!saved) return nullptr;
+  return Qualified(actual, {parent_prefix, bare, arena});
+}
+
+void SubstituteActualsInAssertion(Stmt& stmt, const ActualsByFormal& actuals,
+                                  Arena& arena) {
+  auto substitute = [&](Expr*& e) { e = SubstituteFormals(e, actuals, arena); };
+  substitute(stmt.assert_expr);
+  substitute(stmt.assert_disable_iff);
+  if (stmt.assert_property != nullptr) {
+    stmt.assert_property = CopiedTree(stmt.assert_property, arena);
+    ForEachTreeSlot(stmt.assert_property, substitute);
+  }
+  if (stmt.assert_sequence != nullptr) {
+    stmt.assert_sequence = arena.Create<ModuleItem>(*stmt.assert_sequence);
+    ForEachBodySlot(stmt.assert_sequence->seq_linear, substitute);
+  }
 }
 
 void CollectActualReadNames(Expr* actual,

@@ -534,6 +534,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   RecordCheckerActuals(inst, inst_prefix_, inst_prefix_ + inst_seg, ctx_,
                        arena_);
   RecordCheckerActualSampleScope(inst);
+  RecordProceduralCheckerActuals(inst, inst_prefix_ + inst_seg);
   std::unordered_map<std::string_view, std::string_view> inout_joins;
   for (const auto& binding : inst.port_bindings) {
     if (TryAliasInterfacePort(inst, binding)) continue;

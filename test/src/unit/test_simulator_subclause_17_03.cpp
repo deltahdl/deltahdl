@@ -578,4 +578,66 @@ TEST(ProceduralCheckerInstance, APackageCheckerIsInstantiatedInAProcedure) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 1u);
 }
 
+// §17.3 with §16.14.6.1: an actual reading the procedure's automatic v1 is
+// read with the value v1 had when the instance was reached, as the
+// check_loop example has it: each of the five posedges reaches `c` with v1
+// at 5, 10 and 20, and arr holds 1 at 5 and 20 alone.
+TEST(ProceduralCheckerInstance, AnAutomaticInTheActualIsSavedWhenQueued) {
+  EXPECT_EQ(CheckerCounts("module top;\n"
+                          "  logic clk = 0;\n"
+                          "  logic arr [20:0];\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  initial begin\n"
+                          "    for (int i = 0; i < 21; i++) arr[i] = 0;\n"
+                          "    arr[5] = 1; arr[20] = 1;\n"
+                          "  end\n"
+                          "  always @(posedge clk) begin\n"
+                          "    automatic int v1 = 0;\n"
+                          "    for (int i = 0; i < 4; i++) begin\n"
+                          "      v1 = v1 + 5;\n"
+                          "      if (i != 2) chk c(arr[v1], clk);\n"
+                          "    end\n"
+                          "  end\n"
+                          "  initial #52 $finish;\n"
+                          "endmodule\n",
+                          "c"),
+            std::make_pair(10ull, 5ull));
+}
+
+// §16.14.6.1 with §16.5.1: the static b beside the saved automatic k is
+// still read sampled at the tick: the procedure flips b before reaching the
+// instance, so the sampled 1, 0, 1, 0, 1 of the five posedges is judged
+// rather than the 0, 1, 0, 1, 0 standing when each is queued.
+TEST(ProceduralCheckerInstance, AStaticBesideTheSavedAutomaticIsSampled) {
+  EXPECT_EQ(CheckerCounts("module top;\n"
+                          "  logic clk = 0, b = 1;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  always @(posedge clk) begin\n"
+                          "    automatic int k = 1;\n"
+                          "    b = ~b;\n"
+                          "    chk c(b && k == 1, clk);\n"
+                          "  end\n"
+                          "  initial #52 $finish;\n"
+                          "endmodule\n",
+                          "c"),
+            std::make_pair(3ull, 2ull));
+}
+
+// §16.14.6.1: a const cast in the actual is saved as it stands when the
+// instance is queued, after the procedure flips b, so 0, 1, 0, 1, 0 is
+// judged where b's sampled value would give 1, 0, 1, 0, 1.
+TEST(ProceduralCheckerInstance, AConstCastInTheActualIsSavedWhenQueued) {
+  EXPECT_EQ(CheckerCounts("module top;\n"
+                          "  logic clk = 0, b = 1;\n"
+                          "  always #5 clk = ~clk;\n"
+                          "  always @(posedge clk) begin\n"
+                          "    b = ~b;\n"
+                          "    chk c(const'(b), clk);\n"
+                          "  end\n"
+                          "  initial #52 $finish;\n"
+                          "endmodule\n",
+                          "c"),
+            std::make_pair(2ull, 3ull));
+}
+
 }  // namespace

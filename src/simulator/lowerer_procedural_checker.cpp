@@ -1,9 +1,15 @@
 #include <string>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
+#include "simulator/assertion_read_names.h"
+#include "simulator/checker_actuals.h"
 #include "simulator/lowerer.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
@@ -28,9 +34,38 @@ bool Lowerer::KeepProceduralCheckerAssertion(const RtlirProcess& proc) {
     stmt->assert_clock = SubstituteClock(
         stmt->assert_clock, CheckerTreeActuals(inst_prefix_, ctx_), arena_);
   }
+  // §17.3 with §16.14.6.1: the instance's own assertions read in a formal's
+  // place the actual whose locals and const casts are saved as it is queued.
+  std::vector<const Expr*> saved_actuals;
+  auto it = procedural_checker_actuals_.find(inst_prefix_);
+  if (it != procedural_checker_actuals_.end()) {
+    SubstituteActualsInAssertion(*stmt, it->second, arena_);
+    for (const auto& entry : it->second) saved_actuals.push_back(entry.second);
+  }
   procedural_checker_assertions_[procedural_checker_root_].push_back(
-      StartProceduralCheckerAssertion(stmt, inst_prefix_, ctx_, arena_));
+      StartProceduralCheckerAssertion(stmt, inst_prefix_,
+                                      std::move(saved_actuals), ctx_, arena_));
   return true;
+}
+
+void Lowerer::RecordProceduralCheckerActuals(const RtlirModuleInst& inst,
+                                             const std::string& child_prefix) {
+  if (!inst.is_procedural || !inst.resolved->is_checker) return;
+  ActualsByFormal actuals;
+  std::unordered_set<std::string> names;
+  for (const RtlirPortBinding& binding : inst.port_bindings) {
+    Expr* actual = ProceduralActualInInstantiatingScope(
+        binding.connection, inst_prefix_, inst.procedure_locals, arena_);
+    if (actual == nullptr) continue;
+    actuals[binding.port_name] = actual;
+    CollectSampledOperandNames(actual, names);
+  }
+  if (actuals.empty()) return;
+  procedural_checker_actuals_[child_prefix] = std::move(actuals);
+  AssertionSampleScope scope;
+  scope.inst_prefix = inst_prefix_;
+  scope.names.assign(names.begin(), names.end());
+  assertion_sample_scopes_.push_back(std::move(scope));
 }
 
 // §17.3: a procedural checker instance's static assertions, and those of

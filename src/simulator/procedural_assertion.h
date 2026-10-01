@@ -10,6 +10,7 @@
 
 namespace delta {
 
+struct Expr;
 struct Process;
 class SimContext;
 struct Stmt;
@@ -52,11 +53,14 @@ struct ProceduralAssertionState {
 // the instantiation, where a static checker runs it as a process of its own.
 // `state` is the queue a concurrent one keeps, and nullptr for a deferred
 // one; `inst_prefix` is the checker's instance, which the statement's names,
-// its action block's among them, resolve in.
+// its action block's among them, resolve in. `saved_actuals` are the actuals
+// the statement reads in its formals' place whose const casts and procedure
+// variables §16.14.6.1 saves when an instance is queued.
 struct ProceduralCheckerAssertion {
   const Stmt* stmt = nullptr;
   ProceduralAssertionState* state = nullptr;
   std::string inst_prefix;
+  std::vector<const Expr*> saved_actuals;
 };
 
 // §17.3: the static assertion `stmt` of the procedural checker instance
@@ -64,8 +68,8 @@ struct ProceduralCheckerAssertion {
 // evaluates it in that instance, armed before the first clock tick as
 // StartProceduralAssertionMonitors arms one.
 const ProceduralCheckerAssertion* StartProceduralCheckerAssertion(
-    const Stmt* stmt, std::string_view inst_prefix, SimContext& ctx,
-    Arena& arena);
+    const Stmt* stmt, std::string_view inst_prefix,
+    std::vector<const Expr*> saved_actuals, SimContext& ctx, Arena& arena);
 
 // §17.3 with §16.14.6: places one pending instance of the concurrent
 // `assertion` in the procedural assertion queue of the current process, so

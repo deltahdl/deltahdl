@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -9,10 +10,18 @@
 
 namespace delta {
 
+// §17.3: a checker instantiation a procedure holds, with the variables the
+// procedure declares in the blocks and loops enclosing it, in scope there.
+struct CheckerInstantiationSite {
+  Stmt* stmt = nullptr;
+  std::vector<std::string_view> locals;
+};
+
 // §17.3: the checker instantiations the procedure body `body` holds, each a
 // procedural checker instance, in source order; one inside a fork block,
 // where none may stand, is reported and left out.
-std::vector<Stmt*> CheckerInstantiationsIn(Stmt* body, DiagEngine& diag);
+std::vector<CheckerInstantiationSite> CheckerInstantiationsIn(Stmt* body,
+                                                              DiagEngine& diag);
 
 // §17.3: whether the instantiation `item`, standing in a procedure of `mod`,
 // is elaborated as a procedural checker instance of `child`, the design

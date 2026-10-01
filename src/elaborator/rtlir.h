@@ -629,6 +629,10 @@ struct RtlirModuleInst {
   // §17.3: a procedural checker instance, instantiated by a statement of a
   // procedure rather than by a module item.
   bool is_procedural = false;
+  // §17.3 with §16.14.6.1: for a procedural instance, the variables the
+  // procedure declares in the blocks and loops enclosing the instantiation,
+  // whose value an actual reading one takes from the instance's queuing.
+  std::vector<std::string_view> procedure_locals;
 };
 
 struct RtlirImport {

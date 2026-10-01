@@ -219,11 +219,12 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
 }
 
 const ProceduralCheckerAssertion* StartProceduralCheckerAssertion(
-    const Stmt* stmt, std::string_view inst_prefix, SimContext& ctx,
-    Arena& arena) {
+    const Stmt* stmt, std::string_view inst_prefix,
+    std::vector<const Expr*> saved_actuals, SimContext& ctx, Arena& arena) {
   auto* assertion = arena.Create<ProceduralCheckerAssertion>();
   assertion->stmt = stmt;
   assertion->inst_prefix = inst_prefix;
+  assertion->saved_actuals = std::move(saved_actuals);
   if (stmt->is_concurrent_clocked) {
     assertion->state = StartMonitor(stmt, inst_prefix, ctx, arena);
   }
@@ -246,7 +247,14 @@ void EnqueueProceduralCheckerAssertion(
     Arena& arena) {
   ctx.CurrentProcess()->procedural_assertions.emplace(assertion.stmt,
                                                       assertion.state);
-  PlaceInstance(assertion.state, nullptr, ctx, arena);
+  // §16.14.6.1: the actuals are read here, in the procedure reaching the
+  // instantiation, whose variables they name.
+  auto* bindings = arena.Create<InstanceBindings>();
+  for (const Expr* actual : assertion.saved_actuals) {
+    BindSites(actual, *bindings, ctx, arena);
+  }
+  PlaceInstance(assertion.state, bindings->values.empty() ? nullptr : bindings,
+                ctx, arena);
 }
 
 void FlushProceduralAssertionQueue(Process& proc) {
