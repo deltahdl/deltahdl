@@ -17,6 +17,7 @@
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/coverage.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/exec_task.h"
 #include "simulator/net.h"

@@ -316,7 +316,7 @@ TEST(CovergroupInstanceSim, AutomaticBinsFromDeclaration) {
 TEST(CovergroupInstanceSim, SignedAndExpressionCoverpointsAutomaticBins) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
-                       "  int i; bit [1:0] v; int n, t;\n"
+                       "  byte i; bit [1:0] v; int n, t;\n"
                        "  covergroup cg;\n"
                        "    coverpoint i;\n"
                        "    coverpoint v ^ 2'b11;\n"

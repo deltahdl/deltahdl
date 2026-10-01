@@ -1,29 +1,20 @@
 #ifndef DELTA_ELABORATOR_COVERGROUP_VARIABLES_H
 #define DELTA_ELABORATOR_COVERGROUP_VARIABLES_H
 
-#include <string_view>
-
-#include "common/source_loc.h"
-#include "parser/ast_type.h"
-
 namespace delta {
 
 class Arena;
-struct CovergroupDecl;
+struct ModuleItem;
 struct RtlirModule;
+struct RtlirVariable;
 
-// §19.3: the declaration of the covergroup a variable declared of type `dt`
-// holds an instance of, read among the covergroups `mod` declares; null where
-// `dt` names no covergroup of the module.
-const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
-                                         const RtlirModule* mod);
-
-// §19.3: a covergroup with a clocking event samples its instance at each
-// occurrence of the event. Adds to `mod` an always process that waits on the
-// event and calls sample() on the instance the variable `var_name` holds.
-void AddCovergroupEventProcess(std::string_view var_name,
-                               const CovergroupDecl& cg, SourceLoc loc,
-                               RtlirModule* mod, Arena& arena);
+// §19.3: records in `var` the declaration of the covergroup its type names,
+// read among the covergroups `mod` declares. A covergroup with a clocking
+// event samples its instance at each occurrence of the event, so for such a
+// covergroup `mod` gains an always process that waits on the event and calls
+// sample() on the instance the variable declared by `item` holds.
+void BindCovergroupVariable(const ModuleItem& item, RtlirVariable& var,
+                            RtlirModule* mod, Arena& arena);
 
 }  // namespace delta
 

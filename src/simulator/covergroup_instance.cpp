@@ -17,6 +17,7 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 #include "simulator/evaluation.h"
@@ -27,8 +28,8 @@ namespace delta {
 
 namespace {
 
-// CoverBin lists every value a bin holds, so a range is expanded value by
-// value; this bounds how many values one range contributes.
+// CoverBin lists every value a bin holds, so a range or a coverpoint's span is
+// expanded value by value; this bounds how many values one of them gives.
 constexpr int64_t kMaxRangeValues = int64_t{1} << 16;
 
 struct ValueBounds {
@@ -173,7 +174,8 @@ void BuildCoverpoint(CovergroupInstance& inst, const CoverPointDecl& decl,
     }
   }
   ExcludeIgnoredAndIllegalValues(cp);
-  CoverageDB::AutoCreateBins(cp, bounds.min, bounds.max);
+  CoverageDB::AutoCreateBins(
+      cp, bounds.min, std::min(bounds.max, bounds.min + kMaxRangeValues - 1));
   inst.points.emplace_back(std::move(name), decl.expr);
 }
 

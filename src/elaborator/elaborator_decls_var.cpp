@@ -22,7 +22,6 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
-#include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -899,12 +898,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetVariableTypeInfo(item, var);
-  var.covergroup = DeclaredCovergroup(item->data_type, mod);
-  if (var.covergroup != nullptr &&
-      var.covergroup->event.kind == CoverageEventKind::kClocking) {
-    AddCovergroupEventProcess(item->name, *var.covergroup, item->loc, mod,
-                              arena_);
-  }
+  BindCovergroupVariable(*item, var, mod, arena_);
 
   ElaborateUnpackedDims(
       item, td_array_dims_,
