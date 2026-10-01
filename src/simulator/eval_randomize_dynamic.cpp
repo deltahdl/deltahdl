@@ -291,12 +291,12 @@ namespace {
 // drawn for.
 void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
                        const Logic4Vec& lv) {
-  auto aa = obj->assoc_properties.find(ri.array_base);
-  if (aa == obj->assoc_properties.end() || aa->second == nullptr) return;
-  if (aa->second->is_string_key) {
-    aa->second->str_data[ri.str_key] = lv;
+  // The array the element was collected from holds it under its key.
+  AssocArrayObject* aa = obj->assoc_properties.at(ri.array_base);
+  if (aa->is_string_key) {
+    aa->str_data[ri.str_key] = lv;
   } else {
-    aa->second->int_data[ri.int_key] = lv;
+    aa->int_data[ri.int_key] = lv;
   }
 }
 
@@ -304,14 +304,10 @@ void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
 // the property holds, the other members left as they were.
 void WriteStructMember(ClassObject* obj, const RandInfo& ri,
                        const Logic4Vec& lv) {
-  auto whole = obj->properties.find(ri.struct_base);
-  if (whole == obj->properties.end() ||
-      whole->second.width < ri.struct_offset + ri.var.width) {
-    return;
-  }
-  DepositBitField(whole->second, ri.struct_offset, lv, ri.var.width);
-  obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] =
-      whole->second;
+  // The property the structure's layout came from holds the whole value.
+  Logic4Vec& whole = obj->properties.at(ri.struct_base);
+  DepositBitField(whole, ri.struct_offset, lv, ri.var.width);
+  obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] = whole;
 }
 
 // The value `lv` drawn for `ri`, written where the variable is held.

@@ -117,10 +117,10 @@ struct RandInfo {
 };
 
 // §18.4: the random variables of the rand member `m` of `level` where it is
-// an unpacked structure: one per integral member its typedef declares rand or
+// an unpacked structure: one per integral member its type declares rand or
 // randc, named `h1.addr`, its other members keeping their values. False,
-// adding nothing, where `m` holds no unpacked structure of a typedef the
-// class chain declares. Defined in eval_randomize_struct.cpp.
+// adding nothing, where `m` holds no unpacked structure of a named type.
+// Defined in eval_randomize_struct.cpp.
 bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
                           SimContext& ctx, std::vector<RandInfo>& out);
 

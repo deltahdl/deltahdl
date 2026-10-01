@@ -77,6 +77,10 @@ struct StructFieldInfo {
   // a member's type was read as signed by its kind alone, so a signed logic
   // member typed unsigned.
   bool is_signed = false;
+  // §18.4: whether the member's declaration wrote rand or randc, so that a
+  // rand variable of an unpacked structure randomizes it.
+  bool is_rand = false;
+  bool is_randc = false;
   // §7.2.1: the layout of this field's own type when it is itself a struct or
   // union, so a nested member is reachable by its dotted path. Null for
   // scalars.

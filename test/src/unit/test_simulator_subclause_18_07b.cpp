@@ -102,4 +102,29 @@ TEST(InlineConstraintsRun, AForeachIteratesAnArrayOfTheCallersScope) {
   EXPECT_EQ(out, "0 49\n");
 }
 
+// §18.7 with §18.5.7.1: a foreach in an inline block may iterate a queue of
+// the scope containing the call too, its elements read as state.
+TEST(InlineConstraintsRun, AForeachIteratesAQueueOfTheCallersScope) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  bit [3:0] banned[$] = '{1, 2, 3};\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (40) begin\n"
+      "      if (c.randomize() with {\n"
+      "            foreach (banned[i]) x != banned[i]; x < 5; } != 1) bad++;\n"
+      "      if (c.x inside {1, 2, 3} || c.x >= 5) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace

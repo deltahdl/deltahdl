@@ -76,6 +76,10 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     // it, the modifier where one was written and the kind's default where
     // none was (ApplyMemberType in parser_aggregate_types.cpp).
     fi.is_signed = m.is_signed;
+    // §18.4: the members the type declares random, which a rand variable of
+    // an unpacked structure of it has randomized.
+    fi.is_rand = m.is_rand;
+    fi.is_randc = m.is_randc;
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
       fi.elem_count = UnpackedMemberCount(m);

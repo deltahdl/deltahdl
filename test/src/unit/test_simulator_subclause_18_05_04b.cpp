@@ -105,4 +105,34 @@ TEST(UniqueConstraintRun, ASliceContributesEachElementItSelects) {
   EXPECT_EQ(out, "0\n");
 }
 
+// §18.5.4: a whole unpacked array in a unique group adds every element, and a
+// slice written high index first selects the same elements as one written
+// low first: the four elements of a, two bits each, take all four values,
+// and c[3] and c[2] differ.
+TEST(UniqueConstraintRun, AWholeArrayAndAReversedSliceAddTheirElements) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [1:0] a[4];\n"
+      "  rand bit [1:0] c[4];\n"
+      "  constraint u { unique {a}; unique {c[3:2]}; c[2] == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  bit [3:0] seen;\n"
+      "  initial begin\n"
+      "    static C k = new;\n"
+      "    repeat (20) begin\n"
+      "      if (k.randomize() != 1) bad++;\n"
+      "      seen = 0;\n"
+      "      foreach (k.a[i]) seen[k.a[i]] = 1;\n"
+      "      if (seen != 4'hF || k.c[3] == 1) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace

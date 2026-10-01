@@ -385,4 +385,60 @@ TEST(RandQueueRun, AnAssociativeArrayRandomizesItsElementsKeepingItsKeys) {
   EXPECT_EQ(out, "1 2 1 1 6 10\n");
 }
 
+// §18.4: with no constraint on its size, a rand dynamic array of handles
+// keeps its size and its objects, each randomized.
+TEST(RandQueueRun, AnArrayOfHandlesWithoutASizeConstraintKeepsItsSize) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class L;\n"
+      "  rand bit [7:0] v;\n"
+      "  constraint k { v inside {[1:9]}; }\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand L arr[];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.arr = new[2];\n"
+      "    c.arr[0] = new; c.arr[1] = new;\n"
+      "    c.arr[0].v = 200; c.arr[1].v = 200;\n"
+      "    $display(\"%0d %0d %0d\", c.randomize(), c.arr.size(),\n"
+      "             c.arr[0].v inside {[1:9]} && c.arr[1].v inside {[1:9]});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 1\n");
+}
+
+// §18.4: the structure may be of a type declared outside the class, and a
+// member it declares rand that is an array, which is no integral variable
+// of its bits, is left as it is.
+TEST(RandPackedStructRun, AModuleTypedefsRandMembersAreRandomized) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct {\n"
+      "  rand int addr;\n"
+      "  int crc;\n"
+      "  rand bit [3:0] lanes[2];\n"
+      "} header;\n"
+      "class P;\n"
+      "  rand header h1;\n"
+      "  constraint c { h1.addr inside {[7:9]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static P p = new;\n"
+      "    p.h1.crc = 77;\n"
+      "    repeat (10) begin\n"
+      "      if (p.randomize() != 1 || !(p.h1.addr inside {[7:9]})) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", bad, p.h1.crc);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 77\n");
+}
+
 }  // namespace
