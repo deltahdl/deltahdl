@@ -30,7 +30,8 @@ constexpr int kMaxTypedefHops = 16;
 // block, subroutine or statement -- maps each name it declares to the type
 // written for it, a function's being its return type; each typedef it
 // declares to the type it names; each instance it holds to the module that
-// instance instantiates; and keeps the package imports it holds.
+// instance instantiates; each named generate block it holds to the block's
+// items; and keeps the package imports it holds.
 struct Scope {
   explicit Scope(const Scope* enclosing, const ClassDecl* body = nullptr)
       : outer(enclosing), cls(body) {}
@@ -40,6 +41,7 @@ struct Scope {
   std::unordered_map<std::string_view, const DataType*> names;
   std::unordered_map<std::string_view, const DataType*> types;
   std::unordered_map<std::string_view, std::string_view> instances;
+  std::unordered_map<std::string_view, const std::vector<ModuleItem*>*> blocks;
   std::vector<const ImportItem*> imports;
 };
 
@@ -51,6 +53,29 @@ std::vector<const ClassDecl*> EnclosingClasses(const Scope* s) {
     if (s->cls != nullptr) chain.insert(chain.begin(), s->cls);
   }
   return chain;
+}
+
+bool IsGenerateConstruct(ModuleItemKind kind) {
+  return kind == ModuleItemKind::kGenerateFor ||
+         kind == ModuleItemKind::kGenerateIf ||
+         kind == ModuleItemKind::kGenerateCase;
+}
+
+// Records in `scope` the named generate blocks of the construct `item`: a
+// loop's or a branch's own block, each else branch chained after it, and each
+// case item's block. A block named by §27.6's genblk<n> rule is left out,
+// since §23.6 lets no name from outside the block reach into it.
+void DeclareGenerateBlocks(const ModuleItem& item, Scope& scope) {
+  for (const ModuleItem* g = &item; g != nullptr; g = g->gen_else) {
+    if (!g->name.empty() && !g->name_is_generated) {
+      scope.blocks[g->name] = &g->gen_body;
+    }
+    for (const auto& ci : g->gen_case_items) {
+      if (!ci.label.empty() && !ci.name_is_generated) {
+        scope.blocks[ci.label] = &ci.body;
+      }
+    }
+  }
 }
 
 // Records in `scope` what `item` declares. A forward typedef, `typedef class
@@ -76,6 +101,7 @@ void DeclareItem(const ModuleItem& item, Scope& scope) {
       scope.imports.push_back(&item.import_item);
       break;
     default:
+      if (IsGenerateConstruct(item.kind)) DeclareGenerateBlocks(item, scope);
       break;
   }
 }
@@ -84,12 +110,6 @@ void DeclareItems(const std::vector<ModuleItem*>& items, Scope& scope) {
   for (const auto* item : items) {
     if (item != nullptr) DeclareItem(*item, scope);
   }
-}
-
-bool IsGenerateConstruct(ModuleItemKind kind) {
-  return kind == ModuleItemKind::kGenerateFor ||
-         kind == ModuleItemKind::kGenerateIf ||
-         kind == ModuleItemKind::kGenerateCase;
 }
 
 // §18.7 reads the names of an inline constraint block first in the class of
@@ -259,21 +279,45 @@ class InlineUniqueWalk {
     return nullptr;
   }
 
-  // The module `e` names as an instance: an instance a scope from `s` outward
-  // holds, an element of an array of instances, or an instance inside the
-  // module of another.
-  const ModuleDecl* InstanceOf(const Expr* e, const Scope* s) const {
-    if (e->kind == ExprKind::kSelect) return InstanceOf(e->base, s);
+  // The scope of the module named `name`, or null where none has that name.
+  const Scope* ModuleScopeNamed(std::string_view name) const {
+    const ModuleDecl* decl = FindModule(name);
+    return decl == nullptr ? nullptr : &ModuleScope(decl);
+  }
+
+  // The scope a name of `scope` itself opens: an instance's module, or a named
+  // generate block, read with `scope` around it. Null for any other name.
+  const Scope* ChildScope(std::string_view name, const Scope& scope) const {
+    auto inst = scope.instances.find(name);
+    if (inst != scope.instances.end()) return ModuleScopeNamed(inst->second);
+    auto blk = scope.blocks.find(name);
+    if (blk == scope.blocks.end()) return nullptr;
+    auto& block = block_scopes_.emplace_back(std::make_unique<Scope>(&scope));
+    DeclareItems(*blk->second, *block);
+    return block.get();
+  }
+
+  // The scope `e` names as the leading part of a hierarchical name (§23.6): an
+  // instance or a named generate block a scope from `s` outward holds, an
+  // element of an array of either, one nested inside another, or, where no
+  // scope declares the name at all, a module above named upward by its own
+  // name (§23.8). A name a scope declares as anything else is no scope.
+  const Scope* NamedScope(const Expr* e, const Scope* s) const {
+    if (e->kind == ExprKind::kSelect) return NamedScope(e->base, s);
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
-      const ModuleDecl* outer = InstanceOf(e->lhs, s);
-      return outer == nullptr ? nullptr
-                              : InstanceOf(e->rhs, &ModuleScope(outer));
+      const Scope* outer = NamedScope(e->lhs, s);
+      return outer == nullptr ? nullptr : ChildScope(e->rhs->text, *outer);
     }
     for (; s != nullptr; s = s->outer) {
-      auto it = s->instances.find(e->text);
-      if (it != s->instances.end()) return FindModule(it->second);
+      if (s->cls != nullptr) {
+        if (FindMemberInClass(s->cls, e->text, unit_) != nullptr)
+          return nullptr;
+        continue;
+      }
+      if (s->names.count(e->text) > 0) return nullptr;
+      if (const Scope* child = ChildScope(e->text, *s)) return child;
     }
-    return nullptr;
+    return ModuleScopeNamed(e->text);
   }
 
   const ClassDecl* AccessClass(const Expr* access, const Scope* s) const {
@@ -283,8 +327,8 @@ class InlineUniqueWalk {
       if (chain.empty()) {
         return NameClass(access->rhs->text, &PackageScope(access->lhs->text));
       }
-    } else if (const ModuleDecl* inst = InstanceOf(access->lhs, s)) {
-      return NameClass(access->rhs->text, &ModuleScope(inst));
+    } else if (const Scope* named = NamedScope(access->lhs, s)) {
+      return NameClass(access->rhs->text, named);
     } else if (const ClassDecl* object = Resolve(access->lhs, s)) {
       chain = {object};
     }
@@ -425,6 +469,10 @@ class InlineUniqueWalk {
       module_scopes_;
   mutable std::unordered_map<std::string_view, std::unique_ptr<Scope>>
       package_scopes_;
+  // The scopes of generate blocks a hierarchical name has been read through.
+  // Each is read with the scope declaring the block around it, which lives no
+  // longer than the walk of that scope, so none is reused across lookups.
+  mutable std::vector<std::unique_ptr<Scope>> block_scopes_;
 };
 
 }  // namespace

@@ -569,4 +569,113 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughPackageHandleRejected) {
   }
 }
 
+// 18.5.4 with 18.7 and 23.8: a hierarchical name may start with the name of a
+// module above, and the group is checked against the class of the handle it
+// reaches there. A name a scope declares is that declaration and no module's,
+// whether the scope is a class whose property it names or a module whose
+// variable a method of a class inside it reads.
+TEST(UniqueMemberForms, InlineRandcMemberThroughUpwardReferenceRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "class W;\n"
+             "  C sub;\n"
+             "endclass\n"
+             "module child;\n"
+             "  initial void'(t.x.randomize() with { unique {a, b}; });\n"
+             "endmodule\n"
+             "module t;\n"
+             "  C x;\n"
+             "  W wm;\n"
+             "  child u();\n"
+             "  class H;\n"
+             "    W own;\n"
+             "    function int go();\n"
+             "      return own.sub.randomize() with { unique {a, b}; }\n"
+             "           + wm.sub.randomize() with { unique {a, b}; };\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+  for (uint32_t line : {9u, 18u, 19u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7 and 27.6: a named generate block is a scope a hierarchical
+// name reaches into -- a conditional block, a case item's block, an element of
+// a loop's blocks, or a block inside another instance -- and the group is
+// checked against the class of the handle declared there.
+TEST(UniqueMemberForms, InlineRandcMemberThroughGenerateBlockHandleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "endclass\n"
+             "module mid;\n"
+             "  if (1) begin : gb\n"
+             "    C h;\n"
+             "  end\n"
+             "endmodule\n"
+             "module m;\n"
+             "  if (1) begin : g\n"
+             "    C h;\n"
+             "  end else begin : ge\n"
+             "    C h;\n"
+             "  end\n"
+             "  case (1)\n"
+             "    1: begin : k\n"
+             "      C h;\n"
+             "    end\n"
+             "  endcase\n"
+             "  for (genvar i = 0; i < 2; i++) begin : gl\n"
+             "    C h;\n"
+             "  end\n"
+             "  mid u();\n"
+             "  initial begin\n"
+             "    void'(g.h.randomize() with { unique {a, b}; });\n"
+             "    void'(k.h.randomize() with { unique {a, b}; });\n"
+             "    void'(gl[1].h.randomize() with { unique {a, b}; });\n"
+             "    void'(u.gb.h.randomize() with { unique {a, b}; });\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+  for (uint32_t line : {26u, 27u, 28u, 29u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a uniqueness constraint member shall not be a randc variable", line,
+        "18.5.4"));
+  }
+}
+
+// 18.5.4 with 18.7: a receiver whose name resolves to no declaration and no
+// module has no class to read the group's names in, so the uniqueness rule
+// reports nothing of its own there; resolving the name is left to the rules
+// of 23.8.
+TEST(UniqueMemberForms, InlineReceiverNamingNothingGetsNoUniquenessReport) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  rand bit [1:0] a;\n"
+      "  randc bit [1:0] b;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial void'(nosuch.x.randomize() with { unique {a, b}; });\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 6,
+      "18.5.4"));
+}
+
 }  // namespace
