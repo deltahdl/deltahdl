@@ -199,4 +199,20 @@ TEST(ProceduralCheckerInstantiation, OneInstanceToAnInstantiation) {
                             7, "A.4.1.4"));
 }
 
+// §17.3 with §23.3.2: an instantiation in a procedure naming no design
+// element is reported as one written as a module item is.
+TEST(ProceduralCheckerInstantiation, AnUnknownNameIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic clk, a;\n"
+      "  always @(posedge clk) begin\n"
+      "    nochk c(a, clk);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'nochk'", 4,
+                            "23.3.2"));
+}
+
 }  // namespace

@@ -551,4 +551,31 @@ TEST(ProceduralCheckerInstance, ANestedStaticInstanceFollowsItsAncestor) {
             std::make_pair(2ull, 1ull));
 }
 
+// §17.3 with §17.2: a procedural instance may name a checker a package
+// declares, found through the package scope as a static instance's is, and
+// behaves as the first case's does.
+TEST(ProceduralCheckerInstance, APackageCheckerIsInstantiatedInAProcedure) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "package p;\n"
+      "  checker chk(logic a, logic clk);\n"
+      "    int pass = 0, fail = 0;\n"
+      "    a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
+      "  endchecker\n"
+      "endpackage\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1, en = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always @(posedge clk) begin\n"
+      "    if (en) p::chk c(a, clk);\n"
+      "  end\n"
+      "  initial begin #12 a = 0; #10 en = 0; #10 a = 1; #10 en = 1; "
+      "#10 $finish; end\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 1u);
+}
+
 }  // namespace
