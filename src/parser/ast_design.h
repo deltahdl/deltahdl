@@ -15,6 +15,8 @@
 
 namespace delta {
 
+struct ClassMember;
+
 // One identifier of a bind target and the constant_bit_select written after
 // it. A.9.3 spells hierarchical_identifier as `[ $root . ] { identifier
 // constant_bit_select . } identifier` and A.1.4 puts one more
@@ -110,20 +112,19 @@ struct ExternalConstraintBlock {
   // 'static' qualification must match the completing prototype's, or be absent
   // on both.
   bool is_static = false;
-  // 18.5.1: the top-level relation expressions of the external block's body,
-  // captured so elaboration can complete the matching prototype with them. A
-  // prototype so completed then constrains randomization like an in-class
-  // constraint block; a prototype left without a block keeps an empty set and
-  // behaves as an empty constraint (equivalent to the constant expression 1).
-  std::vector<Expr*> constraint_exprs;
-  // 18.5.13: the inner relation of each soft constraint of the body, carried
-  // to the prototype as its own soft constraints, whose priority (18.5.13.1)
-  // is the prototype's place in the class.
-  std::vector<Expr*> constraint_soft_exprs;
-  // 18.5.1 with 26.2: the package that declares the block, empty for a block
-  // at compilation-unit scope. The block shares this scope with the class it
-  // completes, so the class is looked up among the package's classes.
-  std::string_view package_name;
+  // 18.5.1: the external block's body, scanned into a constraint member exactly
+  // as an in-class block is, with every list that scan fills: relations, soft
+  // relations, distributions, uniqueness groups, foreach and solve-before
+  // constraints, disable soft directives and function calls. Elaboration
+  // carries all of it onto the prototype the block completes, which then
+  // constrains randomization like an in-class block; a prototype left without
+  // a block behaves as an empty constraint (equivalent to the constant 1).
+  ClassMember* body = nullptr;
+  // 18.5.1 with A.1.11: the item list of the scope that declares the block, a
+  // package, module, interface, program or generate block, or null for a
+  // block at compilation-unit scope. The block shares this scope with the
+  // class it completes, so the class is looked up among these items.
+  const std::vector<ModuleItem*>* scope_items = nullptr;
 };
 
 struct CompilationUnit {

@@ -69,11 +69,7 @@ void FilterAnonymousProgramItems(DiagEngine& diag,
     // ModuleItemKind a definition does, so the kind cannot tell them apart.
     // ModuleItem::is_extern is what does.
     if (!IsAnonymousProgramItemKind(item->kind) || item->is_extern) {
-      diag.Error(item->loc,
-                 "an anonymous program may contain only task, function, class, "
-                 "interface class, covergroup, and class constructor "
-                 "declarations",
-                 Subclause("A.1.11"));
+      diag.Error(item->loc, kAnonymousProgramItemsMessage, Subclause("A.1.11"));
       continue;
     }
     item->from_anonymous_program = true;
@@ -401,7 +397,8 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   return stmt;
 }
 
-void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
+void Parser::ParseOutOfBlockConstraint(
+    CompilationUnit* unit, const std::vector<ModuleItem*>* scope_items) {
   // 18.5.1: external constraint block, declared outside its enclosing class
   // with the class scope resolution operator. Record the class/name pair and
   // its location so elaboration can pair it with a prototype and check its
@@ -432,25 +429,16 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Expect(TokenKind::kColonColon, Subclause("18.5.1"));
   std::string_view constraint_name = ExpectIdentifier(Subclause("18.5.1")).text;
   Expect(TokenKind::kLBrace, Subclause("18.5.1"));
-  // 18.5.1: capture the block's relations so elaboration can complete the
-  // matching prototype with them. The body is scanned exactly like an in-class
-  // constraint block, using a scratch member to collect the relations.
+  // 18.5.1: capture the block's body so elaboration can complete the matching
+  // prototype with it. The body is scanned exactly like an in-class constraint
+  // block, into a member of its own that the block keeps whole.
   auto* body = arena_.Create<ClassMember>();
   body->kind = ClassMemberKind::kConstraint;
   ScanConstraintBodyRelations(body);
   if (unit) {
-    ExternalConstraintBlock ext{class_name,
-                                constraint_name,
-                                loc,
-                                is_initial,
-                                is_extends,
-                                is_final,
-                                is_static,
-                                std::move(body->constraint_exprs),
-                                std::move(body->constraint_soft_exprs),
-                                current_package_ != nullptr
-                                    ? current_package_->name
-                                    : std::string_view{}};
+    ExternalConstraintBlock ext{
+        class_name, constraint_name, loc,  is_initial, is_extends,
+        is_final,   is_static,       body, scope_items};
     unit->external_constraints.push_back(std::move(ext));
   }
 }
@@ -479,7 +467,7 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
     return true;
   }
   if (Check(TokenKind::kKwConstraint)) {
-    ParseOutOfBlockConstraint(unit);
+    ParseOutOfBlockConstraint(unit, nullptr);
     return true;
   }
   return false;
@@ -626,7 +614,7 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   }
 
   if (Check(TokenKind::kKwStatic)) {
-    ParseOutOfBlockConstraint(unit);
+    ParseOutOfBlockConstraint(unit, nullptr);
     return true;
   }
 
@@ -819,21 +807,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
     return true;
   }
 
-  if (Check(TokenKind::kKwConstraint)) {
-    ParseOutOfBlockConstraint(current_compilation_unit_);
-    return true;
-  }
-  if (Check(TokenKind::kKwStatic)) {
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Check(TokenKind::kKwConstraint)) {
-      lexer_.RestorePos(saved);
-      ParseOutOfBlockConstraint(current_compilation_unit_);
-      return true;
-    }
-    lexer_.RestorePos(saved);
-  }
-  return false;
+  return TryParseExternConstraintItem(items);
 }
 
 PackageDecl* Parser::ParsePackageDecl() {

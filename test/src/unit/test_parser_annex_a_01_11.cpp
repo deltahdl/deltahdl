@@ -416,6 +416,12 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramWithTypedef) {
   ExpectAnonymousProgramExcludes("typedef int anon_int_t;");
 }
 
+// An extern_constraint_declaration is a package_or_generate_item_declaration
+// and no anonymous_program_item.
+TEST(PackageItemsParsing, ErrorAnonymousProgramWithExternalConstraintBlock) {
+  ExpectAnonymousProgramExcludes("constraint C::p { 1; }");
+}
+
 // A module_instantiation is a module_or_generate_item and no
 // anonymous_program_item; A.1.11 does not admit it even as a package_item.
 // The parser reads `m u0();` as a hierarchical_instance from its shape alone,

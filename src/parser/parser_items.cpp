@@ -590,6 +590,9 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   // Each branch parses one module_or_generate_item form; the shared
   // AttachAttrs is applied once after the dispatch. The data-declaration
   // fallback attaches its own attributes, so it returns early.
+  if (TryParseExternConstraintItem(items)) {
+    return;
+  }
   if (TryParseKeywordItem(items)) {
     ApplyAssertionLabel(items, before, assertion_label);
   } else if (Check(TokenKind::kKwParameter) ||

@@ -248,4 +248,35 @@ void Parser::RejectInstInProgram(SourceLoc loc, std::string_view cell,
   diag_.Error(loc, msg, Subclause("24.3"));
 }
 
+// 18.5.1 with A.1.11: an extern_constraint_declaration is a
+// package_or_generate_item_declaration, which a package, module, interface,
+// program and generate block reach, so the block is read there and records the
+// body's items as its scope. A.1.8's checker items and A.1.11's
+// anonymous_program_item leave it out; there it is reported and read without
+// being recorded, so that the body resumes after it.
+bool Parser::TryParseExternConstraintItem(std::vector<ModuleItem*>& items) {
+  if (Check(TokenKind::kKwStatic)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    bool is_constraint = Check(TokenKind::kKwConstraint);
+    lexer_.RestorePos(saved);
+    if (!is_constraint) return false;
+  } else if (!Check(TokenKind::kKwConstraint)) {
+    return false;
+  }
+  bool admitted = true;
+  if (InCheckerBody()) {
+    RejectInCheckerBody(
+        "an external constraint block is not an item of a checker");
+    admitted = false;
+  } else if (in_anonymous_program_) {
+    diag_.Error(CurrentLoc(), kAnonymousProgramItemsMessage,
+                Subclause("A.1.11"));
+    admitted = false;
+  }
+  ParseOutOfBlockConstraint(admitted ? current_compilation_unit_ : nullptr,
+                            &items);
+  return true;
+}
+
 }  // namespace delta

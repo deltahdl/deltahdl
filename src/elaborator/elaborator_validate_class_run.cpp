@@ -38,6 +38,11 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   constraints.ValidateConstraintBlockNames();
 
+  // 18.5.1: complete each prototype with its external block's body before the
+  // checks on a constraint's contents, so those checks reach the block, and so
+  // randomization applies it.
+  constraints.CompleteExternalConstraints();
+
   constraints.ValidateForeachConstraintDims();
 
   constraints.ValidateDistConstraints();
@@ -53,10 +58,6 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   constraints.ValidateBuiltinRandomizationMethods();
 
   constraints.ValidateExternalConstraints();
-
-  // 18.5.1: once the external blocks are validated, complete each prototype by
-  // attaching its external block's relations so randomization applies them.
-  constraints.CompleteExternalConstraints();
 
   constraints.ValidateConstraintInheritance();
 

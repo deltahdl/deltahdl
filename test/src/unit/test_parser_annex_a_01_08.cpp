@@ -643,6 +643,20 @@ TEST(CheckerItemsParsing, CheckerClassDeclarationRejected) {
       r.diags, "a class declaration is not an item of a checker", 2, "A.1.8"));
 }
 
+// An extern_constraint_declaration is A.1.11's
+// package_or_generate_item_declaration's, and no checker item.
+TEST(CheckerItemsParsing, CheckerExternalConstraintBlockRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  constraint k::p { 1; }\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an external constraint block is not an item of a checker", 2,
+      "A.1.8"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->external_constraints.empty());
+}
+
 // Neither parameter_declaration nor local_parameter_declaration is a checker
 // item, and A.1.2's checker_declaration carries no parameter_port_list: the
 // elaboration-time constants a checker takes are formal arguments, as §17.9's

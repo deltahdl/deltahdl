@@ -115,4 +115,159 @@ TEST(ExternalConstraintBlocksRun, ABlockInAPackageCompletesThePackagesClass) {
   EXPECT_EQ(RunCapture(src, f), "32 1\n");
 }
 
+// 18.5.1 with A.1.11: a block beside a class in a module completes that
+// class's prototype, so x is 5 on every draw.
+TEST(ExternalConstraintBlocksRun, ABlockInAModuleCompletesTheModulesClass) {
+  const char* src =
+      "module t;\n"
+      "  class C;\n"
+      "    rand bit [3:0] x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "  constraint C::p { x == 5; }\n"
+      "  int fives = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (16) if (c.randomize() && c.x == 5) fives++;\n"
+      "    $display(\"%0d\", fives);\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  EXPECT_EQ(RunCapture(src, f), "16\n");
+}
+
+// 18.5.1 with A.1.11: a block beside a class in a generate block completes
+// the class there.
+TEST(ExternalConstraintBlocksRun, ABlockInAGenerateBlockCompletesItsClass) {
+  const char* src =
+      "module t;\n"
+      "  if (1) begin : g\n"
+      "    class C;\n"
+      "      rand bit [3:0] x;\n"
+      "      constraint p;\n"
+      "    endclass\n"
+      "    constraint C::p { x == 9; }\n"
+      "    int nines = 0;\n"
+      "    initial begin\n"
+      "      static C c = new;\n"
+      "      repeat (16) if (c.randomize() && c.x == 9) nines++;\n"
+      "      $display(\"%0d\", nines);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  EXPECT_EQ(RunCapture(src, f), "16\n");
+}
+
+// 18.5.1 with A.1.7: a program body reaches the same declarations, so a block
+// beside a class in a program completes it.
+TEST(ExternalConstraintBlocksRun, ABlockInAProgramCompletesItsClass) {
+  const char* src =
+      "program t;\n"
+      "  class C;\n"
+      "    rand bit [3:0] x;\n"
+      "    constraint p;\n"
+      "  endclass\n"
+      "  constraint C::p { x == 12; }\n"
+      "  int twelves = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (16) if (c.randomize() && c.x == 12) twelves++;\n"
+      "    $display(\"%0d\", twelves);\n"
+      "  end\n"
+      "endprogram\n";
+  SimFixture f;
+  EXPECT_EQ(RunCapture(src, f), "16\n");
+}
+
+// The class C below, its prototype p completed by the external block whose body
+// is `block`, around an initial that randomizes a C 40 times and counts in bad
+// each draw for which `bad_when` holds, then prints bad.
+std::string Completed(const std::string& members, const std::string& block,
+                      const std::string& bad_when) {
+  return "class C;\n" + members + "  constraint p;\nendclass\n" +
+         "constraint C::p { " + block + " }\n" +
+         "module t;\n"
+         "  int bad = 0;\n"
+         "  initial begin\n"
+         "    static C c = new;\n"
+         "    repeat (40) begin\n"
+         "      void'(c.randomize());\n"
+         "      if (" +
+         bad_when +
+         ") bad++;\n"
+         "    end\n"
+         "    $display(\"bad %0d\", bad);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// 18.5.1 with 18.5.3: the completed prototype is the block's whole body, so a
+// distribution in it confines x to the values it weights.
+TEST(ExternalConstraintBlocksRun, ADistributionInTheBlockHolds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                Completed("  rand bit [3:0] x;\n", "x dist { 3 := 1, 9 := 1 };",
+                          "c.x != 3 && c.x != 9"),
+                f),
+            "bad 0\n");
+}
+
+// 18.5.1 with 18.5.4: a uniqueness group in the block keeps a and b apart.
+TEST(ExternalConstraintBlocksRun, AUniqueGroupInTheBlockHolds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Completed("  rand bit [1:0] a, b;\n", "unique {a, b};",
+                                 "c.a == c.b"),
+                       f),
+            "bad 0\n");
+}
+
+// 18.5.1 with 18.5.7.1: a foreach in the block constrains every element.
+TEST(ExternalConstraintBlocksRun, AForeachInTheBlockHolds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Completed("  rand bit [3:0] a[4];\n",
+                                 "foreach (a[i]) a[i] == i;",
+                                 "c.a[0] != 0 || c.a[1] != 1 || c.a[2] != 2 || "
+                                 "c.a[3] != 3"),
+                       f),
+            "bad 0\n");
+}
+
+// 18.5.1 with 18.5.13: a soft distribution in the block confines x to the
+// values it weights when nothing opposes it.
+TEST(ExternalConstraintBlocksRun, ASoftDistributionInTheBlockHolds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Completed("  rand bit [3:0] x;\n",
+                                 "soft x dist { 3 := 1, 9 := 1 };",
+                                 "c.x != 3 && c.x != 9"),
+                       f),
+            "bad 0\n");
+}
+
+// The count a design built by Completed prints.
+int BadCount(const std::string& src) {
+  SimFixture f;
+  return std::stoi(RunCapture(src, f).substr(4));
+}
+
+// 18.5.1 with 18.5.13.2: the block's disable soft discards the soft constraint
+// on x that the earlier block q gives, so x is 3 on few of the 40 draws rather
+// than on every one.
+TEST(ExternalConstraintBlocksRun, ADisableSoftInTheBlockHolds) {
+  EXPECT_LT(BadCount(Completed("  rand bit [3:0] x;\n"
+                               "  constraint q { soft x == 3; }\n",
+                               "disable soft x;", "c.x == 3")),
+            20);
+}
+
+// 18.5.1 with 18.5.9: the block's solve s before d draws s first, so s is 1 on
+// about half the 40 draws, where without the ordering s == 1, which leaves d a
+// single value, has 1 chance in 257.
+TEST(ExternalConstraintBlocksRun, ASolveBeforeInTheBlockHolds) {
+  EXPECT_GT(BadCount(Completed("  rand bit s;\n  rand bit [7:0] d;\n"
+                               "  constraint q { s -> d == 0; }\n",
+                               "solve s before d;", "c.s")),
+            5);
+}
+
 }  // namespace

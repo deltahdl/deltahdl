@@ -287,6 +287,29 @@ static bool LocStrictlyBefore(const SourceLoc& a, const SourceLoc& b) {
   return a.column < b.column;
 }
 
+// 18.5.1 with A.1.11: the class an external constraint block completes, which
+// shares the block's scope: one of the compilation unit's classes for a block
+// at compilation-unit scope, otherwise a class item of the package, module,
+// interface, program or generate block that declares the block. Null when that
+// scope declares no class of the name the block gives.
+static ClassDecl* ExternalBlockClass(const CompilationUnit* unit,
+                                     const ExternalConstraintBlock& ext) {
+  if (ext.scope_items == nullptr) {
+    for (auto* cls : unit->classes) {
+      if (cls->name == ext.class_name) return cls;
+    }
+    return nullptr;
+  }
+  for (const auto* item : *ext.scope_items) {
+    if (item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr &&
+        item->class_decl->name == ext.class_name) {
+      return item->class_decl;
+    }
+  }
+  return nullptr;
+}
+
 // 18.5.1: an external constraint block completes a constraint prototype.
 //   - The explicit prototype form ('extern constraint name;') shall have a
 //     corresponding external constraint block.
@@ -297,12 +320,15 @@ static bool LocStrictlyBefore(const SourceLoc& a, const SourceLoc& b) {
 // 18.5.1: validate one constraint prototype against the external constraint
 // blocks: an explicit prototype with no block is an error, and a prototype
 // completed by more than one block is an error.
-static void ValidateOnePrototypeCompletion(
-    const ClassMember* m, std::string_view cls_name,
-    const std::vector<ExternalConstraintBlock>& exts, DiagEngine& diag) {
+static void ValidateOnePrototypeCompletion(const ClassMember* m,
+                                           const ClassDecl* cls,
+                                           const CompilationUnit* unit,
+                                           DiagEngine& diag) {
+  std::string_view cls_name = cls->name;
   int matches = 0;
-  for (const auto& ext : exts) {
-    if (ext.class_name == cls_name && ext.constraint_name == m->name) {
+  for (const auto& ext : unit->external_constraints) {
+    if (ext.constraint_name == m->name &&
+        ExternalBlockClass(unit, ext) == cls) {
       ++matches;
     }
   }
@@ -334,8 +360,7 @@ void ClassConstraintValidator::ValidateOneClassExternalConstraints(
     // Pure constraints are obligations governed by 18.5.2, not completed by an
     // external block, so they are outside the scope of this check.
     if (m->is_pure_virtual) continue;
-    ValidateOnePrototypeCompletion(m, cls->name, unit_->external_constraints,
-                                   diag_);
+    ValidateOnePrototypeCompletion(m, cls, unit_, diag_);
   }
 }
 
@@ -500,7 +525,8 @@ void ClassConstraintValidator::ValidateNonAbstractPureConstraints(
 void ClassConstraintValidator::ValidateConstraintSpecifierParity(
     const ClassDecl* cls, const ClassMember* m) {
   for (const auto& ext : unit_->external_constraints) {
-    if (ext.class_name != cls->name || ext.constraint_name != m->name) continue;
+    if (ext.constraint_name != m->name || ExternalBlockClass(unit_, ext) != cls)
+      continue;
     if (m->is_constraint_initial != ext.is_initial ||
         m->is_constraint_extends != ext.is_extends ||
         m->is_constraint_final != ext.is_final) {
@@ -533,7 +559,8 @@ static void ValidatePureConstraintConflicts(const ClassDecl* cls,
                                             const CompilationUnit* unit,
                                             DiagEngine& diag) {
   for (const auto& ext : unit->external_constraints) {
-    if (ext.class_name == cls->name && ext.constraint_name == m->name) {
+    if (ext.constraint_name == m->name &&
+        ExternalBlockClass(unit, ext) == cls) {
       diag.Error(
           ext.loc,
           std::format("external constraint block '{}::{}' conflicts with "
@@ -580,33 +607,8 @@ void ClassConstraintValidator::ValidateConstraintInheritance() {
   }
 }
 
-// 18.5.1 with 26.2: the class an external constraint block completes, which
-// shares the block's scope: one of the compilation unit's classes for a block
-// at compilation-unit scope, one of the package's for a block in a package.
-// Null when that scope declares no class of the name the block gives.
-static ClassDecl* ExternalBlockClass(const CompilationUnit* unit,
-                                     const ExternalConstraintBlock& ext) {
-  if (ext.package_name.empty()) {
-    for (auto* cls : unit->classes) {
-      if (cls->name == ext.class_name) return cls;
-    }
-    return nullptr;
-  }
-  for (const auto* pkg : unit->packages) {
-    if (pkg->name != ext.package_name) continue;
-    for (const auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kClassDecl &&
-          item->class_decl != nullptr &&
-          item->class_decl->name == ext.class_name) {
-        return item->class_decl;
-      }
-    }
-  }
-  return nullptr;
-}
-
 void ClassConstraintValidator::ValidateExternalConstraints() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     ValidateOneClassExternalConstraints(cls);
   }
 
@@ -636,26 +638,40 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
   }
 }
 
+// Append every element of src to dst.
+template <typename T>
+static void AppendAll(std::vector<T>& dst, const std::vector<T>& src) {
+  dst.insert(dst.end(), src.begin(), src.end());
+}
+
 // 18.5.1: an external constraint block completes its constraint prototype. Copy
-// the block's captured relations onto the matching prototype member so that the
-// completed constraint takes effect at randomization exactly like an in-class
-// constraint block (18.5). A prototype left without a block keeps its empty
-// relation set and thus behaves as an empty constraint (no effect on
-// randomization, equivalent to a constraint block holding the constant 1).
-// Copy one external constraint block's relations onto the prototype it
-// completes.
+// every list of the block's scanned body onto the matching prototype member so
+// that the completed constraint takes effect at randomization, and meets the
+// checks on a constraint's contents, exactly like an in-class constraint block
+// (18.5). A prototype left without a block keeps its empty lists and thus
+// behaves as an empty constraint (no effect on randomization, equivalent to a
+// constraint block holding the constant 1).
 static void CompleteOneExternalConstraint(ClassDecl* cls,
                                           const ExternalConstraintBlock& ext) {
+  const ClassMember* body = ext.body;
   for (auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kConstraint && m->is_constraint_prototype &&
-        m->name == ext.constraint_name) {
-      m->constraint_exprs.insert(m->constraint_exprs.end(),
-                                 ext.constraint_exprs.begin(),
-                                 ext.constraint_exprs.end());
-      m->constraint_soft_exprs.insert(m->constraint_soft_exprs.end(),
-                                      ext.constraint_soft_exprs.begin(),
-                                      ext.constraint_soft_exprs.end());
+    if (m->kind != ClassMemberKind::kConstraint ||
+        !m->is_constraint_prototype || m->name != ext.constraint_name) {
+      continue;
     }
+    AppendAll(m->constraint_foreach_refs, body->constraint_foreach_refs);
+    AppendAll(m->constraint_solve_before_refs,
+              body->constraint_solve_before_refs);
+    AppendAll(m->constraint_function_call_refs,
+              body->constraint_function_call_refs);
+    AppendAll(m->constraint_soft_refs, body->constraint_soft_refs);
+    AppendAll(m->constraint_exprs, body->constraint_exprs);
+    AppendAll(m->constraint_dist_refs, body->constraint_dist_refs);
+    AppendAll(m->constraint_disable_soft_refs,
+              body->constraint_disable_soft_refs);
+    AppendAll(m->constraint_soft_exprs, body->constraint_soft_exprs);
+    AppendAll(m->constraint_soft_dist_refs, body->constraint_soft_dist_refs);
+    AppendAll(m->constraint_unique_refs, body->constraint_unique_refs);
   }
 }
 

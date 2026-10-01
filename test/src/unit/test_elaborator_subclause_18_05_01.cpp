@@ -130,6 +130,162 @@ TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
                             8, "18.5.1"));
 }
 
+// 18.5.1: inside a module the block shall follow its class there too.
+TEST(ExternalConstraintBlocks, BlockBeforeClassInModuleRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  constraint C::p { x > 0; }\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    constraint p;\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::p' shall "
+                            "appear after the declaration of class 'C'",
+                            2, "18.5.1"));
+}
+
+// 18.5.1: a block in a module does not complete a class of the compilation
+// unit; the module declares no class of that name.
+TEST(ExternalConstraintBlocks, BlockInModuleForUnitClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint p;\n"
+             "endclass\n"
+             "module m;\n"
+             "  constraint C::p { x > 0; }\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::p' shall appear in "
+                            "the scope that declares class 'C'",
+                            6, "18.5.1"));
+}
+
+// 18.5.1: an explicit prototype needs its block wherever its class stands, a
+// class of a package or of a module as much as one of the compilation unit.
+TEST(ExternalConstraintBlocks,
+     ExplicitPrototypeInPackageOrModuleClassNeedsBlock) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    extern constraint p;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "  class D;\n"
+             "    rand int y;\n"
+             "    extern constraint q;\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'p' in class 'C' "
+                            "has no external constraint block",
+                            4, "18.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'q' in class 'D' "
+                            "has no external constraint block",
+                            10, "18.5.1"));
+}
+
+// 18.5.1: a block completes the class of its own scope only, so the block a
+// package gives its C leaves the explicit prototype of the compilation unit's
+// C without one.
+TEST(ExternalConstraintBlocks, OtherScopesBlockDoesNotCompleteThePrototype) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  extern constraint p;\n"
+             "endclass\n"
+             "package pkg;\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    extern constraint p;\n"
+             "  endclass\n"
+             "  constraint C::p { x > 0; }\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'p' in class 'C' "
+                            "has no external constraint block",
+                            3, "18.5.1"));
+}
+
+// 18.5.1, 18.5.2 and 18.5.10: two classes named C in two scopes each take
+// their own block, so neither prototype counts as completed twice, and the
+// static qualifier of one pair is not held against the other's.
+TEST(ExternalConstraintBlocks, SameNamedClassesInTwoScopesEachTakeTheirBlock) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  static constraint p;\n"
+             "endclass\n"
+             "static constraint C::p { x > 0; }\n"
+             "package pkg;\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    constraint p;\n"
+             "  endclass\n"
+             "  constraint C::p { x < 0; }\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+}
+
+// 18.5.2: a pure constraint conflicts with a block of its own class only, not
+// with the block another scope gives a class of the same name.
+TEST(ExternalConstraintBlocks, PureConstraintIgnoresOtherScopesBlock) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("virtual class C;\n"
+             "  pure constraint p;\n"
+             "endclass\n"
+             "package pkg;\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    constraint p;\n"
+             "  endclass\n"
+             "  constraint C::p { x > 0; }\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+}
+
+// 18.5.1: the completed prototype is the block's body, so the rules on what a
+// constraint holds reach a block written outside the class; here 18.5.4's ban
+// on a randc member of a unique group.
+TEST(ExternalConstraintBlocks, BlockBodyIsCheckedLikeAnInClassBlock) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [1:0] a;\n"
+             "  randc bit [1:0] b;\n"
+             "  constraint p;\n"
+             "endclass\n"
+             "constraint C::p { unique {a, b}; }\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a uniqueness constraint member shall not be a randc variable", 6,
+      "18.5.4"));
+}
+
 // 18.5.1: a constraint block of the same name as a prototype in the same class
 // declaration is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {

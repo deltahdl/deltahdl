@@ -4,6 +4,8 @@
 
 #include "fixture_parser.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 
@@ -83,8 +85,8 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
 }
 
 // 18.5.1 with 26.2: the block shares its scope with the class it completes,
-// so the parser records the package that declares it, and no package for the
-// block at compilation-unit scope.
+// so the parser records the item list of the package that declares it, and
+// none for the block at compilation-unit scope.
 TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsItsPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -101,10 +103,63 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsItsPackage) {
       "constraint D::proto1 { y > 0; }\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->external_constraints.size(), 2u);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->external_constraints[0].class_name, "C");
-  EXPECT_EQ(r.cu->external_constraints[0].package_name, "pkg");
+  EXPECT_EQ(r.cu->external_constraints[0].scope_items,
+            &r.cu->packages[0]->items);
   EXPECT_EQ(r.cu->external_constraints[1].class_name, "D");
-  EXPECT_EQ(r.cu->external_constraints[1].package_name, "");
+  EXPECT_EQ(r.cu->external_constraints[1].scope_items, nullptr);
+}
+
+// 18.5.1 with A.1.11: extern_constraint_declaration is a
+// package_or_generate_item_declaration, which a module body reaches, so a
+// block beside a class inside a module is read and records the module's items
+// as its scope; the static form is read there too.
+TEST(ExternalConstraintBlockParsing, ExternalBlockInAModuleRecordsTheModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    constraint p;\n"
+      "    static constraint q;\n"
+      "  endclass\n"
+      "  constraint C::p { x > 0; }\n"
+      "  static constraint C::q { x < 9; }\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->external_constraints.size(), 2u);
+  EXPECT_EQ(r.cu->external_constraints[0].constraint_name, "p");
+  EXPECT_EQ(r.cu->external_constraints[0].scope_items,
+            &r.cu->modules[0]->items);
+  EXPECT_EQ(r.cu->external_constraints[1].constraint_name, "q");
+  EXPECT_TRUE(r.cu->external_constraints[1].is_static);
+  EXPECT_EQ(r.cu->external_constraints[1].scope_items,
+            &r.cu->modules[0]->items);
+}
+
+// 18.5.1 with A.1.11: a generate block holds package_or_generate_item
+// declarations too, so a block beside a class in one records the generate
+// block's items, the list that holds the class.
+TEST(ExternalConstraintBlockParsing, ExternalBlockInAGenerateBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    class C;\n"
+      "      rand int x;\n"
+      "      constraint p;\n"
+      "    endclass\n"
+      "    constraint C::p { x > 0; }\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->external_constraints.size(), 1u);
+  const auto* scope = r.cu->external_constraints[0].scope_items;
+  ASSERT_NE(scope, nullptr);
+  EXPECT_NE(scope, &r.cu->modules[0]->items);
+  ASSERT_FALSE(scope->empty());
+  EXPECT_EQ(scope->front()->kind, ModuleItemKind::kClassDecl);
+  EXPECT_EQ(scope->front()->name, "C");
 }
 
 // 18.5.1: an external constraint block completes the prototype with the
@@ -120,7 +175,8 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockCapturesBodyRelations) {
       "constraint C::proto2 { x >= 0; x < 10; }\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->external_constraints.size(), 1u);
-  EXPECT_EQ(r.cu->external_constraints.front().constraint_exprs.size(), 2u);
+  EXPECT_EQ(r.cu->external_constraints.front().body->constraint_exprs.size(),
+            2u);
 }
 
 }  // namespace

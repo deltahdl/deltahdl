@@ -31,6 +31,11 @@ namespace delta {
 // closes; defined in parser/parser_type_name_scope.h.
 class TypeNameScope;
 
+// A.1.11: the report on an item an anonymous program does not admit.
+inline constexpr char kAnonymousProgramItemsMessage[] =
+    "an anonymous program may contain only task, function, class, interface "
+    "class, covergroup, and class constructor declarations";
+
 class Parser {
  public:
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
@@ -103,7 +108,12 @@ class Parser {
   // into unit->cu_items and answers whether one stood; a false answer consumed
   // nothing.
   bool TryParseCuImportOrExportDecl(CompilationUnit* unit);
-  void ParseOutOfBlockConstraint(CompilationUnit* unit);
+  void ParseOutOfBlockConstraint(CompilationUnit* unit,
+                                 const std::vector<ModuleItem*>* scope_items);
+  // 18.5.1 with A.1.11: reads an extern_constraint_declaration standing as an
+  // item of the body whose items are `items`, recording `items` as its scope,
+  // and answers whether one stood; a false answer consumed nothing.
+  bool TryParseExternConstraintItem(std::vector<ModuleItem*>& items);
 
   ModuleDecl* ParseModuleDecl();
   ModuleDecl* ParseExternModuleDecl();
