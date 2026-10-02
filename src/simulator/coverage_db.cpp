@@ -154,22 +154,28 @@ static bool ReadCrossDbRecord(std::istream& in, const std::string& tag,
   return true;
 }
 
-// Read one record of a coverage snapshot into the parsed record list. A record
-// tag the format does not define, or one whose enclosing record is missing (a
-// coverpoint or bin outside a covergroup), fails the read.
-static bool ReadCoverageDbRecord(std::istream& in, const std::string& tag,
-                                 std::vector<CoverGroup>& loaded) {
-  if (tag == "CR" || tag == "XBIN") return ReadCrossDbRecord(in, tag, loaded);
+// Read an instance record of a coverage snapshot, "CG <name> <sample_count>"
+// opening a covergroup instance and "TY <name>" naming the covergroup type of
+// the last one, into the parsed record list.
+static bool ReadGroupDbRecord(std::istream& in, const std::string& tag,
+                              std::vector<CoverGroup>& loaded) {
   if (tag == "CG") {
     CoverGroup g;
     if (!(in >> g.name >> g.sample_count)) return false;
     loaded.push_back(std::move(g));
     return true;
   }
-  if (tag == "TY") {
-    if (loaded.empty()) return false;
-    return static_cast<bool>(in >> loaded.back().type_name);
-  }
+  if (loaded.empty()) return false;
+  return static_cast<bool>(in >> loaded.back().type_name);
+}
+
+// Read one record of a coverage snapshot into the parsed record list. A record
+// tag the format does not define, or one whose enclosing record is missing (a
+// coverpoint or bin outside a covergroup), fails the read.
+static bool ReadCoverageDbRecord(std::istream& in, const std::string& tag,
+                                 std::vector<CoverGroup>& loaded) {
+  if (tag == "CR" || tag == "XBIN") return ReadCrossDbRecord(in, tag, loaded);
+  if (tag == "CG" || tag == "TY") return ReadGroupDbRecord(in, tag, loaded);
   if (tag == "CP") {
     if (loaded.empty()) return false;
     CoverPoint cp;
@@ -204,25 +210,31 @@ bool CoverageDB::LoadCoverageDbFile(const std::string& path) {
   return true;
 }
 
+// Writes the coverpoints and crosses of one covergroup instance, each with its
+// bins, in the form LoadCoverageDbFile reads.
+static void WriteGroupItems(std::ostream& out, const CoverGroup& g) {
+  for (const CoverPoint& cp : g.coverpoints) {
+    out << "CP " << cp.name << '\n';
+    for (const CoverBin& b : cp.bins) {
+      out << "BIN " << b.name << ' '
+          << (b.values.empty() ? 0 : b.values.front()) << ' ' << b.hit_count
+          << '\n';
+    }
+  }
+  for (const CrossCover& cross : g.crosses) {
+    out << "CR " << cross.name << '\n';
+    for (const CrossBin& b : cross.bins) {
+      out << "XBIN " << b.name << ' ' << b.hit_count << '\n';
+    }
+  }
+}
+
 void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
   std::ofstream out(path);
   for (const CoverGroup& g : groups_) {
     out << "CG " << g.name << ' ' << g.sample_count << '\n';
     if (!g.type_name.empty()) out << "TY " << g.type_name << '\n';
-    for (const CoverPoint& cp : g.coverpoints) {
-      out << "CP " << cp.name << '\n';
-      for (const CoverBin& b : cp.bins) {
-        out << "BIN " << b.name << ' '
-            << (b.values.empty() ? 0 : b.values.front()) << ' ' << b.hit_count
-            << '\n';
-      }
-    }
-    for (const CrossCover& cross : g.crosses) {
-      out << "CR " << cross.name << '\n';
-      for (const CrossBin& b : cross.bins) {
-        out << "XBIN " << b.name << ' ' << b.hit_count << '\n';
-      }
-    }
+    WriteGroupItems(out, g);
   }
 }
 
