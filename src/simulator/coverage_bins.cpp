@@ -497,10 +497,15 @@ BinValueResolution CoverageDB::ResolveBinValue(int64_t value,
   // type (LRM 19.5.7 b, condition 1).
   if (!eff.is_signed && value_is_signed && value < 0)
     return BinValueResolution::kUnsignedNegative;
-  // Condition 2: the static cast to the effective type alters the value, i.e.
-  // the value is not expressible in that type (LRM 19.5.7 b, condition 2).
-  if (CastToEffectiveType(value, eff) != value)
-    return BinValueResolution::kValueChanged;
+  // Condition 2: assigning the value to the effective type yields one not
+  // equal to it under the rules for == (LRM 19.5.7 b, condition 2). That
+  // comparison is signed only where both sides are (LRM 11.8.1), so the cast
+  // must give the value back; otherwise it is unsigned with zero extension
+  // (LRM 11.8.2), so the value's bits must fit the type's width.
+  bool fits = value_is_signed && eff.is_signed
+                  ? CastToEffectiveType(value, eff) == value
+                  : value >= 0 && value <= EffectiveTypeMax({eff.width, false});
+  if (!fits) return BinValueResolution::kValueChanged;
   return BinValueResolution::kOk;
 }
 

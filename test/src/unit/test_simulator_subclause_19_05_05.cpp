@@ -304,4 +304,29 @@ TEST(CovergroupInstanceSim, IgnoredTransitionLeavesTheTransitionBins) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.5: a covered sequence is removed when it cannot be matched without
+// also matching an excluded one, so `2 => 3` removes `1 => 2 => 3 => 4`,
+// leaving t no sequence and out of coverage; `2 => 4`, which does not hold
+// it, stays: one of the two remaining bins, v, is hit.
+TEST(CovergroupInstanceSim, IgnoredTransitionRemovesASequenceContainingIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [2:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins t = (1 => 2 => 3 => 4);\n"
+                       "      bins u = (2 => 4); bins one = {1};\n"
+                       "      ignore_bins x = (2 => 3); }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 1; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

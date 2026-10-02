@@ -7,6 +7,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -80,24 +81,150 @@ void AppendWildcardValue(const Logic4Vec& v, const SampledCoverpoint& point,
   }
 }
 
-// §19.5.1: the values one covergroup_value_range adds, a `$` bound standing
-// for the end of the coverpoint's values; §11.4.13: a tolerance range is the
-// span around its center.
+// §19.5.7: the effective type of `point`, to which a bin value is cast; a
+// width not known stands for every value, as PointTypeBounds has it.
+CoverpointEffectiveType EffectiveTypeOf(const SampledCoverpoint& point) {
+  if (point.width == 0) return {64, true};
+  return {point.width, point.is_signed};
+}
+
+// §19.5.7: the warning a bin value at `at` warrants by the condition
+// `resolution` names, the value taking no part in its bin.
+void WarnOfBinValue(SourceLoc at, int64_t value, BinValueResolution resolution,
+                    DiagEngine& diag) {
+  std::string message;
+  if (resolution == BinValueResolution::kUnknownBits) {
+    message = "a bin value holding x or z bits takes no part in its bin";
+  } else if (resolution == BinValueResolution::kUnsignedNegative) {
+    message = std::format(
+        "bin value {} is negative while the coverpoint's type is unsigned, "
+        "and takes no part in its bin",
+        value);
+  } else {
+    message = std::format(
+        "bin value {} does not fit the coverpoint's type and takes no part in "
+        "its bin",
+        value);
+  }
+  diag.Warning(at, message, Subclause("19.5.7"));
+}
+
+// §19.5.7: the bin value `value`, written at `at`, as the type of `point`
+// holds it, or nothing where that type cannot express it, which draws a
+// warning instead.
+std::optional<int64_t> ResolvedValue(const Logic4Vec& value, SourceLoc at,
+                                     const SampledCoverpoint& point,
+                                     DiagEngine& diag) {
+  int64_t v = CovergroupIntOf(value);
+  BinValueResolution resolution = CoverageDB::ResolveBinValue(
+      v, value.is_signed, !value.IsKnown(), false, EffectiveTypeOf(point));
+  if (!CoverageDB::SingletonValueParticipates(resolution)) {
+    WarnOfBinValue(at, v, resolution, diag);
+    return std::nullopt;
+  }
+  return CoverageDB::CastToEffectiveType(v, EffectiveTypeOf(point));
+}
+
+// §19.5.1 with §19.5.7: the singleton `range` names, as ResolvedValue gives
+// it.
+void AppendSingleton(const CovergroupValueRange& range,
+                     const SampledCoverpoint& point, SimContext& ctx,
+                     Arena& arena, ValueList& out) {
+  if (std::optional<int64_t> held =
+          ResolvedValue(EvalExpr(range.lo, ctx, arena), range.lo->range.start,
+                        point, ctx.GetDiag())) {
+    out.push_back({*held, *held});
+  }
+}
+
+// §19.5.7 with §11.8.1: the values `point` expresses of a range whose bounds
+// are `unsigned_bounds`: those of its type, or, for unsigned bounds on a
+// signed type, whose comparison with them is unsigned, those whose bits fit
+// its width.
+CoverValueRange ExpressedValues(const SampledCoverpoint& point,
+                                bool unsigned_bounds) {
+  CoverpointEffectiveType eff = EffectiveTypeOf(point);
+  if (!unsigned_bounds || !eff.is_signed || eff.width >= 64) {
+    return PointTypeBounds(point);
+  }
+  return {0, CoverageDB::EffectiveTypeMax({eff.width, false})};
+}
+
+// §19.5.7: the values of `kept`, each expressed by `point`, as its type holds
+// them: a signed type casts the values past its largest to negative ones.
+void AppendAsHeld(CoverValueRange kept, const SampledCoverpoint& point,
+                  ValueList& out) {
+  CoverpointEffectiveType eff = EffectiveTypeOf(point);
+  int64_t top = CoverageDB::EffectiveTypeMax(eff);
+  if (kept.hi <= top) {
+    out.push_back(kept);
+    return;
+  }
+  if (kept.lo <= top) out.push_back({kept.lo, top});
+  out.push_back(
+      {CoverageDB::CastToEffectiveType(std::max(kept.lo, top + 1), eff),
+       CoverageDB::CastToEffectiveType(kept.hi, eff)});
+}
+
+// §19.5.1 with §19.5.7: the range `range` names, a `$` bound standing for the
+// end of the coverpoint's values, kept to the values the coverpoint's type
+// expresses; a range reaching past them, or with an x or z bound, draws a
+// warning.
+void AppendRange(const CovergroupValueRange& range,
+                 const SampledCoverpoint& point, SimContext& ctx, Arena& arena,
+                 ValueList& out) {
+  const Expr* at = range.lo != nullptr ? range.lo : range.hi;
+  CoverValueRange written = PointTypeBounds(point);
+  bool unsigned_bounds = false;
+  for (auto [bound, end] :
+       {std::pair{range.lo, &written.lo}, std::pair{range.hi, &written.hi}}) {
+    if (bound == nullptr) continue;
+    Logic4Vec value = EvalExpr(bound, ctx, arena);
+    if (!value.IsKnown()) {
+      ctx.GetDiag().Warning(at->range.start,
+                            "a bin range with an x or z bound takes no part "
+                            "in its bin",
+                            Subclause("19.5.7"));
+      return;
+    }
+    *end = CovergroupIntOf(value);
+    unsigned_bounds = unsigned_bounds || !value.is_signed;
+  }
+  if (written.lo > written.hi) return;
+  CoverValueRange domain = ExpressedValues(point, unsigned_bounds);
+  CoverValueRange kept{std::max(written.lo, domain.lo),
+                       std::min(written.hi, domain.hi)};
+  if (kept.lo > kept.hi) {
+    ctx.GetDiag().Warning(
+        at->range.start,
+        std::format("bin range [{}:{}] holds no value the coverpoint's type "
+                    "can express and takes no part in its bin",
+                    written.lo, written.hi),
+        Subclause("19.5.7"));
+    return;
+  }
+  if (kept.lo != written.lo || kept.hi != written.hi) {
+    ctx.GetDiag().Warning(
+        at->range.start,
+        std::format("bin range [{}:{}] holds values the coverpoint's type "
+                    "cannot express; only [{}:{}] takes part in its bin",
+                    written.lo, written.hi, kept.lo, kept.hi),
+        Subclause("19.5.7"));
+  }
+  AppendAsHeld(kept, point, out);
+}
+
+// §19.5.1: the values one covergroup_value_range adds; §11.4.13: a tolerance
+// range is the span around its center.
 void AppendValueRange(const CovergroupValueRange& range,
                       const SampledCoverpoint& point, SimContext& ctx,
                       Arena& arena, ValueList& out) {
-  CoverValueRange bounds = PointTypeBounds(point);
   if (range.kind == CovergroupValueRangeKind::kValue) {
-    int64_t v = CovergroupInt(range.lo, ctx, arena);
-    out.push_back({v, v});
+    AppendSingleton(range, point, ctx, arena, out);
     return;
   }
   if (range.kind == CovergroupValueRangeKind::kRange) {
-    int64_t lo =
-        range.lo != nullptr ? CovergroupInt(range.lo, ctx, arena) : bounds.lo;
-    int64_t hi =
-        range.hi != nullptr ? CovergroupInt(range.hi, ctx, arena) : bounds.hi;
-    if (lo <= hi) out.push_back({lo, hi});
+    AppendRange(range, point, ctx, arena, out);
     return;
   }
   auto [lo, hi] = CoverageDB::ToleranceRange(
@@ -153,8 +280,10 @@ ValueList FilterWith(const ValueList& list, const Expr* with_expr,
 
 // §19.5.1.2: the elements of the array a set_covergroup_expression names, in
 // order: a fixed-size or dynamic array, or a queue (§7.10), which keeps its
-// elements as a queue rather than through array info.
-ValueList SetExpressionValues(const Expr* e, SimContext& ctx, Arena& arena) {
+// elements as a queue rather than through array info. §19.5.7 resolves each
+// against the type of `point` as ResolvedValue does.
+ValueList SetExpressionValues(const Expr* e, const SampledCoverpoint& point,
+                              SimContext& ctx, Arena& arena) {
   ValueList values;
   if (e->kind != ExprKind::kIdentifier) return values;
   std::vector<Logic4Vec> elements;
@@ -164,7 +293,10 @@ ValueList SetExpressionValues(const Expr* e, SimContext& ctx, Arena& arena) {
     elements = queue->elements;
   }
   for (const Logic4Vec& element : elements) {
-    AppendValue(values, SelectBoundValue(element));
+    if (std::optional<int64_t> held =
+            ResolvedValue(element, e->range.start, point, ctx.GetDiag())) {
+      AppendValue(values, *held);
+    }
   }
   return values;
 }
@@ -469,8 +601,10 @@ void ExcludeIgnoredAndIllegalValues(CoverPoint* cp) {
 }
 
 // §19.5.5 and §19.5.6: a transition an ignore_bins or illegal_bins holds is
-// excluded from coverage, so it is taken out of the coverpoint's transition
-// bins; a bin it leaves holding none takes no part in coverage.
+// excluded from coverage, so a covered sequence that cannot be matched
+// without also matching it, one holding it as a run of consecutive values, is
+// taken out of the coverpoint's transition bins; a bin it leaves holding none
+// takes no part in coverage.
 void ExcludeIgnoredAndIllegalTransitions(CoverPoint* cp) {
   std::set<std::vector<int64_t>> excluded;
   for (const CoverBin& bin : cp->bins) {
@@ -478,11 +612,14 @@ void ExcludeIgnoredAndIllegalTransitions(CoverPoint* cp) {
       excluded.insert(bin.transitions.begin(), bin.transitions.end());
   }
   if (excluded.empty()) return;
+  auto holds_excluded = [&excluded](const std::vector<int64_t>& sequence) {
+    return std::ranges::any_of(excluded, [&sequence](const auto& run) {
+      return !std::ranges::search(sequence, run).empty();
+    });
+  };
   for (CoverBin& bin : cp->bins) {
     if (bin.kind != CoverBinKind::kTransition) continue;
-    std::erase_if(bin.transitions, [&](const std::vector<int64_t>& sequence) {
-      return excluded.contains(sequence);
-    });
+    std::erase_if(bin.transitions, holds_excluded);
   }
 }
 
@@ -619,9 +756,10 @@ void AddIntegralBins(const CovergroupInstance& inst, SampledCoverpoint& point,
       AddRangeListBins(inst, point, bins, ctx, arena);
       return;
     case BinsOrOptionsKind::kSetExpression:
-      AddValueBins(point, bins,
-                   {SetExpressionValues(bins.set_expr, ctx, arena), nullptr},
-                   ctx, arena);
+      AddValueBins(
+          point, bins,
+          {SetExpressionValues(bins.set_expr, point, ctx, arena), nullptr}, ctx,
+          arena);
       return;
     case BinsOrOptionsKind::kTransitions:
       AddTransitionBins(point, bins, ctx, arena);
