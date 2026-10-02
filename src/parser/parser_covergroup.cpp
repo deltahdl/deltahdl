@@ -102,6 +102,22 @@ bool HasUnboundedStep(const TransSet& set) {
   return false;
 }
 
+// §19.5.5, §19.5.6: an ignore_bins or an illegal_bins `bins` cannot specify a
+// transition of unbounded or undetermined length; each one it holds is
+// reported.
+void ReportUnboundedExcludingTransitions(const BinsOrOptions& bins,
+                                         DiagEngine& diag) {
+  bool ignore = bins.keyword == BinsKeyword::kIgnoreBins;
+  for (const TransSet& set : bins.transitions) {
+    if (!HasUnboundedStep(set)) continue;
+    diag.Error(set.loc,
+               std::format("an {} transition cannot be of unbounded or "
+                           "undetermined length",
+                           ignore ? "ignore_bins" : "illegal_bins"),
+               Subclause(ignore ? "19.5.5" : "19.5.6"));
+  }
+}
+
 }  // namespace
 
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
@@ -796,15 +812,7 @@ void Parser::CheckTransitionBins(const BinsOrOptions& bins) {
     }
   }
   if (bins.keyword != BinsKeyword::kBins) {
-    bool ignore = bins.keyword == BinsKeyword::kIgnoreBins;
-    for (const TransSet& set : bins.transitions) {
-      if (!HasUnboundedStep(set)) continue;
-      diag_.Error(set.loc,
-                  std::format("an {} transition cannot be of unbounded or "
-                              "undetermined length",
-                              ignore ? "ignore_bins" : "illegal_bins"),
-                  Subclause(ignore ? "19.5.5" : "19.5.6"));
-    }
+    ReportUnboundedExcludingTransitions(bins, diag_);
     return;
   }
   if (!bins.is_array || bins.array_size != nullptr) return;
