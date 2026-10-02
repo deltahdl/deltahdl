@@ -17,7 +17,6 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
-#include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
