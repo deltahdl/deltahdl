@@ -97,6 +97,13 @@ def test_a_file_the_suite_expects_accepted_is_judged_by_the_rule_it_breaks(
     assert rst.tagged_clause({"tags": "20.4"}, "20.4--timeformat.sv") == "20.4.3"
 
 
+def test_isunbounded_of_a_literal_is_judged_by_the_parameter_name_rule(
+    rst: ModuleType,
+) -> None:
+    assert rst.expects_rejection({"tags": "20.6"}, "20.6--isunbounded.sv")
+    assert rst.tagged_clause({"tags": "20.6"}, "20.6--isunbounded.sv") == "20.6.3"
+
+
 _FILES_DECLARING_AN_IMPLICITLY_STATIC_VARIABLE_WITH_AN_INITIALIZER = [
     "6.19.5.1--enum_first.sv",
     "6.19.5.2--enum_last.sv",

@@ -301,11 +301,10 @@ TEST(ArrayQueryElab, IntegralIndexesAndOtherDimensionsAreAccepted) {
 // call with no argument are left to the run.
 TEST(ArrayQueryConstExpr, AQueryWhoseDimensionsAreUnknownDoesNotFold) {
   EvalFixture f;
-  for (const char* kText :
-       {"$size(logic [k:0])", "$size(v[3:0])", "$size(v[2])", "$size(real)",
-        "$size(int, 2)", "$size(int, 0)", "$size(int, k)", "$size()",
-        "$left(Undeclared)"}) {
-    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+  for (const char* text : {"$size(logic [k:0])", "$size(v[3:0])", "$size(v[2])",
+                           "$size(real)", "$size(int, 2)", "$size(int, 0)",
+                           "$size(int, k)", "$size()", "$left(Undeclared)"}) {
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(text, f)).has_value()) << text;
   }
 }
 
@@ -330,9 +329,9 @@ TEST(ArrayQueryConstExpr, ATypedefOrTypeOperatorFoldsForTheTypeItHolds) {
   const std::unordered_set<std::string_view> kAggregates = {"Arr"};
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$size(type(int))", f)), 32);
   TypedefRegistryGuard guard(&kTypedefs, &kAggregates);
-  for (const char* kText :
+  for (const char* text :
        {"$size(Arr2)", "$size(Bad)", "$size(R)", "$size(NotATypedef)"}) {
-    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(text, f)).has_value()) << text;
   }
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$size(type(logic [3:0]))", f)), 4);
 }
@@ -364,8 +363,8 @@ TEST(ArrayQueryConstExpr, OnlyFixedDimensionsOfAParameterOrVariableFold) {
   descending.unpacked_dims = {RtlirUnpackedDim{7, 4}};
   mod.variables.push_back(descending);
   ParamRangeRegistryGuard guard(&mod);
-  for (const char* kText : {"$size(DA)", "$size(uv)", "$size(none)"}) {
-    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+  for (const char* text : {"$size(DA)", "$size(uv)", "$size(none)"}) {
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(text, f)).has_value()) << text;
   }
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$high(FA)", f)), 2);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$high(dv)", f)), 7);

@@ -494,8 +494,12 @@ TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
       "endmodule\n",
       ef);
   ASSERT_NE(design, nullptr);
-  // The $fatal's own report is the one error: the argument is accepted.
-  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
+  // The argument is accepted: the $fatal reports itself with the argument
+  // formatted, and no report says the argument is not constant.
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(), "idx=1", 3, "20.10.1"));
+  EXPECT_FALSE(ReportedError(ef.diag.Diagnostics(),
+                             "argument to $fatal must be a constant expression",
+                             3, "20.10.1"));
   EXPECT_TRUE(design->simulation_blocked);
 }
 

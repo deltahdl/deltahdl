@@ -35,9 +35,13 @@ TEST(ElaborationSeverityTaskElab, FatalValidFinishNumbers) {
     auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
     auto* design = Elaborate(src, f);
     ASSERT_NE(design, nullptr);
-    // The $fatal's own report (§20.10.1) is the one error: the
-    // finish_number is valid.
-    EXPECT_EQ(f.diag.ErrorCount(), 1u)
+    // The finish_number is valid: the one report is the $fatal's own
+    // (§20.10.1), and none stands on the argument (§20.10).
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "elaboration FATAL in scope 'm'", 1, "20.10.1"))
+        << "finish_number " << fn;
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "finish_number must be 0, 1, or 2", 1, "20.10"))
         << "finish_number " << fn << " should be valid";
   }
 }
@@ -64,8 +68,9 @@ TEST(ElaborationSeverityTaskElab, FatalNoArgsIsValid) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The $fatal's own report (§20.10.1) is the one error: the call is valid.
-  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  // The call is valid: what it reports is the $fatal's own report (§20.10.1).
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm'", 2, "20.10.1"));
 }
 
 }  // namespace

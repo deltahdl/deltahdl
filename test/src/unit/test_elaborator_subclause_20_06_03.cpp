@@ -23,11 +23,11 @@ TEST(IsunboundedElab, AnArgumentThatNamesNoParameterIsRejected) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  const char* kMessage =
+  const char* message =
       "the argument of '$isunbounded' shall be the name of a parameter";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "20.6.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "20.6.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "20.6.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 4, "20.6.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 5, "20.6.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 8, "20.6.3"));
 }
 
 // §20.6.3: a parameter of the port list or of the body, a localparam and a

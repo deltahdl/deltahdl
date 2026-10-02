@@ -13,7 +13,6 @@
 #include "elaborator/elaborator_dpi_names.h"
 #include "elaborator/elaborator_dpi_signature.h"
 #include "elaborator/let_construct.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

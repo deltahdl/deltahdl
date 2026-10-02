@@ -218,6 +218,7 @@ _RULE_OF_FILE_TAGGED_BY_FEATURE: dict[str, str] = {
 
 _RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED: dict[str, str] = {
     "20.4--timeformat.sv": "20.4.3",
+    "20.6--isunbounded.sv": "20.6.3",
     "6.19.5.1--enum_first.sv": "6.21",
     "6.19.5.2--enum_last.sv": "6.21",
     "6.19.5.3--enum_next.sv": "6.21",
