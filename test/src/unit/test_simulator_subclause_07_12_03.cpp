@@ -598,6 +598,32 @@ TEST(ArrayReductionSim, ReductionOnASubarraySelectFoldsItsElements) {
   EXPECT_EQ(out, "15 120 0 11 30 3 7\n");
 }
 
+// §7.12.3 with §7.4.4 and §8.5: a class property may be a multidimensional
+// array, and a select of its leading dimension, `h.g[1]` through a handle or
+// `g[1]` bare in a method, names a subarray that each reduction folds by its
+// own operand: 7, 5 and 13 sum to 25, multiply to 455, and to 5, or and xor
+// to 15, and sum through `item * 2` to 50.
+TEST(ArrayReductionSim, ReductionOnASubarrayOfAClassPropertyFoldsItsElements) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int g[2][3];\n"
+      "  function int inner(); return g[1].product(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    h.g[1][0] = 7; h.g[1][1] = 5; h.g[1][2] = 13; h.g[0][2] = 2;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", h.g[1].sum(),\n"
+      "             h.g[1].product(), h.g[1].and(), h.g[1].or(), "
+      "h.g[1].xor(),\n"
+      "             h.g[1].sum() with (item * 2), h.inner());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25 455 5 15 15 50 455\n");
+}
+
 // §7.12.3 with §6.11: a reduction without a with clause is of the array's
 // element type, so over signed elements -- a byte or an int fixed-size array,
 // a queue, an associative array, a subarray -- it is signed and -1 + -2 reads
