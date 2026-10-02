@@ -47,6 +47,17 @@ void ValidateModuleCovergroups(
     const std::unordered_map<std::string_view, DataTypeKind>& var_types,
     const CovergroupDeclared& declared, DiagEngine& diag);
 
+// Whether a bare name denotes a covergroup type where a module reads it.
+using CovergroupTypeVisible = std::function<bool(std::string_view)>;
+
+// §19.8: get_coverage() is the one covergroup method called through the
+// covergroup type, `cg::get_coverage()` or `cg::x::get_coverage()`; a call
+// through a type `visible` names to any other method, in a procedure or a
+// subroutine of `decl`, is reported.
+void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
+                                 const CovergroupTypeVisible& visible,
+                                 DiagEngine& diag);
+
 // The covergroups embedded in `cls` (§19.4). A name such a covergroup reads is
 // a property of the class or of a class it extends, or else an item of
 // `scope_items`, the declarations of the scope the class is declared in.

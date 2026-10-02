@@ -207,6 +207,53 @@ void CheckOptionWrites(
   });
 }
 
+// §19.8: the covergroup type the call `call` is made through, `cg` in
+// `cg::m()` or `cg::x::m()`, where `visible` names it a covergroup type; empty
+// for any other call.
+std::string_view CovergroupTypeCalled(const Expr* call,
+                                      const CovergroupTypeVisible& visible) {
+  const Expr* access = call->lhs;
+  if (call->kind != ExprKind::kCall || access == nullptr ||
+      access->kind != ExprKind::kMemberAccess || !access->is_scope_resolution ||
+      access->lhs == nullptr) {
+    return {};
+  }
+  const Expr* scope = access->lhs;
+  if (scope->kind == ExprKind::kMemberAccess && scope->is_scope_resolution) {
+    scope = scope->lhs;
+  }
+  if (scope->kind != ExprKind::kIdentifier || !visible(scope->text)) return {};
+  return scope->text;
+}
+
+// §19.8: reports each call in `e` made through a covergroup type to a method
+// other than get_coverage(), the one static covergroup method.
+void CheckTypeCallsIn(const Expr* e, const CovergroupTypeVisible& visible,
+                      DiagEngine& diag) {
+  if (e == nullptr) return;
+  std::string_view type = CovergroupTypeCalled(e, visible);
+  if (!type.empty() && e->lhs->rhs->text != "get_coverage") {
+    diag.Error(e->range.start,
+               std::format("method '{}' cannot be called through the "
+                           "covergroup type '{}'; only get_coverage() can",
+                           e->lhs->rhs->text, type),
+               Subclause("19.8"));
+  }
+  ForEachExprChild(
+      e, [&](const Expr* child) { CheckTypeCallsIn(child, visible, diag); });
+}
+
+// §19.8: CheckTypeCallsIn over every expression of `s` and the statements it
+// holds.
+void CheckTypeCalls(const Stmt* s, const CovergroupTypeVisible& visible,
+                    DiagEngine& diag) {
+  if (s == nullptr) return;
+  ForEachChildExpr(s,
+                   [&](const Expr* e) { CheckTypeCallsIn(e, visible, diag); });
+  ForEachChildStmt(
+      s, [&](const Stmt* sub) { CheckTypeCalls(sub, visible, diag); });
+}
+
 // The module's variables declared with one of its covergroups as their type.
 std::unordered_set<std::string_view> CovergroupVariables(
     const ModuleDecl* decl) {
@@ -279,6 +326,17 @@ void ValidateModuleCovergroups(const ModuleDecl* decl,
     CheckOptionWrites(body_item->body, covergroup_vars, diag);
     for (const Stmt* s : body_item->func_body_stmts) {
       CheckOptionWrites(s, covergroup_vars, diag);
+    }
+  });
+}
+
+void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
+                                 const CovergroupTypeVisible& visible,
+                                 DiagEngine& diag) {
+  ForEachBodyOwningItem(decl->items, [&](const auto* body_item) {
+    CheckTypeCalls(body_item->body, visible, diag);
+    for (const Stmt* s : body_item->func_body_stmts) {
+      CheckTypeCalls(s, visible, diag);
     }
   });
 }

@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_name_rules.h"
 #include "elaborator/covergroup_rules.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -746,6 +747,12 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // the variables it may name are the ones a bare read may: the module's
   // covergroups are checked against the same predicate.
   ValidateModuleCovergroups(decl, var_types_, declared, diag_);
+  ValidateCovergroupTypeCalls(
+      decl,
+      [this, mod](std::string_view n) {
+        return VisibleCovergroup(n, mod, unit_) != nullptr;
+      },
+      diag_);
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
@@ -791,9 +798,12 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   };
   ReportUnknownScopeBases(
       decl,
-      [this, &explicit_imported, &wildcard_packages](std::string_view n) {
+      [this, mod, &explicit_imported, &wildcard_packages](std::string_view n) {
+        // §8.23 with §19.8: a covergroup type is a base of `::` as well, for
+        // `cg::get_coverage()` and `cg::x::get_coverage()`.
         return IsKnownScopeBase(n, cu_scope_names_, class_names_, typedefs_,
                                 unit_) ||
+               VisibleCovergroup(n, mod, unit_) != nullptr ||
                explicit_imported.count(n) != 0 ||
                AnyPackageProvidesName(unit_, pkg_provided_names_,
                                       wildcard_packages, n);

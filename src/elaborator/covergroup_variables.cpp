@@ -48,9 +48,7 @@ const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
 
 // The declaration of the covergroup a variable of type `dt` holds an instance
 // of, or null where `dt` names none. §26.3: a name written behind a package
-// scope is that package's; a bare name is one `mod` declares, else one of a
-// package that an import `mod` has reached by now makes visible, else one of
-// the compilation unit.
+// scope is that package's; a bare name is one VisibleCovergroup finds.
 const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
                                          const RtlirModule* mod,
                                          const CompilationUnit* unit) {
@@ -58,20 +56,7 @@ const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
   if (!dt.scope_name.empty()) {
     return PackageCovergroup(unit, dt.scope_name, dt.type_name);
   }
-  if (const CovergroupDecl* own =
-          CovergroupNamed(mod->let_decls, dt.type_name)) {
-    return own;
-  }
-  for (const RtlirImport& imp : mod->imports) {
-    if (!imp.is_wildcard && imp.item_name != dt.type_name) continue;
-    if (const CovergroupDecl* imported =
-            PackageCovergroup(unit, imp.package_name, dt.type_name)) {
-      return imported;
-    }
-  }
-  // §3.12.1: else one the compilation unit declares, outside every design
-  // element, which every scope below it sees.
-  return CovergroupNamed(unit->cu_items, dt.type_name);
+  return VisibleCovergroup(dt.type_name, mod, unit);
 }
 
 // Adds to `mod` an always process that waits on the covergroup's clocking
@@ -106,6 +91,24 @@ void AddCovergroupEventProcess(std::string_view var_name,
 }
 
 }  // namespace
+
+const CovergroupDecl* VisibleCovergroup(std::string_view name,
+                                        const RtlirModule* mod,
+                                        const CompilationUnit* unit) {
+  if (const CovergroupDecl* own = CovergroupNamed(mod->let_decls, name)) {
+    return own;
+  }
+  for (const RtlirImport& imp : mod->imports) {
+    if (!imp.is_wildcard && imp.item_name != name) continue;
+    if (const CovergroupDecl* imported =
+            PackageCovergroup(unit, imp.package_name, name)) {
+      return imported;
+    }
+  }
+  // §3.12.1: else one the compilation unit declares, outside every design
+  // element, which every scope below it sees.
+  return CovergroupNamed(unit->cu_items, name);
+}
 
 void BindCovergroupVariable(const ModuleItem& item, RtlirVariable& var,
                             RtlirModule* mod, const CompilationUnit* unit,
