@@ -180,26 +180,31 @@ Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, int64_t index,
   return value;
 }
 
-// §7.12.2: the order sort(), or rsort() where `ascending` is clear, puts the
-// elements `elems` of `ref` in: by the value of the with clause of `expr`
-// where it has one, of the clause's signedness, and otherwise by their own
-// value, as text where the property holds strings (§6.16) and as numbers of
-// the element type's signedness (§6.11). Elements of equal keys keep their
-// order.
-std::vector<size_t> SortOrder(const Expr* expr, const ClassArrayRef& ref,
-                              const std::vector<Logic4Vec>& elems,
-                              bool ascending, SimContext& ctx, Arena& arena) {
+// §7.12.2: the keys sort() and rsort() order the elements `elems` of `ref`
+// by: the value of the with clause of `expr` where it has one, of the
+// clause's signedness, and otherwise the elements themselves.
+std::vector<Logic4Vec> SortKeys(const Expr* expr, const ClassArrayRef& ref,
+                                const std::vector<Logic4Vec>& elems,
+                                SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> keys;
   keys.reserve(elems.size());
   for (uint32_t i = 0; i < elems.size(); ++i)
     keys.push_back(
         WithValue(expr, elems[i], IndexFromLeft(ref, i), ctx, arena));
-  const bool kText = expr->with_expr == nullptr && ref.prop->is_string;
+  return keys;
+}
+
+// §7.12.2: the order sort(), or rsort() where `ascending` is clear, puts
+// elements of the keys `keys` in: as text where `as_text` is set, a string
+// property's own elements (§6.16), and otherwise as numbers of each key's
+// signedness (§6.11). Elements of equal keys keep their order.
+std::vector<size_t> SortOrder(const std::vector<Logic4Vec>& keys, bool as_text,
+                              bool ascending) {
   auto before = [&](size_t a, size_t b) {
-    if (kText) return Logic4VecToString(keys[a]) < Logic4VecToString(keys[b]);
+    if (as_text) return Logic4VecToString(keys[a]) < Logic4VecToString(keys[b]);
     return OrdersBefore(keys[a], keys[b], keys[a].is_signed);
   };
-  std::vector<size_t> order(elems.size());
+  std::vector<size_t> order(keys.size());
   std::iota(order.begin(), order.end(), 0);
   std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
     return ascending ? before(a, b) : before(b, a);
@@ -230,7 +235,9 @@ bool OrderClassArray(const Expr* expr, const ClassArrayRef& ref,
     for (size_t i = order.size(); i > 1; --i)
       std::swap(order[i - 1], order[ctx.Urandom32() % i]);
   } else {
-    order = SortOrder(expr, ref, elems, method == "sort", ctx, arena);
+    const bool kText = expr->with_expr == nullptr && ref.prop->is_string;
+    order = SortOrder(SortKeys(expr, ref, elems, ctx, arena), kText,
+                      method == "sort");
   }
   for (uint32_t i = 0; i < elems.size(); ++i) {
     StoreClassArrayElement(ref, IndexFromLeft(ref, i), elems[order[i]], ctx,
