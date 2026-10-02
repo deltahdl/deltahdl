@@ -108,10 +108,27 @@ static void CheckMemberAccessVisibility(
 // `::` access names a static member with no object, so the member itself is
 // what the qualifier is checked on: `C::m_inst` with `static local C m_inst;`
 // was accepted from a module, since only a `.` access was ever read.
+//
+// §8.23 (printed 200) lets `::` reach a class's static members, parameters and
+// types from outside it; a property or method written without `static`
+// belongs to an object, which `C::x` and `C::f()` name none of, so `C::x`
+// was read as 0 and `C::f()` run as though it were static. The constructor
+// is the one method §8.8 (printed 185) calls through `::` with no object,
+// `D::new(42)` being the typed constructor call that builds one.
 static void CheckScopedMemberVisibility(const Expr* e,
                                         const CompilationUnit* unit,
                                         DiagEngine& diag) {
-  ReportHiddenMember(ScopedClassMember(e, unit), e->rhs->range.start, diag);
+  const ClassMember* m = ScopedClassMember(e, unit);
+  ReportHiddenMember(m, e->rhs->range.start, diag);
+  if (m != nullptr && !m->is_static && !m->is_param && m->name != "new" &&
+      (m->kind == ClassMemberKind::kProperty ||
+       m->kind == ClassMemberKind::kMethod)) {
+    diag.Error(e->rhs->range.start,
+               std::format("cannot reach non-static member '{}' through the "
+                           "class scope operator from outside its class",
+                           e->rhs->text),
+               Subclause("8.23"));
+  }
 }
 
 // 18.11: naming a property in randomize()'s inline argument list changes that
