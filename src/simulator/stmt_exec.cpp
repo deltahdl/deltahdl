@@ -359,7 +359,8 @@ static ExecTask AwaitForkJoin(ForkJoinState* state) {
 // the spawning process for as long as it waits at the join, and of every
 // branch (RegisterForkChildScopes), so the disable kills the branches and
 // takes the parent out of the join, which then completes at once. §19.3: the
-// block beginning and ending are block events a covergroup may sample at.
+// block beginning and ending are block events a covergroup may sample at, the
+// ending only where the block was not disabled.
 static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   ctx.PushStaticScope(stmt->label);
@@ -368,9 +369,9 @@ static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
   SampleAtBlockEvent(stmt->label, true, ctx, arena);
 }
 
-static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx,
-                               Arena& arena) {
-  SampleAtBlockEvent(stmt->label, false, ctx, arena);
+static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                               bool ended) {
+  if (ended) SampleAtBlockEvent(stmt->label, false, ctx, arena);
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopActiveNamedScope();
   ctx.PopStaticScope(stmt->label);
@@ -417,7 +418,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
   if (labeled) {
-    ExitForkLabelScope(stmt, ctx, arena);
+    ExitForkLabelScope(stmt, ctx, arena, result != StmtResult::kDisable);
     if (result == StmtResult::kDisable &&
         ctx.GetDisableTarget() == stmt->label) {
       ctx.ClearDisableTarget();
@@ -466,11 +467,8 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
 }
 
 // Drops the named-scope registration and active-scope push established for a
-// named task call before its body started executing. §19.3: the task ending
-// is a block event a covergroup may sample at.
-static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx,
-                                     Arena& arena) {
-  SampleAtBlockEvent(func->name, false, ctx, arena);
+// named task call before its body started executing.
+static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx) {
   ctx.PopActiveNamedScope();
   ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
 }
@@ -492,7 +490,7 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
     ctx.ClearDisableTarget();
     return InlineTaskDisable::kStopHere;
   }
-  if (has_name) UnregisterTaskNamedScope(func, ctx, arena);
+  if (has_name) UnregisterTaskNamedScope(func, ctx);
   TeardownTaskCall(func, expr, ctx, arena);
   return InlineTaskDisable::kPropagate;
 }
@@ -501,6 +499,8 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
 // returns, or until a disable reaches it: §9.6.2 ends the task's activation at
 // a disable of its own name, which HandleInlineTaskDisable answers kStopHere
 // for, and passes any other disable on as kDisable for the caller to unwind.
+// §19.3: the task ending is a block event a covergroup may sample at, unless
+// the task was disabled.
 static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
                                    SimContext& ctx, Arena& arena) {
   bool has_name = !func->name.empty();
@@ -510,11 +510,12 @@ static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
     if (result == StmtResult::kDisable) {
       if (HandleInlineTaskDisable(func, expr, has_name, ctx, arena) ==
           InlineTaskDisable::kStopHere) {
-        break;
+        co_return StmtResult::kDone;
       }
       co_return StmtResult::kDisable;
     }
   }
+  if (has_name) SampleAtBlockEvent(func->name, false, ctx, arena);
   co_return StmtResult::kDone;
 }
 
@@ -566,7 +567,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   }
   StmtResult outcome = co_await ExecInlineTaskBody(func, expr, ctx, arena);
   if (outcome == StmtResult::kDisable) co_return StmtResult::kDisable;
-  if (has_name) UnregisterTaskNamedScope(func, ctx, arena);
+  if (has_name) UnregisterTaskNamedScope(func, ctx);
   TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
 }

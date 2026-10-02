@@ -257,4 +257,265 @@ TEST(CovergroupInstanceSim, RebuiltInstanceSamplesOncePerBlockEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3: an end block event is not triggered when its block, task or named fork
+// is disabled, so only the second pass of blk, which ends normally, samples.
+TEST(CovergroupInstanceSim, DisabledBlockTaskOrForkTriggersNoEndEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  task tk; v = 2; disable tk; v = 0; endtask\n"
+                       "  covergroup cg @@(end blk or end tk or end fk);\n"
+                       "    coverpoint v { bins b[] = {[0:3]}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    for (int i = 0; i < 2; i++) begin : blk\n"
+                       "      v = i; if (i == 0) disable blk;\n"
+                       "    end\n"
+                       "    tk();\n"
+                       "    fork : fk begin v = 3; disable fk; end join\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3: a covergroup variable holds a handle, so a copy of it and a formal
+// it is passed to reach the instance the variable holds.
+TEST(CovergroupInstanceSim, CopiedHandleAndFormalReachTheInstance) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  cg d;\n"
+                 "  function void f(cg h); h.sample(); endfunction\n"
+                 "  initial begin\n"
+                 "    v = 1; d = c; d.sample();\n"
+                 "    $write(\"copy=%0.2f \", c.get_inst_coverage());\n"
+                 "    v = 2; f(c);\n"
+                 "    $display(\"formal=%0.2f\", c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "copy=50.00 formal=100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3: each new builds a fresh instance, so a handle copied before the
+// variable is given a second instance still reaches the first.
+TEST(CovergroupInstanceSim, SecondNewLeavesTheCopiedInstance) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  cg d;\n"
+                 "  initial begin\n"
+                 "    v = 1; c.sample(); d = c; c = new; v = 2; c.sample();\n"
+                 "    $display(\"%0.2f %0.2f\", d.get_inst_coverage(),\n"
+                 "             c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §19.7.1: a covergroup whose strobe option is set samples in the
+// Postponed region of the slot its clocking event occurred in, so it sees the
+// v = 2 written after the edge, where the unstrobed one sees v = 1.
+TEST(CovergroupInstanceSim, StrobedCovergroupSamplesInPostponedRegion) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit clk; bit [1:0] v;\n"
+                 "  covergroup cg @(posedge clk);\n"
+                 "    type_option.strobe = 1;\n"
+                 "    coverpoint v { bins b = {2}; bins c = {3}; }\n"
+                 "  endgroup\n"
+                 "  covergroup cg2 @(posedge clk);\n"
+                 "    coverpoint v { bins b = {2}; bins c = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new; cg2 c2 = new;\n"
+                 "  initial begin\n"
+                 "    v = 1; #1 clk = 1; #0 v = 2;\n"
+                 "    #1 $display(\"%0.2f %0.2f\", c.get_inst_coverage(),\n"
+                 "                c2.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 0.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §19.7.1: a strobed covergroup takes one sample per time slot
+// however often its clocking event occurs in it, the value v holds at the end
+// of the slot, while a procedural sample() call is taken at once.
+TEST(CovergroupInstanceSim, StrobedCovergroupSamplesOncePerTimeSlot) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit clk; bit [1:0] v; int n, t;\n"
+                 "  covergroup cg @(clk);\n"
+                 "    type_option.strobe = 1;\n"
+                 "    coverpoint v { bins b[] = {[0:3]}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    #1 clk = 1; v = 1; #0 clk = 0; v = 2; #0 clk = 1;\n"
+                 "    v = 3;\n"
+                 "    #1 void'(c.get_inst_coverage(n, t));\n"
+                 "    $display(\"n=%0d t=%0d\", n, t);\n"
+                 "    v = 0; c.sample(); void'(c.get_inst_coverage(n, t));\n"
+                 "    $display(\"n=%0d t=%0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "n=1 t=4\nn=2 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.4 with §19.7.1: an embedded covergroup's strobe option defers its
+// clocking-event samples to the Postponed region as well.
+TEST(CovergroupInstanceSim, StrobedEmbeddedCovergroupSamplesInPostponedRegion) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit clk;\n"
+                       "  class C;\n"
+                       "    bit [1:0] x;\n"
+                       "    covergroup cg @(posedge clk);\n"
+                       "      type_option.strobe = 1;\n"
+                       "      coverpoint x { bins b = {2}; bins c = {3}; }\n"
+                       "    endgroup\n"
+                       "    function new(); cg = new; endfunction\n"
+                       "  endclass\n"
+                       "  C o;\n"
+                       "  initial begin\n"
+                       "    o = new; o.x = 1; #1 clk = 1; #0 o.x = 2;\n"
+                       "    #1 $display(\"%0.2f\", o.cg.get_inst_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §7.4: an element of an unpacked array of a covergroup type holds
+// the instance a new assigned to it builds, apart from its sibling's.
+TEST(CovergroupInstanceSim, ArrayElementHoldsTheInstanceNewBuilds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  cg arr[2];\n"
+                 "  initial begin\n"
+                 "    arr[0] = new; arr[1] = new; v = 1; arr[1].sample();\n"
+                 "    $display(\"%0.2f %0.2f\", arr[0].get_inst_coverage(),\n"
+                 "             arr[1].get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §8.3 and §26.3: a class property whose type is a covergroup the
+// module or a package declares holds the instance the constructor's new
+// builds.
+TEST(CovergroupInstanceSim, ClassPropertyHoldsTheInstanceNewBuilds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  covergroup pcg with function sample(int a);\n"
+                 "    coverpoint a { bins one = {1}; bins two = {2}; }\n"
+                 "  endgroup\n"
+                 "endpackage\n"
+                 "module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  class K;\n"
+                 "    cg p;\n"
+                 "    pk::pcg q;\n"
+                 "    function new(); p = new; q = new; endfunction\n"
+                 "  endclass\n"
+                 "  K k;\n"
+                 "  initial begin\n"
+                 "    k = new; v = 2; k.p.sample(); k.q.sample(1);\n"
+                 "    $display(\"%0.2f %0.2f\", k.p.get_inst_coverage(),\n"
+                 "             k.q.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §8.9: a static class property of a covergroup type holds the
+// instance `K::s = new` builds.
+TEST(CovergroupInstanceSim, StaticPropertyHoldsTheInstanceNewBuilds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                       "  endgroup\n"
+                       "  class K; static cg s; endclass\n"
+                       "  initial begin\n"
+                       "    K::s = new; v = 1; K::s.sample();\n"
+                       "    $display(\"%0.2f\", K::s.get_inst_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §6.21 and §13.4: a variable of a covergroup type declared in an
+// automatic function, an automatic task or a procedural block holds the
+// instance its new initializer builds.
+TEST(CovergroupInstanceSim, AutomaticLocalHoldsTheInstanceNewBuilds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  function automatic real f();\n"
+                 "    cg l = new;\n"
+                 "    l.sample();\n"
+                 "    return l.get_inst_coverage();\n"
+                 "  endfunction\n"
+                 "  task automatic t();\n"
+                 "    cg l = new;\n"
+                 "    v = 1; l.sample();\n"
+                 "    $write(\"%0.2f \", l.get_inst_coverage());\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    automatic cg l = new;\n"
+                 "    v = 2; l.sample();\n"
+                 "    $write(\"%0.2f %0.2f \", f(), l.get_inst_coverage());\n"
+                 "    t(); $display;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 50.00 50.00 \n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

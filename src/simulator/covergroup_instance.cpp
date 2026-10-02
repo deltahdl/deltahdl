@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,11 +28,15 @@
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 #include "simulator/covergroup_instance_internal.h"
+#include "simulator/deferred_caller.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/gen_block_const_frame.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
@@ -47,6 +52,9 @@ CovergroupFrame::CovergroupFrame(const CovergroupInstance& inst,
     if (c.function != nullptr) BindFunctionArgs(c.function, c.call, ctx, arena);
   }
   ctx.EnterSubroutineScope({});
+  if (inst.gen_consts != nullptr) {
+    BindGenBlockConstVars(*inst.gen_consts, ctx, arena);
+  }
   for (const auto& [name, var] : inst.formals) ctx.BindLocalVariable(name, var);
   if (inst.owner != nullptr) {
     ctx.PushThis(inst.owner);
@@ -149,6 +157,7 @@ void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
     point.is_real = DeclaredTypeIsReal(decl.data_type, ctx);
     point.is_four_state = DeclaredTypeIs4State(decl.data_type, ctx);
     point.enum_type = EnumTypeOfDataType(decl.data_type, ctx);
+    if (!point.is_real) point.assigned_width = point.width;
     return;
   }
   Logic4Vec v = EvalExpr(decl.expr, ctx, arena);
@@ -247,7 +256,7 @@ SampledValues ReadPoints(const CovergroupInstance& inst, SimContext& ctx,
                          Arena& arena) {
   SampledValues values;
   for (const SampledCoverpoint& point : inst.points) {
-    Logic4Vec v = EvalExpr(point.expr, ctx, arena);
+    Logic4Vec v = EvalExpr(point.expr, ctx, arena, point.assigned_width);
     const std::string& name = point.point->name;
     if (point.is_real) {
       values.real.emplace_back(
@@ -292,8 +301,14 @@ void SampleInstance(CovergroupInstance& inst, const Expr* call, SimContext& ctx,
                     Arena& arena) {
   if (!inst.group->collecting) return;
   CovergroupFrame frame(inst, ctx, arena, {{inst.sample_function, call}});
+  // §19.3 with §23.6: the expressions are read in the scope the instance was
+  // built in, however the call reached it; the actuals above in the caller's.
+  GenBlockSubroutineScope scope{inst.inst_prefix, inst.gen_prefixes, {}};
+  EnterCalleeInstance(ctx, {nullptr, inst.inst_prefix,
+                            inst.built_by_process ? &scope : nullptr});
   SetGuards(inst, ctx, arena);
   SampledValues values = ReadPoints(inst, ctx, arena);
+  LeaveCalleeInstance(ctx);
   std::vector<uint64_t> violations;
   violations.reserve(inst.group->coverpoints.size());
   for (const CoverPoint& cp : inst.group->coverpoints) {
@@ -322,19 +337,33 @@ struct CovergroupTarget {
   SampledCross* cross = nullptr;
 };
 
-// The object an expression naming a class handle holds; null where it names
-// none. Only a name is read, so that no expression is evaluated for its side
-// effects.
-ClassObject* ObjectNamed(const Expr* e, SimContext& ctx, Arena& arena) {
-  if (e->kind != ExprKind::kIdentifier) return nullptr;
-  if (e->text == "this") return ctx.CurrentThis();
-  if (ctx.GetVariableClassType(e->text).empty()) return nullptr;
-  return ctx.GetClassObject(EvalExpr(e, ctx, arena).ToUint64());
+// Whether `e` is a name a variable is read by, an identifier or a dotted,
+// scoped (`K::s`) or selected path of them, whose evaluation calls nothing.
+bool IsNamePath(const Expr* e) {
+  if (e->kind == ExprKind::kIdentifier) return true;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return e->lhs != nullptr && IsNamePath(e->lhs);
+  }
+  if (e->kind == ExprKind::kSelect && e->index_end == nullptr) {
+    return e->base != nullptr && IsNamePath(e->base);
+  }
+  return false;
 }
 
-// The instance a receiver names: a variable holding one, by its own name or
-// by a hierarchical one, an embedded covergroup of the object whose method is
-// running, or `h.cg`, the embedded covergroup `cg` of the object `h` holds.
+// §19.3: the instance the variable `e` names holds a handle to, the variable
+// read by its own name, by a hierarchical one (§23.6), through a virtual
+// interface (§25.9) or as an element of an array; null where it holds none.
+CovergroupInstance* InstanceHeldBy(const Expr* e, SimContext& ctx,
+                                   Arena& arena) {
+  if (!IsNamePath(e)) return nullptr;
+  Logic4Vec handle = EvalExpr(e, ctx, arena);
+  if (handle.width == 0 || !handle.IsKnown()) return nullptr;
+  return ctx.Covergroups().Held(handle.ToUint64());
+}
+
+// The instance a receiver names: an embedded covergroup of the object whose
+// method is running, `h.cg`, the embedded covergroup `cg` of the object `h`
+// holds, or the instance a variable of a covergroup type holds a handle to.
 CovergroupInstance* InstanceNamed(const Expr* e, SimContext& ctx,
                                   Arena& arena) {
   CovergroupTable& table = ctx.Covergroups();
@@ -343,20 +372,13 @@ CovergroupInstance* InstanceNamed(const Expr* e, SimContext& ctx,
     if (self != nullptr && table.Embedded(self->type, e->text) != nullptr) {
       return table.FindEmbedded(self, e->text);
     }
-    return table.Find(e->text, ctx);
+  } else if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+    ClassObject* owner = ObjectNamed(e->lhs, ctx, arena);
+    if (owner != nullptr && table.Embedded(owner->type, e->rhs->text)) {
+      return table.FindEmbedded(owner, e->rhs->text);
+    }
   }
-  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
-    return nullptr;
-  }
-  // §23.6: `u1.c` names the instance a variable of module instance u1 holds,
-  // kept under the hierarchical name's key.
-  if (CovergroupInstance* inst =
-          table.Find(HierarchicalReferenceName(e), ctx)) {
-    return inst;
-  }
-  ClassObject* owner = ObjectNamed(e->lhs, ctx, arena);
-  if (owner == nullptr) return nullptr;
-  return table.FindEmbedded(owner, e->rhs->text);
+  return InstanceHeldBy(e, ctx, arena);
 }
 
 CovergroupTarget TargetNamed(const Expr* e, SimContext& ctx, Arena& arena) {
@@ -476,10 +498,32 @@ Logic4Vec ReportCoverage(const CovergroupTarget& target, const Expr* call,
   return MakeRealVec(arena, coverage, 64);
 }
 
+// §19.3 with §19.7.1: a covergroup whose strobe option is set samples the
+// occurrences of its clocking event in a time slot once, in the slot's
+// Postponed region, its expressions read in the scope of the process that saw
+// the event.
+void StrobeSample(CovergroupInstance& inst, SimContext& ctx, Arena& arena) {
+  if (inst.strobe_pending) return;
+  inst.strobe_pending = true;
+  std::shared_ptr<Process> caller = SnapshotCallingProcess(ctx);
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [&inst, caller, &ctx, &arena]() {
+    CallerStandIn stand_in(caller.get(), ctx);
+    inst.strobe_pending = false;
+    SampleInstance(inst, EmptyCall(arena), ctx, arena);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
+                                   event);
+}
+
 Logic4Vec RunGroupMethod(std::string_view method, CovergroupInstance& inst,
                          const Expr* call, SimContext& ctx, Arena& arena) {
   if (method == "sample") {
-    SampleInstance(inst, call, ctx, arena);
+    if (call->is_coverage_event_sample && inst.group->type_option.strobe) {
+      StrobeSample(inst, ctx, arena);
+    } else {
+      SampleInstance(inst, call, ctx, arena);
+    }
   } else if (method == "start") {
     CoverageDB::Start(inst.group);
   } else if (method == "stop") {
@@ -520,34 +564,6 @@ bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §19.3 and §19.4: where an assignment of `new` to `lhs` builds its
-// instance; a site of no covergroup where `lhs` is of no covergroup type.
-CovergroupSite NewSiteOf(const Expr* lhs, SimContext& ctx, Arena& arena) {
-  ClassObject* owner = nullptr;
-  std::string_view name;
-  if (lhs->kind == ExprKind::kIdentifier) {
-    owner = ctx.CurrentThis();
-    name = lhs->text;
-  } else if (lhs->kind == ExprKind::kMemberAccess &&
-             !lhs->is_scope_resolution) {
-    owner = ObjectNamed(lhs->lhs, ctx, arena);
-    if (owner == nullptr) return {};
-    name = lhs->rhs->text;
-  } else {
-    return {};
-  }
-  if (owner != nullptr) {
-    if (const CovergroupDecl* decl =
-            ctx.Covergroups().Embedded(owner->type, name)) {
-      return {CovergroupTable::EmbeddedKey(owner, name), decl, owner};
-    }
-    if (lhs->kind != ExprKind::kIdentifier) return {};
-  }
-  const auto* declared = ctx.Covergroups().FindDeclared(name, ctx);
-  if (declared == nullptr) return {};
-  return {declared->first, declared->second, nullptr};
-}
-
 // §19.3 with §19.4: the process sampling an embedded covergroup at each
 // occurrence of its clocking event, as an always procedure would.
 SimCoroutine EmbeddedSamplingCoroutine(const Stmt* wait, SimContext& ctx,
@@ -571,6 +587,7 @@ const Stmt* EmbeddedSamplingWait(const CovergroupDecl& decl, Arena& arena) {
   auto* call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->lhs = access;
+  call->is_coverage_event_sample = true;
   auto* sample = arena.Create<Stmt>();
   sample->kind = StmtKind::kExprStmt;
   sample->expr = call;
@@ -614,6 +631,13 @@ void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
 
 }  // namespace
 
+ClassObject* ObjectNamed(const Expr* e, SimContext& ctx, Arena& arena) {
+  if (e->kind != ExprKind::kIdentifier) return nullptr;
+  if (e->text == "this") return ctx.CurrentThis();
+  if (ctx.GetVariableClassType(e->text).empty()) return nullptr;
+  return ctx.GetClassObject(EvalExpr(e, ctx, arena).ToUint64());
+}
+
 void BuildCoverpoint(CovergroupInstance& inst, const CoverPointDecl& decl,
                      size_t index, SimContext& ctx, Arena& arena) {
   const CoverGroup& group = *inst.group;
@@ -639,17 +663,28 @@ void BuildCoverpoint(CovergroupInstance& inst, const CoverPointDecl& decl,
   BuildCoverpointBins(inst, inst.points.back(), decl, ctx, arena);
 }
 
-CovergroupInstance* CovergroupTable::Create(std::string_view key) {
-  return &instances_[std::string(key)];
+CovergroupInstance* CovergroupTable::Create(std::string_view key,
+                                            bool embedded) {
+  std::string unique(key);
+  if (!embedded) unique += std::format("#{}", instances_.size());
+  CovergroupInstance* inst = &instances_[unique];
+  if (!identities_.contains(inst)) {
+    constexpr uint64_t kHandleTag = 0xC6000000;
+    uint64_t identity = kHandleTag | identities_.size();
+    identities_[inst] = identity;
+    held_[identity] = inst;
+  }
+  return inst;
 }
 
-CovergroupInstance* CovergroupTable::Find(std::string_view name,
-                                          const SimContext& ctx) {
-  for (const std::string& key : ctx.ScopedObjectKeys(name)) {
-    auto it = instances_.find(key);
-    if (it != instances_.end()) return &it->second;
-  }
-  return nullptr;
+uint64_t CovergroupTable::IdentityOf(const CovergroupInstance* inst) const {
+  auto it = identities_.find(inst);
+  return it == identities_.end() ? 0 : it->second;
+}
+
+CovergroupInstance* CovergroupTable::Held(uint64_t identity) const {
+  auto it = held_.find(identity);
+  return it == held_.end() ? nullptr : it->second;
 }
 
 std::string CovergroupTable::EmbeddedKey(const ClassObject* owner,
@@ -692,19 +727,13 @@ CovergroupInstance* CovergroupTable::FindEmbedded(const ClassObject* owner,
   return it != instances_.end() ? &it->second : nullptr;
 }
 
-void CovergroupTable::Declare(std::string_view key,
-                              const CovergroupDecl* decl) {
-  declared_[std::string(key)] = decl;
+void CovergroupTable::Declare(const Variable* v, const CovergroupDecl* decl) {
+  declared_[v] = decl;
 }
 
-const std::pair<const std::string, const CovergroupDecl*>*
-CovergroupTable::FindDeclared(std::string_view name,
-                              const SimContext& ctx) const {
-  for (const std::string& key : ctx.ScopedObjectKeys(name)) {
-    auto it = declared_.find(key);
-    if (it != declared_.end()) return &*it;
-  }
-  return nullptr;
+const CovergroupDecl* CovergroupTable::DeclaredOf(const Variable* v) const {
+  auto it = declared_.find(v);
+  return it == declared_.end() ? nullptr : it->second;
 }
 
 void CovergroupTable::Record(const CovergroupInstance& inst) {
@@ -735,10 +764,17 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   bool first_for_owner =
       site.owner != nullptr &&
       ctx.Covergroups().FindEmbedded(site.owner, decl.name) == nullptr;
-  CovergroupInstance* inst = ctx.Covergroups().Create(site.key);
+  CovergroupInstance* inst =
+      ctx.Covergroups().Create(site.key, site.owner != nullptr);
   *inst = CovergroupInstance{};
   inst->decl = &decl;
   inst->owner = site.owner;
+  inst->gen_consts = site.gen_consts;
+  inst->inst_prefix = ctx.ActiveInstancePrefix();
+  if (const Process* building = ctx.CurrentProcess()) {
+    inst->gen_prefixes = building->gen_prefixes;
+    inst->built_by_process = true;
+  }
   inst->group = ctx.CoverageData().CreateGroup(site.key);
   inst->group->options.name = site.key;
   inst->sample_function =
@@ -775,28 +811,6 @@ void SampleAtBlockEvent(std::string_view scope, bool is_begin, SimContext& ctx,
         });
     if (named) SampleInstance(*inst, EmptyCall(arena), ctx, arena);
   }
-}
-
-void CreateCovergroupForVar(std::string_view name, const RtlirVariable& var,
-                            SimContext& ctx, Arena& arena) {
-  ctx.Covergroups().Declare(name, var.covergroup);
-  const Expr* init = var.init_expr;
-  if (init != nullptr && init->kind == ExprKind::kCall && init->text == "new") {
-    BuildCovergroupInstance({std::string(name), var.covergroup, nullptr}, init,
-                            ctx, arena);
-  }
-}
-
-bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  const Expr* rhs = stmt->rhs;
-  if (stmt->lhs == nullptr || rhs == nullptr || rhs->kind != ExprKind::kCall ||
-      rhs->text != "new") {
-    return false;
-  }
-  CovergroupSite site = NewSiteOf(stmt->lhs, ctx, arena);
-  if (site.decl == nullptr) return false;
-  BuildCovergroupInstance(site, rhs, ctx, arena);
-  return true;
 }
 
 bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx,

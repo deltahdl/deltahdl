@@ -286,6 +286,30 @@ TEST(CovergroupInstanceSim, CoverpointDataTypeConvertsTheSample) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5: a coverpoint with a data type samples its expression as though it
+// were assigned to a variable of that type, so the 2-bit operands of a + b
+// widen to 3 bits and 3 + 1 keeps its carry: bin f (4) is hit, not s (5) and
+// not the 0 the self-determined sum would give.
+TEST(CovergroupInstanceSim, CoverpointDataTypeWidensTheExpression) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] a, b;\n"
+          "  covergroup cg;\n"
+          "    bit [2:0] cp: coverpoint a + b { bins f = {4}; bins s = {5}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    a = 3; b = 1; c.sample();\n"
+          "    $display(\"cov=%0.2f\", c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 // §19.5: a sample taken while a coverpoint's iff guard is false is ignored for
 // that coverpoint, so only hi is hit.
 TEST(CovergroupInstanceSim, CoverpointIffGuardIgnoresSample) {
@@ -305,6 +329,29 @@ TEST(CovergroupInstanceSim, CoverpointIffGuardIgnoresSample) {
                  "endmodule\n",
                  f),
       "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5 with §27.4: a covergroup declared in a loop generate block reads the
+// block instance's genvar in its bins, one bin in G[1] and two in G[2].
+TEST(CovergroupInstanceSim, BinsReadTheGenerateBlockGenvar) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] v = 1;\n"
+          "  for (genvar g = 1; g <= 2; g++) begin : G\n"
+          "    covergroup cg; coverpoint v { bins b[] = {[1:g]}; } endgroup\n"
+          "    cg c = new;\n"
+          "  end\n"
+          "  initial begin\n"
+          "    G[1].c.sample(); G[2].c.sample();\n"
+          "    $display(\"%0.2f %0.2f\", G[1].c.get_inst_coverage(),\n"
+          "             G[2].c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "100.00 50.00\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 

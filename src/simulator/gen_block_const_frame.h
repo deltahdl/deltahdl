@@ -10,6 +10,19 @@
 
 namespace delta {
 
+// §27.4: binds each of `consts`, the implicit localparam of a loop generate
+// block, as a signed 32-bit local of the innermost frame.
+inline void BindGenBlockConstVars(const GenBlockConsts& consts, SimContext& ctx,
+                                  Arena& arena) {
+  for (const auto& [name, value] : consts) {
+    auto* var = arena.Create<Variable>();
+    var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(value));
+    var->value.is_signed = true;
+    var->is_signed = true;
+    ctx.BindLocalVariable(name, var);
+  }
+}
+
 // §27.4: the implicit localparam of each loop generate block enclosing a
 // declaration, "an integer parameter that has the same name and type as the
 // loop index" whose value in each instance is the index that instance was
@@ -25,13 +38,7 @@ class GenBlockConstFrame {
       : ctx_(ctx), pushed_(!consts.empty()) {
     if (!pushed_) return;
     ctx_.PushScope();
-    for (const auto& [name, value] : consts) {
-      auto* var = arena.Create<Variable>();
-      var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(value));
-      var->value.is_signed = true;
-      var->is_signed = true;
-      ctx_.BindLocalVariable(name, var);
-    }
+    BindGenBlockConstVars(consts, ctx_, arena);
   }
   ~GenBlockConstFrame() {
     if (pushed_) ctx_.PopScope();

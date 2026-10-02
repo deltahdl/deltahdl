@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "elaborator/rtlir_scopes.h"
 #include "simulator/coverage_types.h"
 
 namespace delta {
@@ -19,6 +20,7 @@ class SimContext;
 struct ClassObject;
 struct ClassTypeInfo;
 struct CovergroupDecl;
+struct DataType;
 struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
@@ -50,6 +52,9 @@ struct SampledCoverpoint {
   // falls in no automatic bin, and the enumeration it is, null for none.
   bool is_four_state = true;
   const EnumTypeInfo* enum_type = nullptr;
+  // §19.5: the width the expression is evaluated at, as though assigned to a
+  // variable of the coverpoint's integral data type; 0 where none is written.
+  uint32_t assigned_width = 0;
   // §19.5.1: the guard of each bin whose definition ends in `iff`, by index
   // into the coverpoint's bins.
   std::vector<std::pair<size_t, const Expr*>> bin_guards;
@@ -82,31 +87,52 @@ struct CovergroupInstance {
   // §19.8.1: the formals of `with function sample`, as a function the
   // arguments of sample() are bound to; null where the covergroup has none.
   const ModuleItem* sample_function = nullptr;
+  // §19.3 with §23.6 and §27.4: the module instance, and where a process
+  // built the instance the generate block instances, of the scope `new` ran
+  // in, where the covergroup's expressions are read however the instance is
+  // reached.
+  std::string inst_prefix;
+  std::vector<std::string> gen_prefixes;
+  bool built_by_process = false;
+  // §27.4: the implicit localparams of the loop generate blocks the variable
+  // holding the instance is declared in, which the covergroup's expressions
+  // read; null outside any.
+  const GenBlockConsts* gen_consts = nullptr;
   std::vector<SampledCoverpoint> points;
   std::vector<SampledCross> crosses;
+  // §19.7.1: whether a strobed sample is waiting in the Postponed region of
+  // the current time slot, so that further occurrences of the clocking event
+  // in the slot add none.
+  bool strobe_pending = false;
 };
 
-// The covergroup instances a run's variables hold, keyed by the storage name
-// of the variable, as the semaphores and mailboxes of SimContext are, or for
-// an embedded covergroup by its object and name.
+// The covergroup instances of a run. §19.3: a variable of a covergroup type
+// holds a handle to the instance `new` built, its identity, so that a copy of
+// the handle or a formal it is passed to reaches the same instance; each
+// `new` builds a fresh one. §19.4: an embedded covergroup's instance is kept
+// by its object and name, its one `new` in the class's constructor.
 class CovergroupTable {
  public:
-  CovergroupInstance* Create(std::string_view key);
-  // The instance a reference to `name` denotes, searched in the order
-  // SimContext::ScopedObjectKeys gives; null where `name` holds none.
-  CovergroupInstance* Find(std::string_view name, const SimContext& ctx);
+  // A fresh instance, for an embedded covergroup (`embedded`) the one kept
+  // under `key`, built again where one is.
+  CovergroupInstance* Create(std::string_view key, bool embedded);
+  // The identity a variable holding `inst` stores, and the instance a stored
+  // identity refers to, null for the null handle or a value of no instance.
+  // An identity carries a tag no class handle reaches, so a class handle read
+  // as one refers to no instance, and fits the 32-bit carrier of a class
+  // property.
+  uint64_t IdentityOf(const CovergroupInstance* inst) const;
+  CovergroupInstance* Held(uint64_t identity) const;
   // §19.4: the instance of the covergroup `name` embedded in `owner`'s class.
   CovergroupInstance* FindEmbedded(const ClassObject* owner,
                                    std::string_view name);
   static std::string EmbeddedKey(const ClassObject* owner,
                                  std::string_view name);
-  // §19.3: records that the variable stored under `key` is of the covergroup
-  // type `decl`, so that a `new` assigned to it later builds an instance.
-  void Declare(std::string_view key, const CovergroupDecl* decl);
-  // The key of the variable `name` denotes, searched as Find searches, with
-  // the covergroup type Declare recorded for it; null where `name` is of none.
-  const std::pair<const std::string, const CovergroupDecl*>* FindDeclared(
-      std::string_view name, const SimContext& ctx) const;
+  // §19.3: records that the variable `v`, or the array it carries the
+  // elements of, is of the covergroup type `decl`, so that a `new` assigned
+  // to it later builds an instance; and the type recorded, null for none.
+  void Declare(const Variable* v, const CovergroupDecl* decl);
+  const CovergroupDecl* DeclaredOf(const Variable* v) const;
   // §19.11.3: notes a built instance among those of its type, and the
   // instances of the covergroup type `decl`, in the order they were built.
   void Record(const CovergroupInstance& inst);
@@ -129,7 +155,9 @@ class CovergroupTable {
 
  private:
   std::unordered_map<std::string, CovergroupInstance> instances_;
-  std::unordered_map<std::string, const CovergroupDecl*> declared_;
+  std::unordered_map<uint64_t, CovergroupInstance*> held_;
+  std::unordered_map<const CovergroupInstance*, uint64_t> identities_;
+  std::unordered_map<const Variable*, const CovergroupDecl*> declared_;
   std::vector<std::pair<const CovergroupDecl*, const CoverGroup*>> built_;
   std::vector<std::pair<std::string, CovergroupInstance*>> block_watchers_;
   std::unordered_map<
@@ -145,6 +173,7 @@ struct CovergroupSite {
   std::string key;
   const CovergroupDecl* decl = nullptr;
   ClassObject* owner = nullptr;
+  const GenBlockConsts* gen_consts = nullptr;
 };
 
 // §19.3 and §19.4: builds at `site` the instance a `new` of its covergroup
@@ -155,12 +184,25 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
                                             SimContext& ctx, Arena& arena);
 
 // §19.3: records the covergroup type of a variable `cg name ...;` and builds
-// the instance its initializer `new(...)` makes, if it has one.
+// the instance its initializer `new(...)` makes, if it has one, storing its
+// handle in `v`.
 void CreateCovergroupForVar(std::string_view name, const RtlirVariable& var,
-                            SimContext& ctx, Arena& arena);
+                            Variable* v, SimContext& ctx, Arena& arena);
+
+// §19.3: the covergroup a declared type names, one a module, interface or
+// program declares by its bare name, or a package's behind its scope or
+// imported; null for any other type.
+const CovergroupDecl* CovergroupOfType(const DataType& type, SimContext& ctx);
+
+// §19.3: a variable `v` of a subroutine or block declared of a covergroup
+// type `type`, its handle built by an initializer `new(...)`, `init`, where
+// there is one. False where `type` is of no covergroup.
+bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
+                              Variable* v, SimContext& ctx, Arena& arena);
 
 // §19.3 and §19.4: a blocking assignment of `new` to a variable of a
-// covergroup type, or in a class method to a covergroup the class embeds,
+// covergroup type, an element of an array of them, a property or static
+// property of one, or in a class method to a covergroup the class embeds,
 // builds the instance. False where the assignment is not one.
 bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 

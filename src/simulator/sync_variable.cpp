@@ -70,7 +70,7 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
   } else if (var.class_type_name == "mailbox") {
     CreateMailboxForVar(name, var, v, ctx, arena);
   } else if (var.covergroup != nullptr) {
-    CreateCovergroupForVar(name, var, ctx, arena);
+    CreateCovergroupForVar(name, var, v, ctx, arena);
   }
 }
 

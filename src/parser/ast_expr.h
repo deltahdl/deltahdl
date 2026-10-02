@@ -121,6 +121,10 @@ struct Expr {
   // the leading dot, so this flag is the only record that the identifier came
   // from a binding position.
   bool is_pattern_binding = false;
+  // §19.3: the sample() call deltahdl synthesizes for a covergroup's clocking
+  // event, which the strobe option (§19.7.1) defers to the Postponed region;
+  // a sample() written in the source is never one.
+  bool is_coverage_event_sample = false;
 
   // §16.12.18: for an actual argument of a property instance that is a
   // sequence_expr or a property_expr rather than an expression, passed to a

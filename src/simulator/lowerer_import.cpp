@@ -66,10 +66,12 @@ static bool IsPackageSubroutine(const ModuleItem* item) {
 
 // §11.12 with §26.3: an imported let is referenced by its bare name, as an
 // imported function is, and so, §16.8 and §16.12, are an imported named
-// sequence and property; a declaration of the importing scope keeps the name.
+// sequence and property, and, §19.3, an imported covergroup; a declaration of
+// the importing scope keeps the name.
 static void ImportNamedDeclaration(ModuleItem* item, SimContext& ctx) {
   switch (item->kind) {
     case ModuleItemKind::kLetDecl:
+    case ModuleItemKind::kCovergroupDecl:
       if (!ctx.FindLetDecl(item->name)) ctx.RegisterLetDecl(item->name, item);
       return;
     case ModuleItemKind::kSequenceDecl:

@@ -11,6 +11,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/class_typedef_layout.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
@@ -222,6 +223,9 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // module-scope declaration does (Lowerer sets the same flag there), so an
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
+  // §19.3: a local of a covergroup type holds a handle, its instance built by
+  // a `new` initializer.
+  if (TryCreateCovergroupLocal(type, init, v, ctx, arena)) return v;
   v->is_4state = DeclaredTypeIs4State(type, ctx);
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;

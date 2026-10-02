@@ -14,6 +14,7 @@ namespace delta {
 class Arena;
 class SimContext;
 struct ModuleItem;
+struct ClassObject;
 struct CoverCrossDecl;
 struct CoverPointDecl;
 struct CovergroupInstance;
@@ -51,6 +52,11 @@ class CovergroupFrame {
 
 // The integral and the real value of an expression a covergroup reads, and
 // of a value it reads.
+// The object an expression naming a class handle holds; null where it names
+// none. Only a name is read, so that no expression is evaluated for its side
+// effects.
+ClassObject* ObjectNamed(const Expr* e, SimContext& ctx, Arena& arena);
+
 int64_t CovergroupInt(const Expr* e, SimContext& ctx, Arena& arena);
 double CovergroupReal(const Expr* e, SimContext& ctx, Arena& arena);
 int64_t CovergroupIntOf(const Logic4Vec& v);

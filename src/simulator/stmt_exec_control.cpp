@@ -67,12 +67,12 @@ static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx,
 // Tears down what EnterBlockScope pushed. A no-op where it pushed nothing.
 // Always called immediately before ExecBlock returns so the scope stack is
 // balanced on every exit path. §19.3: a named block ending is a block event a
-// covergroup may sample at.
+// covergroup may sample at, unless the block was disabled, `ended` false.
 static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                               std::string_view frame) {
+                               std::string_view frame, bool ended) {
   if (frame.empty()) return;
   if (!stmt->label.empty()) {
-    SampleAtBlockEvent(stmt->label, false, ctx, arena);
+    if (ended) SampleAtBlockEvent(stmt->label, false, ctx, arena);
     ctx.PopActiveNamedScope();
     ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   }
@@ -109,27 +109,27 @@ ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (result == StmtResult::kDisable) {
       if (named && ctx.GetDisableTarget() == stmt->label) {
         ctx.ClearDisableTarget();
-        TeardownBlockScope(stmt, ctx, arena, frame);
+        TeardownBlockScope(stmt, ctx, arena, frame, false);
         co_return StmtResult::kDone;
       }
-      TeardownBlockScope(stmt, ctx, arena, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame, false);
       co_return StmtResult::kDisable;
     }
     if (result != StmtResult::kDone) {
-      TeardownBlockScope(stmt, ctx, arena, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame, true);
       co_return result;
     }
     if (ctx.StopRequested()) {
-      TeardownBlockScope(stmt, ctx, arena, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame, true);
       co_return StmtResult::kDone;
     }
 
     if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
-      TeardownBlockScope(stmt, ctx, arena, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame, false);
       co_return StmtResult::kDone;
     }
   }
-  TeardownBlockScope(stmt, ctx, arena, frame);
+  TeardownBlockScope(stmt, ctx, arena, frame, true);
   co_return StmtResult::kDone;
 }
 

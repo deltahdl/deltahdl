@@ -85,6 +85,7 @@ void AddCovergroupEventProcess(std::string_view var_name,
   call->kind = ExprKind::kCall;
   call->lhs = access;
   call->range.start = loc;
+  call->is_coverage_event_sample = true;
   auto* sample = arena.Create<Stmt>();
   sample->kind = StmtKind::kExprStmt;
   sample->expr = call;

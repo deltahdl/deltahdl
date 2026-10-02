@@ -659,11 +659,15 @@ static bool IsVirtualInterfaceDecl(const RtlirVariable& var) {
   return var.elem_type_kind == DataTypeKind::kVirtualInterface;
 }
 
-// The width of the variable's storage: a class handle (§8.3) and a virtual
-// interface handle (§25.9) are 64 bits wide whatever the declaration's own
-// width says, and every other declaration is as wide as it was elaborated.
+// The width of the variable's storage: a class handle (§8.3), a virtual
+// interface handle (§25.9) and a covergroup handle (§19.3) are 64 bits wide
+// whatever the declaration's own width says, and every other declaration is
+// as wide as it was elaborated.
 static uint32_t StorageWidth(const RtlirVariable& var) {
-  if (!var.class_type_name.empty() || IsVirtualInterfaceDecl(var)) return 64;
+  if (!var.class_type_name.empty() || IsVirtualInterfaceDecl(var) ||
+      var.covergroup != nullptr) {
+    return 64;
+  }
   return var.width;
 }
 

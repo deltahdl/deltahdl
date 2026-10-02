@@ -460,4 +460,131 @@ TEST(CovergroupInstanceSim, MethodsReachInstanceThroughHierarchicalName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.8 with §23.6: sample() called through a hierarchical name reads the
+// coverpoint expressions in the instance holding the covergroup, u1's v and
+// the interface instance's v, never the caller's v of 3.
+TEST(CovergroupInstanceSim, HierarchicalSampleReadsTheInstanceScope) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface ifc;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {0}; bins b = {1}; bins c = {2}; "
+                 "bins d = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "endinterface\n"
+                 "module leaf;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {0}; bins b = {1}; bins c = {2}; "
+                 "bins d = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  bit [1:0] v = 3;\n"
+                 "  leaf u1();\n"
+                 "  ifc i();\n"
+                 "  initial begin\n"
+                 "    u1.v = 1; u1.c.sample(); u1.v = 2; u1.c.sample();\n"
+                 "    i.v = 1; i.c.sample(); i.v = 2; i.c.sample();\n"
+                 "    $display(\"%0.2f %0.2f\", u1.c.get_inst_coverage(),\n"
+                 "             i.c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.8 with §23.6 and §27.4: a covergroup instance held in a loop generate
+// block instance or a named conditional generate block is reached from the
+// enclosing module by the block's hierarchical name.
+TEST(CovergroupInstanceSim, GenerateBlockInstanceReachedByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] v;\n"
+          "  covergroup cg;\n"
+          "    coverpoint v { bins a = {0}; bins b = {1}; bins c = {2}; "
+          "bins d = {3}; }\n"
+          "  endgroup\n"
+          "  for (genvar g = 0; g < 2; g++) begin : G\n"
+          "    cg c = new;\n"
+          "  end\n"
+          "  if (1) begin : B\n"
+          "    cg c = new;\n"
+          "  end\n"
+          "  initial begin\n"
+          "    v = 1; G[1].c.sample(); B.c.sample(); v = 2; B.c.sample();\n"
+          "    $display(\"%0.2f %0.2f %0.2f\", G[0].c.get_inst_coverage(),\n"
+          "             G[1].c.get_inst_coverage(), "
+          "B.c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "0.00 25.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.8 with §23.6 and §23.8: a name starting at the top-level module reaches
+// the instance the bare name does, from the module itself and upward from an
+// instance it holds.
+TEST(CovergroupInstanceSim, TopRootedNameReachesInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module leaf;\n"
+                "  initial #1 top.c.sample();\n"
+                "endmodule\n"
+                "module top;\n"
+                "  bit [1:0] v = 1;\n"
+                "  covergroup cg; coverpoint v { bins a = {1}; bins b = {2}; } "
+                "endgroup\n"
+                "  cg c = new;\n"
+                "  leaf u();\n"
+                "  initial begin\n"
+                "    #2 v = 2; top.c.sample();\n"
+                "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.8 with §25.9: an interface's covergroup instance is reached through a
+// virtual interface, in a class method and in the module.
+TEST(CovergroupInstanceSim, VirtualInterfaceReachesInstance) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface ifc;\n"
+          "  bit [1:0] v;\n"
+          "  covergroup cg; coverpoint v { bins a = {1}; bins b = {2}; } "
+          "endgroup\n"
+          "  cg c = new;\n"
+          "endinterface\n"
+          "class M;\n"
+          "  virtual ifc vif;\n"
+          "  function void hit(); vif.c.sample(); endfunction\n"
+          "  function real r(); return vif.c.get_inst_coverage(); "
+          "endfunction\n"
+          "endclass\n"
+          "module top;\n"
+          "  ifc i();\n"
+          "  M m;\n"
+          "  virtual ifc w;\n"
+          "  initial begin\n"
+          "    m = new; m.vif = i; w = i;\n"
+          "    i.v = 2; m.hit();\n"
+          "    $display(\"%0.2f %0.2f\", m.r(), w.c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

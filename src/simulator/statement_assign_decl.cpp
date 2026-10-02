@@ -19,6 +19,7 @@
 #include "simulator/block_enums.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
@@ -854,13 +855,18 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
 
 // §15.3.1 and §15.4.1 with §6.21: a semaphore or mailbox local of the block
 // is bound to an object of its own once whichever path above has created it
-// (CreateSyncObjectForLocal).
+// (CreateSyncObjectForLocal), and, §19.3, a covergroup local holds the
+// handle of the instance its `new` initializer builds.
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
   StmtResult result = ExecVarDeclBody(stmt, ctx, arena);
-  CreateSyncObjectForLocal(stmt, ctx.FindLocalVariable(stmt->var_name), ctx,
-                           arena);
+  Variable* local = ctx.FindLocalVariable(stmt->var_name);
+  CreateSyncObjectForLocal(stmt, local, ctx, arena);
+  if (local != nullptr) {
+    TryCreateCovergroupLocal(stmt->var_decl_type, stmt->var_init, local, ctx,
+                             arena);
+  }
   return result;
 }
 

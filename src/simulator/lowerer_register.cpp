@@ -503,8 +503,10 @@ static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
   auto* key = arena.Create<std::string>(std::string(pkg->name) +
                                         "::" + std::string(item->name));
   // §11.12 with §26.3: a package's let is a declaration of the package,
-  // named from any scope through the package, `pex::twice(7)`.
-  if (item->kind == ModuleItemKind::kLetDecl) {
+  // named from any scope through the package, `pex::twice(7)`, and so, §19.3,
+  // is its covergroup, the type of `pk::pcg c`.
+  if (item->kind == ModuleItemKind::kLetDecl ||
+      item->kind == ModuleItemKind::kCovergroupDecl) {
     ctx.RegisterLetDecl(*key, item);
     return;
   }
