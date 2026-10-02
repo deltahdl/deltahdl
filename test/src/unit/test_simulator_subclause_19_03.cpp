@@ -169,4 +169,92 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3: a block event `begin t` samples as the task starts, so v is still
+// the 0 it held before the call, not the 3 the task writes.
+TEST(CovergroupInstanceSim, BeginBlockEventSamplesAsTaskStarts) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  task tk; v = 3; endtask\n"
+                       "  covergroup cg @@(begin tk);\n"
+                       "    coverpoint v { bins lo = {0}; bins z = {2}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin v = 0; tk(); "
+                       "void'(c.get_inst_coverage(n, t)); "
+                       "$display(\"n=%0d t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3: the terms of a block event joined by `or` each sample: `end fn`
+// once the function has written 3, `begin blk` before the block writes 2.
+TEST(CovergroupInstanceSim, OrJoinedBlockEventsSampleFunctionEndAndBlockBegin) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v; int n, t;\n"
+                 "  function void fn; v = 3; endfunction\n"
+                 "  covergroup cg @@(end fn or begin blk);\n"
+                 "    coverpoint v { bins one = {1}; bins three = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin v = 0; fn(); v = 1;\n"
+                 "    begin : blk v = 2; end\n"
+                 "    void'(c.get_inst_coverage(n, t));\n"
+                 "    $display(\"n=%0d t=%0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "n=2 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3: a block event names the task of the instance the covergroup is in,
+// so only u1's instance samples when u1 runs its task.
+TEST(CovergroupInstanceSim, BlockEventSamplesOnlyTheInstanceRunningTheTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(bit GO = 0);\n"
+                       "  bit [1:0] v;\n"
+                       "  task tk; endtask\n"
+                       "  covergroup cg @@(begin tk);\n"
+                       "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial if (GO) tk();\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  m #(1) u1(); m u2();\n"
+                       "  initial #1 $display(\"%0.2f %0.2f\", "
+                       "u1.c.get_inst_coverage(), u2.c.get_inst_coverage());\n"
+                       "endmodule\n",
+                       f),
+            "50.00 0.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3: an instance built again by a second new is sampled once per block
+// event, so with at_least 2 one call of the task covers no bin.
+TEST(CovergroupInstanceSim, RebuiltInstanceSamplesOncePerBlockEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  task go; endtask\n"
+                       "  covergroup cg @@(end go);\n"
+                       "    option.at_least = 2;\n"
+                       "    coverpoint v { bins b = {2}; bins e = {1}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin c = new; v = 2; go();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=0 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

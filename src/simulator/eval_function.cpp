@@ -818,11 +818,14 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.PushFuncName(func->name);
   // §21.2.1.5: a function is a subroutine level of the hierarchical name, so
   // %m inside its body names the function; task calls push the same scope in
-  // ExecInlineTaskCall.
+  // ExecInlineTaskCall. §19.3: the function beginning and ending are block
+  // events a covergroup may sample at.
   ctx.PushActiveNamedScope(func->name);
+  SampleAtBlockEvent(func->name, true, ctx, arena);
   ctx.EnterFunction();
   ExecFunctionBodyInCallee(func, target.inst_prefix, ret_var, ctx, arena);
   ctx.ExitFunction();
+  SampleAtBlockEvent(func->name, false, ctx, arena);
   ctx.PopActiveNamedScope();
   ctx.PopFuncName();
   WritebackInCaller(func, expr, ctx, arena);

@@ -12,6 +12,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -48,25 +49,30 @@ static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
 }
 
 // Pushes the frame BlockFrameName gives `stmt`, and for a named block the
-// named scope beside it, answering the frame's name, empty where none.
-static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx) {
+// named scope beside it, answering the frame's name, empty where none. §19.3:
+// a named block beginning is a block event a covergroup may sample at.
+static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
   std::string_view frame = BlockFrameName(stmt, ctx);
   if (frame.empty()) return frame;
   ctx.PushStaticScope(frame);
   if (!stmt->label.empty()) {
     ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
     ctx.PushActiveNamedScope(stmt->label);
+    SampleAtBlockEvent(stmt->label, true, ctx, arena);
   }
   return frame;
 }
 
 // Tears down what EnterBlockScope pushed. A no-op where it pushed nothing.
 // Always called immediately before ExecBlock returns so the scope stack is
-// balanced on every exit path.
-static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx,
+// balanced on every exit path. §19.3: a named block ending is a block event a
+// covergroup may sample at.
+static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
                                std::string_view frame) {
   if (frame.empty()) return;
   if (!stmt->label.empty()) {
+    SampleAtBlockEvent(stmt->label, false, ctx, arena);
     ctx.PopActiveNamedScope();
     ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   }
@@ -97,33 +103,33 @@ void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
 
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool named = !stmt->label.empty();
-  std::string_view frame = EnterBlockScope(stmt, ctx);
+  std::string_view frame = EnterBlockScope(stmt, ctx, arena);
   for (auto* s : stmt->stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kDisable) {
       if (named && ctx.GetDisableTarget() == stmt->label) {
         ctx.ClearDisableTarget();
-        TeardownBlockScope(stmt, ctx, frame);
+        TeardownBlockScope(stmt, ctx, arena, frame);
         co_return StmtResult::kDone;
       }
-      TeardownBlockScope(stmt, ctx, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame);
       co_return StmtResult::kDisable;
     }
     if (result != StmtResult::kDone) {
-      TeardownBlockScope(stmt, ctx, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame);
       co_return result;
     }
     if (ctx.StopRequested()) {
-      TeardownBlockScope(stmt, ctx, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame);
       co_return StmtResult::kDone;
     }
 
     if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
-      TeardownBlockScope(stmt, ctx, frame);
+      TeardownBlockScope(stmt, ctx, arena, frame);
       co_return StmtResult::kDone;
     }
   }
-  TeardownBlockScope(stmt, ctx, frame);
+  TeardownBlockScope(stmt, ctx, arena, frame);
   co_return StmtResult::kDone;
 }
 

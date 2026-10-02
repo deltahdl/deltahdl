@@ -16,6 +16,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_event_property.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
@@ -357,14 +358,19 @@ static ExecTask AwaitForkJoin(ForkJoinState* state) {
 // of its own branches or from another process. The label is a named scope of
 // the spawning process for as long as it waits at the join, and of every
 // branch (RegisterForkChildScopes), so the disable kills the branches and
-// takes the parent out of the join, which then completes at once.
-static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx) {
+// takes the parent out of the join, which then completes at once. §19.3: the
+// block beginning and ending are block events a covergroup may sample at.
+static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
   ctx.PushStaticScope(stmt->label);
   ctx.PushActiveNamedScope(stmt->label);
   ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
+  SampleAtBlockEvent(stmt->label, true, ctx, arena);
 }
 
-static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx) {
+static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  SampleAtBlockEvent(stmt->label, false, ctx, arena);
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopActiveNamedScope();
   ctx.PopStaticScope(stmt->label);
@@ -372,7 +378,7 @@ static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx) {
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) EnterForkLabelScope(stmt, ctx);
+  if (labeled) EnterForkLabelScope(stmt, ctx, arena);
 
   uint32_t process_count = 0;
   for (auto* s : stmt->fork_stmts) {
@@ -411,7 +417,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
   if (labeled) {
-    ExitForkLabelScope(stmt, ctx);
+    ExitForkLabelScope(stmt, ctx, arena);
     if (result == StmtResult::kDisable &&
         ctx.GetDisableTarget() == stmt->label) {
       ctx.ClearDisableTarget();
@@ -460,8 +466,11 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
 }
 
 // Drops the named-scope registration and active-scope push established for a
-// named task call before its body started executing.
-static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx) {
+// named task call before its body started executing. §19.3: the task ending
+// is a block event a covergroup may sample at.
+static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx,
+                                     Arena& arena) {
+  SampleAtBlockEvent(func->name, false, ctx, arena);
   ctx.PopActiveNamedScope();
   ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
 }
@@ -483,7 +492,7 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
     ctx.ClearDisableTarget();
     return InlineTaskDisable::kStopHere;
   }
-  if (has_name) UnregisterTaskNamedScope(func, ctx);
+  if (has_name) UnregisterTaskNamedScope(func, ctx, arena);
   TeardownTaskCall(func, expr, ctx, arena);
   return InlineTaskDisable::kPropagate;
 }
@@ -553,10 +562,11 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   if (has_name) {
     ctx.RegisterNamedScope(func->name, ctx.CurrentProcess());
     ctx.PushActiveNamedScope(func->name);
+    SampleAtBlockEvent(func->name, true, ctx, arena);
   }
   StmtResult outcome = co_await ExecInlineTaskBody(func, expr, ctx, arena);
   if (outcome == StmtResult::kDisable) co_return StmtResult::kDisable;
-  if (has_name) UnregisterTaskNamedScope(func, ctx);
+  if (has_name) UnregisterTaskNamedScope(func, ctx, arena);
   TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
 }

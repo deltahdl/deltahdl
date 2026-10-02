@@ -111,6 +111,14 @@ class CovergroupTable {
   // instances of the covergroup type `decl`, in the order they were built.
   void Record(const CovergroupInstance& inst);
   std::vector<const CoverGroup*> InstancesOf(const CovergroupDecl* decl) const;
+  // §19.3: notes an instance whose covergroup is sampled at a block event,
+  // with the instance prefix of the scope it was built in, once however often
+  // the instance is rebuilt.
+  void WatchBlockEvents(CovergroupInstance* inst, std::string scope);
+  const std::vector<std::pair<std::string, CovergroupInstance*>>&
+  BlockEventWatchers() const {
+    return block_watchers_;
+  }
   // Whether any instance has been built, before which no call or option read
   // can reach one.
   bool Empty() const { return instances_.empty(); }
@@ -123,6 +131,7 @@ class CovergroupTable {
   std::unordered_map<std::string, CovergroupInstance> instances_;
   std::unordered_map<std::string, const CovergroupDecl*> declared_;
   std::vector<std::pair<const CovergroupDecl*, const CoverGroup*>> built_;
+  std::vector<std::pair<std::string, CovergroupInstance*>> block_watchers_;
   std::unordered_map<
       const ClassTypeInfo*,
       std::vector<std::pair<std::string_view, const CovergroupDecl*>>>
@@ -160,6 +169,13 @@ bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // crosses, `c.a.option.weight = ...;`, writes the option. False where the
 // assignment is not one.
 bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §19.3: a covergroup whose coverage event is a block_event_expression is
+// sampled as a task, function or block one of its terms names begins
+// (`is_begin`) or ends. Called as the scope named `scope` is entered or left,
+// it samples each such instance built in the running instance.
+void SampleAtBlockEvent(std::string_view scope, bool is_begin, SimContext& ctx,
+                        Arena& arena);
 
 // §19.8: sample(), get_coverage(), get_inst_coverage(), set_inst_name(),
 // start() and stop() called through an instance, the coverage methods also

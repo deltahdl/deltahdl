@@ -332,9 +332,9 @@ ClassObject* ObjectNamed(const Expr* e, SimContext& ctx, Arena& arena) {
   return ctx.GetClassObject(EvalExpr(e, ctx, arena).ToUint64());
 }
 
-// The instance a receiver names: a variable holding one, an embedded
-// covergroup of the object whose method is running, or `h.cg`, the embedded
-// covergroup `cg` of the object `h` holds.
+// The instance a receiver names: a variable holding one, by its own name or
+// by a hierarchical one, an embedded covergroup of the object whose method is
+// running, or `h.cg`, the embedded covergroup `cg` of the object `h` holds.
 CovergroupInstance* InstanceNamed(const Expr* e, SimContext& ctx,
                                   Arena& arena) {
   CovergroupTable& table = ctx.Covergroups();
@@ -347,6 +347,12 @@ CovergroupInstance* InstanceNamed(const Expr* e, SimContext& ctx,
   }
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
     return nullptr;
+  }
+  // §23.6: `u1.c` names the instance a variable of module instance u1 holds,
+  // kept under the hierarchical name's key.
+  if (CovergroupInstance* inst =
+          table.Find(HierarchicalReferenceName(e), ctx)) {
+    return inst;
   }
   ClassObject* owner = ObjectNamed(e->lhs, ctx, arena);
   if (owner == nullptr) return nullptr;
@@ -705,6 +711,14 @@ void CovergroupTable::Record(const CovergroupInstance& inst) {
   built_.emplace_back(inst.decl, inst.group);
 }
 
+void CovergroupTable::WatchBlockEvents(CovergroupInstance* inst,
+                                       std::string scope) {
+  for (const auto& watcher : block_watchers_) {
+    if (watcher.second == inst) return;
+  }
+  block_watchers_.emplace_back(std::move(scope), inst);
+}
+
 std::vector<const CoverGroup*> CovergroupTable::InstancesOf(
     const CovergroupDecl* decl) const {
   std::vector<const CoverGroup*> groups;
@@ -740,7 +754,27 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   if (first_for_owner && decl.event.kind == CoverageEventKind::kClocking) {
     StartEmbeddedSampling(*inst, ctx, arena);
   }
+  if (decl.event.kind == CoverageEventKind::kBlockEvent) {
+    ctx.Covergroups().WatchBlockEvents(inst, ctx.ActiveInstancePrefix());
+  }
   return inst;
+}
+
+void SampleAtBlockEvent(std::string_view scope, bool is_begin, SimContext& ctx,
+                        Arena& arena) {
+  const auto& watchers = ctx.Covergroups().BlockEventWatchers();
+  if (watchers.empty()) return;
+  std::string prefix = ctx.ActiveInstancePrefix();
+  for (size_t i = 0; i < watchers.size(); ++i) {
+    CovergroupInstance* inst = watchers[i].second;
+    if (watchers[i].first != prefix) continue;
+    bool named = std::ranges::any_of(
+        inst->decl->event.block_event, [&](const BlockEventTerm& term) {
+          return term.is_begin == is_begin && !term.path.empty() &&
+                 term.path.back() == scope;
+        });
+    if (named) SampleInstance(*inst, EmptyCall(arena), ctx, arena);
+  }
 }
 
 void CreateCovergroupForVar(std::string_view name, const RtlirVariable& var,

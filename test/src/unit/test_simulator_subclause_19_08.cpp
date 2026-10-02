@@ -437,4 +437,27 @@ TEST(CovergroupInstanceSim, SetInstNameSetsOptionName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.8 with §23.6: sample() and get_inst_coverage() reach the instance a
+// hierarchical name denotes, u1's and not u2's.
+TEST(CovergroupInstanceSim, MethodsReachInstanceThroughHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module leaf;\n"
+                 "  bit w;\n"
+                 "  covergroup g; coverpoint w; endgroup\n"
+                 "  g k = new;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  leaf u1(); leaf u2();\n"
+                 "  initial begin\n"
+                 "    u1.k.sample();\n"
+                 "    $display(\"%0.2f/%0.2f\", u1.k.get_inst_coverage(), "
+                 "u2.k.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00/0.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
