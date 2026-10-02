@@ -92,6 +92,9 @@ class CallResultReceiverScope {
   CallResultReceiverScope& operator=(const CallResultReceiverScope&) = delete;
 
   bool Holds() const { return base_ != nullptr; }
+  // Ends the hold before the scope does, as its destructor would: what a
+  // statement does before its process waits, the receiver's object resolved.
+  void Release();
 
  private:
   const Expr* base_ = nullptr;
@@ -99,6 +102,12 @@ class CallResultReceiverScope {
   std::optional<ReturnedAggregate> outer_aggregate_;
   SimContext& ctx_;
 };
+
+// Whether `side` starts at the call a CallResultReceiverScope holds, through
+// the members it selects and the elements it indexes -- `pk()` or `pk().kid`
+// while `pk()` is held -- so that evaluating it reads the held value and runs
+// nothing.
+bool StartsAtHeldCall(const Expr* side);
 
 // Records, for the innermost running body, the elements of the queue, dynamic
 // array or fixed-size unpacked array `returned` names -- the expression of the

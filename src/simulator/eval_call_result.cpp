@@ -338,12 +338,20 @@ CallResultReceiverScope::CallResultReceiverScope(const Expr* call,
   base_ = base;
 }
 
-CallResultReceiverScope::~CallResultReceiverScope() {
+CallResultReceiverScope::~CallResultReceiverScope() { Release(); }
+
+void CallResultReceiverScope::Release() {
   if (base_ == nullptr) return;
   ctx_.ClearDeferredArgSnapshot(base_);
   auto& reg = Register();
   reg.held_base = outer_base_;
   reg.held_aggregate = std::move(outer_aggregate_);
+  base_ = nullptr;
+}
+
+bool StartsAtHeldCall(const Expr* side) {
+  const Expr* call = CallReceiverStartsAt(side);
+  return call != nullptr && call == Register().held_base;
 }
 
 FunctionBodyResultScope::FunctionBodyResultScope(SimContext& ctx) : ctx_(ctx) {

@@ -150,9 +150,11 @@ static SyncProperty MakeSyncProperty(const SyncMember& m, ClassObject* obj,
           std::move(spelling)};
 }
 
-// The receiver as it was written, `c.mb` or `C::mb`, for a report to name.
+// The receiver as it was written, `c.mb`, `C::mb` or `pk().mb`, for a report
+// to name.
 static std::string SpellHandlePath(const Expr* expr) {
   if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  if (expr->kind == ExprKind::kCall) return std::string(expr->callee) + "()";
   return SpellHandlePath(expr->lhs) + (expr->is_scope_resolution ? "::" : ".") +
          std::string(expr->rhs->text);
 }

@@ -16,6 +16,7 @@
 #include "parser/ast_type.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
@@ -772,9 +773,11 @@ bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
 // was reached. §15.4.5 and §15.4.7: the message get() or peek() waited for
 // reaches the named variable once the wait ends, at the time of the put()
 // that ended it. The awaiters are named so their message outlives the wait.
-ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
+ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                         CallResultReceiverScope& held) {
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "put")) {
     MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
+    held.Release();
     if (msg.refused) co_return StmtResult::kDone;
     MailboxMessageType type = msg.type;
     co_await MailboxPutAwaiter{
@@ -782,6 +785,7 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "get")) {
+    held.Release();
     if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
     MailboxGetAwaiter get{.mbx = *mbx,
                           .expected = RetrievalTargetType(expr, ctx, arena),
@@ -793,6 +797,7 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "peek")) {
+    held.Release();
     if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
     MailboxPeekAwaiter peek{.mbx = *mbx,
                             .expected = RetrievalTargetType(expr, ctx, arena),

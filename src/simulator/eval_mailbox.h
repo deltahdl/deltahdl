@@ -8,6 +8,7 @@
 
 namespace delta {
 
+class CallResultReceiverScope;
 struct Expr;
 struct MailboxObject;
 struct Stmt;
@@ -58,7 +59,10 @@ bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
 // §15.4.3, §15.4.5 and §15.4.7: runs a call IsMailboxBlockingCall answered
 // true for, suspending the process while a bounded mailbox is full or while
 // the mailbox is empty, and storing the message get() or peek() retrieved
-// into the variable the call names.
-ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena);
+// into the variable the call names. §11.3.1: the receiver `held` holds, if
+// any, is released once the mailbox and the message are resolved, before the
+// process may wait.
+ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                         CallResultReceiverScope& held);
 
 }  // namespace delta

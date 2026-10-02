@@ -550,14 +550,17 @@ static WaitingCall ClassifyWaitingCall(const Expr* expr, SimContext& ctx,
   return WaitingCall::kNone;
 }
 
+// §11.3.1: the receiver `held` holds, if any, is released once the object the
+// call waits on is resolved, before the process waits.
 static ExecTask ExecWaitingCall(WaitingCall kind, const Expr* expr,
-                                SimContext& ctx, Arena& arena) {
+                                CallResultReceiverScope& held, SimContext& ctx,
+                                Arena& arena) {
   if (kind == WaitingCall::kProcess) {
-    co_return co_await ExecSuspendingProcessCall(expr, ctx, arena);
+    co_return co_await ExecSuspendingProcessCall(expr, ctx, arena, held);
   }
   // §15.4.3, §15.4.5 and §15.4.7: put(), get() and peek() wait on the mailbox.
   if (kind == WaitingCall::kMailbox) {
-    co_return co_await ExecMailboxCall(expr, ctx, arena);
+    co_return co_await ExecMailboxCall(expr, ctx, arena, held);
   }
   // §15.3: a process calling get() procures the keys it asks for before it can
   // continue, and waits where it stands until enough keys are in the bucket.
@@ -565,6 +568,7 @@ static ExecTask ExecWaitingCall(WaitingCall kind, const Expr* expr,
   // expression evaluator: only a statement can suspend the process it is in.
   auto* sem = SemaphoreCallTarget(expr, ctx, "get");
   int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+  held.Release();
   // §15.3.3: a negative count is an error, and the process does not wait.
   if (ReportNegativeKeyCount(expr, count, "15.3.3", ctx)) {
     co_return StmtResult::kDone;
@@ -587,22 +591,18 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   // expression evaluator while the value is still held. The value is released
   // before the process waits or a task's body runs, since another process may
   // reach the statement meanwhile.
-  InstanceMethodInfo instance_call;
-  bool enables_task = false;
-  WaitingCall waiting = WaitingCall::kNone;
-  {
-    CallResultReceiverScope receiver(expr, ctx, arena);
-    waiting = ClassifyWaitingCall(expr, ctx, arena);
-    if (waiting == WaitingCall::kNone)
-      enables_task = SetupInstanceTaskCall(expr, ctx, arena, instance_call);
-    if (waiting == WaitingCall::kNone && !enables_task && receiver.Holds()) {
-      ExecCallStmtExpr(expr, ctx, arena);
-      co_return StmtResult::kDone;
-    }
-  }
+  CallResultReceiverScope receiver(expr, ctx, arena);
+  WaitingCall waiting = ClassifyWaitingCall(expr, ctx, arena);
   if (waiting != WaitingCall::kNone) {
-    co_return co_await ExecWaitingCall(waiting, expr, ctx, arena);
+    co_return co_await ExecWaitingCall(waiting, expr, receiver, ctx, arena);
   }
+  InstanceMethodInfo instance_call;
+  bool enables_task = SetupInstanceTaskCall(expr, ctx, arena, instance_call);
+  if (!enables_task && receiver.Holds()) {
+    ExecCallStmtExpr(expr, ctx, arena);
+    co_return StmtResult::kDone;
+  }
+  receiver.Release();
   // §13.3 with §8.6: a task enabled through an object handle runs as a
   // coroutine too, so its timing controls suspend this process.
   if (enables_task) {

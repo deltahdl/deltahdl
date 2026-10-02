@@ -129,4 +129,35 @@ TEST(MailboxSim, ClassExtendingTheMailboxHoldsTheBaseQueue) {
   EXPECT_EQ(var->value.ToUint64(), 26u);
 }
 
+// §15.3 and §15.4 with §8.6 and §8.5: a mailbox or semaphore property is
+// reached through any expression that yields its object's handle, a call's
+// result among them, and §11.3.1 has the call run once for each method:
+// try_put() stores 5, num() counts it, try_get() takes it into x, put() adds a
+// key and try_get(3) takes all three. Each was reported as a call through a
+// null handle and did nothing.
+TEST(IpcSync, MethodsOfASyncPropertyReachedThroughACallsResult) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class K;\n"
+      "  mailbox #(int) mb = new;\n"
+      "  semaphore s = new(2);\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, x, n, ok;\n"
+      "  K k = new;\n"
+      "  function K pk(); calls++; return k; endfunction\n"
+      "  initial begin\n"
+      "    ok = pk().mb.try_put(5);\n"
+      "    n = pk().mb.num();\n"
+      "    ok += pk().mb.try_get(x);\n"
+      "    pk().s.put(1);\n"
+      "    ok += pk().s.try_get(3);\n"
+      "    $display(\"%0d %0d %0d %0d\", calls, ok, n, x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 3 1 5\n");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace

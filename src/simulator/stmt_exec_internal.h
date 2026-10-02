@@ -13,6 +13,7 @@
 
 namespace delta {
 
+class CallResultReceiverScope;
 struct Expr;
 struct Stmt;
 struct Logic4Vec;
@@ -86,10 +87,12 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx);
 StmtResult ExecDisableForkImpl(SimContext& ctx);
 // §9.7: a call statement through a process handle that suspends the calling
 // process -- `h.await()`, or `suspend()` on the running process itself -- and
-// its execution. Defined in stmt_exec_process.cpp.
+// its execution, which releases the receiver `held` holds, if any, once the
+// process is resolved and before it waits (§11.3.1). Defined in
+// stmt_exec_process.cpp.
 bool IsSuspendingProcessCall(const Expr* expr, SimContext& ctx, Arena& arena);
 ExecTask ExecSuspendingProcessCall(const Expr* expr, SimContext& ctx,
-                                   Arena& arena);
+                                   Arena& arena, CallResultReceiverScope& held);
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);

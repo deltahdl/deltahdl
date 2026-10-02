@@ -216,4 +216,38 @@ TEST(SemaphoreSim, GetWithANegativeCountIsReported) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// §15.4.3, §15.4.5, §15.4.7 and §15.3.3 with §8.6 and §11.3.1: a call
+// statement that may wait -- a mailbox's put(), peek() and get(), a
+// semaphore's get() -- through a property of a call's result runs the call
+// once, as the statement resolves the object it waits on, and acts on that
+// object: 5 is put, peeked into y and taken into x, and both keys are taken.
+TEST(IpcSync, AWaitingCallThroughACallsResultRunsTheCallOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class K;\n"
+      "  mailbox #(int) mb = new;\n"
+      "  semaphore s = new(2);\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, x, y, c1, c2, c3, c4;\n"
+      "  K k = new;\n"
+      "  function K pk(); calls++; return k; endfunction\n"
+      "  initial begin\n"
+      "    pk().mb.put(5);\n"
+      "    c1 = calls;\n"
+      "    pk().mb.peek(y);\n"
+      "    c2 = calls;\n"
+      "    pk().mb.get(x);\n"
+      "    c3 = calls;\n"
+      "    pk().s.get(2);\n"
+      "    c4 = calls;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", c1, c2, c3, c4, y, x, "
+      "k.s.try_get(1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3 4 5 5 0\n");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace

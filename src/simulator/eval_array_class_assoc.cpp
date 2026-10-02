@@ -18,6 +18,7 @@
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_element_assoc.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -123,10 +124,13 @@ bool PropertyIsArray(const ClassTypeInfo* from, std::string_view field,
 // Whether `expr` is a path of names to an object -- an identifier, `this`
 // among them, or a member access down such a path -- which is evaluated to a
 // handle without running anything. A call or a select on the way is not, and
-// is left to the paths that own it rather than evaluated here and again there.
+// is left to the paths that own it rather than evaluated here and again there,
+// save the call a CallResultReceiverScope holds (§8.6, §11.3.1): a member path
+// from it, `pk().mb`, reads the held value and runs nothing.
 bool IsHandlePath(const Expr* expr) {
   if (expr == nullptr) return false;
   if (expr->kind == ExprKind::kIdentifier) return true;
+  if (expr->kind == ExprKind::kCall) return StartsAtHeldCall(expr);
   return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
          expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier &&
          IsHandlePath(expr->lhs);

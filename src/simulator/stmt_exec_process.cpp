@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/exec_task.h"
 #include "simulator/process.h"
@@ -71,11 +72,13 @@ bool IsSuspendingProcessCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 ExecTask ExecSuspendingProcessCall(const Expr* expr, SimContext& ctx,
-                                   Arena& arena) {
+                                   Arena& arena,
+                                   CallResultReceiverScope& held) {
   ProcessMethodCall call;
   ResolveProcessMethodCall(expr, ctx, arena, call);
   if (call.method == "await") {
     Process* target = ResolveProcessAwaitTarget(expr, call.proc, ctx);
+    held.Release();
     if (target) co_await ProcessAwaitAwaiter{target};
     co_return StmtResult::kDone;
   }
@@ -83,6 +86,7 @@ ExecTask ExecSuspendingProcessCall(const Expr* expr, SimContext& ctx,
   // reports what §9.7 forbids, and the process then stops here.
   Logic4Vec ignored;
   TryEvalProcessMethodCall(expr, ctx, arena, ignored);
+  held.Release();
   co_await SelfSuspendAwaiter{call.proc};
   co_return StmtResult::kDone;
 }
