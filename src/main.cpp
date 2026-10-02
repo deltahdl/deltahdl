@@ -533,6 +533,9 @@ int SimulateDesign(const delta::CliOptions& opts,
   // the final blocks that could still evaluate one have run.
   delta::ReportImmediateCoverResults(sim_ctx.ImmediateCovers(), std::cout);
   delta::ReportConcurrentCoverResults(sim_ctx.ConcurrentCovers(), std::cout);
+  // §19.7: the cross bins a cross's cross_num_print_missing asks the coverage
+  // report to list, once the final blocks have sampled.
+  sim_ctx.CoverageData().ReportMissingCrossBins(std::cout);
   // §19.9: the coverage database is saved at the end of the run to the file
   // $set_coverage_db_name named, once the final blocks have sampled.
   sim_ctx.CoverageData().SaveNamedCoverageDb();

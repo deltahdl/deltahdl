@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -395,6 +396,34 @@ CrossSampleOutcome CoverageDB::ClassifyCrossSample(
     return CrossSampleOutcome::kIgnored;
   }
   return CrossSampleOutcome::kCounted;
+}
+
+// §19.7, Table 19-1: the report of `cross` of the covergroup instance `group`
+// ReportMissingCrossBins makes, where any of its cross bins is not covered,
+// naming the cross by the instance's name.
+static void ReportMissingBinsOf(const CoverGroup& group,
+                                const CrossCover& cross, std::ostream& os) {
+  std::vector<const CrossBin*> missing;
+  for (const CrossBin& bin : cross.bins) {
+    if (bin.hit_count < bin.at_least) missing.push_back(&bin);
+  }
+  if (missing.empty()) return;
+  os << "cross " << group.name << "." << cross.name << ": " << missing.size()
+     << " cross bins missing\n";
+  size_t shown =
+      std::min(missing.size(),
+               static_cast<size_t>(cross.option.cross_num_print_missing));
+  for (size_t i = 0; i < shown; ++i) os << "  " << missing[i]->name << "\n";
+}
+
+void CoverageDB::ReportMissingCrossBins(std::ostream& os) const {
+  for (const CoverGroup& group : groups_) {
+    for (const CrossCover& cross : group.crosses) {
+      if (cross.option.cross_num_print_missing > 0) {
+        ReportMissingBinsOf(group, cross, os);
+      }
+    }
+  }
 }
 
 }  // namespace delta

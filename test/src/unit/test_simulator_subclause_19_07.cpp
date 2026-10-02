@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -323,6 +325,113 @@ TEST(CoverageOptionSim,
       "endmodule\n",
       f);
   EXPECT_EQ(out, "100.00 0.00 2\n");
+}
+
+// §19.7, Table 19-1: with detect_overlap true, two bins of a coverpoint whose
+// range lists share a value draw a warning, an array's bin among them and two
+// intervals of a real coverpoint (§19.5.1), while an ignore_bins sharing
+// values with a bin draws none, and neither does a coverpoint that leaves the
+// option at its default of 0.
+TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingRangeLists) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  bit [3:0] x; real r;\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { option.detect_overlap = 1;\n"
+      "      bins lo = {[0:5]}; bins hi = {[3:8]};\n"
+      "      bins top = {9, 10}; bins s[] = {10, 11}; ignore_bins ig = {0}; }\n"
+      "    b: coverpoint x { bins lo = {[0:5]}; bins hi = {[3:8]}; }\n"
+      "    c: coverpoint r { option.detect_overlap = 1; bins lo = "
+      "{[1.0:3.0]};\n"
+      "      bins hi = {[2.0:4.0]}; bins far = {[5.0:6.0]}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin x = 4; c.sample(); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bins 'lo' and 'hi' of coverpoint 'a' overlap "
+                              "in their range lists",
+                              5, "19.7"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bins 'top' and 's[10]' of coverpoint 'a' "
+                              "overlap in their range lists",
+                              6, "19.7"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bins 'lo' and 'hi' of coverpoint 'c' overlap "
+                              "in their range lists",
+                              9, "19.7"));
+  EXPECT_EQ(f.diag.WarningCount(), 3u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.7, Table 19-1: with detect_overlap true, two transition bins whose
+// transition lists share a transition draw a warning; §19.5.2 expands
+// `0, 1 => 2` into `0 => 2` and `1 => 2`. The option set on the covergroup is
+// each coverpoint's default, and an ignore_bins transition draws none.
+TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingTransitionLists) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  bit [3:0] x;\n"
+      "  covergroup cg;\n"
+      "    option.detect_overlap = 1;\n"
+      "    a: coverpoint x { bins t1 = (1 => 2); bins t2 = (0, 1 => 2);\n"
+      "      bins t3 = (3 => 4); ignore_bins it = (3 => 4); }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin x = 1; c.sample(); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bins 't1' and 't2' of coverpoint 'a' overlap "
+                              "in their transition lists",
+                              5, "19.7"));
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.7, Table 19-1: cross_num_print_missing is how many of a cross's missing
+// cross bins the coverage report lists, 0 by default listing none. ab sets 2
+// of its 3 missing; the covergroup-level 1 of cg2 is xy's default, and pq,
+// whose one bin is covered, has none to list; ba keeps 0.
+TEST(CoverageOptionSim, CrossNumPrintMissingListsThatManyMissingBins) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  bit x, y;\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x;\n"
+      "    b: coverpoint y;\n"
+      "    ab: cross a, b { option.cross_num_print_missing = 2; }\n"
+      "    ba: cross b, a;\n"
+      "  endgroup\n"
+      "  covergroup cg2;\n"
+      "    option.cross_num_print_missing = 1;\n"
+      "    a: coverpoint x;\n"
+      "    b: coverpoint y;\n"
+      "    xy: cross a, b;\n"
+      "    p: coverpoint x { bins one = {1}; }\n"
+      "    q: coverpoint y { bins one = {1}; }\n"
+      "    pq: cross p, q;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  cg2 c2 = new;\n"
+      "  initial begin\n"
+      "    x = 0; y = 0; c.sample(); c2.sample();\n"
+      "    x = 1; y = 1; c2.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  std::ostringstream report;
+  f.ctx.CoverageData().ReportMissingCrossBins(report);
+  EXPECT_EQ(report.str(),
+            "cross c.ab: 3 cross bins missing\n"
+            "  <auto[0],auto[1]>\n"
+            "  <auto[1],auto[0]>\n"
+            "cross c2.xy: 2 cross bins missing\n"
+            "  <auto[0],auto[1]>\n");
 }
 
 }  // namespace

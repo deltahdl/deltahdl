@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <iosfwd>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -85,6 +86,11 @@ class CoverageDB {
   // left unwritten.
   void SaveCoverageDbFile(const std::string& path) const;
   void SaveNamedCoverageDb() const;
+
+  // §19.7, Table 19-1: for each cross whose cross_num_print_missing is greater
+  // than 0, the number of its cross bins not covered and the first that many
+  // of them, as the report at the end of the run lists them.
+  void ReportMissingCrossBins(std::ostream& os) const;
 
   // --- LRM 19.8: predefined coverage methods --------------------------------
 

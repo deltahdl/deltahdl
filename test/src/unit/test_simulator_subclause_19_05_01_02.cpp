@@ -42,4 +42,30 @@ TEST(CovergroupInstanceSim, SetExpressionBinsTakeArrayElements) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.1.2: a queue is an unpacked array (§7.10), so it defines one bin per
+// element as any other array does, read as it stands when the instance is
+// constructed: the element pushed before `new` is a bin of its own.
+TEST(CovergroupInstanceSim, SetExpressionBinsTakeQueueElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [2:0] v; int n, t;\n"
+                       "  int q[$] = '{1, 3, 5};\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins s[] = q; }\n"
+                       "  endgroup\n"
+                       "  cg c;\n"
+                       "  initial begin\n"
+                       "    q.push_back(6);\n"
+                       "    c = new;\n"
+                       "    v = 6; c.sample();\n"
+                       "    v = 3; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
