@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -233,6 +240,166 @@ TEST(ArrayQueryOnType,
                             "array query function '$size' cannot be applied "
                             "directly to dynamically sized type 'qt'",
                             7, "20.7"));
+}
+
+// §20.7: use on an associative array dimension is restricted to index types
+// with integral values, so a query of the string-indexed dimension of `aa`,
+// with or without the dimension number, is an error.
+TEST(ArrayQueryElab, AQueryOfAStringIndexedDimensionIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    n = $low(aa);\n"
+      "    n = $size(aa, 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$low' cannot be used on "
+                            "the associative dimension of 'aa', whose index "
+                            "type 'string' has no integral values",
+                            5, "20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot be used on "
+                            "the associative dimension of 'aa', whose index "
+                            "type 'string' has no integral values",
+                            6, "20.7"));
+}
+
+// §20.7: an integral index type, and $dimensions, which counts the dimensions
+// rather than querying one, stay legal on an associative array; so does a
+// query of a fixed dimension of an array whose second dimension is
+// string-indexed, a query whose dimension number does not fold, and a query
+// of a variable that is no array.
+TEST(ArrayQueryElab, IntegralIndexesAndOtherDimensionsAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int ai[int];\n"
+      "  int aa[string];\n"
+      "  int fs[4][string];\n"
+      "  int n, k;\n"
+      "  initial begin\n"
+      "    n = $low(ai);\n"
+      "    n = $dimensions(aa);\n"
+      "    n = $size(fs, 1);\n"
+      "    n = $size(aa, k);\n"
+      "    n = $size(aa, 5);\n"
+      "    n = $size(k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §20.7: a query folds only where its argument's dimensions are known here:
+// a range that does not fold, a part- or bit-select of a variable, a type
+// with no dimensions, a dimension number past the last or not constant, and a
+// call with no argument are left to the run.
+TEST(ArrayQueryConstExpr, AQueryWhoseDimensionsAreUnknownDoesNotFold) {
+  EvalFixture f;
+  for (const char* kText :
+       {"$size(logic [k:0])", "$size(v[3:0])", "$size(v[2])", "$size(real)",
+        "$size(int, 2)", "$size(int, 0)", "$size(int, k)", "$size()",
+        "$left(Undeclared)"}) {
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+  }
+}
+
+// §20.7 with §6.18: a typedef answers for the type it names, so one naming an
+// unpacked aggregate, whose dimensions the table does not carry, one whose
+// packed range does not fold, one naming a real type and a name the table
+// does not hold are not folded; a `type(...)` argument answers for the type it
+// holds, with or without a table.
+TEST(ArrayQueryConstExpr, ATypedefOrTypeOperatorFoldsForTheTypeItHolds) {
+  EvalFixture f;
+  DataType alias;
+  alias.kind = DataTypeKind::kNamed;
+  alias.type_name = "Arr";
+  DataType unfolded;
+  unfolded.kind = DataTypeKind::kLogic;
+  unfolded.packed_dim_left = ParseExprFrom("k", f);
+  unfolded.packed_dim_right = ParseExprFrom("0", f);
+  DataType real_type;
+  real_type.kind = DataTypeKind::kReal;
+  const std::unordered_map<std::string_view, DataType> kTypedefs = {
+      {"Arr2", alias}, {"Bad", unfolded}, {"R", real_type}};
+  const std::unordered_set<std::string_view> kAggregates = {"Arr"};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$size(type(int))", f)), 32);
+  TypedefRegistryGuard guard(&kTypedefs, &kAggregates);
+  for (const char* kText :
+       {"$size(Arr2)", "$size(Bad)", "$size(R)", "$size(NotATypedef)"}) {
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+  }
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$size(type(logic [3:0]))", f)), 4);
+}
+
+// §20.7: a parameter or a variable answers for its declared dimensions only
+// where every one of them is fixed, so a dynamic dimension, `[]`, and a
+// variable whose dimension did not fold are not folded; a fixed parameter
+// array, [3] being [0:2], and a variable declared [7:4] are, $high of the
+// descending [7:4] being 7.
+TEST(ArrayQueryConstExpr, OnlyFixedDimensionsOfAParameterOrVariableFold) {
+  EvalFixture f;
+  std::vector<Expr*> dynamic_dims = {nullptr};
+  std::vector<Expr*> fixed_dims = {ParseExprFrom("3", f)};
+  RtlirModule mod;
+  RtlirParamDecl dynamic_param;
+  dynamic_param.name = "DA";
+  dynamic_param.unpacked_dims = &dynamic_dims;
+  RtlirParamDecl fixed_param;
+  fixed_param.name = "FA";
+  fixed_param.unpacked_dims = &fixed_dims;
+  mod.params = {dynamic_param, fixed_param};
+  RtlirVariable unfolded;
+  unfolded.name = "uv";
+  unfolded.num_unpacked_dims = 1;
+  mod.variables.push_back(unfolded);
+  RtlirVariable descending;
+  descending.name = "dv";
+  descending.num_unpacked_dims = 1;
+  descending.unpacked_dims = {RtlirUnpackedDim{7, 4}};
+  mod.variables.push_back(descending);
+  ParamRangeRegistryGuard guard(&mod);
+  for (const char* kText : {"$size(DA)", "$size(uv)", "$size(none)"}) {
+    EXPECT_FALSE(ConstEvalInt(ParseExprFrom(kText, f)).has_value()) << kText;
+  }
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$high(FA)", f)), 2);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$high(dv)", f)), 7);
+}
+
+// §20.7: an array query is a constant expression only on an argument whose
+// dimensions are fixed, so one on a parameter declared with a dynamic
+// dimension, or on a queue, cannot initialize a localparam (§6.20.4); one on
+// a parameter whose dimension a parameter sizes can.
+TEST(ArrayQueryElab, AQueryOnADynamicDimensionIsNoConstantExpression) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  parameter int DA[] = '{1, 2};\n"
+      "  int q[$];\n"
+      "  localparam int S = $size(DA);\n"
+      "  localparam int T = $size(q);\n"
+      "  parameter int N = 2;\n"
+      "  parameter int C[N] = '{1, 2};\n"
+      "  localparam int U = $size(C);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "localparam 'U' initializer is not a constant "
+                             "expression",
+                             8, "6.20.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "localparam 'S' initializer is not a constant "
+                            "expression",
+                            4, "6.20.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "localparam 'T' initializer is not a constant "
+                            "expression",
+                            5, "6.20.4"));
 }
 
 }  // namespace

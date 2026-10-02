@@ -38,6 +38,9 @@ static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
     if (!arg) return std::nullopt;
     return CastConstVal(*arg, arg->width, expr->callee == "$signed");
   }
+  // §20.6.1: $typename answers a string, and §11.10 makes a string the packed
+  // number of its characters, as it makes a string literal.
+  if (expr->callee == "$typename") return ConstEvalStringLiteral(expr);
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;
   return ConstVal{*val, 32, true};
@@ -653,6 +656,67 @@ static std::optional<int64_t> ConstEvalFirstIntArg(const Expr* expr,
 
 // §20.5: the real-returning conversion functions may appear in a constant real
 // context. Each folds from the constant integral value of its argument.
+// §20.8.2, Table 20-4: the real math functions, each the C function it
+// corresponds to, by the number of arguments it takes.
+using RealMathOne = double (*)(double);
+using RealMathTwo = double (*)(double, double);
+
+static const std::unordered_map<std::string_view, RealMathOne>&
+RealMathOneArg() {
+  static const std::unordered_map<std::string_view, RealMathOne> kFunctions = {
+      {"$ln", [](double x) { return std::log(x); }},
+      {"$log10", [](double x) { return std::log10(x); }},
+      {"$exp", [](double x) { return std::exp(x); }},
+      {"$sqrt", [](double x) { return std::sqrt(x); }},
+      {"$floor", [](double x) { return std::floor(x); }},
+      {"$ceil", [](double x) { return std::ceil(x); }},
+      {"$sin", [](double x) { return std::sin(x); }},
+      {"$cos", [](double x) { return std::cos(x); }},
+      {"$tan", [](double x) { return std::tan(x); }},
+      {"$asin", [](double x) { return std::asin(x); }},
+      {"$acos", [](double x) { return std::acos(x); }},
+      {"$atan", [](double x) { return std::atan(x); }},
+      {"$sinh", [](double x) { return std::sinh(x); }},
+      {"$cosh", [](double x) { return std::cosh(x); }},
+      {"$tanh", [](double x) { return std::tanh(x); }},
+      {"$asinh", [](double x) { return std::asinh(x); }},
+      {"$acosh", [](double x) { return std::acosh(x); }},
+      {"$atanh", [](double x) { return std::atanh(x); }},
+  };
+  return kFunctions;
+}
+
+static const std::unordered_map<std::string_view, RealMathTwo>&
+RealMathTwoArgs() {
+  static const std::unordered_map<std::string_view, RealMathTwo> kFunctions = {
+      {"$pow", [](double x, double y) { return std::pow(x, y); }},
+      {"$atan2", [](double y, double x) { return std::atan2(y, x); }},
+      {"$hypot", [](double x, double y) { return std::hypot(x, y); }},
+  };
+  return kFunctions;
+}
+
+// §20.8.2: a real math function may be used in a constant expression, so it
+// folds where each of its arguments, an integer one converted to real, does.
+static std::optional<double> ConstEvalRealMathCall(const Expr* expr,
+                                                   const ScopeMap& scope) {
+  std::vector<double> args;
+  for (const Expr* arg : expr->args) {
+    std::optional<double> v = ConstEvalReal(arg, scope);
+    if (!v) return std::nullopt;
+    args.push_back(*v);
+  }
+  auto one = RealMathOneArg().find(expr->callee);
+  if (one != RealMathOneArg().end() && args.size() == 1) {
+    return one->second(args[0]);
+  }
+  auto two = RealMathTwoArgs().find(expr->callee);
+  if (two != RealMathTwoArgs().end() && args.size() == 2) {
+    return two->second(args[0], args[1]);
+  }
+  return std::nullopt;
+}
+
 static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
                                                   const ScopeMap& scope) {
   if (expr->callee == "$itor") {
@@ -676,7 +740,7 @@ static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
     std::memcpy(&fv, &bits, sizeof(fv));
     return static_cast<double>(fv);
   }
-  return std::nullopt;
+  return ConstEvalRealMathCall(expr, scope);
 }
 
 // §6.20.2 (printed pages 126-127): a name standing for a real parameter of

@@ -300,6 +300,9 @@ static std::optional<int64_t> EvalConstRealToIntCall(const Expr* expr,
 std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                         const ScopeMap& scope) {
   if (expr->callee == "$bits") return EvalConstBits(expr, scope);
+  if (IsArrayQueryFunction(expr->callee)) {
+    return EvalConstArrayQuery(expr, scope);
+  }
   if (expr->callee == "$countbits") return EvalConstCountbits(expr, scope);
   // §20.5: the integer-returning conversion functions take a real argument, so
   // they fold from the constant real value rather than an integral first arg.
@@ -542,6 +545,25 @@ static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
   return chars;
 }
 
+// §20.6.1: $typename may stand in a constant expression, and given a built-in
+// data type its answer is that type's keyword, the default signing being
+// dropped (step b). The other forms, which name a user-defined type or an
+// expression, are not folded here.
+static std::optional<std::string> ConstTypenameChars(const Expr* expr) {
+  static constexpr std::string_view kBuiltinTypes[] = {
+      "bit",  "logic", "byte",      "shortint", "int",    "longint", "integer",
+      "time", "real",  "shortreal", "realtime", "string", "chandle", "event"};
+  if (expr->callee != "$typename" || expr->args.size() != 1) {
+    return std::nullopt;
+  }
+  const Expr* arg = expr->args[0];
+  if (arg->kind != ExprKind::kIdentifier) return std::nullopt;
+  for (std::string_view type : kBuiltinTypes) {
+    if (arg->text == type) return std::string(type);
+  }
+  return std::nullopt;
+}
+
 std::optional<std::string> ConstEvalString(const Expr* expr) {
   if (expr == nullptr) return std::nullopt;
   switch (expr->kind) {
@@ -553,6 +575,8 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
       return ConcatenatedStringChars(expr);
     case ExprKind::kReplicate:
       return ReplicatedStringChars(expr);
+    case ExprKind::kSystemCall:
+      return ConstTypenameChars(expr);
     default:
       return std::nullopt;
   }

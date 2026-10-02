@@ -15,8 +15,10 @@ TEST(SeveritySystemTaskElab, FatalFinishNumberInRangeAccepted) {
     auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
     auto* design = Elaborate(src, ef);
     ASSERT_NE(design, nullptr);
-    EXPECT_FALSE(ef.has_errors)
-        << "finish_number " << fn << " must elaborate cleanly";
+    // The $fatal's own report (§20.10.1) is the one error: the
+    // finish_number is accepted.
+    EXPECT_EQ(ef.diag.ErrorCount(), 1u)
+        << "finish_number " << fn << " must be accepted";
   }
 }
 

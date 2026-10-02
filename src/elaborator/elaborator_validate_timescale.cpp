@@ -6,6 +6,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -177,6 +178,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
     }
   }
   CheckModuleTimescaleOrder(decl, diag_);
+  CheckIsunboundedArgs(decl, diag_);
 }
 
 namespace {

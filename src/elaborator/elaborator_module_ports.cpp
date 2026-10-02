@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -132,34 +133,6 @@ static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
              Subclause("23.2.2.2"));
 }
 
-// Fold one unpacked dimension of a port into the address range it declares.
-//
-// §7.4.2 writes a fixed-size unpacked dimension as
-// `[ constant_expression : constant_expression ]`, whose "first value may be
-// greater than, equal to, or less than the second value", and admits the short
-// form where "[size] shall mean the same as [0:size-1]". Both bounds are kept
-// in the order written, because §11.5.2 resolves an address against "the
-// address bounds given in the declaration" and `[1:4]` and `[4:1]` place their
-// elements at the same addresses in opposite order.
-//
-// The bounds are folded in the port's own parameter scope. §11.2.1 lets a
-// constant expression name a parameter, so `mem [N]` and `mem [1:N-1]` are
-// dimensions the empty scope resolves nothing in, and a dimension that folds to
-// nothing is one no consumer is told about.
-static std::optional<RtlirUnpackedDim> FoldPortUnpackedDim(
-    const Expr* dim, const ScopeMap& scope) {
-  if (dim == nullptr) return std::nullopt;
-  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    auto lv = ConstEvalInt(dim->lhs, scope);
-    auto rv = ConstEvalInt(dim->rhs, scope);
-    if (!lv || !rv) return std::nullopt;
-    return RtlirUnpackedDim{*lv, *rv};
-  }
-  auto sv = ConstEvalInt(dim, scope);
-  if (!sv || *sv <= 0) return std::nullopt;
-  return RtlirUnpackedDim{0, *sv - 1};
-}
-
 // The address range and the element count of every unpacked dimension of a
 // port, and the number of dimensions the declaration wrote. The count is what
 // the declaration says rather than what folded, so a consumer reading fewer
@@ -173,7 +146,7 @@ static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
     // fixed size and no address range, so there is nothing here to fold and
     // nothing to report.
     if (dim == nullptr) continue;
-    auto folded = FoldPortUnpackedDim(dim, scope);
+    auto folded = FoldUnpackedDimBounds(dim, scope);
     if (!folded) {
       diag.Error(port.loc,
                  std::format("unpacked dimension of port '{}' is not a "

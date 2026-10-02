@@ -218,4 +218,18 @@ TEST(RealMath, NegatedRealLiteralIsARealArgument) {
   EXPECT_EQ(DisplayReal("$floor(-2.5)", f), "-3\n");
 }
 
+// §20.8.2: a real math function may be used in a constant expression, so a
+// parameter initialized by one holds its value: R is 1.5, and I, $pow nested
+// in $rtoi, is 9. Folded as nothing, both read 0.
+TEST(RealMath, AParameterInitializedByAMathFunctionHoldsItsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter real R = $sqrt(2.25);\n"
+                       "  localparam int I = $rtoi($pow(3, 2));\n"
+                       "  initial $display(\"%f %0d\", R, I);\n"
+                       "endmodule\n",
+                       f),
+            "1.500000 9\n");
+}
+
 }  // namespace

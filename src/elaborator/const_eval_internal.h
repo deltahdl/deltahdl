@@ -11,7 +11,9 @@
 
 namespace delta {
 
+struct DataType;
 struct RtlirParamDecl;
+struct RtlirUnpackedDim;
 
 struct ConstVal {
   int64_t value;
@@ -293,6 +295,32 @@ const RtlirParamDecl* RegisteredParamNamed(std::string_view name);
 // The parameters of the registered module as a scope, for a fold of one of
 // their own expressions. Defined in const_eval.cpp.
 ScopeMap RegisteredModuleScope();
+
+// §6.18: the type the typedef `name` of the scope being elaborated stands for,
+// null when no TypedefRegistryGuard is live, when the table holds no such name
+// and when the name stands for an unpacked aggregate, whose dimensions the
+// table does not carry; and the width of `type` as the table resolves it.
+// Defined in const_eval_bits.cpp.
+const DataType* RegisteredTypedef(std::string_view name);
+uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
+
+// §20.7: the answer of an array query function whose argument has the
+// dimensions its declaration fixes -- a data type, a parameter array or a
+// variable of the registered module -- in a constant expression; empty where
+// the argument's dimensions are not known here or the answer would be 'x.
+// Defined in const_eval_array_query.cpp.
+bool IsArrayQueryFunction(std::string_view name);
+// §20.7: whether `arg` names a parameter or a variable of the registered
+// module with a dynamic, queue or associative dimension, on which an array
+// query is no constant expression.
+bool HasDynamicDimension(const Expr* arg);
+// §7.4.2: the bounds an unpacked dimension declares, `[l:r]` as written and
+// `[size]` as `[0:size-1]`, folded in `scope`; empty where they do not fold.
+// Defined in const_eval_array_query.cpp.
+std::optional<RtlirUnpackedDim> FoldUnpackedDimBounds(const Expr* dim,
+                                                      const ScopeMap& scope);
+std::optional<int64_t> EvalConstArrayQuery(const Expr* expr,
+                                           const ScopeMap& scope);
 
 // §5.7.1: the width an integer literal's size constant states, and 32 for an
 // unsized one. Defined in const_eval.cpp.

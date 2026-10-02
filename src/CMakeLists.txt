@@ -216,6 +216,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_eval_named.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/const_eval.cpp
+    elaborator/const_eval_array_query.cpp
     elaborator/const_eval_bits.cpp
     elaborator/const_eval_func.cpp
     elaborator/const_eval_is_constant.cpp
@@ -431,6 +432,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_decls_redecl.cpp
     elaborator/elaborator_decls_var.cpp
     elaborator/elaborator_dpi.cpp
+    elaborator/elaborator_elab_severity_task.cpp
     elaborator/elaborator_dpi_formals.cpp
     elaborator/elaborator_dpi_names.cpp
     elaborator/elaborator_dpi_signature.cpp
@@ -494,6 +496,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_operations_aggregate.cpp
     elaborator/elaborator_validate_operations_streaming.cpp
     elaborator/elaborator_validate_operations_unsized.cpp
+    elaborator/elaborator_validate_isunbounded.cpp
     elaborator/elaborator_validate_queries.cpp
     elaborator/elaborator_validate_queries_dims.cpp
     elaborator/elaborator_validate_randsequence.cpp

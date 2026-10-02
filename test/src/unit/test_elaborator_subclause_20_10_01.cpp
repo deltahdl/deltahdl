@@ -494,7 +494,8 @@ TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
       "endmodule\n",
       ef);
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(ef.has_errors);
+  // The $fatal's own report is the one error: the argument is accepted.
+  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
   EXPECT_TRUE(design->simulation_blocked);
 }
 
@@ -515,6 +516,84 @@ TEST(ElabSeverityTask, NonConstantStillRejectedAfterGenerateFor) {
   EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
                             "argument to $error must be a constant expression",
                             6, "20.10.1"));
+}
+
+// §20.10.1: each elaboration severity task reports with its own severity, so
+// $error and $fatal are errors while $warning and $info are not.
+TEST(ElabSeverityTask, ErrorAndFatalAreReportedAsErrors) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  $error(\"oops\");\n"
+      "  $fatal(1, \"boom\");\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration ERROR in scope 'm': oops", 2,
+                            "20.10.1"));
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm': boom", 3,
+                            "20.10.1"));
+}
+
+TEST(ElabSeverityTask, WarningAndInfoAreReportedAsWarnings) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  $warning(\"careful\");\n"
+      "  $info(\"fyi\");\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration WARNING in scope 'm': careful", 2,
+                              "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 'm': fyi", 3,
+                              "20.10.1"));
+  EXPECT_FALSE(ef.diag.HasErrors());
+}
+
+// §20.10.1: the message list is formatted as $display formats it, each
+// specifier taking the value of the constant expression after the format.
+TEST(ElabSeverityTask, MessageFormatsItsConstantArguments) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  parameter P = 5;\n"
+      "  $warning(\"P=%0d h=%h\", P, 8'hab);\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration WARNING in scope 'm': P=5 h=ab", 3,
+                              "20.10.1"));
+}
+
+// §20.10.1 with §21.2.1.3: a %d without a field width is sized to the
+// argument's width, so a 4-bit parameter takes two columns.
+TEST(ElabSeverityTask, MessageSizesADecimalByTheArgumentsWidth) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  parameter logic [3:0] P = 5;\n"
+      "  $info(\"[%d]\", P);\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 'm': [ 5]", 3,
+                              "20.10.1"));
+}
+
+// §20.10.1 with §21.2.1: an argument wider than 64 bits is formatted whole.
+TEST(ElabSeverityTask, MessageFormatsAnArgumentWiderThanSixtyFourBits) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  $info(\"%h\", 72'h12_3456789a_bcdef012);\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ReportedWarning(
+      ef.diag.Diagnostics(),
+      "elaboration INFO in scope 'm': 123456789abcdef012", 2, "20.10.1"));
 }
 
 }  // namespace

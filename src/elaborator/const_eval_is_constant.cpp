@@ -71,6 +71,7 @@ bool IsConstantSysFunc(std::string_view name) {
       "$countbits",
 
       "$sformatf",
+      "$typename",
   };
   return kConstSysFuncs.count(name) > 0;
 }
@@ -86,13 +87,19 @@ bool AllElementsConstant(const std::vector<Expr*>& elems,
 static bool IsConstEvenWithNonConstArgs(std::string_view name) {
   static const std::unordered_set<std::string_view> kFuncs = {
       "$bits", "$dimensions", "$unpacked_dimensions", "$left", "$right",
-      "$low",  "$high",       "$increment",           "$size",
+      "$low",  "$high",       "$increment",           "$size", "$typename",
   };
   return kFuncs.count(name) > 0;
 }
 
 static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   if (!IsConstantSysFunc(expr->callee)) return false;
+  // §20.7: an array query is a constant expression only on an argument whose
+  // dimensions are fixed.
+  if (IsArrayQueryFunction(expr->callee) && !expr->args.empty() &&
+      HasDynamicDimension(expr->args[0])) {
+    return false;
+  }
   if (IsConstEvenWithNonConstArgs(expr->callee)) return true;
   return AllElementsConstant(expr->args, scope);
 }

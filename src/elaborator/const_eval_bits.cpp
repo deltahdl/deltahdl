@@ -50,6 +50,20 @@ TypedefRegistryGuard::~TypedefRegistryGuard() {
   g_aggregate_typedef_names = prev_aggregate_names_;
 }
 
+const DataType* RegisteredTypedef(std::string_view name) {
+  if (g_typedefs == nullptr) return nullptr;
+  if (g_aggregate_typedef_names != nullptr &&
+      g_aggregate_typedef_names->count(name) != 0)
+    return nullptr;
+  auto it = g_typedefs->find(name);
+  return it == g_typedefs->end() ? nullptr : &it->second;
+}
+
+uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope) {
+  return g_typedefs == nullptr ? EvalTypeWidth(type)
+                               : EvalTypeWidth(type, *g_typedefs, scope);
+}
+
 // §20.6.2: the packed bit width of a built-in integral type keyword. The
 // vector atoms (bit/logic/reg) are 1 bit; the integer-atom keywords carry
 // their standard widths. Non-integral (real, string, ...) and user-defined

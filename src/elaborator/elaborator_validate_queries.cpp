@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -514,6 +515,38 @@ bool DimIsVariableSized(const Expr* d) {
 using VarDimMap =
     std::unordered_map<std::string_view, const std::vector<Expr*>*>;
 
+// §20.7: the query functions that answer for one dimension, whose use on an
+// associative array dimension is restricted to integral index types.
+bool QueriesOneDimension(std::string_view callee) {
+  return callee == "$left" || callee == "$right" || callee == "$low" ||
+         callee == "$high" || callee == "$increment" || callee == "$size";
+}
+
+// §20.7: a query of one dimension of `v` (dimension n, 1 where the call
+// writes no n) is an error where that dimension is associative with a
+// `string` index, a type with no integral values.
+void CheckQueryOnStringIndex(const Expr* e, const VarDimMap& vars,
+                             const ScopeMap& scope, DiagEngine& diag) {
+  if (!QueriesOneDimension(e->callee)) return;
+  auto it = vars.find(e->args[0]->text);
+  if (it == vars.end()) return;
+  std::optional<int64_t> n =
+      e->args.size() >= 2 ? ConstEvalInt(e->args[1], scope) : 1;
+  const std::vector<Expr*>& dims = *it->second;
+  if (!n || *n < 1 || static_cast<uint64_t>(*n) > dims.size()) return;
+  const Expr* dim = dims[static_cast<size_t>(*n - 1)];
+  if (dim == nullptr || dim->kind != ExprKind::kIdentifier ||
+      dim->text != "string") {
+    return;
+  }
+  diag.Error(e->range.start,
+             std::format("array query function '{}' cannot be used on the "
+                         "associative dimension of '{}', whose index type "
+                         "'string' has no integral values",
+                         e->callee, e->args[0]->text),
+             Subclause("20.7"));
+}
+
 // §20.7.1: when a §20.7 query function is called as (v, n) on an array variable
 // v with a constant dimension index n greater than 1, it is an error if the
 // n-th dimension is variable-sized. The slowest-varying unpacked dimension is
@@ -523,29 +556,35 @@ using VarDimMap =
 // an inner variable-sized dimension does not, because each element of the
 // slower-varying dimension can hold a differently sized object. $dimensions and
 // $unpacked_dimensions take no second argument, so they never reach this check.
+void CheckQueryOnVariableSizedDim(const Expr* e, const VarDimMap& vars,
+                                  const ScopeMap& scope, DiagEngine& diag) {
+  if (e->args.size() < 2 || e->args[1] == nullptr) return;
+  // §20.7: the dimension index is a constant expression, so fold it in the
+  // module's parameter scope. This resolves a parameter, localparam, or
+  // genvar-valued n the same way a literal one is resolved; a non-constant
+  // (e.g. run-time-variable) index folds to nothing and is left alone.
+  auto n_val = ConstEvalInt(e->args[1], scope);
+  auto it = vars.find(e->args[0]->text);
+  if (!n_val || *n_val <= 1 || it == vars.end()) return;
+  auto n = static_cast<uint64_t>(*n_val);
+  const std::vector<Expr*>& dims = *it->second;
+  if (n <= dims.size() && DimIsVariableSized(dims[n - 1])) {
+    diag.Error(e->range.start,
+               std::format("array query function '{}' cannot query "
+                           "variable-sized dimension {} of array '{}'",
+                           e->callee, n, e->args[0]->text),
+               Subclause("20.7.1"));
+  }
+}
+
 void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSystemCall && IsArrayQueryFunc(e->callee) &&
-      e->args.size() >= 2 && e->args[0] && e->args[1] &&
+      !e->args.empty() && e->args[0] &&
       e->args[0]->kind == ExprKind::kIdentifier) {
-    // §20.7: the dimension index is a constant expression, so fold it in the
-    // module's parameter scope. This resolves a parameter, localparam, or
-    // genvar-valued n the same way a literal one is resolved; a non-constant
-    // (e.g. run-time-variable) index folds to nothing and is left alone.
-    auto n_val = ConstEvalInt(e->args[1], scope);
-    auto it = vars.find(e->args[0]->text);
-    if (n_val && *n_val > 1 && it != vars.end()) {
-      auto n = static_cast<uint64_t>(*n_val);
-      const std::vector<Expr*>& dims = *it->second;
-      if (n <= dims.size() && DimIsVariableSized(dims[n - 1])) {
-        diag.Error(e->range.start,
-                   std::format("array query function '{}' cannot query "
-                               "variable-sized dimension {} of array '{}'",
-                               e->callee, n, e->args[0]->text),
-                   Subclause("20.7.1"));
-      }
-    }
+    CheckQueryOnStringIndex(e, vars, scope, diag);
+    CheckQueryOnVariableSizedDim(e, vars, scope, diag);
   }
   CheckArrayQueryOnVarDimExpr(e->lhs, vars, scope, diag);
   CheckArrayQueryOnVarDimExpr(e->rhs, vars, scope, diag);

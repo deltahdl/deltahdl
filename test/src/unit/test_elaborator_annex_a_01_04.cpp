@@ -35,7 +35,10 @@ TEST(ElaborationSeverityTaskElab, FatalValidFinishNumbers) {
     auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
     auto* design = Elaborate(src, f);
     ASSERT_NE(design, nullptr);
-    EXPECT_FALSE(f.has_errors) << "finish_number " << fn << " should be valid";
+    // The $fatal's own report (§20.10.1) is the one error: the
+    // finish_number is valid.
+    EXPECT_EQ(f.diag.ErrorCount(), 1u)
+        << "finish_number " << fn << " should be valid";
   }
 }
 
@@ -61,7 +64,8 @@ TEST(ElaborationSeverityTaskElab, FatalNoArgsIsValid) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  // The $fatal's own report (§20.10.1) is the one error: the call is valid.
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

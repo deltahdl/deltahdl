@@ -497,4 +497,8 @@ bool TypedefHasDynamicDim(const std::vector<Expr*>& dims);
 void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
                                         DiagEngine& diag);
 
+// §20.6.3: reports each call of $isunbounded in `decl` whose argument is not
+// the name of a parameter. Defined in elaborator_validate_isunbounded.cpp.
+void CheckIsunboundedArgs(const ModuleDecl* decl, DiagEngine& diag);
+
 }  // namespace delta

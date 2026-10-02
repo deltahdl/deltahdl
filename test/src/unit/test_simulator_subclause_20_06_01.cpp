@@ -159,4 +159,20 @@ TEST(UtilitySystemTaskTest, TypenameDistinguishesTypesForStringComparison) {
   EXPECT_EQ(out, "logic[7:0]\nlogic[7:0]\nlogic[3:0]\n");
 }
 
+// §20.6.1: $typename may stand in a constant expression, so a string parameter
+// or localparam initialized by it holds the type's name and compares equal to
+// it.
+TEST(TypenameSim, AStringParameterInitializedByTypenameHoldsTheName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter string P = $typename(int);\n"
+                       "  localparam string L = $typename(real);\n"
+                       "  initial $display(\"[%s] [%s] %0d\", P, L, P == "
+                       "\"int\");\n"
+                       "endmodule\n",
+                       f),
+            "[int] [real] 1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

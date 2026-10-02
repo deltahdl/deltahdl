@@ -587,4 +587,116 @@ TEST(ArrayQuerySim, QueryResultIsASignedInteger) {
   EXPECT_EQ(out, "-1 1 -1 1\n");
 }
 
+// §20.7: an array query function on a data type is legal in a constant
+// expression, so a parameter, a localparam and a packed dimension fold its
+// answer: a ranged vector type, an integer type's [31:0], a type of two packed
+// dimensions, a typedef of sixteen bits and a packed structure of nine.
+TEST(ArrayQuerySim, AQueryOnADataTypeFoldsInAConstantExpression) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef logic [16:1] Word;\n"
+                 "  typedef struct packed { logic v; bit [8:1] d; } P;\n"
+                 "  parameter int W = $size(logic [5:0]);\n"
+                 "  localparam int L = $left(int);\n"
+                 "  localparam int D = $dimensions(logic [3:0][1:0]);\n"
+                 "  localparam int I = $increment(Word);\n"
+                 "  localparam int S = $size(P);\n"
+                 "  localparam int R = $right(logic [3:0][1:0], 2);\n"
+                 "  bit [$size(Word)-1:0] v;\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d\", W, L, "
+                 "D, I, S, R, $bits(v));\n"
+                 "endmodule\n",
+                 f),
+      "6 31 2 1 9 0 16\n");
+}
+
+// §20.7: the dimensions of a parameter array are fixed, so a query of them
+// folds in a constant expression, the declared [4] being [0:3] and the
+// written [7:4] its own bounds.
+TEST(ArrayQuerySim, AQueryOnAParameterArrayFoldsInAConstantExpression) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter int A[4] = '{1, 2, 3, 4};\n"
+                       "  parameter int B[7:4] = '{1, 2, 3, 4};\n"
+                       "  localparam int N = $size(A);\n"
+                       "  localparam int H = $high(A) - $low(A);\n"
+                       "  localparam int U = $unpacked_dimensions(B);\n"
+                       "  localparam int BL = $left(B);\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", N, H, U, BL);\n"
+                       "endmodule\n",
+                       f),
+            "4 3 1 7\n");
+}
+
+// §20.7: so are the fixed unpacked dimensions of a variable, here in the
+// parameter override of an instance.
+TEST(ArrayQuerySim, AQueryOnAFixedVariableFoldsInAParameterOverride) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub #(int W = 1, int H = 1);\n"
+                       "  initial $display(\"%0d %0d\", W, H);\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic [4:0] vec[0:2];\n"
+                       "  int m[2][5];\n"
+                       "  sub #($size(vec) * 2, $size(m, 2)) u();\n"
+                       "endmodule\n",
+                       f),
+            "6 5\n");
+}
+
+// §20.7: each built-in type folds with the dimension it implies -- a vector
+// type's one bit and an integer type's [n-1:0] -- a ranged vector keeps the
+// bounds and direction it is written with, and a typedef answers for the type
+// it names: two packed dimensions, a typedef of a typedef, a packed union.
+TEST(ArrayQuerySim, EachDataTypeFoldsWithTheDimensionsItHolds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef logic [16:1] Word;\n"
+                 "  typedef Word Word2;\n"
+                 "  typedef logic [3:0][1:0] Two;\n"
+                 "  typedef union packed { logic [3:0] a; bit [3:0] b; } U;\n"
+                 "  localparam int A = $size(logic) * 1000 + $left(byte) * 10 "
+                 "+ $left(shortint);\n"
+                 "  localparam int B = $left(longint) * 100 + $left(time);\n"
+                 "  localparam int C = $size(reg [3:0]) * 100 + $right(logic "
+                 "[0:3]) * 10 + $high(logic [0:3]);\n"
+                 "  localparam int D = $increment(logic [0:3]) * 10 + "
+                 "$low(logic [0:3]);\n"
+                 "  localparam int E = $dimensions(Two) * 100 + $size(Two, 2) "
+                 "* 10 + $size(U);\n"
+                 "  localparam int G = $size(Word2);\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d\", A, B, C, D, "
+                 "E, G);\n"
+                 "endmodule\n",
+                 f),
+      "1085 6363 433 -10 224 16\n");
+}
+
+// §20.7: a parameter folds with its unpacked dimensions and then the packed
+// ones of its type -- an int's [31:0], a declared [7:4] -- or, declared with
+// no type, the [31:0] of the integer value it holds. A real parameter has no
+// dimensions, so $size of it is 'x, read as 0, and $dimensions 0.
+TEST(ArrayQuerySim, AParameterFoldsWithTheDimensionsOfItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter int P = 3;\n"
+                       "  parameter logic [7:4] Q = 0;\n"
+                       "  parameter int A[4] = '{1, 2, 3, 4};\n"
+                       "  parameter U = 5;\n"
+                       "  parameter real R = 1.5;\n"
+                       "  localparam int S = $size(P);\n"
+                       "  localparam int L = $left(Q);\n"
+                       "  localparam int D = $dimensions(A);\n"
+                       "  localparam int W = $size(U);\n"
+                       "  localparam int RS = $size(R);\n"
+                       "  localparam int RD = $dimensions(R);\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d\", S, L, "
+                       "D, W, RS, RD);\n"
+                       "endmodule\n",
+                       f),
+            "32 7 2 32 0 0\n");
+}
+
 }  // namespace
