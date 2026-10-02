@@ -1,5 +1,6 @@
 #include "elaborator/class_method_reads.h"
 
+#include <cstddef>
 #include <format>
 #include <functional>
 #include <string_view>
