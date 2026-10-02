@@ -723,8 +723,10 @@ static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
   return ctx.FindLetDecl(expr->callee);
 }
 
-static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+// A method called on a receiver: a built-in method of its type, or a class
+// method of the object it yields.
+static bool TryDispatchReceiverMethod(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out) {
   if (TryDispatchModeMethod(expr, ctx, arena, out)) return true;
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
@@ -739,7 +741,12 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryEvalElementObjectMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalAssocElementMethodCall(expr, ctx, arena, out)) return true;
   // and one on a chained property receiver, `c.kid.f()`, on its object.
-  if (TryEvalMethodOnEvaluatedBase(expr, ctx, arena, out)) return true;
+  return TryEvalMethodOnEvaluatedBase(expr, ctx, arena, out);
+}
+
+static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (TryDispatchReceiverMethod(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;

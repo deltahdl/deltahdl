@@ -520,21 +520,27 @@ static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
   co_return StmtResult::kDone;
 }
 
+// Runs at once a call statement served before any search for a task to
+// enable: a system task call, or a call of rand_mode() or constraint_mode();
+// false where the statement is neither.
+static bool ExecNonSuspendingCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  if (TryExecSystemCallTask(expr, ctx, arena)) return true;
+  // §18.8 and §18.9: rand_mode() and constraint_mode() are neither tasks nor
+  // waits, so the expression evaluator runs them at once. §11.3.1 has their
+  // receiver evaluated once, and the checks in ExecInlineTaskCall evaluate a
+  // receiver such as `pk().x` to learn whether it is a process, a semaphore or
+  // a mailbox.
+  if (!IsModeMethodCall(expr)) return false;
+  ExecCallStmtExpr(expr, ctx, arena);
+  return true;
+}
+
 static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
 
-  if (TryExecSystemCallTask(expr, ctx, arena)) {
-    co_return StmtResult::kDone;
-  }
-  // §18.8 and §18.9: rand_mode() and constraint_mode() are neither tasks nor
-  // waits, so the expression evaluator runs them at once. §11.3.1 has their
-  // receiver evaluated once, and the checks below evaluate a receiver such as
-  // `pk().x` to learn whether it is a process, a semaphore or a mailbox.
-  if (IsModeMethodCall(expr)) {
-    ExecCallStmtExpr(expr, ctx, arena);
-    co_return StmtResult::kDone;
-  }
+  if (ExecNonSuspendingCall(expr, ctx, arena)) co_return StmtResult::kDone;
 
   if (IsSuspendingProcessCall(expr, ctx, arena)) {
     co_return co_await ExecSuspendingProcessCall(expr, ctx, arena);
