@@ -60,6 +60,19 @@ bool InstanceOptionForbiddenAtItemLevel(std::string_view member, bool cross) {
   return member == "auto_bin_max" || member == "detect_overlap";
 }
 
+// §19.7.1, Table 19-4: whether a type coverage option named `member` may NOT
+// be specified at the cross level when `cross` holds, at the coverpoint level
+// otherwise. strobe, merge_instances and distribute_first belong to the
+// covergroup level alone, real_interval to the covergroup and coverpoint
+// levels; weight, goal and comment are allowed at every level.
+bool TypeOptionForbiddenAtItemLevel(std::string_view member, bool cross) {
+  if (member == "strobe" || member == "merge_instances" ||
+      member == "distribute_first") {
+    return true;
+  }
+  return cross && member == "real_interval";
+}
+
 bool IsLiteralOne(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kIntegerLiteral &&
          e->int_val == 1;
@@ -456,22 +469,26 @@ void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
 }
 
 // §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
-// cross body. A member that may not be specified at this syntactic level is
-// rejected; a `type_option` is held to §19.7.1's constant value.
+// cross body, or §19.7.1, Table 19-4: a type option set there. A member that
+// may not be specified at this syntactic level is rejected; a `type_option` is
+// held to §19.7.1's constant value.
 bool Parser::ParseItemLevelOption(CoverageOption& option,
                                   const CovergroupBodyState& state,
                                   CovItemLevel level) {
   if (!ParseCoverageOption(option)) return false;
-  if (!option.is_type_option &&
-      InstanceOptionForbiddenAtItemLevel(option.member,
-                                         level == CovItemLevel::kCross)) {
-    diag_.Error(option.loc,
-                "coverage option 'option." + std::string(option.member) +
-                    "' may not be specified at the " +
-                    std::string(level == CovItemLevel::kCross ? "cross"
-                                                              : "coverpoint") +
-                    " level",
-                Subclause("19.7"));
+  const bool kCross = level == CovItemLevel::kCross;
+  const bool kForbidden =
+      option.is_type_option
+          ? TypeOptionForbiddenAtItemLevel(option.member, kCross)
+          : InstanceOptionForbiddenAtItemLevel(option.member, kCross);
+  if (kForbidden) {
+    diag_.Error(
+        option.loc,
+        "coverage option '" +
+            std::string(option.is_type_option ? "type_option." : "option.") +
+            std::string(option.member) + "' may not be specified at the " +
+            std::string(kCross ? "cross" : "coverpoint") + " level",
+        Subclause(option.is_type_option ? "19.7.1" : "19.7"));
   }
   RejectFormalInTypeOption(option, state);
   return option.value != nullptr;
