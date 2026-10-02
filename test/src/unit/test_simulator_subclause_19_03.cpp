@@ -122,4 +122,51 @@ TEST(CovergroupInstanceSim, ProceduralNewBuildsInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3 with §26.3: a covergroup a package declares is a type its import makes
+// visible, so `pcg c = new;` builds an instance sampling the package's pv, 0.
+TEST(CovergroupInstanceSim, ImportedPackageCovergroupBuildsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  bit [1:0] pv;\n"
+                       "  covergroup pcg; coverpoint pv { bins lo = {0}; bins "
+                       "hi = {3}; bins z = {2}; } endgroup\n"
+                       "endpackage\n"
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  pcg c = new; int n, t;\n"
+                       "  initial begin pv = 0; c.sample(); "
+                       "void'(c.get_inst_coverage(n, t)); "
+                       "$display(\"n=%0d t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §26.3: a package-qualified covergroup type needs no import, and
+// an explicit import of the type's own name makes it visible past one naming
+// another item, so `p::pcg c` and `pcg d` each build an instance.
+TEST(CovergroupInstanceSim,
+     PackageCovergroupByScopeOrNamedImportBuildsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  bit [1:0] pv;\n"
+                       "  covergroup pcg; coverpoint pv { bins lo = {0}; bins "
+                       "hi = {3}; } endgroup\n"
+                       "endpackage\n"
+                       "module top;\n"
+                       "  p::pcg c = new;\n"
+                       "  import p::pv; import p::pcg;\n"
+                       "  pcg d = new; int n, t;\n"
+                       "  initial begin pv = 3; c.sample(); d.sample(); "
+                       "void'(c.get_inst_coverage(n, t)); "
+                       "$write(\"n=%0d t=%0d \", n, t); "
+                       "void'(d.get_inst_coverage(n, t)); "
+                       "$display(\"n=%0d t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=2 n=1 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

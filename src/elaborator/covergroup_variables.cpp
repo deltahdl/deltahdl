@@ -1,11 +1,13 @@
 #include "elaborator/covergroup_variables.h"
 
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_covergroup.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -23,15 +25,47 @@ Expr* MakeIdentifier(std::string_view text, SourceLoc loc, Arena& arena) {
   return id;
 }
 
-// The declaration of the covergroup a variable of type `dt` holds an instance
-// of, read among the covergroups `mod` declares; null where `dt` names none.
-const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
-                                         const RtlirModule* mod) {
-  if (dt.kind != DataTypeKind::kNamed) return nullptr;
-  for (const ModuleItem* item : mod->let_decls) {
-    if (item->kind == ModuleItemKind::kCovergroupDecl &&
-        item->name == dt.type_name) {
+// The covergroup named `name` among `items`, or null where none is.
+const CovergroupDecl* CovergroupNamed(const std::vector<ModuleItem*>& items,
+                                      std::string_view name) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl && item->name == name) {
       return item->covergroup;
+    }
+  }
+  return nullptr;
+}
+
+// The covergroup named `name` that package `pkg_name` declares, or null.
+const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
+                                        std::string_view pkg_name,
+                                        std::string_view name) {
+  for (const PackageDecl* pkg : unit->packages) {
+    if (pkg->name == pkg_name) return CovergroupNamed(pkg->items, name);
+  }
+  return nullptr;
+}
+
+// The declaration of the covergroup a variable of type `dt` holds an instance
+// of, or null where `dt` names none. §26.3: a name written behind a package
+// scope is that package's; a bare name is one `mod` declares, else one of a
+// package that an import `mod` has reached by now makes visible.
+const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
+                                         const RtlirModule* mod,
+                                         const CompilationUnit* unit) {
+  if (dt.kind != DataTypeKind::kNamed) return nullptr;
+  if (!dt.scope_name.empty()) {
+    return PackageCovergroup(unit, dt.scope_name, dt.type_name);
+  }
+  if (const CovergroupDecl* own =
+          CovergroupNamed(mod->let_decls, dt.type_name)) {
+    return own;
+  }
+  for (const RtlirImport& imp : mod->imports) {
+    if (!imp.is_wildcard && imp.item_name != dt.type_name) continue;
+    if (const CovergroupDecl* imported =
+            PackageCovergroup(unit, imp.package_name, dt.type_name)) {
+      return imported;
     }
   }
   return nullptr;
@@ -70,8 +104,9 @@ void AddCovergroupEventProcess(std::string_view var_name,
 }  // namespace
 
 void BindCovergroupVariable(const ModuleItem& item, RtlirVariable& var,
-                            RtlirModule* mod, Arena& arena) {
-  var.covergroup = DeclaredCovergroup(item.data_type, mod);
+                            RtlirModule* mod, const CompilationUnit* unit,
+                            Arena& arena) {
+  var.covergroup = DeclaredCovergroup(item.data_type, mod, unit);
   if (var.covergroup != nullptr &&
       var.covergroup->event.kind == CoverageEventKind::kClocking) {
     AddCovergroupEventProcess(item.name, *var.covergroup, item.loc, mod, arena);

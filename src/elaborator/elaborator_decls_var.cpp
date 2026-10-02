@@ -898,7 +898,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetVariableTypeInfo(item, var);
-  BindCovergroupVariable(*item, var, mod, arena_);
+  BindCovergroupVariable(*item, var, mod, unit_, arena_);
 
   ElaborateUnpackedDims(
       item, td_array_dims_,
