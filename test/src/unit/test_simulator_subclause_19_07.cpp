@@ -264,4 +264,65 @@ TEST(CovergroupInstanceSim, ProceduralOptionWritesSetTheInstanceOptions) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.7: an instance option may be assigned procedurally after the covergroup
+// is built, and one set at the covergroup level is the default of each of its
+// coverpoints that sets none of its own: at_least 2 on e, as on c's cx itself
+// and in d's definition, leaves one hit short of covering the bin. Assigned
+// to e, it was held but its coverpoint counted the bin after one hit.
+TEST(CoverageOptionSim,
+     ACovergroupOptionAssignedProcedurallyIsItsItemsDefault) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(bit x);\n"
+      "    cx: coverpoint x { bins one = {1}; }\n"
+      "  endgroup\n"
+      "  covergroup cd with function sample(bit x);\n"
+      "    option.at_least = 2;\n"
+      "    cx: coverpoint x { bins one = {1}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  cg e = new;\n"
+      "  cd d = new;\n"
+      "  initial begin\n"
+      "    c.cx.option.at_least = 2;\n"
+      "    e.option.at_least = 2;\n"
+      "    c.sample(1); e.sample(1); d.sample(1);\n"
+      "    $display(\"%0.2f %0.2f %0.2f %0d %0d\", c.get_inst_coverage(), "
+      "e.get_inst_coverage(), d.get_inst_coverage(), c.cx.option.at_least, "
+      "e.option.at_least);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0.00 0.00 0.00 2 2\n");
+}
+
+// §19.7: a covergroup-level option assigned procedurally is the default of
+// each cross that does not set its own: xy sets at_least 1 in its definition
+// and covers its bin after one hit, while yx takes the covergroup's 2. A
+// cross's own option, yx's weight, written after instantiation, is its own.
+TEST(CoverageOptionSim,
+     ACovergroupOptionAssignedProcedurallyIsItsCrossesDefault) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(bit x, bit y);\n"
+      "    cx: coverpoint x { bins one = {1}; }\n"
+      "    cy: coverpoint y { bins one = {1}; }\n"
+      "    xy: cross cx, cy { option.at_least = 1; type_option.weight = 2; }\n"
+      "    yx: cross cx, cy;\n"
+      "  endgroup\n"
+      "  cg e = new;\n"
+      "  initial begin\n"
+      "    e.option.at_least = 2;\n"
+      "    e.yx.option.weight = 2;\n"
+      "    e.sample(1, 1);\n"
+      "    $display(\"%0.2f %0.2f %0d\", e.xy.get_inst_coverage(),\n"
+      "             e.yx.get_inst_coverage(), e.yx.option.weight);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "100.00 0.00 2\n");
+}
+
 }  // namespace

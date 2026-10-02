@@ -163,6 +163,9 @@ struct CoverPoint {
   // 19.11). The value originates from option.weight (LRM 19.7); a coverpoint
   // carries it so the covergroup average can weight each item.
   int32_t weight = 1;
+  // §19.7.1: the coverpoint's type_option.weight, by which its coverage merged
+  // over the instances is weighed in the type coverage under merge_instances.
+  int32_t type_weight = 1;
   // When the coverpoint's own coverage rules (LRM 19.11.1) indicate it is to be
   // excluded, the covergroup average drops it from both the numerator and the
   // denominator (LRM 19.11).

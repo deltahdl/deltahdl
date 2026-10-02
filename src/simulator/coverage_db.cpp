@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <fstream>
 #include <istream>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -130,11 +131,32 @@ void CoverageDB::MergeCumulativeCoverage(
   }
 }
 
+// Read a cross record of a coverage snapshot, "CR <name>" opening a cross of
+// the last covergroup and "XBIN <name> <hit_count>" a bin of the last cross,
+// into the parsed record list.
+static bool ReadCrossDbRecord(std::istream& in, const std::string& tag,
+                              std::vector<CoverGroup>& loaded) {
+  if (loaded.empty()) return false;
+  std::vector<CrossCover>& crosses = loaded.back().crosses;
+  if (tag == "CR") {
+    CrossCover cross;
+    if (!(in >> cross.name)) return false;
+    crosses.push_back(std::move(cross));
+    return true;
+  }
+  if (crosses.empty()) return false;
+  CrossBin b;
+  if (!(in >> b.name >> b.hit_count)) return false;
+  crosses.back().bins.push_back(std::move(b));
+  return true;
+}
+
 // Read one record of a coverage snapshot into the parsed record list. A record
 // tag the format does not define, or one whose enclosing record is missing (a
 // coverpoint or bin outside a covergroup), fails the read.
 static bool ReadCoverageDbRecord(std::istream& in, const std::string& tag,
                                  std::vector<CoverGroup>& loaded) {
+  if (tag == "CR" || tag == "XBIN") return ReadCrossDbRecord(in, tag, loaded);
   if (tag == "CG") {
     CoverGroup g;
     if (!(in >> g.name >> g.sample_count)) return false;
@@ -173,6 +195,31 @@ bool CoverageDB::LoadCoverageDbFile(const std::string& path) {
 
   MergeCumulativeCoverage(loaded);
   return true;
+}
+
+void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
+  std::ofstream out(path);
+  for (const CoverGroup& g : groups_) {
+    out << "CG " << g.name << ' ' << g.sample_count << '\n';
+    for (const CoverPoint& cp : g.coverpoints) {
+      out << "CP " << cp.name << '\n';
+      for (const CoverBin& b : cp.bins) {
+        out << "BIN " << b.name << ' '
+            << (b.values.empty() ? 0 : b.values.front()) << ' ' << b.hit_count
+            << '\n';
+      }
+    }
+    for (const CrossCover& cross : g.crosses) {
+      out << "CR " << cross.name << '\n';
+      for (const CrossBin& b : cross.bins) {
+        out << "XBIN " << b.name << ' ' << b.hit_count << '\n';
+      }
+    }
+  }
+}
+
+void CoverageDB::SaveNamedCoverageDb() const {
+  if (!coverage_db_name_.empty()) SaveCoverageDbFile(coverage_db_name_);
 }
 
 // --- LRM 19.11: coverage computation ----------------------------------------

@@ -141,7 +141,29 @@ const Expr* CoverageCallType(const Expr* type_expr, std::string& item) {
   return type_expr;
 }
 
+// §19.8 and §19.7.1: the covergroup type `cg` that `scope`, the left side of
+// `cg::get_coverage` or `cg::x::type_option`, names, with x stored in `item`;
+// null where it names no covergroup.
+const CovergroupDecl* CovergroupTypeNamed(const Expr* scope, SimContext& ctx,
+                                          std::string& item) {
+  const ModuleItem* found =
+      ctx.FindLetDecl(CoverageCallType(scope, item)->text);
+  if (found == nullptr || found->kind != ModuleItemKind::kCovergroupDecl) {
+    return nullptr;
+  }
+  return found->covergroup;
+}
+
 }  // namespace
+
+const CovergroupDecl* TypeOptionOwner(const Expr* access, SimContext& ctx,
+                                      std::string& item) {
+  if (!access->is_scope_resolution || access->rhs == nullptr ||
+      access->rhs->text != "type_option" || access->lhs == nullptr) {
+    return nullptr;
+  }
+  return CovergroupTypeNamed(access->lhs, ctx, item);
+}
 
 // §19.8 and §19.11: get_coverage() answers for the covergroup type, and
 // get_inst_coverage() for the instance, or for its type where the
@@ -185,24 +207,18 @@ Logic4Vec ReportCoverage(const CovergroupTarget& target, const Expr* call,
 bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   const Expr* access = expr->lhs;
+  if (access->rhs->text != "get_coverage") return false;
   std::string item_name;
-  const Expr* type_expr = CoverageCallType(access->lhs, item_name);
-  if (access->rhs->text != "get_coverage" ||
-      type_expr->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  const ModuleItem* item = ctx.FindLetDecl(type_expr->text);
-  if (item == nullptr || item->kind != ModuleItemKind::kCovergroupDecl) {
-    return false;
-  }
+  const CovergroupDecl* decl = CovergroupTypeNamed(access->lhs, ctx, item_name);
+  if (decl == nullptr) return false;
   std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(item->covergroup);
+      ctx.Covergroups().InstancesOf(decl);
   bool merge = !instances.empty() && instances[0]->type_option.merge_instances;
   CoverageReading r;
   if (item_name.empty()) {
-    r.coverage = TypeCoverage(item->covergroup, merge, ctx, r.covered, r.total);
+    r.coverage = TypeCoverage(decl, merge, ctx, r.covered, r.total);
   } else {
-    r = ItemTypeReading(item->covergroup, item_name, merge, ctx);
+    r = ItemTypeReading(decl, item_name, merge, ctx);
   }
   WriteCounts(expr, r.covered, r.total, ctx, arena);
   out = MakeRealVec(arena, r.coverage, 64);

@@ -533,6 +533,9 @@ int SimulateDesign(const delta::CliOptions& opts,
   // the final blocks that could still evaluate one have run.
   delta::ReportImmediateCoverResults(sim_ctx.ImmediateCovers(), std::cout);
   delta::ReportConcurrentCoverResults(sim_ctx.ConcurrentCovers(), std::cout);
+  // §19.9: the coverage database is saved at the end of the run to the file
+  // $set_coverage_db_name named, once the final blocks have sampled.
+  sim_ctx.CoverageData().SaveNamedCoverageDb();
   // §21.7.3.6.1: close the dump by recording the final simulation time, which
   // an extended VCD file ends with. This covers a dump the source's own VCD
   // tasks opened as well as one --vcd asked for, and does nothing when the run

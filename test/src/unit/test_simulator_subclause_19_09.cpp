@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -428,6 +430,137 @@ TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
       "  end\n"
       "endmodule\n";
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
+}
+
+// The text of the file at `path`, empty where there is none.
+static std::string FileText(const std::string& path) {
+  std::ifstream in(path);
+  std::stringstream text;
+  text << in.rdbuf();
+  return text.str();
+}
+
+// A module whose covergroup cg declares `items` and is sampled by `sample`
+// with the bits a and b, whose initial block runs `body`.
+static std::string CovergroupRun(const std::string& items,
+                                 const std::string& body) {
+  return "module t;\n"
+         "  covergroup cg with function sample(bit [1:0] a, bit b);\n" +
+         items +
+         "  endgroup\n"
+         "  cg c = new;\n"
+         "  initial begin\n" +
+         body +
+         "  end\n"
+         "endmodule\n";
+}
+
+// §19.9: $set_coverage_db_name names the file the run's coverage is saved to
+// at its end, and $load_coverage_db in a later run loads it as cumulative
+// coverage: the first run hits bins 0 and 1 of cp and the transition 0 => 1 of
+// ct, and the second bin 2, so the second reads the average of 75 and 100.
+// The end of a run (main.cpp, after the final blocks) saves the database; no
+// file was written, and the second run read only its own hit.
+TEST(Coverage, TheRunSavesItsDatabaseForALaterRunToLoad) {
+  const std::string kPath =
+      testing::TempDir() + "delta_cov_19_09_round_trip.db";
+  const std::string kItems =
+      "    cp: coverpoint a;\n"
+      "    ct: coverpoint a { bins t = (0 => 1); }\n";
+  std::remove(kPath.c_str());
+  SimFixture first;
+  RunCapture(CovergroupRun(kItems, "    $set_coverage_db_name(\"" + kPath +
+                                       "\");\n"
+                                       "    c.sample(0, 0); c.sample(1, 0);\n"),
+             first);
+  first.ctx.CoverageData().SaveNamedCoverageDb();
+  const std::string kSaved = FileText(kPath);
+  SimFixture second;
+  EXPECT_EQ(
+      RunCapture(CovergroupRun(kItems, "    $load_coverage_db(\"" + kPath +
+                                           "\");\n    c.sample(2, 0);\n"
+                                           "    $display(\"%0.2f %0.2f\", "
+                                           "$get_coverage(), "
+                                           "cg::get_coverage());\n"),
+                 second),
+      "87.50 87.50\n");
+  // The second run named no database, so its end writes none over the first.
+  second.ctx.CoverageData().SaveNamedCoverageDb();
+  EXPECT_EQ(FileText(kPath), kSaved);
+  std::remove(kPath.c_str());
+}
+
+// §19.9 with §19.6: the database holds a covergroup's crosses as well as its
+// coverpoints, so the cross bin <0,0> the first run hits is covered in the
+// second, which hits <1,1>: two of x's four bins. The file held no cross, and
+// the second run read one of four.
+TEST(Coverage, TheSavedDatabaseCarriesCrossBinHits) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_cross.db";
+  const std::string kItems =
+      "    ca: coverpoint a { bins lo = {0}; bins hi = {[1:3]}; }\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb;\n";
+  std::remove(kPath.c_str());
+  SimFixture first;
+  RunCapture(CovergroupRun(kItems, "    $set_coverage_db_name(\"" + kPath +
+                                       "\");\n    c.sample(0, 0);\n"),
+             first);
+  first.ctx.CoverageData().SaveNamedCoverageDb();
+  SimFixture second;
+  EXPECT_EQ(
+      RunCapture(CovergroupRun(kItems, "    $load_coverage_db(\"" + kPath +
+                                           "\");\n    c.sample(1, 1);\n"
+                                           "    $display(\"%0.2f\", "
+                                           "c.x.get_inst_coverage());\n"),
+                 second),
+      "50.00\n");
+  std::remove(kPath.c_str());
+}
+
+// §19.9: a snapshot whose cross record or cross bin stands where no
+// covergroup or cross encloses it is malformed, and loading it leaves the
+// live database as it was: cg's one bin of four stays the only one covered.
+TEST(Coverage, ACrossRecordOutsideItsEnclosingRecordFailsTheLoad) {
+  for (const std::string kRecord :
+       {"CR x\n", "CG t.c 1\nXBIN <lo,auto[0]> 1\n", "CG t.c 1\nCR\n",
+        "CG t.c 1\nCR x\nXBIN b\n"}) {
+    const std::string kPath = testing::TempDir() + "delta_cov_19_09_bad.db";
+    {
+      std::ofstream out(kPath);
+      out << kRecord;
+    }
+    SimFixture f;
+    EXPECT_EQ(RunCapture(CovergroupRun("    cp: coverpoint a;\n",
+                                       "    $load_coverage_db(\"" + kPath +
+                                           "\");\n    c.sample(0, 0);\n"
+                                           "    $display(\"%0.2f\", "
+                                           "cg::get_coverage());\n"),
+                         f),
+              "25.00\n")
+        << kRecord;
+    std::remove(kPath.c_str());
+  }
+}
+
+// §19.9: the saved database is the form LoadCoverageDbFile reads, a bin's
+// first value standing for it and 0 where it lists none, its spans held as
+// ranges instead.
+TEST(Coverage, SaveCoverageDbFileWritesTheLoadedForm) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  CoverBin b0;
+  b0.name = "b0";
+  b0.values = {5};
+  CoverageDB::AddBin(cp, b0);
+  CoverBin b1;
+  b1.name = "b1";
+  CoverageDB::AddBin(cp, b1);
+  db.Sample(g, {{"x", 5}});
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_form.db";
+  db.SaveCoverageDbFile(kPath);
+  EXPECT_EQ(FileText(kPath), "CG cg 1\nCP x\nBIN b0 5 1\nBIN b1 0 0\n");
+  std::remove(kPath.c_str());
 }
 
 }  // namespace

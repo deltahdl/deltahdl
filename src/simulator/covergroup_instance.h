@@ -63,6 +63,9 @@ struct SampledCoverpoint {
   // §19.7 and §19.7.1: the coverpoint's options.
   CoverPointOption option;
   CoverPointTypeOption type_option;
+  // §19.7: the instance options the coverpoint sets itself, in its definition
+  // or by an assignment to it, which the covergroup's do not default.
+  std::vector<std::string_view> own_options;
 };
 
 // A cross of an instance (§19.6): its index into CoverGroup::crosses, the
@@ -72,6 +75,8 @@ struct SampledCross {
   const Expr* iff = nullptr;
   std::vector<std::pair<size_t, const Expr*>> bin_guards;
   std::vector<IllegalCrossProducts> illegal;
+  // §19.7: the instance options the cross sets itself, as for a coverpoint.
+  std::vector<std::string_view> own_options;
 };
 
 // One instance of a covergroup (§19.3): the declaration it was built from,
@@ -106,6 +111,16 @@ struct CovergroupInstance {
   // the current time slot, so that further occurrences of the clocking event
   // in the slot add none.
   bool strobe_pending = false;
+};
+
+// §19.7.1: a type option written procedurally through the covergroup type
+// `decl`, at the covergroup level where `item` is empty and else of its
+// coverpoint or cross `item`.
+struct TypeOptionWrite {
+  const CovergroupDecl* decl = nullptr;
+  std::string item;
+  std::string member;
+  Logic4Vec value;
 };
 
 // The covergroup instances of a run. §19.3: a variable of a covergroup type
@@ -155,6 +170,16 @@ class CovergroupTable {
   // embeds; null where none does. Each class's are read once.
   const CovergroupDecl* Embedded(const ClassTypeInfo* type,
                                  std::string_view name);
+  // §19.7.1: a type option holds for the covergroup type as a whole, so one
+  // written through the type is written to each instance of it built so far
+  // and kept for each built later, which takes it after its definition's.
+  void WriteTypeOption(TypeOptionWrite write);
+  void TakeTypeOptionWrites(CovergroupInstance& inst) const;
+  const std::vector<TypeOptionWrite>& TypeOptionWrites() const {
+    return type_option_writes_;
+  }
+  // An instance of the covergroup type `decl` built so far, null for none.
+  const CovergroupInstance* AnyOf(const CovergroupDecl* decl) const;
 
  private:
   std::unordered_map<std::string, CovergroupInstance> instances_;
@@ -170,6 +195,7 @@ class CovergroupTable {
   // §19.4.1: the covergroups a derived covergroup amounts to, its base's
   // items it does not override and its own (EmbeddedCovergroups).
   std::list<CovergroupDecl> composed_;
+  std::vector<TypeOptionWrite> type_option_writes_;
 };
 
 // §19.3 and §19.4: where a `new` of a covergroup builds its instance: the

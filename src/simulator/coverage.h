@@ -74,8 +74,17 @@ class CoverageDB {
   // or its contents are malformed, leaving the live database unchanged in the
   // open-failure case. The serialized form is line-oriented tokens: "CG <name>
   // <sample_count>" opens a covergroup type, "CP <name>" a coverpoint within
-  // it, and "BIN <name> <value> <hit_count>" a bin within that coverpoint.
+  // it, "BIN <name> <value> <hit_count>" a bin within that coverpoint, "CR
+  // <name>" a cross within the covergroup type, and "XBIN <name> <hit_count>"
+  // a bin within that cross.
   bool LoadCoverageDbFile(const std::string& path);
+
+  // Writes the live database to `path` in the form LoadCoverageDbFile reads,
+  // and at the end of a simulation run to the file $set_coverage_db_name
+  // named, where it named one (LRM 19.9). A file that cannot be opened is
+  // left unwritten.
+  void SaveCoverageDbFile(const std::string& path) const;
+  void SaveNamedCoverageDb() const;
 
   // --- LRM 19.8: predefined coverage methods --------------------------------
 

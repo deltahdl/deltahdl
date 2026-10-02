@@ -138,14 +138,6 @@ const Expr* EmptyCall(Arena& arena) {
   return call;
 }
 
-// §19.5: the name a coverpoint goes by, its label or, unlabelled, the variable
-// its expression names; any other is given its position.
-std::string CoverpointName(const CoverPointDecl& cp, size_t index) {
-  if (!cp.label.empty()) return std::string(cp.label);
-  if (cp.expr->kind == ExprKind::kIdentifier) return std::string(cp.expr->text);
-  return std::format("__coverpoint_{}", index);
-}
-
 // The property a bare name `e` reads of the running object where the object
 // holds no value of it yet and its declaration gives its width; null for any
 // other name, a local or formal shadowing it among them.
@@ -555,6 +547,12 @@ void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
 
 }  // namespace
 
+std::string CoverpointName(const CoverPointDecl& cp, size_t index) {
+  if (!cp.label.empty()) return std::string(cp.label);
+  if (cp.expr->kind == ExprKind::kIdentifier) return std::string(cp.expr->text);
+  return std::format("__coverpoint_{}", index);
+}
+
 ClassObject* ObjectNamed(const Expr* e, SimContext& ctx, Arena& arena) {
   if (e->kind != ExprKind::kIdentifier) return nullptr;
   if (e->text == "this") return ctx.CurrentThis();
@@ -766,6 +764,7 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
        {inst->sample_function, EmptyCall(arena)}});
   KeepFormals(*inst, ctx);
   BuildItems(*inst, ctx, arena);
+  ctx.Covergroups().TakeTypeOptionWrites(*inst);
   ctx.Covergroups().Record(*inst);
   if (first_for_owner && decl.event.kind == CoverageEventKind::kClocking) {
     StartEmbeddedSampling(*inst, ctx, arena);
@@ -795,6 +794,7 @@ void SampleAtBlockEvent(std::string_view scope, bool is_begin, SimContext& ctx,
 
 bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx,
                                Arena& arena) {
+  if (TryCovergroupTypeOptionAssign(stmt, ctx, arena)) return true;
   const Expr* lhs = stmt->lhs;
   if (lhs == nullptr || stmt->rhs == nullptr ||
       lhs->kind != ExprKind::kMemberAccess || lhs->rhs == nullptr ||
@@ -810,10 +810,9 @@ bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx,
   if (target.point != nullptr) {
     WritePointOption(*target.point, member, value);
   } else if (target.cross != nullptr) {
-    WriteCrossOption(target.inst->group->crosses[target.cross->index], member,
-                     value);
+    WriteCrossOption(*target.inst, *target.cross, member, value);
   } else {
-    WriteGroupOption(*target.inst->group, member, value);
+    WriteGroupOption(*target.inst, member, value);
   }
   return true;
 }
@@ -846,6 +845,9 @@ bool TryEvalCovergroupMethodOnHandle(const Logic4Vec& handle, const Expr* expr,
 bool TryEvalCovergroupOptionRead(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
+  if (access != nullptr && access->is_scope_resolution) {
+    return TryEvalCovergroupTypeOptionRead(expr, ctx, arena, out);
+  }
   if (expr->rhs == nullptr || access == nullptr ||
       access->kind != ExprKind::kMemberAccess || access->rhs == nullptr ||
       (access->rhs->text != "option" && access->rhs->text != "type_option") ||

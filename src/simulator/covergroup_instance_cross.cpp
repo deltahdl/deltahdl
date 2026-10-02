@@ -557,6 +557,18 @@ std::vector<ModuleItem*> CrossFunctions(const CoverCrossDecl& decl) {
   return functions;
 }
 
+// §19.7: the instance options the cross's definition sets.
+std::vector<std::string_view> OwnCrossOptions(const CoverCrossDecl& decl) {
+  std::vector<std::string_view> own;
+  for (const CrossBodyItem& item : decl.body) {
+    if (item.kind == CrossBodyItemKind::kOption &&
+        !item.option.is_type_option) {
+      own.push_back(item.option.member);
+    }
+  }
+  return own;
+}
+
 }  // namespace
 
 void BuildCross(CovergroupInstance& inst, const CoverCrossDecl& decl,
@@ -584,6 +596,7 @@ void BuildCross(CovergroupInstance& inst, const CoverCrossDecl& decl,
   SampledCross sampled;
   sampled.index = inst.group->crosses.size();
   sampled.iff = decl.iff;
+  sampled.own_options = OwnCrossOptions(decl);
   CrossCover* added = CoverageDB::AddCross(inst.group, std::move(cross));
   CrossSelector selector{inst,
                          std::move(points),

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -17,12 +18,15 @@ struct ModuleItem;
 struct ClassObject;
 struct CoverCrossDecl;
 struct CoverPointDecl;
+struct CovergroupDecl;
 struct CovergroupInstance;
 struct CoverageOption;
 struct CovergroupValueRange;
 struct Expr;
 struct SampledCoverpoint;
 struct SampledCross;
+struct Stmt;
+struct TypeOptionWrite;
 
 // A call whose actuals a CovergroupFrame binds to the formals of `function`:
 // new()'s to the covergroup's own (§19.3), sample()'s to those of `with
@@ -115,13 +119,15 @@ void ApplyCrossOption(CrossCover& cross, const CoverageOption& option,
 // the coverpoint `point` or the cross `cross`, where `member` is one that an
 // assignment after instantiation may set: name, weight, goal, comment,
 // at_least and cross_num_print_missing. A coverpoint's or a cross's new
-// weight and at_least take effect in its coverage at once.
-void WriteGroupOption(CoverGroup& group, std::string_view member,
+// weight and at_least take effect in its coverage at once. Written to the
+// covergroup, at_least and cross_num_print_missing are the default of each
+// coverpoint and cross that does not set its own.
+void WriteGroupOption(CovergroupInstance& inst, std::string_view member,
                       const Logic4Vec& value);
 void WritePointOption(SampledCoverpoint& point, std::string_view member,
                       const Logic4Vec& value);
-void WriteCrossOption(CrossCover& cross, std::string_view member,
-                      const Logic4Vec& value);
+void WriteCrossOption(CovergroupInstance& inst, SampledCross& cross,
+                      std::string_view member, const Logic4Vec& value);
 
 // §19.7 and §19.10: the value of the option `member`, a type option where
 // `type_option` holds, of the covergroup, the coverpoint or the cross; false
@@ -132,6 +138,42 @@ bool ReadPointOption(const SampledCoverpoint& point, bool type_option,
                      std::string_view member, Arena& arena, Logic4Vec& out);
 bool ReadCrossOption(const CrossCover& cross, bool type_option,
                      std::string_view member, Arena& arena, Logic4Vec& out);
+
+// §19.5: the name a coverpoint goes by, its label or, unlabelled, the variable
+// its expression names; any other is given its position `index` among the
+// covergroup's items.
+std::string CoverpointName(const CoverPointDecl& cp, size_t index);
+
+// §19.7.1: writes a type option written through the covergroup type to the
+// instance `inst` of it, at the covergroup level where `write.item` is empty
+// and else to its coverpoint or cross of that name.
+void SetTypeOption(CovergroupInstance& inst, const TypeOptionWrite& write);
+
+// §19.7.1: the value of the type option `member` of the instance `inst`, of
+// the covergroup where `item` is empty and else of its coverpoint or cross
+// `item`; false where there is no such option.
+bool ReadTypeOption(const CovergroupInstance& inst, std::string_view item,
+                    std::string_view member, Arena& arena, Logic4Vec& out);
+
+// §19.7.1 and §19.8: the covergroup type that `cg::type_option` or
+// `cg::x::type_option`, `access`, is reached through, with x stored in `item`;
+// null where `access` is none of these.
+const CovergroupDecl* TypeOptionOwner(const Expr* access, SimContext& ctx,
+                                      std::string& item);
+
+// §19.7.1: a blocking assignment to a type option through the covergroup
+// type, `cg::type_option.comment = ...;` or `cg::x::type_option.weight =
+// ...;`, writes it to every instance of the type, built or to be built;
+// strobe and real_interval, set in the definition only, are left as they are.
+// False where the assignment is not one.
+bool TryCovergroupTypeOptionAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena);
+
+// §19.7.1: a read of `cg::type_option.member` or `cg::x::type_option.member`,
+// taken from an instance of the type. False where the expression is not one or
+// no instance of the type has been built.
+bool TryEvalCovergroupTypeOptionRead(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out);
 
 // What a call or an option read reaches: an instance, or one of its
 // coverpoints or crosses.

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -164,6 +165,96 @@ TEST(CoverageTypeOptions, TypeCoverageZeroWeight) {
   std::vector<const CoverGroup*> insts = {g};
   EXPECT_DOUBLE_EQ(
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/false), 0.0);
+}
+
+// §19.7.1: type_option is a member of a covergroup type and of each of its
+// coverpoints, reached through the type, and every type option but strobe and
+// real_interval may be assigned procedurally: a's weight of 3 from the
+// definition and the covergroup's default 1 read back, and a written 5 is
+// held. Each read 0 and the write was lost.
+TEST(TypeOptionSim, ATypeOptionIsReadAndWrittenThroughTheType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "covergroup gc with function sample(bit a_var);\n"
+      "  a : coverpoint a_var { type_option.weight = 3; bins one = {1}; }\n"
+      "endgroup\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic gc g1 = new;\n"
+      "    $display(\"%0d %0d\", gc::a::type_option.weight, "
+      "gc::type_option.weight);\n"
+      "    gc::type_option.weight = 5;\n"
+      "    $display(\"%0d\", gc::type_option.weight);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1\n5\n");
+}
+
+// §19.7.1: a type option belongs to the covergroup type, so it reads through
+// the type before any instance is built: a's weight of 3 from the definition,
+// the goal default of 100, and a's goal and the covergroup's comment once
+// written through the type; strobe is set in the definition only, so the
+// write to it leaves 0. Read before an instance, each was 0.
+TEST(TypeOptionSim, ATypeOptionReadsThroughTheTypeBeforeAnyInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "covergroup gc with function sample(bit a_var);\n"
+      "  type_option.comment = \"def\";\n"
+      "  a : coverpoint a_var { type_option.weight = 3; }\n"
+      "  x : cross a, a_var { type_option.goal = 90; }\n"
+      "endgroup\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %s %0d\", gc::a::type_option.weight,\n"
+      "             gc::type_option.goal, gc::type_option.comment,\n"
+      "             gc::x::type_option.goal);\n"
+      "    gc::a::type_option.goal = 80;\n"
+      "    gc::type_option.comment = \"set\";\n"
+      "    gc::type_option.strobe = 1;\n"
+      "    $display(\"%0d %s %0d %0d\", gc::a::type_option.goal,\n"
+      "             gc::type_option.comment, gc::type_option.strobe,\n"
+      "             gc::zz::type_option.goal);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 100 def 90\n80 set 0 0\n");
+}
+
+// §19.7.1: a type option written through the type before an instance is
+// built holds for the instance, as the clause's example sets
+// gc::a::type_option.weight before `gc g1 = new;`, and one written after it
+// holds at once; each is the type's alone, so go's comment stays empty. A
+// coverpoint or cross the type does not have reads nothing.
+TEST(TypeOptionSim, ATypeOptionWrittenBeforeAnInstanceHoldsForIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "covergroup gc with function sample(bit a_var, bit b_var);\n"
+      "  a : coverpoint a_var;\n"
+      "  x : cross a_var, b_var;\n"
+      "endgroup\n"
+      "covergroup go with function sample(bit v);\n"
+      "  coverpoint v;\n"
+      "endgroup\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    gc::type_option.comment = \"all\";\n"
+      "    gc::a::type_option.weight = 3;\n"
+      "    gc::x::type_option.goal = 70;\n"
+      "    begin\n"
+      "      automatic go o = new;\n"
+      "      automatic gc g1 = new;\n"
+      "      $display(\"%s %0d %0d %0d\", gc::type_option.comment,\n"
+      "               gc::a::type_option.weight, gc::x::type_option.goal,\n"
+      "               gc::zz::type_option.goal);\n"
+      "      gc::x::type_option.weight = 4;\n"
+      "      $display(\"%0d [%s]\", gc::x::type_option.weight,\n"
+      "               go::type_option.comment);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "all 3 70 0\n4 []\n");
 }
 
 }  // namespace

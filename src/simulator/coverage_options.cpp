@@ -132,34 +132,61 @@ void TallyMergedBins(const std::map<std::string, MergedBin>& bins,
   }
 }
 
-// Adds one covergroup instance's coverpoint bins to the merged-coverpoint union
-// (LRM 19.11.3). Names are only meaningful within their item, so each bin is
-// keyed by the name of its coverpoint joined with the bin name.
-void AccumulateInstancePointBins(const CoverGroup* g,
-                                 std::map<std::string, MergedBin>& point_bins) {
+// One coverpoint's or cross's bins unioned over the instances (LRM 19.11.3),
+// and the type_option.weight its merged coverage is weighed by (LRM 19.7.1).
+struct MergedItem {
+  std::map<std::string, MergedBin> bins;
+  int32_t weight = 1;
+};
+
+// Adds one covergroup instance's coverpoint and cross bins to the union of
+// each item's (LRM 19.11.3). Bin names are only meaningful within their item,
+// and the names of a covergroup's coverpoints and crosses are distinct, so
+// each item is kept under its own name.
+void AccumulateInstanceItems(const CoverGroup* g,
+                             std::map<std::string, MergedItem>& items) {
   for (const CoverPoint& cp : g->coverpoints) {
     if (cp.excluded_from_coverage) continue;
+    MergedItem& item = items[cp.name];
+    item.weight = cp.type_weight;
     for (const CoverBin& bin : cp.bins) {
       if (!BinParticipates(bin)) continue;
-      AccumulateMergedBin(point_bins, cp.name + '\x1f' + bin.name,
-                          bin.hit_count, bin.at_least);
+      AccumulateMergedBin(item.bins, bin.name, bin.hit_count, bin.at_least);
+    }
+  }
+  for (const CrossCover& cross : g->crosses) {
+    if (cross.excluded_from_coverage) continue;
+    MergedItem& item = items[cross.name];
+    item.weight = cross.type_option.weight;
+    // Every stored cross bin is a coverage bin; ignore_bins and illegal_bins
+    // products are never stored (LRM 19.6.2, 19.6.3, 19.11.2).
+    for (const CrossBin& bin : cross.bins) {
+      AccumulateMergedBin(item.bins, bin.name, bin.hit_count, bin.at_least);
     }
   }
 }
 
-// Adds one covergroup instance's cross bins to the merged-cross union (LRM
-// 19.11.3), keyed by the name of the cross joined with the bin name.
-void AccumulateInstanceCrossBins(const CoverGroup* g,
-                                 std::map<std::string, MergedBin>& cross_bins) {
-  for (const CrossCover& cross : g->crosses) {
-    if (cross.excluded_from_coverage) continue;
-    // Every stored cross bin is a coverage bin; ignore_bins and illegal_bins
-    // products are never stored (LRM 19.6.2, 19.6.3, 19.11.2).
-    for (const CrossBin& bin : cross.bins) {
-      AccumulateMergedBin(cross_bins, cross.name + '\x1f' + bin.name,
-                          bin.hit_count, bin.at_least);
-    }
+// The average of each item's merged coverage weighed by its type weight (LRM
+// 19.7.1). An item with no bin adds nothing, and a covergroup with none is
+// fully covered.
+double WeighMergedItems(const std::map<std::string, MergedItem>& items) {
+  double sum = 0.0;
+  int64_t total_weight = 0;
+  bool any = false;
+  for (const auto& [name, item] : items) {
+    (void)name;
+    uint32_t total = 0;
+    uint32_t covered = 0;
+    TallyMergedBins(item.bins, total, covered);
+    if (total == 0) continue;
+    any = true;
+    sum += 100.0 * static_cast<double>(covered) / static_cast<double>(total) *
+           item.weight;
+    total_weight += item.weight;
   }
+  if (!any) return 100.0;
+  if (total_weight == 0) return 0.0;
+  return sum / static_cast<double>(total_weight);
 }
 
 // Weighted average of the per-instance coverage. The covergroup type coverage
@@ -187,26 +214,18 @@ double CoverageDB::ComputeTypeCoverage(
     return AverageInstanceTypeCoverage(instances);
   }
 
-  // Merge: union all bins from all instances (LRM 19.11.3). Bins overlap across
-  // instances when they share the same name, and the cumulative count of an
-  // overlapping bin is the sum of its counts in every instance containing it.
-  // Bins with distinct names are distinct members of the union, so instances
-  // whose bin layouts differ (for example a different auto_bin_max producing
-  // differently named auto bins) enlarge the union rather than collapse onto
-  // one another. Names are only meaningful within their item, so coverpoint
-  // bins and cross bins are keyed by the name of their coverpoint or cross.
-  std::map<std::string, MergedBin> point_bins;
-  std::map<std::string, MergedBin> cross_bins;
-  for (const CoverGroup* g : instances) {
-    AccumulateInstancePointBins(g, point_bins);
-    AccumulateInstanceCrossBins(g, cross_bins);
-  }
-  uint32_t total = 0;
-  uint32_t covered = 0;
-  TallyMergedBins(point_bins, total, covered);
-  TallyMergedBins(cross_bins, total, covered);
-  if (total == 0) return 100.0;
-  return 100.0 * static_cast<double>(covered) / static_cast<double>(total);
+  // Merge: each coverpoint and cross is merged over the instances, the union
+  // of its bins there, and the type coverage weighs each item's merged
+  // coverage by its type_option.weight (LRM 19.7.1, 19.11.3). Bins overlap
+  // across instances when they share the same name, and the cumulative count
+  // of an overlapping bin is the sum of its counts in every instance
+  // containing it. Bins with distinct names are distinct members of the
+  // union, so instances whose bin layouts differ (for example a different
+  // auto_bin_max producing differently named auto bins) enlarge the union
+  // rather than collapse onto one another.
+  std::map<std::string, MergedItem> items;
+  for (const CoverGroup* g : instances) AccumulateInstanceItems(g, items);
+  return WeighMergedItems(items);
 }
 
 // --- LRM 19.11.3: type coverage computation ---------------------------------

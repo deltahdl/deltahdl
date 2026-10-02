@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -282,6 +283,47 @@ TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
       "  end\n"
       "endmodule\n";
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 50.0);
+}
+
+// §19.7.1 (Table 19-3 and the g1 example): with merge_instances set, a
+// covergroup type's coverage is the average of its coverpoints' merged
+// coverage weighted by their type_option.weight, set in the definition or
+// procedurally through the type: a, uncovered, weighs 3 and b, covered, 1, so
+// both types read (3 * 0 + 100) / 4; c, whose every value is ignored, has no
+// bin to weigh, and gz's one coverpoint weighs 0, so gz reads 0. Taken as the
+// union of their bins, gc and gp read 50.
+TEST(TypeCoverageSim,
+     ACovergroupTypesCoverageWeighsItsItemsByTheirTypeWeights) {
+  SimFixture f;
+  auto out = RunCapture(
+      "covergroup gc with function sample(bit a_var, bit b_var);\n"
+      "  type_option.merge_instances = 1;\n"
+      "  a : coverpoint a_var { type_option.weight = 3; bins one = {1}; }\n"
+      "  b : coverpoint b_var { bins one = {1}; }\n"
+      "  c : coverpoint b_var { ignore_bins i = {0, 1}; }\n"
+      "endgroup\n"
+      "covergroup gz with function sample(bit a_var);\n"
+      "  type_option.merge_instances = 1;\n"
+      "  a : coverpoint a_var { type_option.weight = 0; bins one = {1}; }\n"
+      "endgroup\n"
+      "covergroup gp with function sample(bit a_var, bit b_var);\n"
+      "  type_option.merge_instances = 1;\n"
+      "  a : coverpoint a_var { bins one = {1}; }\n"
+      "  b : coverpoint b_var { bins one = {1}; }\n"
+      "endgroup\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic gc g1 = new;\n"
+      "    automatic gp g2 = new;\n"
+      "    automatic gz g3 = new;\n"
+      "    gp::a::type_option.weight = 3;\n"
+      "    g1.sample(0, 1); g2.sample(0, 1); g3.sample(1);\n"
+      "    $display(\"%0.2f %0.2f %0.2f\", gc::get_coverage(),\n"
+      "             gp::get_coverage(), gz::get_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 25.00 0.00\n");
 }
 
 }  // namespace

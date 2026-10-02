@@ -6,13 +6,17 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/types.h"
 #include "parser/ast_covergroup.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/coverage_types.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/covergroup_instance_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 namespace delta {
 
@@ -214,6 +218,108 @@ bool ReadOption(const Options& options, const OptionFields<Options>& fields,
   return false;
 }
 
+// §19.7: writes `value` to the instance option `member` of a coverpoint or a
+// cross, whose new weight and at_least take effect in its coverage at once.
+void SetPointOptionValue(SampledCoverpoint& point, std::string_view member,
+                         const Logic4Vec& value) {
+  SetOptionValue(point.option, kPointFields, member, value);
+  point.point->weight = point.option.weight;
+  for (CoverBin& bin : point.point->bins) {
+    bin.at_least = static_cast<uint32_t>(std::max(0, point.option.at_least));
+  }
+}
+
+void SetCrossOptionValue(CrossCover& cross, std::string_view member,
+                         const Logic4Vec& value) {
+  SetOptionValue(cross.option, kCrossFields, member, value);
+  for (CrossBin& bin : cross.bins) {
+    bin.at_least = static_cast<uint32_t>(std::max(0, cross.option.at_least));
+  }
+}
+
+// §19.7: whether a coverpoint or cross sets the option `member` itself, in
+// its definition or by an assignment to it, so that the covergroup's value of
+// it is not its default.
+bool SetsOwnOption(const std::vector<std::string_view>& own,
+                   std::string_view member) {
+  return std::ranges::find(own, member) != own.end();
+}
+
+// §19.7.1: the type option assignments of the item `index` of a covergroup
+// definition where it is the coverpoint or cross `item`, added to `found`;
+// whether it is that item.
+bool ItemTypeOptions(const CoverageSpecOrOption& spec, size_t index,
+                     std::string_view item,
+                     std::vector<const CoverageOption*>& found) {
+  if (spec.kind == CoverageSpecKind::kCoverPoint &&
+      CoverpointName(*spec.cover_point, index) == item) {
+    for (const BinsOrOptions& bins : spec.cover_point->bins) {
+      if (bins.kind == BinsOrOptionsKind::kOption)
+        found.push_back(&bins.option);
+    }
+    return true;
+  }
+  if (spec.kind == CoverageSpecKind::kCoverCross &&
+      spec.cover_cross->label == item) {
+    for (const CrossBodyItem& body : spec.cover_cross->body) {
+      if (body.kind == CrossBodyItemKind::kOption)
+        found.push_back(&body.option);
+    }
+    return true;
+  }
+  return false;
+}
+
+// §19.7.1: the type option `member` the definition `decl` gives at one level,
+// starting from the defaults of Table 19-3 in `options`, with each type option
+// written through the type since, `writes`.
+template <typename Options>
+bool ReadDefinedOption(Options options, const OptionFields<Options>& fields,
+                       const std::vector<const CoverageOption*>& defined,
+                       std::span<const TypeOptionWrite* const> writes,
+                       std::string_view member, SimContext& ctx, Arena& arena,
+                       Logic4Vec& out) {
+  for (const CoverageOption* option : defined) {
+    if (option->is_type_option) SetOption(options, fields, *option, ctx, arena);
+  }
+  for (const TypeOptionWrite* write : writes) {
+    SetOptionValue(options, fields, write->member, write->value);
+  }
+  return ReadOption(options, fields, member, arena, out);
+}
+
+// §19.7.1: the type option `member` of the covergroup type `decl`, of the
+// covergroup where `item` is empty and else of its coverpoint or cross `item`,
+// as its definition and the writes through the type since give it, where no
+// instance of the type has been built to read it from.
+bool ReadDefinedTypeOption(const CovergroupDecl& decl, std::string_view item,
+                           std::string_view member, SimContext& ctx,
+                           Arena& arena, Logic4Vec& out) {
+  std::vector<const TypeOptionWrite*> writes;
+  for (const TypeOptionWrite& write : ctx.Covergroups().TypeOptionWrites()) {
+    if (write.decl == &decl && write.item == item) writes.push_back(&write);
+  }
+  std::vector<const CoverageOption*> defined;
+  for (size_t i = 0; i < decl.items.size(); ++i) {
+    const CoverageSpecOrOption& spec = decl.items[i];
+    if (item.empty()) {
+      if (spec.kind == CoverageSpecKind::kOption)
+        defined.push_back(&spec.option);
+      continue;
+    }
+    if (!ItemTypeOptions(spec, i, item, defined)) continue;
+    if (spec.kind == CoverageSpecKind::kCoverCross) {
+      return ReadDefinedOption(CrossTypeOption{}, kCrossTypeFields, defined,
+                               writes, member, ctx, arena, out);
+    }
+    return ReadDefinedOption(CoverPointTypeOption{}, kPointTypeFields, defined,
+                             writes, member, ctx, arena, out);
+  }
+  return item.empty() &&
+         ReadDefinedOption(CoverGroupTypeOption{}, kGroupTypeFields, defined,
+                           writes, member, ctx, arena, out);
+}
+
 }  // namespace
 
 void ApplyGroupOption(CovergroupInstance& inst, const CoverageOption& option,
@@ -229,8 +335,10 @@ void ApplyPointOption(SampledCoverpoint& point, const CoverageOption& option,
                       SimContext& ctx, Arena& arena) {
   if (option.is_type_option) {
     SetOption(point.type_option, kPointTypeFields, option, ctx, arena);
+    point.point->type_weight = point.type_option.weight;
   } else {
     SetOption(point.option, kPointFields, option, ctx, arena);
+    point.own_options.push_back(option.member);
   }
 }
 
@@ -243,29 +351,35 @@ void ApplyCrossOption(CrossCover& cross, const CoverageOption& option,
   }
 }
 
-void WriteGroupOption(CoverGroup& group, std::string_view member,
+void WriteGroupOption(CovergroupInstance& inst, std::string_view member,
                       const Logic4Vec& value) {
   if (!ProcedurallyAssignable(member)) return;
-  SetOptionValue(group.options, kGroupFields, member, value);
+  SetOptionValue(inst.group->options, kGroupFields, member, value);
+  if (member != "at_least" && member != "cross_num_print_missing") return;
+  for (SampledCoverpoint& point : inst.points) {
+    if (!SetsOwnOption(point.own_options, member)) {
+      SetPointOptionValue(point, member, value);
+    }
+  }
+  for (SampledCross& cross : inst.crosses) {
+    if (!SetsOwnOption(cross.own_options, member)) {
+      SetCrossOptionValue(inst.group->crosses[cross.index], member, value);
+    }
+  }
 }
 
 void WritePointOption(SampledCoverpoint& point, std::string_view member,
                       const Logic4Vec& value) {
   if (!ProcedurallyAssignable(member)) return;
-  SetOptionValue(point.option, kPointFields, member, value);
-  point.point->weight = point.option.weight;
-  for (CoverBin& bin : point.point->bins) {
-    bin.at_least = static_cast<uint32_t>(std::max(0, point.option.at_least));
-  }
+  point.own_options.push_back(member);
+  SetPointOptionValue(point, member, value);
 }
 
-void WriteCrossOption(CrossCover& cross, std::string_view member,
-                      const Logic4Vec& value) {
+void WriteCrossOption(CovergroupInstance& inst, SampledCross& cross,
+                      std::string_view member, const Logic4Vec& value) {
   if (!ProcedurallyAssignable(member)) return;
-  SetOptionValue(cross.option, kCrossFields, member, value);
-  for (CrossBin& bin : cross.bins) {
-    bin.at_least = static_cast<uint32_t>(std::max(0, cross.option.at_least));
-  }
+  cross.own_options.push_back(member);
+  SetCrossOptionValue(inst.group->crosses[cross.index], member, value);
 }
 
 bool ReadGroupOption(const CoverGroup& group, bool type_option,
@@ -290,6 +404,100 @@ bool ReadCrossOption(const CrossCover& cross, bool type_option,
              ? ReadOption(cross.type_option, kCrossTypeFields, member, arena,
                           out)
              : ReadOption(cross.option, kCrossFields, member, arena, out);
+}
+
+void SetTypeOption(CovergroupInstance& inst, const TypeOptionWrite& write) {
+  if (write.item.empty()) {
+    SetOptionValue(inst.group->type_option, kGroupTypeFields, write.member,
+                   write.value);
+    return;
+  }
+  for (SampledCoverpoint& point : inst.points) {
+    if (point.point->name != write.item) continue;
+    SetOptionValue(point.type_option, kPointTypeFields, write.member,
+                   write.value);
+    point.point->type_weight = point.type_option.weight;
+  }
+  for (CrossCover& cross : inst.group->crosses) {
+    if (cross.name != write.item) continue;
+    SetOptionValue(cross.type_option, kCrossTypeFields, write.member,
+                   write.value);
+  }
+}
+
+bool ReadTypeOption(const CovergroupInstance& inst, std::string_view item,
+                    std::string_view member, Arena& arena, Logic4Vec& out) {
+  if (item.empty()) {
+    return ReadGroupOption(*inst.group, true, member, arena, out);
+  }
+  for (const SampledCoverpoint& point : inst.points) {
+    if (point.point->name == item) {
+      return ReadPointOption(point, true, member, arena, out);
+    }
+  }
+  for (const CrossCover& cross : inst.group->crosses) {
+    if (cross.name == item) {
+      return ReadCrossOption(cross, true, member, arena, out);
+    }
+  }
+  return false;
+}
+
+void CovergroupTable::WriteTypeOption(TypeOptionWrite write) {
+  for (auto& [key, inst] : instances_) {
+    (void)key;
+    if (inst.decl == write.decl) SetTypeOption(inst, write);
+  }
+  type_option_writes_.push_back(std::move(write));
+}
+
+void CovergroupTable::TakeTypeOptionWrites(CovergroupInstance& inst) const {
+  for (const TypeOptionWrite& write : type_option_writes_) {
+    if (write.decl == inst.decl) SetTypeOption(inst, write);
+  }
+}
+
+const CovergroupInstance* CovergroupTable::AnyOf(
+    const CovergroupDecl* decl) const {
+  for (const auto& [key, inst] : instances_) {
+    (void)key;
+    if (inst.decl == decl) return &inst;
+  }
+  return nullptr;
+}
+
+// §19.7.1: `cg::type_option.member = ...;` and `cg::x::type_option.member =
+// ...;`, where `access` is the `cg::type_option` or `cg::x::type_option` the
+// member is selected from.
+bool TryCovergroupTypeOptionAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  const Expr* lhs = stmt->lhs;
+  if (lhs == nullptr || stmt->rhs == nullptr ||
+      lhs->kind != ExprKind::kMemberAccess || lhs->rhs == nullptr ||
+      lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kMemberAccess) {
+    return false;
+  }
+  TypeOptionWrite write;
+  write.decl = TypeOptionOwner(lhs->lhs, ctx, write.item);
+  if (write.decl == nullptr) return false;
+  write.member = std::string(lhs->rhs->text);
+  // §19.7.1: strobe and real_interval are set in the definition only.
+  if (write.member == "strobe" || write.member == "real_interval") return true;
+  write.value = EvalExpr(stmt->rhs, ctx, arena);
+  ctx.Covergroups().WriteTypeOption(std::move(write));
+  return true;
+}
+
+bool TryEvalCovergroupTypeOptionRead(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  std::string item;
+  const CovergroupDecl* decl = TypeOptionOwner(expr->lhs, ctx, item);
+  if (decl == nullptr) return false;
+  const CovergroupInstance* inst = ctx.Covergroups().AnyOf(decl);
+  if (inst == nullptr) {
+    return ReadDefinedTypeOption(*decl, item, expr->rhs->text, ctx, arena, out);
+  }
+  return ReadTypeOption(*inst, item, expr->rhs->text, arena, out);
 }
 
 }  // namespace delta
