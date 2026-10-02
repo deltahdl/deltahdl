@@ -749,6 +749,26 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+static void RunFunctionBody(const ModuleItem* func,
+                            std::string_view inst_prefix, Variable* ret_var,
+                            SimContext& ctx, Arena& arena) {
+  // §20.17.2: a function body is a calling context on the $stacktrace chain,
+  // so record its frame just as task calls do (see PushTaskCallScope).
+  ctx.PushFuncName(func->name);
+  // §21.2.1.5: a function is a subroutine level of the hierarchical name, so
+  // %m inside its body names the function; task calls push the same scope in
+  // ExecInlineTaskCall. §19.3: the function beginning and ending are block
+  // events a covergroup may sample at.
+  ctx.PushActiveNamedScope(func->name);
+  SampleAtBlockEvent(func->name, true, ctx, arena);
+  ctx.EnterFunction();
+  ExecFunctionBodyInCallee(func, inst_prefix, ret_var, ctx, arena);
+  ctx.ExitFunction();
+  SampleAtBlockEvent(func->name, false, ctx, arena);
+  ctx.PopActiveNamedScope();
+  ctx.PopFuncName();
+}
+
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
@@ -813,21 +833,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ret_var->is_real = DeclaredTypeIsReal(func->return_type, ctx);
   }
 
-  // §20.17.2: a function body is a calling context on the $stacktrace chain,
-  // so record its frame just as task calls do (see PushTaskCallScope).
-  ctx.PushFuncName(func->name);
-  // §21.2.1.5: a function is a subroutine level of the hierarchical name, so
-  // %m inside its body names the function; task calls push the same scope in
-  // ExecInlineTaskCall. §19.3: the function beginning and ending are block
-  // events a covergroup may sample at.
-  ctx.PushActiveNamedScope(func->name);
-  SampleAtBlockEvent(func->name, true, ctx, arena);
-  ctx.EnterFunction();
-  ExecFunctionBodyInCallee(func, target.inst_prefix, ret_var, ctx, arena);
-  ctx.ExitFunction();
-  SampleAtBlockEvent(func->name, false, ctx, arena);
-  ctx.PopActiveNamedScope();
-  ctx.PopFuncName();
+  RunFunctionBody(func, target.inst_prefix, ret_var, ctx, arena);
   WritebackInCaller(func, expr, ctx, arena);
   result = CallResult(is_void, ret_var, arena);
 
