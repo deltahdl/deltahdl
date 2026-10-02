@@ -68,7 +68,7 @@ TEST(AutoBinCreation, BinCountMatchesAutoBinCount) {
 
 // LRM 19.5.3: when 2^M does not divide evenly by N, the 2^M values are
 // distributed across the N bins with the last bin absorbing the remaining
-// items — M=3, N=3 yields {0,1}, {2,3}, {4,5,6,7}.
+// items — M=3, N=3 yields [0:1], [2:3], [4:7].
 TEST(AutoBinCreation, LastBinAbsorbsRemainder) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -78,9 +78,9 @@ TEST(AutoBinCreation, LastBinAbsorbsRemainder) {
   CoverageDB::AutoCreateBins(cp, 0, 7);  // M = 3, 2^M = 8 values, N = 3
 
   ASSERT_EQ(cp->bins.size(), 3u);
-  EXPECT_EQ(cp->bins[0].values, (std::vector<int64_t>{0, 1}));
-  EXPECT_EQ(cp->bins[1].values, (std::vector<int64_t>{2, 3}));
-  EXPECT_EQ(cp->bins[2].values, (std::vector<int64_t>{4, 5, 6, 7}));
+  EXPECT_EQ(cp->bins[0].ranges, (std::vector<CoverValueRange>{{0, 1}}));
+  EXPECT_EQ(cp->bins[1].ranges, (std::vector<CoverValueRange>{{2, 3}}));
+  EXPECT_EQ(cp->bins[2].ranges, (std::vector<CoverValueRange>{{4, 7}}));
 }
 
 // LRM 19.5.3: each automatic bin is named "auto[value]" for a single value and
@@ -128,8 +128,8 @@ TEST(AutoBinCreation, SampleWithXZExcluded) {
 }
 
 // LRM 19.5.3 (edge): when 2^M divides evenly by N, every bin holds the same
-// number of values — eight values across four bins give {0,1}, {2,3}, {4,5},
-// {6,7} with no remainder to absorb.
+// number of values — eight values across four bins give [0:1], [2:3], [4:5],
+// [6:7] with no remainder to absorb.
 TEST(AutoBinCreation, EvenDivisionDistributesValuesEqually) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -139,10 +139,10 @@ TEST(AutoBinCreation, EvenDivisionDistributesValuesEqually) {
   CoverageDB::AutoCreateBins(cp, 0, 7);  // 8 values, N = 4
 
   ASSERT_EQ(cp->bins.size(), 4u);
-  EXPECT_EQ(cp->bins[0].values, (std::vector<int64_t>{0, 1}));
-  EXPECT_EQ(cp->bins[1].values, (std::vector<int64_t>{2, 3}));
-  EXPECT_EQ(cp->bins[2].values, (std::vector<int64_t>{4, 5}));
-  EXPECT_EQ(cp->bins[3].values, (std::vector<int64_t>{6, 7}));
+  EXPECT_EQ(cp->bins[0].ranges, (std::vector<CoverValueRange>{{0, 1}}));
+  EXPECT_EQ(cp->bins[1].ranges, (std::vector<CoverValueRange>{{2, 3}}));
+  EXPECT_EQ(cp->bins[2].ranges, (std::vector<CoverValueRange>{{4, 5}}));
+  EXPECT_EQ(cp->bins[3].ranges, (std::vector<CoverValueRange>{{6, 7}}));
 }
 
 // LRM 19.5.3 (edge): when the auto_bin_max limit exceeds the number of
@@ -156,8 +156,8 @@ TEST(AutoBinCreation, BinCountClampedToValueCountWhenCapExceedsRange) {
   CoverageDB::AutoCreateBins(cp, 0, 3);  // 2^M = 4
 
   ASSERT_EQ(cp->bins.size(), 4u);
-  EXPECT_EQ(cp->bins[0].values, (std::vector<int64_t>{0}));
-  EXPECT_EQ(cp->bins[3].values, (std::vector<int64_t>{3}));
+  EXPECT_EQ(cp->bins[0].ranges, (std::vector<CoverValueRange>{{0, 0}}));
+  EXPECT_EQ(cp->bins[3].ranges, (std::vector<CoverValueRange>{{3, 3}}));
 }
 
 // LRM 19.5.3 (edge): for a coverpoint wide enough that 2^M is astronomically
@@ -330,6 +330,26 @@ TEST(CovergroupInstanceSim, SignedAndExpressionCoverpointsAutomaticBins) {
                        "endmodule\n",
                        f),
             "n=2 t=68\n");
+}
+
+// §19.5.3: the 64 automatic bins of an int coverpoint split all 2^32 of its
+// values among them, so -5 falls in the 32nd, the bin ending at -1.
+TEST(CovergroupInstanceSim, AutomaticBinsOfIntSpanEveryValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  int i; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint i;\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin i = -5; c.sample(); void'(c.get_inst_coverage(n, "
+          "t)); $display(\"n=%0d t=%0d\", n, t); end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=64\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

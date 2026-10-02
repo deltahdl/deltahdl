@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -53,21 +52,8 @@ TEST(Coverage, AutoBinCreation) {
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 7);
   EXPECT_EQ(cp->bins.size(), 4u);
-
-  struct {
-    size_t bin_idx;
-    size_t val_idx;
-    int64_t expected;
-  } const kCases[] = {
-      {0, 0, 0},
-      {0, 1, 1},
-      {3, 0, 6},
-      {3, 1, 7},
-  };
-  for (const auto& c : kCases) {
-    EXPECT_EQ(cp->bins[c.bin_idx].values[c.val_idx], c.expected);
-  }
-  EXPECT_EQ(cp->bins[0].values.size(), 2u);
+  EXPECT_EQ(cp->bins[0].ranges, (std::vector<CoverValueRange>{{0, 1}}));
+  EXPECT_EQ(cp->bins[3].ranges, (std::vector<CoverValueRange>{{6, 7}}));
 }
 
 TEST(Coverage, AutoBinSmallRange) {
@@ -78,8 +64,7 @@ TEST(Coverage, AutoBinSmallRange) {
   CoverageDB::AutoCreateBins(cp, 0, 3);
 
   EXPECT_EQ(cp->bins.size(), 4u);
-  EXPECT_EQ(cp->bins[0].values.size(), 1u);
-  EXPECT_EQ(cp->bins[0].values[0], 0);
+  EXPECT_EQ(cp->bins[0].ranges, (std::vector<CoverValueRange>{{0, 0}}));
 }
 
 // LRM 19.5.1: a fixed number of bins smaller than the value count distributes
@@ -321,6 +306,71 @@ TEST(CovergroupInstanceSim, ArrayAndFixedCountBinsFromDeclaration) {
                        "endmodule\n",
                        f),
             "n=3 t=7\n");
+}
+
+// §19.5.1: a range bin holds every value of its range, however many: 99999
+// lies in [0:100000], beyond the first 65536 values, so the one bin is hit.
+TEST(CovergroupInstanceSim, RangeBinHoldsEveryValueOfItsRange) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  int v; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint v { bins big = {[0:100000]}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin v = 99999; c.sample(); void'(c.get_inst_coverage(n, "
+          "t)); $display(\"n=%0d t=%0d\", n, t); end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5.1: a bin's trailing iff keeps its count from incrementing at a sample
+// where the guard is false, so lo stays unhit.
+TEST(CovergroupInstanceSim, BinIffGuardKeepsCountFromIncrementing) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v; bit en;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins lo = {0} iff (en); bins hi = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    en = 0; v = 0; c.sample();\n"
+                 "    v = 3; c.sample();\n"
+                 "    $display(\"cov=%0.2f\", c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5.1: a range bin of a real coverpoint covers the real values within the
+// range, so 1.5 hits [1.0:2.0].
+TEST(CovergroupInstanceSim, RealCoverpointRangeBinCountsRealSample) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  real r; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint r { bins a = {[1.0:2.0]}; bins b = {[3.0:4.0]}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    r = 1.5; c.sample();\n"
+          "    void'(c.get_inst_coverage(n, t));\n"
+          "    $display(\"n=%0d t=%0d\", n, t);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

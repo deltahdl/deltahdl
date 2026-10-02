@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -100,6 +101,29 @@ TEST(CoverageWith, DistributeIntoZeroBins) {
       candidates, [](int64_t) { return true; }, /*num_bins=*/0,
       /*distribute_first=*/false);
   EXPECT_TRUE(bins.empty());
+}
+
+// §19.5.1.1: a with clause keeps the values of the range list for which the
+// expression is true, item standing for the value: the even four of 0 to 7.
+TEST(CovergroupInstanceSim, WithFilterKeepsMatchingValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [2:0] v; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint v { bins m[] = {[0:7]} with (item % 2 == 0); }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    v = 2; c.sample();\n"
+          "    void'(c.get_inst_coverage(n, t));\n"
+          "    $display(\"n=%0d t=%0d\", n, t);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

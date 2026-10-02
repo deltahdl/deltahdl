@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -41,6 +42,33 @@ TEST(Coverage, UninstantiatedCoverGroupNotCreated) {
   MyClass with(true);
   ASSERT_NE(with.cg, nullptr);
   EXPECT_EQ(with.db.GroupCount(), 1u);
+}
+
+// §19.4: an embedded covergroup is instantiated by new in the enclosing
+// class's constructor, one instance per object, and samples the object's
+// members.
+TEST(CovergroupInstanceSim, EmbeddedCovergroupBuiltInConstructor) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  class xyz;\n"
+                 "    bit [1:0] m_x;\n"
+                 "    covergroup cov1; coverpoint m_x { bins lo = {0}; bins hi "
+                 "= {3}; } endgroup\n"
+                 "    function new(); cov1 = new; endfunction\n"
+                 "    function void go(bit [1:0] x); m_x = x; cov1.sample(); "
+                 "endfunction\n"
+                 "  endclass\n"
+                 "  xyz o;\n"
+                 "  initial begin\n"
+                 "    o = new;\n"
+                 "    o.go(0);\n"
+                 "    $display(\"cov=%0.2f\", o.cov1.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

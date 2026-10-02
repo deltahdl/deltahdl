@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "simulator/coverage.h"
@@ -46,85 +47,71 @@ bool CoverageDB::CrossItemsInSameGroup(const CoverGroup* group,
 
 namespace {
 
-// Collects, for one crossed coverpoint name, the value lists of the bins that
-// may contribute a cross product. Default, ignore, and illegal bins are skipped
-// (LRM 19.6). Returns an empty list when the coverpoint is absent.
-std::vector<std::vector<int64_t>> CollectContributingBinValues(
-    CoverGroup* group, const std::string& name) {
-  CoverPoint* cp = nullptr;
-  for (auto& candidate : group->coverpoints) {
-    if (candidate.name == name) {
-      cp = &candidate;
-      break;
+// The indices of the bins of the coverpoint `name` that may contribute a cross
+// product: default, ignore, and illegal bins are skipped (LRM 19.6). Empty when
+// the coverpoint is absent.
+std::vector<size_t> ContributingBins(const CoverGroup& group,
+                                     const std::string& name) {
+  std::vector<size_t> contributing;
+  for (const auto& cp : group.coverpoints) {
+    if (cp.name != name) continue;
+    for (size_t i = 0; i < cp.bins.size(); ++i) {
+      CoverBinKind kind = cp.bins[i].kind;
+      if (kind == CoverBinKind::kDefault || kind == CoverBinKind::kIgnore ||
+          kind == CoverBinKind::kIllegal) {
+        continue;
+      }
+      contributing.push_back(i);
     }
-  }
-  std::vector<std::vector<int64_t>> contributing;
-  if (cp != nullptr) {
-    for (const auto& bin : cp->bins) {
-      if (bin.kind == CoverBinKind::kDefault) continue;
-      if (bin.kind == CoverBinKind::kIgnore) continue;
-      if (bin.kind == CoverBinKind::kIllegal) continue;
-      contributing.push_back(bin.values);
-    }
+    break;
   }
   return contributing;
 }
 
-// Builds one cross bin from the current per-coverpoint bin index combination.
-CrossBin MakeCrossProductBin(
-    const std::vector<std::vector<std::vector<int64_t>>>& per_point,
-    const std::vector<size_t>& idx) {
-  CrossBin cbin;
-  cbin.value_sets.reserve(per_point.size());
-  cbin.name = "<";
-  for (size_t i = 0; i < per_point.size(); ++i) {
-    cbin.value_sets.push_back(per_point[i][idx[i]]);
-    if (i != 0) cbin.name += ",";
-    cbin.name += std::to_string(idx[i]);
-  }
-  cbin.name += ">";
-  return cbin;
-}
-
-// Advances the per-coverpoint bin index combination to the next Cartesian
-// product position. Returns false when the product has been exhausted.
-bool AdvanceCrossProductIndex(
-    const std::vector<std::vector<std::vector<int64_t>>>& per_point,
-    std::vector<size_t>& idx) {
-  size_t pos = per_point.size();
-  while (pos > 0) {
-    --pos;
-    if (++idx[pos] < per_point[pos].size()) return true;
-    idx[pos] = 0;
-    if (pos == 0) return false;
-  }
-  return false;
-}
-
 }  // namespace
 
-void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
-  // Collect, for each crossed coverpoint, the value lists of the bins that may
-  // contribute a cross product. Default, ignore, and illegal bins are skipped
-  // (LRM 19.6).
-  std::vector<std::vector<std::vector<int64_t>>> per_point;
+std::vector<std::vector<size_t>> CoverageDB::CrossProductTuples(
+    const CoverGroup* group, const CrossCover* cross) {
+  std::vector<std::vector<size_t>> per_point;
   per_point.reserve(cross->coverpoint_names.size());
+  std::vector<size_t> counts;
+  counts.reserve(cross->coverpoint_names.size());
   for (const auto& name : cross->coverpoint_names) {
-    per_point.push_back(CollectContributingBinValues(group, name));
+    per_point.push_back(ContributingBins(*group, name));
+    counts.push_back(per_point.back().size());
   }
+  std::vector<std::vector<size_t>> tuples = EnumerateCrossProducts(counts);
+  for (auto& tuple : tuples) {
+    for (size_t i = 0; i < tuple.size(); ++i) tuple[i] = per_point[i][tuple[i]];
+  }
+  return tuples;
+}
 
+std::string CoverageDB::CrossProductName(const CoverGroup* group,
+                                         const CrossCover* cross,
+                                         const std::vector<size_t>& tuple) {
+  std::string name = "<";
+  for (size_t i = 0; i < tuple.size(); ++i) {
+    if (i != 0) name += ",";
+    for (const auto& cp : group->coverpoints) {
+      if (cp.name == cross->coverpoint_names[i]) {
+        name += cp.bins[tuple[i]].name;
+        break;
+      }
+    }
+  }
+  return name + ">";
+}
+
+void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
+  // One cross bin per product of the crossed coverpoints' bins that may
+  // contribute one (LRM 19.6), named after those bins.
   cross->bins.clear();
-  // Any constituent coverpoint with no contributing bin yields an empty
-  // Cartesian product.
-  for (const auto& point : per_point) {
-    if (point.empty()) return;
-  }
-
-  // Iterate the Cartesian product of the per-coverpoint bin lists.
-  std::vector<size_t> idx(per_point.size(), 0);
-  while (true) {
-    cross->bins.push_back(MakeCrossProductBin(per_point, idx));
-    if (!AdvanceCrossProductIndex(per_point, idx)) return;
+  for (auto& tuple : CrossProductTuples(group, cross)) {
+    CrossBin cbin;
+    cbin.name = CrossProductName(group, cross, tuple);
+    cbin.bin_tuples.push_back(std::move(tuple));
+    cross->bins.push_back(std::move(cbin));
   }
 }
 

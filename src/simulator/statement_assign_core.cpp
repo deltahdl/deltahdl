@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_assoc_class_handles.h"
@@ -624,7 +625,8 @@ static bool TryDispatchSyncAssign(const Stmt* stmt, SimContext& ctx,
 // class, whose handle forms would construct one object for it.
 static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
-  return TryClassArrayNewAssign(stmt, ctx, arena) ||
+  return TryCovergroupNewAssign(stmt, ctx, arena) ||
+         TryClassArrayNewAssign(stmt, ctx, arena) ||
          TryClassNewAssign(stmt, ctx, arena) ||
          TryTypedClassNewAssign(stmt, ctx, arena) ||
          TryMemberClassNewAssign(stmt, ctx, arena);

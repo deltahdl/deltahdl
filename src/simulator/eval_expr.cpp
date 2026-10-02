@@ -15,6 +15,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/clocking.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array_handles.h"
@@ -759,6 +760,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 
   if (TryObjectMemberRead(expr, ctx, arena, out)) return out;
+  if (TryEvalCovergroupOptionRead(expr, ctx, arena, out)) return out;
 
   auto resolved = HierarchicalReferenceName(expr);
   if (TryLocalScopeQualifier(resolved, ctx, arena, out)) return out;

@@ -17,7 +17,9 @@ static bool MatchesBinValues(const CoverBin& bin, int64_t value) {
   for (int64_t v : bin.values) {
     if (v == value) return true;
   }
-  return false;
+  return std::ranges::any_of(bin.ranges, [&](const CoverValueRange& r) {
+    return r.lo <= value && value <= r.hi;
+  });
 }
 
 static bool MatchesBin(const CoverBin& bin, int64_t value) {
@@ -74,14 +76,10 @@ uint32_t CoverageDB::GroupCount() const {
 }
 
 CoverPoint* CoverageDB::AddCoverPoint(CoverGroup* group, std::string name) {
-  group->coverpoints.push_back(
-      CoverPoint{std::move(name),
-                 {},
-                 false,
-                 true,
-                 0,
-                 0,
-                 static_cast<uint32_t>(group->options.auto_bin_max)});
+  CoverPoint cp;
+  cp.name = std::move(name);
+  cp.auto_bin_count = static_cast<uint32_t>(group->options.auto_bin_max);
+  group->coverpoints.push_back(std::move(cp));
   return &group->coverpoints.back();
 }
 
@@ -153,34 +151,35 @@ void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
   if (!ShouldAutoCreateBins(cp)) return;
   cp->auto_bin_min = min_val;
   cp->auto_bin_max = max_val;
-  int64_t range = max_val - min_val + 1;
-  if (range <= 0) return;
-  // The number of bins is N = MIN(2^M, auto_bin_max); the [min,max] window the
-  // caller supplies carries the 2^M possible values and auto_bin_count carries
-  // the auto_bin_max limit (LRM 19.5.3).
-  uint32_t bin_count = cp->auto_bin_count;
-  if (static_cast<int64_t>(bin_count) > range) {
-    bin_count = static_cast<uint32_t>(range);
-  }
+  if (max_val < min_val) return;
+  // The window holds span + 1 values, counted unsigned so that the 2^64 values
+  // of a 64-bit coverpoint do not overflow. The number of bins is N = MIN(2^M,
+  // auto_bin_max); the [min,max] window the caller supplies carries the 2^M
+  // possible values and auto_bin_count carries the auto_bin_max limit (LRM
+  // 19.5.3).
+  uint64_t span =
+      static_cast<uint64_t>(max_val) - static_cast<uint64_t>(min_val);
+  uint64_t bin_count = cp->auto_bin_count;
+  if (span < bin_count) bin_count = span + 1;
   if (bin_count == 0) return;
 
-  // Distribute the 2^M values uniformly across the N bins. When the count does
-  // not divide evenly, the last bin absorbs the remaining items, e.g. M=3, N=3
-  // yields {0,1}, {2,3}, {4,5,6,7} (LRM 19.5.3).
-  int64_t per_bin = range / static_cast<int64_t>(bin_count);
-  int64_t cursor = min_val;
-  for (uint32_t i = 0; i < bin_count; ++i) {
-    bool last = (i + 1 == bin_count);
-    int64_t count = last ? (max_val - cursor + 1) : per_bin;
-    int64_t low = cursor;
-    int64_t high = cursor + count - 1;
+  // Distribute the 2^M values uniformly across the N bins, each bin a range of
+  // floor((span + 1) / N) of them. When the count does not divide evenly, the
+  // last bin absorbs the remaining items, e.g. M=3, N=3 yields [0:1], [2:3],
+  // [4:7] (LRM 19.5.3).
+  uint64_t per_bin =
+      (span / bin_count) + (span % bin_count == bin_count - 1 ? 1 : 0);
+  auto cursor = static_cast<uint64_t>(min_val);
+  for (uint64_t i = 0; i < bin_count; ++i) {
+    auto low = static_cast<int64_t>(cursor);
+    int64_t high = i + 1 == bin_count
+                       ? max_val
+                       : static_cast<int64_t>(cursor + per_bin - 1);
     CoverBin bin;
     bin.kind = CoverBinKind::kAuto;
     bin.name = AutoBinName(low, high);
-    for (int64_t j = 0; j < count; ++j) {
-      bin.values.push_back(cursor + j);
-    }
-    cursor += count;
+    bin.ranges.push_back({low, high});
+    cursor += per_bin;
     cp->bins.push_back(std::move(bin));
   }
 }
@@ -190,34 +189,22 @@ CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
   return &group->crosses.back();
 }
 
+// Whether a bin of `kind` that `matches` finds the sampled value in exists.
 // An illegal bin takes precedence over every other bin: a sampled value that
 // hits an illegal state bin is a run-time error and is counted toward no
-// coverage bin, even when it also belongs to another bin (LRM 19.5.6).
-static bool ValueHitsIllegalBin(const CoverPoint* cp, int64_t value) {
-  for (const auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kIllegal && MatchesBin(bin, value)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// An ignored value is removed from the value set of every coverage bin, so a
+// coverage bin, even when it also belongs to another bin (LRM 19.5.6). An
+// ignored value is removed from the value set of every coverage bin, so a
 // sampled value that hits an ignored state bin counts toward no coverage bin —
 // even one it would otherwise share — and is silently excluded from coverage
 // with no run-time error (LRM 19.5.5).
-static bool ValueHitsIgnoreBin(const CoverPoint* cp, int64_t value) {
-  for (const auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kIgnore && MatchesBin(bin, value)) {
-      return true;
-    }
-  }
-  return false;
+template <typename Matches>
+static bool ValueHitsBinOfKind(const CoverPoint* cp, CoverBinKind kind,
+                               const Matches& matches) {
+  return std::ranges::any_of(cp->bins, [&](const CoverBin& bin) {
+    return bin.kind == kind && matches(bin);
+  });
 }
 
-// Increments every value bin the sample lands in, honoring illegal/ignore
-// dominance and per-bin iff guards, and reports whether the value lies within
-// any defined (non-default) bin (LRM 19.5, 19.5.1, 19.5.5, 19.5.6).
 // Whether a matched non-default bin actually takes the hit. An illegal or
 // ignore bin never counts one itself; an illegal match dominates the sample, so
 // the value counts toward no other bin (LRM 19.5.6), and an ignored value is
@@ -232,20 +219,34 @@ static bool ValueBinTakesHit(const CoverBin& bin, bool value_is_illegal,
   return !bin.has_iff_guard || bin.iff_guard_value;
 }
 
-static bool ScoreValueBins(CoverPoint* cp, int64_t value, bool value_is_illegal,
-                           bool value_is_ignored) {
+// Counts a sampled value into every value bin `matches` finds it in, honoring
+// illegal/ignore dominance and per-bin iff guards, raises the run-time error of
+// an illegal value, and gives the default bin a value no defined bin holds (LRM
+// 19.5, 19.5.1, 19.5.5, 19.5.6).
+template <typename Matches>
+static void ScoreSampledValue(CoverPoint* cp, const Matches& matches) {
+  bool value_is_illegal =
+      ValueHitsBinOfKind(cp, CoverBinKind::kIllegal, matches);
+  bool value_is_ignored =
+      ValueHitsBinOfKind(cp, CoverBinKind::kIgnore, matches);
   // A value "lies within a defined bin" if it matches any non-default bin,
   // including illegal and ignore bins. The default bin catches only what the
   // defined bins miss (LRM 19.5).
   bool matched_defined = false;
-  for (auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kDefault) continue;
-    if (!MatchesBin(bin, value)) continue;
+  for (size_t i = 0; i < cp->bins.size(); ++i) {
+    CoverBin& bin = cp->bins[i];
+    if (bin.kind == CoverBinKind::kDefault || !matches(bin)) continue;
     matched_defined = true;
-    if (ValueBinTakesHit(bin, value_is_illegal, value_is_ignored))
+    if (ValueBinTakesHit(bin, value_is_illegal, value_is_ignored)) {
       ++bin.hit_count;
+      cp->sampled_bins.push_back(i);
+    }
   }
-  return matched_defined;
+  if (value_is_illegal) ++cp->illegal_violations;
+  if (matched_defined) return;
+  for (auto& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kDefault) ++bin.hit_count;
+  }
 }
 
 // Transition bins count whenever the most recent samples complete one of their
@@ -300,7 +301,8 @@ static bool SampleHistoryMatchesSeq(const CoverPoint* cp,
 
 // Scores any transition bin whose sequence was completed by the latest sample.
 static void ScoreTransitionBins(CoverPoint* cp) {
-  for (auto& bin : cp->bins) {
+  for (size_t i = 0; i < cp->bins.size(); ++i) {
+    CoverBin& bin = cp->bins[i];
     if (!IsTransitionBin(bin)) continue;
     for (const auto& seq : bin.transitions) {
       if (!SampleHistoryMatchesSeq(cp, seq)) continue;
@@ -310,6 +312,7 @@ static void ScoreTransitionBins(CoverPoint* cp) {
         ++cp->illegal_violations;
       } else {
         ++bin.hit_count;
+        cp->sampled_bins.push_back(i);
       }
       break;
     }
@@ -428,7 +431,8 @@ static bool AdvanceTransitionPattern(
 // its patterns completes; a completed illegal pattern raises a run-time error
 // and counts toward no bin (LRM 19.5.2, 19.5.6).
 static void ScorePatternBins(CoverPoint* cp, int64_t value) {
-  for (auto& bin : cp->bins) {
+  for (size_t b = 0; b < cp->bins.size(); ++b) {
+    CoverBin& bin = cp->bins[b];
     if (bin.transition_patterns.empty()) continue;
     if (bin.pattern_threads.size() != bin.transition_patterns.size()) {
       bin.pattern_threads.assign(bin.transition_patterns.size(), {});
@@ -447,23 +451,16 @@ static void ScorePatternBins(CoverPoint* cp, int64_t value) {
       ++cp->illegal_violations;
     } else {
       ++bin.hit_count;
+      cp->sampled_bins.push_back(b);
     }
   }
 }
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
+  cp->sampled_bins.clear();
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
-  bool value_is_illegal = ValueHitsIllegalBin(cp, value);
-  bool value_is_ignored = ValueHitsIgnoreBin(cp, value);
-  bool matched_defined =
-      ScoreValueBins(cp, value, value_is_illegal, value_is_ignored);
-  // Issue the run-time error for an illegal value occurrence (LRM 19.5.6).
-  if (value_is_illegal) ++cp->illegal_violations;
-  if (!matched_defined) {
-    for (auto& bin : cp->bins) {
-      if (bin.kind == CoverBinKind::kDefault) ++bin.hit_count;
-    }
-  }
+  ScoreSampledValue(
+      cp, [&](const CoverBin& bin) { return MatchesBin(bin, value); });
 
   // Concrete (bounded) transition sequences match against the trailing sample
   // window; goto/nonconsecutive pattern bins are matched incrementally. Either,
@@ -474,6 +471,21 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     ScoreTransitionBins(cp);
   }
   if (CollectPatternBins(cp)) ScorePatternBins(cp, value);
+}
+
+// Whether `value` falls within one of the intervals of a real bin (LRM 19.5.1).
+static bool MatchesRealBin(const CoverBin& bin, double value) {
+  return std::ranges::any_of(bin.real_intervals, [&](const RealInterval& r) {
+    return r.low <= value &&
+           (value < r.high || (r.high_inclusive && value == r.high));
+  });
+}
+
+void CoverageDB::SampleRealCoverPoint(CoverPoint* cp, double value) {
+  cp->sampled_bins.clear();
+  if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  ScoreSampledValue(
+      cp, [&](const CoverBin& bin) { return MatchesRealBin(bin, value); });
 }
 
 void CoverageDB::SampleCross(
@@ -490,22 +502,86 @@ void CoverageDB::SampleCross(
   }
 }
 
+// Whether the latest sample counted every coverpoint of `points` in its bin
+// of `tuple` (LRM 19.6.1).
+static bool SampledBinTuple(const std::vector<const CoverPoint*>& points,
+                            const std::vector<size_t>& tuple) {
+  for (size_t i = 0; i < points.size(); ++i) {
+    if (points[i] == nullptr ||
+        std::ranges::find(points[i]->sampled_bins, tuple[i]) ==
+            points[i]->sampled_bins.end()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The coverpoints a cross crosses, in its order; null for a name the group
+// holds no coverpoint of.
+static std::vector<const CoverPoint*> CrossedPoints(const CoverGroup& group,
+                                                    const CrossCover& cross) {
+  std::vector<const CoverPoint*> points;
+  points.reserve(cross.coverpoint_names.size());
+  for (const std::string& name : cross.coverpoint_names) {
+    auto it = std::ranges::find(group.coverpoints, name, &CoverPoint::name);
+    points.push_back(it == group.coverpoints.end() ? nullptr : &*it);
+  }
+  return points;
+}
+
+bool CoverageDB::CrossTupleSampled(const CoverGroup* group,
+                                   const CrossCover* cross,
+                                   const std::vector<size_t>& tuple) {
+  return SampledBinTuple(CrossedPoints(*group, *cross), tuple);
+}
+
+// A cross bin defined over bin tuples is incremented once at a sample that
+// matches any of its cross products (LRM 19.6.1), unless the cross's or the
+// bin's iff guard is false (LRM 19.6).
+static void SampleCrossBinTuples(const CoverGroup& group, CrossCover& cross) {
+  if (cross.has_iff_guard && !cross.iff_guard_value) return;
+  std::vector<const CoverPoint*> points = CrossedPoints(group, cross);
+  for (CrossBin& cbin : cross.bins) {
+    if (cbin.has_iff_guard && !cbin.iff_guard_value) continue;
+    if (std::ranges::any_of(cbin.bin_tuples, [&](const auto& tuple) {
+          return SampledBinTuple(points, tuple);
+        })) {
+      ++cbin.hit_count;
+    }
+  }
+}
+
 void CoverageDB::Sample(
     CoverGroup* group,
     const std::vector<std::pair<std::string, int64_t>>& values) {
+  Sample(group, values, {});
+}
+
+void CoverageDB::Sample(
+    CoverGroup* group,
+    const std::vector<std::pair<std::string, int64_t>>& values,
+    const std::vector<std::pair<std::string, double>>& real_values) {
   // A stopped instance ignores triggered samples entirely (LRM 19.8).
   if (!group->collecting) return;
   ++group->sample_count;
   for (auto& cp : group->coverpoints) {
+    cp.sampled_bins.clear();
     for (const auto& [name, val] : values) {
       if (name == cp.name) {
         SampleCoverPoint(&cp, val);
         break;
       }
     }
+    for (const auto& [name, val] : real_values) {
+      if (name == cp.name) {
+        SampleRealCoverPoint(&cp, val);
+        break;
+      }
+    }
   }
   for (auto& cross : group->crosses) {
     SampleCross(&cross, values);
+    SampleCrossBinTuples(*group, cross);
   }
 }
 
@@ -515,8 +591,8 @@ bool BinParticipates(const CoverBin& bin) {
   if (bin.kind == CoverBinKind::kDefault) return false;
   // A bin with no associated value, concrete transition, or structured
   // transition pattern has nothing to cover and does not participate.
-  if (bin.values.empty() && bin.transitions.empty() &&
-      bin.transition_patterns.empty()) {
+  if (bin.values.empty() && bin.ranges.empty() && bin.real_intervals.empty() &&
+      bin.transitions.empty() && bin.transition_patterns.empty()) {
     return false;
   }
   return true;

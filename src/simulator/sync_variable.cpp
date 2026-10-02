@@ -69,7 +69,7 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
     CreateSemaphoreForVar(name, var, v, ctx, arena);
   } else if (var.class_type_name == "mailbox") {
     CreateMailboxForVar(name, var, v, ctx, arena);
-  } else if (var.covergroup != nullptr && InitIsNew(var)) {
+  } else if (var.covergroup != nullptr) {
     CreateCovergroupForVar(name, var, ctx, arena);
   }
 }

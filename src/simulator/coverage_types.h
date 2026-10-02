@@ -1,6 +1,7 @@
 #ifndef DELTA_SIMULATOR_COVERAGE_TYPES_H_
 #define DELTA_SIMULATOR_COVERAGE_TYPES_H_
 
+#include <cstddef>
 #include <cstdint>
 // AddCoverPoint and AddBin hand back a pointer to the element they appended,
 // and a caller naturally holds those while it builds the rest of the group.
@@ -63,10 +64,35 @@ struct TransitionMatchThread {
   bool gap_ok = false;
 };
 
+// An inclusive span of integral values, [lo:hi], that a bin holds without
+// listing each of them: a range bin (LRM 19.5.1) and an automatic bin (LRM
+// 19.5.3) may span far more values than could be listed one by one.
+struct CoverValueRange {
+  int64_t lo = 0;
+  int64_t hi = 0;
+  bool operator==(const CoverValueRange&) const = default;
+};
+
+// One partition of a real coverpoint range. A real bin may divide a range of
+// real values into intervals; each interval includes its low value and excludes
+// its high value, except the final interval of a range, which also includes its
+// high value (LRM 19.5.1).
+struct RealInterval {
+  double low = 0.0;
+  double high = 0.0;
+  bool high_inclusive = false;
+};
+
 struct CoverBin {
   std::string name;
   CoverBinKind kind = CoverBinKind::kExplicit;
   std::vector<int64_t> values;
+  // The spans the bin holds beside `values`; a sampled value in either is in
+  // the bin.
+  std::vector<CoverValueRange> ranges;
+  // The intervals and single values a bin of a real coverpoint holds, a
+  // single value as an interval whose ends are both that value (LRM 19.5.1).
+  std::vector<RealInterval> real_intervals;
   std::vector<std::vector<int64_t>> transitions;
   // Structured transition patterns that carry goto (->) or nonconsecutive (=)
   // repetition. These describe sequences of unbounded or varying length that
@@ -84,16 +110,6 @@ struct CoverBin {
   // incremented (LRM 19.5.1).
   bool has_iff_guard = false;
   bool iff_guard_value = true;
-};
-
-// One partition of a real coverpoint range. A real bin may divide a range of
-// real values into intervals; each interval includes its low value and excludes
-// its high value, except the final interval of a range, which also includes its
-// high value (LRM 19.5.1).
-struct RealInterval {
-  double low = 0.0;
-  double high = 0.0;
-  bool high_inclusive = false;
 };
 
 // Effective type of a coverpoint expression e, used when resolving bin values
@@ -153,11 +169,19 @@ struct CoverPoint {
   // contributes to no coverage bin; illegal bins take precedence over every
   // other bin a sample might also match (LRM 19.5.6).
   uint64_t illegal_violations = 0;
+  // The indices into `bins` of the bins the latest sample was counted in,
+  // which a cross bin defined over the coverpoint's bins reads (LRM 19.6).
+  std::vector<size_t> sampled_bins;
 };
 
 struct CrossBin {
   std::string name;
   std::vector<std::vector<int64_t>> value_sets;
+  // The cross products the bin holds, each a tuple of indices into the bins
+  // of the crossed coverpoints, in the order the cross lists them (LRM 19.6,
+  // 19.6.1). The bin is hit when every coverpoint of the cross was counted in
+  // its bin of one tuple; value_sets is left empty for such a bin.
+  std::vector<std::vector<size_t>> bin_tuples;
   uint64_t hit_count = 0;
   uint32_t at_least = 1;
   // Per-bin guard from a trailing "iff" on a cross bin definition: when the

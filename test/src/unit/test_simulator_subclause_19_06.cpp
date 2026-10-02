@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_coverage.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -212,6 +213,29 @@ TEST(Coverage, CrossEmptyWhenCoverpointHasNoEligibleBins) {
   auto* xc = CoverageDB::AddCross(g, std::move(cross));
   CoverageDB::AutoCreateCrossBins(g, xc);
   EXPECT_TRUE(xc->bins.empty());
+}
+
+// §19.6: a variable crossed directly gets an implicit coverpoint, as though
+// coverpoint y; had been written, with its two automatic bins; the cross has
+// four products, one of them hit.
+TEST(CovergroupInstanceSim, CrossedVariableGetsImplicitCoverpoint) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] x; bit y; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    cx: coverpoint x { bins a = {0}; bins b = {1}; }\n"
+                       "    xy: cross cx, y;\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    x = 0; y = 1; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=3 t=8\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

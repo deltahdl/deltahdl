@@ -370,6 +370,9 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sva_engine.cpp
     simulator/coverage.cpp
     simulator/covergroup_instance.cpp
+    simulator/covergroup_instance_bins.cpp
+    simulator/covergroup_instance_cross.cpp
+    simulator/covergroup_instance_options.cpp
     simulator/dpi_binding.cpp
     simulator/dpi_c_call.cpp
     simulator/dpi_c_type.cpp

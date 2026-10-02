@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -487,6 +488,28 @@ TEST(CoverageTransitionBins, WorkedExampleReproducesStandardBinCounts) {
   EXPECT_EQ(pb5->hit_count, 4u);
   EXPECT_EQ(pb6->hit_count, 1u);
   EXPECT_EQ(pb7->hit_count, 1u);
+}
+
+// §19.5.2: a transition bin counts the sequence of values its trans_list
+// writes; 1 then 2 completes t but not u.
+TEST(CovergroupInstanceSim, TransitionBinCountsItsSequence) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v; int n, t;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins t = (1 => 2); bins u = (2 => 3); }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    v = 1; c.sample(); v = 2; c.sample();\n"
+                 "    void'(c.get_inst_coverage(n, t));\n"
+                 "    $display(\"n=%0d t=%0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "n=1 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

@@ -377,4 +377,64 @@ TEST(CovergroupInstanceSim, StopAndStartControlCollection) {
       "stopped=0.00\nstarted=50.00\n");
 }
 
+// §19.8: every coverpoint of an instance has get_inst_coverage(), whose
+// ref-int pair receives its covered and defined bins.
+TEST(CovergroupInstanceSim, CoverageMethodThroughCoverpoint) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    cp: coverpoint v { bins lo = {0}; bins hi = {3}; "
+                       "bins mid = {1}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 0; c.sample();\n"
+                       "    void'(c.cp.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.8: get_coverage() called on the covergroup type answers the coverage of
+// the type over its instances (§19.11.3), here the one instance's 50.
+TEST(CovergroupInstanceSim, TypeCoverageThroughScopeOperator) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 0; c.sample();\n"
+                       "    $display(\"type=%0.2f\", cg::get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "type=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.8: set_inst_name() sets the instance's name, which §19.10 makes its
+// option.name.
+TEST(CovergroupInstanceSim, SetInstNameSetsOptionName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit v;\n"
+                       "  covergroup cg; coverpoint v; endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    c.set_inst_name(\"foo_inst\");\n"
+                       "    $display(\"name=%s\", c.option.name);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "name=foo_inst\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

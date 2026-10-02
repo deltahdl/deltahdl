@@ -265,4 +265,47 @@ TEST(CovergroupInstanceSim, DefaultBinFromDeclarationNotCounted) {
             "n=0 t=2\n");
 }
 
+// §19.5: a coverpoint with a data type samples its expression converted to
+// that type, and its automatic bins span the type's values: four bins for
+// bit [1:0], the 8-bit 5 sampled as 1.
+TEST(CovergroupInstanceSim, CoverpointDataTypeConvertsTheSample) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [7:0] v; int n, t;\n"
+          "  covergroup cg;\n"
+          "    bit [1:0] lo2: coverpoint v;\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin v = 8'h05; c.sample(); void'(c.get_inst_coverage(n, "
+          "t)); $display(\"n=%0d t=%0d\", n, t); end\n"
+          "endmodule\n",
+          f),
+      "n=1 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5: a sample taken while a coverpoint's iff guard is false is ignored for
+// that coverpoint, so only hi is hit.
+TEST(CovergroupInstanceSim, CoverpointIffGuardIgnoresSample) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v; bit en;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v iff (en) { bins lo = {0}; bins hi = {3}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    en = 0; v = 0; c.sample();\n"
+                 "    en = 1; v = 3; c.sample();\n"
+                 "    $display(\"cov=%0.2f\", c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

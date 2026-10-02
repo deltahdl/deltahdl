@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_coverage.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -202,6 +203,30 @@ TEST(Coverage, NoAutoBinsRetainedWhenUserBinsCoverAll) {
       CoverageDB::RetainedAutoCrossProducts(counts, all,
                                             /*retain_auto_bins=*/true);
   EXPECT_TRUE(retained.empty());
+}
+
+// §19.6.1: a user-defined cross bin holds the products its select_expression
+// selects, and automatic bins are kept only for the other products: sel and
+// two automatic bins.
+TEST(CovergroupInstanceSim, UserCrossBinReplacesTheProductsItSelects) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit x, y; int n, t;\n"
+          "  covergroup cg;\n"
+          "    cx: coverpoint x { bins a = {0}; bins b = {1}; }\n"
+          "    cy: coverpoint y { bins a = {0}; bins b = {1}; }\n"
+          "    xy: cross cx, cy { bins sel = binsof(cx) intersect {0}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin x = 1; y = 1; c.sample(); "
+          "void'(c.get_inst_coverage(n, t)); $display(\"n=%0d t=%0d\", n, t); "
+          "end\n"
+          "endmodule\n",
+          f),
+      "n=3 t=7\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

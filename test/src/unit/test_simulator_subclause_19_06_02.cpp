@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -110,6 +111,27 @@ TEST(Coverage, IgnoredProductNeverRetained) {
       /*also_in_other_cross_bin=*/true));
   EXPECT_FALSE(CoverageDB::IgnoredCrossProductRetained(
       /*also_in_other_cross_bin=*/false));
+}
+
+// §19.6.2: the products an ignore_bins selection selects are excluded from
+// coverage; the four with x = 0 leave twelve of the cross's sixteen.
+TEST(CovergroupInstanceSim, IgnoreBinsExcludeTheirProducts) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] x, y; int n, t;\n"
+          "  covergroup cg;\n"
+          "    coverpoint x; coverpoint y;\n"
+          "    xy: cross x, y { ignore_bins ig = binsof(x) intersect {0}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin void'(c.get_inst_coverage(n, t)); $display(\"n=%0d "
+          "t=%0d\", n, t); end\n"
+          "endmodule\n",
+          f),
+      "n=0 t=20\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

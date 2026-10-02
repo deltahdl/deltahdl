@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -185,6 +186,28 @@ TEST(Coverage, WildcardBinsForbiddenOnRealCoverpoint) {
   real_cp->is_real = true;
   EXPECT_TRUE(CoverageDB::WildcardBinsAllowed(integral_cp));
   EXPECT_FALSE(CoverageDB::WildcardBinsAllowed(real_cp));
+}
+
+// §19.5.4: each ? bit of a wildcard bin's value matches 0 and 1, so 3'b1??
+// holds 5.
+TEST(CovergroupInstanceSim, WildcardBinMatchesUnknownBitsBothWays) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [2:0] v;\n"
+          "  covergroup cg;\n"
+          "    coverpoint v { wildcard bins w = {3'b1??}; bins z = {0}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    v = 3'b101; c.sample();\n"
+          "    $display(\"cov=%0.2f\", c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

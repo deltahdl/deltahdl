@@ -173,4 +173,29 @@ TEST(CovergroupInstanceSim, IllegalCrossProductIsRunTimeError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §19.6.3: a sampled product an illegal_bins selection covers is a run-time
+// error whatever form the select_expression takes, && among them.
+TEST(CovergroupInstanceSim, IllegalSelectionJoinedByAndIsRunTimeError) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] x, y;\n"
+          "  covergroup cg;\n"
+          "    coverpoint x; coverpoint y;\n"
+          "    xy: cross x, y { illegal_bins bad = binsof(x) intersect {0} && "
+          "binsof(y) intersect {1}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin x = 0; y = 1; c.sample(); $display(\"done\"); end\n"
+          "endmodule\n",
+          f),
+      "done\n");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "sampled values of cross 'xy' fall in its illegal bins 'bad'", 8,
+      "19.6.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

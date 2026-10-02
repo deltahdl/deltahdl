@@ -59,7 +59,7 @@ TEST(PointCoverage, EmptiedBinExcludedFromBothNumeratorAndDenominator) {
 
   // Strip every value from the first bin, as applying ignore_bins to all of its
   // values would.
-  cp->bins[0].values.clear();
+  cp->bins[0].ranges.clear();
 
   db.Sample(g, {{"x", 1}});
   db.Sample(g, {{"x", 2}});

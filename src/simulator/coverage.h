@@ -29,6 +29,11 @@ class CoverageDB {
 
   void Sample(CoverGroup* group,
               const std::vector<std::pair<std::string, int64_t>>& values);
+  // The same, with the values of the group's real coverpoints in
+  // `real_values` (LRM 19.5.1).
+  void Sample(CoverGroup* group,
+              const std::vector<std::pair<std::string, int64_t>>& values,
+              const std::vector<std::pair<std::string, double>>& real_values);
 
   static double GetCoverage(const CoverGroup* group);
   static double GetInstCoverage(const CoverGroup* group);
@@ -106,6 +111,19 @@ class CoverageDB {
   // coverpoints' bins. Default, ignore, and illegal coverpoint bins do not
   // contribute any cross product (LRM 19.6).
   static void AutoCreateCrossBins(CoverGroup* group, CrossCover* cross);
+  // The products AutoCreateCrossBins makes a bin of, each a tuple of indices
+  // into the bins of the crossed coverpoints, and the name such a bin takes,
+  // `<a,b>` after the coverpoint bins it pairs (LRM 19.6).
+  static std::vector<std::vector<size_t>> CrossProductTuples(
+      const CoverGroup* group, const CrossCover* cross);
+  static std::string CrossProductName(const CoverGroup* group,
+                                      const CrossCover* cross,
+                                      const std::vector<size_t>& tuple);
+  // Whether the latest sample counted each coverpoint of the cross in its bin
+  // of `tuple`, the cross product the tuple names (LRM 19.6.1).
+  static bool CrossTupleSampled(const CoverGroup* group,
+                                const CrossCover* cross,
+                                const std::vector<size_t>& tuple);
 
   // A bare variable crossed directly must be integral. A real value can only
   // participate in a cross through an explicitly declared coverpoint of a real
@@ -808,6 +826,7 @@ class CoverageDB {
 
  private:
   void SampleCoverPoint(CoverPoint* cp, int64_t value);
+  void SampleRealCoverPoint(CoverPoint* cp, double value);
   void SampleCross(CrossCover* cross,
                    const std::vector<std::pair<std::string, int64_t>>& vals);
 

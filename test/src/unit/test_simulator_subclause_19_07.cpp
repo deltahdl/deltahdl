@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -200,6 +201,46 @@ TEST(Coverage, InstanceOptionProceduralSettability) {
         InstanceOptionKind::kCrossNumPrintMissing}) {
     EXPECT_TRUE(CoverageDB::OptionSettableProcedurally(kind));
   }
+}
+
+// §19.7: an option assignment in the definition takes effect when the
+// covergroup is instantiated; at_least = 2 leaves the bin hit once uncovered.
+TEST(CovergroupInstanceSim, AtLeastSetInDefinitionAppliesToInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module top;\n"
+                "  bit [1:0] v;\n"
+                "  covergroup cg;\n"
+                "    option.at_least = 2;\n"
+                "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+                "  endgroup\n"
+                "  cg c = new;\n"
+                "  initial begin\n"
+                "    v = 0; c.sample(); v = 3; c.sample(); v = 3; c.sample();\n"
+                "    $display(\"cov=%0.2f\", c.get_inst_coverage());\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.7 and §19.10: option is a member of every instance, so c.option.at_least
+// reads the value the definition gave it.
+TEST(CovergroupInstanceSim, OptionReadThroughInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v;\n"
+                       "  covergroup cg;\n"
+                       "    option.at_least = 2;\n"
+                       "    coverpoint v { bins lo = {0}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial $display(\"al=%0d\", c.option.at_least);\n"
+                       "endmodule\n",
+                       f),
+            "al=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace
