@@ -1,3 +1,4 @@
+#include "elaborator/class_method_reads.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_validate_classes.h"
 
@@ -17,6 +18,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   ValidateEmbeddedCovergroupAssign();
 
   ValidateEmbeddedCovergroupRules();
+
+  ValidateClassMethodReads();
 
   ValidateDerivedCovergroupBase();
 
@@ -64,6 +67,10 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   constraints.ValidateConstraintInheritance();
 
   ValidateForwardClassTypedefs();
+}
+
+void ElaboratorClassRules::ValidateClassMethodReads() {
+  ReportClassMethodUnresolved(unit_, diag_);
 }
 
 }  // namespace delta

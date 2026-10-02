@@ -90,6 +90,9 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
 
   void ValidateEmbeddedCovergroupAssign();
   void ValidateEmbeddedCovergroupRules();
+  // §23.9: the names the methods of the unit's classes read, each declared
+  // somewhere in the unit. Defined in elaborator_validate_class_run.cpp.
+  void ValidateClassMethodReads();
   void ValidateDerivedCovergroupBase();
 
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
