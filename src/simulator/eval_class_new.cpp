@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -16,6 +17,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
@@ -97,6 +99,13 @@ static bool TryInitClassPropertyNew(const ClassTypeInfo* info,
                                     Logic4Vec& out) {
   const Expr* init = prop.init_expr;
   if (init->kind != ExprKind::kCall || init->text != "new") return false;
+  // §19.3 with §8.7: a property of a covergroup type, `cg g = new;`, holds
+  // the instance its initializer builds; evaluated as a value, the `new`
+  // built none and the property held no handle.
+  if (auto handle = CovergroupPropertyNew(info, prop.name, init, ctx, arena)) {
+    out = *handle;
+    return true;
+  }
   std::string_view class_name =
       PropertyClassName(ctx.CurrentThis(), info, prop.name, ctx);
   if (class_name.empty()) return false;

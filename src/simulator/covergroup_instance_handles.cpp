@@ -1,4 +1,5 @@
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -147,6 +148,17 @@ bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
   HoldNewInstance(v, {std::string(decl->name), decl, nullptr}, init, ctx,
                   arena);
   return true;
+}
+
+std::optional<Logic4Vec> CovergroupPropertyNew(const ClassTypeInfo* type,
+                                               std::string_view name,
+                                               const Expr* init,
+                                               SimContext& ctx, Arena& arena) {
+  const CovergroupDecl* decl = PropertyCovergroup(type, name, ctx);
+  if (decl == nullptr) return std::nullopt;
+  return HandleOf(BuildCovergroupInstance({std::string(name), decl, nullptr},
+                                          init, ctx, arena),
+                  ctx, arena);
 }
 
 bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {

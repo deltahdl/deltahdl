@@ -281,6 +281,11 @@ static const EnumTypeInfo* EnumTypeOfClassMember(const ClassTypeInfo* cls,
   const ClassTypeInfo* declarer = nullptr;
   const DataType* type = ClassMemberDeclaredType(cls, name, declarer);
   if (type == nullptr) return nullptr;
+  // §6.19 with §8.5: an enumeration the property declares inline is
+  // registered under the property's own key (CollectClassEnumMembers in
+  // lowerer_class.cpp); it names no type to look up.
+  if (type->kind == DataTypeKind::kEnum)
+    return ctx.FindEnumType(ClassInlineEnumKey(declarer->name, name));
   return EnumTypeOfDeclaredType(*type, {declarer, {}}, ctx);
 }
 

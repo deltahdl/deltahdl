@@ -631,4 +631,102 @@ TEST(CovergroupInstanceSim, SampleStatementOnReturnedHandleCallsItOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.8 (printed page 611): get_coverage() called on a coverpoint through the
+// type, `cg::x::get_coverage(covered, total)`, counts that coverpoint's bins in
+// every instance, the clause's own example giving 6 for x's 2 and 4 bins, of
+// which cv1 has hit one. It answered cv1's whole covergroup, 2 of 5.
+TEST(CoverageMethodSim, ACoverpointsTypeCoverageCountsItsBinsInEveryInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a, b, c, d, cov, tot;\n"
+      "  string s;\n"
+      "  covergroup cg (int xb, yb, ref int x, y);\n"
+      "    coverpoint x {bins xbins[] = {[0:xb]};}\n"
+      "    coverpoint y {bins ybins[] = {[0:yb]};}\n"
+      "  endgroup\n"
+      "  cg cv1 = new(1, 2, a, b);\n"
+      "  cg cv2 = new(3, 6, c, d);\n"
+      "  initial begin\n"
+      "    a = 0; b = 0; c = 9; d = 9;\n"
+      "    cv1.sample();\n"
+      "    void'(cv1.x.get_inst_coverage(cov, tot)); s = "
+      "$sformatf(\"%0d/%0d\", cov, tot);\n"
+      "    void'(cv1.get_inst_coverage(cov, tot)); s = {s, $sformatf(\" "
+      "%0d/%0d\", cov, tot)};\n"
+      "    void'(cg::x::get_coverage(cov, tot)); s = {s, $sformatf(\" "
+      "%0d/%0d\", cov, tot)};\n"
+      "    void'(cg::get_coverage(cov, tot)); s = {s, $sformatf(\" %0d/%0d\", "
+      "cov, tot)};\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1/2 2/5 1/6 2/16\n");
+}
+
+// §19.8, Table 19-5: stop() on a coverpoint or a cross stops collecting its
+// coverage until start(), so the sample of 1 taken while cp is stopped counts
+// nowhere and the cross keeps only its (0, 0) bin. Both kept counting.
+TEST(CoverageMethodSim, StopOnACoverpointOrCrossStopsItsCollection) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(int x, bit a, bit b);\n"
+      "    cp: coverpoint x {bins b[] = {[0:3]};}\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    cr: cross ca, cb;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    c.sample(0, 0, 0);\n"
+      "    c.cp.stop();\n"
+      "    c.cr.stop();\n"
+      "    c.sample(1, 1, 1);\n"
+      "    $write(\"%0.2f \", c.cp.get_inst_coverage());\n"
+      "    c.cp.start();\n"
+      "    c.sample(2, 1, 1);\n"
+      "    $display(\"%0.2f %0.2f\", c.cp.get_inst_coverage(), "
+      "c.cr.get_inst_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 50.00 25.00\n");
+}
+
+// §19.8: stop() on a coverpoint of a real expression stops it as on an
+// integral one, so c1's hi bin stays uncovered; and get_coverage() through an
+// instance's coverpoint or cross, or through the type, `cg::ab::`, answers for
+// that item over every instance: ca's instance coverages of 100 and 50
+// average 75, ab's of 50 and 25 average 37.5, with 3 of the 8 cross bins of
+// the two instances covered.
+TEST(CoverageMethodSim, ARealCoverpointStopsAndCrossesReportTheirTypeCoverage) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(real r, bit a, bit b);\n"
+      "    cr: coverpoint r { bins lo = {[0.0:1.0]}; bins hi = {[2.0:3.0]}; }\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    ab: cross ca, cb;\n"
+      "  endgroup\n"
+      "  cg c1 = new, c2 = new;\n"
+      "  int cov, tot;\n"
+      "  initial begin\n"
+      "    c1.sample(0.5, 0, 0);\n"
+      "    c1.cr.stop();\n"
+      "    c1.sample(2.5, 1, 1);\n"
+      "    $write(\"%0.2f \", c1.cr.get_inst_coverage());\n"
+      "    c2.sample(2.5, 0, 1);\n"
+      "    $write(\"%0.2f %0.2f \", c1.ca.get_coverage(), "
+      "c1.ab.get_coverage());\n"
+      "    void'(cg::ab::get_coverage(cov, tot));\n"
+      "    $display(\"%0d/%0d\", cov, tot);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "50.00 75.00 37.50 3/8\n");
+}
+
 }  // namespace

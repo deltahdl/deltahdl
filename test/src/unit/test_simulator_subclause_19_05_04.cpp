@@ -210,4 +210,30 @@ TEST(CovergroupInstanceSim, WildcardBinMatchesUnknownBitsBothWays) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.4: a sample is compared with a bin's values by ===, so `xx` and
+// `x1` match no bin of 2-state values: neither coverpoint counts its sample.
+// Their known bits were matched, `xx` counting in {0} and `x1` in {1}.
+TEST(Coverage, ASampleWithUnknownBitsMatchesNo2StateBin) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [1:0] v;\n"
+      "  logic [1:0] w = 2'bx1;\n"
+      "  event e;\n"
+      "  covergroup cg @(e);\n"
+      "    cp: coverpoint v { bins z = {0}; bins t = {3}; }\n"
+      "    cq: coverpoint w { bins o = {1}; bins t = {3}; }\n"
+      "  endgroup\n"
+      "  cg g = new;\n"
+      "  initial begin\n"
+      "    $display(\"%b %b\", v, w);\n"
+      "    #1 -> e;\n"
+      "    #1 $display(\"%0.2f %0.2f\", g.cp.get_inst_coverage(), "
+      "g.cq.get_inst_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx x1\n0.00 0.00\n");
+}
+
 }  // namespace

@@ -388,4 +388,37 @@ TEST(CovergroupInstanceSim, SampleHoldingUnknownBitsFallsInNoAutomaticBin) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.3: an enum coverpoint has one automatic bin per value of its
+// enumeration, whether the enum is declared at module level or, as `e`, on a
+// property of the class embedding the covergroup. The property's took 64.
+TEST(AutoBinCreationSim, AnEnumDeclaredInAClassHasABinPerValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  enum {red, green, blue} color;\n"
+      "  typedef enum {A, B} ab_t;\n"
+      "  ab_t ab;\n"
+      "  int cov, t1, t2, t3;\n"
+      "  covergroup cg;\n"
+      "    c1: coverpoint color;\n"
+      "    c2: coverpoint ab;\n"
+      "  endgroup\n"
+      "  cg g = new;\n"
+      "  class K;\n"
+      "    enum {x1, x2, x3, x4} e;\n"
+      "    covergroup kg; ce: coverpoint e; endgroup\n"
+      "    function new(); kg = new; endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    automatic K k = new;\n"
+      "    void'(g.c1.get_inst_coverage(cov, t1));\n"
+      "    void'(g.c2.get_inst_coverage(cov, t2));\n"
+      "    void'(k.kg.ce.get_inst_coverage(cov, t3));\n"
+      "    $display(\"%0d %0d %0d\", t1, t2, t3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 2 4\n");
+}
+
 }  // namespace

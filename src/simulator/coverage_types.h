@@ -144,6 +144,9 @@ enum class BinValueResolution : uint8_t {
 struct CoverPoint {
   std::string name;
   std::deque<CoverBin> bins;
+  // §19.8, Table 19-5: whether the coverpoint is collecting coverage, which
+  // start() and stop() called on it switch apart from its covergroup's.
+  bool collecting = true;
   bool has_iff_guard = false;
   bool iff_guard_value = true;
   int64_t auto_bin_min = 0;
@@ -216,6 +219,9 @@ struct CrossCover {
   std::string name;
   std::vector<std::string> coverpoint_names;
   std::vector<CrossBin> bins;
+  // §19.8, Table 19-5: whether the cross is collecting coverage, which
+  // start() and stop() called on it switch apart from its covergroup's.
+  bool collecting = true;
   // Guard from an "iff" on the cross declaration: when false at a sampling
   // point the whole cross is ignored (LRM 19.6).
   bool has_iff_guard = false;

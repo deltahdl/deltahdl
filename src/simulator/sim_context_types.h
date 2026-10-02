@@ -53,6 +53,15 @@ struct GenBlockSubroutineScope {
   std::vector<std::pair<std::string_view, int64_t>> consts;
 };
 
+// §6.19 with §8.5: the key the enumeration a class property declares inline,
+// `enum {a, b} e;` in class C, is registered under, "C::$e": in the class's
+// scope, beside its typedefs' "C::name", under a name `$` keeps from every
+// source identifier.
+inline std::string ClassInlineEnumKey(std::string_view cls,
+                                      std::string_view prop) {
+  return std::string(cls) + "::$" + std::string(prop);
+}
+
 struct EnumTypeInfo {
   std::string_view type_name;
   std::vector<EnumMemberInfo> members;

@@ -1,12 +1,12 @@
 #include "simulator/covergroup_instance.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <limits>
+#include <list>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -146,6 +146,21 @@ std::string CoverpointName(const CoverPointDecl& cp, size_t index) {
   return std::format("__coverpoint_{}", index);
 }
 
+// The property a bare name `e` reads of the running object where the object
+// holds no value of it yet and its declaration gives its width; null for any
+// other name, a local or formal shadowing it among them.
+const ClassTypeInfo::PropertyInfo* UnheldProperty(const Expr* e,
+                                                  SimContext& ctx) {
+  const ClassObject* self = ctx.CurrentThis();
+  if (e->kind != ExprKind::kIdentifier || self == nullptr ||
+      ctx.FindLocalVariable(e->text) != nullptr ||
+      self->properties.contains(std::string(e->text))) {
+    return nullptr;
+  }
+  const ClassTypeInfo::PropertyInfo* prop = self->type->FindProperty(e->text);
+  return prop != nullptr && prop->width_is_declared ? prop : nullptr;
+}
+
 // §19.5: a coverpoint with a data type samples its expression as that type,
 // and one without as the self-determined type of the expression.
 void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
@@ -164,6 +179,15 @@ void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
   point.is_signed = v.is_signed;
   point.is_real = v.is_real;
   point.enum_type = EnumTypeOfExpr(decl.expr, ctx, arena);
+  // §19.4.1 with §8.7: a derived covergroup is built where its base's `new`
+  // is, in the base class's constructor, before the deriving class's
+  // properties are initialized; the value read for one of them is then no
+  // measure of its type, and the declaration's width is taken.
+  if (const ClassTypeInfo::PropertyInfo* prop =
+          UnheldProperty(decl.expr, ctx)) {
+    point.width = prop->width;
+    point.is_signed = prop->is_signed;
+  }
 }
 
 // §19.5.3: whether the bits of a sampled value that the coverpoint's type
@@ -328,14 +352,6 @@ void SampleInstance(CovergroupInstance& inst, const Expr* call, SimContext& ctx,
   ReportIllegalCrossProducts(inst, call->range.start, ctx);
 }
 
-// What a call or an option read reaches: an instance, or one of its
-// coverpoints or crosses.
-struct CovergroupTarget {
-  CovergroupInstance* inst = nullptr;
-  SampledCoverpoint* point = nullptr;
-  SampledCross* cross = nullptr;
-};
-
 // Whether `e` is a name a variable is read by, an identifier or a dotted,
 // scoped (`K::s`) or selected path of them, whose evaluation calls nothing.
 bool IsNamePath(const Expr* e) {
@@ -397,104 +413,6 @@ CovergroupTarget TargetNamed(const Expr* e, SimContext& ctx, Arena& arena) {
   return {};
 }
 
-// §19.8: the optional ref-int pair of get_coverage() and get_inst_coverage()
-// receives the covered and the defined bins.
-void WriteCounts(const Expr* call, int32_t covered, int32_t total,
-                 SimContext& ctx, Arena& arena) {
-  if (call->args.size() != 2) return;
-  std::array<int32_t, 2> counts = {covered, total};
-  for (size_t i = 0; i < 2; ++i) {
-    Variable* v = ctx.FindVariable(call->args[i]->text);
-    if (v != nullptr) {
-      v->value = MakeLogic4VecVal(arena, v->value.width,
-                                  static_cast<uint64_t>(counts[i]));
-    }
-  }
-}
-
-bool MergesInstances(const CovergroupInstance& inst) {
-  return inst.group->type_option.merge_instances;
-}
-
-// §19.11.3: the coverage of the covergroup type, over every instance of it,
-// with the covered and defined bins of them all.
-double TypeCoverage(const CovergroupDecl* decl, bool merge, SimContext& ctx,
-                    int32_t& covered, int32_t& total) {
-  std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(decl);
-  covered = 0;
-  total = 0;
-  for (const CoverGroup* group : instances) {
-    int32_t n = 0;
-    int32_t t = 0;
-    CoverageDB::GetCoverage(group, n, t);
-    covered += n;
-    total += t;
-  }
-  return CoverageDB::ComputeTypeCoverage(instances, merge);
-}
-
-// The same item of every instance of the instance's type: its coverpoint or
-// cross of one name.
-std::vector<const CoverPoint*> PointsOfType(const CovergroupInstance& inst,
-                                            const std::string& name,
-                                            SimContext& ctx) {
-  std::vector<const CoverPoint*> found;
-  for (const CoverGroup* group : ctx.Covergroups().InstancesOf(inst.decl)) {
-    for (const CoverPoint& cp : group->coverpoints) {
-      if (cp.name == name) found.push_back(&cp);
-    }
-  }
-  return found;
-}
-
-std::vector<const CrossCover*> CrossesOfType(const CovergroupInstance& inst,
-                                             const std::string& name,
-                                             SimContext& ctx) {
-  std::vector<const CrossCover*> found;
-  for (const CoverGroup* group : ctx.Covergroups().InstancesOf(inst.decl)) {
-    for (const CrossCover& cross : group->crosses) {
-      if (cross.name == name) found.push_back(&cross);
-    }
-  }
-  return found;
-}
-
-// §19.8 and §19.11: get_coverage() answers for the covergroup type, and
-// get_inst_coverage() for the instance, or for its type where the
-// merge_instances type option is set and the get_inst_coverage option is not
-// (§19.7, Table 19-1); through a coverpoint or a cross, each answers for that
-// item.
-Logic4Vec ReportCoverage(const CovergroupTarget& target, const Expr* call,
-                         bool instance, SimContext& ctx, Arena& arena) {
-  int32_t covered = 0;
-  int32_t total = 0;
-  double coverage = 0.0;
-  const CovergroupInstance& inst = *target.inst;
-  bool merge = MergesInstances(inst);
-  if (target.point != nullptr) {
-    const CoverPoint* cp = target.point->point;
-    coverage = CoverageDB::GetPointCoverage(cp, covered, total);
-    if (!instance) {
-      coverage = CoverageDB::ComputePointTypeCoverage(
-          PointsOfType(inst, cp->name, ctx), merge);
-    }
-  } else if (target.cross != nullptr) {
-    const CrossCover& cross = inst.group->crosses[target.cross->index];
-    coverage = CoverageDB::GetCrossCoverage(&cross, covered, total);
-    if (!instance) {
-      coverage = CoverageDB::ComputeCrossTypeCoverage(
-          CrossesOfType(inst, cross.name, ctx), merge);
-    }
-  } else if (instance && (!merge || inst.group->options.get_inst_coverage)) {
-    coverage = CoverageDB::GetInstCoverage(inst.group, covered, total);
-  } else {
-    coverage = TypeCoverage(inst.decl, merge, ctx, covered, total);
-  }
-  WriteCounts(call, covered, total, ctx, arena);
-  return MakeRealVec(arena, coverage, 64);
-}
-
 // §19.3 with §19.7.1: a covergroup whose strobe option is set samples the
 // occurrences of its clocking event in a time slot once, in the slot's
 // Postponed region, its expressions read in the scope of the process that saw
@@ -532,6 +450,18 @@ Logic4Vec RunGroupMethod(std::string_view method, CovergroupInstance& inst,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §19.8, Table 19-5: start() and stop() called on a coverpoint or a cross
+// switch that item's collection alone, on where `start`. Answers true, the
+// call having been served.
+bool SwitchItemCollection(const CovergroupTarget& target, bool start) {
+  bool& collecting =
+      target.point != nullptr
+          ? target.point->point->collecting
+          : target.inst->group->crosses[target.cross->index].collecting;
+  collecting = start;
+  return true;
+}
+
 // §19.8: runs the method `call` names on `target`, the coverage methods on an
 // instance or one of its coverpoints or crosses and the others on an
 // instance; false for any other method of a coverpoint or cross.
@@ -543,7 +473,11 @@ bool RunCovergroupMethod(const CovergroupTarget& target, const Expr* call,
         ReportCoverage(target, call, method == "get_inst_coverage", ctx, arena);
     return true;
   }
-  if (target.point != nullptr || target.cross != nullptr) return false;
+  out = MakeLogic4VecVal(arena, 1, 0);
+  if (target.point != nullptr || target.cross != nullptr) {
+    return (method == "start" || method == "stop") &&
+           SwitchItemCollection(target, method == "start");
+  }
   out = RunGroupMethod(method, *target.inst, call, ctx, arena);
   return true;
 }
@@ -552,29 +486,6 @@ bool IsCovergroupMethod(std::string_view method) {
   return method == "sample" || method == "get_coverage" ||
          method == "get_inst_coverage" || method == "set_inst_name" ||
          method == "start" || method == "stop";
-}
-
-// §19.8: `cg::get_coverage()`, the coverage of the covergroup type `cg`.
-bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                             Logic4Vec& out) {
-  const Expr* access = expr->lhs;
-  if (access->rhs->text != "get_coverage" ||
-      access->lhs->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  const ModuleItem* item = ctx.FindLetDecl(access->lhs->text);
-  if (item == nullptr || item->kind != ModuleItemKind::kCovergroupDecl) {
-    return false;
-  }
-  int32_t covered = 0;
-  int32_t total = 0;
-  std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(item->covergroup);
-  bool merge = !instances.empty() && instances[0]->type_option.merge_instances;
-  double coverage = TypeCoverage(item->covergroup, merge, ctx, covered, total);
-  WriteCounts(expr, covered, total, ctx, arena);
-  out = MakeRealVec(arena, coverage, 64);
-  return true;
 }
 
 // §19.3 with §19.4: the process sampling an embedded covergroup at each
@@ -706,9 +617,47 @@ std::string CovergroupTable::EmbeddedKey(const ClassObject* owner,
 
 namespace {
 
-// §19.4: every covergroup `type` and the classes it derives from embed.
+// The name a coverage item goes by, which a derived covergroup's item of the
+// same kind overrides by (§19.4.1): a coverpoint's (CoverpointName), a
+// cross's label, and an option's member, empty for an unlabelled cross.
+std::string ItemName(const CoverageSpecOrOption& item, size_t index) {
+  if (item.kind == CoverageSpecKind::kCoverPoint)
+    return CoverpointName(*item.cover_point, index);
+  if (item.kind == CoverageSpecKind::kCoverCross)
+    return std::string(item.cover_cross->label);
+  return {};
+}
+
+// §19.4.1: the covergroup the derived covergroup `derived` amounts to: the
+// argument list and coverage event of its base `base`, the base's items its
+// own do not override -- a coverpoint or labelled cross of the same name --
+// and its own items after them, so that an option it sets is set after, and
+// overrides, the base's.
+CovergroupDecl ComposeDerived(const CovergroupDecl& base,
+                              const CovergroupDecl& derived) {
+  CovergroupDecl out = base;
+  out.items.clear();
+  for (size_t i = 0; i < base.items.size(); ++i) {
+    const CoverageSpecOrOption& item = base.items[i];
+    std::string name = ItemName(item, i);
+    bool overridden = false;
+    for (size_t j = 0; j < derived.items.size() && !name.empty(); ++j) {
+      overridden = overridden || (derived.items[j].kind == item.kind &&
+                                  ItemName(derived.items[j], j) == name);
+    }
+    if (!overridden) out.items.push_back(item);
+  }
+  out.items.insert(out.items.end(), derived.items.begin(), derived.items.end());
+  return out;
+}
+
+// §19.4: every covergroup `type` and the classes it derives from embed, the
+// most derived first. §19.4.1: one that extends the covergroup of its name
+// further up is composed with it (ComposeDerived), from the base down, the
+// composition kept in `composed`.
 std::vector<std::pair<std::string_view, const CovergroupDecl*>>
-EmbeddedCovergroups(const ClassTypeInfo* type) {
+EmbeddedCovergroups(const ClassTypeInfo* type,
+                    std::list<CovergroupDecl>& composed) {
   std::vector<std::pair<std::string_view, const CovergroupDecl*>> embedded;
   for (; type != nullptr; type = type->parent) {
     if (type->decl == nullptr) continue;
@@ -716,6 +665,15 @@ EmbeddedCovergroups(const ClassTypeInfo* type) {
       if (member->kind == ClassMemberKind::kCovergroup) {
         embedded.emplace_back(member->name, member->covergroup);
       }
+    }
+  }
+  for (size_t i = embedded.size(); i-- > 0;) {
+    if (embedded[i].second->extends_base.empty()) continue;
+    for (size_t j = i + 1; j < embedded.size(); ++j) {
+      if (embedded[j].first != embedded[i].first) continue;
+      embedded[i].second = &composed.emplace_back(
+          ComposeDerived(*embedded[j].second, *embedded[i].second));
+      break;
     }
   }
   return embedded;
@@ -726,7 +684,7 @@ EmbeddedCovergroups(const ClassTypeInfo* type) {
 const CovergroupDecl* CovergroupTable::Embedded(const ClassTypeInfo* type,
                                                 std::string_view name) {
   auto [it, inserted] = embedded_.try_emplace(type);
-  if (inserted) it->second = EmbeddedCovergroups(type);
+  if (inserted) it->second = EmbeddedCovergroups(type, composed_);
   for (const auto& [embedded, decl] : it->second) {
     if (embedded == name) return decl;
   }

@@ -22,6 +22,7 @@ struct CoverageOption;
 struct CovergroupValueRange;
 struct Expr;
 struct SampledCoverpoint;
+struct SampledCross;
 
 // A call whose actuals a CovergroupFrame binds to the formals of `function`:
 // new()'s to the covergroup's own (§19.3), sample()'s to those of `with
@@ -131,6 +132,29 @@ bool ReadPointOption(const SampledCoverpoint& point, bool type_option,
                      std::string_view member, Arena& arena, Logic4Vec& out);
 bool ReadCrossOption(const CrossCover& cross, bool type_option,
                      std::string_view member, Arena& arena, Logic4Vec& out);
+
+// What a call or an option read reaches: an instance, or one of its
+// coverpoints or crosses.
+struct CovergroupTarget {
+  CovergroupInstance* inst = nullptr;
+  SampledCoverpoint* point = nullptr;
+  SampledCross* cross = nullptr;
+};
+
+// Defined in covergroup_instance_coverage.cpp. §19.8 and §19.11:
+// get_coverage() answers for the covergroup type, and get_inst_coverage() for
+// the instance, or for its type where the merge_instances type option is set
+// and the get_inst_coverage option is not (§19.7, Table 19-1); through a
+// coverpoint or a cross, each answers for that item. The call's ref-int pair
+// receives the covered and defined bins.
+Logic4Vec ReportCoverage(const CovergroupTarget& target, const Expr* call,
+                         bool instance, SimContext& ctx, Arena& arena);
+
+// Defined in covergroup_instance_coverage.cpp. §19.8: `cg::get_coverage()`,
+// the coverage of the covergroup type `cg`, and `cg::x::get_coverage()`, that
+// of its coverpoint or cross x over every instance. False for any other call.
+bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                             Logic4Vec& out);
 
 }  // namespace delta
 

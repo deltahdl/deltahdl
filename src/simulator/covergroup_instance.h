@@ -3,6 +3,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -11,6 +13,7 @@
 
 #include "common/types.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_covergroup.h"
 #include "simulator/coverage_types.h"
 
 namespace delta {
@@ -19,7 +22,6 @@ class Arena;
 class SimContext;
 struct ClassObject;
 struct ClassTypeInfo;
-struct CovergroupDecl;
 struct DataType;
 struct EnumTypeInfo;
 struct Expr;
@@ -165,6 +167,9 @@ class CovergroupTable {
       const ClassTypeInfo*,
       std::vector<std::pair<std::string_view, const CovergroupDecl*>>>
       embedded_;
+  // §19.4.1: the covergroups a derived covergroup amounts to, its base's
+  // items it does not override and its own (EmbeddedCovergroups).
+  std::list<CovergroupDecl> composed_;
 };
 
 // §19.3 and §19.4: where a `new` of a covergroup builds its instance: the
@@ -206,6 +211,14 @@ bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
 // property of one, or in a class method to a covergroup the class embeds,
 // builds the instance. False where the assignment is not one.
 bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §19.3 with §8.7: the handle the declaration initializer `init`, a call of
+// `new(...)`, gives the property `name` of `type` where the property is of a
+// covergroup type: the instance built for it. None for any other property.
+std::optional<Logic4Vec> CovergroupPropertyNew(const ClassTypeInfo* type,
+                                               std::string_view name,
+                                               const Expr* init,
+                                               SimContext& ctx, Arena& arena);
 
 // §19.7: a blocking assignment to an instance option of a covergroup
 // instance, `c.option.comment = ...;`, or of one of its coverpoints or

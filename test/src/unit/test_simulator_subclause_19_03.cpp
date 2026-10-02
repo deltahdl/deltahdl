@@ -567,4 +567,35 @@ TEST(CovergroupInstanceSim, InheritedPropertyAndModuleVariableTakeNew) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3 with §8.7 and §26.3: a class property of a covergroup type a package
+// declares, given `new` by its declaration, holds an instance as one given
+// `new` in the constructor does, each counting the sample of 0 as 1 of 4
+// bins. The initialized one held none.
+TEST(CovergroupInstanceSim,
+     APackageCovergroupPropertyInitializedByNewHasAnInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package pk;\n"
+      "  covergroup cg with function sample(bit [1:0] x);\n"
+      "    cp: coverpoint x;\n"
+      "  endgroup\n"
+      "endpackage\n"
+      "import pk::*;\n"
+      "class H;\n"
+      "  cg g = new;\n"
+      "  cg h;\n"
+      "  function new(); h = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H a = new;\n"
+      "    a.g.sample(0); a.h.sample(0);\n"
+      "    $display(\"%0.2f %0.2f\", a.g.get_inst_coverage(), "
+      "a.h.get_inst_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 25.00\n");
+}
+
 }  // namespace

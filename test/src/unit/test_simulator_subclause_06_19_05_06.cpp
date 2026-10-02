@@ -587,4 +587,27 @@ TEST(EnumMethodNameSim, NameOfAnXOrZMember) {
             "XX Z B []\n");
 }
 
+// §6.19.5.6 with §8.5: a class property may be declared with an inline
+// enumeration, and name() and num() on it, inside a method and through a
+// handle, answer that enumeration's: x3 of four values. The property's type
+// was found by no name, so name() answered "" and num() 0.
+TEST(EnumNameMethod, AnInlineEnumClassPropertyHasItsEnumerationsMethods) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class K;\n"
+      "  enum {x1, x2, x3, x4} e;\n"
+      "  function void show(); e = x3; $display(\"%s %0d\", e.name(), "
+      "e.num()); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic K k = new;\n"
+      "    k.show();\n"
+      "    $display(\"%s %0d\", k.e.name(), k.e.num());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x3 4\nx3 4\n");
+}
+
 }  // namespace

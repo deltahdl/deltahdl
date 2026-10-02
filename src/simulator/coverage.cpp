@@ -475,13 +475,15 @@ static void ScorePatternBins(CoverPoint* cp, int64_t value) {
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   cp->sampled_bins.clear();
-  if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  // §19.8: a coverpoint stopped by its own stop() collects nothing.
+  if (!cp->collecting || (cp->has_iff_guard && !cp->iff_guard_value)) return;
+  // §19.5.4: a sample is compared with a bin's values by ===, which no value
+  // a bin holds matches where the sample has x or z bits, the bin values all
+  // being 2-state, and §19.5.3 leaves such a sample out of the automatic bins:
+  // it falls to a default bin alone. Compared by its known bits, `xx` counted
+  // in a bin of 0.
   ScoreSampledValue(cp, [&](const CoverBin& bin) {
-    if (bin.kind == CoverBinKind::kAuto &&
-        !AutoBinSampleIncluded(cp->sample_has_xz)) {
-      return false;
-    }
-    return MatchesBin(bin, value);
+    return AutoBinSampleIncluded(cp->sample_has_xz) && MatchesBin(bin, value);
   });
 
   // Concrete (bounded) transition sequences match against the trailing sample
@@ -505,7 +507,7 @@ static bool MatchesRealBin(const CoverBin& bin, double value) {
 
 void CoverageDB::SampleRealCoverPoint(CoverPoint* cp, double value) {
   cp->sampled_bins.clear();
-  if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  if (!cp->collecting || (cp->has_iff_guard && !cp->iff_guard_value)) return;
   ScoreSampledValue(
       cp, [&](const CoverBin& bin) { return MatchesRealBin(bin, value); });
 }
@@ -513,8 +515,10 @@ void CoverageDB::SampleRealCoverPoint(CoverPoint* cp, double value) {
 void CoverageDB::SampleCross(
     CrossCover* cross,
     const std::vector<std::pair<std::string, int64_t>>& vals) {
-  // A false cross-level iff guard ignores the cross entirely (LRM 19.6).
-  if (cross->has_iff_guard && !cross->iff_guard_value) return;
+  // A false cross-level iff guard ignores the cross entirely (LRM 19.6), and
+  // a cross stopped by its own stop() collects nothing (LRM 19.8).
+  if (!cross->collecting || (cross->has_iff_guard && !cross->iff_guard_value))
+    return;
   for (auto& cbin : cross->bins) {
     // A false per-bin iff guard ignores that cross bin (LRM 19.6).
     if (cbin.has_iff_guard && !cbin.iff_guard_value) continue;
@@ -559,9 +563,10 @@ bool CoverageDB::CrossTupleSampled(const CoverGroup* group,
 
 // A cross bin defined over bin tuples is incremented once at a sample that
 // matches any of its cross products (LRM 19.6.1), unless the cross's or the
-// bin's iff guard is false (LRM 19.6).
+// bin's iff guard is false (LRM 19.6) or the cross is stopped (LRM 19.8).
 static void SampleCrossBinTuples(const CoverGroup& group, CrossCover& cross) {
-  if (cross.has_iff_guard && !cross.iff_guard_value) return;
+  if (!cross.collecting || (cross.has_iff_guard && !cross.iff_guard_value))
+    return;
   std::vector<const CoverPoint*> points = CrossedPoints(group, cross);
   for (CrossBin& cbin : cross.bins) {
     if (cbin.has_iff_guard && !cbin.iff_guard_value) continue;

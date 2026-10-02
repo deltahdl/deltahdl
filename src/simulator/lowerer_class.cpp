@@ -617,14 +617,23 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
 static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
                                     SimContext& ctx, Arena& arena) {
   for (const auto* member : cls->members) {
-    if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
+    // §6.19 with §8.5: and the enumeration a property declares inline,
+    // `enum {a, b} e;`, under the property's own key (ClassInlineEnumKey),
+    // which EnumTypeOfClassMember resolves the property's type by.
+    const bool kInline = member->kind == ClassMemberKind::kProperty &&
+                         member->data_type.kind == DataTypeKind::kEnum;
+    if (!kInline &&
+        (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)) {
       continue;
-    const auto& enum_members = member->typedef_item->typedef_type.enum_members;
+    }
+    const DataType& decl_type =
+        kInline ? member->data_type : member->typedef_item->typedef_type;
+    const auto& enum_members = decl_type.enum_members;
     if (enum_members.empty()) continue;
     EnumTypeInfo type;
     type.type_name = *arena.Create<std::string>(
-        std::string(info->name) + "::" + std::string(member->name));
-    const DataType& decl_type = member->typedef_item->typedef_type;
+        kInline ? ClassInlineEnumKey(info->name, member->name)
+                : std::string(info->name) + "::" + std::string(member->name));
     type.width = EvalTypeWidth(decl_type);
     type.is_4state = Is4stateType(decl_type, TypedefMap{});
     int64_t next_val = 0;
