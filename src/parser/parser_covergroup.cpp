@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <format>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -783,7 +784,8 @@ void Parser::ParseBinsValue(BinsOrOptions& bins) {
 }
 
 // §19.5.2: a transition of length 0 is illegal, and the `[ ]` form, one bin
-// per transition, cannot hold a transition of unbounded length.
+// per transition, cannot hold a transition of unbounded length; §19.5.5 and
+// §19.5.6: nor can an ignore_bins or an illegal_bins.
 void Parser::CheckTransitionBins(const BinsOrOptions& bins) {
   for (const TransSet& set : bins.transitions) {
     if (IsLengthZeroTransition(set)) {
@@ -792,6 +794,18 @@ void Parser::CheckTransitionBins(const BinsOrOptions& bins) {
                   "a single value range",
                   Subclause("19.5.2"));
     }
+  }
+  if (bins.keyword != BinsKeyword::kBins) {
+    bool ignore = bins.keyword == BinsKeyword::kIgnoreBins;
+    for (const TransSet& set : bins.transitions) {
+      if (!HasUnboundedStep(set)) continue;
+      diag_.Error(set.loc,
+                  std::format("an {} transition cannot be of unbounded or "
+                              "undetermined length",
+                              ignore ? "ignore_bins" : "illegal_bins"),
+                  Subclause(ignore ? "19.5.5" : "19.5.6"));
+    }
+    return;
   }
   if (!bins.is_array || bins.array_size != nullptr) return;
   for (const TransSet& set : bins.transitions) {
