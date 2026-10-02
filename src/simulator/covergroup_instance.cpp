@@ -346,7 +346,7 @@ CovergroupTarget TargetNamed(const Expr* e, SimContext& ctx, Arena& arena) {
 void WriteCounts(const Expr* call, int32_t covered, int32_t total,
                  SimContext& ctx, Arena& arena) {
   if (call->args.size() != 2) return;
-  const std::array<int32_t, 2> counts = {covered, total};
+  std::array<int32_t, 2> counts = {covered, total};
   for (size_t i = 0; i < 2; ++i) {
     Variable* v = ctx.FindVariable(call->args[i]->text);
     if (v != nullptr) {
@@ -430,7 +430,7 @@ Logic4Vec ReportCoverage(const CovergroupTarget& target, const Expr* call,
       coverage = CoverageDB::ComputeCrossTypeCoverage(
           CrossesOfType(inst, cross.name, ctx), merge);
     }
-  } else if (instance && !(merge && !inst.group->options.get_inst_coverage)) {
+  } else if (instance && (!merge || inst.group->options.get_inst_coverage)) {
     coverage = CoverageDB::GetInstCoverage(inst.group, covered, total);
   } else {
     coverage = TypeCoverage(inst.decl, merge, ctx, covered, total);
@@ -556,19 +556,29 @@ std::string CovergroupTable::EmbeddedKey(const ClassObject* owner,
   return std::format("{}.{}", static_cast<const void*>(owner), name);
 }
 
-const CovergroupDecl* CovergroupTable::Embedded(const ClassTypeInfo* type,
-                                                std::string_view name) {
-  auto [it, inserted] = embedded_.try_emplace(type);
-  if (inserted) {
-    for (const ClassTypeInfo* t = type; t != nullptr; t = t->parent) {
-      if (t->decl == nullptr) continue;
-      for (const ClassMember* member : t->decl->members) {
-        if (member->kind == ClassMemberKind::kCovergroup) {
-          it->second.emplace_back(member->name, member->covergroup);
-        }
+namespace {
+
+// §19.4: every covergroup `type` and the classes it derives from embed.
+std::vector<std::pair<std::string_view, const CovergroupDecl*>>
+EmbeddedCovergroups(const ClassTypeInfo* type) {
+  std::vector<std::pair<std::string_view, const CovergroupDecl*>> embedded;
+  for (; type != nullptr; type = type->parent) {
+    if (type->decl == nullptr) continue;
+    for (const ClassMember* member : type->decl->members) {
+      if (member->kind == ClassMemberKind::kCovergroup) {
+        embedded.emplace_back(member->name, member->covergroup);
       }
     }
   }
+  return embedded;
+}
+
+}  // namespace
+
+const CovergroupDecl* CovergroupTable::Embedded(const ClassTypeInfo* type,
+                                                std::string_view name) {
+  auto [it, inserted] = embedded_.try_emplace(type);
+  if (inserted) it->second = EmbeddedCovergroups(type);
   for (const auto& [embedded, decl] : it->second) {
     if (embedded == name) return decl;
   }

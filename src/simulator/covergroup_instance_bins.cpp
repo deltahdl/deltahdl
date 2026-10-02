@@ -337,20 +337,27 @@ std::vector<std::vector<int64_t>> ExpandTransSet(
 // §19.5.2: the patterns a trans_set holding a goto `[-> ]` or nonconsecutive
 // `[= ]` repetition matches, a consecutive repetition written out as that
 // many plain elements.
+// The element of a pattern one step matches, carrying the step's goto or
+// nonconsecutive repetition.
+TransitionPatternElement PatternElement(const TransStep& step) {
+  TransitionPatternElement element;
+  element.values = step.values;
+  if (RepeatsUnbounded(step)) {
+    element.has_repeat = true;
+    element.repeat_kind = step.repetition == TransRepetition::kGoto
+                              ? TransitionRepeatKind::kGoto
+                              : TransitionRepeatKind::kNonconsecutive;
+    element.repeat_lo = step.lo;
+    element.repeat_hi = step.hi;
+  }
+  return element;
+}
+
 std::vector<std::vector<TransitionPatternElement>> TransSetPatterns(
     const std::vector<TransStep>& steps) {
   std::vector<std::vector<TransitionPatternElement>> patterns = {{}};
   for (const TransStep& step : steps) {
-    TransitionPatternElement element;
-    element.values = step.values;
-    if (RepeatsUnbounded(step)) {
-      element.has_repeat = true;
-      element.repeat_kind = step.repetition == TransRepetition::kGoto
-                                ? TransitionRepeatKind::kGoto
-                                : TransitionRepeatKind::kNonconsecutive;
-      element.repeat_lo = step.lo;
-      element.repeat_hi = step.hi;
-    }
+    TransitionPatternElement element = PatternElement(step);
     bool repeats = step.repetition == TransRepetition::kConsecutive;
     std::vector<std::vector<TransitionPatternElement>> next;
     for (uint32_t n = repeats ? step.lo : 1; n <= (repeats ? step.hi : 1);
