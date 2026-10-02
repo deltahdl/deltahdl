@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_covergroup.h"
@@ -126,6 +127,14 @@ OwnNames CovergroupOwnNames(const CovergroupDecl& cg) {
   return names;
 }
 
+// The formal of `cg` named `name`, or null where it has none.
+const FunctionArg* FindFormal(const CovergroupDecl& cg, std::string_view name) {
+  for (const FunctionArg& formal : cg.formals) {
+    if (formal.name == name) return &formal;
+  }
+  return nullptr;
+}
+
 // The names a covergroup body reads: its own coverpoints; its formals, which
 // shadow the names of the scope it is declared in; and then those names.
 class CovergroupScope {
@@ -141,10 +150,7 @@ class CovergroupScope {
 
   // The formal of the covergroup named `name`, or null where it has none.
   const FunctionArg* Formal(std::string_view name) const {
-    for (const FunctionArg& formal : cg_.formals) {
-      if (formal.name == name) return &formal;
-    }
-    return nullptr;
+    return FindFormal(cg_, name);
   }
 
   std::optional<DataTypeKind> TypeOf(std::string_view name) const {
@@ -269,21 +275,75 @@ std::optional<SetExpressionArrayKind> ArrayKindRead(
   return s.arrays.kind_of(name);
 }
 
-// §19.5.1.2: the rules the set_covergroup_expression of a coverpoint's bin
-// `bins` obeys: the array it yields is no associative array, and every name it
-// reads is visible to it.
-void CheckSetExpression(const BinsOrOptions& bins, const SetExpressionScope& s,
-                        DiagEngine& diag) {
+// The kinds whose assignment compatibility (§6.22.3) the kind alone settles:
+// the built-in integral types but an enum, the real types and string. A named
+// type is left to the rules of its declaration.
+bool IsBuiltinValueKind(DataTypeKind kind) {
+  return (IsIntegralType(kind) && kind != DataTypeKind::kEnum) ||
+         IsRealType(kind) || kind == DataTypeKind::kString;
+}
+
+// §19.5.1.2: whether elements of kind `element` may define the bins of a
+// coverpoint of kind `coverpoint`; true wherever either kind is not a
+// built-in one.
+bool ElementsAssignable(DataTypeKind coverpoint, DataTypeKind element) {
+  if (!IsBuiltinValueKind(coverpoint) || !IsBuiltinValueKind(element)) {
+    return true;
+  }
+  DataType coverpoint_type;
+  coverpoint_type.kind = coverpoint;
+  DataType element_type;
+  element_type.kind = element;
+  return SetExpressionElementTypeAllowed(coverpoint_type, element_type);
+}
+
+// The kind of the type of coverpoint `cp`: the one its data type declares or
+// else that of the variable it covers; nothing for any other expression.
+std::optional<DataTypeKind> CoverpointKind(const CoverPointDecl& cp,
+                                           const CovergroupScope& scope) {
+  if (cp.has_data_type) return cp.data_type.kind;
+  if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
+    return scope.TypeOf(cp.expr->text);
+  }
+  return std::nullopt;
+}
+
+// §19.5.1.2: the rules the array `name` obeys where a
+// set_covergroup_expression names it to define the bins of a coverpoint of
+// kind `coverpoint`: it is no associative array, and its elements are
+// assignment compatible with the coverpoint's type.
+void CheckSetExpressionArray(const Expr* name,
+                             std::optional<DataTypeKind> coverpoint,
+                             const SetExpressionScope& s, DiagEngine& diag) {
+  std::optional<SetExpressionArrayKind> kind = ArrayKindRead(name->text, s);
+  if (!kind.has_value()) return;
+  if (!SetExpressionArrayKindAllowed(*kind)) {
+    diag.Error(name->range.start,
+               std::format("the associative array '{}' cannot define the "
+                           "bins of a set_covergroup_expression",
+                           name->text),
+               Subclause("19.5.1.2"));
+  }
+  std::optional<DataTypeKind> element = s.scope.TypeOf(name->text);
+  if (coverpoint.has_value() && element.has_value() &&
+      !ElementsAssignable(*coverpoint, *element)) {
+    diag.Error(name->range.start,
+               std::format("the elements of '{}' are not assignment "
+                           "compatible with the coverpoint's type",
+                           name->text),
+               Subclause("19.5.1.2"));
+  }
+}
+
+// §19.5.1.2: the rules the set_covergroup_expression of the bin `bins` of a
+// coverpoint of kind `coverpoint` obeys: the array it names obeys
+// CheckSetExpressionArray, and every name it reads is visible to it.
+void CheckSetExpression(const BinsOrOptions& bins,
+                        std::optional<DataTypeKind> coverpoint,
+                        const SetExpressionScope& s, DiagEngine& diag) {
   const Expr* e = bins.set_expr;
   if (e->kind == ExprKind::kIdentifier) {
-    std::optional<SetExpressionArrayKind> kind = ArrayKindRead(e->text, s);
-    if (kind.has_value() && !SetExpressionArrayKindAllowed(*kind)) {
-      diag.Error(e->range.start,
-                 std::format("the associative array '{}' cannot define the "
-                             "bins of a set_covergroup_expression",
-                             e->text),
-                 Subclause("19.5.1.2"));
-    }
+    CheckSetExpressionArray(e, coverpoint, s, diag);
   }
   std::vector<const Expr*> reads;
   CollectBareIdents(e, reads);
@@ -301,11 +361,49 @@ void CheckSetExpression(const BinsOrOptions& bins, const SetExpressionScope& s,
 // set_covergroup_expression defines.
 void CheckSetExpressions(const CoverPointDecl& cp, const SetExpressionScope& s,
                          DiagEngine& diag) {
+  std::optional<DataTypeKind> coverpoint = CoverpointKind(cp, s.scope);
   for (const BinsOrOptions& bins : cp.bins) {
     if (bins.kind == BinsOrOptionsKind::kSetExpression &&
         bins.set_expr != nullptr) {
-      CheckSetExpression(bins, s, diag);
+      CheckSetExpression(bins, coverpoint, s, diag);
     }
+  }
+}
+
+// The names the set_covergroup_expressions of the bins of `cp` read, added to
+// `reads`.
+void CollectSetExpressionReads(const CoverPointDecl& cp,
+                               std::vector<const Expr*>& reads) {
+  for (const BinsOrOptions& bins : cp.bins) {
+    if (bins.kind == BinsOrOptionsKind::kSetExpression) {
+      CollectBareIdents(bins.set_expr, reads);
+    }
+  }
+}
+
+// §23.9 with §19.5.1.2: a set_covergroup_expression of a covergroup `cg` a
+// module declares reads the names `declared` answers for, and one that is
+// none of them, no formal of `cg` and no name of its own, which
+// CheckSetExpression reports, resolves to nothing.
+void ReportUnresolvedSetExpressionReads(const CovergroupDecl& cg,
+                                        const CovergroupDeclared& declared,
+                                        DiagEngine& diag) {
+  std::vector<const Expr*> reads;
+  for (const CoverageSpecOrOption& item : cg.items) {
+    if (item.kind == CoverageSpecKind::kCoverPoint) {
+      CollectSetExpressionReads(*item.cover_point, reads);
+    }
+  }
+  OwnNames own_names = CovergroupOwnNames(cg);
+  for (const Expr* read : reads) {
+    if (own_names.contains(read->text) ||
+        FindFormal(cg, read->text) != nullptr || declared(read->text)) {
+      continue;
+    }
+    diag.Error(
+        read->range.start,
+        std::format("reference to unresolved identifier '{}'", read->text),
+        Subclause("23.9"));
   }
 }
 
@@ -584,6 +682,7 @@ void ValidateModuleCovergroups(const ModuleDecl* decl,
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kCovergroupDecl) continue;
     ValidateCovergroup(*item->covergroup, type_of, declared, arrays, diag);
+    ReportUnresolvedSetExpressionReads(*item->covergroup, declared, diag);
   }
   std::unordered_set<std::string_view> covergroup_vars =
       CovergroupVariables(decl);

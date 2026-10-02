@@ -42,9 +42,10 @@ struct CovergroupArrays {
 //   its default bin is no array (§19.5.1), and its bins take no `with`
 //   expression (§19.5.1.1);
 // - a coverpoint of a real expression has no transition bin (§19.5.2);
-// - a bin's set_covergroup_expression yields no associative array and reads
-//   no name declared only within the covergroup (§19.5.1.2), `arrays`
-//   giving the kind of array a name denotes;
+// - a bin's set_covergroup_expression yields no associative array, nor one
+//   whose elements are not assignment compatible with the coverpoint's type,
+//   and reads no name declared only within the covergroup (§19.5.1.2),
+//   `arrays` giving the kind of array a name denotes;
 // - a cross item is a coverpoint of its own covergroup or a variable, and no
 //   real variable (§19.6).
 void ValidateCovergroup(const CovergroupDecl& cg,
@@ -52,11 +53,13 @@ void ValidateCovergroup(const CovergroupDecl& cg,
                         const CovergroupDeclared& declared,
                         const CovergroupArrays& arrays, DiagEngine& diag);
 
-// The covergroups a module declares, checked by ValidateCovergroup, and the
-// procedural writes through an instance of one to an option §19.7 restricts
-// to the definition. `var_types` gives the type of each variable and net the
-// module declares, and `declared` answers whether a name is visible in the
-// module at all: its own declarations, its imports and its generate blocks.
+// The covergroups a module declares, checked by ValidateCovergroup and for a
+// set_covergroup_expression reading a name the module does not declare
+// (§23.9), and the procedural writes through an instance of one to an option
+// §19.7 restricts to the definition. `var_types` gives the type of each
+// variable and net the module declares, and `declared` answers whether a name
+// is visible in the module at all: its own declarations, its imports and its
+// generate blocks.
 void ValidateModuleCovergroups(
     const ModuleDecl* decl,
     const std::unordered_map<std::string_view, DataTypeKind>& var_types,

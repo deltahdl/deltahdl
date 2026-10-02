@@ -334,4 +334,105 @@ TEST(CoverpointBinSetExpression, IndexTypeAndArrayOfClassScope) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
+// §19.5.1.2 with §23.9: a set_covergroup_expression reads the names of the
+// scope that declares the covergroup, and one naming nothing declared there,
+// nor a formal of the covergroup, is an unresolved reference. A name of the
+// covergroup's own, reported by the rule above, is not reported again.
+TEST(CoverpointBinSetExpression, UndeclaredNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x;\n"
+      "  int q[] = '{1, 2};\n"
+      "  localparam int P = 2;\n"
+      "  covergroup cg(int lim);\n"
+      "    a: coverpoint x { bins s[] = zz; }\n"
+      "    b: coverpoint x { bins s[] = q; }\n"
+      "    c: coverpoint x { bins s[] = lim > P ? q : ww; }\n"
+      "    d: coverpoint x { bins s[] = b; }\n"
+      "  endgroup\n"
+      "  cg cv = new(1);\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{6u, "zz"},
+                            std::pair<uint32_t, const char*>{8u, "ww"}}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("reference to unresolved identifier '") + name + "'", line,
+        "23.9"));
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'b' is declared within covergroup 'cg' and is "
+                            "not visible in a set_covergroup_expression",
+                            9, "19.5.1.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+// §19.5.1.2: the array a set_covergroup_expression yields has elements
+// assignment compatible with the coverpoint's type, the type its data type
+// declares or else the type of the variable it covers. A string is
+// assignment compatible with neither an integral nor a real type (§6.16),
+// while a real or byte element is, and an element of a named type is left to
+// the rules of its declaration.
+TEST(CoverpointBinSetExpression, StringElementOfNumericCoverpointIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  bit [3:0] x;\n"
+      "  real r;\n"
+      "  string sa[] = '{\"a\"};\n"
+      "  real ra[] = '{1.0};\n"
+      "  byte ba[3];\n"
+      "  e_t ea[2];\n"
+      "  covergroup cg(ref string fs[]);\n"
+      "    a: coverpoint x { bins s[] = sa; }\n"
+      "    b: coverpoint x { bins s[] = ra; }\n"
+      "    c: coverpoint r { bins s[] = ba; }\n"
+      "    d: coverpoint r { bins s[] = sa; }\n"
+      "    e: coverpoint x { bins s[] = fs; }\n"
+      "    bit [7:0] g: coverpoint x { bins s[] = sa; }\n"
+      "    h: coverpoint x { bins s[] = ea; }\n"
+      "  endgroup\n"
+      "  cg cv = new(sa);\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{10u, "sa"},
+                            std::pair<uint32_t, const char*>{13u, "sa"},
+                            std::pair<uint32_t, const char*>{14u, "fs"},
+                            std::pair<uint32_t, const char*>{15u, "sa"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("the elements of '") + name +
+                                  "' are not assignment compatible with the "
+                                  "coverpoint's type",
+                              line, "19.5.1.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+// §19.5.1.2: a covergroup of a class reads the class's arrays under the same
+// rule.
+TEST(CoverpointBinSetExpression, StringElementOfClassCoverpointIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class k;\n"
+      "    bit [3:0] x;\n"
+      "    string sa[];\n"
+      "    int ia[];\n"
+      "    covergroup cg;\n"
+      "      a: coverpoint x { bins s[] = sa; }\n"
+      "      b: coverpoint x { bins s[] = ia; }\n"
+      "    endgroup\n"
+      "    function new; cg = new; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the elements of 'sa' are not assignment "
+                            "compatible with the coverpoint's type",
+                            7, "19.5.1.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace
