@@ -270,54 +270,70 @@ bool ItemTypeOptions(const CoverageSpecOrOption& spec, size_t index,
   return false;
 }
 
-// §19.7.1: the type option `member` the definition `decl` gives at one level,
-// starting from the defaults of Table 19-3 in `options`, with each type option
-// written through the type since, `writes`.
+// §19.7.1: a type option named through the covergroup type `decl`, of the
+// covergroup where `item` is empty and else of its coverpoint or cross `item`.
+struct TypeOptionName {
+  const CovergroupDecl* decl = nullptr;
+  std::string_view item;
+  std::string_view member;
+};
+
+// §19.7.1: the type option assignments a definition gives one level of a
+// covergroup type, `defined`, and the type options written through the type
+// since, `writes`.
+struct DefinedTypeOptions {
+  std::vector<const CoverageOption*> defined;
+  std::vector<const TypeOptionWrite*> writes;
+};
+
+// §19.7.1: the type options of one level, starting from the defaults of
+// Table 19-3 in `options`, as `set` gives them.
 template <typename Options>
-bool ReadDefinedOption(Options options, const OptionFields<Options>& fields,
-                       const std::vector<const CoverageOption*>& defined,
-                       std::span<const TypeOptionWrite* const> writes,
-                       std::string_view member, SimContext& ctx, Arena& arena,
-                       Logic4Vec& out) {
-  for (const CoverageOption* option : defined) {
+Options DefinedOptions(Options options, const OptionFields<Options>& fields,
+                       const DefinedTypeOptions& set, SimContext& ctx,
+                       Arena& arena) {
+  for (const CoverageOption* option : set.defined) {
     if (option->is_type_option) SetOption(options, fields, *option, ctx, arena);
   }
-  for (const TypeOptionWrite* write : writes) {
+  for (const TypeOptionWrite* write : set.writes) {
     SetOptionValue(options, fields, write->member, write->value);
   }
-  return ReadOption(options, fields, member, arena, out);
+  return options;
 }
 
-// §19.7.1: the type option `member` of the covergroup type `decl`, of the
-// covergroup where `item` is empty and else of its coverpoint or cross `item`,
-// as its definition and the writes through the type since give it, where no
-// instance of the type has been built to read it from.
-bool ReadDefinedTypeOption(const CovergroupDecl& decl, std::string_view item,
-                           std::string_view member, SimContext& ctx,
+// §19.7.1: the type option `name`, as its definition and the writes through
+// the type since give it, where no instance of the type has been built to
+// read it from.
+bool ReadDefinedTypeOption(const TypeOptionName& name, SimContext& ctx,
                            Arena& arena, Logic4Vec& out) {
-  std::vector<const TypeOptionWrite*> writes;
+  DefinedTypeOptions set;
   for (const TypeOptionWrite& write : ctx.Covergroups().TypeOptionWrites()) {
-    if (write.decl == &decl && write.item == item) writes.push_back(&write);
+    if (write.decl == name.decl && write.item == name.item) {
+      set.writes.push_back(&write);
+    }
   }
-  std::vector<const CoverageOption*> defined;
+  const CovergroupDecl& decl = *name.decl;
   for (size_t i = 0; i < decl.items.size(); ++i) {
     const CoverageSpecOrOption& spec = decl.items[i];
-    if (item.empty()) {
+    if (name.item.empty()) {
       if (spec.kind == CoverageSpecKind::kOption)
-        defined.push_back(&spec.option);
+        set.defined.push_back(&spec.option);
       continue;
     }
-    if (!ItemTypeOptions(spec, i, item, defined)) continue;
+    if (!ItemTypeOptions(spec, i, name.item, set.defined)) continue;
     if (spec.kind == CoverageSpecKind::kCoverCross) {
-      return ReadDefinedOption(CrossTypeOption{}, kCrossTypeFields, defined,
-                               writes, member, ctx, arena, out);
+      return ReadOption(
+          DefinedOptions(CrossTypeOption{}, kCrossTypeFields, set, ctx, arena),
+          kCrossTypeFields, name.member, arena, out);
     }
-    return ReadDefinedOption(CoverPointTypeOption{}, kPointTypeFields, defined,
-                             writes, member, ctx, arena, out);
+    return ReadOption(DefinedOptions(CoverPointTypeOption{}, kPointTypeFields,
+                                     set, ctx, arena),
+                      kPointTypeFields, name.member, arena, out);
   }
-  return item.empty() &&
-         ReadDefinedOption(CoverGroupTypeOption{}, kGroupTypeFields, defined,
-                           writes, member, ctx, arena, out);
+  return name.item.empty() &&
+         ReadOption(DefinedOptions(CoverGroupTypeOption{}, kGroupTypeFields,
+                                   set, ctx, arena),
+                    kGroupTypeFields, name.member, arena, out);
 }
 
 }  // namespace
@@ -495,7 +511,8 @@ bool TryEvalCovergroupTypeOptionRead(const Expr* expr, SimContext& ctx,
   if (decl == nullptr) return false;
   const CovergroupInstance* inst = ctx.Covergroups().AnyOf(decl);
   if (inst == nullptr) {
-    return ReadDefinedTypeOption(*decl, item, expr->rhs->text, ctx, arena, out);
+    return ReadDefinedTypeOption({decl, item, expr->rhs->text}, ctx, arena,
+                                 out);
   }
   return ReadTypeOption(*inst, item, expr->rhs->text, arena, out);
 }
