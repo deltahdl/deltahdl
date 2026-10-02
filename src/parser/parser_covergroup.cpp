@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <format>
 #include <string>
 #include <string_view>
@@ -14,6 +13,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/covergroup_sample_formal_uses.h"
 #include "parser/parser.h"
 #include "parser/parser_covergroup_internal.h"
 
@@ -23,26 +23,6 @@ namespace {
 
 bool IsCoverpointOrCross(TokenKind k) {
   return k == TokenKind::kKwCoverpoint || k == TokenKind::kKwCross;
-}
-
-// The first identifier anywhere in `e` that is one of `names`, or null.
-const Expr* FindNamedIdentifier(const Expr* e,
-                                const std::vector<std::string_view>& names) {
-  if (e == nullptr) return nullptr;
-  if (e->kind == ExprKind::kIdentifier &&
-      std::find(names.begin(), names.end(), e->text) != names.end()) {
-    return e;
-  }
-  for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
-                            e->false_expr, e->base, e->index, e->index_end}) {
-    if (const Expr* found = FindNamedIdentifier(child, names)) return found;
-  }
-  for (const std::vector<Expr*>* list : {&e->args, &e->elements}) {
-    for (const Expr* child : *list) {
-      if (const Expr* found = FindNamedIdentifier(child, names)) return found;
-    }
-  }
-  return nullptr;
 }
 
 // §19.7, Table 19-2: whether an instance coverage option named `member` may
@@ -157,6 +137,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     ParseCovergroupItem(state);
   }
   Expect(TokenKind::kKwEndgroup, Subclause("19.3"));
+  ReportSampleFormalsOutsideCoverpoints(*cg, diag_);
   MatchEndLabel(item->name);
   items.push_back(item);
 }
@@ -275,7 +256,6 @@ void Parser::ParseSampleFunctionEvent(CovergroupBodyState& state) {
                           "an output direction",
                           Subclause("19.8.1"));
   for (const FunctionArg& formal : formals) {
-    state.sample_formals.push_back(formal.name);
     for (std::string_view taken : state.formals) {
       if (taken != formal.name) continue;
       diag_.Error(formals_loc,
@@ -449,9 +429,7 @@ void Parser::RejectFormalInTypeOption(const CoverageOption& option,
 // §19.7: a covergroup-level coverage-option assignment. Assigning the same
 // option twice in the same covergroup definition is an error, so each
 // assignment is keyed by its `option`/`type_option` keyword joined with the
-// member name and a repeat is flagged. §19.8.1: an overridden sample method's
-// formal may not be referenced from a coverage-option value, so each
-// reference to one there is reported.
+// member name and a repeat is flagged.
 void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
   CoverageSpecOrOption item;
   item.kind = CoverageSpecKind::kOption;
@@ -464,16 +442,6 @@ void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
                       "' is assigned more than once in the same covergroup "
                       "definition",
                   Subclause("19.7"));
-    }
-    std::vector<std::string_view> rest = state.sample_formals;
-    while (const Expr* formal = FindNamedIdentifier(item.option.value, rest)) {
-      diag_.Error(formal->range.start,
-                  "sample method formal argument '" +
-                      std::string(formal->text) +
-                      "' may only designate a coverpoint or conditional "
-                      "guard expression, not a coverage-option value",
-                  Subclause("19.8.1"));
-      std::erase(rest, formal->text);
     }
     RejectFormalInTypeOption(item.option, state);
     state.cg->items.push_back(item);

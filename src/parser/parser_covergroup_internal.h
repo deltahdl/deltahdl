@@ -26,14 +26,13 @@ inline bool IsOptionKeyword(const Token& t) {
 }
 
 // The state one covergroup body is read with (§19.3): its tree, the option
-// assignments its own level has made (§19.7), the names of its formals and of
-// its sample method's formals (§19.7.1, §19.8.1), and the names its
-// coverpoints and crosses have taken (§19.5).
+// assignments its own level has made (§19.7), the names of its formals
+// (§19.7.1, §19.8.1), and the names its coverpoints and crosses have taken
+// (§19.5).
 struct CovergroupBodyState {
   CovergroupDecl* cg = nullptr;
   std::unordered_set<std::string> seen_options;
   std::vector<std::string_view> formals;
-  std::vector<std::string_view> sample_formals;
   std::unordered_set<std::string_view> names;
 };
 
