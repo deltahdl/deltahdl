@@ -651,6 +651,18 @@ CovergroupDecl ComposeDerived(const CovergroupDecl& base,
   return out;
 }
 
+// The covergroup of the name of `embedded[i]` that a class further up the
+// chain embeds, the one a derived covergroup at `i` extends; null where none.
+const CovergroupDecl* NextOfName(
+    const std::vector<std::pair<std::string_view, const CovergroupDecl*>>&
+        embedded,
+    size_t i) {
+  for (size_t j = i + 1; j < embedded.size(); ++j) {
+    if (embedded[j].first == embedded[i].first) return embedded[j].second;
+  }
+  return nullptr;
+}
+
 // §19.4: every covergroup `type` and the classes it derives from embed, the
 // most derived first. §19.4.1: one that extends the covergroup of its name
 // further up is composed with it (ComposeDerived), from the base down, the
@@ -669,11 +681,9 @@ EmbeddedCovergroups(const ClassTypeInfo* type,
   }
   for (size_t i = embedded.size(); i-- > 0;) {
     if (embedded[i].second->extends_base.empty()) continue;
-    for (size_t j = i + 1; j < embedded.size(); ++j) {
-      if (embedded[j].first != embedded[i].first) continue;
-      embedded[i].second = &composed.emplace_back(
-          ComposeDerived(*embedded[j].second, *embedded[i].second));
-      break;
+    if (const CovergroupDecl* base = NextOfName(embedded, i)) {
+      embedded[i].second =
+          &composed.emplace_back(ComposeDerived(*base, *embedded[i].second));
     }
   }
   return embedded;
