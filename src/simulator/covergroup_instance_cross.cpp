@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -10,13 +11,17 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/covergroup_instance_internal.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
@@ -34,7 +39,8 @@ using Tuple = std::vector<size_t>;
 // index into its points of each coverpoint the cross crosses, the cross
 // items as written, the cross's products, the values of each `intersect` the
 // expression holds, and the products each `with` (§19.6.1.2) and
-// cross_set_expression (§19.6.1.4) selects, each read once.
+// cross_set_expression (§19.6.1.4) selects, each read once; and the cross's
+// name, which a report about one of them gives.
 struct CrossSelector {
   const CovergroupInstance& inst;
   std::vector<size_t> points;
@@ -43,7 +49,14 @@ struct CrossSelector {
   std::unordered_map<const SelectExpression*, std::vector<CoverValueRange>>
       intersects;
   std::unordered_map<const SelectExpression*, std::set<Tuple>> computed;
+  std::string_view cross_name;
 };
+
+// §19.6.1.2: the most value tuples one `with` is evaluated for, over all the
+// bin tuples it is applied to. Each is one evaluation of the expression when
+// the instance is built, so a `with` over wide coverpoints, two int ones
+// spanning 2^64, is reported rather than run.
+constexpr uint64_t kMaxWithValueTuples = uint64_t{1} << 20;
 
 // §19.6: the coverpoint `name` of the instance, by index into its points; a
 // variable the cross names that no coverpoint does is given an implicit
@@ -269,29 +282,82 @@ class WithEvaluation {
 std::set<Tuple> WithSelections(const SelectExpression& select,
                                const CrossSelector& selector, SimContext& ctx,
                                Arena& arena) {
-  MatchPolicy policy = ReadPolicy(select, ctx, arena);
+  std::vector<
+      std::pair<const Tuple*, std::vector<std::vector<CoverValueRange>>>>
+      candidates;
+  candidates.reserve(selector.products.size());
+  uint64_t total = 0;
+  for (const Tuple& tuple : selector.products) {
+    if (!Selects(*select.lhs, tuple, selector)) continue;
+    candidates.emplace_back(&tuple, TupleSpans(tuple, selector));
+    total =
+        std::min(kMaxWithValueTuples + 1,
+                 total + std::min(kMaxWithValueTuples + 1,
+                                  ValueTupleCount(candidates.back().second)));
+  }
   std::set<Tuple> chosen;
+  if (total > kMaxWithValueTuples) {
+    ctx.GetDiag().Error(
+        select.loc,
+        std::format("cross '{}': the `with` expression ranges over more than "
+                    "the {} value tuples deltahdl evaluates",
+                    selector.cross_name, kMaxWithValueTuples),
+        Subclause("19.6.1.2"));
+    return chosen;
+  }
+  MatchPolicy policy = ReadPolicy(select, ctx, arena);
   ctx.PushScope();
   WithEvaluation evaluation(select.expr, policy, selector, ctx, arena);
-  for (const Tuple& tuple : selector.products) {
-    if (Selects(*select.lhs, tuple, selector) &&
-        evaluation.Selects(TupleSpans(tuple, selector))) {
-      chosen.insert(tuple);
-    }
+  for (const auto& [tuple, spans] : candidates) {
+    if (evaluation.Selects(spans)) chosen.insert(*tuple);
   }
   ctx.PopScope();
   return chosen;
 }
 
-// §19.6.1.4: the value tuples a cross_set_expression lists, written as an
-// array literal of one array literal per tuple, each value as its
-// coverpoint's type holds it.
+// §19.6.1.3: the value tuple a CrossValType element holds, each member read
+// as its coverpoint's type holds it. The members are laid out as a structure's
+// are, the first in the most significant bits.
+std::vector<int64_t> ElementValueTuple(const Logic4Vec& element,
+                                       const CrossSelector& selector,
+                                       Arena& arena) {
+  uint32_t offset = 0;
+  for (size_t point : selector.points)
+    offset += selector.inst.points[point].width;
+  std::vector<int64_t> values;
+  values.reserve(selector.points.size());
+  for (size_t point : selector.points) {
+    const SampledCoverpoint& sampled = selector.inst.points[point];
+    offset -= sampled.width;
+    values.push_back(ConvertToPointType(
+        ExtractBitField(arena, element, offset, sampled.width), sampled));
+  }
+  return values;
+}
+
+// §19.6.1.4: the value tuples a cross_set_expression yields, each value as
+// its coverpoint's type holds it: those an array literal of one array literal
+// per tuple lists, and otherwise the elements of the CrossQueueType the
+// expression evaluates to, a call of a function returning one among them.
 std::set<std::vector<int64_t>> CrossSetValueTuples(
     const Expr* e, const CrossSelector& selector, SimContext& ctx,
     Arena& arena) {
   std::set<std::vector<int64_t>> tuples;
   e = UnwrapTypedPattern(e);
-  if (e->kind != ExprKind::kAssignmentPattern) return tuples;
+  if (e->kind != ExprKind::kAssignmentPattern) {
+    std::optional<ReturnedAggregate> returned;
+    std::vector<Logic4Vec> elements;
+    EvalWithReturnedAggregate(e, ctx, arena, returned);
+    if (returned) {
+      elements = std::move(returned->elements);
+    } else {
+      CollectQueueElements(e, ctx, arena, elements);
+    }
+    for (const Logic4Vec& element : elements) {
+      tuples.insert(ElementValueTuple(element, selector, arena));
+    }
+    return tuples;
+  }
   for (const Expr* element : e->elements) {
     element = UnwrapTypedPattern(element);
     if (element->kind != ExprKind::kAssignmentPattern ||
@@ -426,6 +492,71 @@ void AddCrossBins(const CovergroupInstance& inst, CrossCover& cross,
   }
 }
 
+// A decimal literal of `value`, a bound of a member's packed dimension.
+Expr* DecimalLiteral(uint32_t value, Arena& arena) {
+  std::string text = std::to_string(value);
+  auto* literal = arena.Create<Expr>();
+  literal->kind = ExprKind::kIntegerLiteral;
+  literal->int_val = value;
+  literal->text = {arena.AllocString(text.data(), text.size()), text.size()};
+  return literal;
+}
+
+// §19.6.1.3: CrossValType, a structure of one member per coverpoint the
+// cross crosses, in the order it lists them, each named as the coverpoint is
+// and of its type's width, signedness and number of states.
+DataType CrossValType(const CrossSelector& selector, Arena& arena) {
+  DataType type;
+  type.kind = DataTypeKind::kStruct;
+  type.struct_members.reserve(selector.points.size());
+  for (size_t point : selector.points) {
+    const SampledCoverpoint& sampled = selector.inst.points[point];
+    StructMember member;
+    member.type_kind =
+        sampled.is_four_state ? DataTypeKind::kLogic : DataTypeKind::kBit;
+    member.is_signed = sampled.is_signed;
+    member.packed_dim_left = DecimalLiteral(sampled.width - 1, arena);
+    member.packed_dim_right = DecimalLiteral(0, arena);
+    member.name = sampled.point->name;
+    type.struct_members.push_back(member);
+  }
+  return type;
+}
+
+// §19.6.1.3 with §13.4.1: a function the cross body declares returning
+// CrossQueueType, an unbounded queue of CrossValType, has an implicit variable
+// of that queue, as a function returning a typedef of a queue has
+// (ModuleItem::return_array_dims). The cross's coverpoints have the same
+// types in every instance, so the first instance built shapes it.
+void ShapeCrossQueueReturns(const CoverCrossDecl& decl,
+                            const CrossSelector& selector, Arena& arena) {
+  for (const CrossBodyItem& item : decl.body) {
+    ModuleItem* func = item.function;
+    if (item.kind != CrossBodyItemKind::kFunction ||
+        func->return_type.kind != DataTypeKind::kNamed ||
+        func->return_type.type_name != "CrossQueueType" ||
+        !func->return_array_dims.empty()) {
+      continue;
+    }
+    auto* dim = arena.Create<Expr>();
+    dim->kind = ExprKind::kIdentifier;
+    dim->text = "$";
+    func->return_array_dims.push_back(dim);
+    func->return_array_elem_type = CrossValType(selector, arena);
+  }
+}
+
+// The functions a cross body declares (A.2.11 cross_body_item).
+std::vector<ModuleItem*> CrossFunctions(const CoverCrossDecl& decl) {
+  std::vector<ModuleItem*> functions;
+  functions.reserve(decl.body.size());
+  for (const CrossBodyItem& item : decl.body) {
+    if (item.kind == CrossBodyItemKind::kFunction)
+      functions.push_back(item.function);
+  }
+  return functions;
+}
+
 }  // namespace
 
 void BuildCross(CovergroupInstance& inst, const CoverCrossDecl& decl,
@@ -459,13 +590,19 @@ void BuildCross(CovergroupInstance& inst, const CoverCrossDecl& decl,
                          std::move(items),
                          CoverageDB::CrossProductTuples(inst.group, added),
                          {},
-                         {}};
+                         {},
+                         added->name};
+  // §19.6.1.4: a call in a select expression names the functions the cross
+  // body declares ahead of every other.
+  ShapeCrossQueueReturns(decl, selector, arena);
+  ctx.PushFunctionScope(CrossFunctions(decl));
   for (const CrossBodyItem& item : decl.body) {
     if (item.kind == CrossBodyItemKind::kBinsSelection) {
       ReadIntersects(item.bins.select, selector, ctx, arena);
       ReadComputedSelections(item.bins.select, selector, ctx, arena);
     }
   }
+  ctx.PopFunctionScope();
   CrossSelections selections =
       ReadSelections(decl, selector.products, selector, sampled);
   AddCrossBins(inst, *added, selector.products, selections, sampled);

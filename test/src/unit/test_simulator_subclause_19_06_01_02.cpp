@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -164,6 +165,32 @@ TEST(CovergroupInstanceSim, CrossWithSelectsTheProductsWhoseValuesSatisfyIt) {
                        f),
             "n=1 t=13\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.6.1.2: a `with` is evaluated for each value tuple of the bin tuples it
+// is applied to; over two int coverpoints those number 2^64, more than
+// deltahdl evaluates, so the bin is reported and selects nothing, and the
+// instance is built with its 4096 automatic bins.
+TEST(CovergroupInstanceSim, CrossWithOverTooManyValueTuplesIsReported) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int a, b; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint a; coverpoint b;\n"
+                       "    X: cross a, b { bins eq = X with (a == b); }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=4096\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cross 'X': the `with` expression ranges over "
+                            "more than the 1048576 value tuples deltahdl "
+                            "evaluates",
+                            5, "19.6.1.2"));
 }
 
 }  // namespace

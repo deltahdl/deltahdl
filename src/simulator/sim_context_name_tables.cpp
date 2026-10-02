@@ -44,6 +44,23 @@ ModuleItem* DeclaredNameTables::FindFunction(std::string_view name) {
   return (it != functions_.end()) ? it->second : nullptr;
 }
 
+void DeclaredNameTables::PushFunctionScope(std::vector<ModuleItem*> functions) {
+  function_scopes_.push_back(std::move(functions));
+}
+
+void DeclaredNameTables::PopFunctionScope() { function_scopes_.pop_back(); }
+
+ModuleItem* DeclaredNameTables::FindScopedFunction(
+    std::string_view name) const {
+  for (auto scope = function_scopes_.rbegin(); scope != function_scopes_.rend();
+       ++scope) {
+    for (ModuleItem* func : *scope) {
+      if (func->name == name) return func;
+    }
+  }
+  return nullptr;
+}
+
 void DeclaredNameTables::RegisterGenBlockSubroutineScope(
     std::string_view key, GenBlockSubroutineScope scope) {
   gen_block_subroutine_scopes_[key] = std::move(scope);

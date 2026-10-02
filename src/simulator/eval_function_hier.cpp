@@ -167,6 +167,14 @@ class CallerGenBlockScope {
   std::vector<std::string> callee_prefixes_;
 };
 
+// A bare callee a cross body declares while the cross is built (§19.6.1.4,
+// PushFunctionScope), and otherwise the one the package frame the call stands
+// in provides (§26.3).
+ModuleItem* ScopedOrPackageFunction(const std::string& name, SimContext& ctx) {
+  if (ModuleItem* func = ctx.FindScopedFunction(name)) return func;
+  return ctx.FindFunctionInPackageScope(name);
+}
+
 }  // namespace
 
 std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
@@ -225,7 +233,7 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // calls p's five ahead of the module's own. Null outside any package frame
   // or where the package provides no such name, and the module's and the
   // top's registrations are searched then.
-  if (!is_hierarchical) target.func = ctx.FindFunctionInPackageScope(path);
+  if (!is_hierarchical) target.func = ScopedOrPackageFunction(path, ctx);
   if (target.func != nullptr) {
     target.inst_prefix = std::move(active);
     return target;

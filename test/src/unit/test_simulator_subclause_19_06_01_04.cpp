@@ -140,4 +140,59 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.6.1.4 with §19.6.1.3: the cross_set_expression may be a call of a
+// function the cross body declares, returning the cross's CrossQueueType; the
+// value tuples it pushes, <1,2> and <3,0>, go to the bin one as a literal
+// listing them does, and 14 automatic bins remain, in the second instance
+// built as in the first.
+TEST(CovergroupInstanceSim,
+     CrossSetFunctionSelectsTheProductsHoldingTheTuplesItReturns) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a, b; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint a; coverpoint b;\n"
+                       "    X: cross a, b {\n"
+                       "      function CrossQueueType mysel();\n"
+                       "        mysel.push_back('{1,2});\n"
+                       "        mysel.push_back('{3,0});\n"
+                       "      endfunction\n"
+                       "      bins one = mysel();\n"
+                       "    }\n"
+                       "  endgroup\n"
+                       "  cg d = new;\n"
+                       "  cg c = new;\n"
+                       "  initial begin a = 1; b = 2; c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=15\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.6.1.4: the cross_set_expression may be any expression yielding the value
+// tuples, a slice of a queue of structures among them: <1,2> and <3,0> go to
+// the bin one, and 14 automatic bins remain.
+TEST(CovergroupInstanceSim,
+     CrossSetQueueSliceSelectsTheProductsHoldingItsTuples) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a, b; int n, t;\n"
+                       "  typedef struct { bit [1:0] a; bit [1:0] b; } vt;\n"
+                       "  vt q[$] = '{ '{1,2}, '{3,0} };\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint a; coverpoint b;\n"
+                       "    X: cross a, b { bins one = q[0:$]; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin a = 1; b = 2; c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=15\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

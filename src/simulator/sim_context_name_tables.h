@@ -48,6 +48,15 @@ class DeclaredNameTables {
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
 
+  // §19.6.1.4 with A.2.11: the functions a cross body declares, which a call
+  // its select expressions make names ahead of every registered subroutine
+  // while the cross is built. Each push opens a scope of its own, popped in
+  // the reverse order; FindScopedFunction searches the innermost first and
+  // answers null where no open scope declares `name`.
+  void PushFunctionScope(std::vector<ModuleItem*> functions);
+  void PopFunctionScope();
+  ModuleItem* FindScopedFunction(std::string_view name) const;
+
   // §27.4 with §13.4 and §23.6: the scope the subroutine registered under
   // `key` runs in, recorded for a subroutine a generate block instance
   // declares, under the instance-qualified key a hierarchical call resolves
@@ -329,6 +338,8 @@ class DeclaredNameTables {
 
  protected:
   std::unordered_map<std::string_view, ModuleItem*> functions_;
+  // §19.6.1.4: see PushFunctionScope.
+  std::vector<std::vector<ModuleItem*>> function_scopes_;
   // §27.4 with §13.4: see RegisterGenBlockSubroutineScope.
   std::unordered_map<std::string_view, GenBlockSubroutineScope>
       gen_block_subroutine_scopes_;
