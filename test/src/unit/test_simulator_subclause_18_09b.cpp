@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -83,6 +84,100 @@ TEST(ConstraintModeRun, TheObjectCallTurnsEveryBlockOff) {
           "endmodule\n",
       f);
   EXPECT_EQ(out, "1 1 0 0 1\n");
+}
+
+// §18.9 with §8.6: constraint_mode() acts on the object a call returns,
+// through a block of it or the object as a whole, and §11.3.1 has the call
+// run once for each: two calls turn lo off and read it back off, leaving hi
+// on, and a third turns hi off too.
+TEST(ConstraintModeRun, ACallsResultIsTheObjectAndIsCalledOnce) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "  constraint lo { x > 2; }\n"
+      "  constraint hi { x < 9; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, r;\n"
+      "  K k = new;\n"
+      "  function K pk();\n"
+      "    calls++;\n"
+      "    return k;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    pk().lo.constraint_mode(0);\n"
+      "    r = pk().lo.constraint_mode();\n"
+      "    $display(\"%0d %0d %0d\", calls, r, k.hi.constraint_mode());\n"
+      "    pk().constraint_mode(0);\n"
+      "    $display(\"%0d %0d\", calls, k.hi.constraint_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0 1\n3 0\n");
+}
+
+// §18.9 with §8.6: an element of an array of handles is the object it holds,
+// so the calls through ks[1] and ks[0] change the modes read through the
+// handles first and second, and the queries through ks[1] answer its own
+// object's modes.
+TEST(ConstraintModeRun, AnArrayElementIsTheObjectItHolds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "  constraint lo { x > 2; }\n"
+      "  constraint hi { x < 9; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  K ks[2];\n"
+      "  K first, second;\n"
+      "  initial begin\n"
+      "    ks[0] = new;\n"
+      "    ks[1] = new;\n"
+      "    first = ks[0];\n"
+      "    second = ks[1];\n"
+      "    ks[1].lo.constraint_mode(0);\n"
+      "    ks[0].constraint_mode(0);\n"
+      "    $display(\"%0d %0d %0d %0d\", second.lo.constraint_mode(),\n"
+      "             ks[1].hi.constraint_mode(), first.hi.constraint_mode(),\n"
+      "             ks[1].lo.constraint_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 0 0\n");
+}
+
+// §18.9 with §8.4: a call returning the null handle yields no object whose
+// block the call could reach, so both forms are reported as calls through a
+// null handle, the query answers 0, and the call runs once for each.
+TEST(ConstraintModeRun, ACallsNullResultIsReported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "  constraint lo { x > 2; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, r = 7;\n"
+      "  function K pn();\n"
+      "    calls++;\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    pn().lo.constraint_mode(0);\n"
+      "    r = pn().lo.constraint_mode();\n"
+      "    $display(\"%0d %0d\", calls, r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0\n");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "method 'constraint_mode' called through a null handle", 12, "8.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "method 'constraint_mode' called through a null handle", 13, "8.4"));
 }
 
 }  // namespace

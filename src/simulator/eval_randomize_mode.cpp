@@ -313,6 +313,20 @@ bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// The receiver `e` of the call `e.method(...)`, the dot not a package's scope
+// resolution; null for an expression of any other shape.
+const Expr* ReceiverOfMethod(const Expr* expr, std::string_view method) {
+  if (expr->kind != ExprKind::kCall) return nullptr;
+  const Expr* callee = expr->lhs;
+  if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
+      callee->is_scope_resolution || callee->lhs == nullptr ||
+      callee->rhs == nullptr || callee->rhs->kind != ExprKind::kIdentifier ||
+      callee->rhs->text != method) {
+    return nullptr;
+  }
+  return callee->lhs;
+}
+
 // 18.6.1 and 18.13 with 8.4: randomize(), srandom(), get_randstate() and
 // set_randstate() are methods of the object whatever handle expression yields
 // it -- an element of an array of handles, a handle held in another object's
@@ -322,16 +336,11 @@ bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
 // handle illegal, and it is reported here as through a named one.
 ClassObject* ExprReceiverObject(const Expr* expr, std::string_view method,
                                 SimContext& ctx, Arena& arena) {
-  const Expr* callee = expr->lhs;
-  if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
-      callee->is_scope_resolution || callee->lhs == nullptr ||
-      callee->rhs == nullptr || callee->rhs->kind != ExprKind::kIdentifier ||
-      callee->rhs->text != method) {
-    return nullptr;
-  }
-  uint64_t handle = EvalExpr(callee->lhs, ctx, arena).ToUint64();
+  const Expr* recv = ReceiverOfMethod(expr, method);
+  if (recv == nullptr) return nullptr;
+  uint64_t handle = EvalExpr(recv, ctx, arena).ToUint64();
   if (handle == kNullClassHandle) {
-    ReportNullHandleCall(method, callee->rhs->range.start, ctx);
+    ReportNullHandleCall(method, expr->lhs->rhs->range.start, ctx);
     return nullptr;
   }
   ClassObject* obj = ctx.GetClassObject(handle);
@@ -664,22 +673,148 @@ void SetAllRandVariablesActive(ClassObject* obj, bool on) {
   }
 }
 
-bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, Logic4Vec& out) {
+namespace {
+
+// §18.8 and §18.9: the object a rand_mode() or constraint_mode() call acts on,
+// null where its receiver yields none; the random variable or constraint block
+// the call names, empty for the call on the object as a whole; and for §18.8's
+// element form the select whose index the caller evaluates.
+struct ModeTarget {
+  ClassObject* obj = nullptr;
+  std::string_view name;
+  const Expr* element = nullptr;
+};
+
+// Whether the class declaration `decl` declares `name` as a constraint block,
+// for `block`, or else as a random variable, rand or randc.
+bool DeclaresModeMemberIn(const ClassDecl* decl, std::string_view name,
+                          bool block) {
+  for (const ClassMember* m : decl->members) {
+    if (m->name != name) continue;
+    if (block ? m->kind == ClassMemberKind::kConstraint
+              : m->kind == ClassMemberKind::kProperty &&
+                    (m->is_rand || m->is_randc)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Whether the object's class, or a class it extends, declares `name` as what
+// the call `method` controls: a random variable for rand_mode() (§18.8), a
+// constraint block for constraint_mode() (§18.9). A built-in class declares
+// neither.
+bool DeclaresModeMember(const ClassObject* obj, std::string_view name,
+                        std::string_view method) {
+  bool block = method == "constraint_mode";
+  for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
+    if (lvl->decl != nullptr && DeclaresModeMemberIn(lvl->decl, name, block))
+      return true;
+  }
+  return false;
+}
+
+// The object the handle `value` refers to, null for a null handle. §8.4 makes
+// a call through a null handle illegal, so the call `call` is reported.
+ClassObject* ModeObject(const Logic4Vec& value, const Expr* call,
+                        SimContext& ctx) {
+  uint64_t handle = value.ToUint64();
+  if (handle == kNullClassHandle) {
+    ReportNullHandleCall(call->lhs->rhs->text, call->lhs->rhs->range.start,
+                         ctx);
+  }
+  return ctx.GetClassObject(handle);
+}
+
+// §8.6 with §18.8 and §18.9: a receiver no name resolves -- a call's result,
+// `pk().x.rand_mode(0)`, an element of an array of handles,
+// `ks[1].x.rand_mode(0)`, or a handle another object holds -- reaches its
+// object by its value, evaluated once (§11.3.1). The receiver `e.m`, or for
+// rand_mode()'s element form `e.m[i]`, names the member m of e's object where
+// that object declares m as what the method controls; otherwise the receiver
+// is itself the handle the call is made on, read with e held so that e is not
+// evaluated again. False when the call is no call of `method`; `out.obj` is
+// null where the receiver yields no object.
+bool ResolveExprModeTarget(const Expr* expr, std::string_view method,
+                           SimContext& ctx, Arena& arena, ModeTarget& out) {
+  const Expr* recv = ReceiverOfMethod(expr, method);
+  if (recv == nullptr) return false;
+  const Expr* member = recv;
+  if (method == "rand_mode" && recv->kind == ExprKind::kSelect &&
+      recv->index != nullptr && recv->index_end == nullptr &&
+      recv->base != nullptr) {
+    member = recv->base;
+  }
+  if (member->kind != ExprKind::kMemberAccess || member->is_scope_resolution ||
+      member->lhs == nullptr || member->rhs == nullptr ||
+      member->rhs->kind != ExprKind::kIdentifier) {
+    out.obj = ModeObject(EvalExpr(recv, ctx, arena), expr, ctx);
+    return true;
+  }
+  Logic4Vec owner_value = EvalExpr(member->lhs, ctx, arena);
+  ClassObject* owner = ModeObject(owner_value, expr, ctx);
+  if (owner == nullptr) return true;
+  if (DeclaresModeMember(owner, member->rhs->text, method)) {
+    out = {owner, member->rhs->text, member == recv ? nullptr : recv};
+    return true;
+  }
+  ctx.SetDeferredArgSnapshot(member->lhs, owner_value);
+  out.obj = ModeObject(EvalExpr(recv, ctx, arena), expr, ctx);
+  ctx.ClearDeferredArgSnapshot(member->lhs);
+  return true;
+}
+
+// The target of a rand_mode() or constraint_mode() call: through a handle's
+// name, `h.x.rand_mode(0)` or `p::h.x.rand_mode(0)`, the object the name holds,
+// and through any other receiver the object its value refers to
+// (ResolveExprModeTarget). False when the call is no call of `method`, or
+// its name holds no object.
+bool ResolveModeTarget(const Expr* expr, std::string_view method,
+                       SimContext& ctx, Arena& arena, ModeTarget& out) {
   std::string_view obj_name;
-  std::string_view constraint_name;
-  ScopedModeParts scoped;
-  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name)) {
-    if (!ExtractScopedModeParts(expr, "constraint_mode", arena, scoped)) {
-      return false;
+  bool named = method == "rand_mode"
+                   ? ExtractRandModeParts(expr, obj_name, out.name, out.element)
+                   : ExtractConstraintModeParts(expr, obj_name, out.name);
+  if (!named) {
+    ScopedModeParts scoped;
+    if (!ExtractScopedModeParts(expr, method, arena, scoped)) {
+      return ResolveExprModeTarget(expr, method, ctx, arena, out);
     }
     obj_name = scoped.obj_name;
-    constraint_name = scoped.name;
+    out.name = scoped.name;
+    out.element = scoped.element;
   }
   MethodCallParts parts;
   parts.var_name = obj_name;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
-  if (!obj) return false;
+  out.obj = ResolveRandomizeTarget(ctx, parts);
+  return out.obj != nullptr;
+}
+
+// The value of a mode call that reaches no object, which acts on nothing: the
+// nonvoid form's int or the void form's bit.
+Logic4Vec NullTargetResult(const Expr* expr, Arena& arena) {
+  return MakeLogic4VecVal(arena, expr->args.empty() ? 32 : 1, 0);
+}
+
+}  // namespace
+
+bool IsModeMethodCall(const Expr* expr) {
+  return ReceiverOfMethod(expr, "rand_mode") != nullptr ||
+         ReceiverOfMethod(expr, "constraint_mode") != nullptr;
+}
+
+bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  ModeTarget target;
+  if (!ResolveModeTarget(expr, "constraint_mode", ctx, arena, target)) {
+    return false;
+  }
+  ClassObject* obj = target.obj;
+  if (obj == nullptr) {
+    out = NullTargetResult(expr, arena);
+    return true;
+  }
+  std::string_view constraint_name = target.name;
 
   // 18.9 nonvoid form: called with no argument, constraint_mode() returns the
   // current active state of the named block -- 1 (ON) when active, 0 (OFF) when
@@ -706,22 +841,15 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
 
 bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
-  std::string_view obj_name;
-  std::string_view var_name;
-  const Expr* element = nullptr;
-  ScopedModeParts scoped;
-  if (!ExtractRandModeParts(expr, obj_name, var_name, element)) {
-    if (!ExtractScopedModeParts(expr, "rand_mode", arena, scoped)) {
-      return false;
-    }
-    obj_name = scoped.obj_name;
-    var_name = scoped.name;
-    element = scoped.element;
+  ModeTarget target;
+  if (!ResolveModeTarget(expr, "rand_mode", ctx, arena, target)) return false;
+  ClassObject* obj = target.obj;
+  if (obj == nullptr) {
+    out = NullTargetResult(expr, arena);
+    return true;
   }
-  MethodCallParts parts;
-  parts.var_name = obj_name;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
-  if (!obj) return false;
+  std::string_view var_name = target.name;
+  const Expr* element = target.element;
   // 18.8: an element of an unpacked array member is named by its key, the
   // one the solver's variable for it carries.
   std::string element_key;

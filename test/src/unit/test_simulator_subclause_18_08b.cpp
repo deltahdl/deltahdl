@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -121,6 +122,137 @@ TEST(RandModeRun, AStaticVariablesModeIsSharedByEveryInstance) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "0 1 1\n");
+}
+
+// §18.8 with §8.6: rand_mode() acts on the object a call returns, through a
+// variable of it, an element of its array or the object as a whole, and
+// §11.3.1 has the call run once for each: three calls turn off x and a[1]
+// and read x back off, leaving a[0] on, and a fourth turns a[0] off too.
+TEST(RandModeRun, ACallsResultIsTheObjectAndIsCalledOnce) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "  rand bit [3:0] a[2];\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, r;\n"
+      "  K k = new;\n"
+      "  function K pk();\n"
+      "    calls++;\n"
+      "    return k;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    pk().x.rand_mode(0);\n"
+      "    pk().a[1].rand_mode(0);\n"
+      "    r = pk().x.rand_mode();\n"
+      "    $display(\"%0d %0d %0d %0d\", calls, r, k.a[1].rand_mode(),\n"
+      "             k.a[0].rand_mode());\n"
+      "    pk().rand_mode(0);\n"
+      "    $display(\"%0d %0d\", calls, k.a[0].rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 0 0 1\n4 0\n");
+}
+
+// §18.8 with §8.6: an element of an array of handles is the object it holds,
+// so the calls through ks[1] and ks[0] change the modes read through the
+// handles first and second, and the queries through ks[1] answer its own
+// object's modes.
+TEST(RandModeRun, AnArrayElementIsTheObjectItHolds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "  rand bit [3:0] a[2];\n"
+      "endclass\n"
+      "module t;\n"
+      "  K ks[2];\n"
+      "  K first, second;\n"
+      "  initial begin\n"
+      "    ks[0] = new;\n"
+      "    ks[1] = new;\n"
+      "    first = ks[0];\n"
+      "    second = ks[1];\n"
+      "    ks[1].x.rand_mode(0);\n"
+      "    ks[1].a[0].rand_mode(0);\n"
+      "    ks[0].rand_mode(0);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", second.x.rand_mode(),\n"
+      "             second.a[0].rand_mode(), ks[1].a[1].rand_mode(),\n"
+      "             first.a[1].rand_mode(), ks[1].x.rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0 1 0 0\n");
+}
+
+// §18.8: through a call's result, ph().r names the random variable r of the
+// object, whose mode alone the call turns off, while ph().k, no random
+// variable, is the handle to an object of its own, every variable of which
+// the call turns off; ph() runs once per call (§11.3.1).
+TEST(RandModeRun, AHandlePropertyIsTheObjectUnlessItIsRandom) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x, y;\n"
+      "endclass\n"
+      "class H;\n"
+      "  K k;\n"
+      "  rand K r;\n"
+      "  function new();\n"
+      "    k = new;\n"
+      "    r = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0;\n"
+      "  H h = new;\n"
+      "  function H ph();\n"
+      "    calls++;\n"
+      "    return h;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    ph().k.rand_mode(0);\n"
+      "    ph().r.rand_mode(0);\n"
+      "    ph().r.y.rand_mode(0);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", calls, h.k.x.rand_mode(),\n"
+      "             h.r.rand_mode(), h.r.x.rand_mode(), h.r.y.rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 0 0 1 0\n");
+}
+
+// §18.8 with §8.4: a call returning the null handle yields no object whose
+// variable the call could reach, so both forms are reported as calls through a
+// null handle, the query answers 0, and the call runs once for each.
+TEST(RandModeRun, ACallsNullResultIsReported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class K;\n"
+      "  rand bit [3:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls = 0, r = 7;\n"
+      "  function K pn();\n"
+      "    calls++;\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    pn().x.rand_mode(0);\n"
+      "    r = pn().x.rand_mode();\n"
+      "    $display(\"%0d %0d\", calls, r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'rand_mode' called through a null handle",
+                            11, "8.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'rand_mode' called through a null handle",
+                            12, "8.4"));
 }
 
 }  // namespace

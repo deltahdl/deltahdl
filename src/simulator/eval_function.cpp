@@ -686,20 +686,29 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 }
 
 // Clause 18: the randomization methods are built in on any class handle and are
-// never user-declared -- randomize() and srandom() (18.6.3, 18.13.3), the
-// randstate accessors (18.13.4, 18.13.5), and the constraint_mode()/rand_mode()
-// controls (18.9, 18.8) -- so each is dispatched ahead of the user-method
-// lookup. 18.12 adds the scope randomize, std::randomize(...) or the bare
-// randomize(...) spelling outside a class method, which randomizes the current
-// scope's variables rather than a class object's members; it has no receiver,
-// so the class randomize path passes it over.
+// never user-declared -- randomize() and srandom() (18.6.3, 18.13.3) and the
+// randstate accessors (18.13.4, 18.13.5) -- so each is dispatched ahead of the
+// user-method lookup. 18.12 adds the scope randomize, std::randomize(...) or
+// the bare randomize(...) spelling outside a class method, which randomizes
+// the current scope's variables rather than a class object's members; it has
+// no receiver, so the class randomize path passes it over.
 static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalScopeRandomizeCall(expr, ctx, arena, out)) return true;
   if (TryEvalObjectSrandom(expr, ctx, arena, out)) return true;
   if (TryEvalObjectGetRandState(expr, ctx, arena, out)) return true;
-  if (TryEvalObjectSetRandState(expr, ctx, arena, out)) return true;
+  return TryEvalObjectSetRandState(expr, ctx, arena, out);
+}
+
+// §18.8 and §18.9: rand_mode() and constraint_mode() are built in on any
+// class handle, are no method of any other type and cannot be overridden, so
+// they are dispatched first. §11.3.1 has the receiver evaluated once, and the
+// built-in and container arms after this evaluate a receiver such as
+// `pk().x` to learn whether it is theirs: reached after them, the call in it
+// ran three times.
+static bool TryDispatchModeMethod(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
   if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
   return TryEvalObjectRandMode(expr, ctx, arena, out);
 }
@@ -716,6 +725,7 @@ static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
 
 static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
+  if (TryDispatchModeMethod(expr, ctx, arena, out)) return true;
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryDispatchRandomizeMethod(expr, ctx, arena, out)) return true;

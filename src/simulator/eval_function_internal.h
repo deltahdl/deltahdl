@@ -397,6 +397,12 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
 // Defined in eval_randomize.cpp.
 bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
+
+// §18.8 and §18.9: whether `expr` calls rand_mode() or constraint_mode() on
+// an object, `e.rand_mode(...)` or `e.constraint_mode(...)`: built-in methods
+// that cannot be overridden, so the call is no task and never waits.
+// Defined in eval_randomize_mode.cpp.
+bool IsModeMethodCall(const Expr* expr);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 // §13.5.3: evaluates a subroutine argument's default in the scope of the
