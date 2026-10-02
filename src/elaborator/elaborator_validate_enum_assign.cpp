@@ -4,6 +4,7 @@
 // enumeration.
 
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <functional>
 #include <string>
