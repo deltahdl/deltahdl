@@ -71,8 +71,7 @@ const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
   }
   // §3.12.1: else one the compilation unit declares, outside every design
   // element, which every scope below it sees.
-  return unit != nullptr ? CovergroupNamed(unit->cu_items, dt.type_name)
-                         : nullptr;
+  return CovergroupNamed(unit->cu_items, dt.type_name);
 }
 
 // Adds to `mod` an always process that waits on the covergroup's clocking
