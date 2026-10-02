@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -263,7 +264,26 @@ static bool TryFixedSubarrayAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// §10.9.1 with §7.4.4: an assignment pattern assigned to a subarray of a
+// multidimensional fixed-size array, `A[1] = '{6, 4, 9}` or `M[1] =
+// '{'{1, 2}, '{3, 4}}`, fills it element by element as it fills an array of
+// the subarray's shape. Taken as one value written into a select, the pattern
+// wrote no element.
+static bool TrySubarrayPatternAssign(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kSelect || stmt->rhs == nullptr ||
+      stmt->rhs->kind != ExprKind::kAssignmentPattern) {
+    return false;
+  }
+  std::string prefix;
+  ArrayInfo sub;
+  if (!ResolveSubarraySelect(stmt->lhs, ctx, arena, prefix, sub)) return false;
+  DistributePatternToArray(prefix, sub, stmt->rhs, ctx, arena);
+  return true;
+}
+
 bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (TrySubarrayPatternAssign(stmt, ctx, arena)) return true;
   if (TryFixedSubarrayAssign(stmt, ctx, arena)) return true;
   if (!IsCompoundSelect(stmt->lhs) || !IsCompoundSelect(stmt->rhs))
     return false;

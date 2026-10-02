@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -83,6 +86,31 @@ TEST(ArrayLiteralSim, APatternInitializesADynamicArrayProperty) {
   EXPECT_EQ(RunAndGet(src, "e2"), 7u);
   EXPECT_EQ(RunAndGet(src, "rn"), 2u);
   EXPECT_EQ(RunAndGet(src, "r1"), 5u);
+}
+
+// §10.9.1 with §7.4.4: a select of a multidimensional array's leading
+// dimensions is an unpacked array, which an assignment pattern fills element
+// by element: positionally, by `default`, and with nested patterns into the
+// subarray of a three-dimensional array, `m3[1]`, and into one of its
+// subarrays, `m3[0][1]`. The elements stayed 0.
+TEST(ArrayLiteralSim, APatternFillsASubarraySelect) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int mg[2][3];\n"
+      "  int m3[2][2][2];\n"
+      "  initial begin\n"
+      "    mg[1] = '{6, 4, 9};\n"
+      "    mg[0] = '{default: 7};\n"
+      "    m3[1] = '{'{1, 2}, '{3, 4}};\n"
+      "    m3[0][1] = '{5, 6};\n"
+      "    $display(\"%p %p\", mg, m3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{'{7, 7, 7}, '{6, 4, 9}} '{'{'{0, 0}, '{5, 6}}, '{'{1, 2}, '{3, "
+            "4}}}\n");
 }
 
 }  // namespace

@@ -731,13 +731,37 @@ static std::vector<Logic4Vec> LocatorElements(std::string_view name,
   return CollectVecElements(name, info, ctx, arena);
 }
 
+// §7.12.1 with §7.4.4: `parts` for a locator on a subarray select of a
+// multidimensional array, `m[1].min()`, named by the prefix its elements'
+// names extend, and the subarray's shape in `sub`; false for any other call,
+// whose receiver's indexes are left unevaluated.
+static bool SubarrayLocatorParts(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, MethodCallParts& parts,
+                                 ArrayInfo& sub) {
+  const Expr* receiver = LocatorReceiver(expr);
+  if (receiver == nullptr || receiver->kind != ExprKind::kSelect) return false;
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  std::string prefix;
+  if (!IsLocatorMethod(access->rhs->text) ||
+      !ResolveSubarraySelect(receiver, ctx, arena, prefix, sub)) {
+    return false;
+  }
+  parts.var_name = *arena.Create<std::string>(std::move(prefix));
+  parts.method_name = access->rhs->text;
+  return true;
+}
+
 static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
+  ArrayInfo sub;
   // A property reached through a handle has no bare name to extract, so the
   // associative receiver is asked for first, by expression.
   AssocArrayObject* aa = LocatorAssocReceiver(expr, parts, ctx, arena);
-  if (aa == nullptr && !ExtractLocatorParts(expr, arena, parts)) return false;
+  const bool kSubarray =
+      aa == nullptr && SubarrayLocatorParts(expr, ctx, arena, parts, sub);
+  if (aa == nullptr && !kSubarray && !ExtractLocatorParts(expr, arena, parts))
+    return false;
   if (!IsLocatorMethod(parts.method_name)) return false;
 
   if (!expr->args.empty() && !expr->with_expr) {
@@ -757,7 +781,7 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
   if (aa != nullptr)
     return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
                                         *aa, out);
-  auto* info = ctx.FindArrayInfo(parts.var_name);
+  const ArrayInfo* info = kSubarray ? &sub : ctx.FindArrayInfo(parts.var_name);
   ArrayInfo queue_info;
   if (!info) {
     if (!DescribeQueueAsArray(parts.var_name, ctx, queue_info)) return false;

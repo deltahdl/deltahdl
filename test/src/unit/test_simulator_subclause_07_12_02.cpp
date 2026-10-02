@@ -653,4 +653,100 @@ TEST(ArrayOrderingSim, SortWithAClauseOrdersByTheClausesSignedness) {
   EXPECT_EQ(out, "-3 -3 5 5\n");
 }
 
+// §7.12.2 with §7.12: sort() and rsort() take a with clause in either
+// spelling, the call `dq.sort(x) with (x % 3)` as the member access `dm.sort
+// with (item % 3)`, and order a queue by its value: 9, 4, 5 and 2 have the
+// keys 0, 1, 2 and 2, the equal keys keeping their order. The call spelling
+// on a queue sorted by the elements' own values, '{2, 4, 5, 9}.
+TEST(ArrayOrderingSim, TheCallSpellingOrdersAQueueByItsWithClause) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int dq[$] = '{5, 2, 9, 4};\n"
+      "  int dr[$] = '{5, 2, 9, 4};\n"
+      "  int dm[$] = '{5, 2, 9, 4};\n"
+      "  initial begin\n"
+      "    dq.sort(x) with (x % 3);\n"
+      "    dr.rsort(x) with (x % 3);\n"
+      "    dm.sort with (item % 3);\n"
+      "    $display(\"%p %p %p\", dq, dr, dm);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{9, 4, 5, 2} '{5, 2, 4, 9} '{9, 4, 5, 2}\n");
+}
+
+// §7.12.2 with §8.5: the ordering methods reorder any fixed-size or dynamic
+// array, and a class property may be one, so sort(), rsort() bare in a method,
+// reverse() and sort() with a with clause reorder a fixed-size int property --
+// -2 % 3 is -2, below 9 % 3, 4 % 3 and 5 % 3 -- and sort() a dynamic byte
+// property by signed value and a string property lexicographically. Each call
+// left the property's elements where they were.
+TEST(ArrayOrderingSim, OrderingMethodsReorderAClassArrayProperty) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int arr[4];\n"
+      "  byte d[];\n"
+      "  string s[3];\n"
+      "  function void down(); arr.rsort(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    h.arr = '{5, -2, 9, 4};\n"
+      "    h.arr.sort();\n"
+      "    $display(\"%0d %0d %0d %0d\", h.arr[0], h.arr[1], h.arr[2], "
+      "h.arr[3]);\n"
+      "    h.down();\n"
+      "    $display(\"%0d %0d %0d %0d\", h.arr[0], h.arr[1], h.arr[2], "
+      "h.arr[3]);\n"
+      "    h.arr.reverse();\n"
+      "    $display(\"%0d %0d %0d %0d\", h.arr[0], h.arr[1], h.arr[2], "
+      "h.arr[3]);\n"
+      "    h.arr.sort(x) with (x % 3);\n"
+      "    $display(\"%0d %0d %0d %0d\", h.arr[0], h.arr[1], h.arr[2], "
+      "h.arr[3]);\n"
+      "    h.d = '{3, -1, 2};\n"
+      "    h.d.sort();\n"
+      "    h.s[0] = \"pear\"; h.s[1] = \"apple\"; h.s[2] = \"fig\";\n"
+      "    h.s.sort();\n"
+      "    $display(\"%0d %0d %0d %s %s %s\", h.d[0], h.d[1], h.d[2], h.s[0], "
+      "h.s[1], h.s[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "-2 4 5 9\n9 5 4 -2\n-2 4 5 9\n-2 9 4 5\n-1 2 3 apple fig pear\n");
+}
+
+// §7.12.2 with §8.5: shuffle() randomizes the order of a class property's
+// elements: over 16 calls on eight elements 0 to 7, some call moves the first
+// or the last, and each leaves the same eight values, which sort() puts back
+// in place. A shuffle that does nothing moves none in any call.
+TEST(ArrayOrderingSim, ShuffleReordersAClassArrayPropertysOwnElements) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int arr[8];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    automatic int moved = 0, kept = 0;\n"
+      "    repeat (16) begin\n"
+      "      h.arr = '{0, 1, 2, 3, 4, 5, 6, 7};\n"
+      "      h.arr.shuffle();\n"
+      "      if (h.arr[0] != 0 || h.arr[7] != 7) moved++;\n"
+      "      h.arr.sort();\n"
+      "      if (h.arr[0] == 0 && h.arr[3] == 3 && h.arr[7] == 7 && "
+      "h.arr.sum() == 28) kept++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", moved > 0, kept);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 16\n");
+}
+
 }  // namespace

@@ -196,4 +196,60 @@ TEST(ArrayLocatorRows, ElementLocatorsReturnTheSubarraysOfA3DArray) {
   EXPECT_EQ(out, "1 4 7 1 2\n");
 }
 
+// §7.12.1 with §7.4.4: a select of a multidimensional array's leading
+// dimension, `mg[1]`, is an unpacked array, which each locator searches as a
+// one-dimensional array: 4 is its least element and 9 its greatest, 6 and 9
+// exceed 5, 4 stands at indexes 1 and 3, and three values are unique. Each
+// returned a queue holding one 0.
+TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfASubarraySelect) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int mg[2][4] = '{'{1, 2, 3, 4}, '{6, 4, 9, 4}};\n"
+      "  int a[$], b[$], c[$], d[$], e[$], g[$], u[$], ui[$];\n"
+      "  initial begin\n"
+      "    a = mg[1].min();\n"
+      "    b = mg[1].max();\n"
+      "    c = mg[1].find(x) with (x > 5);\n"
+      "    d = mg[1].find_index(x) with (x == 4);\n"
+      "    e = mg[1].find_first_index with (item > 5);\n"
+      "    g = mg[1].find_last with (item < 9);\n"
+      "    u = mg[1].unique();\n"
+      "    ui = mg[1].unique_index();\n"
+      "    $display(\"%p %p %p %p %p %p %0d %0d\", a, b, c, d, e, g, u.size(), "
+      "ui.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{4} '{9} '{6, 9} '{1, 3} '{0} '{4} 3 3\n");
+}
+
+// §7.12.1 with §7.4.4 and §8.5: a class property may be a multidimensional
+// array, and `h.g[1]` through a handle or `g[1]` bare in a method is its
+// subarray, which the locators search as they search a module array's. Each
+// returned a queue holding one 0.
+TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfAClassPropertysSubarray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int g[2][4];\n"
+      "  function int top(); int m[$]; m = g[1].max(); return m[0]; "
+      "endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a[$], c[$], d[$], u[$];\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    h.g[1][0] = 6; h.g[1][1] = 4; h.g[1][2] = 9; h.g[1][3] = 4;\n"
+      "    a = h.g[1].min();\n"
+      "    c = h.g[1].find(x) with (x > 5);\n"
+      "    d = h.g[1].find_index(x) with (x == 4);\n"
+      "    u = h.g[1].unique();\n"
+      "    $display(\"%p %p %p %0d %0d\", a, c, d, u.size(), h.top());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{4} '{6, 9} '{1, 3} 3 9\n");
+}
+
 }  // namespace

@@ -234,9 +234,8 @@ Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
   return MakeLogic4VecVal(arena, info.elem_width, 0);
 }
 
-static void DistributePatternToArray(std::string_view arr_name,
-                                     const ArrayInfo& info, const Expr* rhs,
-                                     SimContext& ctx, Arena& arena) {
+void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
+                              const Expr* rhs, SimContext& ctx, Arena& arena) {
   if (info.dim_sizes.size() > 1) {
     DistributeDimPattern(PatternDist{info, ctx, arena}, std::string(arr_name),
                          0, rhs);

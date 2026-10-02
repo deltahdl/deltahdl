@@ -1,8 +1,12 @@
 #include "simulator/eval_class_array.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <numeric>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -145,35 +149,24 @@ const Expr* CallReceiver(const Expr* expr, std::string_view& method) {
   return access->lhs;
 }
 
-// §7.12.3: the identity of the operand a reduction method named `method`
-// joins the elements by, from which a fold over any count of elements is
-// defined; false for a name that is no reduction method.
-bool ReductionIdentity(std::string_view method, uint64_t& acc) {
-  if (method == "sum" || method == "or" || method == "xor") {
-    acc = 0;
-  } else if (method == "product") {
-    acc = 1;
-  } else if (method == "and") {
-    acc = ~static_cast<uint64_t>(0);
-  } else {
-    return false;
-  }
-  return true;
+// §7.12.2: whether `method` names one of the array ordering methods.
+bool IsOrderingMethod(std::string_view method) {
+  return method == "sort" || method == "rsort" || method == "reverse" ||
+         method == "shuffle";
 }
 
-// §7.12.3: `acc` joined with the element value `v` by the method's operand.
-uint64_t Join(std::string_view method, uint64_t acc, uint64_t v) {
-  if (method == "sum") return acc + v;
-  if (method == "product") return acc * v;
-  if (method == "and") return acc & v;
-  if (method == "or") return acc | v;
-  return acc ^ v;
+// The declared index of the i-th element from the left of `ref`, the higher
+// bound first for a descending dimension (§7.4.2).
+int64_t IndexFromLeft(const ClassArrayRef& ref, uint32_t i) {
+  return ref.prop->array_descending
+             ? ref.lo + static_cast<int64_t>(ref.size) - 1 - i
+             : ref.lo + i;
 }
 
-// §7.12.3: the value the with clause of the call `expr` maps the element
+// §7.12.2: the value the with clause of the call `expr` maps the element
 // `elem` at `index` to, the iterator and its index bound as §7.12 names
 // them; the element itself where the call has no with clause.
-Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, uint32_t index,
+Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, int64_t index,
                     SimContext& ctx, Arena& arena) {
   if (expr->with_expr == nullptr) return elem;
   IterNames names = ExtractIterNames(expr);
@@ -181,30 +174,69 @@ Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, uint32_t index,
   ctx.CreateLocalVariable(names.iter_name, elem.width, elem.is_signed)->value =
       elem;
   ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
-      MakeLogic4VecVal(arena, 32, index);
+      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
   Logic4Vec value = EvalExpr(expr->with_expr, ctx, arena);
   ctx.PopScope();
   return value;
 }
 
-// §7.12.3/§18.5.7.2: the elements of `ref` reduced by the method `method`,
-// each through the with clause of `expr` where it has one, into a result of
-// the element type, or of the with clause's expression, which the fold is
-// held to.
-Logic4Vec ReduceClassArray(const Expr* expr, const ClassArrayRef& ref,
-                           std::string_view method, SimContext& ctx,
-                           Arena& arena) {
-  uint64_t acc = 0;
-  ReductionIdentity(method, acc);
-  Logic4Vec result =
-      WithValue(expr, ElementDefault(*ref.prop, arena), 0, ctx, arena);
+// §7.12.2: the order sort(), or rsort() where `ascending` is clear, puts the
+// elements `elems` of `ref` in: by the value of the with clause of `expr`
+// where it has one, of the clause's signedness, and otherwise by their own
+// value, as text where the property holds strings (§6.16) and as numbers of
+// the element type's signedness (§6.11). Elements of equal keys keep their
+// order.
+std::vector<size_t> SortOrder(const Expr* expr, const ClassArrayRef& ref,
+                              const std::vector<Logic4Vec>& elems,
+                              bool ascending, SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> keys;
+  keys.reserve(elems.size());
+  for (uint32_t i = 0; i < elems.size(); ++i)
+    keys.push_back(
+        WithValue(expr, elems[i], IndexFromLeft(ref, i), ctx, arena));
+  const bool kText = expr->with_expr == nullptr && ref.prop->is_string;
+  auto before = [&](size_t a, size_t b) {
+    if (kText) return Logic4VecToString(keys[a]) < Logic4VecToString(keys[b]);
+    return OrdersBefore(keys[a], keys[b], keys[a].is_signed);
+  };
+  std::vector<size_t> order(elems.size());
+  std::iota(order.begin(), order.end(), 0);
+  std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    return ascending ? before(a, b) : before(b, a);
+  });
+  return order;
+}
+
+// §7.12.2 with §8.5: the ordering method `method` called on the fixed-size or
+// dynamic array property `ref` reorders its elements, read from the left and
+// written back in their new order: sorted, reversed, or shuffled at random
+// as a declared array is. Each element is read with the property's
+// signedness, which a with clause's iterator takes. Answers true, the call
+// having been served.
+bool OrderClassArray(const Expr* expr, const ClassArrayRef& ref,
+                     std::string_view method, SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> elems;
+  elems.reserve(ref.size);
   for (uint32_t i = 0; i < ref.size; ++i) {
-    Logic4Vec elem = ReadClassArrayElement(ref, ref.lo + i, ctx, arena);
-    acc = Join(method, acc, WithValue(expr, elem, i, ctx, arena).ToUint64());
+    elems.push_back(
+        ReadClassArrayElement(ref, IndexFromLeft(ref, i), ctx, arena));
+    elems.back().is_signed = ref.prop->is_signed;
   }
-  Logic4Vec out = MakeLogic4VecVal(arena, result.width, acc);
-  out.is_signed = result.is_signed;
-  return out;
+  std::vector<size_t> order(elems.size());
+  std::iota(order.begin(), order.end(), 0);
+  if (method == "reverse") {
+    std::reverse(order.begin(), order.end());
+  } else if (method == "shuffle") {
+    for (size_t i = order.size(); i > 1; --i)
+      std::swap(order[i - 1], order[ctx.Urandom32() % i]);
+  } else {
+    order = SortOrder(expr, ref, elems, method == "sort", ctx, arena);
+  }
+  for (uint32_t i = 0; i < elems.size(); ++i) {
+    StoreClassArrayElement(ref, IndexFromLeft(ref, i), elems[order[i]], ctx,
+                           arena);
+  }
+  return true;
 }
 
 }  // namespace
@@ -355,10 +387,13 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
-  uint64_t acc = 0;
-  if (!ReductionIdentity(method, acc)) return false;
-  out = ReduceClassArray(expr, ref, method, ctx, arena);
-  return true;
+  // §7.12.2 with §8.5: the ordering methods reorder the property's own
+  // elements, which no other arm reaches: the array arm reads an array by the
+  // name it is declared with, and the copy QueuePropertyReceiver makes for the
+  // reductions and locators is written back to nothing.
+  out = MakeLogic4VecVal(arena, 1, 0);
+  return IsOrderingMethod(method) &&
+         OrderClassArray(expr, ref, method, ctx, arena);
 }
 
 bool TryWriteClassArrayElement(const Expr* lhs, const Logic4Vec& rhs_val,
@@ -471,14 +506,6 @@ bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   ResizeClassArray(ref, static_cast<uint32_t>(size), has_init ? &init : nullptr,
                    ctx, arena);
   return true;
-}
-
-// The declared index of the i-th element from the left of `ref`, the higher
-// bound first for a descending dimension (§7.4.2).
-static int64_t IndexFromLeft(const ClassArrayRef& ref, uint32_t i) {
-  return ref.prop->array_descending
-             ? ref.lo + static_cast<int64_t>(ref.size) - 1 - i
-             : ref.lo + i;
 }
 
 bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,

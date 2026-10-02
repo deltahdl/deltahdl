@@ -675,8 +675,8 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
 // element that took that position. Each id is bounds-guarded on its own, so an
 // element_ids list that has drifted shorter than elements costs the entries it
 // no longer covers rather than the whole permutation.
-static void SortQueueByWithExpr(QueueObject* q, const Expr* expr,
-                                bool ascending, SimContext& ctx, Arena& arena) {
+void SortQueueByWithExpr(QueueObject* q, const Expr* expr, bool ascending,
+                         SimContext& ctx, Arena& arena) {
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
   // §6.11 with §7.12: each element as it reads, the iterator taking its type.

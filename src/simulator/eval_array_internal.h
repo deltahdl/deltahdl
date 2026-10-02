@@ -13,6 +13,7 @@ namespace delta {
 struct ArrayInfo;
 struct AssocArrayObject;
 struct Expr;
+struct QueueObject;
 class SimContext;
 class Arena;
 
@@ -127,5 +128,11 @@ uint64_t ApplyReduction(std::string_view method,
 // as two's-complement numbers where `is_signed` says that type is signed, and
 // as unsigned ones where it is not. Defined in eval_array_value_ops.cpp.
 bool OrdersBefore(const Logic4Vec& a, const Logic4Vec& b, bool is_signed);
+
+// Defined in eval_array.cpp; §7.12.2: the queue `q` sorted by the value the
+// with clause of `expr` gives each element, ascending or descending, its
+// element ids following their elements (§7.10.3).
+void SortQueueByWithExpr(QueueObject* q, const Expr* expr, bool ascending,
+                         SimContext& ctx, Arena& arena);
 
 }  // namespace delta

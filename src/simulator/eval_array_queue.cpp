@@ -274,7 +274,15 @@ static bool OrderQueue(QueueObject* q, std::string_view prop, SimContext& ctx);
 // §7.12.2's ordering methods over the queue of `call`, whatever names it: a
 // declared one, the running method's property, or, §8.5, a property through
 // a handle, `h.q.sort()`, which read by a bare name was left in its order.
-static bool ExecQueueOrdering(const QueueCall& call, SimContext& ctx) {
+// sort() and rsort() called with a with clause, `q.sort(x) with (x % 3)`,
+// order by the clause's value, which sorting by the elements' own ignored.
+static bool ExecQueueOrdering(const QueueCall& call, const Expr* expr,
+                              SimContext& ctx, Arena& arena) {
+  if (expr->with_expr != nullptr &&
+      (call.method == "sort" || call.method == "rsort")) {
+    SortQueueByWithExpr(call.queue, expr, call.method == "sort", ctx, arena);
+    return true;
+  }
   return IsQueueOrderingMethod(call.method) &&
          OrderQueue(call.queue, call.method, ctx);
 }
@@ -291,7 +299,7 @@ bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   if (DispatchQueuePush(call.method, call.queue, expr, ctx, arena) ||
       DispatchQueueDelete(call.method, call.queue, expr, ctx, arena) ||
-      ExecQueueOrdering(call, ctx)) {
+      ExecQueueOrdering(call, expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     AnnounceQueueChange(call.receiver, call.owner, ctx);
     return true;

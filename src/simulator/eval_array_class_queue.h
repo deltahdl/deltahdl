@@ -99,8 +99,9 @@ bool TryEvalQueueElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
 // property's queue, and Call() is `call` with that spelling as a bare name
 // for its receiver. The queue an array method returns, `IA.find(x) with
 // (x > 5).unique`, is named so too, as is a fixed or dynamic array property,
-// `h.d.max`, by a queue holding a copy of its elements, which serves the
-// reductions and locators this is for, as they only read the elements.
+// `h.d.max`, or a subarray of a multidimensional one, `h.g[1].min()` (§7.4.4),
+// by a queue holding a copy of its elements, which serves the reductions and
+// locators this is for, as they only read the elements.
 // Nothing is pushed, and Call() is null, for a call of any other shape or on
 // any other receiver.
 class QueuePropertyReceiver {

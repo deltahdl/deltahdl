@@ -365,6 +365,12 @@ bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // element. False when either side is no such compound select.
 bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// Defined in statement_assign_pattern.cpp; §10.9.1: the assignment pattern
+// `rhs` stored into the fixed-size array whose elements are the variables
+// `arr_name[i]...`, of the shape `info`, item by item.
+void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
+                              const Expr* rhs, SimContext& ctx, Arena& arena);
+
 // The whole-object assignment forms, defined in statement_assign_object.cpp
 // and each used by the blocking-assignment dispatch in
 // statement_assign_core.cpp, which offers a statement to them in turn before

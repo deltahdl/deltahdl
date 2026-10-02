@@ -463,6 +463,17 @@ static QueueObject* ClassArrayElementsCopy(const Expr* receiver,
   return q;
 }
 
+// The name the copy of the receiver `receiver` is held under: its own
+// spelling, "q" or "h.q". A method's result, `IA.find(x) with (x > 5).unique`,
+// and a subarray, `h.g[1]`, have no spelling of their own; `$` begins no
+// identifier a description can write.
+static std::string_view ReceiverQueueName(const Expr* receiver, Arena& arena) {
+  if (receiver->kind == ExprKind::kIdentifier) return receiver->text;
+  if (receiver->kind == ExprKind::kCall) return "$method.result";
+  if (receiver->kind == ExprKind::kSelect) return "$subarray";
+  return *arena.Create<std::string>(FlattenHierPath(receiver));
+}
+
 QueuePropertyReceiver::QueuePropertyReceiver(const Expr* call, SimContext& ctx,
                                              Arena& arena)
     : ctx_(ctx) {
@@ -475,19 +486,19 @@ QueuePropertyReceiver::QueuePropertyReceiver(const Expr* call, SimContext& ctx,
   const Expr* receiver = access->lhs;
   const bool kBare = receiver->kind == ExprKind::kIdentifier;
   const bool kCall = receiver->kind == ExprKind::kCall;
-  if (kBare ? ctx.FindQueue(receiver->text) != nullptr
-            : receiver->kind != ExprKind::kMemberAccess && !kCall) {
+  // §7.4.4 with §8.5: a select of a multidimensional array property's leading
+  // dimension, `h.g[1]` or `g[1]` in a method, is a subarray, copied as a
+  // one-dimensional array property is.
+  const bool kSubarray = receiver->kind == ExprKind::kSelect;
+  if (kBare
+          ? ctx.FindQueue(receiver->text) != nullptr
+          : receiver->kind != ExprKind::kMemberAccess && !kCall && !kSubarray) {
     return;
   }
-  QueueObject* q = FindQueueOfBase(receiver, ctx, arena);
+  QueueObject* q = kSubarray ? nullptr : FindQueueOfBase(receiver, ctx, arena);
   if (q == nullptr) q = ClassArrayElementsCopy(receiver, ctx, arena);
   if (q == nullptr) return;
-  // A method's result, `IA.find(x) with (x > 5).unique`, has no spelling of
-  // its own; `$` begins no identifier a description can write.
-  std::string_view name = kBare   ? receiver->text
-                          : kCall ? std::string_view("$method.result")
-                                  : std::string_view(*arena.Create<std::string>(
-                                        FlattenHierPath(receiver)));
+  std::string_view name = ReceiverQueueName(receiver, arena);
   ctx.PushScope();
   std::vector<Scope> stack = ctx.SwapScopeStack({});
   stack.back().queues[name] = q;
