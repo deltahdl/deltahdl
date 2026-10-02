@@ -3,7 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <list>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -132,6 +132,12 @@ struct TypeOptionWrite {
 // the handle or a formal it is passed to reaches the same instance; each
 // `new` builds a fresh one. §19.4: an embedded covergroup's instance is kept
 // by its object and name, its one `new` in the class's constructor.
+// §19.4.1: the covergroup a derived covergroup amounts to, by the derived
+// covergroup's declaration and the base covergroup it extends.
+using ComposedCovergroups =
+    std::map<std::pair<const CovergroupDecl*, const CovergroupDecl*>,
+             CovergroupDecl>;
+
 class CovergroupTable {
  public:
   // A fresh instance, for an embedded covergroup (`embedded`) the one kept
@@ -176,6 +182,12 @@ class CovergroupTable {
   // embeds; null where none does. Each class's are read once.
   const CovergroupDecl* Embedded(const ClassTypeInfo* type,
                                  std::string_view name);
+  // §19.4 with §8.25 and §19.4.1: the class whose declaration embeds the
+  // covergroup `decl` that `type` embeds, the furthest base of `type` that
+  // embeds the same; each specialization of a parameterized class is a class
+  // of its own.
+  const ClassTypeInfo* DeclaringClass(const ClassTypeInfo* type,
+                                      const CovergroupDecl* decl);
   // §19.7.1: a type option holds for the covergroup type as a whole, so one
   // written through the type is written to each instance of it built so far
   // and kept for each built later, which takes it after its definition's.
@@ -204,8 +216,10 @@ class CovergroupTable {
       std::vector<std::pair<std::string_view, const CovergroupDecl*>>>
       embedded_;
   // §19.4.1: the covergroups a derived covergroup amounts to, its base's
-  // items it does not override and its own (EmbeddedCovergroups).
-  std::list<CovergroupDecl> composed_;
+  // items it does not override and its own (EmbeddedCovergroups), one for
+  // each derived covergroup and the base it extends, however many classes
+  // inherit it.
+  ComposedCovergroups composed_;
   std::vector<TypeOptionWrite> type_option_writes_;
 };
 

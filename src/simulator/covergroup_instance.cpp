@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
-#include <list>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -664,10 +664,9 @@ const CovergroupDecl* NextOfName(
 // §19.4: every covergroup `type` and the classes it derives from embed, the
 // most derived first. §19.4.1: one that extends the covergroup of its name
 // further up is composed with it (ComposeDerived), from the base down, the
-// composition kept in `composed`.
+// composition kept in `composed` once for the two, whichever class reaches it.
 std::vector<std::pair<std::string_view, const CovergroupDecl*>>
-EmbeddedCovergroups(const ClassTypeInfo* type,
-                    std::list<CovergroupDecl>& composed) {
+EmbeddedCovergroups(const ClassTypeInfo* type, ComposedCovergroups& composed) {
   std::vector<std::pair<std::string_view, const CovergroupDecl*>> embedded;
   for (; type != nullptr; type = type->parent) {
     if (type->decl == nullptr) continue;
@@ -680,8 +679,9 @@ EmbeddedCovergroups(const ClassTypeInfo* type,
   for (size_t i = embedded.size(); i-- > 0;) {
     if (embedded[i].second->extends_base.empty()) continue;
     if (const CovergroupDecl* base = NextOfName(embedded, i)) {
-      embedded[i].second =
-          &composed.emplace_back(ComposeDerived(*base, *embedded[i].second));
+      auto [it, inserted] = composed.try_emplace({embedded[i].second, base});
+      if (inserted) it->second = ComposeDerived(*base, *embedded[i].second);
+      embedded[i].second = &it->second;
     }
   }
   return embedded;
@@ -726,6 +726,16 @@ void CovergroupTable::WatchBlockEvents(CovergroupInstance* inst,
   block_watchers_.emplace_back(std::move(scope), inst);
 }
 
+const ClassTypeInfo* CovergroupTable::DeclaringClass(
+    const ClassTypeInfo* type, const CovergroupDecl* decl) {
+  const ClassTypeInfo* found = type;
+  for (const ClassTypeInfo* t = type->parent;
+       t != nullptr && Embedded(t, decl->name) == decl; t = t->parent) {
+    found = t;
+  }
+  return found;
+}
+
 std::vector<const CoverGroup*> CovergroupTable::InstancesOf(
     const CovergroupDecl* decl, const ClassTypeInfo* declaring_class) const {
   std::vector<const CoverGroup*> groups;
@@ -736,29 +746,6 @@ std::vector<const CoverGroup*> CovergroupTable::InstancesOf(
   }
   return groups;
 }
-
-namespace {
-
-// §19.4 with §8.25: the class among `type` and the classes it derives from
-// whose own declaration embeds `decl`, each specialization of a parameterized
-// class being one of its own; `type` itself for a covergroup composed from a
-// base's (§19.4.1), which no declaration holds. The walk stops at a class with
-// no declaration of its own, a built-in one, which embeds no covergroup.
-const ClassTypeInfo* DeclaringClass(const ClassTypeInfo* type,
-                                    const CovergroupDecl* decl) {
-  for (const ClassTypeInfo* t = type; t != nullptr && t->decl != nullptr;
-       t = t->parent) {
-    for (const ClassMember* member : t->decl->members) {
-      if (member->kind == ClassMemberKind::kCovergroup &&
-          member->covergroup == decl) {
-        return t;
-      }
-    }
-  }
-  return type;
-}
-
-}  // namespace
 
 CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
                                             const Expr* new_call,
@@ -773,7 +760,8 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   inst->decl = &decl;
   inst->owner = site.owner;
   if (site.owner != nullptr) {
-    inst->declaring_class = DeclaringClass(site.owner->type, &decl);
+    inst->declaring_class =
+        ctx.Covergroups().DeclaringClass(site.owner->type, &decl);
   }
   inst->gen_consts = site.gen_consts;
   inst->inst_prefix = ctx.ActiveInstancePrefix();

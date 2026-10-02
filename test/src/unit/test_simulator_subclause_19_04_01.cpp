@@ -299,4 +299,39 @@ TEST(DerivedCovergroupSim, ADerivedCrossOverridesTheBasesCrossOfItsLabel) {
   EXPECT_EQ(out, "8 6\n");
 }
 
+// §19.4.1 with §8.13: c_c inherits b_c's derived covergroup g without
+// extending it again, so b's and c's instances are of one covergroup type and
+// get_coverage() averages b's 50 (two of four bins) and c's 0 to 25 for both.
+// Counted as two types they read 50 and 0.
+TEST(DerivedCovergroupSim, AFurtherSubclassSharesTheDerivedCovergroupType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class a_c;\n"
+      "  bit [1:0] p, q;\n"
+      "  covergroup g;\n"
+      "    cp: coverpoint p { bins b[] = {[0:1]}; }\n"
+      "  endgroup\n"
+      "  function new(); g = new; endfunction\n"
+      "endclass\n"
+      "class b_c extends a_c;\n"
+      "  covergroup extends g;\n"
+      "    cq: coverpoint q { bins b[] = {[0:1]}; }\n"
+      "  endgroup : g\n"
+      "  function new(); super.new(); endfunction\n"
+      "endclass\n"
+      "class c_c extends b_c;\n"
+      "  function new(); super.new(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  b_c b = new;\n"
+      "  c_c c = new;\n"
+      "  initial begin\n"
+      "    b.p = 0; b.q = 0; b.g.sample();\n"
+      "    $display(\"%0.2f %0.2f\", b.g.get_coverage(), c.g.get_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 25.00\n");
+}
+
 }  // namespace
