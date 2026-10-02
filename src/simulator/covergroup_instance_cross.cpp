@@ -299,6 +299,7 @@ std::set<std::vector<int64_t>> CrossSetValueTuples(
       continue;
     }
     std::vector<int64_t> values;
+    values.reserve(selector.points.size());
     for (size_t i = 0; i < selector.points.size(); ++i) {
       values.push_back(
           ConvertToPointType(EvalExpr(element->elements[i], ctx, arena),
