@@ -504,4 +504,24 @@ TEST_F(VerifyParseTest, CovergroupEventIsBareIdentifier) {
   EXPECT_EQ(cg->event.clocking[0].signal->text, "clk");
 }
 
+// §19.3 with §3.12.1 and A.1.11: a covergroup_declaration is a
+// package_or_generate_item_declaration, which a compilation unit holds outside
+// every design element, so a covergroup may be declared there and parses into
+// the unit's own items. It was refused at its keyword as "expected top-level
+// declaration".
+TEST(CovergroupParsing, ACovergroupDeclaredInTheCompilationUnit) {
+  auto result = Parse(R"(
+    covergroup ucg with function sample(bit x);
+      coverpoint x { bins one = {1}; bins zero = {0}; }
+    endgroup
+    module t;
+      ucg c = new;
+    endmodule
+  )");
+  ASSERT_FALSE(result.has_errors);
+  ASSERT_EQ(result.cu->cu_items.size(), 1u);
+  EXPECT_EQ(result.cu->cu_items[0]->kind, ModuleItemKind::kCovergroupDecl);
+  EXPECT_EQ(result.cu->cu_items[0]->name, "ucg");
+}
+
 }  // namespace

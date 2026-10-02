@@ -470,6 +470,13 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
     ParseOutOfBlockConstraint(unit, nullptr);
     return true;
   }
+  // §3.12.1 with A.1.11: a covergroup_declaration is a
+  // package_or_generate_item_declaration, which a compilation unit holds
+  // outside every design element (§19.3).
+  if (Check(TokenKind::kKwCovergroup)) {
+    ParseCovergroupDecl(unit->cu_items);
+    return true;
+  }
   return false;
 }
 
