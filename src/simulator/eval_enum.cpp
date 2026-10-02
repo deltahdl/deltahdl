@@ -216,10 +216,13 @@ static const EnumTypeInfo* EnumTypeOfDeclaredType(const DataType& type,
   return ctx.FindEnumType(type.type_name);
 }
 
+const EnumTypeInfo* EnumTypeOfDataType(const DataType& type, SimContext& ctx) {
+  return EnumTypeOfDeclaredType(type, {ctx.CurrentMethodClass(), {}}, ctx);
+}
+
 void RecordVariableEnumType(std::string_view var_name, const DataType& type,
                             SimContext& ctx) {
-  const EnumTypeInfo* info =
-      EnumTypeOfDeclaredType(type, {ctx.CurrentMethodClass(), {}}, ctx);
+  const EnumTypeInfo* info = EnumTypeOfDataType(type, ctx);
   if (info == nullptr) return;
   ctx.SetVariableEnumType(var_name, info->type_name);
 }

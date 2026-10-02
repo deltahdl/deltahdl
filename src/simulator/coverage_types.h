@@ -172,6 +172,9 @@ struct CoverPoint {
   // The indices into `bins` of the bins the latest sample was counted in,
   // which a cross bin defined over the coverpoint's bins reads (LRM 19.6).
   std::vector<size_t> sampled_bins;
+  // Whether the latest sampled value held an x or z bit, which keeps it out
+  // of every automatically created bin (LRM 19.5.3).
+  bool sample_has_xz = false;
 };
 
 struct CrossBin {

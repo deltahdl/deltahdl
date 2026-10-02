@@ -243,4 +243,25 @@ TEST(CovergroupInstanceSim, OptionReadThroughInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.7: an instance option other than per_instance, get_inst_coverage,
+// auto_bin_max, detect_overlap and cross_retain_auto_bins may be assigned after
+// instantiation, at the covergroup level or at a coverpoint's.
+TEST(CovergroupInstanceSim, ProceduralOptionWritesSetTheInstanceOptions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module top;\n"
+                "  bit [1:0] v;\n"
+                "  covergroup cg; a: coverpoint v { bins lo = {0}; } endgroup\n"
+                "  cg c = new;\n"
+                "  initial begin\n"
+                "    c.option.comment = \"hello\"; c.a.option.weight = 3;\n"
+                "    $display(\"comment=%s weight=%0d\", c.option.comment, "
+                "c.a.option.weight);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "comment=hello weight=3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

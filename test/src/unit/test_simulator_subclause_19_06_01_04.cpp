@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -114,6 +116,28 @@ TEST(CrossSetExpressionSelect, EmptyQueueSelectsNothing) {
   EXPECT_TRUE(
       CoverageDB::SelectCrossBinTuplesBySetExpression(candidates, queue, policy)
           .empty());
+}
+
+// §19.6.1.4: a cross_set_expression selects each bin tuple holding one of the
+// value tuples it lists: <1,2> and <3,0> go to the bin one, which the sample
+// a = 1, b = 2 covers, and 14 automatic bins remain.
+TEST(CovergroupInstanceSim,
+     CrossSetExpressionSelectsTheProductsHoldingItsTuples) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a, b; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint a; coverpoint b;\n"
+                       "    X: cross a, b { bins one = '{ '{1,2}, '{3,0} }; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin a = 1; b = 2; c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=15\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

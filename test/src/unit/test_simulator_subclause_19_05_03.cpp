@@ -351,4 +351,41 @@ TEST(CovergroupInstanceSim, AutomaticBinsOfIntSpanEveryValue) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.3: a coverpoint of an enumeration type gets one automatic bin for each
+// named constant, auto[RED], auto[GREEN] and auto[BLUE], rather than bins over
+// the 32-bit range of its base type.
+TEST(CovergroupInstanceSim, EnumCoverpointGetsOneAutomaticBinPerConstant) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                       "  color_t col; int n, t;\n"
+                       "  covergroup cg; coverpoint col; endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin col = GREEN; c.sample(); "
+                       "void'(c.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5.3: automatically created bins consider 2-state values only, so the
+// sample 2'bx0 is counted in none of the four bins of v.
+TEST(CovergroupInstanceSim, SampleHoldingUnknownBitsFallsInNoAutomaticBin) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  logic [1:0] v; int n, t;\n"
+          "  covergroup cg; coverpoint v; endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin v = 2'bx0; c.sample(); void'(c.get_inst_coverage(n, "
+          "t)); $display(\"n=%0d t=%0d\", n, t); end\n"
+          "endmodule\n",
+          f),
+      "n=0 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

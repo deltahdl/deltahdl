@@ -280,6 +280,11 @@ void RecordVariableEnumType(std::string_view var_name, const DataType& type,
 const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
                                    Arena& arena);
 
+// The enumeration a data type names, `color_t` or `p::color_t`, resolved as
+// a declaration in the current scope would resolve it; null for a type that
+// names none. Defined in eval_enum.cpp.
+const EnumTypeInfo* EnumTypeOfDataType(const DataType& type, SimContext& ctx);
+
 // §6.19.5: the call `expr`, `c.next(2)` or `h.e.name()`, when its receiver
 // is of an enumeration type and its method one of the six; false for any
 // other call, the receiver left unevaluated.

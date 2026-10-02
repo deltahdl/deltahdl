@@ -29,7 +29,11 @@
 #include "simulator/covergroup_instance_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/stmt_exec.h"
+#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -59,16 +63,22 @@ CovergroupFrame::~CovergroupFrame() {
   ctx_.PopScope();
 }
 
-int64_t CovergroupInt(const Expr* e, SimContext& ctx, Arena& arena) {
-  Logic4Vec v = EvalExpr(e, ctx, arena);
+int64_t CovergroupIntOf(const Logic4Vec& v) {
   if (v.is_real) return static_cast<int64_t>(std::llround(RealVecToDouble(v)));
   return SelectBoundValue(v);
 }
 
-double CovergroupReal(const Expr* e, SimContext& ctx, Arena& arena) {
-  Logic4Vec v = EvalExpr(e, ctx, arena);
+double CovergroupRealOf(const Logic4Vec& v) {
   if (v.is_real) return RealVecToDouble(v);
   return static_cast<double>(SelectBoundValue(v));
+}
+
+int64_t CovergroupInt(const Expr* e, SimContext& ctx, Arena& arena) {
+  return CovergroupIntOf(EvalExpr(e, ctx, arena));
+}
+
+double CovergroupReal(const Expr* e, SimContext& ctx, Arena& arena) {
+  return CovergroupRealOf(EvalExpr(e, ctx, arena));
 }
 
 CoverValueRange PointTypeBounds(const SampledCoverpoint& point) {
@@ -84,9 +94,13 @@ CoverValueRange PointTypeBounds(const SampledCoverpoint& point) {
 }
 
 int64_t ConvertToPointType(const Logic4Vec& v, const SampledCoverpoint& point) {
-  uint64_t bits = v.is_real
-                      ? static_cast<uint64_t>(std::llround(RealVecToDouble(v)))
-                      : v.ToUint64();
+  return ConvertToPointType(
+      v.is_real ? static_cast<uint64_t>(std::llround(RealVecToDouble(v)))
+                : v.ToUint64(),
+      point);
+}
+
+int64_t ConvertToPointType(uint64_t bits, const SampledCoverpoint& point) {
   if (point.width == 0 || point.width >= 64) return static_cast<int64_t>(bits);
   uint64_t mask = (uint64_t{1} << point.width) - 1;
   bits &= mask;
@@ -133,12 +147,28 @@ void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
     point.width = DeclaredTypeWidth(decl.data_type, ctx);
     point.is_signed = DeclaredTypeIsSigned(decl.data_type, ctx);
     point.is_real = DeclaredTypeIsReal(decl.data_type, ctx);
+    point.is_four_state = DeclaredTypeIs4State(decl.data_type, ctx);
+    point.enum_type = EnumTypeOfDataType(decl.data_type, ctx);
     return;
   }
   Logic4Vec v = EvalExpr(decl.expr, ctx, arena);
   point.width = v.width;
   point.is_signed = v.is_signed;
   point.is_real = v.is_real;
+  point.enum_type = EnumTypeOfExpr(decl.expr, ctx, arena);
+}
+
+// §19.5.3: whether the bits of a sampled value that the coverpoint's type
+// keeps hold an x or z.
+bool SampleHasUnknownBits(const Logic4Vec& v, const SampledCoverpoint& point) {
+  if (v.is_real || !point.is_four_state) return false;
+  uint32_t width = point.width == 0 ? v.width : std::min(point.width, v.width);
+  for (uint32_t i = 0; i < v.nwords && i * 64 < width; ++i) {
+    uint32_t bits = std::min<uint32_t>(64, width - (i * 64));
+    uint64_t mask = bits == 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
+    if ((v.words[i].bval & mask) != 0) return true;
+  }
+  return false;
 }
 
 // §19.3: the instance's formals, which the frame of its construction bound to
@@ -224,6 +254,7 @@ SampledValues ReadPoints(const CovergroupInstance& inst, SimContext& ctx,
           name, v.is_real ? RealVecToDouble(v)
                           : static_cast<double>(ConvertToPointType(v, point)));
     } else {
+      point.point->sample_has_xz = SampleHasUnknownBits(v, point);
       values.integral.emplace_back(name, ConvertToPointType(v, point));
     }
   }
@@ -511,6 +542,70 @@ CovergroupSite NewSiteOf(const Expr* lhs, SimContext& ctx, Arena& arena) {
   return {declared->first, declared->second, nullptr};
 }
 
+// §19.3 with §19.4: the process sampling an embedded covergroup at each
+// occurrence of its clocking event, as an always procedure would.
+SimCoroutine EmbeddedSamplingCoroutine(const Stmt* wait, SimContext& ctx,
+                                       Arena& arena) {
+  while (!ctx.StopRequested()) {
+    if (co_await ExecStmt(wait, ctx, arena) != StmtResult::kDone) break;
+  }
+}
+
+// §19.3: the statement an embedded covergroup's sampling process repeats,
+// `@(clocking_event) name.sample();`.
+const Stmt* EmbeddedSamplingWait(const CovergroupDecl& decl, Arena& arena) {
+  auto* access = arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = arena.Create<Expr>();
+  access->lhs->kind = ExprKind::kIdentifier;
+  access->lhs->text = decl.name;
+  access->rhs = arena.Create<Expr>();
+  access->rhs->kind = ExprKind::kIdentifier;
+  access->rhs->text = "sample";
+  auto* call = arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->lhs = access;
+  auto* sample = arena.Create<Stmt>();
+  sample->kind = StmtKind::kExprStmt;
+  sample->expr = call;
+  auto* wait = arena.Create<Stmt>();
+  wait->kind = StmtKind::kEventControl;
+  wait->events = decl.event.clocking;
+  wait->body = sample;
+  return wait;
+}
+
+// §19.3 with §19.4: an embedded covergroup with a clocking event is sampled
+// at each occurrence of the event for each object whose instance of it is
+// built, by a process of its own that waits on the event, `this` the object,
+// and calls sample() on the object's instance. The process stands in the
+// instance and generate blocks of the one building the instance, where the
+// event's names resolve.
+void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
+                           Arena& arena) {
+  auto* p = arena.Create<Process>();
+  p->kind = ProcessKind::kAlways;
+  if (const Process* building = ctx.CurrentProcess()) {
+    p->inst_prefix = building->inst_prefix;
+    p->gen_prefixes = building->gen_prefixes;
+    p->gen_block_name = building->gen_block_name;
+    p->program_block_id = building->program_block_id;
+  }
+  p->saved_this_stack = {inst.owner};
+  p->saved_method_class_stack = {inst.owner->type};
+  p->rng_seed = ctx.DrawSeedForChild();
+  p->coro = EmbeddedSamplingCoroutine(EmbeddedSamplingWait(*inst.decl, arena),
+                                      ctx, arena)
+                .Release();
+  auto* start = ctx.GetScheduler().GetEventPool().Acquire();
+  start->callback = [p, &ctx]() {
+    if (!p->active) return;
+    ctx.SetCurrentProcess(p);
+    p->Resume();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, start);
+}
+
 }  // namespace
 
 void BuildCoverpoint(CovergroupInstance& inst, const CoverPointDecl& decl,
@@ -623,6 +718,9 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
                                             const Expr* new_call,
                                             SimContext& ctx, Arena& arena) {
   const CovergroupDecl& decl = *site.decl;
+  bool first_for_owner =
+      site.owner != nullptr &&
+      ctx.Covergroups().FindEmbedded(site.owner, decl.name) == nullptr;
   CovergroupInstance* inst = ctx.Covergroups().Create(site.key);
   *inst = CovergroupInstance{};
   inst->decl = &decl;
@@ -639,6 +737,9 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   KeepFormals(*inst, ctx);
   BuildItems(*inst, ctx, arena);
   ctx.Covergroups().Record(*inst);
+  if (first_for_owner && decl.event.kind == CoverageEventKind::kClocking) {
+    StartEmbeddedSampling(*inst, ctx, arena);
+  }
   return inst;
 }
 
@@ -661,6 +762,31 @@ bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   CovergroupSite site = NewSiteOf(stmt->lhs, ctx, arena);
   if (site.decl == nullptr) return false;
   BuildCovergroupInstance(site, rhs, ctx, arena);
+  return true;
+}
+
+bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  const Expr* lhs = stmt->lhs;
+  if (lhs == nullptr || stmt->rhs == nullptr ||
+      lhs->kind != ExprKind::kMemberAccess || lhs->rhs == nullptr ||
+      lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kMemberAccess ||
+      lhs->lhs->rhs == nullptr || lhs->lhs->rhs->text != "option" ||
+      ctx.Covergroups().Empty()) {
+    return false;
+  }
+  CovergroupTarget target = TargetNamed(lhs->lhs->lhs, ctx, arena);
+  if (target.inst == nullptr) return false;
+  Logic4Vec value = EvalExpr(stmt->rhs, ctx, arena);
+  std::string_view member = lhs->rhs->text;
+  if (target.point != nullptr) {
+    WritePointOption(*target.point, member, value);
+  } else if (target.cross != nullptr) {
+    WriteCrossOption(target.inst->group->crosses[target.cross->index], member,
+                     value);
+  } else {
+    WriteGroupOption(*target.inst->group, member, value);
+  }
   return true;
 }
 

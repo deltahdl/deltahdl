@@ -24,6 +24,11 @@ class CoverageDB {
   static CoverBin* AddBin(CoverPoint* cp, CoverBin bin);
 
   static void AutoCreateBins(CoverPoint* cp, int64_t min_val, int64_t max_val);
+  // One automatic bin per named constant of an enumeration coverpoint, each
+  // a name and its value (LRM 19.5.3).
+  static void AutoCreateEnumBins(
+      CoverPoint* cp,
+      const std::vector<std::pair<std::string_view, int64_t>>& members);
 
   static CrossCover* AddCross(CoverGroup* group, CrossCover cross);
 

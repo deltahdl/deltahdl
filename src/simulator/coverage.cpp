@@ -184,6 +184,22 @@ void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
   }
 }
 
+void CoverageDB::AutoCreateEnumBins(
+    CoverPoint* cp,
+    const std::vector<std::pair<std::string_view, int64_t>>& members) {
+  // A coverpoint of an enumeration type gets one automatic bin per named
+  // constant, named after it, rather than bins over its integral range (LRM
+  // 19.5.3).
+  if (!ShouldAutoCreateBins(cp)) return;
+  for (const auto& [name, value] : members) {
+    CoverBin bin;
+    bin.kind = CoverBinKind::kAuto;
+    bin.name = AutoEnumBinName(name);
+    bin.values.push_back(value);
+    cp->bins.push_back(std::move(bin));
+  }
+}
+
 CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
   group->crosses.push_back(std::move(cross));
   return &group->crosses.back();
@@ -299,6 +315,20 @@ static bool SampleHistoryMatchesSeq(const CoverPoint* cp,
   return true;
 }
 
+// Counts a transition the latest sample completed into bin `index`: an
+// illegal bin raises its run-time error (LRM 19.5.6), and any other bin is
+// counted unless its iff guard is false at this sampling point (LRM 19.5.1).
+static void CountCompletedTransition(CoverPoint* cp, size_t index) {
+  CoverBin& bin = cp->bins[index];
+  if (bin.kind == CoverBinKind::kIllegal) {
+    ++cp->illegal_violations;
+    return;
+  }
+  if (bin.has_iff_guard && !bin.iff_guard_value) return;
+  ++bin.hit_count;
+  cp->sampled_bins.push_back(index);
+}
+
 // Scores any transition bin whose sequence was completed by the latest sample.
 static void ScoreTransitionBins(CoverPoint* cp) {
   for (size_t i = 0; i < cp->bins.size(); ++i) {
@@ -306,14 +336,7 @@ static void ScoreTransitionBins(CoverPoint* cp) {
     if (!IsTransitionBin(bin)) continue;
     for (const auto& seq : bin.transitions) {
       if (!SampleHistoryMatchesSeq(cp, seq)) continue;
-      // A completed illegal transition is a run-time error and counts toward
-      // no coverage bin; an ordinary transition bin increments (LRM 19.5.6).
-      if (bin.kind == CoverBinKind::kIllegal) {
-        ++cp->illegal_violations;
-      } else {
-        ++bin.hit_count;
-        cp->sampled_bins.push_back(i);
-      }
+      CountCompletedTransition(cp, i);
       break;
     }
   }
@@ -446,21 +469,20 @@ static void ScorePatternBins(CoverPoint* cp, int64_t value) {
         completed = true;
       }
     }
-    if (!completed) continue;
-    if (bin.kind == CoverBinKind::kIllegal) {
-      ++cp->illegal_violations;
-    } else {
-      ++bin.hit_count;
-      cp->sampled_bins.push_back(b);
-    }
+    if (completed) CountCompletedTransition(cp, b);
   }
 }
 
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   cp->sampled_bins.clear();
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
-  ScoreSampledValue(
-      cp, [&](const CoverBin& bin) { return MatchesBin(bin, value); });
+  ScoreSampledValue(cp, [&](const CoverBin& bin) {
+    if (bin.kind == CoverBinKind::kAuto &&
+        !AutoBinSampleIncluded(cp->sample_has_xz)) {
+      return false;
+    }
+    return MatchesBin(bin, value);
+  });
 
   // Concrete (bounded) transition sequences match against the trailing sample
   // window; goto/nonconsecutive pattern bins are matched incrementally. Either,

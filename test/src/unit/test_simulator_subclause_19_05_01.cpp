@@ -373,4 +373,25 @@ TEST(CovergroupInstanceSim, RealCoverpointRangeBinCountsRealSample) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.1: a bin's trailing iff keeps its count from incrementing while the
+// guard is false, a transition bin's as a value bin's: the transition 1 => 2
+// completes while en is 0, so t stays uncovered.
+TEST(CovergroupInstanceSim, TransitionBinIffGuardSuppressesItsCount) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; bit en; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins t = (1 => 2) iff (en); bins u "
+                       "= (2 => 3); }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin en = 0; v = 1; c.sample(); v = 2; "
+                       "c.sample(); void'(c.get_inst_coverage(n, t)); "
+                       "$display(\"n=%0d t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=0 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

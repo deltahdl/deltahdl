@@ -71,4 +71,30 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupBuiltInConstructor) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3 with §19.4: an embedded covergroup with a clocking event samples at
+// each occurrence of the event for the object whose instance the constructor
+// built: the posedge of clk samples m_x = 3 into the bin hi.
+TEST(CovergroupInstanceSim, EmbeddedCovergroupSamplesAtItsClockingEvent) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit clk;\n"
+                 "  class xyz;\n"
+                 "    bit [1:0] m_x;\n"
+                 "    covergroup cov1 @(posedge clk); coverpoint m_x { bins lo "
+                 "= {0}; bins hi = {3}; } endgroup\n"
+                 "    function new(); cov1 = new; endfunction\n"
+                 "  endclass\n"
+                 "  xyz o;\n"
+                 "  initial begin\n"
+                 "    o = new; o.m_x = 3;\n"
+                 "    #1 clk = 1; #1;\n"
+                 "    $display(\"cov=%0.2f\", o.cov1.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "cov=50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

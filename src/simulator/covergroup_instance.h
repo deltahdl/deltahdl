@@ -19,6 +19,7 @@ class SimContext;
 struct ClassObject;
 struct ClassTypeInfo;
 struct CovergroupDecl;
+struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
 struct RtlirVariable;
@@ -45,6 +46,10 @@ struct SampledCoverpoint {
   uint32_t width = 0;
   bool is_signed = false;
   bool is_real = false;
+  // §19.5.3: whether that type holds x and z, so that a sample holding them
+  // falls in no automatic bin, and the enumeration it is, null for none.
+  bool is_four_state = true;
+  const EnumTypeInfo* enum_type = nullptr;
   // §19.5.1: the guard of each bin whose definition ends in `iff`, by index
   // into the coverpoint's bins.
   std::vector<std::pair<size_t, const Expr*>> bin_guards;
@@ -149,6 +154,12 @@ void CreateCovergroupForVar(std::string_view name, const RtlirVariable& var,
 // covergroup type, or in a class method to a covergroup the class embeds,
 // builds the instance. False where the assignment is not one.
 bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// §19.7: a blocking assignment to an instance option of a covergroup
+// instance, `c.option.comment = ...;`, or of one of its coverpoints or
+// crosses, `c.a.option.weight = ...;`, writes the option. False where the
+// assignment is not one.
+bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §19.8: sample(), get_coverage(), get_inst_coverage(), set_inst_name(),
 // start() and stop() called through an instance, the coverage methods also

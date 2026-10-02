@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -138,32 +139,46 @@ constexpr OptionFields<CrossOption> kCrossFields = {
 constexpr OptionFields<CrossTypeOption> kCrossTypeFields = {
     kCrossTypeInts, {}, kCrossTypeStrings, {}};
 
+// §19.7: sets the option `member` to `value`, an int as an integral value, a
+// bit as true where nonzero, a string as a string and a real as a real.
+template <typename Options>
+void SetOptionValue(Options& options, const OptionFields<Options>& fields,
+                    std::string_view member, const Logic4Vec& value) {
+  for (const auto& [name, field] : fields.ints) {
+    if (name == member) {
+      options.*field = static_cast<int32_t>(CovergroupIntOf(value));
+    }
+  }
+  for (const auto& [name, field] : fields.bits) {
+    if (name == member) options.*field = CovergroupIntOf(value) != 0;
+  }
+  for (const auto& [name, field] : fields.strings) {
+    if (name == member) options.*field = Logic4VecToString(value);
+  }
+  for (const auto& [name, field] : fields.reals) {
+    if (name == member) options.*field = CovergroupRealOf(value);
+  }
+}
+
 // §19.7: sets the member an option assignment names to the value of its
 // expression, evaluated when the covergroup is instantiated.
 template <typename Options>
 void SetOption(Options& options, const OptionFields<Options>& fields,
                const CoverageOption& option, SimContext& ctx, Arena& arena) {
-  for (const auto& [name, field] : fields.ints) {
-    if (name == option.member) {
-      options.*field =
-          static_cast<int32_t>(CovergroupInt(option.value, ctx, arena));
-    }
-  }
-  for (const auto& [name, field] : fields.bits) {
-    if (name == option.member) {
-      options.*field = CovergroupInt(option.value, ctx, arena) != 0;
-    }
-  }
-  for (const auto& [name, field] : fields.strings) {
-    if (name == option.member) {
-      options.*field = Logic4VecToString(EvalExpr(option.value, ctx, arena));
-    }
-  }
-  for (const auto& [name, field] : fields.reals) {
-    if (name == option.member) {
-      options.*field = CovergroupReal(option.value, ctx, arena);
-    }
-  }
+  SetOptionValue(options, fields, option.member,
+                 EvalExpr(option.value, ctx, arena));
+}
+
+// §19.7: the instance options an assignment after instantiation may set;
+// per_instance and get_inst_coverage are set in the covergroup definition
+// only, and auto_bin_max, detect_overlap and cross_retain_auto_bins in the
+// covergroup or coverpoint definition only.
+constexpr std::array<std::string_view, 6> kProcedurallyAssignable = {
+    "name", "weight", "goal", "comment", "at_least", "cross_num_print_missing"};
+
+bool ProcedurallyAssignable(std::string_view member) {
+  return std::ranges::find(kProcedurallyAssignable, member) !=
+         kProcedurallyAssignable.end();
 }
 
 // §19.10: the value of an option member, an int as a signed 32-bit value, a
@@ -225,6 +240,31 @@ void ApplyCrossOption(CrossCover& cross, const CoverageOption& option,
     SetOption(cross.type_option, kCrossTypeFields, option, ctx, arena);
   } else {
     SetOption(cross.option, kCrossFields, option, ctx, arena);
+  }
+}
+
+void WriteGroupOption(CoverGroup& group, std::string_view member,
+                      const Logic4Vec& value) {
+  if (!ProcedurallyAssignable(member)) return;
+  SetOptionValue(group.options, kGroupFields, member, value);
+}
+
+void WritePointOption(SampledCoverpoint& point, std::string_view member,
+                      const Logic4Vec& value) {
+  if (!ProcedurallyAssignable(member)) return;
+  SetOptionValue(point.option, kPointFields, member, value);
+  point.point->weight = point.option.weight;
+  for (CoverBin& bin : point.point->bins) {
+    bin.at_least = static_cast<uint32_t>(std::max(0, point.option.at_least));
+  }
+}
+
+void WriteCrossOption(CrossCover& cross, std::string_view member,
+                      const Logic4Vec& value) {
+  if (!ProcedurallyAssignable(member)) return;
+  SetOptionValue(cross.option, kCrossFields, member, value);
+  for (CrossBin& bin : cross.bins) {
+    bin.at_least = static_cast<uint32_t>(std::max(0, cross.option.at_least));
   }
 }
 

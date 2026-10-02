@@ -283,4 +283,25 @@ TEST(CovergroupInstanceSim, IgnoreBinsFromDeclarationRemoveValues) {
       "n=1 t=3\n");
 }
 
+// §19.5.5: a transition an ignore_bins names is removed from every transition
+// bin, so t[2=>3] holds nothing and takes no part, leaving t[1=>2], which the
+// samples 1, 2 cover.
+TEST(CovergroupInstanceSim, IgnoredTransitionLeavesTheTransitionBins) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins t[] = (1 => 2), (2 => 3); "
+                       "ignore_bins ig = (2 => 3); }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin v = 1; c.sample(); v = 2; c.sample(); "
+                       "void'(c.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

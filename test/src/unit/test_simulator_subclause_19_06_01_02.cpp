@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -141,6 +143,27 @@ TEST(CrossWithCovergroup, MatchesDollarRejectsCandidateWithNoValueTuples) {
   CrossWithMatchPolicy all;
   all.require_all = true;
   EXPECT_TRUE(CoverageDB::SelectCrossBinTuples(candidates, &pred, all).empty());
+}
+
+// §19.6.1.2: `X with (a == b)` selects the bin tuples of the cross holding a
+// value tuple for which a == b: the four automatic products <a[i],b[i]> go to
+// the bin eq, which the sample a = b = 1 covers, and 12 automatic bins remain.
+TEST(CovergroupInstanceSim, CrossWithSelectsTheProductsWhoseValuesSatisfyIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a, b; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint a; coverpoint b;\n"
+                       "    X: cross a, b { bins eq = X with (a == b); }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin a = 1; b = 1; c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
+                       "t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=13\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

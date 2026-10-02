@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -410,22 +411,6 @@ void AddTransitionBins(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-// Sorts and joins overlapping and adjacent spans.
-ValueList Normalize(ValueList list) {
-  std::ranges::sort(list, {}, &CoverValueRange::lo);
-  ValueList joined;
-  for (const CoverValueRange& r : list) {
-    if (!joined.empty() &&
-        (joined.back().hi == std::numeric_limits<int64_t>::max() ||
-         r.lo <= joined.back().hi + 1)) {
-      joined.back().hi = std::max(joined.back().hi, r.hi);
-      continue;
-    }
-    joined.push_back(r);
-  }
-  return joined;
-}
-
 // The spans of `r` left once the sorted, disjoint `excluded` are taken out.
 void SubtractSpans(const CoverValueRange& r, const ValueList& excluded,
                    ValueList& out) {
@@ -440,6 +425,11 @@ void SubtractSpans(const CoverValueRange& r, const ValueList& excluded,
   out.push_back({cursor, r.hi});
 }
 
+bool IsExcludingBin(const CoverBin& bin) {
+  return bin.kind == CoverBinKind::kIgnore ||
+         bin.kind == CoverBinKind::kIllegal;
+}
+
 // §19.5.5 and §19.5.6: a value an ignore_bins or illegal_bins holds is
 // excluded from coverage, so it is taken out of the coverpoint's other value
 // bins, automatic ones included, after their values are distributed; a bin it
@@ -447,13 +437,12 @@ void SubtractSpans(const CoverValueRange& r, const ValueList& excluded,
 void ExcludeIgnoredAndIllegalValues(CoverPoint* cp) {
   ValueList excluded;
   for (const CoverBin& bin : cp->bins) {
-    if (bin.kind != CoverBinKind::kIgnore && bin.kind != CoverBinKind::kIllegal)
-      continue;
+    if (!IsExcludingBin(bin)) continue;
     for (int64_t v : bin.values) excluded.push_back({v, v});
     excluded.insert(excluded.end(), bin.ranges.begin(), bin.ranges.end());
   }
   if (excluded.empty()) return;
-  excluded = Normalize(std::move(excluded));
+  excluded = NormalizeSpans(std::move(excluded));
   for (CoverBin& bin : cp->bins) {
     if (bin.kind != CoverBinKind::kExplicit && bin.kind != CoverBinKind::kAuto)
       continue;
@@ -466,6 +455,24 @@ void ExcludeIgnoredAndIllegalValues(CoverPoint* cp) {
     for (const CoverValueRange& r : bin.ranges)
       SubtractSpans(r, excluded, kept);
     bin.ranges = std::move(kept);
+  }
+}
+
+// §19.5.5 and §19.5.6: a transition an ignore_bins or illegal_bins holds is
+// excluded from coverage, so it is taken out of the coverpoint's transition
+// bins; a bin it leaves holding none takes no part in coverage.
+void ExcludeIgnoredAndIllegalTransitions(CoverPoint* cp) {
+  std::set<std::vector<int64_t>> excluded;
+  for (const CoverBin& bin : cp->bins) {
+    if (IsExcludingBin(bin))
+      excluded.insert(bin.transitions.begin(), bin.transitions.end());
+  }
+  if (excluded.empty()) return;
+  for (CoverBin& bin : cp->bins) {
+    if (bin.kind != CoverBinKind::kTransition) continue;
+    std::erase_if(bin.transitions, [&](const std::vector<int64_t>& sequence) {
+      return excluded.contains(sequence);
+    });
   }
 }
 
@@ -617,7 +624,37 @@ void AddIntegralBins(const CovergroupInstance& inst, SampledCoverpoint& point,
   }
 }
 
+// §19.5.3: the named constants of an enumeration coverpoint, each with its
+// value as the coverpoint holds it; a constant holding x or z is left out,
+// as automatic bins hold 2-state values only.
+std::vector<std::pair<std::string_view, int64_t>> EnumMembers(
+    const SampledCoverpoint& point) {
+  std::vector<std::pair<std::string_view, int64_t>> members;
+  for (const EnumMemberInfo& member : point.enum_type->members) {
+    if (member.xz == 0) {
+      members.emplace_back(member.name,
+                           ConvertToPointType(member.value, point));
+    }
+  }
+  return members;
+}
+
 }  // namespace
+
+std::vector<CoverValueRange> NormalizeSpans(std::vector<CoverValueRange> list) {
+  std::ranges::sort(list, {}, &CoverValueRange::lo);
+  std::vector<CoverValueRange> joined;
+  for (const CoverValueRange& r : list) {
+    if (!joined.empty() &&
+        (joined.back().hi == std::numeric_limits<int64_t>::max() ||
+         r.lo <= joined.back().hi + 1)) {
+      joined.back().hi = std::max(joined.back().hi, r.hi);
+      continue;
+    }
+    joined.push_back(r);
+  }
+  return joined;
+}
 
 std::vector<CoverValueRange> CovergroupRangeValues(
     const std::vector<CovergroupValueRange>& ranges,
@@ -639,9 +676,14 @@ void BuildCoverpointBins(CovergroupInstance& inst, SampledCoverpoint& point,
       AddIntegralBins(inst, point, bins, ctx, arena);
     }
   }
-  CoverValueRange bounds = PointTypeBounds(point);
-  CoverageDB::AutoCreateBins(cp, bounds.lo, bounds.hi);
+  if (point.enum_type != nullptr) {
+    CoverageDB::AutoCreateEnumBins(cp, EnumMembers(point));
+  } else {
+    CoverValueRange bounds = PointTypeBounds(point);
+    CoverageDB::AutoCreateBins(cp, bounds.lo, bounds.hi);
+  }
   ExcludeIgnoredAndIllegalValues(cp);
+  ExcludeIgnoredAndIllegalTransitions(cp);
   for (CoverBin& bin : cp->bins) {
     bin.at_least = static_cast<uint32_t>(std::max(0, point.option.at_least));
   }

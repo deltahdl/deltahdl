@@ -49,9 +49,12 @@ class CovergroupFrame {
   bool pushed_this_ = false;
 };
 
-// The integral and the real value of an expression a covergroup reads.
+// The integral and the real value of an expression a covergroup reads, and
+// of a value it reads.
 int64_t CovergroupInt(const Expr* e, SimContext& ctx, Arena& arena);
 double CovergroupReal(const Expr* e, SimContext& ctx, Arena& arena);
+int64_t CovergroupIntOf(const Logic4Vec& v);
+double CovergroupRealOf(const Logic4Vec& v);
 
 // The values of a coverpoint's type, which a `$` bound of a range (§19.5.1),
 // a `with` on the coverpoint's name (§19.5.1.1) and its automatic bins
@@ -64,9 +67,13 @@ std::vector<CoverValueRange> CovergroupRangeValues(
     const std::vector<CovergroupValueRange>& ranges,
     const SampledCoverpoint& point, SimContext& ctx, Arena& arena);
 
+// `list` sorted, its overlapping and adjacent spans joined.
+std::vector<CoverValueRange> NormalizeSpans(std::vector<CoverValueRange> list);
+
 // §19.5: `v` as the coverpoint's type holds it, the value converted as though
 // assigned to a variable of that type.
 int64_t ConvertToPointType(const Logic4Vec& v, const SampledCoverpoint& point);
+int64_t ConvertToPointType(uint64_t bits, const SampledCoverpoint& point);
 
 // §19.5: adds to an instance whose group options are in place the coverpoint
 // `decl` declares, its options applied and its bins built. `index` is the
@@ -96,6 +103,18 @@ void ApplyPointOption(SampledCoverpoint& point, const CoverageOption& option,
                       SimContext& ctx, Arena& arena);
 void ApplyCrossOption(CrossCover& cross, const CoverageOption& option,
                       SimContext& ctx, Arena& arena);
+
+// §19.7: writes `value` to the instance option `member` of the covergroup,
+// the coverpoint `point` or the cross `cross`, where `member` is one that an
+// assignment after instantiation may set: name, weight, goal, comment,
+// at_least and cross_num_print_missing. A coverpoint's or a cross's new
+// weight and at_least take effect in its coverage at once.
+void WriteGroupOption(CoverGroup& group, std::string_view member,
+                      const Logic4Vec& value);
+void WritePointOption(SampledCoverpoint& point, std::string_view member,
+                      const Logic4Vec& value);
+void WriteCrossOption(CrossCover& cross, std::string_view member,
+                      const Logic4Vec& value);
 
 // §19.7 and §19.10: the value of the option `member`, a type option where
 // `type_option` holds, of the covergroup, the coverpoint or the cross; false
