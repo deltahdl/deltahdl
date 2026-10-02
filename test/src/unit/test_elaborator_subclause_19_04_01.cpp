@@ -249,4 +249,51 @@ TEST(EmbeddedCovergroupInheritance, EffectiveOptionValue) {
   EXPECT_EQ(EffectiveDerivedOption(inherited), 10);
 }
 
+// §19.4.1: a derived covergroup may refer to any component of its base, so a
+// cross it declares may name the base's coverpoints by their labels, `ca` and
+// `cb`, which no variable of the class is named. The cross items were looked
+// for among the derived body's own coverpoints alone and refused.
+TEST(EmbeddedCovergroupInheritance,
+     ADerivedCrossNamesTheBasesCoverpointLabels) {
+  EXPECT_TRUE(ElabOk(
+      "class base;\n"
+      "  bit a, b;\n"
+      "  covergroup g1;\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  covergroup extends g1;\n"
+      "    x: cross ca, cb { ignore_bins one = binsof(ca) intersect {1}; }\n"
+      "  endgroup : g1\n"
+      "endclass\n"
+      "module m; endmodule\n"));
+}
+
+// §19.4.1 with §19.6: a name neither covergroup in the chain declares as a
+// coverpoint, nor the class as a variable, is still refused as a cross item.
+TEST(EmbeddedCovergroupInheritance, ADerivedCrossOfAnUnknownNameIsRefused) {
+  ElabFixture f;
+  ElabOk(
+      "class base;\n"
+      "  bit a;\n"
+      "  covergroup g1;\n"
+      "    ca: coverpoint a;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  covergroup extends g1;\n"
+      "    x: cross ca, zz;\n"
+      "  endgroup : g1\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cross item 'zz' is neither a coverpoint of "
+                            "covergroup 'g1' nor a variable",
+                            9, "19.6"));
+}
+
 }  // namespace

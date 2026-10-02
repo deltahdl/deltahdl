@@ -223,6 +223,25 @@ std::unordered_set<std::string_view> CovergroupVariables(
   return vars;
 }
 
+// §19.4.1: the coverpoints a derived covergroup `cg` of `cls` inherits, those
+// of the covergroups of its name the classes `cls` extends embed; none for a
+// covergroup that extends none.
+std::unordered_set<std::string_view> InheritedCoverpoints(
+    const ClassDecl* cls, const CovergroupDecl& cg,
+    const CompilationUnit* unit) {
+  std::unordered_set<std::string_view> names;
+  if (cg.extends_base.empty()) return names;
+  for (const ClassDecl* base = FindClassDecl(cls->base_class, unit);
+       base != nullptr; base = FindClassDecl(base->base_class, unit)) {
+    for (const ClassMember* m : base->members) {
+      if (m->kind != ClassMemberKind::kCovergroup || m->name != cg.name)
+        continue;
+      names.merge(CoverpointNames(*m->covergroup));
+    }
+  }
+  return names;
+}
+
 }  // namespace
 
 void ValidateCovergroup(const CovergroupDecl& cg,
@@ -278,11 +297,15 @@ void ValidateEmbeddedCovergroups(const ClassDecl* cls,
     }
     return std::nullopt;
   };
-  CovergroupDeclared declared = [&](std::string_view name) {
-    return type_of(name).has_value();
-  };
   for (const ClassMember* m : cls->members) {
     if (m->kind != ClassMemberKind::kCovergroup) continue;
+    // §19.4.1: a derived covergroup refers to the components of its base, so
+    // a cross of it names the base's coverpoints as its own.
+    std::unordered_set<std::string_view> inherited =
+        InheritedCoverpoints(cls, *m->covergroup, unit);
+    CovergroupDeclared declared = [&](std::string_view name) {
+      return inherited.contains(name) || type_of(name).has_value();
+    };
     ValidateCovergroup(*m->covergroup, type_of, declared, diag);
   }
 }
