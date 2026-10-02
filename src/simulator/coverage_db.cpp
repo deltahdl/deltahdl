@@ -65,6 +65,8 @@ static void MergeLoadedCross(CrossCover* live, const CrossCover& loaded) {
 // Copies a covergroup seen only in the persisted database onto a freshly
 // created live group in full (LRM 19.9).
 static void CopyLoadedGroupInFull(CoverGroup* live, const CoverGroup& loaded) {
+  live->type_name = loaded.type_name;
+  live->from_database = true;
   live->coverpoints = loaded.coverpoints;
   live->crosses = loaded.crosses;
   live->options = loaded.options;
@@ -118,7 +120,8 @@ void CoverageDB::MergeCumulativeCoverage(
   for (const auto& loaded : cumulative) {
     CoverGroup* live = FindGroup(loaded.name);
     if (live == nullptr) {
-      // A covergroup type seen only in the persisted database is added in full.
+      // An instance seen only in the persisted database is added in full, as
+      // one more instance of its covergroup type.
       live = CreateGroup(loaded.name);
       CopyLoadedGroupInFull(live, loaded);
       continue;
@@ -163,6 +166,10 @@ static bool ReadCoverageDbRecord(std::istream& in, const std::string& tag,
     loaded.push_back(std::move(g));
     return true;
   }
+  if (tag == "TY") {
+    if (loaded.empty()) return false;
+    return static_cast<bool>(in >> loaded.back().type_name);
+  }
   if (tag == "CP") {
     if (loaded.empty()) return false;
     CoverPoint cp;
@@ -201,6 +208,7 @@ void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
   std::ofstream out(path);
   for (const CoverGroup& g : groups_) {
     out << "CG " << g.name << ' ' << g.sample_count << '\n';
+    if (!g.type_name.empty()) out << "TY " << g.type_name << '\n';
     for (const CoverPoint& cp : g.coverpoints) {
       out << "CP " << cp.name << '\n';
       for (const CoverBin& b : cp.bins) {
@@ -216,6 +224,15 @@ void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
       }
     }
   }
+}
+
+std::vector<const CoverGroup*> CoverageDB::LoadedInstancesOf(
+    std::string_view type_name) const {
+  std::vector<const CoverGroup*> found;
+  for (const CoverGroup& g : groups_) {
+    if (g.from_database && g.type_name == type_name) found.push_back(&g);
+  }
+  return found;
 }
 
 void CoverageDB::SaveNamedCoverageDb() const {

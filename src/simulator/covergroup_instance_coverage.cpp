@@ -40,6 +40,19 @@ void WriteCounts(const Expr* call, int32_t covered, int32_t total,
   }
 }
 
+// §19.9, §19.11.3: the instances of the covergroup type `decl`, those built
+// in the run and then those a coverage database loaded.
+std::vector<const CoverGroup*> TypeInstances(const CovergroupDecl* decl,
+                                             SimContext& ctx) {
+  std::vector<const CoverGroup*> instances =
+      ctx.Covergroups().InstancesOf(decl);
+  for (const CoverGroup* loaded :
+       ctx.CoverageData().LoadedInstancesOf(decl->name)) {
+    instances.push_back(loaded);
+  }
+  return instances;
+}
+
 bool MergesInstances(const CovergroupInstance& inst) {
   return inst.group->type_option.merge_instances;
 }
@@ -48,8 +61,7 @@ bool MergesInstances(const CovergroupInstance& inst) {
 // with the covered and defined bins of them all.
 double TypeCoverage(const CovergroupDecl* decl, bool merge, SimContext& ctx,
                     int32_t& covered, int32_t& total) {
-  std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(decl);
+  std::vector<const CoverGroup*> instances = TypeInstances(decl, ctx);
   covered = 0;
   total = 0;
   for (const CoverGroup* group : instances) {
@@ -68,7 +80,7 @@ std::vector<const CoverPoint*> PointsOfType(const CovergroupDecl* decl,
                                             const std::string& name,
                                             SimContext& ctx) {
   std::vector<const CoverPoint*> found;
-  for (const CoverGroup* group : ctx.Covergroups().InstancesOf(decl)) {
+  for (const CoverGroup* group : TypeInstances(decl, ctx)) {
     for (const CoverPoint& cp : group->coverpoints) {
       if (cp.name == name) found.push_back(&cp);
     }
@@ -80,7 +92,7 @@ std::vector<const CrossCover*> CrossesOfType(const CovergroupDecl* decl,
                                              const std::string& name,
                                              SimContext& ctx) {
   std::vector<const CrossCover*> found;
-  for (const CoverGroup* group : ctx.Covergroups().InstancesOf(decl)) {
+  for (const CoverGroup* group : TypeInstances(decl, ctx)) {
     for (const CrossCover& cross : group->crosses) {
       if (cross.name == name) found.push_back(&cross);
     }
@@ -211,8 +223,7 @@ bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
   std::string item_name;
   const CovergroupDecl* decl = CovergroupTypeNamed(access->lhs, ctx, item_name);
   if (decl == nullptr) return false;
-  std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(decl);
+  std::vector<const CoverGroup*> instances = TypeInstances(decl, ctx);
   bool merge = !instances.empty() && instances[0]->type_option.merge_instances;
   CoverageReading r;
   if (item_name.empty()) {

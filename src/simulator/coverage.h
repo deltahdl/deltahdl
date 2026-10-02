@@ -74,10 +74,10 @@ class CoverageDB {
   // $load_coverage_db (LRM 19.9). Returns false when the file cannot be opened
   // or its contents are malformed, leaving the live database unchanged in the
   // open-failure case. The serialized form is line-oriented tokens: "CG <name>
-  // <sample_count>" opens a covergroup type, "CP <name>" a coverpoint within
-  // it, "BIN <name> <value> <hit_count>" a bin within that coverpoint, "CR
-  // <name>" a cross within the covergroup type, and "XBIN <name> <hit_count>"
-  // a bin within that cross.
+  // <sample_count>" opens a covergroup instance, "TY <name>" names its
+  // covergroup type, "CP <name>" a coverpoint within it, "BIN <name> <value>
+  // <hit_count>" a bin within that coverpoint, "CR <name>" a cross within the
+  // covergroup type, and "XBIN <name> <hit_count>" a bin within that cross.
   bool LoadCoverageDbFile(const std::string& path);
 
   // Writes the live database to `path` in the form LoadCoverageDbFile reads,
@@ -86,6 +86,12 @@ class CoverageDB {
   // left unwritten.
   void SaveCoverageDbFile(const std::string& path) const;
   void SaveNamedCoverageDb() const;
+
+  // The instances of the covergroup type `type_name` a coverage database
+  // loaded, which its type coverage counts beside those built in the run
+  // (LRM 19.9, 19.11.3).
+  std::vector<const CoverGroup*> LoadedInstancesOf(
+      std::string_view type_name) const;
 
   // §19.7, Table 19-1: for each cross whose cross_num_print_missing is greater
   // than 0, the number of its cross bins not covered and the first that many

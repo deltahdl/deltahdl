@@ -517,6 +517,27 @@ TEST(Coverage, TheSavedDatabaseCarriesCrossBinHits) {
   std::remove(kPath.c_str());
 }
 
+// Loads a database holding `record` into a run of CovergroupRun whose cg
+// covers a in its four automatic bins, samples 0 and prints the type's
+// coverage, returning what the run printed.
+static std::string LoadRecordThenSample(const std::string& record) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_bad.db";
+  {
+    std::ofstream out(kPath);
+    out << record;
+  }
+  SimFixture f;
+  std::string printed =
+      RunCapture(CovergroupRun("    cp: coverpoint a;\n",
+                               "    $load_coverage_db(\"" + kPath +
+                                   "\");\n    c.sample(0, 0);\n"
+                                   "    $display(\"%0.2f\", "
+                                   "cg::get_coverage());\n"),
+                 f);
+  std::remove(kPath.c_str());
+  return printed;
+}
+
 // §19.9: a snapshot whose cross record or cross bin stands where no
 // covergroup or cross encloses it is malformed, and loading it leaves the
 // live database as it was: cg's one bin of four stays the only one covered.
@@ -524,21 +545,15 @@ TEST(Coverage, ACrossRecordOutsideItsEnclosingRecordFailsTheLoad) {
   for (const std::string kRecord :
        {"CR x\n", "CG t.c 1\nXBIN <lo,auto[0]> 1\n", "CG t.c 1\nCR\n",
         "CG t.c 1\nCR x\nXBIN b\n"}) {
-    const std::string kPath = testing::TempDir() + "delta_cov_19_09_bad.db";
-    {
-      std::ofstream out(kPath);
-      out << kRecord;
-    }
-    SimFixture f;
-    EXPECT_EQ(RunCapture(CovergroupRun("    cp: coverpoint a;\n",
-                                       "    $load_coverage_db(\"" + kPath +
-                                           "\");\n    c.sample(0, 0);\n"
-                                           "    $display(\"%0.2f\", "
-                                           "cg::get_coverage());\n"),
-                         f),
-              "25.00\n")
-        << kRecord;
-    std::remove(kPath.c_str());
+    EXPECT_EQ(LoadRecordThenSample(kRecord), "25.00\n") << kRecord;
+  }
+}
+
+// §19.9: a type record with no instance record before it, or with no type
+// name, is malformed, and loading it leaves the live database as it was.
+TEST(Coverage, ATypeRecordOutsideAnInstanceRecordFailsTheLoad) {
+  for (const std::string kRecord : {"TY cg\n", "CG g 1\nTY"}) {
+    EXPECT_EQ(LoadRecordThenSample(kRecord), "25.00\n") << kRecord;
   }
 }
 
@@ -560,6 +575,92 @@ TEST(Coverage, SaveCoverageDbFileWritesTheLoadedForm) {
   const std::string kPath = testing::TempDir() + "delta_cov_19_09_form.db";
   db.SaveCoverageDbFile(kPath);
   EXPECT_EQ(FileText(kPath), "CG cg 1\nCP x\nBIN b0 5 1\nBIN b1 0 0\n");
+  std::remove(kPath.c_str());
+}
+
+// A module whose covergroup cg, its type options `options` first, covers x in
+// bins b1 and b2, with one instance named `inst` and an initial block running
+// `body`.
+static std::string InstanceRun(const std::string& inst,
+                               const std::string& options,
+                               const std::string& body) {
+  return "module t;\n"
+         "  bit [1:0] x;\n"
+         "  covergroup cg;\n" +
+         options +
+         "    px: coverpoint x { bins b1 = {1}; bins b2 = {2}; }\n"
+         "  endgroup\n"
+         "  cg " +
+         inst +
+         " = new;\n"
+         "  initial begin\n" +
+         body +
+         "  end\n"
+         "endmodule\n";
+}
+
+// Runs InstanceRun with an instance g that covers b1 and saves the run's
+// coverage to `path`, then with an instance h that loads it, prints the type's
+// coverage, covers b2 and prints `after`, returning what the second run
+// printed.
+static std::string SaveAsGThenLoadIntoH(const std::string& path,
+                                        const std::string& options,
+                                        const std::string& after) {
+  SimFixture first;
+  RunCapture(InstanceRun("g", options,
+                         "    $set_coverage_db_name(\"" + path +
+                             "\");\n    x = 1; g.sample();\n"),
+             first);
+  first.ctx.CoverageData().SaveNamedCoverageDb();
+  SimFixture second;
+  return RunCapture(
+      InstanceRun("h", options,
+                  "    $load_coverage_db(\"" + path +
+                      "\");\n"
+                      "    $display(\"%0.2f\", cg::get_coverage());\n"
+                      "    x = 2; h.sample();\n" +
+                      after),
+      second);
+}
+
+// §19.9, §19.11.3: the database holds the coverage of covergroup types, so a
+// saved instance g that no live instance is named after is loaded as one more
+// instance of type cg, and the type's coverage is the average of g's 50 and
+// h's 0, then 50. h's own coverage is what h sampled.
+TEST(Coverage, LoadedInstanceOfNoLiveNameCountsForItsType) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_inst.db";
+  EXPECT_EQ(SaveAsGThenLoadIntoH(kPath, "",
+                                 "    $display(\"%0.2f %0.2f\", "
+                                 "cg::get_coverage(), "
+                                 "h.get_inst_coverage());\n"),
+            "25.00\n50.00 50.00\n");
+  std::remove(kPath.c_str());
+}
+
+// §19.11.3: with merge_instances set, the type's coverage is the union of the
+// loaded instance g's b1 and the live h's b2, and so is that of its coverpoint
+// px; h's get_inst_coverage() returns the same, its get_inst_coverage option
+// being off (§19.7, Table 19-1).
+TEST(Coverage, LoadedInstanceJoinsTheMergedUnionOfItsType) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_merge.db";
+  EXPECT_EQ(
+      SaveAsGThenLoadIntoH(kPath, "    type_option.merge_instances = 1;\n",
+                           "    $display(\"%0.2f %0.2f %0.2f\", "
+                           "cg::get_coverage(), "
+                           "cg::px::get_coverage(), "
+                           "h.get_inst_coverage());\n"),
+      "50.00\n100.00 100.00 100.00\n");
+  std::remove(kPath.c_str());
+}
+
+// §19.9: the saved database names the covergroup type of each instance, in a
+// TY record after the instance's CG record.
+TEST(Coverage, SavedInstanceRecordsItsCovergroupType) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_type.db";
+  SimFixture f;
+  RunCapture(InstanceRun("g", "", "    x = 1; g.sample();\n"), f);
+  f.ctx.CoverageData().SaveCoverageDbFile(kPath);
+  EXPECT_EQ(FileText(kPath).substr(0, 14), "CG g 1\nTY cg\nC");
   std::remove(kPath.c_str());
 }
 

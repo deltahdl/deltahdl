@@ -755,6 +755,7 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   }
   inst->group = ctx.CoverageData().CreateGroup(site.key);
   inst->group->options.name = site.key;
+  inst->group->type_name = decl.name;
   inst->sample_function =
       FormalsFunction("sample", decl.event.sample_formals, arena);
   const Expr* call = new_call != nullptr ? new_call : EmptyCall(arena);

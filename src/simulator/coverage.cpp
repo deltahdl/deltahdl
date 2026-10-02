@@ -60,7 +60,9 @@ static bool MatchesCrossBin(
 
 CoverGroup* CoverageDB::CreateGroup(std::string name) {
   size_t idx = groups_.size();
-  groups_.push_back(CoverGroup{std::move(name), {}, {}, CoverOptions{}, 0});
+  CoverGroup group;
+  group.name = std::move(name);
+  groups_.push_back(std::move(group));
   name_index_[groups_[idx].name] = idx;
   return &groups_[idx];
 }
