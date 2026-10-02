@@ -544,6 +544,28 @@ TEST(ObjectMethodSim, MethodCalledThroughAnElementsPropertyReceiverRuns) {
             7u);
 }
 
+// An element of a property that is an array of handles, `h.kids[1]`, is a
+// handle to the object it holds (§7.4 with §8.4): run() adds one to that
+// object's v alone, so get() reads 8 through kids[1] and 7 through kids[0].
+TEST(ObjectMethodSim, MethodCalledThroughAnElementOfAnArrayPropertyRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("class H;\n"
+                                          "  C kids[2];\n"
+                                          "endclass\n"
+                                          "module t;\n"
+                                          "  H h = new;\n"
+                                          "  int y;\n"
+                                          "  initial begin\n"
+                                          "    h.kids[0] = new;\n"
+                                          "    h.kids[1] = new;\n"
+                                          "    h.kids[1].run();\n"
+                                          "    y = h.kids[1].get() * 10 + "
+                                          "h.kids[0].get();\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "y"),
+            87u);
+}
+
 // A call's result as the receiver, `h.get_kid().get()`, which
 // TryEvalCallResultMethodCall (eval_call_result.cpp) served already; pinned
 // beside the chained property so the two receivers stay served by one arm
