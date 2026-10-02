@@ -2,6 +2,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -148,6 +149,14 @@ bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
   HoldNewInstance(v, {std::string(decl->name), decl, nullptr}, init, ctx,
                   arena);
   return true;
+}
+
+void RegisterUnitCovergroups(const std::vector<ModuleItem*>& items,
+                             SimContext& ctx) {
+  for (ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl)
+      ctx.RegisterLetDecl(item->name, item);
+  }
 }
 
 std::optional<Logic4Vec> CovergroupPropertyNew(const ClassTypeInfo* type,

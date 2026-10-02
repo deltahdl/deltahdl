@@ -212,6 +212,13 @@ bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
 // builds the instance. False where the assignment is not one.
 bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// §19.3 with §3.12.1: registers each covergroup among `items`, the
+// compilation unit's, as a type found by its bare name (CovergroupOfType); a
+// module's own covergroup, registered when the module is lowered, takes the
+// name after.
+void RegisterUnitCovergroups(const std::vector<ModuleItem*>& items,
+                             SimContext& ctx);
+
 // §19.3 with §8.7: the handle the declaration initializer `init`, a call of
 // `new(...)`, gives the property `name` of `type` where the property is of a
 // covergroup type: the instance built for it. None for any other property.
