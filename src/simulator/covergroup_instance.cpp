@@ -661,6 +661,16 @@ const CovergroupDecl* NextOfName(
   return nullptr;
 }
 
+// §19.4.1: the covergroup `derived` extending `base` amounts to, composed the
+// first time any class reaches the two and kept in `composed`.
+const CovergroupDecl* ComposedOnce(ComposedCovergroups& composed,
+                                   const CovergroupDecl& base,
+                                   const CovergroupDecl& derived) {
+  auto [it, inserted] = composed.try_emplace({&derived, &base});
+  if (inserted) it->second = ComposeDerived(base, derived);
+  return &it->second;
+}
+
 // §19.4: every covergroup `type` and the classes it derives from embed, the
 // most derived first. §19.4.1: one that extends the covergroup of its name
 // further up is composed with it (ComposeDerived), from the base down, the
@@ -679,9 +689,7 @@ EmbeddedCovergroups(const ClassTypeInfo* type, ComposedCovergroups& composed) {
   for (size_t i = embedded.size(); i-- > 0;) {
     if (embedded[i].second->extends_base.empty()) continue;
     if (const CovergroupDecl* base = NextOfName(embedded, i)) {
-      auto [it, inserted] = composed.try_emplace({embedded[i].second, base});
-      if (inserted) it->second = ComposeDerived(*base, *embedded[i].second);
-      embedded[i].second = &it->second;
+      embedded[i].second = ComposedOnce(composed, *base, *embedded[i].second);
     }
   }
   return embedded;
