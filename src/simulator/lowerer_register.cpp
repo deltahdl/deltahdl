@@ -700,6 +700,14 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   const CompilationUnit* unit = design->compilation_unit;
   if (unit == nullptr) return;
   RegisterTypedefItems(unit->cu_items, {}, ctx);
+  // §19.3 with §3.12.1: a covergroup the compilation unit declares is a type
+  // found by its bare name (CovergroupOfType), as a module's is.
+  for (ModuleItem* item : unit->cu_items) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl &&
+        ctx.FindLetDecl(item->name) == nullptr) {
+      ctx.RegisterLetDecl(item->name, item);
+    }
+  }
   for (const PackageDecl* pkg : unit->packages)
     RegisterTypedefItems(pkg->items, pkg->name, ctx);
   RegisterScopeTypedefs(unit->modules, ctx);

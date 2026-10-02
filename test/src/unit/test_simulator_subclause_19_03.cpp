@@ -598,4 +598,36 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(out, "25.00 25.00\n");
 }
 
+// §19.3 with §3.12.1: a covergroup the compilation unit declares is a type
+// every scope below it sees, so a module variable, a class property given
+// `new` in the constructor and an automatic local of it each hold an instance
+// of their own, counting 1, 2 and 3 of the 4 values. Each held none, the type
+// found neither by the elaboration of the variable nor at the run.
+TEST(CovergroupInstanceSim, ACompilationUnitCovergroupTypeHasInstances) {
+  SimFixture f;
+  auto out = RunCapture(
+      "covergroup ucg with function sample(bit [1:0] x);\n"
+      "  coverpoint x;\n"
+      "endgroup\n"
+      "class H;\n"
+      "  ucg p;\n"
+      "  function new(); p = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  ucg c = new;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    automatic ucg l = new;\n"
+      "    c.sample(1);\n"
+      "    h.p.sample(1); h.p.sample(2);\n"
+      "    l.sample(0); l.sample(1); l.sample(2);\n"
+      "    $display(\"%0.2f %0.2f %0.2f\", c.get_inst_coverage(), "
+      "h.p.get_inst_coverage(),\n"
+      "             l.get_inst_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 50.00 75.00\n");
+}
+
 }  // namespace

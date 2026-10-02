@@ -49,7 +49,8 @@ const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
 // The declaration of the covergroup a variable of type `dt` holds an instance
 // of, or null where `dt` names none. §26.3: a name written behind a package
 // scope is that package's; a bare name is one `mod` declares, else one of a
-// package that an import `mod` has reached by now makes visible.
+// package that an import `mod` has reached by now makes visible, else one of
+// the compilation unit.
 const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
                                          const RtlirModule* mod,
                                          const CompilationUnit* unit) {
@@ -68,7 +69,10 @@ const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
       return imported;
     }
   }
-  return nullptr;
+  // §3.12.1: else one the compilation unit declares, outside every design
+  // element, which every scope below it sees.
+  return unit != nullptr ? CovergroupNamed(unit->cu_items, dt.type_name)
+                         : nullptr;
 }
 
 // Adds to `mod` an always process that waits on the covergroup's clocking
