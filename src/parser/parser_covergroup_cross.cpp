@@ -1,10 +1,12 @@
 #include <string_view>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_covergroup.h"
+#include "parser/ast_expr.h"
 #include "parser/parser.h"
 #include "parser/parser_covergroup_internal.h"
 #include "parser/parser_type_name_scope.h"
@@ -17,6 +19,28 @@ namespace {
 // `&&` and `||` that join select_expressions (§19.6.1.1), so neither is read
 // as an operator of the expression.
 constexpr int kCrossSetExpressionBp = 7;
+
+// §19.6 with §19.6.1.4: a cross's name is seen inside its body only as the
+// cross itself, so an operand read as a cross_identifier that is not the
+// label of the cross `label` -- a queue `q`, or any name in an unlabelled
+// cross -- is the cross_set_expression naming that variable.
+void ReadOtherNamesAsCrossSets(SelectExpression* select, std::string_view label,
+                               Arena& arena) {
+  if (select == nullptr) return;
+  ReadOtherNamesAsCrossSets(select->lhs, label, arena);
+  ReadOtherNamesAsCrossSets(select->rhs, label, arena);
+  if (select->kind != SelectExpressionKind::kCrossIdentifier ||
+      select->cross_name == label) {
+    return;
+  }
+  auto* name = arena.Create<Expr>();
+  name->kind = ExprKind::kIdentifier;
+  name->text = select->cross_name;
+  name->range.start = select->loc;
+  select->kind = SelectExpressionKind::kCrossSet;
+  select->expr = name;
+  select->cross_name = {};
+}
 
 }  // namespace
 
@@ -206,7 +230,9 @@ void Parser::ParseCrossBodyItem(CoverCrossDecl& cross,
     return;
   }
   item.kind = CrossBodyItemKind::kBinsSelection;
-  if (ParseBinsSelection(item.bins)) cross.body.push_back(item);
+  if (!ParseBinsSelection(item.bins)) return;
+  ReadOtherNamesAsCrossSets(item.bins.select, cross.label, arena_);
+  cross.body.push_back(item);
 }
 
 // A.2.11 bins_selection: `bins_keyword name = select_expression [ iff ( ... )

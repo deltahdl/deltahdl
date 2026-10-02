@@ -172,26 +172,29 @@ TEST(CovergroupInstanceSim,
 }
 
 // §19.6.1.4: the cross_set_expression may be any expression yielding the value
-// tuples, a slice of a queue of structures among them: <1,2> and <3,0> go to
-// the bin one, and 14 automatic bins remain.
+// tuples: a queue of structures named alone, `bins one = q;`, the cross not
+// being named q, and a slice of it. In each cross <1,2> and <3,0> go to the
+// bin one, and 14 automatic bins remain.
 TEST(CovergroupInstanceSim,
-     CrossSetQueueSliceSelectsTheProductsHoldingItsTuples) {
+     CrossSetQueueAndSliceSelectTheProductsHoldingTuples) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
-                       "  bit [1:0] a, b; int n, t;\n"
+                       "  bit [1:0] a, b; int n, t, m, u;\n"
                        "  typedef struct { bit [1:0] a; bit [1:0] b; } vt;\n"
                        "  vt q[$] = '{ '{1,2}, '{3,0} };\n"
                        "  covergroup cg;\n"
                        "    coverpoint a; coverpoint b;\n"
-                       "    X: cross a, b { bins one = q[0:$]; }\n"
+                       "    X: cross a, b { bins one = q; }\n"
+                       "    Y: cross a, b { bins one = q[0:$]; }\n"
                        "  endgroup\n"
                        "  cg c = new;\n"
                        "  initial begin a = 1; b = 2; c.sample(); "
-                       "void'(c.X.get_inst_coverage(n, t)); $display(\"n=%0d "
-                       "t=%0d\", n, t); end\n"
+                       "void'(c.X.get_inst_coverage(n, t)); "
+                       "void'(c.Y.get_inst_coverage(m, u)); $display(\"%0d %0d "
+                       "%0d %0d\", n, t, m, u); end\n"
                        "endmodule\n",
                        f),
-            "n=1 t=15\n");
+            "1 15 1 15\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 

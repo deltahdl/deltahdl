@@ -192,4 +192,47 @@ TEST_F(VerifyParseTest, CrossBinWithCovergroupExpressionsTree) {
   EXPECT_TRUE(x->body[3].bins.select->matches_dollar);
 }
 
+// §19.6 with §19.6.1.4: a cross's name is seen only through a covergroup
+// variable or the covergroup's scope, so a lone identifier in its body is the
+// cross_identifier only where it is the cross's own label; any other, a queue
+// `q` or one in an unlabelled cross, is a cross_set_expression.
+TEST_F(VerifyParseTest, LoneIdentifierOtherThanTheCrossLabelIsACrossSet) {
+  auto* unit = Parse(R"(
+    module m;
+      bit [1:0] a, b;
+      covergroup cg;
+        X: cross a, b {
+          bins all = X;
+          bins one = q;
+          bins two = q with (a == b);
+        }
+        cross a, b { bins three = X; }
+      endgroup
+    endmodule
+  )");
+  EXPECT_FALSE(diag_.HasErrors());
+  const CovergroupDecl* cg = nullptr;
+  for (const ModuleItem* item : unit->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl) cg = item->covergroup;
+  }
+  ASSERT_NE(cg, nullptr);
+  ASSERT_EQ(cg->items.size(), 2u);
+  const CoverCrossDecl* x = cg->items[0].cover_cross;
+  ASSERT_EQ(x->body.size(), 3u);
+  EXPECT_EQ(x->body[0].bins.select->kind,
+            SelectExpressionKind::kCrossIdentifier);
+  const SelectExpression* one = x->body[1].bins.select;
+  ASSERT_EQ(one->kind, SelectExpressionKind::kCrossSet);
+  ASSERT_NE(one->expr, nullptr);
+  EXPECT_EQ(one->expr->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(one->expr->text, "q");
+  const SelectExpression* two = x->body[2].bins.select;
+  ASSERT_EQ(two->kind, SelectExpressionKind::kWith);
+  EXPECT_EQ(two->lhs->kind, SelectExpressionKind::kCrossSet);
+  const CoverCrossDecl* unnamed = cg->items[1].cover_cross;
+  ASSERT_EQ(unnamed->body.size(), 1u);
+  EXPECT_EQ(unnamed->body[0].bins.select->kind,
+            SelectExpressionKind::kCrossSet);
+}
+
 }  // namespace
