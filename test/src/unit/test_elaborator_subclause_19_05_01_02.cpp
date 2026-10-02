@@ -1,6 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+
 #include "elaborator/coverpoint_bin_set_expression.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -107,6 +113,112 @@ TEST(CoverpointBinSetExpression, CovergroupLocalNamesAreNotVisible) {
 // §19.5.1.2: a name declared outside the covergroup remains visible.
 TEST(CoverpointBinSetExpression, ExternalNameIsVisible) {
   EXPECT_TRUE(SetExpressionNameVisible(SetExpressionNameOrigin::kExternal));
+}
+
+// §19.5.1.2: the array a set_covergroup_expression yields may be of any kind
+// but associative. A module's associative array is reported where a bin reads
+// it; its fixed-size, dynamic and queue arrays are accepted.
+TEST(CoverpointBinSetExpression, AssociativeArrayOfModuleIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x;\n"
+      "  int aa[int];\n"
+      "  int wild[*];\n"
+      "  int fixed_a[3];\n"
+      "  int dyn[];\n"
+      "  int q[$];\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { bins s[] = aa; }\n"
+      "    b: coverpoint x { bins s[] = wild; }\n"
+      "    c: coverpoint x { bins f[] = fixed_a; bins d[] = dyn; bins u[] = q; "
+      "}\n"
+      "  endgroup\n"
+      "  cg cv = new;\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{9u, "aa"},
+                            std::pair<uint32_t, const char*>{10u, "wild"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("the associative array '") + name +
+                                  "' cannot define the bins of a "
+                                  "set_covergroup_expression",
+                              line, "19.5.1.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §19.5.1.2: the rule binds a covergroup embedded in a class (§19.4) as well;
+// there the array read is a property of the class.
+TEST(CoverpointBinSetExpression, AssociativeArrayOfClassIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class k;\n"
+      "  bit [3:0] x;\n"
+      "  int aa[string];\n"
+      "  int dyn[];\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { bins s[] = aa; bins d[] = dyn; }\n"
+      "  endgroup\n"
+      "  function new; cg = new; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the associative array 'aa' cannot define the "
+                            "bins of a set_covergroup_expression",
+                            6, "19.5.1.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §19.5.1.2: a coverpoint identifier and a bin identifier declared within the
+// covergroup are not visible in a set_covergroup_expression, so a bin naming
+// one reads nothing. A name declared outside the covergroup is read.
+TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x;\n"
+      "  int vals[] = '{1, 2};\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { bins lo = {1}; }\n"
+      "    b: coverpoint x { bins s[] = a; }\n"
+      "    c: coverpoint x { bins t[] = lo; }\n"
+      "    d: coverpoint x { bins u[] = vals; }\n"
+      "  endgroup\n"
+      "  cg cv = new;\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{6u, "a"},
+                            std::pair<uint32_t, const char*>{7u, "lo"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("'") + name +
+                                  "' is declared within covergroup 'cg' and "
+                                  "is not visible in a "
+                                  "set_covergroup_expression",
+                              line, "19.5.1.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §19.5.1.2: a bin identifier hides nothing from a set_covergroup_expression,
+// so where a variable outside the covergroup shares the bin's name, the
+// expression reads the variable.
+TEST(CoverpointBinSetExpression, OuterNameSharingABinNameIsRead) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x;\n"
+      "  int lo[] = '{1, 2};\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { bins lo = {1}; }\n"
+      "    b: coverpoint x { bins s[] = lo; }\n"
+      "  endgroup\n"
+      "  cg cv = new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

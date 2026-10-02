@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "elaborator/coverpoint_bin_set_expression.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -25,17 +26,28 @@ using CovergroupTypeOf =
     std::function<std::optional<DataTypeKind>(std::string_view)>;
 using CovergroupDeclared = std::function<bool(std::string_view)>;
 
+// The kind of array a name a covergroup reads denotes where the covergroup is
+// declared, or nothing where it denotes no unpacked array.
+using CovergroupArrayKindOf =
+    std::function<std::optional<SetExpressionArrayKind>(std::string_view)>;
+
 // The Clause 19 rules a covergroup is checked against once the declarations it
 // reads are known, read from the tree the parser keeps for it
 // (src/parser/ast_covergroup.h):
 // - a coverpoint of a real expression declares at least one `bins` (§19.5),
 //   its default bin is no array (§19.5.1), and its bins take no `with`
 //   expression (§19.5.1.1);
+// - a coverpoint of a real expression has no transition bin (§19.5.2);
+// - a bin's set_covergroup_expression yields no associative array and reads
+//   no name declared only within the covergroup (§19.5.1.2), `array_kind_of`
+//   giving the kind of array a name denotes;
 // - a cross item is a coverpoint of its own covergroup or a variable, and no
 //   real variable (§19.6).
 void ValidateCovergroup(const CovergroupDecl& cg,
                         const CovergroupTypeOf& type_of,
-                        const CovergroupDeclared& declared, DiagEngine& diag);
+                        const CovergroupDeclared& declared,
+                        const CovergroupArrayKindOf& array_kind_of,
+                        DiagEngine& diag);
 
 // The covergroups a module declares, checked by ValidateCovergroup, and the
 // procedural writes through an instance of one to an option §19.7 restricts
