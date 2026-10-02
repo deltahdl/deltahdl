@@ -563,4 +563,55 @@ TEST(ObjectMethodSim, MethodCalledThroughACallResultReceiverRuns) {
             7u);
 }
 
+// §8.6 with §13.4.1 and §11.3.1: a method called as a statement on the value
+// a call returns runs once on that value, and the call that yields it is an
+// operand evaluated once, as in the expression `void'(pk().get())`. The
+// statement path asks first whether the method is a task it enables through
+// the object, and that question evaluated the call once more before the
+// expression evaluator took it.
+static std::string CallResultReceiverDesign(std::string_view body) {
+  return ElementMethodDesign(
+      "module t;\n"
+      "  int calls;\n"
+      "  C k = new;\n"
+      "  int q[$] = '{1, 2};\n"
+      "  typedef int iq[$];\n"
+      "  function C pk(); calls++; return k; endfunction\n"
+      "  function string ps(); calls++; return \"abc\"; endfunction\n"
+      "  function iq pq(); calls++; return q; endfunction\n"
+      "  int y;\n"
+      "  initial begin\n" +
+      std::string(body) +
+      "    y = calls * 100 + k.v;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ObjectMethodSim, FunctionMethodStatementOnACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(CallResultReceiverDesign("    pk().get();\n"), "y"),
+            107u);
+}
+
+TEST(ObjectMethodSim, TaskMethodStatementOnACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(CallResultReceiverDesign("    pk().run();\n"), "y"),
+            108u);
+}
+
+TEST(ObjectMethodSim, BuiltInMethodStatementOnACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(CallResultReceiverDesign("    pk().randomize();\n"
+                                               "    pk().srandom(3);\n"),
+                      "y"),
+            207u);
+}
+
+TEST(ObjectMethodSim, StringMethodStatementOnACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(CallResultReceiverDesign("    ps().len();\n"), "y"),
+            107u);
+}
+
+TEST(ObjectMethodSim, QueueMethodStatementOnACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(CallResultReceiverDesign("    pq().size();\n"), "y"),
+            107u);
+}
+
 }  // namespace

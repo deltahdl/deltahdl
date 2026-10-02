@@ -17,6 +17,7 @@
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_event_property.h"
 #include "simulator/covergroup_instance.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
@@ -549,9 +550,24 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     co_return co_await ExecMailboxCall(expr, ctx, arena);
   }
   // §13.3 with §8.6: a task enabled through an object handle runs as a
-  // coroutine too, so its timing controls suspend this process.
+  // coroutine too, so its timing controls suspend this process. §11.3.1: a
+  // receiver that is a call's value, `pk().t()` or `pk().f()`, is evaluated
+  // once, before the search for a task to enable through it, and a statement
+  // whose method is no task is run by the expression evaluator while that
+  // value is still held (CallResultReceiverScope). The value is released
+  // before a task's body runs, since another process may reach the statement
+  // while this one waits in it.
   InstanceMethodInfo instance_call;
-  if (SetupInstanceTaskCall(expr, ctx, arena, instance_call)) {
+  bool enables_task = false;
+  {
+    CallResultReceiverScope receiver(expr, ctx, arena);
+    enables_task = SetupInstanceTaskCall(expr, ctx, arena, instance_call);
+    if (!enables_task && receiver.Holds()) {
+      ExecCallStmtExpr(expr, ctx, arena);
+      co_return StmtResult::kDone;
+    }
+  }
+  if (enables_task) {
     co_return co_await ExecInstanceTaskCall(instance_call, expr, ctx, arena);
   }
   auto* func = ctx.EnterSubroutinePackage(SetupTaskCall(expr, ctx, arena));

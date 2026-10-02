@@ -609,4 +609,26 @@ TEST(CovergroupInstanceSim, MethodOnReturnedHandleReachesTheInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.8 with §8.6 and §11.3.1: sample() called as a statement on the handle a
+// call returns evaluates that call once, as the expression form does.
+TEST(CovergroupInstanceSim, SampleStatementOnReturnedHandleCallsItOnce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v;\n"
+                       "  int calls;\n"
+                       "  covergroup cg; coverpoint v { bins a = {1}; bins b = "
+                       "{2}; } endgroup\n"
+                       "  cg c = new;\n"
+                       "  function cg pick(); calls++; return c; endfunction\n"
+                       "  initial begin\n"
+                       "    v = 1; pick().sample();\n"
+                       "    $display(\"%0d %0.2f\", calls, "
+                       "c.get_inst_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

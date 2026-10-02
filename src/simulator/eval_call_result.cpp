@@ -98,6 +98,10 @@ struct ReturnedAggregateRegister {
   std::vector<ReturnedRecord> bodies;
   ReturnedRecord completed;
   int evaluations = 0;
+  // The base a CallResultReceiverScope holds, and the aggregate its call
+  // returned.
+  const Expr* held_base = nullptr;
+  std::optional<ReturnedAggregate> held_aggregate;
 };
 
 // One register per thread, as eval_let.cpp keeps its expansion set: a body
@@ -291,6 +295,33 @@ bool TryReturnedAggregateMethod(const ReturnedAggregate& returned,
 
 }  // namespace
 
+CallResultReceiverScope::CallResultReceiverScope(const Expr* call,
+                                                 SimContext& ctx, Arena& arena)
+    : ctx_(ctx) {
+  if (call == nullptr || call->kind != ExprKind::kCall ||
+      !SelectsMemberOfCallResult(call->lhs)) {
+    return;
+  }
+  const Expr* base = call->lhs->lhs;
+  std::optional<ReturnedAggregate> returned;
+  Logic4Vec value = EvalWithReturnedAggregate(base, ctx, arena, returned);
+  auto& reg = Register();
+  outer_base_ = reg.held_base;
+  outer_aggregate_ = std::move(reg.held_aggregate);
+  reg.held_base = base;
+  reg.held_aggregate = std::move(returned);
+  ctx.SetDeferredArgSnapshot(base, value);
+  base_ = base;
+}
+
+CallResultReceiverScope::~CallResultReceiverScope() {
+  if (base_ == nullptr) return;
+  ctx_.ClearDeferredArgSnapshot(base_);
+  auto& reg = Register();
+  reg.held_base = outer_base_;
+  reg.held_aggregate = std::move(outer_aggregate_);
+}
+
 FunctionBodyResultScope::FunctionBodyResultScope() {
   Register().bodies.emplace_back();
 }
@@ -338,6 +369,10 @@ Logic4Vec EvalWithReturnedAggregate(
   if (expr == nullptr || expr->kind != ExprKind::kCall)
     return EvalExpr(expr, ctx, arena);
   auto& reg = Register();
+  if (expr == reg.held_base) {
+    returned = reg.held_aggregate;
+    return EvalExpr(expr, ctx, arena);
+  }
   ++reg.evaluations;
   reg.completed.aggregate.reset();
   Logic4Vec value = EvalExpr(expr, ctx, arena);

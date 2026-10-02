@@ -60,6 +60,32 @@ class FunctionBodyResultScope {
   FunctionBodyResultScope& operator=(const FunctionBodyResultScope&) = delete;
 };
 
+// §8.6 with §11.3.1 and §13.4.1: the base of a method call statement that
+// starts at a call, `pk()` of `pk().f();` or `pk().kid` of `pk().kid.f();`,
+// evaluated once on construction and held for the scope's life as the base's
+// snapshot (SimContext::SetDeferredArgSnapshot), with the aggregate its call
+// returned, if any, for EvalWithReturnedAggregate. Every evaluation of the
+// base within the scope reads the held value, so a statement path that
+// evaluates the base to find a task to enable through it, and the expression
+// evaluator the statement then falls to, run the call once between them, as
+// the expression `void'(pk().f())` does. Holds nothing for a statement of any
+// other shape.
+class CallResultReceiverScope {
+ public:
+  CallResultReceiverScope(const Expr* call, SimContext& ctx, Arena& arena);
+  ~CallResultReceiverScope();
+  CallResultReceiverScope(const CallResultReceiverScope&) = delete;
+  CallResultReceiverScope& operator=(const CallResultReceiverScope&) = delete;
+
+  bool Holds() const { return base_ != nullptr; }
+
+ private:
+  const Expr* base_ = nullptr;
+  const Expr* outer_base_ = nullptr;
+  std::optional<ReturnedAggregate> outer_aggregate_;
+  SimContext& ctx_;
+};
+
 // Records, for the innermost running body, the elements of the queue, dynamic
 // array or fixed-size unpacked array `returned` names -- the expression of the
 // `return` statement ExecFuncReturn is carrying out -- and records nothing for
