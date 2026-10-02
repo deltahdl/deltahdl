@@ -42,6 +42,11 @@ constexpr std::array<std::string_view, 2> kCovergroupDefinitionOnly = {
 constexpr std::array<std::string_view, 3> kCoverpointDefinitionOnly = {
     "auto_bin_max", "detect_overlap", "cross_retain_auto_bins"};
 
+// §19.7.1: the type options that can be set only in the covergroup definition.
+// Every other type option may be assigned procedurally at any time.
+constexpr std::array<std::string_view, 2> kTypeDefinitionOnly = {
+    "strobe", "real_interval"};
+
 template <typename Names>
 bool Contains(const Names& names, auto value) {
   return std::find(names.begin(), names.end(), value) != names.end();
@@ -207,15 +212,13 @@ void CheckOptionWrites(
   });
 }
 
-// §19.8: the covergroup type the call `call` is made through, `cg` in
-// `cg::m()` or `cg::x::m()`, where `visible` names it a covergroup type; empty
-// for any other call.
-std::string_view CovergroupTypeCalled(const Expr* call,
+// §19.8 and §19.7.1: the covergroup type the selection `access` is made
+// through, `cg` in `cg::m` or `cg::x::m`, where `visible` names it a covergroup
+// type; empty for any other expression.
+std::string_view CovergroupTypeScoped(const Expr* access,
                                       const CovergroupTypeVisible& visible) {
-  const Expr* access = call->lhs;
-  if (call->kind != ExprKind::kCall || access == nullptr ||
-      access->kind != ExprKind::kMemberAccess || !access->is_scope_resolution ||
-      access->lhs == nullptr) {
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      !access->is_scope_resolution || access->lhs == nullptr) {
     return {};
   }
   const Expr* scope = access->lhs;
@@ -224,6 +227,49 @@ std::string_view CovergroupTypeCalled(const Expr* call,
   }
   if (scope->kind != ExprKind::kIdentifier || !visible(scope->text)) return {};
   return scope->text;
+}
+
+// §19.8: the covergroup type the call `call` is made through, `cg` in
+// `cg::m()` or `cg::x::m()`, where `visible` names it a covergroup type; empty
+// for any other call.
+std::string_view CovergroupTypeCalled(const Expr* call,
+                                      const CovergroupTypeVisible& visible) {
+  if (call->kind != ExprKind::kCall) return {};
+  return CovergroupTypeScoped(call->lhs, visible);
+}
+
+// §19.7.1: the type option a procedural write sets where its target is
+// `cg::type_option.<member>` or `cg::x::type_option.<member>` with `cg` a
+// covergroup type `visible` names; empty for any other target.
+std::string_view CovergroupTypeOptionWritten(
+    const Expr* target, const CovergroupTypeVisible& visible) {
+  if (target == nullptr || target->kind != ExprKind::kMemberAccess ||
+      target->lhs == nullptr) {
+    return {};
+  }
+  const Expr* access = target->lhs;
+  if (access->rhs == nullptr || access->rhs->text != "type_option" ||
+      CovergroupTypeScoped(access, visible).empty()) {
+    return {};
+  }
+  return target->rhs->text;
+}
+
+// §19.7.1: reports `s` where it is a procedural write through a covergroup
+// type to a type option the definition alone may set.
+void CheckTypeOptionWrite(const Stmt* s, const CovergroupTypeVisible& visible,
+                          DiagEngine& diag) {
+  if (s->kind != StmtKind::kBlockingAssign &&
+      s->kind != StmtKind::kNonblockingAssign) {
+    return;
+  }
+  std::string_view member = CovergroupTypeOptionWritten(s->lhs, visible);
+  if (!Contains(kTypeDefinitionOnly, member)) return;
+  diag.Error(s->range.start,
+             std::format("type option '{}' can be set only in the covergroup "
+                         "definition",
+                         member),
+             Subclause("19.7.1"));
 }
 
 // §19.8: reports each call in `e` made through a covergroup type to a method
@@ -243,11 +289,12 @@ void CheckTypeCallsIn(const Expr* e, const CovergroupTypeVisible& visible,
       e, [&](const Expr* child) { CheckTypeCallsIn(child, visible, diag); });
 }
 
-// §19.8: CheckTypeCallsIn over every expression of `s` and the statements it
-// holds.
+// §19.8 and §19.7.1: CheckTypeCallsIn over every expression of `s`, and
+// CheckTypeOptionWrite over `s`, and both over the statements it holds.
 void CheckTypeCalls(const Stmt* s, const CovergroupTypeVisible& visible,
                     DiagEngine& diag) {
   if (s == nullptr) return;
+  CheckTypeOptionWrite(s, visible, diag);
   ForEachChildExpr(s,
                    [&](const Expr* e) { CheckTypeCallsIn(e, visible, diag); });
   ForEachChildStmt(

@@ -53,7 +53,9 @@ using CovergroupTypeVisible = std::function<bool(std::string_view)>;
 // §19.8: get_coverage() is the one covergroup method called through the
 // covergroup type, `cg::get_coverage()` or `cg::x::get_coverage()`; a call
 // through a type `visible` names to any other method, in a procedure or a
-// subroutine of `decl`, is reported.
+// subroutine of `decl`, is reported. So is a procedural write there through
+// such a type to the strobe or real_interval type option, which §19.7.1 lets
+// the covergroup definition alone set.
 void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
                                  const CovergroupTypeVisible& visible,
                                  DiagEngine& diag);
