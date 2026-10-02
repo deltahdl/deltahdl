@@ -172,9 +172,10 @@ TEST(CoverpointBinSetExpression, AssociativeArrayOfClassIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.5.1.2: a coverpoint identifier and a bin identifier declared within the
-// covergroup are not visible in a set_covergroup_expression, so a bin naming
-// one reads nothing. A name declared outside the covergroup is read.
+// §19.5.1.2: a coverpoint identifier and a bin identifier, of a coverpoint or
+// of a cross, declared within the covergroup are not visible in a
+// set_covergroup_expression, so a bin naming one reads nothing. A name
+// declared outside the covergroup is read.
 TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -186,12 +187,15 @@ TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
       "    b: coverpoint x { bins s[] = a; }\n"
       "    c: coverpoint x { bins t[] = lo; }\n"
       "    d: coverpoint x { bins u[] = vals; }\n"
+      "    ad: cross a, d { option.weight = 2; bins xb = binsof(a); }\n"
+      "    e: coverpoint x { bins v[] = xb; }\n"
       "  endgroup\n"
       "  cg cv = new;\n"
       "endmodule\n",
       f);
   for (auto [line, name] : {std::pair<uint32_t, const char*>{6u, "a"},
-                            std::pair<uint32_t, const char*>{7u, "lo"}}) {
+                            std::pair<uint32_t, const char*>{7u, "lo"},
+                            std::pair<uint32_t, const char*>{10u, "xb"}}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               std::string("'") + name +
                                   "' is declared within covergroup 'cg' and "
@@ -199,7 +203,7 @@ TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
                                   "set_covergroup_expression",
                               line, "19.5.1.2"));
   }
-  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 // §19.5.1.2: a bin identifier hides nothing from a set_covergroup_expression,
@@ -219,6 +223,115 @@ TEST(CoverpointBinSetExpression, OuterNameSharingABinNameIsRead) {
       "endmodule\n",
       f);
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5.1.2 with §7.8: an associative array's index may be a type the module
+// declares, a typedef or a class; a dimension naming a parameter declares a
+// fixed-size array, and packed dimensions alone a packed array (§7.4.1), either
+// of which a set_covergroup_expression may yield.
+TEST(CoverpointBinSetExpression, IndexTypeOfModuleMakesArrayAssociative) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int idx_t;\n"
+      "  class key; endclass\n"
+      "  localparam int N = 2;\n"
+      "  bit [3:0] x;\n"
+      "  int at[idx_t];\n"
+      "  int ak[key];\n"
+      "  int fp[N];\n"
+      "  bit [1:0][3:0] pk;\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x { bins s[] = at; }\n"
+      "    b: coverpoint x { bins s[] = ak; }\n"
+      "    c: coverpoint x { bins s[] = fp; }\n"
+      "    d: coverpoint x { bins s[] = pk; }\n"
+      "  endgroup\n"
+      "  cg cv = new;\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{11u, "at"},
+                            std::pair<uint32_t, const char*>{12u, "ak"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("the associative array '") + name +
+                                  "' cannot define the bins of a "
+                                  "set_covergroup_expression",
+                              line, "19.5.1.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §19.5.1.2: a formal of the covergroup is visible to its set expressions, so
+// a formal sharing a bin's name is read, and a formal that is an associative
+// array is no more allowed there than a variable that is one.
+TEST(CoverpointBinSetExpression, FormalOfCovergroupIsReadAsItsArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x;\n"
+      "  int ma[int];\n"
+      "  int md[];\n"
+      "  covergroup cg(ref int fa[int], ref int fd[]);\n"
+      "    a: coverpoint x { bins fd = {2}; }\n"
+      "    b: coverpoint x { bins s[] = fa; }\n"
+      "    c: coverpoint x { bins s[] = fd; }\n"
+      "  endgroup\n"
+      "  cg cv = new(ma, md);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the associative array 'fa' cannot define the "
+                            "bins of a set_covergroup_expression",
+                            7, "19.5.1.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §19.5.1.2 with §7.8: in a class, an index type may be a typedef or a class
+// the class declares, a class of the compilation unit, or a typedef of the
+// module that declares the class, for a property and a covergroup formal
+// alike; and a covergroup of the class reads the module's arrays too.
+TEST(CoverpointBinSetExpression, IndexTypeAndArrayOfClassScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class key; endclass\n"
+      "module m;\n"
+      "  typedef int idx_t;\n"
+      "  int maa[int];\n"
+      "  class k;\n"
+      "    typedef byte inner_t;\n"
+      "    class nested; endclass\n"
+      "    bit [3:0] x;\n"
+      "    int ai[inner_t];\n"
+      "    int an[nested];\n"
+      "    int ak[key];\n"
+      "    int am[idx_t];\n"
+      "    covergroup cg;\n"
+      "      a: coverpoint x { bins s[] = ai; }\n"
+      "      b: coverpoint x { bins s[] = an; }\n"
+      "      c: coverpoint x { bins s[] = ak; }\n"
+      "      d: coverpoint x { bins s[] = am; }\n"
+      "      e: coverpoint x { bins s[] = maa; }\n"
+      "    endgroup\n"
+      "    covergroup cf(ref int fn[nested]);\n"
+      "      a: coverpoint x { bins s[] = fn; }\n"
+      "    endgroup\n"
+      "    function new; cg = new; cf = new(an); endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{14u, "ai"},
+                            std::pair<uint32_t, const char*>{15u, "an"},
+                            std::pair<uint32_t, const char*>{16u, "ak"},
+                            std::pair<uint32_t, const char*>{17u, "am"},
+                            std::pair<uint32_t, const char*>{18u, "maa"},
+                            std::pair<uint32_t, const char*>{21u, "fn"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("the associative array '") + name +
+                                  "' cannot define the bins of a "
+                                  "set_covergroup_expression",
+                              line, "19.5.1.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
 }  // namespace
