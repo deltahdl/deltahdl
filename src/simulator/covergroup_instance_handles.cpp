@@ -34,8 +34,7 @@ namespace {
 const CovergroupDecl* PropertyCovergroup(const ClassTypeInfo* type,
                                          std::string_view name,
                                          SimContext& ctx) {
-  for (; type != nullptr; type = type->parent) {
-    if (type->decl == nullptr) continue;
+  for (; type != nullptr && type->decl != nullptr; type = type->parent) {
     for (const ClassMember* member : type->decl->members) {
       if (member->kind == ClassMemberKind::kProperty && member->name == name) {
         return CovergroupOfType(member->data_type, ctx);
@@ -45,19 +44,16 @@ const CovergroupDecl* PropertyCovergroup(const ClassTypeInfo* type,
   return nullptr;
 }
 
-// The class whose properties `lhs` names one of: the running object's for a
-// bare name, the object's `h` holds for `h.p`, and K for `K::s`; null for
-// none. `owner` is set to the object where there is one.
+// The class whose properties `lhs`, an identifier or a member access, names
+// one of: the running object's for a bare name, the object's `h` holds for
+// `h.p`, and K for `K::s`; null for none. `owner` is set to the object where
+// there is one.
 const ClassTypeInfo* ClassOfTarget(const Expr* lhs, SimContext& ctx,
                                    Arena& arena, ClassObject*& owner) {
   if (lhs->kind == ExprKind::kIdentifier) {
     owner = ctx.CurrentThis();
-  } else if (lhs->kind != ExprKind::kMemberAccess) {
-    return nullptr;
   } else if (lhs->is_scope_resolution) {
-    return lhs->lhs->kind == ExprKind::kIdentifier
-               ? ctx.FindClassType(lhs->lhs->text)
-               : nullptr;
+    return ctx.FindClassType(lhs->lhs->text);
   } else {
     owner = ObjectNamed(lhs->lhs, ctx, arena);
   }
@@ -70,9 +66,10 @@ const ClassTypeInfo* ClassOfTarget(const Expr* lhs, SimContext& ctx,
 // variable of one, an element of an array of them among them. A site of no
 // covergroup where `lhs` is of no covergroup type.
 CovergroupSite NewSiteOf(const Expr* lhs, SimContext& ctx, Arena& arena) {
-  if (lhs->kind == ExprKind::kSelect && lhs->base != nullptr) {
-    Variable* array = ResolveLhsVariable(lhs, ctx);
-    const CovergroupDecl* decl = ctx.Covergroups().DeclaredOf(array);
+  if (lhs->kind != ExprKind::kIdentifier &&
+      lhs->kind != ExprKind::kMemberAccess) {
+    const CovergroupDecl* decl =
+        ctx.Covergroups().DeclaredOf(ResolveLhsVariable(lhs, ctx));
     if (decl == nullptr) return {};
     return {HierarchicalReferenceName(lhs->base), decl, nullptr};
   }

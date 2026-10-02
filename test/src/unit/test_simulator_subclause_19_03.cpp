@@ -518,4 +518,53 @@ TEST(CovergroupInstanceSim, AutomaticLocalHoldsTheInstanceNewBuilds) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.3: a named fork that completes, as a block that is not disabled,
+// triggers its end block event once its join is satisfied.
+TEST(CovergroupInstanceSim, CompletedNamedForkTriggersItsEndEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v; int n, t;\n"
+                       "  covergroup cg @@(end fk);\n"
+                       "    coverpoint v { bins b[] = {[0:3]}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    fork : fk v = 2; #1 v = 3; join\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.3 with §8.13: a property of a covergroup type a derived class inherits
+// receives the instance a new in the derived constructor builds, and a module
+// covergroup variable assigned a new in a method keeps its own.
+TEST(CovergroupInstanceSim, InheritedPropertyAndModuleVariableTakeNew) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    coverpoint v { bins a = {1}; bins b = {2}; }\n"
+                 "  endgroup\n"
+                 "  cg m;\n"
+                 "  class B; cg p; endclass\n"
+                 "  class D extends B;\n"
+                 "    function new(); p = new; m = new; endfunction\n"
+                 "  endclass\n"
+                 "  D d;\n"
+                 "  initial begin\n"
+                 "    d = new; v = 1; d.p.sample(); v = 2; m.sample();\n"
+                 "    $display(\"%0.2f %0.2f\", d.p.get_inst_coverage(),\n"
+                 "             m.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

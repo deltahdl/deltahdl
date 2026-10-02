@@ -355,9 +355,7 @@ bool IsNamePath(const Expr* e) {
 CovergroupInstance* InstanceHeldBy(const Expr* e, SimContext& ctx,
                                    Arena& arena) {
   if (!IsNamePath(e)) return nullptr;
-  Logic4Vec handle = EvalExpr(e, ctx, arena);
-  if (handle.width == 0 || !handle.IsKnown()) return nullptr;
-  return ctx.Covergroups().Held(handle.ToUint64());
+  return ctx.Covergroups().Held(EvalExpr(e, ctx, arena).ToUint64());
 }
 
 // The instance a receiver names: an embedded covergroup of the object whose
@@ -677,8 +675,7 @@ CovergroupInstance* CovergroupTable::Create(std::string_view key,
 }
 
 uint64_t CovergroupTable::IdentityOf(const CovergroupInstance* inst) const {
-  auto it = identities_.find(inst);
-  return it == identities_.end() ? 0 : it->second;
+  return identities_.at(inst);
 }
 
 CovergroupInstance* CovergroupTable::Held(uint64_t identity) const {

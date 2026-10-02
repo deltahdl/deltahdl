@@ -97,4 +97,31 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupSamplesAtItsClockingEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.4 with §8.11: a method reaches its object's embedded covergroup as
+// `this.cg`, sampling and reading the object's own instance.
+TEST(CovergroupInstanceSim, EmbeddedCovergroupReachedThroughThis) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  class C;\n"
+                       "    bit [1:0] x;\n"
+                       "    covergroup cg;\n"
+                       "      coverpoint x { bins a = {1}; bins b = {2}; }\n"
+                       "    endgroup\n"
+                       "    function new(); cg = new; endfunction\n"
+                       "    function real hit(bit [1:0] v);\n"
+                       "      x = v; this.cg.sample();\n"
+                       "      return this.cg.get_inst_coverage();\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  C o;\n"
+                       "  initial begin\n"
+                       "    o = new;\n"
+                       "    $display(\"%0.2f\", o.hit(2));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

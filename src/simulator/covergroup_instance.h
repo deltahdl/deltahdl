@@ -116,8 +116,9 @@ class CovergroupTable {
   // A fresh instance, for an embedded covergroup (`embedded`) the one kept
   // under `key`, built again where one is.
   CovergroupInstance* Create(std::string_view key, bool embedded);
-  // The identity a variable holding `inst` stores, and the instance a stored
-  // identity refers to, null for the null handle or a value of no instance.
+  // The identity a variable holding `inst`, an instance Create made, stores,
+  // and the instance a stored identity refers to, null for the null handle or
+  // a value of no instance.
   // An identity carries a tag no class handle reaches, so a class handle read
   // as one refers to no instance, and fits the 32-bit carrier of a class
   // property.
