@@ -715,7 +715,7 @@ const CovergroupDecl* CovergroupTable::DeclaredOf(const Variable* v) const {
 }
 
 void CovergroupTable::Record(const CovergroupInstance& inst) {
-  built_.emplace_back(inst.decl, inst.group);
+  built_.push_back({inst.decl, inst.declaring_class, inst.group});
 }
 
 void CovergroupTable::WatchBlockEvents(CovergroupInstance* inst,
@@ -727,13 +727,38 @@ void CovergroupTable::WatchBlockEvents(CovergroupInstance* inst,
 }
 
 std::vector<const CoverGroup*> CovergroupTable::InstancesOf(
-    const CovergroupDecl* decl) const {
+    const CovergroupDecl* decl, const ClassTypeInfo* declaring_class) const {
   std::vector<const CoverGroup*> groups;
-  for (const auto& [d, group] : built_) {
-    if (d == decl) groups.push_back(group);
+  for (const BuiltInstance& built : built_) {
+    if (built.decl == decl && built.declaring_class == declaring_class) {
+      groups.push_back(built.group);
+    }
   }
   return groups;
 }
+
+namespace {
+
+// §19.4 with §8.25: the class among `type` and the classes it derives from
+// whose own declaration embeds `decl`, each specialization of a parameterized
+// class being one of its own; `type` itself for a covergroup composed from a
+// base's (§19.4.1), which no declaration holds. The walk stops at a class with
+// no declaration of its own, a built-in one, which embeds no covergroup.
+const ClassTypeInfo* DeclaringClass(const ClassTypeInfo* type,
+                                    const CovergroupDecl* decl) {
+  for (const ClassTypeInfo* t = type; t != nullptr && t->decl != nullptr;
+       t = t->parent) {
+    for (const ClassMember* member : t->decl->members) {
+      if (member->kind == ClassMemberKind::kCovergroup &&
+          member->covergroup == decl) {
+        return t;
+      }
+    }
+  }
+  return type;
+}
+
+}  // namespace
 
 CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
                                             const Expr* new_call,
@@ -747,6 +772,9 @@ CovergroupInstance* BuildCovergroupInstance(const CovergroupSite& site,
   *inst = CovergroupInstance{};
   inst->decl = &decl;
   inst->owner = site.owner;
+  if (site.owner != nullptr) {
+    inst->declaring_class = DeclaringClass(site.owner->type, &decl);
+  }
   inst->gen_consts = site.gen_consts;
   inst->inst_prefix = ctx.ActiveInstancePrefix();
   if (const Process* building = ctx.CurrentProcess()) {

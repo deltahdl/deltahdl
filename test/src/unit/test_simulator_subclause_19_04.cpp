@@ -124,4 +124,66 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupReachedThroughThis) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// A class C parameterized by N, embedding a covergroup cg whose coverpoint cp
+// has N bins over v, then `rest` with the module body that uses it.
+std::string ParameterizedOwner(const std::string& rest) {
+  return "class C #(int N = 2);\n"
+         "  bit [3:0] v;\n"
+         "  covergroup cg;\n"
+         "    cp: coverpoint v { bins b[] = {[0:N-1]}; }\n"
+         "  endgroup\n"
+         "  function new; cg = new; endfunction\n"
+         "endclass\n" +
+         rest;
+}
+
+// §19.4 with §8.25: each specialization of a parameterized class is a type of
+// its own, and so is the covergroup it embeds, so get_coverage() of C #(2)'s
+// cg averages a1's 50 and a2's 50, and that of C #(4)'s cg is b's 25, for the
+// covergroup and for its coverpoint. Over all three instances both read 41.67.
+TEST(EmbeddedCovergroupSim,
+     EachClassSpecializationEmbedsACovergroupTypeOfItsOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(ParameterizedOwner(
+                           "module t;\n"
+                           "  C #(2) a1 = new;\n"
+                           "  C #(2) a2 = new;\n"
+                           "  C #(4) b = new;\n"
+                           "  initial begin\n"
+                           "    a1.v = 0; a1.cg.sample();\n"
+                           "    a2.v = 1; a2.cg.sample();\n"
+                           "    b.v = 2; b.cg.sample();\n"
+                           "    $display(\"%0.2f %0.2f %0.2f %0.2f\", "
+                           "a1.cg.get_coverage(), b.cg.get_coverage(), "
+                           "a1.cg.cp.get_coverage(), b.cg.cp.get_coverage());\n"
+                           "  end\n"
+                           "endmodule\n"),
+                       f),
+            "50.00 25.00 50.00 25.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.4 with §8.25: a class derived from C #(2) inherits C #(2)'s covergroup,
+// so its instance is one more of that covergroup type: a's 50 and d's 0
+// average to 25.
+TEST(EmbeddedCovergroupSim,
+     ADerivedClassSharesItsBaseSpecializationsCovergroup) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(ParameterizedOwner(
+                           "class D extends C #(2);\n"
+                           "endclass\n"
+                           "module t;\n"
+                           "  C #(2) a = new;\n"
+                           "  D d = new;\n"
+                           "  initial begin\n"
+                           "    a.v = 0; a.cg.sample();\n"
+                           "    $display(\"%0.2f %0.2f\", a.cg.get_coverage(), "
+                           "d.cg.get_coverage());\n"
+                           "  end\n"
+                           "endmodule\n"),
+                       f),
+            "25.00 25.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

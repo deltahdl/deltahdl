@@ -91,6 +91,10 @@ struct CovergroupInstance {
   // §19.4: the object a covergroup embedded in a class belongs to, whose
   // members the covergroup's expressions read; null for any other covergroup.
   ClassObject* owner = nullptr;
+  // §19.4 with §8.25: the class, a specialization of its class where that is
+  // parameterized, whose declaration embeds the covergroup; the covergroup
+  // type is the declaration within that class. Null outside a class.
+  const ClassTypeInfo* declaring_class = nullptr;
   // §19.8.1: the formals of `with function sample`, as a function the
   // arguments of sample() are bound to; null where the covergroup has none.
   const ModuleItem* sample_function = nullptr;
@@ -152,9 +156,11 @@ class CovergroupTable {
   void Declare(const Variable* v, const CovergroupDecl* decl);
   const CovergroupDecl* DeclaredOf(const Variable* v) const;
   // §19.11.3: notes a built instance among those of its type, and the
-  // instances of the covergroup type `decl`, in the order they were built.
+  // instances of the covergroup type `decl` declared in `declaring_class`
+  // (§19.4, §8.25), in the order they were built.
   void Record(const CovergroupInstance& inst);
-  std::vector<const CoverGroup*> InstancesOf(const CovergroupDecl* decl) const;
+  std::vector<const CoverGroup*> InstancesOf(
+      const CovergroupDecl* decl, const ClassTypeInfo* declaring_class) const;
   // §19.3: notes an instance whose covergroup is sampled at a block event,
   // with the instance prefix of the scope it was built in, once however often
   // the instance is rebuilt.
@@ -186,7 +192,12 @@ class CovergroupTable {
   std::unordered_map<uint64_t, CovergroupInstance*> held_;
   std::unordered_map<const CovergroupInstance*, uint64_t> identities_;
   std::unordered_map<const Variable*, const CovergroupDecl*> declared_;
-  std::vector<std::pair<const CovergroupDecl*, const CoverGroup*>> built_;
+  struct BuiltInstance {
+    const CovergroupDecl* decl;
+    const ClassTypeInfo* declaring_class;
+    const CoverGroup* group;
+  };
+  std::vector<BuiltInstance> built_;
   std::vector<std::pair<std::string, CovergroupInstance*>> block_watchers_;
   std::unordered_map<
       const ClassTypeInfo*,
