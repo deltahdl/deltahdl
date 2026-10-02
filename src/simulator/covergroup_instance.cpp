@@ -532,6 +532,22 @@ Logic4Vec RunGroupMethod(std::string_view method, CovergroupInstance& inst,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §19.8: runs the method `call` names on `target`, the coverage methods on an
+// instance or one of its coverpoints or crosses and the others on an
+// instance; false for any other method of a coverpoint or cross.
+bool RunCovergroupMethod(const CovergroupTarget& target, const Expr* call,
+                         SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  std::string_view method = call->lhs->rhs->text;
+  if (method == "get_coverage" || method == "get_inst_coverage") {
+    out =
+        ReportCoverage(target, call, method == "get_inst_coverage", ctx, arena);
+    return true;
+  }
+  if (target.point != nullptr || target.cross != nullptr) return false;
+  out = RunGroupMethod(method, *target.inst, call, ctx, arena);
+  return true;
+}
+
 bool IsCovergroupMethod(std::string_view method) {
   return method == "sample" || method == "get_coverage" ||
          method == "get_inst_coverage" || method == "set_inst_name" ||
@@ -847,15 +863,16 @@ bool TryEvalCovergroupMethodCall(const Expr* expr, SimContext& ctx,
   }
   CovergroupTarget target = TargetNamed(access->lhs, ctx, arena);
   if (target.inst == nullptr) return false;
-  std::string_view method = access->rhs->text;
-  if (method == "get_coverage" || method == "get_inst_coverage") {
-    out =
-        ReportCoverage(target, expr, method == "get_inst_coverage", ctx, arena);
-    return true;
-  }
-  if (target.point != nullptr || target.cross != nullptr) return false;
-  out = RunGroupMethod(method, *target.inst, expr, ctx, arena);
-  return true;
+  return RunCovergroupMethod(target, expr, ctx, arena, out);
+}
+
+bool TryEvalCovergroupMethodOnHandle(const Logic4Vec& handle, const Expr* expr,
+                                     SimContext& ctx, Arena& arena,
+                                     Logic4Vec& out) {
+  if (!IsCovergroupMethod(expr->lhs->rhs->text)) return false;
+  CovergroupInstance* inst = ctx.Covergroups().Held(handle.ToUint64());
+  if (inst == nullptr) return false;
+  return RunCovergroupMethod({inst, nullptr, nullptr}, expr, ctx, arena, out);
 }
 
 bool TryEvalCovergroupOptionRead(const Expr* expr, SimContext& ctx,

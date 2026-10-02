@@ -587,4 +587,26 @@ TEST(CovergroupInstanceSim, VirtualInterfaceReachesInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.8 with §8.6: a covergroup method called on the handle a function
+// returns runs on the instance the handle refers to.
+TEST(CovergroupInstanceSim, MethodOnReturnedHandleReachesTheInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module top;\n"
+                "  bit [1:0] v;\n"
+                "  covergroup cg; coverpoint v { bins a = {1}; bins b = {2}; } "
+                "endgroup\n"
+                "  cg c = new;\n"
+                "  function cg pick(); return c; endfunction\n"
+                "  initial begin\n"
+                "    v = 1; pick().sample();\n"
+                "    $display(\"%0.2f %0.2f\", c.get_inst_coverage(),\n"
+                "             pick().get_inst_coverage());\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

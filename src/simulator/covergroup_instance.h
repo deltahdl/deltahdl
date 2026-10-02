@@ -227,6 +227,13 @@ void SampleAtBlockEvent(std::string_view scope, bool is_begin, SimContext& ctx,
 bool TryEvalCovergroupMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out);
 
+// §19.8 with §8.6: a covergroup method called on the handle a receiver that
+// is a call already produced, `pick().sample()`. False where `handle` refers
+// to no instance or the method is none of a covergroup's.
+bool TryEvalCovergroupMethodOnHandle(const Logic4Vec& handle, const Expr* expr,
+                                     SimContext& ctx, Arena& arena,
+                                     Logic4Vec& out);
+
 // §19.7 and §19.10: a read of `option.member` or `type_option.member` through
 // an instance, or through one of its coverpoints or crosses. False where the
 // expression is not one.

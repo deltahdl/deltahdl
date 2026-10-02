@@ -17,6 +17,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/covergroup_instance.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_hier.h"
@@ -619,6 +620,10 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   // Read as a handle, the text named no object and the call answered nothing.
   if (handle.is_string &&
       TryEvalStringMethodOnValue(handle, expr, ctx, arena, out)) {
+    return true;
+  }
+  // §19.8: the call answered a covergroup handle, `pick().sample()`.
+  if (TryEvalCovergroupMethodOnHandle(handle, expr, ctx, arena, out)) {
     return true;
   }
   InstanceMethodInfo info;
