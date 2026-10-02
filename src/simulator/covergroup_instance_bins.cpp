@@ -82,9 +82,12 @@ void AppendWildcardValue(const Logic4Vec& v, const SampledCoverpoint& point,
 }
 
 // §19.5.7: the effective type of `point`, to which a bin value is cast; a
-// width not known stands for every value, as PointTypeBounds has it.
+// width not known, like one of 64 bits or more, stands for every value a bin
+// value can hold, as PointTypeBounds has it.
 CoverpointEffectiveType EffectiveTypeOf(const SampledCoverpoint& point) {
-  if (point.width == 0) return {64, true};
+  if (point.width == 0 || point.width >= 64) {
+    return {64, point.width == 0 || point.is_signed};
+  }
   return {point.width, point.is_signed};
 }
 

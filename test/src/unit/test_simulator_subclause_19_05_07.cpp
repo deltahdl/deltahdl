@@ -338,4 +338,50 @@ TEST(CovergroupInstanceSim, SetExpressionElementsTheTypeCannotExpressLeave) {
   EXPECT_EQ(f.diag.WarningCount(), 2u);
 }
 
+// LRM 11.4.13: a range whose low bound exceeds its high bound holds no value,
+// so `[5:2]` gives rev none and leaves it out of coverage, with no LRM 19.5.7
+// warning, as it holds no value to resolve; `[$:2]` reaches down to the type's
+// least value, 0, and is hit by 1 as ok is.
+TEST(CovergroupInstanceSim, ReversedBinRangeHoldsNoValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [2:0] x;\n"
+          "  covergroup cg;\n"
+          "    a: coverpoint x { bins rev = {[5:2]}; bins low = {[$:2]};\n"
+          "      bins ok = {1}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    x = 1; c.sample();\n"
+          "    $display(\"%0.2f\", c.a.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "100.00\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// LRM 19.5.7: a 64-bit coverpoint expresses every value a bin value of 64 bits
+// holds, so -1 and the largest longint stay in their bins with no warning.
+TEST(CovergroupInstanceSim, SixtyFourBitCoverpointKeepsEveryBinValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  longint l;\n"
+                       "  covergroup cg;\n"
+                       "    a: coverpoint l { bins neg = {-1};\n"
+                       "      bins big = {64'sh7fff_ffff_ffff_ffff}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    l = -1; c.sample();\n"
+                       "    $display(\"%0.2f\", c.a.get_inst_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "50.00\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }  // namespace
