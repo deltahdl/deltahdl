@@ -125,12 +125,13 @@ bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,
                            std::vector<Logic4Vec>& out);
 
 // §10.9.1 with §7.4, §7.5 and §8.5: stores the array assignment pattern `rhs`
-// into `dst_ref`, a one-dimensional array property, element by element: the
-// element at each position from the left takes the item the pattern gives
-// that position (PatternItemAt). A dynamic one is first resized to the
-// pattern's item count. False, storing nothing, where `rhs` is no assignment
-// pattern, `dst_ref` holds subarrays, or `dst_ref` is dynamic and `rhs` keyed
-// or of a replication count that is unknown.
+// into the array property `dst_ref` element by element: the element at each
+// position from the left takes the item the pattern gives that position
+// (PatternItemAt). A dynamic one is first resized to the pattern's item count.
+// One holding subarrays (§7.4.4) is filled as a declared array of its shape
+// is, nested patterns, replications and keys alike. False, storing nothing,
+// where `dst_ref` is dynamic and `rhs` keyed or of a replication count that is
+// unknown.
 bool StoreClassArrayPattern(const ClassArrayRef& dst_ref, const Expr* rhs,
                             SimContext& ctx, Arena& arena);
 

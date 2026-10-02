@@ -702,11 +702,8 @@ static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
 }
 
 // §18.8 and §18.9: rand_mode() and constraint_mode() are built in on any
-// class handle, are no method of any other type and cannot be overridden, so
-// they are dispatched first. §11.3.1 has the receiver evaluated once, and the
-// built-in and container arms after this evaluate a receiver such as
-// `pk().x` to learn whether it is theirs: reached after them, the call in it
-// ran three times.
+// class handle and cannot be overridden, so they are dispatched first, their
+// receiver evaluated once by their own arm (eval_randomize_mode.cpp).
 static bool TryDispatchModeMethod(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
@@ -724,10 +721,13 @@ static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
 }
 
 // A method called on a receiver: a built-in method of its type, or a class
-// method of the object it yields.
+// method of the object it yields. §8.6 with §11.3.1: a receiver starting at a
+// call, `pk().kid` or `pk().a[1]`, is evaluated once for all the arms below,
+// each of which evaluates it to learn whether the method is theirs.
 static bool TryDispatchReceiverMethod(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   if (TryDispatchModeMethod(expr, ctx, arena, out)) return true;
+  CallResultReceiverScope receiver(expr, ctx, arena);
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryDispatchRandomizeMethod(expr, ctx, arena, out)) return true;

@@ -224,7 +224,9 @@ static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
 // forced to zero.
 // §8.7 with §10.9.1: a fixed-size array property whose declaration
 // initializer is an array assignment pattern, `int f[4] = '{5, 1, 8, 3};`,
-// takes each item into the element at its position (StoreClassArrayPattern).
+// takes each item into the element at its position (StoreClassArrayPattern),
+// and a multidimensional one, `int g[2][3] = '{'{...}, '{...}}`, each nested
+// item into the subarray at its position.
 // Evaluated as one value, the pattern answered its last item, which every
 // element was given. The elements are first made at their type's default, as
 // for a property with no initializer, so an element the pattern leaves
@@ -236,8 +238,7 @@ static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
                                      Construction& c) {
   if (prop.init_expr == nullptr ||
       prop.init_expr->kind != ExprKind::kAssignmentPattern ||
-      (prop.array_size == 0 && !prop.is_dynamic) ||
-      prop.dim_sizes.size() >= 2) {
+      (!prop.IsArray() && prop.dim_sizes.size() < 2)) {
     return false;
   }
   uint32_t width = BoundPropertyWidth(prop, c);
@@ -247,8 +248,11 @@ static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
   ClassArrayRef ref;
   ref.obj = c.obj;
   ref.prop = &prop;
-  ref.size = prop.array_size;
-  ref.lo = prop.array_lo;
+  // §7.4.4: a multidimensional property's reference starts at its first
+  // dimension, whose elements are subarrays the pattern's items fill.
+  const bool kMulti = prop.dim_sizes.size() >= 2;
+  ref.size = kMulti ? prop.dim_sizes[0] : prop.array_size;
+  ref.lo = kMulti ? prop.dim_los[0] : prop.array_lo;
   return StoreClassArrayPattern(ref, prop.init_expr, c.ctx, c.arena);
 }
 

@@ -150,15 +150,18 @@ static void CreateStaticProperties(ClassTypeInfo* info, Arena& arena) {
 static bool TryInitStaticArrayPattern(ClassTypeInfo* info,
                                       const ClassTypeInfo::PropertyInfo& p,
                                       SimContext& ctx, Arena& arena) {
-  if (p.init_expr->kind != ExprKind::kAssignmentPattern || !p.IsArray() ||
-      p.dim_sizes.size() >= 2) {
+  if (p.init_expr->kind != ExprKind::kAssignmentPattern ||
+      (!p.IsArray() && p.dim_sizes.size() < 2)) {
     return false;
   }
   ClassArrayRef ref;
   ref.prop = &p;
   ref.static_owner = info;
-  ref.size = p.array_size;
-  ref.lo = p.is_dynamic ? 0 : p.array_lo;
+  // §7.4.4: a multidimensional property's reference starts at its first
+  // dimension, whose elements are subarrays the pattern's items fill.
+  const bool kMulti = p.dim_sizes.size() >= 2;
+  ref.size = kMulti ? p.dim_sizes[0] : p.array_size;
+  ref.lo = kMulti ? p.dim_los[0] : (p.is_dynamic ? 0 : p.array_lo);
   return StoreClassArrayPattern(ref, p.init_expr, ctx, arena);
 }
 

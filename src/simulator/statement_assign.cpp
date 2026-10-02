@@ -387,7 +387,12 @@ static FieldTarget ResolveOwnPropertyMemberTarget(std::string_view base_name,
   if (self == nullptr || NameDenotesVariable(base_name, ctx)) return {};
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
   const ClassTypeInfo* start = enclosing != nullptr ? enclosing : self->type;
-  if (FindPropertyInfo(start, base_name) == nullptr) return {};
+  // §7.4 with §8.4: `kids[1].v` reaches the element of the array property
+  // `kids`, a handle followed into its object as `h.kids[1].v` follows it.
+  if (FindPropertyInfo(start, base_name.substr(0, base_name.find('['))) ==
+      nullptr) {
+    return {};
+  }
   *handled = true;
   std::string path = std::string(base_name) + "." + std::string(field_name);
   return ResolveClassFieldTarget(self, enclosing, path, ctx);
@@ -422,6 +427,15 @@ static FieldTarget ResolveThisField(std::string_view base_name,
   *handled = false;
   if (base_name != "this") return {};
   *handled = true;
+  // §8.11 with §8.4: a path through a handle the object holds, `this.kid.v`
+  // or `this.kids[1].v`, is followed into the object it refers to, as
+  // `h.kids[1].v` is; kept whole, it named a property of `this` that no
+  // declaration has.
+  auto* self = ctx.CurrentThis();
+  if (self != nullptr && field_name.find('.') != std::string_view::npos) {
+    return ResolveClassFieldTarget(self, ctx.CurrentMethodClass(), field_name,
+                                   ctx);
+  }
   return ResolveOwnPropertyTarget(field_name, ctx);
 }
 

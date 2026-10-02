@@ -900,7 +900,7 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   VpiActiveFrameScope frame;
   // §13.4.1: the record a `return` of a queue or an array fills, handed to
   // the evaluation of the call when the body completes (eval_call_result.cpp).
-  FunctionBodyResultScope result_scope;
+  FunctionBodyResultScope result_scope(ctx);
   // A return type nothing can size -- void, a string, a class handle, a
   // parameterized method's type -- leaves the return statement to take the
   // expression's own vector, which is what it has always done. A typedef name

@@ -113,4 +113,63 @@ TEST(ArrayLiteralSim, APatternFillsASubarraySelect) {
             "4}}}\n");
 }
 
+// §10.9.1 with §8.5 and §8.7: a class property may be a multidimensional
+// array, which a nested pattern fills one subarray per outer item, through a
+// handle, by its bare name in a method and as the initializer of an instance
+// or a static property, and which `'{default: 9}` fills at every element. The
+// pattern stored nothing through a handle or in a method, and as an initializer
+// gave every element the last item, 6.
+TEST(ArrayLiteralSim, ANestedPatternFillsAMultidimensionalArrayProperty) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int g[2][3];\n"
+      "  int i[2][3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "  static int s[2][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  function void fill(); g = '{'{1, 2, 3}, '{4, 5, 6}}; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    automatic H k = new;\n"
+      "    automatic H m = new;\n"
+      "    h.g = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "    k.fill();\n"
+      "    m.g = '{default: 9};\n"
+      "    $display(\"%0d %0d %0d %0d\", h.g[0][0], h.g[0][1], h.g[1][0], "
+      "h.g[1][2]);\n"
+      "    $display(\"%0d %0d %0d %0d\", k.g[0][2], k.g[1][1], h.i[0][0], "
+      "h.i[1][2]);\n"
+      "    $display(\"%0d %0d %0d %0d\", m.g[0][0], m.g[1][2], H::s[1][0],\n"
+      "             H::s[0][1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 4 6\n3 5 1 6\n9 9 3 2\n");
+}
+
+// §10.9.1 with §7.4.4 and §8.5: a select of a multidimensional class
+// property's leading dimension, `s.g[1]` through a handle or `g[0]` bare in a
+// method, is a subarray, which a pattern fills element by element. The pattern
+// stored nothing.
+TEST(ArrayLiteralSim, APatternFillsASubarrayOfAClassProperty) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class H;\n"
+      "  int g[2][3];\n"
+      "  function void low(); g[0] = '{4, 5, 6}; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H s = new;\n"
+      "    s.g[1] = '{7, 8, 9};\n"
+      "    s.low();\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", s.g[0][0], s.g[0][1], "
+      "s.g[0][2], s.g[1][0], s.g[1][1], s.g[1][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 5 6 7 8 9\n");
+}
+
 }  // namespace

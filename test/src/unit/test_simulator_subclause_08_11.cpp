@@ -373,4 +373,35 @@ TEST(ClassThisSim, ThisPathReadsAMemberOfAStructProperty) {
       "59 17\n");
 }
 
+// §8.11 with §8.5 and §7.4: inside a method, `kids[1]` names an element of
+// the object's own array of handles, and `kids[1].v = 7` writes the property
+// v of the object that element refers to, as `this.kids[0].v = 5` does
+// through `this` and `h.kids[1].v = 7` does from outside. Both writes inside
+// the methods were lost and the properties stayed 0.
+TEST(ClassThisSim, AMemberOfAnElementOfAHandleArrayPropertyIsWrittenInAMethod) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class K;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class H;\n"
+      "  K kids[2];\n"
+      "  function void mk(); kids[0] = new; kids[1] = new; endfunction\n"
+      "  function void setv(); kids[1].v = 7; kids[0].v = 2; endfunction\n"
+      "  function void thisset(); this.kids[0].v = 5; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic H h = new;\n"
+      "    h.mk();\n"
+      "    h.setv();\n"
+      "    $display(\"%0d %0d\", h.kids[1].v, h.kids[0].v);\n"
+      "    h.thisset();\n"
+      "    $display(\"%0d %0d\", h.kids[1].v, h.kids[0].v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 2\n7 5\n");
+}
+
 }  // namespace

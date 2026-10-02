@@ -636,4 +636,73 @@ TEST(ObjectMethodSim, QueueMethodStatementOnACallResultEvaluatesItOnce) {
             107u);
 }
 
+// §8.6 with §11.3.1: a method called through a member of a call's result,
+// `pk().kid.get()`, or through an element of one, `pk().a[1].get()`, runs on
+// the object that member or element holds, and the call is an operand
+// evaluated once, in an expression and in a statement alike. Each arm that
+// asked whether the receiver was a process, a class array or a semaphore
+// evaluated the call again: three runs in an expression and up to five in a
+// statement. The run() calls each add one to the v of the object they reach.
+static std::string MemberOfCallResultDesign(std::string_view body) {
+  return ElementMethodDesign(
+      "class K;\n"
+      "  C kid = new;\n"
+      "  C a[2];\n"
+      "  function new(); a[0] = new; a[1] = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int calls;\n"
+      "  K k = new;\n"
+      "  function K pk(); calls++; return k; endfunction\n"
+      "  int y;\n"
+      "  initial begin\n" +
+      std::string(body) +
+      "    y = calls * 100 + k.kid.v * 10 + k.a[1].v;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ObjectMethodSim, MethodThroughAMemberOfACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(MemberOfCallResultDesign("    void'(pk().kid.get());\n"
+                                               "    void'(pk().a[1].get());\n"),
+                      "y"),
+            277u);
+}
+
+TEST(ObjectMethodSim,
+     MethodStatementThroughAMemberOfACallResultEvaluatesItOnce) {
+  EXPECT_EQ(RunAndGet(MemberOfCallResultDesign("    pk().kid.get();\n"
+                                               "    pk().kid.run();\n"
+                                               "    pk().a[1].get();\n"
+                                               "    pk().a[1].run();\n"),
+                      "y"),
+            488u);
+}
+
+// §8.6 with §11.3.1 and §13.4: the value a call yields for one evaluation is
+// that evaluation's alone, so where the method it reaches recurses into the
+// same expression, `depth(n)` calling `pk().kid.step(n - 1)` which calls
+// depth again, each level runs pk() once of its own: three levels, three
+// runs. A value held across the method's body answered the inner levels with
+// the outer one's and ran pk() once in all.
+TEST(ObjectMethodSim, ARecursiveEvaluationOfTheSameReceiverRunsItsOwnCall) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int calls;\n"
+                "  class C;\n"
+                "    function int step(int n); return depth(n); endfunction\n"
+                "  endclass\n"
+                "  class K; C kid = new; endclass\n"
+                "  K k = new;\n"
+                "  function K pk(); calls++; return k; endfunction\n"
+                "  function int depth(int n);\n"
+                "    return n == 0 ? 0 : 1 + pk().kid.step(n - 1);\n"
+                "  endfunction\n"
+                "  int y;\n"
+                "  initial y = depth(3) * 100 + calls;\n"
+                "endmodule\n",
+                "y"),
+      303u);
+}
+
 }  // namespace

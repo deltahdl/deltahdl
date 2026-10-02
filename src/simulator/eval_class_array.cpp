@@ -246,6 +246,79 @@ bool OrderClassArray(const Expr* expr, const ClassArrayRef& ref,
   return true;
 }
 
+// §7.4.4: the subarray at `index` of the array property `ref` holds
+// subarrays of: an array of the next dimension, its elements held under keys
+// extending the element's own, `g[1][2]`.
+ClassArrayRef SubarrayAt(const ClassArrayRef& ref, int64_t index) {
+  ClassArrayRef sub = ref;
+  sub.path = ClassArrayRefElementKey(ref, index);
+  sub.dim = ref.dim + 1;
+  sub.lo = ref.prop->dim_los[sub.dim];
+  sub.size = ref.prop->dim_sizes[sub.dim];
+  return sub;
+}
+
+// An element of a multidimensional array property, the subarray `ref` of
+// the last dimension holding it at `index`, and the name of the variable
+// that stands for it while a pattern is distributed, `$pattern[1][2]`.
+struct ClassArrayLeaf {
+  ClassArrayRef ref;
+  int64_t index;
+  std::string name;
+};
+
+void CollectLeaves(const ClassArrayRef& ref, const std::string& name,
+                   std::vector<ClassArrayLeaf>& out) {
+  for (uint32_t i = 0; i < ref.size; ++i) {
+    int64_t index = ref.lo + i;
+    std::string child = name + "[" + std::to_string(index) + "]";
+    if (ClassArrayHoldsSubarrays(ref)) {
+      CollectLeaves(SubarrayAt(ref, index), child, out);
+    } else {
+      out.push_back({ref, index, std::move(child)});
+    }
+  }
+}
+
+// §10.9.1 with §7.4.4 and §8.5: a pattern into an array property holding
+// subarrays, `'{'{1, 2, 3}, '{4, 5, 6}}`, fills it as it fills a declared
+// array of the same shape -- nested patterns, replications, keys and
+// `default` alike (DistributePatternToArray) -- by being distributed into
+// variables of that shape, held in a scope pushed for the purpose, each
+// element then taking the value its variable was given.
+bool StoreNestedClassArrayPattern(const ClassArrayRef& dst, const Expr* rhs,
+                                  SimContext& ctx, Arena& arena) {
+  const ClassTypeInfo::PropertyInfo& prop = *dst.prop;
+  const auto kFrom = static_cast<std::ptrdiff_t>(dst.dim);
+  ArrayInfo shape;
+  shape.dim_los.assign(prop.dim_los.begin() + kFrom, prop.dim_los.end());
+  shape.dim_sizes.assign(prop.dim_sizes.begin() + kFrom, prop.dim_sizes.end());
+  shape.dim_descending.assign(shape.dim_sizes.size(), false);
+  for (size_t d = 0; d < shape.dim_descending.size(); ++d) {
+    size_t at = dst.dim + d;
+    shape.dim_descending[d] =
+        at < prop.dim_descending.size() && prop.dim_descending[at];
+  }
+  shape.lo = shape.dim_los[0];
+  shape.size = shape.dim_sizes[0];
+  shape.elem_width = prop.width;
+  shape.is_4state = prop.is_4state;
+  std::vector<ClassArrayLeaf> leaves;
+  CollectLeaves(dst, "$pattern", leaves);
+  ctx.PushScope();
+  for (const ClassArrayLeaf& leaf : leaves) {
+    ctx.CreateLocalVariable(*arena.Create<std::string>(leaf.name), prop.width,
+                            prop.is_signed);
+  }
+  DistributePatternToArray("$pattern", shape, rhs, ctx, arena);
+  for (const ClassArrayLeaf& leaf : leaves) {
+    StoreClassArrayElement(leaf.ref, leaf.index,
+                           ctx.FindVariable(leaf.name)->value, ctx, arena);
+  }
+  ctx.PopScope();
+  return true;
+}
+
 }  // namespace
 
 bool NamesOwnArrayProperty(const Expr* base, SimContext& ctx) {
@@ -311,12 +384,7 @@ static bool ResolveClassSubarray(const Expr* sel, SimContext& ctx, Arena& arena,
   }
   Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
   if (HasUnknownBits(idx)) return false;
-  out = outer;
-  out.path =
-      ClassArrayRefElementKey(outer, static_cast<int64_t>(idx.ToUint64()));
-  out.dim = outer.dim + 1;
-  out.lo = outer.prop->dim_los[out.dim];
-  out.size = outer.prop->dim_sizes[out.dim];
+  out = SubarrayAt(outer, static_cast<int64_t>(idx.ToUint64()));
   return true;
 }
 
@@ -574,10 +642,8 @@ static bool PatternItemCount(const Expr* rhs, SimContext& ctx, Arena& arena,
 
 bool StoreClassArrayPattern(const ClassArrayRef& dst_ref, const Expr* rhs,
                             SimContext& ctx, Arena& arena) {
-  if (rhs == nullptr || rhs->kind != ExprKind::kAssignmentPattern ||
-      ClassArrayHoldsSubarrays(dst_ref)) {
-    return false;
-  }
+  if (ClassArrayHoldsSubarrays(dst_ref))
+    return StoreNestedClassArrayPattern(dst_ref, rhs, ctx, arena);
   ClassArrayRef dst = dst_ref;
   if (dst.prop->is_dynamic) {
     if (!PatternItemCount(rhs, ctx, arena, dst.size)) return false;
@@ -600,11 +666,16 @@ bool StoreClassArrayPattern(const ClassArrayRef& dst_ref, const Expr* rhs,
 
 bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   const Expr* lhs = stmt->lhs;
+  // §10.9.1 with §7.4.4: a pattern fills a subarray of a multidimensional
+  // property, `h.g[1] = '{7, 8, 9}`, as it fills the whole property.
+  const bool kPattern =
+      stmt->rhs != nullptr && stmt->rhs->kind == ExprKind::kAssignmentPattern;
   if (lhs == nullptr || (lhs->kind != ExprKind::kIdentifier &&
-                         lhs->kind != ExprKind::kMemberAccess)) {
+                         lhs->kind != ExprKind::kMemberAccess &&
+                         (!kPattern || lhs->kind != ExprKind::kSelect))) {
     return false;
   }
-  if (stmt->rhs != nullptr && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+  if (kPattern) {
     ClassArrayRef pattern_dst;
     return ResolveClassArray(lhs, ctx, arena, pattern_dst) &&
            StoreClassArrayPattern(pattern_dst, stmt->rhs, ctx, arena);

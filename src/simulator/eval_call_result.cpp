@@ -33,26 +33,49 @@ namespace delta {
 
 namespace {
 
+// Whether `expr` selects a named member, `.m`, the dot no package's scope
+// resolution.
+bool SelectsNamedMember(const Expr* expr) {
+  return expr != nullptr && expr->kind == ExprKind::kMemberAccess &&
+         !expr->is_scope_resolution && expr->rhs != nullptr &&
+         expr->rhs->kind == ExprKind::kIdentifier;
+}
+
+// A.8.4: a system function call is a primary a method is called on as a
+// subroutine call is, `$sformatf("%s", s).len()`.
+bool IsCall(const Expr* expr) {
+  return expr->kind == ExprKind::kCall || expr->kind == ExprKind::kSystemCall;
+}
+
 // Whether `side`, the handle side of a member access, is a method call or a
 // member path down from one, `f()` or `f().p.q`: the object it denotes is the
 // one the call returned, which no name resolves. A path from a name is left to
 // the resolvers that own it, and a select on the way to the element paths.
 bool RootedAtCall(const Expr* side) {
   if (side == nullptr) return false;
-  // A.8.4: a system function call is a primary a method is called on as a
-  // subroutine call is, `$sformatf("%s", s).len()`.
-  if (side->kind == ExprKind::kCall || side->kind == ExprKind::kSystemCall)
-    return true;
-  return side->kind == ExprKind::kMemberAccess && !side->is_scope_resolution &&
-         side->rhs != nullptr && side->rhs->kind == ExprKind::kIdentifier &&
-         RootedAtCall(side->lhs);
+  if (IsCall(side)) return true;
+  return SelectsNamedMember(side) && RootedAtCall(side->lhs);
 }
 
 // Whether `expr` selects a named member, `.m`, of something RootedAtCall.
 bool SelectsMemberOfCallResult(const Expr* expr) {
-  return expr != nullptr && expr->kind == ExprKind::kMemberAccess &&
-         !expr->is_scope_resolution && expr->rhs != nullptr &&
-         expr->rhs->kind == ExprKind::kIdentifier && RootedAtCall(expr->lhs);
+  return SelectsNamedMember(expr) && RootedAtCall(expr->lhs);
+}
+
+// The call a method call's receiver starts at, through the members it selects
+// and the elements it indexes: `pk()` of `pk()`, `pk().kid` and `pk().a[1]`.
+// Null where the receiver starts at anything else, a name among them.
+const Expr* CallReceiverStartsAt(const Expr* side) {
+  while (side != nullptr && !IsCall(side)) {
+    if (SelectsNamedMember(side)) {
+      side = side->lhs;
+    } else if (side->kind == ExprKind::kSelect && side->index != nullptr) {
+      side = side->base;
+    } else {
+      return nullptr;
+    }
+  }
+  return side;
 }
 
 // The method `name` of `obj` by the object's own type: a virtual one through
@@ -299,10 +322,11 @@ CallResultReceiverScope::CallResultReceiverScope(const Expr* call,
                                                  SimContext& ctx, Arena& arena)
     : ctx_(ctx) {
   if (call == nullptr || call->kind != ExprKind::kCall ||
-      !SelectsMemberOfCallResult(call->lhs)) {
+      !SelectsNamedMember(call->lhs)) {
     return;
   }
-  const Expr* base = call->lhs->lhs;
+  const Expr* base = CallReceiverStartsAt(call->lhs->lhs);
+  if (base == nullptr) return;
   std::optional<ReturnedAggregate> returned;
   Logic4Vec value = EvalWithReturnedAggregate(base, ctx, arena, returned);
   auto& reg = Register();
@@ -322,14 +346,29 @@ CallResultReceiverScope::~CallResultReceiverScope() {
   reg.held_aggregate = std::move(outer_aggregate_);
 }
 
-FunctionBodyResultScope::FunctionBodyResultScope() {
-  Register().bodies.emplace_back();
+FunctionBodyResultScope::FunctionBodyResultScope(SimContext& ctx) : ctx_(ctx) {
+  auto& reg = Register();
+  reg.bodies.emplace_back();
+  const Logic4Vec* held = reg.held_base != nullptr
+                              ? ctx.FindDeferredArgSnapshot(reg.held_base)
+                              : nullptr;
+  if (held == nullptr) return;
+  set_aside_base_ = reg.held_base;
+  set_aside_value_ = *held;
+  set_aside_aggregate_ = std::move(reg.held_aggregate);
+  ctx.ClearDeferredArgSnapshot(set_aside_base_);
+  reg.held_base = nullptr;
+  reg.held_aggregate.reset();
 }
 
 FunctionBodyResultScope::~FunctionBodyResultScope() {
   auto& reg = Register();
   reg.completed = std::move(reg.bodies.back());
   reg.bodies.pop_back();
+  if (set_aside_base_ == nullptr) return;
+  ctx_.SetDeferredArgSnapshot(set_aside_base_, set_aside_value_);
+  reg.held_base = set_aside_base_;
+  reg.held_aggregate = std::move(set_aside_aggregate_);
 }
 
 void RecordReturnedAggregate(const Expr* returned, SimContext& ctx,

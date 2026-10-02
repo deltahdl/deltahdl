@@ -536,51 +536,75 @@ static bool ExecNonSuspendingCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// The calls a statement makes its process wait in, which only a statement
+// can: a process's await() or suspend() (§9.7), a semaphore's get() (§15.3)
+// and a mailbox's put(), get() or peek() (§15.4).
+enum class WaitingCall : std::uint8_t { kNone, kProcess, kSemaphore, kMailbox };
+
+static WaitingCall ClassifyWaitingCall(const Expr* expr, SimContext& ctx,
+                                       Arena& arena) {
+  if (IsSuspendingProcessCall(expr, ctx, arena)) return WaitingCall::kProcess;
+  if (SemaphoreCallTarget(expr, ctx, "get") != nullptr)
+    return WaitingCall::kSemaphore;
+  if (IsMailboxBlockingCall(expr, ctx, arena)) return WaitingCall::kMailbox;
+  return WaitingCall::kNone;
+}
+
+static ExecTask ExecWaitingCall(WaitingCall kind, const Expr* expr,
+                                SimContext& ctx, Arena& arena) {
+  if (kind == WaitingCall::kProcess) {
+    co_return co_await ExecSuspendingProcessCall(expr, ctx, arena);
+  }
+  // §15.4.3, §15.4.5 and §15.4.7: put(), get() and peek() wait on the mailbox.
+  if (kind == WaitingCall::kMailbox) {
+    co_return co_await ExecMailboxCall(expr, ctx, arena);
+  }
+  // §15.3: a process calling get() procures the keys it asks for before it can
+  // continue, and waits where it stands until enough keys are in the bucket.
+  // The wait is why this is served here and put()/try_get() are served by the
+  // expression evaluator: only a statement can suspend the process it is in.
+  auto* sem = SemaphoreCallTarget(expr, ctx, "get");
+  int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
+  // §15.3.3: a negative count is an error, and the process does not wait.
+  if (ReportNegativeKeyCount(expr, count, "15.3.3", ctx)) {
+    co_return StmtResult::kDone;
+  }
+  co_await SemaphoreGetAwaiter{.sem = *sem, .count = count, .ctx = &ctx};
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
 
   if (ExecNonSuspendingCall(expr, ctx, arena)) co_return StmtResult::kDone;
 
-  if (IsSuspendingProcessCall(expr, ctx, arena)) {
-    co_return co_await ExecSuspendingProcessCall(expr, ctx, arena);
-  }
-
-  // §15.3: a process calling get() procures the keys it asks for before it can
-  // continue, and waits where it stands until enough keys are in the bucket.
-  // The wait is why this is served here and put()/try_get() are served by the
-  // expression evaluator: only a statement can suspend the process it is in.
-  if (auto* sem = SemaphoreCallTarget(expr, ctx, "get")) {
-    int32_t count = SemaphoreKeyArg(expr, ctx, arena, 1);
-    // §15.3.3: a negative count is an error, and the process does not wait.
-    if (ReportNegativeKeyCount(expr, count, "15.3.3", ctx)) {
-      co_return StmtResult::kDone;
-    }
-    co_await SemaphoreGetAwaiter{.sem = *sem, .count = count, .ctx = &ctx};
-    co_return StmtResult::kDone;
-  }
-  // §15.4.3, §15.4.5 and §15.4.7: put(), get() and peek() wait on the mailbox.
-  if (IsMailboxBlockingCall(expr, ctx, arena)) {
-    co_return co_await ExecMailboxCall(expr, ctx, arena);
-  }
-  // §13.3 with §8.6: a task enabled through an object handle runs as a
-  // coroutine too, so its timing controls suspend this process. §11.3.1: a
-  // receiver that is a call's value, `pk().t()` or `pk().f()`, is evaluated
-  // once, before the search for a task to enable through it, and a statement
-  // whose method is no task is run by the expression evaluator while that
-  // value is still held (CallResultReceiverScope). The value is released
-  // before a task's body runs, since another process may reach the statement
-  // while this one waits in it.
+  // §8.6 with §11.3.1: a receiver that starts at a call, `pk().t()`,
+  // `pk().kid.f()` or `pk().a[1].f()`, is evaluated once and held
+  // (CallResultReceiverScope) while the statement is asked whether it is a
+  // wait, then a task to enable through the object (§13.3), each question
+  // evaluating the receiver; a statement that is neither is run by the
+  // expression evaluator while the value is still held. The value is released
+  // before the process waits or a task's body runs, since another process may
+  // reach the statement meanwhile.
   InstanceMethodInfo instance_call;
   bool enables_task = false;
+  WaitingCall waiting = WaitingCall::kNone;
   {
     CallResultReceiverScope receiver(expr, ctx, arena);
-    enables_task = SetupInstanceTaskCall(expr, ctx, arena, instance_call);
-    if (!enables_task && receiver.Holds()) {
+    waiting = ClassifyWaitingCall(expr, ctx, arena);
+    if (waiting == WaitingCall::kNone)
+      enables_task = SetupInstanceTaskCall(expr, ctx, arena, instance_call);
+    if (waiting == WaitingCall::kNone && !enables_task && receiver.Holds()) {
       ExecCallStmtExpr(expr, ctx, arena);
       co_return StmtResult::kDone;
     }
   }
+  if (waiting != WaitingCall::kNone) {
+    co_return co_await ExecWaitingCall(waiting, expr, ctx, arena);
+  }
+  // §13.3 with §8.6: a task enabled through an object handle runs as a
+  // coroutine too, so its timing controls suspend this process.
   if (enables_task) {
     co_return co_await ExecInstanceTaskCall(instance_call, expr, ctx, arena);
   }

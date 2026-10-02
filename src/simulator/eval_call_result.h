@@ -52,24 +52,38 @@ struct ReturnedAggregate {
 // body's whole run, so the `return` inside it has a record to fill and the
 // completion of the body is what hands the record to the evaluation of the
 // call, whichever call path ran the body.
+//
+// §13.4 with §11.3.1: the receiver a CallResultReceiverScope holds is its own
+// evaluation's, and a body run while it is held -- the method the receiver
+// reaches, or any function that body calls -- may reach the same expression
+// again, recursively, as an evaluation of its own. The held receiver is set
+// aside for the body's run and restored after, so that evaluation runs its
+// call anew.
 class FunctionBodyResultScope {
  public:
-  FunctionBodyResultScope();
+  explicit FunctionBodyResultScope(SimContext& ctx);
   ~FunctionBodyResultScope();
   FunctionBodyResultScope(const FunctionBodyResultScope&) = delete;
   FunctionBodyResultScope& operator=(const FunctionBodyResultScope&) = delete;
+
+ private:
+  SimContext& ctx_;
+  const Expr* set_aside_base_ = nullptr;
+  Logic4Vec set_aside_value_;
+  std::optional<ReturnedAggregate> set_aside_aggregate_;
 };
 
-// §8.6 with §11.3.1 and §13.4.1: the base of a method call statement that
-// starts at a call, `pk()` of `pk().f();` or `pk().kid` of `pk().kid.f();`,
-// evaluated once on construction and held for the scope's life as the base's
-// snapshot (SimContext::SetDeferredArgSnapshot), with the aggregate its call
+// §8.6 with §11.3.1 and §13.4.1: the call a method call statement's receiver
+// starts at, through the members it selects and the elements it indexes,
+// `pk()` of `pk().f();`, `pk().kid.f();` or `pk().a[1].f();`,
+// evaluated once on construction and held for the scope's life as the call's
+// snapshot (SimContext::SetDeferredArgSnapshot), with the aggregate it
 // returned, if any, for EvalWithReturnedAggregate. Every evaluation of the
-// base within the scope reads the held value, so a statement path that
-// evaluates the base to find a task to enable through it, and the expression
-// evaluator the statement then falls to, run the call once between them, as
-// the expression `void'(pk().f())` does. Holds nothing for a statement of any
-// other shape.
+// receiver within the scope reads the held value, so a statement path that
+// evaluates the receiver to find a task to enable through it, and the
+// expression evaluator the statement then falls to, run the call once between
+// them, as the expression `void'(pk().f())` does. Holds nothing for a
+// statement of any other shape.
 class CallResultReceiverScope {
  public:
   CallResultReceiverScope(const Expr* call, SimContext& ctx, Arena& arena);
