@@ -708,6 +708,7 @@ void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
 void ValidateEmbeddedCovergroups(const ClassDecl* cls,
                                  const std::vector<ModuleItem*>& scope_items,
                                  const CompilationUnit* unit,
+                                 const CovergroupDeclared& unit_declared,
                                  DiagEngine& diag) {
   ClassCovergroupScope scope{cls, scope_items, unit};
   CovergroupTypeOf type_of = [&](std::string_view name) {
@@ -726,6 +727,7 @@ void ValidateEmbeddedCovergroups(const ClassDecl* cls,
       return inherited.contains(name) || type_of(name).has_value();
     };
     ValidateCovergroup(*m->covergroup, type_of, declared, arrays, diag);
+    ReportUnresolvedSetExpressionReads(*m->covergroup, unit_declared, diag);
   }
 }
 

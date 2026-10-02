@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/class_method_reads.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -336,10 +337,16 @@ void ElaboratorClassRules::ValidateEmbeddedCovergroupAssign() {
 }
 
 // §19.5 and §19.6 hold of an embedded covergroup as of one a module declares,
-// its names read from its class and the scope that declares the class.
+// its names read from its class and the scope that declares the class; and
+// §23.9 of a name its set_covergroup_expression reads, which some declaration
+// of the unit gives (UnitDeclaredNames) or none does.
 void ElaboratorClassRules::ValidateEmbeddedCovergroupRules() {
+  UnitDeclaredNames names(unit_);
+  CovergroupDeclared unit_declared = [&names](std::string_view name) {
+    return names.Declares(name);
+  };
   for (const auto& [cls, scope_items] : ClassesWithScopes(unit_)) {
-    ValidateEmbeddedCovergroups(cls, *scope_items, unit_, diag_);
+    ValidateEmbeddedCovergroups(cls, *scope_items, unit_, unit_declared, diag_);
   }
 }
 

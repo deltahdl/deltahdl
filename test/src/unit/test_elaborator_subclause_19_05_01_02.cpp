@@ -435,4 +435,31 @@ TEST(CoverpointBinSetExpression, StringElementOfClassCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §19.5.1.2 with §23.9: a covergroup a class embeds reads its set expression
+// in the class, the class's members and the declaring module's names among
+// what it reaches, so `zz`, which nothing declares, is unresolved, while the
+// class's array ia and the module's array mq resolve.
+TEST(CoverpointBinSetExpression, UndeclaredNameInClassCovergroupIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int mq[] = '{1};\n"
+      "  class k;\n"
+      "    bit [3:0] x;\n"
+      "    int ia[];\n"
+      "    covergroup cg;\n"
+      "      a: coverpoint x { bins s[] = zz; }\n"
+      "      b: coverpoint x { bins s[] = ia; }\n"
+      "      c: coverpoint x { bins s[] = mq; }\n"
+      "    endgroup\n"
+      "    function new; cg = new; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'zz'", 7,
+                            "23.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

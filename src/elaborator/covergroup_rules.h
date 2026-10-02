@@ -80,10 +80,14 @@ void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
 
 // The covergroups embedded in `cls` (§19.4). A name such a covergroup reads is
 // a property of the class or of a class it extends, or else an item of
-// `scope_items`, the declarations of the scope the class is declared in.
+// `scope_items`, the declarations of the scope the class is declared in; a
+// name a set_covergroup_expression reads that `unit_declared` denies any
+// declaration of the unit gives is unresolved (§23.9).
 void ValidateEmbeddedCovergroups(const ClassDecl* cls,
                                  const std::vector<ModuleItem*>& scope_items,
-                                 const CompilationUnit* unit, DiagEngine& diag);
+                                 const CompilationUnit* unit,
+                                 const CovergroupDeclared& unit_declared,
+                                 DiagEngine& diag);
 
 }  // namespace delta
 
