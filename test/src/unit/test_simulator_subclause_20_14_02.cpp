@@ -10,7 +10,9 @@
 // evaluator in isolation.
 #include <gtest/gtest.h>
 
+#include <charconv>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -71,8 +73,12 @@ TEST(DistributionFunctions, EachFormReturnsInteger) {
   auto lines = Lines(out);
   ASSERT_EQ(lines.size(), 7u);
   for (const auto& line : lines) {
-    EXPECT_EQ(line.find('.'), std::string::npos) << line;  // no fractional part
-    EXPECT_NO_THROW(std::stoll(line)) << line;
+    // The whole line reads as one integer: no fractional part, no other text.
+    long long value = 0;
+    auto [end, ec] =
+        std::from_chars(line.data(), line.data() + line.size(), value);
+    EXPECT_EQ(ec, std::errc()) << line;
+    EXPECT_EQ(end, line.data() + line.size()) << line;
   }
 }
 
