@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -810,6 +814,80 @@ TEST(Elaboration, EnumAssignedFromItsOwnTypeOrThroughACastAccepted) {
              "    c = w;\n"
              "  end\n"
              "endmodule\n"));
+}
+
+// §6.19.3: a variable of a built-in type other than an enumeration holds a
+// value of that type, so it reaches an enum variable only through a cast,
+// whether assigned or written as an initializer; another enum variable, a
+// member and a cast do not need one, nor does a block's enum of the name.
+TEST(Elaboration, NonEnumVariableAssignedToEnumIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  int i; real r; logic [1:0] l;\n"
+      "  e_t v; e_t u;\n"
+      "  e_t m = i;\n"
+      "  initial begin\n"
+      "    static e_t w = l;\n"
+      "    v = i;\n"
+      "    v = r;\n"
+      "    v = u; v = B; v = e_t'(i);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    e_t i;\n"
+      "    v = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] : {std::pair<uint32_t, const char*>{5u, "i"},
+                            std::pair<uint32_t, const char*>{7u, "l"},
+                            std::pair<uint32_t, const char*>{8u, "i"},
+                            std::pair<uint32_t, const char*>{9u, "r"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("value of non-enum variable '") +
+                                  name +
+                                  "' assigned to enum variable without cast",
+                              line, "6.19.3"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+// §13.4.1 assigns a function's return value to the function's return
+// variable, so §6.19.3 holds of a return in a function returning an
+// enumeration: an integer or a non-enum variable needs a cast, while a formal
+// or a local of the enumeration's type shadows the module's variable. A return
+// with no expression is §12.8's to report and draws no second report here.
+TEST(Elaboration, EnumFunctionReturnWithoutCastIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  int i;\n"
+      "  function e_t g; return 1; endfunction\n"
+      "  function e_t h; return i; endfunction\n"
+      "  function e_t k(e_t i); return i; endfunction\n"
+      "  function e_t n; e_t i; i = B; return i; endfunction\n"
+      "  function e_t p; return e_t'(i + 1); endfunction\n"
+      "  function e_t q; return A; endfunction\n"
+      "  function int r; return i; endfunction\n"
+      "  function e_t z; return; endfunction\n"
+      "  initial $display(g(), h(), k(A), n(), p(), q(), r(), z());\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer returned from enum function 'g' without "
+                            "cast",
+                            4, "6.19.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of non-enum variable 'i' returned from "
+                            "enum function 'h' without cast",
+                            5, "6.19.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return statement in non-void function 'z' shall "
+                            "have an expression",
+                            11, "12.8"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

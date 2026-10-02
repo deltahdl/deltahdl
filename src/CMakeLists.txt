@@ -206,6 +206,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_const_assign.cpp
     elaborator/elaborator_validate_timescale.cpp
     elaborator/elaborator_validate_timescale.cpp
+    elaborator/elaborator_validate_enum_assign.cpp
     elaborator/elaborator_validate_types.cpp
     elaborator/elaborator_validate_struct_types.cpp
     elaborator/type_eval.cpp
