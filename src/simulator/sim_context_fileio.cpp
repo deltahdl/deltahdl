@@ -248,10 +248,8 @@ Net* SimContext::FindNet(std::string_view name) {
     if (prefixed != nets_.end()) return prefixed->second;
   }
   // §23.4: see FindVariable.
-  for (const std::string& scope : NestedDeclOuterScopes(prefix)) {
-    auto outer = nets_.find(scope + std::string(name));
-    if (outer != nets_.end()) return outer->second;
-  }
+  if (Net* outer = FindInNestedDeclOuterScopes(nets_, prefix, name))
+    return outer;
   if (!prefix.empty() && name.find('.') == std::string_view::npos &&
       !IsImportedName(name)) {
     return nullptr;

@@ -336,10 +336,8 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // #(7) m1()` (§24.3) -- and outward through every nested declaration's
   // instance. Reading the top's key instead answered for an instance at the
   // top alone.
-  for (const std::string& scope : NestedDeclOuterScopes(prefix)) {
-    auto it = variables_.find(scope + std::string(name));
-    if (it != variables_.end()) return it->second;
-  }
+  if (auto* outer = FindInNestedDeclOuterScopes(variables_, prefix, name))
+    return outer;
 
   auto dot = name.find('.');
   // §23.9: the upward search "shall continue upward until an item by that name

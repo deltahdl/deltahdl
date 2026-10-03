@@ -291,6 +291,19 @@ class DeclaredNameTables {
   // standing under the empty prefix. Empty for any other instance, whose
   // search §23.9 stops at its own boundary.
   std::vector<std::string> NestedDeclOuterScopes(std::string_view prefix) const;
+  // The entry of `table` a name the nested declaration's instance at `prefix`
+  // reads stands under in the first of NestedDeclOuterScopes that holds it,
+  // or null: SimContext::FindVariable asks its variables and FindNet its nets.
+  template <typename T>
+  T* FindInNestedDeclOuterScopes(
+      const std::unordered_map<std::string_view, T*>& table,
+      std::string_view prefix, std::string_view name) const {
+    for (const std::string& scope : NestedDeclOuterScopes(prefix)) {
+      auto it = table.find(scope + std::string(name));
+      if (it != table.end()) return it->second;
+    }
+    return nullptr;
+  }
 
   // §23.6 with §27.4: the hierarchical name of the instance whose storage is
   // keyed `prefix` ("g_0_pi."), as a path spells it -- "g[0].pi", the generate
