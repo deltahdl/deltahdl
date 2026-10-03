@@ -854,4 +854,26 @@ TEST(AssignmentPatternFormat, ArraysNamedThroughAScopePrefixPrintTheirOwn) {
   EXPECT_EQ(out, "'{1, 2} '{3, 4} '{8, 9} '{0}\n");
 }
 
+// §21.2.1.6 with §8.5: an unpacked array property of a class object, reached
+// through a handle, is an aggregate as an array variable is, so a queue
+// property and a fixed-size one each print their elements as an assignment
+// pattern. Neither is a variable, and each printed 0.
+TEST(FormatPSim, ArrayPropertyThroughAHandlePrintsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class H;\n"
+                       "  int q[$];\n"
+                       "  int a[3];\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    automatic H h = new;\n"
+                       "    h.q = '{5, 2, 9};\n"
+                       "    h.a = '{1, 2, 3};\n"
+                       "    $display(\"%p %p %0d\", h.q, h.a, h.q.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "'{5, 2, 9} '{1, 2, 3} 3\n");
+}
+
 }  // namespace

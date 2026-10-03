@@ -13,8 +13,11 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_queue.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
@@ -664,6 +667,32 @@ static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
   return FormatStructValueForP(*layout, val, ctx);
 }
 
+// §21.2.1.6 with §8.5: an unpacked array property of a class object, through a
+// handle, is an aggregate as an array variable is: a queue property is the
+// queue the object holds, and a fixed-size one the elements the object holds
+// one by one (ResolveClassArray), printed from the left bound. No variable
+// stands under the argument's name, so none of the named forms found it and it
+// printed as one number, 0.
+static std::optional<std::string> BuildFormatPClassArray(const Expr* arg,
+                                                         SimContext& ctx,
+                                                         Arena& arena) {
+  if (arg->kind != ExprKind::kMemberAccess) return std::nullopt;
+  if (const QueueObject* q = FindQueueOfBase(arg, ctx, arena))
+    return FormatQueueForP(q, {}, ctx);
+  ClassArrayRef ref;
+  if (!ResolveClassArray(arg, ctx, arena, ref)) return std::nullopt;
+  std::string out = "'{";
+  for (uint32_t i = 0; i < ref.size; ++i) {
+    if (i) out += ", ";
+    uint32_t idx = LeftToRightAddress(static_cast<uint32_t>(ref.lo), ref.size,
+                                      ref.prop->array_descending, i);
+    out += FormatAggElemForP(ReadClassArrayElement(ref, idx, ctx, arena),
+                             DataTypeKind::kImplicit, nullptr, nullptr, ctx);
+  }
+  out += "}";
+  return out;
+}
+
 std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                          SimContext& ctx) {
   Arena& arena = ctx.GetArena();
@@ -678,6 +707,7 @@ std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   if (auto scoped = BuildFormatPPackageItem(arg, val, ctx, arena))
     return *scoped;
   if (auto elem = BuildFormatPElement(arg, val, ctx)) return *elem;
+  if (auto array = BuildFormatPClassArray(arg, ctx, arena)) return *array;
   if (auto member = BuildFormatPMember(arg, val, ctx)) return *member;
   if (auto slice = BuildFormatPSlice(arg, ctx, arena)) return *slice;
   if (auto found = BuildFormatPLocator(arg, ctx, arena)) return *found;

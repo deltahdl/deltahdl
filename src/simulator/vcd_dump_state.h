@@ -132,6 +132,13 @@ struct VcdDumpState {
   // stored value's type would give them.
   void MarkVcdParameter(std::string_view name);
   bool IsVcdParameter(std::string_view name) const;
+  // §21.7.1.2 with §6.19: the names whose storage holds an enumeration's
+  // named constant, a constant rather than a variable, which no dump declares.
+  void MarkVcdEnumConstant(std::string_view name);
+  bool IsVcdEnumConstant(std::string_view name) const;
+  // §21.7.2.3: the design's packages, each a top-level scope of the dump.
+  void MarkVcdPackage(std::string_view name);
+  bool IsVcdPackage(std::string_view name) const;
 
  private:
   // §21.7.3.1: the one simulation time at which every $dumpports call must
@@ -152,6 +159,10 @@ struct VcdDumpState {
   std::unordered_map<std::string_view, Direction> port_dirs_;
   // §21.7.2.1: the dumped parameters. See IsVcdParameter.
   std::unordered_set<std::string_view> parameters_;
+  // §6.19: the enumeration constants. See IsVcdEnumConstant.
+  std::unordered_set<std::string_view> enum_constants_;
+  // §21.7.2.3: the packages. See IsVcdPackage.
+  std::unordered_set<std::string_view> packages_;
 };
 
 }  // namespace delta

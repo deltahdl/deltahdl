@@ -204,6 +204,7 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     ctx.enum_member_names.insert(member.name);
     RtlirVariable var;
     var.name = member.name;
+    var.is_enum_constant = true;
     var.width = width;
     var.is_4state = false;
     var.is_signed = ctx.is_signed;

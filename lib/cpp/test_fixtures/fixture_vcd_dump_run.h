@@ -99,6 +99,10 @@ class VcdDumpRunTestBase : public VcdTestBase {
       if (!opts.scope.empty()) vcd.BeginScope(opts.scope);
       RegisterSignals(f, vcd, opts.registration);
       if (!opts.scope.empty()) vcd.EndScope();
+      // §21.7.2.3: as the driver does, a package's variables in a top-level
+      // scope of their own, after the module's.
+      if (opts.registration == VcdSignalRegistration::kContextFiltered)
+        f.ctx.RegisterVcdPackageSignals(vcd);
       vcd.EndDefinitions();
       if (!opts.driver_comment.empty()) vcd.WriteComment(opts.driver_comment);
       vcd.ArmDumpvarsStart();

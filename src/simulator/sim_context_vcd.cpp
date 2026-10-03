@@ -62,11 +62,13 @@ static void RegisterVcdStructScope(VcdWriter& vcd, std::string_view scope_name,
 // §21.7.2.1: memories are not dumped. An unpacked array leaves both a
 // whole-array Variable under its own name and per-element shadows named
 // name[index] in the variable table; neither is a dumpable object. An
-// associative array's backing entry is likewise a memory.
+// associative array's backing entry is likewise a memory. An enumeration's
+// named constant (§6.19) is a constant, which only a variable is dumped as.
 bool SimContext::IsUndumpableVcdName(std::string_view name) const {
   return name.find('[') != std::string_view::npos ||
          FindArrayInfo(name) != nullptr ||
-         assoc_arrays_.find(name) != assoc_arrays_.end();
+         assoc_arrays_.find(name) != assoc_arrays_.end() ||
+         vcd_.IsVcdEnumConstant(name);
 }
 
 // §21.7.2.3: the definitions section opens one `$scope module` per module
@@ -131,7 +133,21 @@ static VcdDataType DeclaredVcdDataType(const VcdDumpState& state,
   return VcdDataTypeForDeclKind(state.GetVcdVarKind(name));
 }
 
+bool SimContext::IsVcdPackageVariable(std::string_view name) const {
+  size_t dot = name.find('.');
+  return dot != std::string_view::npos &&
+         vcd_.IsVcdPackage(name.substr(0, dot));
+}
+
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
+  RegisterVcdSignalsOf(vcd, /*packages=*/false);
+}
+
+void SimContext::RegisterVcdPackageSignals(VcdWriter& vcd) {
+  RegisterVcdSignalsOf(vcd, /*packages=*/true);
+}
+
+void SimContext::RegisterVcdSignalsOf(VcdWriter& vcd, bool packages) {
   std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
                                                            variables_.end());
   // Sorted by name, the variables of one instance stand together, since each
@@ -140,7 +156,8 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
             [](const auto& a, const auto& b) { return a.first < b.first; });
   std::vector<std::string_view> open_scopes;
   for (const auto& [name, var] : vars) {
-    if (IsUndumpableVcdName(name)) continue;
+    if (IsUndumpableVcdName(name) || IsVcdPackageVariable(name) != packages)
+      continue;
     // §21.7.5: Table 21-11 gives string no row and the subclause defines no
     // mapping outside it, so a string has no 1364-2005 type to masquerade as.
     // §21.7.2.3 rules that a $var's size "specifies how many bits are in the
@@ -278,6 +295,8 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   if (!top_scope.empty()) vcd->BeginScope(top_scope);
   RegisterVcdSignals(*vcd);
   if (!top_scope.empty()) vcd->EndScope();
+  // §21.7.2.3: a package's variables stand in a top-level scope of its own.
+  RegisterVcdPackageSignals(*vcd);
   vcd->EndDefinitions();
   if (wait_for_dumpvars) {
     // §21.7.1.3: "Executing the $dumpvars task causes the value change dumping

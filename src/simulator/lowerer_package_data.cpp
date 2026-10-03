@@ -576,6 +576,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena) {
   for (auto* pkg : design->packages) {
+    ctx.Vcd().MarkVcdPackage(pkg->name);
     for (auto* item : pkg->items)
       CreatePackageDataItem(item, pkg->name, ctx, arena);
   }

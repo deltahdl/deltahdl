@@ -572,8 +572,8 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
       values[m.name] = m.value;
       auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
                                               std::string(m.name));
-      auto* var = ctx.CreateVariable(*qname, width);
-      var->value =
+      ctx.Vcd().MarkVcdEnumConstant(*qname);
+      ctx.CreateVariable(*qname, width)->value =
           MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
     }
   });

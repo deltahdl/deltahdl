@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 
 #include "common/types.h"
@@ -508,6 +509,38 @@ TEST_F(DumpvarsCallTimes, AloneCallAfterADelayIsAccepted) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §21.7.1.2: $dumpvars with no arguments dumps every variable of the model,
+// and §6.19 makes an enumeration's names constants of its type, no variables,
+// so the dump declares the enumeration variable e and none of the constants --
+// a module's own, a package's or the compilation unit's. Each constant was
+// declared a wire beside the variables.
+class VcdEnumConstantSim : public VcdDumpFromSourceTestBase {};
+
+TEST_F(VcdEnumConstantSim, EnumConstantsAreNoVariablesOfTheDump) {
+  RunSource(
+      "typedef enum {E, F} cu_t;\n"
+      "package p;\n"
+      "  enum {C, D} pe;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  enum {A, B} e;\n"
+      "  cu_t u;\n"
+      "  initial begin\n"
+      "    $dumpfile(\"enum.vcd\");\n"
+      "    $dumpvars;\n"
+      "    e = B;\n"
+      "    #1 e = A;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::string kDump = DumpFile("enum.vcd");
+  EXPECT_NE(kDump.find("$var integer 32 "), std::string::npos) << kDump;
+  EXPECT_NE(kDump.find(" e $end"), std::string::npos) << kDump;
+  for (const char* constant :
+       {" A $end", " B $end", " C $end", " D $end", " E $end", " F $end"}) {
+    EXPECT_EQ(kDump.find(constant), std::string::npos) << constant << kDump;
+  }
 }
 
 }  // namespace

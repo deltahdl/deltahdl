@@ -339,6 +339,14 @@ class SimContext : public DeclaredNameTables,
   // are both excluded -- and a real variable is declared under the real
   // var_type so readers expect its r-form value changes.
   void RegisterVcdSignals(VcdWriter& vcd);
+  // §21.7.2.3: the same for the variables of the design's packages alone, which
+  // RegisterVcdSignals leaves out: a package is no instance of the top module,
+  // so its scope is opened at the top level of the dump, beside the module's.
+  void RegisterVcdPackageSignals(VcdWriter& vcd);
+  // Registers the objects of the packages, or else everything but them.
+  void RegisterVcdSignalsOf(VcdWriter& vcd, bool packages);
+  // Whether `name` is a variable of one of the design's packages, keyed "p.v".
+  bool IsVcdPackageVariable(std::string_view name) const;
   // §21.7.2.1: true for a variable-table entry that names a memory rather than
   // a dumpable object.
   bool IsUndumpableVcdName(std::string_view name) const;

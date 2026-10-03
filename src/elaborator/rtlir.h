@@ -264,6 +264,9 @@ struct RtlirNet {
 
 struct RtlirVariable {
   std::string_view name;
+  // §6.19: the storage behind one of an enumeration's named constants, which
+  // is no variable of the model and so no object a VCD dump declares.
+  bool is_enum_constant = false;
   uint32_t width = 1;
   bool is_4state = true;
   bool is_event = false;

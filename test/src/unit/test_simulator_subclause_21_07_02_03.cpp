@@ -622,5 +622,41 @@ TEST_F(VcdKeywordCommandsE2E, SubInstanceVariablesAreDeclaredInTheirOwnScope) {
   EXPECT_LT(content.rfind("$upscope $end"), content.find("$enddefinitions"));
 }
 
+// §21.7.2.3: a `module` scope is a top-level module or a module instance, and
+// a package is instantiated nowhere, so its variables are declared under a
+// scope of its own at the top level of the definitions, beside the module's:
+// no scope is open where p's opens. It was opened inside m, as if p were an
+// instance m declared.
+class VcdPackageScopeSim : public VcdDumpFromSourceTestBase {};
+
+TEST_F(VcdPackageScopeSim, APackageIsATopLevelScopeOfTheDump) {
+  RunSource(
+      "package p;\n"
+      "  int v = 3;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  int w = 1;\n"
+      "  initial begin\n"
+      "    $dumpfile(\"pkg.vcd\");\n"
+      "    $dumpvars;\n"
+      "    #1 p::v = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::string kDump = DumpFile("pkg.vcd");
+  size_t at = kDump.find("$scope module p $end");
+  ASSERT_NE(at, std::string::npos) << kDump;
+  int depth = 0;
+  for (size_t pos = kDump.find("$scope"); pos < at;
+       pos = kDump.find("$scope", pos + 1)) {
+    ++depth;
+  }
+  for (size_t pos = kDump.find("$upscope"); pos < at;
+       pos = kDump.find("$upscope", pos + 1)) {
+    --depth;
+  }
+  EXPECT_EQ(depth, 0) << kDump;
+  EXPECT_NE(kDump.find(" v $end", at), std::string::npos) << kDump;
+}
+
 }  // namespace
 }  // namespace delta

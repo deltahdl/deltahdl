@@ -137,4 +137,28 @@ bool VcdDumpState::IsVcdParameter(std::string_view name) const {
   return parameters_.count(name) != 0;
 }
 
+// §21.7.1.2: $dumpvars with no arguments dumps every variable of the model,
+// and §6.19 makes an enumeration's names constants of its type rather than
+// variables, so the storage the lowerer keeps them in is marked for the dump to
+// leave out, under the key it stands under.
+void VcdDumpState::MarkVcdEnumConstant(std::string_view name) {
+  enum_constants_.insert(name);
+}
+
+bool VcdDumpState::IsVcdEnumConstant(std::string_view name) const {
+  return enum_constants_.count(name) != 0;
+}
+
+// §21.7.2.3: a `module` scope is a top-level module or a module instance, and a
+// package is instantiated nowhere, so the variables a package declares are
+// dumped under a top-level scope named for it rather than inside the module the
+// dump was opened under; the lowerer names each package the design holds.
+void VcdDumpState::MarkVcdPackage(std::string_view name) {
+  packages_.insert(name);
+}
+
+bool VcdDumpState::IsVcdPackage(std::string_view name) const {
+  return packages_.count(name) != 0;
+}
+
 }  // namespace delta
