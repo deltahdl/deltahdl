@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -196,6 +198,46 @@ TEST(HierarchicalNames, RootHeadedArrayElementIsTheTopsElement) {
                        "endmodule\n",
                        f),
             "1 0 1\n");
+}
+
+// §23.6 with §7.2: a hierarchical name writes a member of another instance's
+// structure, blocking and nonblocking: s1.v.B takes 9 and s1.v.A 4 while the
+// other member keeps what sub wrote. The name was split at its first dot,
+// taking the instance s1 for the variable, and both writes were dropped,
+// printing A=1 B=2.
+TEST(HierarchicalNames, MemberOfAnotherInstancesStructureIsWritten) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { int A; int B; } s_t;\n"
+                       "module sub ();\n"
+                       "  s_t v = '{A: 1, B: 2};\n"
+                       "  initial #2 $display(\"A=%0d B=%0d\", v.A, v.B);\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub s1 ();\n"
+                       "  initial begin\n"
+                       "    #1 s1.v.B = 9;\n"
+                       "    s1.v.A <= 4;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "A=4 B=9\n");
+}
+
+// The same through a structure whose type is the module's type parameter,
+// overridden at the instance, as §6.20.3's `s2.v3.A = 9` writes it.
+TEST(HierarchicalNames, MemberOfATypeParameterStructureIsWritten) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { int A; } a_t;\n"
+                       "module ma #(parameter type t_3 = int) ();\n"
+                       "  t_3 v3;\n"
+                       "  initial #2 $display(\"A=%0d\", v3.A);\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  ma #(.t_3(a_t)) s2 ();\n"
+                       "  initial #1 s2.v3.A = 9;\n"
+                       "endmodule\n",
+                       f),
+            "A=9\n");
 }
 
 }  // namespace

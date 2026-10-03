@@ -696,7 +696,16 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   if (handled) return target;
   target = ResolveOwnPropertyMemberTarget(base_name, field_name, ctx, &handled);
   if (handled) return target;
-  return ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
+  target = ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
+  if (target.kind != FieldTarget::Kind::kNone) return target;
+  // §23.6 with §7.2: `s1.v.B` names a member of the variable v of the instance
+  // s1, which the first dot leaves on the field side, so the split moves to
+  // where the path names a variable, as a read of the same name splits it.
+  size_t split = MemberPathSplit(name, ctx);
+  if (split == dot) return target;
+  return ResolveVariableField(std::string_view(name).substr(0, split),
+                              std::string_view(name).substr(split + 1), ctx,
+                              lhs->range.start);
 }
 
 // Deposits a value in a whole variable, which is the write a component of an

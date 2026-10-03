@@ -277,6 +277,20 @@ class DeclaredNameTables {
 
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
+  // §23.9 with §23.10.2: the instance an override of `prefix`'s parameters
+  // was written in is the instance holding `prefix`. Its prefix is found by
+  // dropping one dotted component at a time until what is left names an
+  // instance RegisterInstanceType recorded -- the top under the empty key --
+  // because a generate block's instance, "u1.g[0].u2.", is keyed through the
+  // block and the block itself is no instance.
+  std::string InstantiatingPrefix(std::string_view prefix) const;
+  // §23.4: the instance prefixes a name the instance at `prefix` does not
+  // declare is looked for under when that instance is a nested declaration's,
+  // innermost first: the instance holding it, then, while that one is a
+  // nested declaration's as well, the instance holding that, the top's names
+  // standing under the empty prefix. Empty for any other instance, whose
+  // search §23.9 stops at its own boundary.
+  std::vector<std::string> NestedDeclOuterScopes(std::string_view prefix) const;
 
   // §23.6 with §27.4: the hierarchical name of the instance whose storage is
   // keyed `prefix` ("g_0_pi."), as a path spells it -- "g[0].pi", the generate

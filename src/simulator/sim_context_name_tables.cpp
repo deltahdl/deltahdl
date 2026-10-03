@@ -528,6 +528,32 @@ std::string_view DeclaredNameTables::FindInstanceType(
                                        : std::string_view{};
 }
 
+std::string DeclaredNameTables::InstantiatingPrefix(
+    std::string_view prefix) const {
+  std::string parent(prefix);
+  while (!parent.empty()) {
+    parent.pop_back();
+    auto dot = parent.rfind('.');
+    parent =
+        dot == std::string::npos ? std::string() : parent.substr(0, dot + 1);
+    std::string key = parent;
+    if (!key.empty()) key.pop_back();
+    if (!FindInstanceType(key).empty()) break;
+  }
+  return parent;
+}
+
+std::vector<std::string> DeclaredNameTables::NestedDeclOuterScopes(
+    std::string_view prefix) const {
+  std::vector<std::string> scopes;
+  std::string scope(prefix);
+  while (!scope.empty() && nested_decl_scopes_.count(scope) != 0) {
+    scope = InstantiatingPrefix(scope);
+    scopes.push_back(scope);
+  }
+  return scopes;
+}
+
 void DeclaredNameTables::RegisterInstancePath(std::string_view prefix,
                                               std::string path) {
   instance_paths_[std::string(prefix)] = std::move(path);

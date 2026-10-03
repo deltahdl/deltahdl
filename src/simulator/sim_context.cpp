@@ -329,6 +329,17 @@ Variable* SimContext::FindVariable(std::string_view name) {
     auto it = variables_.find(prefixed);
     if (it != variables_.end()) return it->second;
   }
+  // §23.4: of a module declared inside the one instantiating it, "The outer
+  // name space is visible to the inner module so that any name declared there
+  // can be used", so the boundary §23.9 draws is not there and the search goes
+  // on in the instance holding it -- m1's K for the program nested in `m
+  // #(7) m1()` (§24.3) -- and outward through every nested declaration's
+  // instance. Reading the top's key instead answered for an instance at the
+  // top alone.
+  for (const std::string& scope : NestedDeclOuterScopes(prefix)) {
+    auto it = variables_.find(scope + std::string(name));
+    if (it != variables_.end()) return it->second;
+  }
 
   auto dot = name.find('.');
   // §23.9: the upward search "shall continue upward until an item by that name
@@ -341,15 +352,12 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // climb, which names the module it reaches; and a name a package import
   // brought into scope is bound flat under its unqualified spelling rather
   // than declared in an enclosing module at all, as is each element of an
-  // imported array (IsImportedName). §23.4 adds a fourth: a module
-  // declared inside the one instantiating it, of which that subclause says
-  // "The outer name space is visible to the inner module so that any name
-  // declared there can be used", so the boundary §23.9 draws is not there.
-  // §23.6's `$root` is a fifth, answered above rather than here: it names the
-  // top of the design outright rather than climbing to it, so no boundary
-  // stands between the reference and what it reaches.
-  if (prefix.empty() || dot != std::string_view::npos || IsImportedName(name) ||
-      nested_decl_scopes_.count(std::string(prefix)) != 0) {
+  // imported array (IsImportedName). A nested declaration's instance at the
+  // top reached the top's key through the §23.4 search above. §23.6's `$root`
+  // is a fourth, answered above rather than here: it names the top of the
+  // design outright rather than climbing to it, so no boundary stands between
+  // the reference and what it reaches.
+  if (prefix.empty() || dot != std::string_view::npos || IsImportedName(name)) {
     auto it = variables_.find(name);
     if (it != variables_.end()) return it->second;
   }

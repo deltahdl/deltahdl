@@ -353,4 +353,24 @@ TEST(ProgramSim, AProgramInitialRunsAfterAModuleInitialAtOneTime) {
             "mod 2000\nprog 2 2.000000\n");
 }
 
+// §24.3 with §23.10.2: a program nested in a module is instantiated in each
+// instance of the module and reads the module's parameter at the value that
+// instance gives it. m1's K is 7 and m2's 2, and the delays order the lines.
+// The program's lookup fell back to the top's storage, which holds no K, and
+// both lines read 0.
+TEST(ProgramConstructSim, NestedProgramReadsItsModuleInstanceParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter int K = 0);\n"
+                       "  program p;\n"
+                       "    initial #K $display(\"k=%0d\", K);\n"
+                       "  endprogram\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  m #(7) m1();\n"
+                       "  m #(2) m2();\n"
+                       "endmodule\n",
+                       f),
+            "k=2\nk=7\n");
+}
+
 }  // namespace

@@ -19,20 +19,6 @@
 
 namespace delta {
 
-std::string InstantiatingPrefix(std::string_view prefix, SimContext& ctx) {
-  std::string parent(prefix);
-  while (!parent.empty()) {
-    parent.pop_back();
-    auto dot = parent.rfind('.');
-    parent =
-        dot == std::string::npos ? std::string() : parent.substr(0, dot + 1);
-    std::string key = parent;
-    if (!key.empty()) key.pop_back();
-    if (!ctx.FindInstanceType(key).empty()) break;
-  }
-  return parent;
-}
-
 void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
     // §23.10/§6.20: a parameter is an instance-specific runtime value, so its
@@ -83,7 +69,7 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   if (p.override_expr == nullptr) return;
   var.init_expr = p.override_expr;
   std::string own = ctx.ActiveInstancePrefix();
-  ctx.SetLoweringInstancePrefix(InstantiatingPrefix(own, ctx));
+  ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
   InitArrayElements(full, var, ctx, arena);
   ctx.SetLoweringInstancePrefix(own);
 }

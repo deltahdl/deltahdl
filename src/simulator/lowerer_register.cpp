@@ -159,7 +159,7 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   if (width <= 64 && !HoldsXZLiteral(expr)) return;
   std::string own = ctx.ActiveInstancePrefix();
   if (param.override_expr != nullptr)
-    ctx.SetLoweringInstancePrefix(InstantiatingPrefix(own, ctx));
+    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
   if (EveryNameHasStorage(expr, ctx)) {
     // §11.6.1 with §6.20.2: the value is sized to the declaration as an
     // assignment to it is. The words are copied because an expression that is

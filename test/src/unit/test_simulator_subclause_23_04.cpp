@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -538,6 +539,27 @@ TEST(NestedModuleSimulation, DoublyNestedDeclarationOwnsANetDeclaredBelowIt) {
   LowerAndRun(design, f);
 
   ExpectNestedOwnsNetAndOuterReadsZ(f, "a.b.v");
+}
+
+// §23.4: a module declared inside m sees m's names from each instance of m,
+// not only from an instance at the top: inner in u reads u's v, 5, and inner
+// in w reads w's v, 6. A top-level v of 9 stands where the lookup fell back
+// to, and both read 9.
+TEST(NestedModuleSimulation, NestedDeclarationReadsItsEnclosingInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter int P = 0);\n"
+                       "  int v = P;\n"
+                       "  module inner;\n"
+                       "    initial #P $display(\"v=%0d\", v);\n"
+                       "  endmodule\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  int v = 9;\n"
+                       "  m #(5) u();\n"
+                       "  m #(6) w();\n"
+                       "endmodule\n",
+                       f),
+            "v=5\nv=6\n");
 }
 
 }  // namespace
