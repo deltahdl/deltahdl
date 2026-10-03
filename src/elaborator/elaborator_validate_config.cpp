@@ -70,43 +70,42 @@ std::vector<ResolvedAttribute> ResolveAttributes(
 
 namespace {
 
+using DefinitionNames =
+    std::map<std::pair<std::string_view, std::string_view>, SourceRange>;
+
+// §3.13(a): reports each of `decls` whose name its library already defines.
+// §23.5: an extern module declaration declares a module's ports without
+// defining the module itself, so it is a prototype rather than a definition
+// and does not participate in the duplicate-definition check. Syntax 24-1 and
+// Syntax 25-1 give a program and an interface the same extern header, and
+// Syntax 29-1's extern UDP declaration is a prototype in the same way. The
+// prototype is matched against its actual definition in
+// elaborator_extern_modules.
+template <typename Decls>
+void CheckDefinitionNames(const Decls& decls, DefinitionNames& def_names,
+                          DiagEngine& diag) {
+  for (const auto* d : decls) {
+    if (d->is_extern) continue;
+    if (!def_names.try_emplace({d->library, d->name}, d->range).second) {
+      diag.Error(d->range.start,
+                 std::format("duplicate definition of '{}'", d->name),
+                 Subclause("3.13"));
+    }
+  }
+}
+
 void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
-  std::map<std::pair<std::string_view, std::string_view>, SourceRange>
-      def_names;
   // §3.13(a) states the prohibition for a module, a primitive, a program and
   // an interface, and names no config. §33.2 is what puts a config into the
   // same name space: "the config is a design element, similar to a module,
   // which exists in the SystemVerilog name space." A collision involving a
-  // config therefore enforces §33.2, so the subclause travels with the caller
-  // rather than being fixed here.
-  auto check_def = [&](std::string_view library, std::string_view name,
-                       SourceRange range, Subclause subclause) {
-    auto [it, inserted] = def_names.try_emplace({library, name}, range);
-    if (!inserted) {
-      diag.Error(range.start, std::format("duplicate definition of '{}'", name),
-                 subclause);
-    }
-  };
-  // §23.5: an extern module declaration declares a module's ports without
-  // defining the module itself, so it is a prototype rather than a definition
-  // and does not participate in the duplicate-definition check. Syntax 24-1
-  // and Syntax 25-1 give a program and an interface the same extern header.
-  // The prototype is matched against its actual definition in
-  // elaborator_extern_modules.
-  for (auto* m : unit->modules)
-    if (!m->is_extern)
-      check_def(m->library, m->name, m->range, Subclause("3.13"));
-  for (auto* p : unit->programs)
-    if (!p->is_extern)
-      check_def(p->library, p->name, p->range, Subclause("3.13"));
-  for (auto* i : unit->interfaces)
-    if (!i->is_extern)
-      check_def(i->library, i->name, i->range, Subclause("3.13"));
-  // Syntax 29-1's extern UDP declaration is a prototype in the same way.
-  for (auto* u : unit->udps)
-    if (!u->is_extern)
-      check_def(u->library, u->name, u->range, Subclause("3.13"));
+  // config therefore enforces §33.2, and is reported below.
+  DefinitionNames def_names;
+  CheckDefinitionNames(unit->modules, def_names, diag);
+  CheckDefinitionNames(unit->programs, def_names, diag);
+  CheckDefinitionNames(unit->interfaces, def_names, diag);
+  CheckDefinitionNames(unit->udps, def_names, diag);
 
   // A config shares its name with a module or primitive lawfully. §33.2.1
   // (printed page 935): "The optional :config extension shall be used
@@ -115,8 +114,7 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   // clause's lib.cell for that case. A config is otherwise in the name space
   // §33.2 puts it in, so one of an interface's or a program's name, or a second
   // config of its own, is still a name defined twice.
-  std::map<std::pair<std::string_view, std::string_view>, SourceRange>
-      config_names;
+  DefinitionNames config_names;
   for (auto* p : unit->programs)
     config_names.try_emplace({p->library, p->name}, p->range);
   for (auto* i : unit->interfaces)
