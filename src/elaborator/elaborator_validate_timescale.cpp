@@ -278,8 +278,7 @@ void CheckDesignElementTimescales(const ModuleDecl* decl,
       DeclaredBy(decl->has_directive_timescale, decl->directive_timescale), cu);
   CheckTimescaleOrder(ts, decl->range.start, diag);
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl != nullptr) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl) {
       CheckDesignElementTimescales(item->nested_module_decl, &ts, cu, diag);
     }
   }

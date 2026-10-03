@@ -229,6 +229,43 @@ TEST(TimescalePrecedenceElaboration, PackageFollowsTheTimescaleBeforeIt) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A package that declares both of its own needs no `timescale, so a
+// `timescale elsewhere in the compilation unit does not excuse it from §3.14:
+// its 1 ns precision is coarser than its 1 ps unit.
+TEST(TimescalePrecedenceElaboration, PackageDeclaringBothIsOrderChecked) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "`timescale 1ns / 1ps\n"
+      "package p;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1ns;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            2, "3.14"));
+}
+
+// §3.14.2.3 b) ranks the `timescale before the package above the compilation
+// unit's `timeunit 1ps;`, so the package runs at 1 ns / 1 ps and is legal.
+// Resolved without the directive it would take the 1 ps unit and the 1 ns
+// default precision, which is the false report the package is spared.
+TEST(TimescalePrecedenceElaboration, PackageDeclaringNeitherFollowsTimescale) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "`timescale 1ns / 1ps\n"
+      "timeunit 1ps;\n"
+      "package p;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(TimescalePrecedenceElaboration, UniformPackageAndModuleAcceptable) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocAndCu(

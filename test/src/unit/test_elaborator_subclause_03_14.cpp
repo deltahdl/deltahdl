@@ -343,6 +343,28 @@ TEST(DesignBuildingBlockElaboration, NestedLoneTimeunitFinerThanInherited) {
                             4, "3.14"));
 }
 
+// The other half of §3.14.2.3 a): an inner module that declares only its
+// precision takes the outer 1 ns unit, and its own 10 ns precision is coarser
+// than that inherited unit, so the pair is the inner module's and is reported
+// there rather than passed over as inherited.
+TEST(DesignBuildingBlockElaboration,
+     NestedLoneTimeprecisionCoarserThanInherited) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module outer;\n"
+             "  timeunit 1ns;\n"
+             "  timeprecision 1ns;\n"
+             "  module inner;\n"
+             "    timeprecision 10ns;\n"
+             "  endmodule\n"
+             "  inner i();\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            4, "3.14"));
+}
+
 // A package is a design element (§3.2, printed 50) and resolves what it does
 // not declare by the same precedence, less the enclosing module it cannot
 // have: its lone `timeunit 1ps;` runs at the 1 ns default precision.
