@@ -18,6 +18,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -175,6 +176,55 @@ ModuleItem* ScopedOrPackageFunction(const std::string& name, SimContext& ctx) {
   return ctx.FindFunctionInPackageScope(name);
 }
 
+// The member access a dotted callee is written as: the call's own name,
+// `v.add` of `v.add(20)`, or the enable itself, `b.t` of `b.t;`; null for a
+// callee of any other shape.
+const Expr* DottedCallee(const Expr* call) {
+  const Expr* callee =
+      call->kind == ExprKind::kCall && call->callee.empty() ? call->lhs : call;
+  if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
+      callee->is_scope_resolution || callee->lhs == nullptr ||
+      callee->rhs == nullptr || callee->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  return callee;
+}
+
+// §25.7 with §25.9 and §25.3.2: a task or function of an interface is called
+// through any name that denotes an instance of it -- a virtual interface,
+// `v.add(20)`, a class's `vif.write(88)` or `C::vif.add(2)`, or an interface
+// port, `b.hit(10)` -- so the callee is the subroutine registered under the
+// key of the instance that name denotes, and its body runs in that instance.
+// Answers true with `target` filled where the head of the callee is such a
+// name and the instance declares the subroutine, and where the head is a
+// virtual interface representing no instance, which §25.9 makes a fatal
+// run-time error, reported here and leaving `target.func` null.
+bool TryInterfaceInstanceCallee(const Expr* call, SimContext& ctx, Arena& arena,
+                                SubroutineTarget& target) {
+  const Expr* callee = DottedCallee(call);
+  if (callee == nullptr) return false;
+  std::string scope;
+  VirtualInterfaceBase base =
+      ResolveVirtualInterfaceBaseExpr(callee->lhs, ctx, arena);
+  if (base.is_virtual_interface) {
+    if (base.handle == kNullVirtualInterface) {
+      ReportNullVirtualInterface(callee->range.start, ctx);
+      return true;
+    }
+    scope = ctx.VirtualInterfaceScope(base.handle);
+  } else if (callee->lhs->kind == ExprKind::kIdentifier) {
+    scope = ctx.FindInterfacePortInstance(ctx.ActiveInstancePrefix() +
+                                          std::string(callee->lhs->text));
+  }
+  if (scope.empty()) return false;
+  ModuleItem* func =
+      ctx.FindFunction(scope + "." + std::string(callee->rhs->text));
+  if (func == nullptr) return false;
+  target.func = func;
+  target.inst_prefix = scope + ".";
+  return true;
+}
+
 }  // namespace
 
 std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
@@ -203,6 +253,7 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
                                       Arena& arena) {
   SubroutineTarget target;
   if (call == nullptr) return target;
+  if (TryInterfaceInstanceCallee(call, ctx, arena, target)) return target;
   std::string active = ctx.ActiveInstancePrefix();
   if (call->kind == ExprKind::kCall && call->callee.empty() &&
       IsPackageScopedCall(call)) {

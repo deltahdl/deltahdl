@@ -323,6 +323,7 @@ class Lowerer {
   // checker instance outside any other.
   void LowerChildBodyUnderCheckerRoot(const RtlirModuleInst& child);
   void LowerChildModules(const RtlirModule* mod);
+  void RegisterChildInstanceKeys(const RtlirModule* mod);
   // One instance of LowerChildModules: its module's declarations, port
   // connections, processes and instances, all under the instance's name
   // joined to inst_prefix_.
@@ -348,6 +349,7 @@ class Lowerer {
                              const std::string& inst_seg, bool from_program);
   bool TryAliasInterfacePort(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding);
+  std::string ConnectedInstanceKey(std::string_view name) const;
 
   SimContext& ctx_;
   Arena& arena_;

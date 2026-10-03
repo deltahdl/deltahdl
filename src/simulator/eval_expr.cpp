@@ -552,9 +552,7 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   }
   if (!base.is_virtual_interface) return false;
   if (base.handle == kNullVirtualInterface) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "reference through a null virtual interface",
-                        Subclause("25.9"));
+    ReportNullVirtualInterface(expr->range.start, ctx);
     out = MakeLogic4Vec(arena, 1);
     return true;
   }
@@ -767,6 +765,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (auto* var = FindReferencedVariable(expr, resolved, ctx, arena)) {
     return ReadReferencedVariable(*var, ctx);
   }
+  if (TryInterfaceInstancePathHandle(expr, ctx, arena, out)) return out;
 
   auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);

@@ -549,6 +549,12 @@ class SimContext : public DeclaredNameTables,
 
   // Full hierarchical scope of an interface instance named `ident` relative to
   // the current process, or empty if `ident` is not a known interface instance.
+  // `ident` is a name or a path as §23.6 spells it: an instance's own name, an
+  // element of an instance array, `s[1]`, a path through generate block
+  // instances, `g[1].s`, one headed by a top-level module's name, `top.s1`,
+  // or an interface port, which denotes the instance connected to it
+  // (§25.3.2). The scope is the key the instance's storage is held under,
+  // which is the one VirtualInterfaceHandle interns for it.
   std::string ResolveInstanceScope(std::string_view ident) const;
 
   void AddPlusArg(std::string arg);
@@ -783,6 +789,8 @@ class SimContext : public DeclaredNameTables,
   void SetMonitorLastValue(Variable* var, const Logic4Vec& value);
 
  private:
+  // See ResolveInstanceScope.
+  std::string InstanceKeyOf(const std::string& cand) const;
   // §13.3.2: static-task (and named-block) storage is per module instance.
   // Qualify the bare scope name with the current process's instance path so
   // that distinct instances of the same module do not share storage. Returns

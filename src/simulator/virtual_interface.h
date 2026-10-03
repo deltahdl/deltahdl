@@ -29,6 +29,8 @@ class Arena;
 class SimContext;
 struct DataType;
 struct Expr;
+struct Logic4Vec;
+struct SourceLoc;
 
 // §25.9: the null handle, which a virtual interface holds before it is
 // initialized and after `null` is assigned to it.
@@ -65,7 +67,11 @@ VirtualInterfaceBase ResolveVirtualInterfaceBase(std::string_view name,
 // of the running scope, a class-handle property of the running method's
 // object, or such a member access in turn, as deep as the design writes it --
 // and whose `p` is a property of that object declared a virtual interface.
-// Answers no virtual interface for any other shape.
+// §8.9 with §8.23: `C::p`, a static property of the class C declared so.
+// §7 with §25.9: an element of a container declared with virtual interface
+// elements -- `v[0]` of a fixed array, `q[1]` of a queue, `m["two"]` of an
+// associative array, `vifs[i]` of an array property -- whose handle is the
+// element's value. Answers no virtual interface for any other shape.
 VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
                                                      SimContext& ctx,
                                                      Arena& arena);
@@ -89,5 +95,34 @@ VirtualInterfaceBase ResolveVirtualInterfaceInnerPath(const Expr* expr,
 std::string VirtualInterfaceComponentName(uint64_t handle,
                                           std::string_view field,
                                           const SimContext& ctx);
+
+// §25.9: the handle an operand of `==` or `!=` against a virtual interface
+// stands for: the null handle for `null`, and otherwise the operand's value,
+// which is a handle for a virtual interface held anywhere -- a variable, a
+// formal, a class property, a function's result -- and for an interface
+// instance named by a name or a path (ResolveInstanceScope). Handles are
+// interned one per instance, so two operands representing one instance
+// answer the same handle.
+uint64_t VirtualInterfaceOperandHandle(const Expr* operand, SimContext& ctx,
+                                       Arena& arena);
+
+// §25.9 with §23.6: an interface instance named by a path rather than a
+// simple name -- an element of an instance array, `s[1]`, an instance in a
+// generate block, `g[1].s`, or one reached from a top, `top.s1` -- is the
+// handle of that instance where a value is wanted, as its simple name is
+// (TryInterfaceInstanceHandle in evaluation.cpp). Answers true and puts the
+// handle in `out` where `expr` is such a path; false for any other
+// expression, a member of an instance among them, and without reading it for
+// a path headed by a name that holds storage -- a variable, an array, a net
+// or a property of the running method's class -- whose select is an element
+// and whose index is read once, by the caller.
+bool TryInterfaceInstancePathHandle(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out);
+
+// §25.9: a reference through a virtual interface that represents no instance
+// is a fatal run-time error, so it is reported at `loc` and the run is ended
+// as `$fatal` ends it (§20.10): the running block stops at its next
+// statement, and no further time step is taken.
+void ReportNullVirtualInterface(SourceLoc loc, SimContext& ctx);
 
 }  // namespace delta

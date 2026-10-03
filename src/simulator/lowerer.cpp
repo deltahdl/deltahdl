@@ -239,6 +239,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // variables. LowerImports leaves a name the module declares to the
   // declaration (§26.5). LowerChildModules orders an instance's the same way.
   LowerImports(mod);
+  RegisterChildInstanceKeys(mod);
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);

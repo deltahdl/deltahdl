@@ -376,6 +376,21 @@ static void RegisterChildInstanceDecls(const RtlirModule* mod,
   RegisterModuleSequenceDecls(mod, ctx);
 }
 
+// §25.9 with §6.8: a virtual interface declared with an initializer naming
+// an instance of the module, `virtual SBus v = s;`, takes that instance's
+// handle as part of static initialization, before the instance itself is
+// lowered, so the key of each instance the module holds is registered ahead
+// of the module's variables. LowerChildInstance registers the same key again
+// when it lowers the instance.
+void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
+  for (const auto& child : mod->children) {
+    if (child.resolved == nullptr) continue;
+    RegisterInstanceKeyBinding(inst_prefix_ + std::string(child.inst_name),
+                               child.resolved->library, child.resolved->name,
+                               ctx_);
+  }
+}
+
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (child.resolved) LowerChildInstance(child);
@@ -473,6 +488,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
     RegisterClassDecl(cls, child.resolved->function_decls);
     fresh_classes.push_back(cls);
   }
+  RegisterChildInstanceKeys(child.resolved);
   CreateChildModuleVariables(inst_prefix_, child.resolved);
   for (const ClassDecl* cls : fresh_classes) InitClassStaticProperties(cls);
   CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);

@@ -5,10 +5,13 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -144,12 +147,48 @@ static const ClassObject* ObjectOf(const Expr* e, SimContext& ctx,
       InstancePropertyHandle(holder, nullptr, e->rhs->text, arena));
 }
 
+// §7 with §25.9: the element `select` picks out of a container whose
+// elements are virtual interfaces holds the handle of the instance it
+// represents, read by evaluating the select; an element holding an unknown
+// bit represents none.
+static VirtualInterfaceBase SelectedElementBase(const Expr* select,
+                                                SimContext& ctx, Arena& arena) {
+  if (select->index_end != nullptr) return {};
+  const Expr* container = select->base;
+  while (container != nullptr && container->kind == ExprKind::kSelect)
+    container = container->base;
+  VirtualInterfaceBase base =
+      ResolveVirtualInterfaceBaseExpr(container, ctx, arena);
+  if (!base.is_virtual_interface) return base;
+  Logic4Vec element = EvalExpr(select, ctx, arena);
+  base.handle = element.IsKnown() ? element.ToUint64() : kNullVirtualInterface;
+  return base;
+}
+
+// §8.23: `C::p` names the static property p of the class C, which a
+// virtual interface declared so holds once for the class.
+static VirtualInterfaceBase ClassScopedBase(const Expr* base, SimContext& ctx,
+                                            Arena& arena) {
+  if (base->lhs == nullptr || base->lhs->kind != ExprKind::kIdentifier ||
+      base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
+  return PropertyBase(cls, nullptr, nullptr, base->rhs->text, arena);
+}
+
 VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
                                                      SimContext& ctx,
                                                      Arena& arena) {
   if (base == nullptr) return {};
   if (base->kind == ExprKind::kIdentifier) {
     return ResolveVirtualInterfaceBase(base->text, ctx, arena);
+  }
+  if (base->kind == ExprKind::kSelect) {
+    return SelectedElementBase(base, ctx, arena);
+  }
+  if (base->kind == ExprKind::kMemberAccess && base->is_scope_resolution) {
+    return ClassScopedBase(base, ctx, arena);
   }
   if (base->kind != ExprKind::kMemberAccess || base->is_scope_resolution ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
@@ -203,6 +242,49 @@ std::string VirtualInterfaceComponentName(uint64_t handle,
   name += ".";
   name += field;
   return name;
+}
+
+uint64_t VirtualInterfaceOperandHandle(const Expr* operand, SimContext& ctx,
+                                       Arena& arena) {
+  if (operand == nullptr) return kNullVirtualInterface;
+  if (operand->kind == ExprKind::kIdentifier && operand->text == "null" &&
+      ctx.FindVariable(operand->text) == nullptr) {
+    return kNullVirtualInterface;
+  }
+  return EvalExpr(operand, ctx, arena).ToUint64();
+}
+
+// Whether the path `expr` starts at a name that holds storage of the running
+// scope rather than at an instance, a generate block or a top: a variable,
+// an array, a net or a property of the class whose method is running.
+static bool PathHeadHoldsStorage(const Expr* expr, SimContext& ctx) {
+  const Expr* head = expr;
+  while (head != nullptr && (head->kind == ExprKind::kSelect ||
+                             head->kind == ExprKind::kMemberAccess)) {
+    head = head->kind == ExprKind::kSelect ? head->base : head->lhs;
+  }
+  if (head == nullptr || head->kind != ExprKind::kIdentifier) return true;
+  return ctx.FindVariable(head->text) != nullptr ||
+         ctx.FindArrayInfo(head->text) != nullptr ||
+         ctx.FindNet(head->text) != nullptr ||
+         ClassScopeDeclares(head->text, ctx);
+}
+
+bool TryInterfaceInstancePathHandle(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out) {
+  if (PathHeadHoldsStorage(expr, ctx)) return false;
+  std::string path = EvaluatedHierarchicalPath(expr, ctx, arena);
+  if (path.empty()) return false;
+  std::string scope = ctx.ResolveInstanceScope(path);
+  if (scope.empty()) return false;
+  out = MakeLogic4VecVal(arena, 64, ctx.VirtualInterfaceHandle(scope));
+  return true;
+}
+
+void ReportNullVirtualInterface(SourceLoc loc, SimContext& ctx) {
+  ctx.GetDiag().Error(loc, "reference through a null virtual interface",
+                      Subclause("25.9"));
+  ctx.RequestFinish();
 }
 
 }  // namespace delta

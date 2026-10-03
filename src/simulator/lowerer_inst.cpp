@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -23,6 +24,7 @@
 #include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -172,6 +174,16 @@ static const Expr* ConnectedInterfaceInstance(const Expr* conn,
   return nullptr;
 }
 
+// §25.3.2: the key of the interface instance a connection's head `name`
+// denotes from the instance being lowered: the instance of that name, or,
+// where `name` is an interface port of that instance, passed down a level,
+// the instance connected to the port in turn.
+std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
+  std::string key = inst_prefix_ + std::string(name);
+  std::string_view through_port = ctx_.FindInterfacePortInstance(key);
+  return through_port.empty() ? key : std::string(through_port);
+}
+
 // §25.3.2: an interface passed through a port shares its members with the
 // connected interface instance. Alias each member of the child interface port
 // (mem.a.member) onto the connected instance's member (sb_intf.member) so reads
@@ -192,8 +204,18 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
   if (it == design_->all_modules.end()) return false;
   const RtlirModule* ifc = it->second;
 
-  std::string port_prefix = inst_prefix_ + std::string(inst.inst_name) + "." +
-                            std::string(binding.port_name) + ".";
+  std::string port_key = inst_prefix_ + std::string(inst.inst_name) + "." +
+                         std::string(binding.port_name);
+  std::string instance_key = ConnectedInstanceKey(instance->text);
+  ctx_.RegisterInterfacePortInstance(port_key, instance_key);
+  // §25.9 with §25.3.2: where a value is wanted, `v = b` or `v == b`, the
+  // port's name stands for the connected instance, so the storage
+  // CreatePortStorage gave the port holds that instance's handle.
+  if (Variable* own = ctx_.FindVariable(port_key)) {
+    own->value =
+        MakeLogic4VecVal(arena_, 64, ctx_.VirtualInterfaceHandle(instance_key));
+  }
+  std::string port_prefix = port_key + ".";
   std::string conn_prefix = inst_prefix_ + std::string(instance->text) + ".";
   for (const auto& var : ifc->variables) {
     auto* alias =

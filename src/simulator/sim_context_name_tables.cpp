@@ -556,7 +556,29 @@ std::vector<std::string> DeclaredNameTables::NestedDeclOuterScopes(
 
 void DeclaredNameTables::RegisterInstancePath(std::string_view prefix,
                                               std::string path) {
+  std::string_view key = prefix;
+  if (key.ends_with('.')) key.remove_suffix(1);
+  instance_keys_by_path_[path] = std::string(key);
   instance_paths_[std::string(prefix)] = std::move(path);
+}
+
+std::string_view DeclaredNameTables::FindInstanceKeyOfPath(
+    std::string_view path) const {
+  auto it = instance_keys_by_path_.find(std::string(path));
+  return (it != instance_keys_by_path_.end()) ? std::string_view(it->second)
+                                              : std::string_view{};
+}
+
+void DeclaredNameTables::RegisterInterfacePortInstance(
+    std::string_view port_key, std::string instance_key) {
+  interface_port_instances_[std::string(port_key)] = std::move(instance_key);
+}
+
+std::string_view DeclaredNameTables::FindInterfacePortInstance(
+    std::string_view port_key) const {
+  auto it = interface_port_instances_.find(std::string(port_key));
+  return (it != interface_port_instances_.end()) ? std::string_view(it->second)
+                                                 : std::string_view{};
 }
 
 std::string_view DeclaredNameTables::FindInstancePath(

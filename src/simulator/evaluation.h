@@ -108,6 +108,14 @@ bool HasUnknownBits(const Logic4Vec& v);
 // enclosing the class. Outside a method every declared name denotes a
 // variable. Defined in evaluation.cpp.
 bool NameDenotesVariable(std::string_view name, SimContext& ctx);
+
+// §8.13: whether the class scope a bare name inside a method resolves against
+// declares `name`, as a static property of the running method's class or as a
+// property of the object's class or one it inherits from. The class scope is
+// searched before the scope enclosing the class, so a name it declares is
+// never the instance of the same name in the enclosing module. Defined in
+// evaluation.cpp.
+bool ClassScopeDeclares(std::string_view name, SimContext& ctx);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 
 // §28.12: a value every bit of which is high impedance, for a source that

@@ -25,7 +25,6 @@
 #include <string_view>
 #include <vector>
 
-#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -155,9 +154,7 @@ inline bool ResolveVirtualInterfaceSignal(const Expr* signal, SimContext& ctx,
   std::string target;
   if (!CollectVirtualInterfaceMember(signal, ctx, target)) return false;
   if (target.empty()) {
-    ctx.GetDiag().Error(signal->range.start,
-                        "reference through a null virtual interface",
-                        Subclause("25.9"));
+    ReportNullVirtualInterface(signal->range.start, ctx);
     return true;
   }
   *out = ctx.FindVariable(target);

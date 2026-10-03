@@ -311,6 +311,20 @@ class DeclaredNameTables {
   // differ; empty for any other instance, whose key is its name.
   void RegisterInstancePath(std::string_view prefix, std::string path);
   std::string_view FindInstancePath(std::string_view prefix) const;
+  // The inverse: the key, without its trailing `.`, of the instance whose
+  // path RegisterInstancePath recorded as `path`, "g_0_pi" for "g[0].pi";
+  // empty for a path no instance recorded.
+  std::string_view FindInstanceKeyOfPath(std::string_view path) const;
+
+  // §25.3.2: an interface port denotes the interface instance connected to
+  // it, so the port's key, "cpu.b" for port b of instance cpu, answers the key
+  // of that instance, "sb_intf", wherever the port's name stands for the
+  // instance: as the source of a virtual interface (§25.9) and as the head of
+  // a subroutine call through the port (§25.7). Empty for a key no interface
+  // port is registered under.
+  void RegisterInterfacePortInstance(std::string_view port_key,
+                                     std::string instance_key);
+  std::string_view FindInterfacePortInstance(std::string_view port_key) const;
 
   // §23.6: each top-level module is the root of a name hierarchy, and the
   // complete path to any object starts at one of them, usable from a parallel
@@ -433,6 +447,8 @@ class DeclaredNameTables {
 
   std::unordered_map<std::string, std::string> instance_types_;
   std::unordered_map<std::string, std::string> instance_paths_;
+  std::unordered_map<std::string, std::string> instance_keys_by_path_;
+  std::unordered_map<std::string, std::string> interface_port_instances_;
   std::unordered_set<std::string> top_module_names_;
   std::unordered_set<std::string> parallel_top_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>

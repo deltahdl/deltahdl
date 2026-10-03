@@ -723,6 +723,16 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
+// The key of the instance `cand` names when read from the top of the design:
+// an instance's own key, the instance an interface port is connected to, or
+// the instance whose path through generate blocks `cand` spells.
+std::string SimContext::InstanceKeyOf(const std::string& cand) const {
+  if (instance_types_.find(cand) != instance_types_.end()) return cand;
+  if (std::string_view key = FindInterfacePortInstance(cand); !key.empty())
+    return std::string(key);
+  return std::string(FindInstanceKeyOfPath(cand));
+}
+
 std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
   std::string prefix = ActiveInstancePrefix();
   // Walk progressively shorter instance prefixes, mirroring FindVariable, so a
@@ -730,7 +740,7 @@ std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
   std::string p = prefix;
   for (;;) {
     std::string cand = p + std::string(ident);
-    if (instance_types_.find(cand) != instance_types_.end()) return cand;
+    if (std::string key = InstanceKeyOf(cand); !key.empty()) return key;
     if (p.empty()) break;
     size_t last =
         (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
@@ -740,6 +750,11 @@ std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
       p = p.substr(0, last + 1);
     }
   }
+  // §23.6: a path headed by a top-level module's name is read from that top,
+  // whose own instances are keyed under no prefix.
+  size_t dot = ident.find('.');
+  if (dot != std::string_view::npos && IsTopModule(ident.substr(0, dot)))
+    return InstanceKeyOf(std::string(ident.substr(dot + 1)));
   return {};
 }
 

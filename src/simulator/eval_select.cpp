@@ -26,6 +26,7 @@
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -865,6 +866,9 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
                                  result)) {
     return result;
   }
+  // §25.9 with §23.3.3.5: an element of an array of interface instances,
+  // `s[1]`, is an instance, whose handle the select stands for.
+  if (TryInterfaceInstancePathHandle(expr, ctx, arena, result)) return result;
   // §13.4.1: a call used as an expression is an implicit variable of its
   // return type, so an index on a call that returned a queue, a dynamic array
   // or a fixed-size unpacked array reads an element of it (§7.10.1, §7.4.5),

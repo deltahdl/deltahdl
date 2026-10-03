@@ -596,9 +596,7 @@ static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
   if (!base.is_virtual_interface) return {};
   *handled = true;
   if (base.handle == kNullVirtualInterface) {
-    ctx.GetDiag().Error(lhs->range.start,
-                        "reference through a null virtual interface",
-                        Subclause("25.9"));
+    ReportNullVirtualInterface(lhs->range.start, ctx);
     FieldTarget target;
     target.kind = FieldTarget::Kind::kNoOp;
     return target;

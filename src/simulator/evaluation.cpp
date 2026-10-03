@@ -27,6 +27,7 @@
 // AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
 // reads.
 #include "simulator/sva_engine_sampling.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 // Resolves an unqualified identifier that is not a local variable against the
@@ -83,12 +84,8 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
   return self->GetProperty(expr->text, arena);
 }
 
-// §8.13: whether the class scope a bare name inside a method resolves against
-// declares `name`, as a static property of the running method's class or as a
-// property of the object's class or one it inherits from. The class scope is
-// searched before the scope enclosing the class, so a name it declares is
-// never the instance of the same name in the enclosing module.
-static bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
+// See evaluation.h.
+bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   if (method_cls != nullptr && method_cls->StaticPropertyOwner(name) != nullptr)
     return true;
@@ -512,22 +509,11 @@ static Logic4Vec EvalEventIdentityEquality(const IdentityEqualityOperands& ops,
 // §25.9: equality of a virtual interface against another virtual interface,
 // an interface instance, or null compares the interface instance each side
 // refers to (an unbound virtual interface and null compare equal).
-static Logic4Vec EvalVirtualInterfaceEquality(
-    const IdentityEqualityOperands& ops, SimContext& ctx, bool lhs_is_vi,
-    bool rhs_is_vi, Arena& arena) {
-  auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
-                           bool is_null) -> std::string {
-    if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
-    if (is_null) return std::string();
-    if (id) return ctx.ResolveInstanceScope(id->text);
-    return std::string();
-  };
-  std::string ls =
-      operand_scope(ops.lv, ops.lhs_id, lhs_is_vi, ops.lhs_is_null);
-  std::string rs =
-      operand_scope(ops.rv, ops.rhs_id, rhs_is_vi, ops.rhs_is_null);
-  bool equal = (ls == rs);
-  return MakeLogic4VecVal(arena, 1, (ops.is_eq_op == equal) ? 1u : 0u);
+static Logic4Vec EvalVirtualInterfaceEquality(const Expr* expr, bool is_eq_op,
+                                              SimContext& ctx, Arena& arena) {
+  bool equal = VirtualInterfaceOperandHandle(expr->lhs, ctx, arena) ==
+               VirtualInterfaceOperandHandle(expr->rhs, ctx, arena);
+  return MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
 }
 
 // Handles equality comparisons (==, !=, ===, !==) whose operands are event
@@ -545,7 +531,7 @@ static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
   bool lhs_is_vi = ctx.IsVirtualInterfaceVar(ops.lv);
   bool rhs_is_vi = ctx.IsVirtualInterfaceVar(ops.rv);
   if (lhs_is_vi || rhs_is_vi) {
-    out = EvalVirtualInterfaceEquality(ops, ctx, lhs_is_vi, rhs_is_vi, arena);
+    out = EvalVirtualInterfaceEquality(expr, ops.is_eq_op, ctx, arena);
     return true;
   }
   return false;
