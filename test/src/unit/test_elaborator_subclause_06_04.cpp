@@ -398,12 +398,14 @@ TEST(SingularAggregateTypes, StringPortDefaultAccepted) {
 
 // §6.11.1 dependency: an enumeration is an integral type and is therefore
 // always singular, so its port default is accepted. The enum is produced by
-// real typedef syntax and driven through the full pipeline.
+// real typedef syntax and driven through the full pipeline; the port is a
+// variable, since its int base is 2-state and §6.7.1 gives a net, which
+// §23.2.2.3 would make a port with no port kind, a 4-state type.
 TEST(SingularAggregateTypes, EnumPortDefaultAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef enum { A, B } e_t;\n"
-      "module t(input e_t p = A);\n"
+      "module t(input var e_t p = A);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

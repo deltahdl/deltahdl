@@ -59,11 +59,13 @@ TEST(DefaultNettypeSimulation, NoneBeforeAndAfterLeavesAWireModuleItsNets) {
 
 // §22.8: each of t0, t1 and t2 takes the `default_nettype before it, so its
 // implicit und is a tri0 reading 0, a tri1 reading 1 and an undriven wire
-// reading z, and each passes the value through p0 to its w. The last
-// directive, wire, governed all three, which read z z z.
+// reading z, and each passes the value through p0 to its w. p0 comes before
+// every directive, so its input is a wire (§23.2.2.3) that pulls nothing. The
+// last directive, wire, governed all three, which read z z z.
 TEST(DefaultNettypeSimulation, EachModuleTakesTheDirectiveBeforeIt) {
   SimFixture f;
-  EXPECT_EQ(PreprocessAndCapture("`default_nettype tri0\n" + PassThrough() +
+  EXPECT_EQ(PreprocessAndCapture(PassThrough() +
+                                     "`default_nettype tri0\n"
                                      "module t0;\n"
                                      "  p0 u(.i(und), .o(w));\n"
                                      "endmodule\n"
