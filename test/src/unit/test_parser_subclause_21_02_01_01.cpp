@@ -49,23 +49,20 @@ TEST(FormatSpecifications, UndefinedSpecifierIsAnErrorInEveryFormatTask) {
 }
 
 // §21.2.1.2 (printed page 659): the field width between the % and an integer
-// specifier's letter "shall be a non-negative decimal integer constant", and
-// only Table 21-2's real specifiers take C's flags (printed page 658), so the
-// `-` of `%-3d` is no width. Its letter is Table 21-1's, so §21.2.1.1's error
-// for an undefined specifier does not reach it, and the malformed width is
-// warned about.
-TEST(FormatSpecifications, FlaggedIntegerSpecifierIsWarnedAbout) {
+// specifier's letter is a non-negative decimal integer constant, and only
+// Table 21-2's real specifiers take C's flags (printed page 658), so `%-3d` is
+// a specifier neither table defines, which §21.2.1.1 makes an error. It was
+// warned about as a malformed field width alone.
+TEST(FormatSpecifications, FlaggedIntegerSpecifierIsAnError) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] v;\n"
       "  initial $display(\"%-3d\", v);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(ReportedWarning(r.diags,
-                              "field width of '%-3d' in a string literal "
-                              "argument of $display is not a non-negative "
-                              "decimal integer constant",
-                              3, "21.2.1.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "undefined format specifier '%-3d' in a string "
+                            "literal argument of $display",
+                            3, "21.2.1.1"));
 }
 
 // §21.2.1.1 with Table 21-1 and Table 21-2: each defined specifier in either

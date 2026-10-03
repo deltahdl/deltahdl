@@ -2,7 +2,6 @@
 
 #include <cctype>
 #include <cstddef>
-#include <cstdint>
 #include <format>
 #include <string_view>
 
@@ -86,43 +85,27 @@ size_t ConversionLetter(std::string_view fmt, size_t i, bool& flagged) {
   return j;
 }
 
-// What a conversion is: one Table 21-1 or Table 21-2 defines, one whose letter
-// neither table defines, or a defined integer letter behind a C flag.
-enum class Conversion : uint8_t { kDefined, kUndefined, kFlaggedWidth };
-
-// The conversion whose letter is at `j`, or which the literal's end cut short
-// there. §21.2.1.2 (printed page 659) has only "a non-negative decimal integer
-// constant" between the % and an integer specifier's letter, so a flag before
-// one, `%-6d`, is no field width; the letter itself is still Table 21-1's.
-Conversion ClassifyConversion(std::string_view fmt, size_t j, bool flagged) {
-  if (j >= fmt.size()) {
-    return flagged ? Conversion::kUndefined : Conversion::kDefined;
-  }
-  if (!IsDefinedSpecifier(fmt[j])) return Conversion::kUndefined;
-  if (flagged && !IsRealSpecifier(fmt[j])) return Conversion::kFlaggedWidth;
-  return Conversion::kDefined;
+// Whether the conversion whose letter is at `j`, or which the literal's end
+// cut short there, is one the standard defines. Table 21-1 and Table 21-2
+// (printed pages 656 and 658) define each specifier by its letter, and
+// §21.2.1.2 (printed page 659) allows only "a non-negative decimal integer
+// constant" between the % and an integer specifier's letter, so a C flag before
+// one, `%-6d`, makes a specifier neither defines; only Table 21-2's real
+// specifiers take the flags.
+bool IsDefinedConversion(std::string_view fmt, size_t j, bool flagged) {
+  if (j >= fmt.size()) return !flagged;
+  return IsDefinedSpecifier(fmt[j]) && (!flagged || IsRealSpecifier(fmt[j]));
 }
 
-// §21.2.1.1 (printed page 656) makes an undefined format specifier an error.
-// A flagged integer specifier breaks §21.2.1.2's field width rule instead,
-// which names no error, and is warned about.
-void ReportConversion(const Expr* lit, std::string_view spec,
-                      Conversion conversion, std::string_view task,
-                      DiagEngine& diag) {
-  if (conversion == Conversion::kUndefined) {
-    diag.Error(lit->range.start,
-               std::format("undefined format specifier '{}' in a string "
-                           "literal argument of {}",
-                           spec, task),
-               Subclause("21.2.1.1"));
-  } else if (conversion == Conversion::kFlaggedWidth) {
-    diag.Warning(lit->range.start,
-                 std::format("field width of '{}' in a string literal "
-                             "argument of {} is not a non-negative decimal "
-                             "integer constant",
-                             spec, task),
-                 Subclause("21.2.1.2"));
-  }
+// §21.2.1.1 (printed page 656) makes an undefined format specifier in a string
+// literal argument an error.
+void ReportUndefinedConversion(const Expr* lit, std::string_view spec,
+                               std::string_view task, DiagEngine& diag) {
+  diag.Error(lit->range.start,
+             std::format("undefined format specifier '{}' in a string "
+                         "literal argument of {}",
+                         spec, task),
+             Subclause("21.2.1.1"));
 }
 
 // The walk the display tasks make of a format (FormatDisplay in the
@@ -140,8 +123,8 @@ void CheckFormatLiteral(const Expr* lit, std::string_view task,
     bool flagged = false;
     size_t j = ConversionLetter(fmt, i, flagged);
     size_t end = j >= fmt.size() ? j : j + 1;
-    ReportConversion(lit, fmt.substr(i, end - i),
-                     ClassifyConversion(fmt, j, flagged), task, diag);
+    if (!IsDefinedConversion(fmt, j, flagged))
+      ReportUndefinedConversion(lit, fmt.substr(i, end - i), task, diag);
     i = j;
   }
 }
