@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -96,18 +97,40 @@ static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
   return FoldDeclaredParamValue(pexpr, *type, values);
 }
 
+// §6.20.1 with §10.9.1: whether `e`, an item of a parameter array's assignment
+// pattern, is a constant expression, integral or real, and for a pattern nested
+// in it for a further dimension, whether each of its own items is.
+static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
+  if (e->kind != ExprKind::kAssignmentPattern)
+    return ConstEvalInt(e, values).has_value() ||
+           ConstEvalReal(e, values).has_value();
+  return std::ranges::all_of(e->elements, [&values](const Expr* item) {
+    return PatternItemsConstant(item, values);
+  });
+}
+
 // A real value and `$` are checked for being constant and recorded nowhere,
 // since the qualified "Class.name" scope holds integers alone; the simulator
 // reads a real class parameter as a real (ClassParamSizer in
 // src/simulator/eval_class_params.cpp).
+//
+// A parameter declared with unpacked dimensions, `is_array`, holds an array of
+// values (§6.20.1), which no integer stands for: a pattern is judged item by
+// item (PatternItemsConstant), a value written as anything else -- the name of
+// another parameter array -- stands as written, and neither is recorded.
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
-                             const DataType* type,
+                             const DataType* type, bool is_array,
                              ClassParamRegistration& reg) {
   if (!pexpr || IsDollarValue(pexpr)) return;
-  bool is_real = TakesRealClassParamValue(pexpr, type);
+  bool is_real = !is_array && TakesRealClassParamValue(pexpr, type);
   std::optional<int64_t> val;
-  if (!is_real) val = FoldClassParamInteger(pexpr, type, reg.values);
-  if (is_real ? !ConstEvalReal(pexpr, reg.values) : !val) {
+  if (!is_real && !is_array)
+    val = FoldClassParamInteger(pexpr, type, reg.values);
+  bool constant = is_array  ? pexpr->kind != ExprKind::kAssignmentPattern ||
+                                  PatternItemsConstant(pexpr, reg.values)
+                  : is_real ? ConstEvalReal(pexpr, reg.values).has_value()
+                            : val.has_value();
+  if (!constant) {
     if (!ExprMentionsAny(pexpr, reg.formals)) {
       reg.diag.Error(pexpr->range.start,
                      std::format("class parameter '{}' value is not a constant "
@@ -117,7 +140,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
     }
     return;
   }
-  if (is_real) return;
+  if (is_array || is_real) return;
   auto* qname = reg.arena.Create<std::string>(std::string(reg.cls->name) + "." +
                                               std::string(pname));
   reg.cu_param_scope[*qname] = *val;
@@ -135,11 +158,13 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
   for (size_t i = 0; i < params.size(); ++i) {
     const auto& [pname, pexpr] = params[i];
     if (reg.cls->type_param_names.count(pname)) continue;
-    RecordClassParam(pname, pexpr, i < types.size() ? &types[i] : nullptr, reg);
+    RecordClassParam(pname, pexpr, i < types.size() ? &types[i] : nullptr,
+                     reg.cls->param_port_unpacked_dims.count(pname) != 0, reg);
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind == ClassMemberKind::kProperty && m->is_param)
-      RecordClassParam(m->name, m->init_expr, &m->data_type, reg);
+      RecordClassParam(m->name, m->init_expr, &m->data_type,
+                       !m->unpacked_dims.empty(), reg);
   }
 }
 

@@ -495,4 +495,44 @@ TEST(ParameterizedClassElaboration,
   EXPECT_EQ(ParamValue(design, "B"), 5);
 }
 
+// §6.20.1 with §8.25: a class parameter declared with unpacked dimensions is
+// an array of constants, assigned by a pattern whose items, nested for a second
+// dimension or real for a real element, are each constant, or by another
+// parameter array; the pattern is no one integer, and is not judged as one.
+TEST(ParameterizedClassElaboration, ParameterArrayOfConstantsOk) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(parameter int P[2] = '{3, 4});\n"
+      "  parameter int A[2] = '{1, 2};\n"
+      "  localparam int M[2][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  localparam real R[2] = '{1.5, 0.25};\n"
+      "  localparam int K[3] = '{default: 7};\n"
+      "  localparam int B[2] = A;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// An item of the pattern that is no constant expression is reported, as a
+// scalar parameter's value would be.
+TEST(ParameterizedClassElaboration, ParameterArrayItemNotConstantIsError) {
+  ElabFixture f;
+  ElabOk(
+      "int g;\n"
+      "class C;\n"
+      "  parameter int A[2] = '{1, g};\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class parameter 'A' value is not a constant "
+                            "expression",
+                            3, "6.20.2"));
+}
+
 }  // namespace
