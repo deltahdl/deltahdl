@@ -22,6 +22,7 @@ static RtlirDesign* ElaborateWithPreprocAndCu(const std::string& src,
   ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
   cu->preproc_timescale = preproc.CurrentTimescale();
   cu->has_preproc_timescale = preproc.HasTimescale();
+  cu->preproc_global_precision = preproc.GlobalPrecision();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();

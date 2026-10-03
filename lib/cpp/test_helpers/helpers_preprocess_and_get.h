@@ -68,10 +68,11 @@ inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
 
 // Runs `src` as deltahdl's driver does: preprocessed, parsed, given what the
 // preprocessor recorded in force at each design element's header -- its
-// `timescale among it -- and the compilation unit's last `timescale, as
-// ApplyPreprocMetadata in src/main.cpp gives them, then elaborated with its
-// last module as the top, lowered and simulated. Returns what the run wrote to
-// stdout; a source that does not elaborate writes nothing.
+// `timescale among it -- and the compilation unit's last `timescale and finest
+// `timescale precision, as ApplyPreprocMetadata in src/main.cpp gives them,
+// then elaborated with its last module as the top, lowered and simulated.
+// Returns what the run wrote to stdout; a source that does not elaborate writes
+// nothing.
 inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, {});
@@ -84,6 +85,7 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   ApplyModuleDirectives(cu, pp.ModuleDirectivesList());
   cu->preproc_timescale = pp.CurrentTimescale();
   cu->has_preproc_timescale = pp.HasTimescale();
+  cu->preproc_global_precision = pp.GlobalPrecision();
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   Elaborator elab(f.arena, f.diag, cu);

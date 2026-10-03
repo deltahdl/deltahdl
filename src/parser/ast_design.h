@@ -182,6 +182,11 @@ struct CompilationUnit {
 
   TimeScale preproc_timescale;
   bool has_preproc_timescale = false;
+  // The finest precision of every `timescale the preprocessor read, which
+  // §3.14.3 counts toward the global precision. preproc_timescale holds only
+  // the last directive, and an earlier finer one need not stand before any
+  // design element's header. Meaningful only under has_preproc_timescale.
+  TimeUnit preproc_global_precision = TimeUnit::kNs;
 
   // Whether the unit holds nothing an elaboration could take up: no module or
   // program to root a design at, no package or class whose items want

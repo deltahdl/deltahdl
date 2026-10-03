@@ -170,6 +170,7 @@ struct PreprocResult {
 
   delta::TimeScale timescale;
   bool has_timescale = false;
+  delta::TimeUnit global_precision = delta::TimeUnit::kNs;
   // The line of `source` each command-line source file's text begins on, in
   // command-line order. §33.3.1 maps a source file to a library, and a design
   // element belongs to the file named on the command line whose text holds
@@ -219,6 +220,7 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   result.delay_mode_directive = preproc.DelayModeDirective();
   result.timescale = preproc.CurrentTimescale();
   result.has_timescale = preproc.HasTimescale();
+  result.global_precision = preproc.GlobalPrecision();
   return result;
 }
 
@@ -300,6 +302,7 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->delay_mode_directive = pp.delay_mode_directive;
   cu->preproc_timescale = pp.timescale;
   cu->has_preproc_timescale = pp.has_timescale;
+  cu->preproc_global_precision = pp.global_precision;
 }
 
 // §33.3.1 (printed pages 935-936): "When parsing a source description file

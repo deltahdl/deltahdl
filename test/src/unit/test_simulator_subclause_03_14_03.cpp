@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 
 using namespace delta;
 
@@ -24,6 +25,28 @@ TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
   f.ctx.SetGlobalPrecision(TimeUnit::kFs);
   EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
   EXPECT_EQ(f.ctx.StepTimeUnit(), f.ctx.GlobalPrecision());
+}
+
+// §3.14.3 takes the smallest precision of every `timescale in the design, not
+// only the last one: the 1 fs before p makes the global precision 1 fs, so the
+// #1.5 of p's task stays 1.5 ns and t reads 1.500. Counted in ticks of the last
+// directive's 1 ns, the delay landed on 2 ns.
+TEST(DesignBuildingBlockSimulation,
+     EarlierFinerTimescaleSetsTheGlobalPrecision) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1fs\n"
+                                 "package p;\n"
+                                 "  task automatic wait_frac(); #1.5; endtask\n"
+                                 "endpackage\n"
+                                 "`timescale 1ns / 1ns\n"
+                                 "module t;\n"
+                                 "  initial begin\n"
+                                 "    p::wait_frac();\n"
+                                 "    $display(\"%0.3f\", $realtime);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "1.500\n");
 }
 
 }  // namespace
