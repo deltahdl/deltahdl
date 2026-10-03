@@ -95,11 +95,16 @@ TEST(SinglePassCompileTimescale, ACompilationUnitTimeunitReachesTheDesign) {
   // the design reports 1 ns unless the merge carries it onto the unit the
   // elaborator was handed. §20.4.1 makes design->cu_timescale what
   // $timeunit/$timeprecision report for the $unit argument.
+  //
+  // The module declares its own precision. §3.14.2.3 would otherwise give it
+  // the 1 ns default, coarser than the 100 ps unit it takes from the
+  // compilation unit, which §3.14 rejects.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto src = tmp.Write("src/top.sv",
                        "timeunit 100ps;\n"
                        "module top;\n"
+                       "  timeprecision 1ps;\n"
                        "endmodule\n");
 
   CommandLineHarness h;
@@ -157,11 +162,16 @@ TEST(SinglePassCompileTimescale,
   // not reached by the two cases above, which read design->cu_timescale
   // instead, and the value it produces is what every delay in the module is
   // scaled by.
+  //
+  // The module declares its own precision. §3.14.2.3 would otherwise give it
+  // the 1 ns default, coarser than the 100 ps unit it takes from the
+  // compilation unit, which §3.14 rejects.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto cu = tmp.Write("src/cu.sv", "timeunit 100ps;\n");
   auto top = tmp.Write("src/top.sv",
                        "module top;\n"
+                       "  timeprecision 1ps;\n"
                        "endmodule\n");
 
   CommandLineHarness h;
@@ -328,11 +338,16 @@ TEST(SinglePassCompileTimescale,
   // src/parser/ast_design.h, so a case declaring nanoseconds reads back the
   // same value whether the declaration crossed to the elaborated design or was
   // dropped on the way, and could not fail.
+  //
+  // The module declares its own precision. §3.14.2.3 would otherwise give it
+  // the 1 ns default, coarser than the 1 ps unit it takes from the compilation
+  // unit, which §3.14 rejects.
   ScratchDir tmp;
   constexpr const char* kSecondFile =
       "// The repeat of the first file's declaration follows this line.\n"
       "timeunit 1ps;\n"
       "module top;\n"
+      "  timeprecision 1ps;\n"
       "endmodule\n";
 
   CommandLineHarness h;

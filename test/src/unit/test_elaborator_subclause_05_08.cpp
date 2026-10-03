@@ -69,12 +69,15 @@ TEST(TimeLiteralElaboration, TimeLiteralConstFoldsIntoParameter) {
 
 // §5.8 + §3.14: the same literal scales to whatever the current time unit is.
 // With an explicit `timeunit 1ps` the literal 3000ps is already in the current
-// unit, so it const-folds to 3000 rather than the ns-scaled 3.
+// unit, so it const-folds to 3000 rather than the ns-scaled 3. The module
+// declares a 1 ps precision as well, since §3.14 rejects the 1 ns default
+// precision §3.14.2.3 would otherwise give it under a 1 ps unit.
 TEST(TimeLiteralElaboration, TimeLiteralConstFoldScalesToCurrentUnit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  timeunit 1ps;\n"
+      "  timeprecision 1ps;\n"
       "  localparam int P = 3000ps;\n"
       "endmodule\n",
       f);

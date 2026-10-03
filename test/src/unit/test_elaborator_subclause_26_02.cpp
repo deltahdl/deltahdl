@@ -188,6 +188,8 @@ TEST(PackageDeclarationElaboration,
              "  timeprecision 1ps;\n"
              "endpackage\n"
              "module m;\n"
+             "  timeunit 1ns;\n"
+             "  timeprecision 1ps;\n"
              "endmodule\n"));
 }
 

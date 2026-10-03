@@ -8,45 +8,11 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
 namespace delta {
-
-// §3.14: a design element's time precision shall be at least as precise as its
-// time unit. When the two are written as separate timeunit/timeprecision
-// statements (rather than the "unit / precision" slash form the parser already
-// checks), the comparison can only happen once both have been collected, so it
-// lands here. The rule is stated once and applies to every design element, so
-// the per-element field comparison is shared.
-// §3.14: the timescale a design element declares -- whether it states a time
-// unit and a time precision, and the unit-with-magnitude each is written as.
-struct DeclaredTimescale {
-  bool has_unit;
-  bool has_precision;
-  TimeUnit unit;
-  int unit_magnitude;
-  TimeUnit precision;
-  int precision_magnitude;
-};
-
-static void CheckTimescaleOrder(const DeclaredTimescale& ts, SourceLoc loc,
-                                DiagEngine& diag) {
-  if (!ts.has_unit || !ts.has_precision) return;
-  if (EffectiveTimeOrder(ts.precision, ts.precision_magnitude) >
-      EffectiveTimeOrder(ts.unit, ts.unit_magnitude)) {
-    diag.Error(loc, "time precision is less precise than the time unit",
-               Subclause("3.14"));
-  }
-}
-
-static void CheckModuleTimescaleOrder(const ModuleDecl* decl,
-                                      DiagEngine& diag) {
-  CheckTimescaleOrder(
-      {decl->has_timeunit, decl->has_timeprecision, decl->time_unit,
-       decl->time_unit_magnitude, decl->time_prec, decl->time_prec_magnitude},
-      decl->range.start, diag);
-}
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
                                            RtlirModule* mod) {
@@ -177,7 +143,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       (this->*kPlainChecks[plain_idx++])();
     }
   }
-  CheckModuleTimescaleOrder(decl, diag_);
   CheckIsunboundedArgs(decl, diag_);
 }
 
@@ -206,6 +171,120 @@ void ClassifyTimescaleElement(bool el_has_unit, bool el_has_prec, SourceLoc loc,
   }
 }
 
+// One half of what a time scope declares (§3.14.2.2): whether it states the
+// time unit, or the time precision, and the unit-with-magnitude it is written
+// as.
+struct DeclaredTime {
+  bool declared;
+  TimeUnit unit;
+  int magnitude;
+};
+
+struct DeclaredTimescale {
+  DeclaredTime unit;
+  DeclaredTime precision;
+};
+
+DeclaredTimescale DeclaredBy(const ModuleDecl* decl) {
+  return {
+      {decl->has_timeunit, decl->time_unit, decl->time_unit_magnitude},
+      {decl->has_timeprecision, decl->time_prec, decl->time_prec_magnitude}};
+}
+
+DeclaredTimescale DeclaredBy(const PackageDecl* pkg) {
+  return {{pkg->has_timeunit, pkg->time_unit, pkg->time_unit_magnitude},
+          {pkg->has_timeprecision, pkg->time_prec, pkg->time_prec_magnitude}};
+}
+
+DeclaredTimescale DeclaredBy(const CompilationUnit* cu) {
+  return {
+      {cu->has_cu_timeunit, cu->cu_time_unit, cu->cu_time_unit_magnitude},
+      {cu->has_cu_timeprecision, cu->cu_time_prec, cu->cu_time_prec_magnitude}};
+}
+
+// A `timescale directive (§22.7) states both halves or, absent, neither.
+DeclaredTimescale DeclaredBy(bool has_timescale, const TimeScale& ts) {
+  return {{has_timescale, ts.unit, ts.magnitude},
+          {has_timescale, ts.precision, ts.prec_magnitude}};
+}
+
+// A design element's time unit or time precision as §3.14.2.3 (printed page
+// 60) resolves it, and whether it came from the module or interface enclosing
+// the element. The default is the 1 ns deltahdl takes for both, which §3.14.2.3
+// leaves to the implementation and the TimeScale struct starts from.
+struct ResolvedTime {
+  TimeUnit unit = TimeUnit::kNs;
+  int magnitude = 1;
+  bool inherited = false;
+};
+
+struct ElementTimescale {
+  ResolvedTime unit;
+  ResolvedTime precision;
+};
+
+// §3.14.2.3: an element takes each of the two from its own declaration, else
+// from the module or interface enclosing it (a), else from the `timescale in
+// force at its header (b), else from the compilation unit's declaration (c),
+// and otherwise from the default (d). A precision the element does not declare
+// is found by the same order of sources as a unit.
+ResolvedTime ResolveTime(const DeclaredTime& own, const ResolvedTime* enclosing,
+                         const DeclaredTime& directive,
+                         const DeclaredTime& cu) {
+  if (own.declared) return {own.unit, own.magnitude, false};
+  if (enclosing != nullptr)
+    return {enclosing->unit, enclosing->magnitude, true};
+  if (directive.declared) return {directive.unit, directive.magnitude, false};
+  if (cu.declared) return {cu.unit, cu.magnitude, false};
+  return {};
+}
+
+ElementTimescale ResolveElementTimescale(const DeclaredTimescale& own,
+                                         const ElementTimescale* enclosing,
+                                         const DeclaredTimescale& directive,
+                                         const DeclaredTimescale& cu) {
+  return {
+      ResolveTime(own.unit, enclosing ? &enclosing->unit : nullptr,
+                  directive.unit, cu.unit),
+      ResolveTime(own.precision, enclosing ? &enclosing->precision : nullptr,
+                  directive.precision, cu.precision)};
+}
+
+// §3.14 (printed page 59): a design element's time precision may be no coarser
+// than its time unit. The comparison is of the two values the element resolves
+// to, wherever each came from, so a lone `timeunit 1ps;` is held to the 1 ns
+// default precision. A pair a nested element inherits whole from the one
+// enclosing it is that element's pair, reported there. An extern declaration
+// (§23.5) is not an element of its own and is left to its definition.
+void CheckTimescaleOrder(const ElementTimescale& ts, SourceLoc loc,
+                         DiagEngine& diag) {
+  if (ts.unit.inherited && ts.precision.inherited) return;
+  if (EffectiveTimeOrder(ts.precision.unit, ts.precision.magnitude) >
+      EffectiveTimeOrder(ts.unit.unit, ts.unit.magnitude)) {
+    diag.Error(loc, "time precision is less precise than the time unit",
+               Subclause("3.14"));
+  }
+}
+
+// Checks a module, interface or program and every module or interface nested
+// in it, each nested one resolving against the element enclosing it.
+void CheckDesignElementTimescales(const ModuleDecl* decl,
+                                  const ElementTimescale* enclosing,
+                                  const DeclaredTimescale& cu,
+                                  DiagEngine& diag) {
+  if (decl->is_extern) return;
+  ElementTimescale ts = ResolveElementTimescale(
+      DeclaredBy(decl), enclosing,
+      DeclaredBy(decl->has_directive_timescale, decl->directive_timescale), cu);
+  CheckTimescaleOrder(ts, decl->range.start, diag);
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl != nullptr) {
+      CheckDesignElementTimescales(item->nested_module_decl, &ts, cu, diag);
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateTimescaleConsistency() {
@@ -218,12 +297,20 @@ void Elaborator::ValidateTimescaleConsistency() {
     ClassifyTimescaleElement(el_has_unit, el_has_prec, loc, scan);
   };
 
-  for (const auto* mod : unit_->modules)
-    inspect(mod->has_timeunit, mod->has_timeprecision, mod->range.start);
-  for (const auto* iface : unit_->interfaces)
-    inspect(iface->has_timeunit, iface->has_timeprecision, iface->range.start);
-  for (const auto* prog : unit_->programs)
-    inspect(prog->has_timeunit, prog->has_timeprecision, prog->range.start);
+  // An extern declaration (§23.5) declares the ports of the design element its
+  // definition gives, and is not an element of its own, so only the definition
+  // is classified.
+  for (const auto* list :
+       {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
+    for (const auto* decl : *list) {
+      if (decl->is_extern) continue;
+      inspect(decl->has_timeunit, decl->has_timeprecision, decl->range.start);
+    }
+  }
+  // §3.2 (printed page 50) counts a package among the design elements, and
+  // §3.14.2.2 lets it declare its own time unit and precision.
+  for (const auto* pkg : unit_->packages)
+    inspect(pkg->has_timeunit, pkg->has_timeprecision, pkg->range.start);
 
   if (scan.any_specified && scan.any_unspecified) {
     diag_.Error(scan.unspecified_loc,
@@ -233,25 +320,34 @@ void Elaborator::ValidateTimescaleConsistency() {
   }
 }
 
-// §3.14: enforce the precision-no-coarser-than-unit rule for the design
-// elements that are not necessarily reached through module item elaboration.
-// A package is never elaborated that way, and an interface or program that is
-// declared but never instantiated is likewise skipped, so the
-// separate-statement form of the check that CheckModuleTimescaleOrder performs
-// for modules would otherwise never run for them. Scanning the declarations
-// directly (as the consistency check in ValidateTimescaleConsistency already
-// does) covers every such element exactly once.
-void Elaborator::ValidateStandaloneTimescaleOrder() {
-  auto check = [&](const ModuleDecl* decl) {
-    CheckModuleTimescaleOrder(decl, diag_);
-  };
-  for (const auto* iface : unit_->interfaces) check(iface);
-  for (const auto* prog : unit_->programs) check(prog);
+// §3.14: enforce the precision-no-coarser-than-unit rule on every design
+// element that can carry a time unit, from its declaration rather than from
+// module item elaboration: a package is never elaborated that way, and a
+// module, interface or program that is declared but never instantiated is
+// skipped by it, so scanning the declarations covers each exactly once.
+//
+// A package has no enclosing element, and the parser records the `timescale in
+// force at the header of a module, interface or program only. A package that
+// leaves either value to a `timescale is therefore not checked: which of the
+// compilation unit's `timescale directives it follows is not known here, and
+// the last of them may not be the one before it.
+void Elaborator::ValidateTimescaleOrder() {
+  DeclaredTimescale cu = DeclaredBy(unit_);
+  for (const auto* list :
+       {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
+    for (const auto* decl : *list) {
+      CheckDesignElementTimescales(decl, nullptr, cu, diag_);
+    }
+  }
+  DeclaredTimescale no_directive = DeclaredBy(false, TimeScale{});
   for (const auto* pkg : unit_->packages) {
-    CheckTimescaleOrder(
-        {pkg->has_timeunit, pkg->has_timeprecision, pkg->time_unit,
-         pkg->time_unit_magnitude, pkg->time_prec, pkg->time_prec_magnitude},
-        pkg->range.start, diag_);
+    DeclaredTimescale own = DeclaredBy(pkg);
+    if (unit_->has_preproc_timescale &&
+        !(own.unit.declared && own.precision.declared)) {
+      continue;
+    }
+    CheckTimescaleOrder(ResolveElementTimescale(own, nullptr, no_directive, cu),
+                        pkg->range.start, diag_);
   }
 }
 

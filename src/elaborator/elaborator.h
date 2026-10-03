@@ -526,7 +526,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateTimescaleConsistency();
 
-  void ValidateStandaloneTimescaleOrder();
+  void ValidateTimescaleOrder();
 
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
                         bool declares_its_constants);

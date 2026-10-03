@@ -139,6 +139,112 @@ TEST(TimescalePrecedenceElaboration, MixedAcrossProgramAndModuleErrors) {
                             5, "3.14.2.3"));
 }
 
+// §3.2 (printed page 50) counts a package among the design elements, and
+// §3.14.2.2 lets a package declare its time unit and precision, so a fully
+// specified package beside a module that specifies neither is the mix
+// §3.14.2.3 forbids. Packages are scanned after modules, so the report stands
+// at the unspecified module on line 5.
+TEST(TimescalePrecedenceElaboration, MixedAcrossPackageAndModuleErrors) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "package p;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endpackage\n"
+      "module a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
+}
+
+// The other way round: a fully specified module beside a package that
+// specifies neither, reported at the package on line 5.
+TEST(TimescalePrecedenceElaboration, MixedAcrossModuleAndPackageErrors) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "package p;\n"
+      "endpackage\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
+}
+
+// An extern module declaration (§23.5) declares the ports of the module its
+// definition gives and is no design element of its own, so it is not an
+// unspecified element beside a definition that specifies both.
+TEST(TimescalePrecedenceElaboration, ExternDeclarationIsNotAnElement) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "extern module m;\n"
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Nor is it held to §3.14 on the values it would resolve to: here the
+// compilation unit's lone 1 ps unit and the 1 ns default precision, which the
+// definition replaces with its own 1 ps.
+TEST(TimescalePrecedenceElaboration, ExternDeclarationIsNotOrderChecked) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "timeunit 1ps;\n"
+      "extern module m;\n"
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §3.14.2.3 b): a package that declares only its unit takes its precision from
+// the `timescale before it, 1 ps here, equal to its unit. The later 1 ns
+// `timescale governs the module and not the package, so the design is legal
+// and is not judged by the last directive of the compilation unit.
+TEST(TimescalePrecedenceElaboration, PackageFollowsTheTimescaleBeforeIt) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "`timescale 1ps / 1ps\n"
+      "package p;\n"
+      "  timeunit 1ps;\n"
+      "endpackage\n"
+      "`timescale 1ns / 1ns\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(TimescalePrecedenceElaboration, UniformPackageAndModuleAcceptable) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "package p;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // "Specified" means both a time unit and a time precision are in effect. An
 // element carrying only a timeunit is still unspecified, so pairing it with a
 // fully specified element trips the same error as pairing with a bare element.

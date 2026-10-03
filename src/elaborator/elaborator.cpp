@@ -457,7 +457,7 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateTimescaleConsistency();
 
-  ValidateStandaloneTimescaleOrder();
+  ValidateTimescaleOrder();
 
   ValidateDpiDeclarations();
 

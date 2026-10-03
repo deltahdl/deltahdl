@@ -52,6 +52,7 @@ TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitPs) {
   auto v = RunAndGetReal(
       "module t;\n"
       "  timeunit 1ps;\n"
+      "  timeprecision 1ps;\n"
       "  realtime r;\n"
       "  initial r = 40ps;\n"
       "endmodule\n",
