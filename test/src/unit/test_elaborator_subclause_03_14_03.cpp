@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;
