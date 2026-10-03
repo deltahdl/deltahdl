@@ -193,6 +193,16 @@ void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
 void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
 
+// §23.9 with §23.10.2: the instance an override of `prefix`'s parameters was
+// written in is the instance holding `prefix`. Its prefix is found by dropping
+// one dotted component at a time until what is left names an instance
+// RegisterInstanceKeyBinding (src/simulator/lowerer.cpp) recorded -- the top
+// under the empty key -- because a generate block's instance,
+// "u1.g[0].u2.", is keyed through the block and the block itself is no
+// instance. Defined in src/simulator/lowerer_params.cpp, where an array
+// parameter's override is read; ReevaluateParamValue reads a scalar's.
+std::string InstantiatingPrefix(std::string_view prefix, SimContext& ctx);
+
 // §6.20.2: a parameter declared with a range or a type has the range of its
 // declaration, unchanged by any override, and RtlirParamDecl::resolved_value
 // holds its value in 64 bits with no x or z among them. `var` is the storage

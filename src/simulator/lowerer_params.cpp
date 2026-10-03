@@ -19,6 +19,20 @@
 
 namespace delta {
 
+std::string InstantiatingPrefix(std::string_view prefix, SimContext& ctx) {
+  std::string parent(prefix);
+  while (!parent.empty()) {
+    parent.pop_back();
+    auto dot = parent.rfind('.');
+    parent =
+        dot == std::string::npos ? std::string() : parent.substr(0, dot + 1);
+    std::string key = parent;
+    if (!key.empty()) key.pop_back();
+    if (!ctx.FindInstanceType(key).empty()) break;
+  }
+  return parent;
+}
+
 void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
     // §23.10/§6.20: a parameter is an instance-specific runtime value, so its
@@ -52,7 +66,7 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_real = DeclaredTypeIsReal(type, ctx);
   var.dtype = &type;
   var.elem_type_kind = type.kind;
-  var.init_expr = p.default_value;
+  var.init_expr = p.override_expr == nullptr ? p.default_value : nullptr;
   var.unpacked_dims = p.unpacked_bounds;
   for (const auto& dim : p.unpacked_bounds) {
     var.unpacked_dim_sizes.push_back(dim.Size());
@@ -63,6 +77,15 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_descending = outer.left > outer.right;
   var.num_unpacked_dims = static_cast<uint32_t>(p.unpacked_bounds.size());
   CreateArrayElements(full, var, ctx, arena);
+  // §23.10.2: an instance's override, `sub #(.A('{5, 6}))`, gives the
+  // parameter its value in place of the declaration's, and the pattern is
+  // written in the instantiating instance, so its items are read there.
+  if (p.override_expr == nullptr) return;
+  var.init_expr = p.override_expr;
+  std::string own = ctx.ActiveInstancePrefix();
+  ctx.SetLoweringInstancePrefix(InstantiatingPrefix(own, ctx));
+  InitArrayElements(full, var, ctx, arena);
+  ctx.SetLoweringInstancePrefix(own);
 }
 
 void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {

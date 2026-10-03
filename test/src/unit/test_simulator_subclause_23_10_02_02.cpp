@@ -133,4 +133,44 @@ TEST(NamedParamAssignment, RealOverrideBesideRangedAndIntegralOverrides) {
             "p 4 q 2.500000 s -1 r 3.000000\n");
 }
 
+// §23.10.2 with §6.20.1: an override gives a parameter any value its
+// declaration could hold, and an array parameter's is an assignment pattern,
+// whether the parameter is declared among the items, A, or in the parameter
+// port list, P. Each element reads the override's item. The pattern was
+// dropped, and A and P printed their declared 1 2.
+TEST(NamedParamAssignment, AssignmentPatternOverridesAnArrayParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  parameter int A[2] = '{1, 2};\n"
+                       "  initial #1 $display(\"%0d %0d\", A[0], A[1]);\n"
+                       "endmodule\n"
+                       "module sp #(parameter int P[2] = '{1, 2});\n"
+                       "  initial #2 $display(\"%0d %0d\", P[0], P[1]);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  sub #(.A('{5, 6})) u();\n"
+                       "  sp #(.P('{7, 8})) v();\n"
+                       "endmodule\n",
+                       f),
+            "5 6\n7 8\n");
+}
+
+// §23.10.2: the override is written in the instantiating module, so a name in
+// its pattern is that module's: top's K, 9, rather than sub's own K, 1, which
+// would print 1 2.
+TEST(NamedParamAssignment, ArrayParameterOverrideReadsTheInstantiatingScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  parameter int K = 1;\n"
+                       "  parameter int A[2] = '{1, 2};\n"
+                       "  initial $display(\"%0d %0d\", A[0], A[1]);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  parameter int K = 9;\n"
+                       "  sub #(.A('{K, K + 1})) u();\n"
+                       "endmodule\n",
+                       f),
+            "9 10\n");
+}
+
 }  // namespace

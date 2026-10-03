@@ -32,6 +32,34 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u0->params[0].resolved_value, 8);
 }
 
+// §23.10.2 with §6.20.1: an override gives a parameter any value its
+// declaration could hold, and A's unpacked dimension makes its value an
+// array, given by an assignment pattern. B, folded from A[1], reads the
+// override's second item, 6; the pattern was dropped, leaving A '{1, 2} and B
+// 2.
+TEST(ModuleInstanceParameterAssignment,
+     AssignmentPatternOverridesAnArrayParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  parameter int A[2] = '{1, 2};\n"
+      "  localparam int B = A[1];\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(.A('{5, 6})) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 2u);
+  EXPECT_EQ(u0->params[0].name, "A");
+  EXPECT_NE(u0->params[0].override_expr, nullptr);
+  EXPECT_EQ(u0->params[1].name, "B");
+  EXPECT_EQ(u0->params[1].resolved_value, 6);
+}
+
 TEST(ModuleInstanceParameterAssignment, UnknownParameterNameProducesError) {
   ElabFixture f;
   ElaborateSrc(

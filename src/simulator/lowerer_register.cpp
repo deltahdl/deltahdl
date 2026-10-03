@@ -97,28 +97,6 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   v->has_packed_range = true;
 }
 
-// §23.9 with §23.10.2: the instance an override of `prefix`'s parameters was
-// written in is the instance holding `prefix`. Its prefix is found by dropping
-// one dotted component at a time until what is left names an instance
-// RegisterInstanceKeyBinding (src/simulator/lowerer.cpp) recorded -- the top
-// under the empty key -- because a generate block's instance,
-// "u1.g[0].u2.", is keyed through the block and the block itself is no
-// instance.
-static std::string InstantiatingPrefix(std::string_view prefix,
-                                       SimContext& ctx) {
-  std::string parent(prefix);
-  while (!parent.empty()) {
-    parent.pop_back();
-    auto dot = parent.rfind('.');
-    parent =
-        dot == std::string::npos ? std::string() : parent.substr(0, dot + 1);
-    std::string key = parent;
-    if (!key.empty()) key.pop_back();
-    if (!ctx.FindInstanceType(key).empty()) break;
-  }
-  return parent;
-}
-
 // §6.20.2 lets a value parameter's expression name literals, parameters,
 // genvars, enumeration names, constant functions and package references, and
 // this is which of those have storage the instance can read now, its own

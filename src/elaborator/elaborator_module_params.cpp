@@ -606,16 +606,34 @@ static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
          item->data_type.kind == DataTypeKind::kVoid;
 }
 
+// Whether `pexpr` is an assignment pattern given to a parameter `decl`
+// declares with unpacked dimensions, in its parameter port list or among its
+// items: §6.20.1 (printed page 124) makes such a parameter's value an array,
+// written as an assignment pattern.
+static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
+                                const Expr* pexpr) {
+  if (pexpr == nullptr || pexpr->kind != ExprKind::kAssignmentPattern)
+    return false;
+  if (decl->param_port_unpacked_dims.count(pname) > 0) return true;
+  const ModuleItem* item = BodyParamDecl(decl, pname);
+  return item != nullptr && !item->unpacked_dims.empty();
+}
+
 // The value of an assignment to a body type parameter is a type, which no
 // fold answers, so it was dropped with the assignment, and `c #(.T(logic
 // [7:0])) u()` over `module c; parameter type T = int; T x;` left x 32 bits
 // wide. A parameter port list's type parameter takes its type from
-// ApplyChildTypeParams (elaborator_module_inst.cpp) instead.
+// ApplyChildTypeParams (elaborator_module_inst.cpp) instead. An array
+// parameter's value is an array, which no fold answers either, so `sub
+// #(.A('{5, 6}))` over `parameter int A[2] = '{1, 2}` left A at '{1, 2}; the
+// pattern is kept for ApplyParamOverride to record as the override's
+// expression.
 void PushInstParamAssignment(const ModuleDecl* child_decl,
                              std::string_view pname, const Expr* pexpr,
                              const ScopeMap& parent_scope,
                              Elaborator::ParamList& child_params) {
-  if (IsBodyTypeParam(child_decl, pname)) {
+  if (IsBodyTypeParam(child_decl, pname) ||
+      IsArrayParamPattern(child_decl, pname, pexpr)) {
     child_params.push_back({pname, 0, pexpr});
     return;
   }
