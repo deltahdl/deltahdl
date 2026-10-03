@@ -84,6 +84,7 @@ class Parser {
   // File-local CPD-dedup helpers (defined static in their respective TUs).
   friend struct ParserStmtHelpers;
   friend struct ParserPortHelpers;
+  friend struct ParserParamPortHelpers;
   friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
   friend struct ParserPropertySpecHelpers;

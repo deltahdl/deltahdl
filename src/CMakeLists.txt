@@ -60,6 +60,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_block_item_decl.cpp
     parser/parser_timeunit.cpp
     parser/parser_port.cpp
+    parser/parser_param_port.cpp
     parser/parser_dpi.cpp
     parser/parser_dpi_validate.cpp
     parser/parser_aggregate_types.cpp
