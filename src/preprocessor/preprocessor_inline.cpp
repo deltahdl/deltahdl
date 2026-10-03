@@ -575,8 +575,8 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   // §22.5.1 (Syntax 22-2): the text_macro_name is required, and opens with an
   // identifier, simple or escaped; a simple one opens with a letter or `_`
   // (§5.6), so a digit or `$` opens none.
-  if (name_end == 0 || !(escaped || rest[0] == '_' ||
-                         std::isalpha(static_cast<unsigned char>(rest[0])))) {
+  if (name_end == 0 || (!escaped && rest[0] != '_' &&
+                        !std::isalpha(static_cast<unsigned char>(rest[0])))) {
     diag_.Error(loc, "`define is missing its macro name", Subclause("22.5.1"));
     return;
   }
