@@ -575,9 +575,11 @@ TEST(Preprocessor, FunctionLikeNameEndingTheSourceAfterTextIsRejected) {
 
 // §22.5.1 (Syntax 22-2): a text macro definition names its macro, with an
 // identifier, simple or escaped, so a `define with nothing after it or with a
-// name no identifier can open is reported. Each was accepted without a word.
+// name no identifier can open, a digit or a `$` (§5.6), is reported. Each was
+// accepted without a word.
 TEST(Preprocessor, DefineMissingItsNameIsReported) {
-  for (const char* directive : {"`define\n", "`define 5 x\n"}) {
+  for (const char* directive :
+       {"`define\n", "`define 5 x\n", "`define $x 1\n"}) {
     PreprocFixture f;
     Preprocess(directive, f);
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
