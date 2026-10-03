@@ -6,6 +6,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_design.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -17,6 +18,8 @@ static RtlirDesign* ElaborateWithPreprocAndCu(const std::string& src,
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
+  // As the driver does, so each element takes the `timescale before it.
+  ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
   cu->preproc_timescale = preproc.CurrentTimescale();
   cu->has_preproc_timescale = preproc.HasTimescale();
   Elaborator elab(f.arena, f.diag, cu);
