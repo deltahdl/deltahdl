@@ -140,7 +140,11 @@ TEST(SubroutineCallElaborationSyntax, TaskCallElaborates) {
 TEST(SubroutineCallElaborationSyntax, VoidCastOfMethodCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function int method(); return 0; endfunction\n"
+      "endclass\n"
       "module m;\n"
+      "  C obj = new;\n"
       "  initial void'(obj.method());\n"
       "endmodule\n",
       f);

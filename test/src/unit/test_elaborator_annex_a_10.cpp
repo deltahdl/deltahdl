@@ -360,7 +360,11 @@ TEST(BnfClarificationElaboration, ScopeRandomizeParenIdentifierListError) {
 TEST(BnfClarificationElaboration, MethodRandomizeParenIdentifierListOk) {
   ElabFixture f;
   ElaborateSrc(
+      "class C;\n"
+      "  rand int a;\n"
+      "endclass\n"
       "module m;\n"
+      "  C obj = new;\n"
       "  initial begin obj.randomize() with (a) { a > 0; }; end\n"
       "endmodule\n",
       f);

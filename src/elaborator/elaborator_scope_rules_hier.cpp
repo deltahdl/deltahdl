@@ -403,6 +403,11 @@ void UnitHierHeadNames::AddStmt(const Stmt* s) {
   for (std::string_view name : {s->label, s->var_name}) {
     if (!name.empty()) scope_names_.insert(name);
   }
+  // §12.7.3: a foreach loop declares its loop variables, and a key of a
+  // class-keyed associative array is a handle a member is selected through.
+  for (std::string_view name : s->foreach_vars) {
+    if (!name.empty()) scope_names_.insert(name);
+  }
   if (s->decl_item != nullptr) AddItem(s->decl_item);
   ForEachChildStmt(s, [&](Stmt* const& sub) { AddStmt(sub); });
 }

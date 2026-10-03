@@ -10,7 +10,11 @@ namespace {
 TEST(SubroutineCallExprElaboration, MethodCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function void method(); endfunction\n"
+      "endclass\n"
       "module m;\n"
+      "  C obj = new;\n"
       "  initial begin obj.method(); end\n"
       "endmodule\n",
       f);
@@ -106,7 +110,11 @@ TEST(SubroutineCallExprElaboration, MixedPositionalAndNamedArgsElaborate) {
 TEST(SubroutineCallExprElaboration, RandomizeBasicElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
+      "class C;\n"
+      "  rand int a;\n"
+      "endclass\n"
       "module m;\n"
+      "  C obj = new;\n"
       "  initial begin obj.randomize(); end\n"
       "endmodule\n",
       f);
@@ -190,7 +198,11 @@ TEST(SubroutineCallExprElaboration,
      ClassMethodRandomizeWithParenIdListAccepted) {
   ElabFixture f;
   ElaborateSrc(
+      "class C;\n"
+      "  rand int a;\n"
+      "endclass\n"
       "module m;\n"
+      "  C obj = new;\n"
       "  initial begin obj.randomize() with (a) { a > 0; }; end\n"
       "endmodule\n",
       f);
