@@ -434,7 +434,7 @@ static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
     return 1 + QueueDimCount(info.element_queue);
   if (info.arr && info.arr->dim_sizes.size() >= 2)
     return static_cast<uint32_t>(info.arr->dim_sizes.size());
-  if (info.queue != nullptr && info.queue->element_array_size > 0) return 2;
+  if (info.queue != nullptr) return QueueDimCount(info.queue);
   return info.has_unpacked ? 1 : 0;
 }
 
@@ -448,27 +448,40 @@ static QueryDimBounds ElementArrayDimBounds(const QueueObject* q) {
   return FixedUnpackedDimBounds(&element);
 }
 
-// §20.7.1: the dim-th unpacked dimension of a fixed-size array whose elements
-// are dynamic arrays, `int a[3][][5]`: its own first, then the elements'
-// dynamic one, read here as the first element's, then the fixed-size
-// dimensions of their elements as declared. A query naming the dynamic
-// dimension or one past it is an error the elaborator reports
-// (§20.7.1's `$size(a, 2)`), so those read a dimension of no meaning.
-static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
-                                                 uint32_t dim) {
-  QueryArgInfo element;
-  element.queue = info.element_queue;
-  std::vector<QueryDimBounds> dims = {FixedUnpackedDimBounds(info.arr),
-                                      DynamicDimBounds(element),
-                                      ElementArrayDimBounds(element.queue)};
-  for (const FixedDimShape& inner : element.queue->element_inner_dims) {
+// §20.7 with §7.4.4: the unpacked dimensions of the queue or dynamic array
+// `q`, outermost first: its own, then, where its elements are fixed-size
+// arrays, theirs as declared. A dimension of queues past the first, which a
+// query may not name (§20.7.1), reads as the elements' first.
+static std::vector<QueryDimBounds> QueueShapeDims(QueueObject* q) {
+  QueryArgInfo queue;
+  queue.queue = q;
+  std::vector<QueryDimBounds> dims = {DynamicDimBounds(queue),
+                                      ElementArrayDimBounds(q)};
+  for (const FixedDimShape& inner : q->element_inner_dims) {
     ArrayInfo shape;
     shape.size = inner.size;
     shape.lo = static_cast<uint32_t>(inner.lo);
     shape.is_descending = inner.descending;
     dims.push_back(FixedUnpackedDimBounds(&shape));
   }
+  return dims;
+}
+
+// The dim-th of `dims`, the last for a dim past them.
+static QueryDimBounds DimOf(const std::vector<QueryDimBounds>& dims,
+                            uint32_t dim) {
   return dims[std::min<size_t>(dim - 1, dims.size() - 1)];
+}
+
+// §20.7.1: the dim-th unpacked dimension of a fixed-size array whose elements
+// are dynamic arrays, `int a[3][][5]`: its own first, then the dimensions of
+// its first element's queue (QueueShapeDims). A query naming the dynamic
+// dimension is an error the elaborator reports (§20.7.1's `$size(a, 2)`).
+static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
+                                                 uint32_t dim) {
+  std::vector<QueryDimBounds> dims = QueueShapeDims(info.element_queue);
+  dims.insert(dims.begin(), FixedUnpackedDimBounds(info.arr));
+  return DimOf(dims, dim);
 }
 
 // The bounds of the dim-th unpacked dimension, which the argument has: one of
@@ -478,9 +491,7 @@ static QueryDimBounds UnpackedQueryDimBounds(const QueryArgInfo& info,
                                              uint32_t dim) {
   if (info.element_queue != nullptr)
     return ElementQueueShapeDimBounds(info, dim);
-  if (dim == 2 && info.queue != nullptr && info.queue->element_array_size > 0) {
-    return ElementArrayDimBounds(info.queue);
-  }
+  if (info.queue != nullptr) return DimOf(QueueShapeDims(info.queue), dim);
   if (info.assoc) return AssocDimBounds(info.assoc);
   if (info.dynamic_outer) return DynamicDimBounds(info);
   if (info.arr->dim_sizes.size() >= 2)

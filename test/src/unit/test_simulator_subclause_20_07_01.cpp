@@ -88,4 +88,37 @@ TEST(ArrayQueryOverVariableDimensionsSim, SizesAParameterArrayAtRunTime) {
             "OUT 4 6 31 9\n");
 }
 
+// §20.7 with §7.4.4: a queue of queues and a dynamic array of dynamic
+// arrays have an unpacked dimension per level, two and two, and three for a
+// queue of queues of queues. A queue counted one whatever its elements were.
+TEST(ArrayQueryOverVariableDimensionsSim, CountsEveryLevelOfAQueue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int qq[$][$];\n"
+                       "  int dd[][];\n"
+                       "  int q3[$][$][$];\n"
+                       "  initial $display(\"%0d %0d %0d\", "
+                       "$unpacked_dimensions(qq), $unpacked_dimensions(dd), "
+                       "$unpacked_dimensions(q3));\n"
+                       "endmodule\n",
+                       f),
+            "2 2 3\n");
+}
+
+// A queue whose elements are arrays of more than one fixed dimension has each
+// of them as a dimension of its own, as declared: [3:1] is three wide with 3
+// on its left, and the int's 32 bits come after.
+TEST(ArrayQueryOverVariableDimensionsSim,
+     BoundsTheFixedDimensionsOfAQueuesElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int q[$][2][3:1];\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d\", "
+                       "$unpacked_dimensions(q), $size(q, 2), $size(q, 3), "
+                       "$left(q, 3), $size(q, 4));\n"
+                       "endmodule\n",
+                       f),
+            "3 2 3 3 32\n");
+}
+
 }  // namespace
