@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -8,6 +9,20 @@
 using namespace delta;
 
 namespace {
+
+// How many instances named `bound` the child `inst` of the design's first top
+// holds, a bind's among them.
+int BoundInChild(const RtlirDesign* design, std::string_view inst,
+                 std::string_view bound) {
+  int count = 0;
+  for (const auto& ch : design->top_modules[0]->children) {
+    if (ch.inst_name != inst || ch.resolved == nullptr) continue;
+    for (const auto& gch : ch.resolved->children) {
+      if (gch.inst_name == bound) ++count;
+    }
+  }
+  return count;
+}
 
 TEST(BindDirective, DesignwideInsertionAddsInstanceToEveryInstanceOfTarget) {
   ElabFixture f;
@@ -703,6 +718,121 @@ TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "is neither a module or interface", 4, "23.11"));
+}
+
+// §23.11: with a bind_target_instance_list, the instantiation goes into the
+// listed instances of the target scope alone, and a bind_target_instance is a
+// hierarchical name, which §23.8 resolves from the scope it is written in:
+// written in top, `c1, c3` are top's c1 and c3. The path was compared with
+// "top.c1" as the walk spells it, and nothing was bound.
+TEST(BindDirective, TargetInstanceListIsReadFromTheDirectivesModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top;\n"
+      "  cpu c1();\n"
+      "  cpu c2();\n"
+      "  cpu c3();\n"
+      "  bind cpu: c1, c3 probe p();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInChild(design, "c1", "p"), 1);
+  EXPECT_EQ(BoundInChild(design, "c2", "p"), 0);
+  EXPECT_EQ(BoundInChild(design, "c3", "p"), 1);
+}
+
+// The second form, `bind c2 probe p();` written in top, binds into top's c2.
+TEST(BindDirective, TargetInstanceIsReadFromTheDirectivesModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top;\n"
+      "  cpu c1();\n"
+      "  cpu c2();\n"
+      "  bind c2 probe p();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInChild(design, "c1", "p"), 0);
+  EXPECT_EQ(BoundInChild(design, "c2", "p"), 1);
+}
+
+// A directive at compilation-unit scope stands in no instance, so its list
+// names an instance by its full path from a top module.
+TEST(BindDirective, TargetInstanceListAtUnitScopeIsAFullPath) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top;\n"
+      "  cpu c1();\n"
+      "  cpu c2();\n"
+      "endmodule\n"
+      "bind cpu: top.c2 probe p();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInChild(design, "c1", "p"), 0);
+  EXPECT_EQ(BoundInChild(design, "c2", "p"), 1);
+}
+
+// §23.11: "A bind target instance shall be an instance of a module or an
+// interface", and a listed one is an instance of the target scope. nosuch
+// names nothing and m1 is an instance of another module, so each entry is
+// reported; both were passed over in silence.
+TEST(BindDirective, TargetInstanceListEntryNamingNoInstanceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module mem; endmodule\n"
+      "module top;\n"
+      "  cpu c1();\n"
+      "  mem m1();\n"
+      "  bind cpu: c1, nosuch, m1 probe p();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind target instance 'nosuch' is no instance of "
+                            "'cpu'",
+                            7, "23.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind target instance 'm1' is no instance of 'cpu'",
+                            7, "23.11"));
+}
+
+// §23.11 with §23.6: a bound instance stands at the end of its target scope,
+// so a hierarchical name reaches it like any instance: s1.c names the m2 the
+// directive puts in s1, whether the directive names the scope or the
+// instance. The name was checked before the bind added it and reported
+// unresolved. s1.d, which nothing binds, is still reported.
+TEST(BindDirective, HierarchicalNameReachesABoundInstance) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m2; int pass = 7; endmodule\n"
+      "module sub; endmodule\n"
+      "bind sub m2 c();\n"
+      "bind top.s1 m2 e();\n"
+      "module top;\n"
+      "  sub s1();\n"
+      "  int x, y, z;\n"
+      "  initial begin\n"
+      "    x = s1.c.pass;\n"
+      "    y = s1.e.pass;\n"
+      "    z = s1.d;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 's1.d' is unresolved: 'd' "
+                            "is not declared in module 'sub'",
+                            11, "23.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

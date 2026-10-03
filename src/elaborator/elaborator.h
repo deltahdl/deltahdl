@@ -918,15 +918,10 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateProgramWideSpaceAccessInPackageAndCuScopes();
 
-  void ApplyBindDirectives(RtlirModule* top);
-  // §23.11: the invariant context carried through the bind hierarchy walk --
-  // the set of bind directives being matched, the modules already visited
-  // (cycle guard), and the directives that have matched a target so far.
-  struct BindWalkCtx {
-    const std::vector<BindDirective*>& binds;
-    std::unordered_set<RtlirModule*>& visited;
-    std::unordered_set<BindDirective*>& applied;
-  };
+  void ApplyBindDirectives(const std::vector<RtlirModule*>& tops);
+  // §23.11: what the walk over the elaborated hierarchy carries; defined in
+  // elaborator_bind.cpp.
+  struct BindWalkCtx;
   void WalkForBind(RtlirModule* mod, const std::string& hier_path,
                    bool under_bind, BindWalkCtx& ctx);
   void ApplyBindInstance(BindDirective* bd, RtlirModule* target);

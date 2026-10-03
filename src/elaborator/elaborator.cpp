@@ -566,11 +566,12 @@ RtlirDesign* Elaborator::ElaborateTops(
     ApplyNetDelaysInModuleTree(top);
   }
 
+  for (auto* top : design->top_modules) WarnUnresolvedDefparams(top);
+  // §23.11: a bind directive's target is read against the whole design, so
+  // every top is walked before a target that matched nothing is reported.
+  ApplyBindDirectives(design->top_modules);
+
   for (auto* top : design->top_modules) {
-    WarnUnresolvedDefparams(top);
-
-    ApplyBindDirectives(top);
-
     ValidateModportExportConflicts(top);
 
     CollectAllModules(top, design->all_modules);

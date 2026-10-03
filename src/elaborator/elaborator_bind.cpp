@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -49,31 +50,94 @@ static std::unordered_set<std::string_view> CollectDeclaredNames(
   return names;
 }
 
-static std::vector<BindDirective*> CollectBindDirectives(
+// §23.11: a bind directive and the module, interface or program it is written
+// in, empty for one at compilation-unit scope. §23.8 resolves the directive's
+// target instance from that scope, so the walk needs both.
+struct BindDirectiveSite {
+  BindDirective* bd;
+  std::string_view owner;
+};
+
+static std::vector<BindDirectiveSite> CollectBindDirectives(
     const CompilationUnit* unit) {
-  std::vector<BindDirective*> binds;
+  std::vector<BindDirectiveSite> binds;
   binds.reserve(unit->bind_directives.size());
-  for (auto* bd : unit->bind_directives) binds.push_back(bd);
-  for (auto* m : unit->modules)
-    for (auto* bd : m->bind_directives) binds.push_back(bd);
-  for (auto* i : unit->interfaces)
-    for (auto* bd : i->bind_directives) binds.push_back(bd);
-  for (auto* p : unit->programs)
-    for (auto* bd : p->bind_directives) binds.push_back(bd);
+  for (auto* bd : unit->bind_directives) binds.push_back({bd, {}});
+  for (const auto* decls :
+       {&unit->modules, &unit->interfaces, &unit->programs}) {
+    for (auto* decl : *decls) {
+      for (auto* bd : decl->bind_directives) binds.push_back({bd, decl->name});
+    }
+  }
   return binds;
 }
+
+// The last identifier of a dotted bind target path, the instance it names
+// within the one before.
+static std::string_view LastPathSegment(std::string_view path) {
+  size_t dot = path.rfind('.');
+  return dot == std::string_view::npos ? path : path.substr(dot + 1);
+}
+
+// Whether directive `bd` targets the instance `inst` of module `module`.
+static bool BindTargetsInstance(const BindDirective* bd,
+                                std::string_view module, std::string_view inst,
+                                const CompilationUnit* unit) {
+  if (!IsBindTargetScope(bd->target.path, unit))
+    return LastPathSegment(bd->target.path) == inst;
+  if (bd->target.path != module) return false;
+  if (bd->target_instances.empty()) return true;
+  return std::any_of(bd->target_instances.begin(), bd->target_instances.end(),
+                     [&](const BindTargetInstance& target) {
+                       return LastPathSegment(target.path) == inst;
+                     });
+}
+
+bool BindIntroducesName(const CompilationUnit* unit, std::string_view module,
+                        std::string_view inst, std::string_view name) {
+  for (const auto& site : CollectBindDirectives(unit)) {
+    const ModuleItem* item = site.bd->instantiation;
+    if (item != nullptr && item->inst_name == name &&
+        BindTargetsInstance(site.bd, module, inst, unit))
+      return true;
+  }
+  return false;
+}
+
+// What the walk over the elaborated hierarchy carries: the directives being
+// matched, the modules already visited (a cycle guard), the directives that
+// matched a target, the entries of target instance lists that matched an
+// instance, and the module each hierarchical path visited so far names.
+struct BindWalkState {
+  const std::vector<BindDirectiveSite>& binds;
+  std::unordered_set<RtlirModule*> visited;
+  std::unordered_set<const BindDirective*> applied;
+  std::unordered_set<const BindTargetInstance*> matched;
+  std::unordered_map<std::string, std::string_view> path_modules;
+};
+
+struct Elaborator::BindWalkCtx : BindWalkState {};
 
 // §23.11: the bind_target_scope shall be a module or an interface, and a
 // bind_target_instance shall be an instance of a module or an interface. A
 // target naming a known scope is honored designwide even when that scope is
 // never instantiated, but a target that resolves to neither a known scope
 // nor any instance in the hierarchy denotes nothing bindable and is an error.
-static void ReportUnmatchedBindTargets(
-    const std::vector<BindDirective*>& binds,
-    const std::unordered_set<BindDirective*>& applied,
-    const CompilationUnit* unit, DiagEngine& diag) {
-  for (auto* bd : binds) {
-    if (applied.count(bd)) continue;
+// With a bind_target_instance_list, each entry names an instance of the
+// target scope, so an entry that matched none is reported as well.
+static void ReportUnmatchedBindTargets(const BindWalkState& ctx,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag) {
+  for (const auto& site : ctx.binds) {
+    const BindDirective* bd = site.bd;
+    for (const auto& inst : bd->target_instances) {
+      if (ctx.matched.count(&inst)) continue;
+      diag.Error(bd->loc,
+                 std::format("bind target instance '{}' is no instance of '{}'",
+                             inst.path, bd->target.path),
+                 Subclause("23.11"));
+    }
+    if (ctx.applied.count(bd)) continue;
     if (IsBindTargetScope(bd->target.path, unit)) continue;
     diag.Error(bd->loc,
                std::format("bind target '{}' is neither a module or interface "
@@ -83,34 +147,56 @@ static void ReportUnmatchedBindTargets(
   }
 }
 
-void Elaborator::ApplyBindDirectives(RtlirModule* top) {
-  if (!top) return;
-  std::vector<BindDirective*> binds = CollectBindDirectives(unit_);
+void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
+  std::vector<BindDirectiveSite> binds = CollectBindDirectives(unit_);
   if (binds.empty()) return;
-  std::unordered_set<RtlirModule*> visited;
-  std::unordered_set<BindDirective*> applied;
-  BindWalkCtx ctx{binds, visited, applied};
-  WalkForBind(top, std::string(top->name), false, ctx);
-
-  ReportUnmatchedBindTargets(binds, applied, unit_, diag_);
+  BindWalkCtx ctx{{binds, {}, {}, {}, {}}};
+  for (auto* top : tops) {
+    if (top) WalkForBind(top, std::string(top->name), false, ctx);
+  }
+  ReportUnmatchedBindTargets(ctx, unit_, diag_);
 }
 
-static bool BindAppliesToModule(const BindDirective* bd, const RtlirModule* mod,
+// §23.11 with §23.8: whether `target`, a bind target instance, names the
+// instance at `hier_path`. Its path names it in full from a top, as one
+// written from `$root` and every one at compilation-unit scope must; or, for
+// a directive written in module `owner`, from an instance of that module, as
+// `bind sub: s2` written in top names top's s2: the instance at `hier_path`
+// less the written path is then one of `owner`.
+static bool TargetInstanceNames(
+    const BindTargetInstance& target, std::string_view owner,
+    const std::string& hier_path,
+    const std::unordered_map<std::string, std::string_view>& path_modules) {
+  std::string_view path = hier_path;
+  if (path == target.path) return true;
+  if (target.from_root || owner.empty()) return false;
+  if (path.size() <= target.path.size() + 1) return false;
+  size_t cut = path.size() - target.path.size() - 1;
+  if (path[cut] != '.' || path.substr(cut + 1) != target.path) return false;
+  auto it = path_modules.find(std::string(path.substr(0, cut)));
+  return it != path_modules.end() && it->second == owner;
+}
+
+static bool BindAppliesToModule(const BindDirectiveSite& site,
+                                const RtlirModule* mod,
                                 const std::string& hier_path,
-                                const CompilationUnit* unit) {
-  bool has_instances = !bd->target_instances.empty();
-  bool is_scope = IsBindTargetScope(bd->target.path, unit);
-  if (is_scope && !has_instances) {
-    return mod->name == bd->target.path;
+                                const CompilationUnit* unit,
+                                BindWalkState& ctx) {
+  const BindDirective* bd = site.bd;
+  if (!IsBindTargetScope(bd->target.path, unit)) {
+    return TargetInstanceNames(bd->target, site.owner, hier_path,
+                               ctx.path_modules);
   }
-  if (is_scope && has_instances) {
-    if (mod->name != bd->target.path) return false;
-    for (const auto& inst : bd->target_instances) {
-      if (hier_path == inst.path) return true;
-    }
-    return false;
+  if (mod->name != bd->target.path) return false;
+  if (bd->target_instances.empty()) return true;
+  bool named = false;
+  for (const auto& inst : bd->target_instances) {
+    if (!TargetInstanceNames(inst, site.owner, hier_path, ctx.path_modules))
+      continue;
+    ctx.matched.insert(&inst);
+    named = true;
   }
-  return hier_path == bd->target.path;
+  return named;
 }
 
 // Build the dotted hierarchical path of a child instance from its parent path.
@@ -126,18 +212,20 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
                              bool under_bind, BindWalkCtx& ctx) {
   if (!mod) return;
   if (!ctx.visited.insert(mod).second) return;
+  ctx.path_modules.emplace(hier_path, mod->name);
 
-  for (auto* bd : ctx.binds) {
-    if (!BindAppliesToModule(bd, mod, hier_path, unit_)) continue;
+  for (const auto& site : ctx.binds) {
+    if (!BindAppliesToModule(site, mod, hier_path, unit_, ctx)) continue;
     // The target resolved to a real scope or instance, so it is bindable even
     // if elaboration of the instantiation later reports a different error.
-    ctx.applied.insert(bd);
+    ctx.applied.insert(site.bd);
     if (under_bind) {
-      diag_.Error(bd->loc, "bind target shall not be a scope created by a bind",
+      diag_.Error(site.bd->loc,
+                  "bind target shall not be a scope created by a bind",
                   Subclause("23.11"));
       continue;
     }
-    ApplyBindInstance(bd, mod);
+    ApplyBindInstance(site.bd, mod);
   }
 
   for (auto& c : mod->children) {

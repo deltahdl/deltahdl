@@ -313,8 +313,9 @@ void CheckHierRefInstanceArrayAccess(
 
 // §23.6: a hierarchical reference `inst.name` into a resolved child of a plain
 // module (see ChildDeclAllowsMemberCheck) is unresolved when the child does not
-// declare `name`. The imported-name case is reported by the imported-member
-// check above, so it is skipped here to avoid a duplicate diagnostic.
+// declare `name` and no bind directive gives it one of that name. The
+// imported-name case is reported by the imported-member check above, so it is
+// skipped here to avoid a duplicate diagnostic.
 void Elaborator::CheckHierRefUndeclaredMember(
     const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
     const Expr* ma) {
@@ -325,6 +326,11 @@ void Elaborator::CheckHierRefUndeclaredMember(
   if (!ChildDeclAllowsMemberCheck(FindModule(it->second->name))) return;
   if (ModuleDeclaresMember(it->second, ma->rhs->text)) return;
   if (ImportedIntoModule(unit_, it->second, ma->rhs->text)) return;
+  // §23.11: a bound instance stands at the end of its target scope, so `s1.c`
+  // names the instance a bind directive puts in s1, which the directives have
+  // not yet inserted while this module is checked.
+  if (BindIntroducesName(unit_, it->second->name, ma->lhs->text, ma->rhs->text))
+    return;
   diag_.Error(
       ma->range.start,
       std::format("hierarchical reference '{}.{}' is unresolved: '{}' is not "

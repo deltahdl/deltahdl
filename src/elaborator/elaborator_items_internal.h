@@ -75,6 +75,16 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
 void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                             const ImportedEnumCtx& ctx);
 
+// §23.11: whether a bind directive of `unit` puts an instance named `name` into
+// the instance `inst` of module `module`: one whose target scope is the
+// module, for every instance or with `inst` in its target instance list, or
+// whose target instance is `inst`. Elaborator::ApplyBindDirectives inserts the
+// instances once the hierarchy is elaborated, after the hierarchical
+// references of the module naming `inst.name` are checked. Defined in
+// elaborator_bind.cpp.
+bool BindIntroducesName(const CompilationUnit* unit, std::string_view module,
+                        std::string_view inst, std::string_view name);
+
 // Maps a net data-type kind to its RTLIR net type, defaulting to kWire for any
 // kind that is not a net type. Defined once in
 // elaborator_validate_operations.cpp and shared by the translation units that
