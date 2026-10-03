@@ -16,10 +16,11 @@ using namespace delta;
 
 namespace {
 
-// LRM 19.9: $load_coverage_db loads cumulative coverage information for all
-// coverage group types. Loaded hit counts accumulate onto the live database for
-// a covergroup type that already exists.
-TEST(Coverage, LoadCumulativeCoverageAccumulatesHits) {
+// LRM 19.9 with 19.11: a loaded record of a covergroup type is one more
+// instance of the type, kept apart from the live instance of the same name, so
+// the live one keeps the half it sampled and its own sample count while
+// $get_coverage averages it with the loaded one's whole.
+TEST(Coverage, LoadCumulativeCoverageCountsAsAnotherInstance) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   auto* cp = CoverageDB::AddCoverPoint(g, "x");
@@ -31,45 +32,54 @@ TEST(Coverage, LoadCumulativeCoverageAccumulatesHits) {
   b1.name = "b1";
   b1.values = {1};
   CoverageDB::AddBin(cp, b1);
-
-  // Live run only ever sampled b0, so half the bins are covered.
   db.Sample(g, {{"x", 0}});
-  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 50.0);
 
-  // A persisted run of the same covergroup type had covered b1.
   CoverGroup loaded;
   loaded.name = "cg";
+  loaded.type_name = "cg";
   loaded.sample_count = 1;
   CoverPoint lcp;
   lcp.name = "x";
-  CoverBin lb1;
+  CoverBin lb0;
+  lb0.name = "b0";
+  lb0.values = {0};
+  lb0.hit_count = 1;
+  lcp.bins.push_back(lb0);
+  CoverBin lb1 = lb0;
   lb1.name = "b1";
   lb1.values = {1};
-  lb1.hit_count = 1;
   lcp.bins.push_back(lb1);
   loaded.coverpoints.push_back(lcp);
 
   db.MergeCumulativeCoverage({loaded});
 
-  // The two runs together cover both bins, and the sample counts add up.
-  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
-  EXPECT_EQ(db.FindGroup("cg")->sample_count, 2u);
+  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 75.0);
+  EXPECT_EQ(db.FindGroup("cg")->sample_count, 1u);
+  EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(db.FindGroup("cg")), 50.0);
+  ASSERT_EQ(db.LoadedInstancesOf("cg").size(), 1u);
 }
 
-// LRM 19.9: a covergroup type present only in the loaded cumulative coverage is
-// added to the database.
+// LRM 19.9: a covergroup type present only in the loaded cumulative coverage
+// is held as a loaded instance of it, built as no live group, and is saved
+// again with the run's coverage, which a later run loads as cumulative.
 TEST(Coverage, LoadCumulativeCoverageAddsAbsentType) {
   CoverageDB db;
-  EXPECT_EQ(db.GroupCount(), 0u);
-
   CoverGroup loaded;
   loaded.name = "cg2";
+  loaded.type_name = "cg2";
   loaded.sample_count = 3;
   db.MergeCumulativeCoverage({loaded});
 
-  EXPECT_EQ(db.GroupCount(), 1u);
-  ASSERT_NE(db.FindGroup("cg2"), nullptr);
-  EXPECT_EQ(db.FindGroup("cg2")->sample_count, 3u);
+  EXPECT_EQ(db.GroupCount(), 0u);
+  ASSERT_EQ(db.LoadedInstancesOf("cg2").size(), 1u);
+  EXPECT_EQ(db.LoadedInstancesOf("cg2")[0]->sample_count, 3u);
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_resave.db";
+  db.SaveCoverageDbFile(kPath);
+  std::ifstream in(kPath);
+  std::stringstream text;
+  text << in.rdbuf();
+  EXPECT_EQ(text.str(), "CG cg2 3\nTY cg2\n");
+  std::remove(kPath.c_str());
 }
 
 // LRM 19.9 edge case: loading an empty cumulative set leaves the database
@@ -86,69 +96,13 @@ TEST(Coverage, LoadCumulativeCoverageEmptyIsNoOp) {
   EXPECT_EQ(db.FindGroup("cg")->sample_count, 5u);
 }
 
-// LRM 19.9: a coverpoint present only in the loaded cumulative coverage is
-// appended to the matching live covergroup type.
-TEST(Coverage, LoadCumulativeCoverageAppendsNewCoverpoint) {
+// LRM 19.11: get_inst_coverage() is the coverage of the instance alone, so a
+// loaded record of the same name adds no coverpoint, bin or cross hit to the
+// live instance, and keeps its own items whole.
+TEST(Coverage, LoadCumulativeCoverageLeavesTheLiveInstanceAsItWas) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "x");
-
-  CoverGroup loaded;
-  loaded.name = "cg";
-  CoverPoint lcp;
-  lcp.name = "y";
-  CoverBin lb;
-  lb.name = "yb0";
-  lb.values = {0};
-  lb.hit_count = 1;
-  lcp.bins.push_back(lb);
-  loaded.coverpoints.push_back(lcp);
-
-  db.MergeCumulativeCoverage({loaded});
-
-  auto* live = db.FindGroup("cg");
-  ASSERT_EQ(live->coverpoints.size(), 2u);
-  EXPECT_EQ(live->coverpoints[1].name, "y");
-  EXPECT_EQ(live->coverpoints[1].bins.at(0).hit_count, 1u);
-}
-
-// LRM 19.9: a bin present only in the loaded cumulative coverage is appended to
-// the matching live coverpoint rather than merged into an existing bin.
-TEST(Coverage, LoadCumulativeCoverageAppendsNewBin) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(cp, b0);
-
-  CoverGroup loaded;
-  loaded.name = "cg";
-  CoverPoint lcp;
-  lcp.name = "x";
-  CoverBin lb;
-  lb.name = "bnew";
-  lb.values = {7};
-  lb.hit_count = 2;
-  lcp.bins.push_back(lb);
-  loaded.coverpoints.push_back(lcp);
-
-  db.MergeCumulativeCoverage({loaded});
-
-  auto& bins = db.FindGroup("cg")->coverpoints.at(0).bins;
-  ASSERT_EQ(bins.size(), 2u);
-  EXPECT_EQ(bins[0].name, "b0");
-  EXPECT_EQ(bins[1].name, "bnew");
-  EXPECT_EQ(bins[1].hit_count, 2u);
-}
-
-// LRM 19.9: cross coverage is also part of the cumulative coverage. Loaded
-// cross-bin hit counts accumulate onto a matching live cross, and a cross seen
-// only in the loaded data is appended.
-TEST(Coverage, LoadCumulativeCoverageMergesCrosses) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
   CrossCover live_cross;
   live_cross.name = "xy";
   CrossBin live_bin;
@@ -159,24 +113,22 @@ TEST(Coverage, LoadCumulativeCoverageMergesCrosses) {
 
   CoverGroup loaded;
   loaded.name = "cg";
-  CrossCover loaded_match;
-  loaded_match.name = "xy";
-  CrossBin loaded_bin;
-  loaded_bin.name = "cb";
-  loaded_bin.hit_count = 4;
-  loaded_match.bins.push_back(loaded_bin);
-  loaded.crosses.push_back(loaded_match);
-  CrossCover loaded_new;
-  loaded_new.name = "zw";
-  loaded.crosses.push_back(loaded_new);
+  loaded.type_name = "cg";
+  CoverPoint lcp;
+  lcp.name = "y";
+  loaded.coverpoints.push_back(lcp);
+  CrossCover loaded_cross = live_cross;
+  loaded_cross.bins[0].hit_count = 4;
+  loaded.crosses.push_back(loaded_cross);
 
   db.MergeCumulativeCoverage({loaded});
 
-  auto& crosses = db.FindGroup("cg")->crosses;
-  ASSERT_EQ(crosses.size(), 2u);
-  EXPECT_EQ(crosses[0].name, "xy");
-  EXPECT_EQ(crosses[0].bins.at(0).hit_count, 5u);
-  EXPECT_EQ(crosses[1].name, "zw");
+  auto* live = db.FindGroup("cg");
+  ASSERT_EQ(live->coverpoints.size(), 1u);
+  EXPECT_EQ(live->crosses.at(0).bins.at(0).hit_count, 1u);
+  const CoverGroup* kept = db.LoadedInstancesOf("cg").at(0);
+  EXPECT_EQ(kept->coverpoints.at(0).name, "y");
+  EXPECT_EQ(kept->crosses.at(0).bins.at(0).hit_count, 4u);
 }
 
 // LRM 19.9: $get_coverage() reports the overall coverage of *all* coverage
@@ -215,7 +167,8 @@ TEST(Coverage, GetCoverageAggregatesAcrossTypes) {
 }
 
 // LRM 19.9: $load_coverage_db loads cumulative coverage for all coverage group
-// types, so a single load can touch more than one type at once.
+// types, so a single load can touch more than one type at once, each record a
+// loaded instance of its own type beside the live ones.
 TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
   CoverageDB db;
   auto* a = db.CreateGroup("cg_a");
@@ -225,14 +178,18 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
 
   CoverGroup la;
   la.name = "cg_a";
+  la.type_name = "cg_a";
   la.sample_count = 10;
   CoverGroup lb;
   lb.name = "cg_b";
+  lb.type_name = "cg_b";
   lb.sample_count = 20;
   db.MergeCumulativeCoverage({la, lb});
 
-  EXPECT_EQ(db.FindGroup("cg_a")->sample_count, 11u);
-  EXPECT_EQ(db.FindGroup("cg_b")->sample_count, 22u);
+  EXPECT_EQ(db.FindGroup("cg_a")->sample_count, 1u);
+  EXPECT_EQ(db.FindGroup("cg_b")->sample_count, 2u);
+  EXPECT_EQ(db.LoadedInstancesOf("cg_a").at(0)->sample_count, 10u);
+  EXPECT_EQ(db.LoadedInstancesOf("cg_b").at(0)->sample_count, 20u);
 }
 
 // --- LRM 19.9: the predefined coverage system tasks/functions driven from real
@@ -458,9 +415,10 @@ static std::string CovergroupRun(const std::string& items,
 // §19.9: $set_coverage_db_name names the file the run's coverage is saved to
 // at its end, and $load_coverage_db in a later run loads it as cumulative
 // coverage: the first run hits bins 0 and 1 of cp and the transition 0 => 1 of
-// ct, and the second bin 2, so the second reads the average of 75 and 100.
-// The end of a run (main.cpp, after the final blocks) saves the database; no
-// file was written, and the second run read only its own hit.
+// ct, 75, and the second only bin 2, 12.5, so the loaded instance and the live
+// one average to 43.75. The end of a run (main.cpp, after the final blocks)
+// saves the database; no file was written, and the second run read only its
+// own hit, 12.5.
 TEST(Coverage, TheRunSavesItsDatabaseForALaterRunToLoad) {
   const std::string kPath =
       testing::TempDir() + "delta_cov_19_09_round_trip.db";
@@ -483,7 +441,7 @@ TEST(Coverage, TheRunSavesItsDatabaseForALaterRunToLoad) {
                                            "$get_coverage(), "
                                            "cg::get_coverage());\n"),
                  second),
-      "87.50 87.50\n");
+      "43.75 43.75\n");
   // The second run named no database, so its end writes none over the first.
   second.ctx.CoverageData().SaveNamedCoverageDb();
   EXPECT_EQ(FileText(kPath), kSaved);
@@ -491,9 +449,9 @@ TEST(Coverage, TheRunSavesItsDatabaseForALaterRunToLoad) {
 }
 
 // §19.9 with §19.6: the database holds a covergroup's crosses as well as its
-// coverpoints, so the cross bin <0,0> the first run hits is covered in the
-// second, which hits <1,1>: two of x's four bins. The file held no cross, and
-// the second run read one of four.
+// coverpoints, so the loaded instance's cross x, one of four bins hit by the
+// first run, averages with the second run's, which hits none, to 12.5. The
+// file held no cross, and the type's cross read the live one's 0.
 TEST(Coverage, TheSavedDatabaseCarriesCrossBinHits) {
   const std::string kPath = testing::TempDir() + "delta_cov_19_09_cross.db";
   const std::string kItems =
@@ -509,11 +467,11 @@ TEST(Coverage, TheSavedDatabaseCarriesCrossBinHits) {
   SimFixture second;
   EXPECT_EQ(
       RunCapture(CovergroupRun(kItems, "    $load_coverage_db(\"" + kPath +
-                                           "\");\n    c.sample(1, 1);\n"
+                                           "\");\n"
                                            "    $display(\"%0.2f\", "
-                                           "c.x.get_inst_coverage());\n"),
+                                           "cg::x::get_coverage());\n"),
                  second),
-      "50.00\n");
+      "12.50\n");
   std::remove(kPath.c_str());
 }
 
@@ -661,6 +619,65 @@ TEST(Coverage, SavedInstanceRecordsItsCovergroupType) {
   RunCapture(InstanceRun("g", "", "    x = 1; g.sample();\n"), f);
   f.ctx.CoverageData().SaveCoverageDbFile(kPath);
   EXPECT_EQ(FileText(kPath).substr(0, 14), "CG g 1\nTY cg\nC");
+  std::remove(kPath.c_str());
+}
+
+// Saves a run of InstanceRun whose instance g covers b1 to `path`, the
+// probe's first run.
+static void SaveGCoveringB1(const std::string& path) {
+  SimFixture first;
+  RunCapture(InstanceRun("g", "",
+                         "    $set_coverage_db_name(\"" + path +
+                             "\");\n    x = 1; g.sample();\n"),
+             first);
+  first.ctx.CoverageData().SaveNamedCoverageDb();
+}
+
+// §19.11: get_inst_coverage() is the coverage of the instance alone, so a g
+// built before the load, named as the saved g is, reads the half it sampled,
+// b2, and the loaded g stays one more instance of cg, the type averaging the
+// two halves. The loaded counts were merged into the live g, which read 100.
+TEST(Coverage, ALoadedRecordStaysOutOfTheInstanceBuiltBeforeIt) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_before.db";
+  SaveGCoveringB1(kPath);
+  SimFixture second;
+  EXPECT_EQ(RunCapture(InstanceRun("g", "",
+                                   "    $load_coverage_db(\"" + kPath +
+                                       "\");\n"
+                                       "    x = 2; g.sample();\n"
+                                       "    $display(\"%0.2f %0.2f\", "
+                                       "cg::get_coverage(), "
+                                       "g.get_inst_coverage());\n"),
+                       second),
+            "50.00 50.00\n");
+  std::remove(kPath.c_str());
+}
+
+// Nothing makes coverage depend on when an instance is built relative to the
+// load: a g built after it reads what one built before it does.
+TEST(Coverage, BothBuildOrdersReadTheSameCoverage) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_09_after.db";
+  SaveGCoveringB1(kPath);
+  SimFixture second;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  bit [1:0] x;\n"
+                 "  covergroup cg;\n"
+                 "    px: coverpoint x { bins b1 = {1}; bins b2 = {2}; }\n"
+                 "  endgroup\n"
+                 "  cg g;\n"
+                 "  initial begin\n"
+                 "    $load_coverage_db(\"" +
+                     kPath +
+                     "\");\n"
+                     "    g = new;\n"
+                     "    x = 2; g.sample();\n"
+                     "    $display(\"%0.2f %0.2f\", cg::get_coverage(), "
+                     "g.get_inst_coverage());\n"
+                     "  end\n"
+                     "endmodule\n",
+                 second),
+      "50.00 50.00\n");
   std::remove(kPath.c_str());
 }
 

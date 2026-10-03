@@ -306,11 +306,9 @@ struct CoverGroup {
   // toggle this; while stopped a triggered sample() records nothing (LRM 19.8).
   bool collecting = true;
   CoverGroupTypeOption type_option = {};
-  // The covergroup type the instance is of, empty where none is known, and
-  // whether the instance was loaded from a coverage database rather than
-  // built in this run, as one more instance of that type (LRM 19.9, 19.11.3).
+  // The covergroup type the instance is of, empty where none is known
+  // (LRM 19.9, 19.11.3).
   std::string type_name;
-  bool from_database = false;
 };
 
 // Identifies a covergroup type option for the Table 19-4 placement queries

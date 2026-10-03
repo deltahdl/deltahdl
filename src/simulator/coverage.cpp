@@ -852,9 +852,11 @@ double CoverageDB::GetGlobalCoverage() const {
   // design with no contributing covergroups — none exist, or every covergroup
   // has a weight of zero — reports 100.0. ComputeOverallCoverage applies
   // exactly those rules, so $get_coverage routes through it.
+  // A record $load_coverage_db loaded is one more instance (LRM 19.9).
   std::vector<const CoverGroup*> instances;
-  instances.reserve(groups_.size());
+  instances.reserve(groups_.size() + loaded_.size());
   for (const auto& g : groups_) instances.push_back(&g);
+  for (const auto& g : loaded_) instances.push_back(&g);
   return ComputeOverallCoverage(instances);
 }
 

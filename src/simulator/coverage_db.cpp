@@ -23,115 +23,9 @@ const std::string& CoverageDB::CoverageDbName() const {
   return coverage_db_name_;
 }
 
-// Accumulates one loaded coverpoint onto a live coverpoint of the same name:
-// matching bins add their hit counts, and a bin found only in the loaded data
-// is appended (LRM 19.9).
-static void MergeLoadedCoverPoint(CoverPoint* live, const CoverPoint& loaded) {
-  for (const auto& lb : loaded.bins) {
-    CoverBin* match = nullptr;
-    for (auto& b : live->bins) {
-      if (b.name == lb.name) {
-        match = &b;
-        break;
-      }
-    }
-    if (match != nullptr) {
-      match->hit_count += lb.hit_count;
-    } else {
-      live->bins.push_back(lb);
-    }
-  }
-}
-
-// Accumulates one loaded cross onto a live cross of the same name, mirroring
-// the per-bin accumulation used for coverpoints (LRM 19.9).
-static void MergeLoadedCross(CrossCover* live, const CrossCover& loaded) {
-  for (const auto& lb : loaded.bins) {
-    CrossBin* match = nullptr;
-    for (auto& b : live->bins) {
-      if (b.name == lb.name) {
-        match = &b;
-        break;
-      }
-    }
-    if (match != nullptr) {
-      match->hit_count += lb.hit_count;
-    } else {
-      live->bins.push_back(lb);
-    }
-  }
-}
-
-// Copies a covergroup seen only in the persisted database onto a freshly
-// created live group in full (LRM 19.9).
-static void CopyLoadedGroupInFull(CoverGroup* live, const CoverGroup& loaded) {
-  live->type_name = loaded.type_name;
-  live->from_database = true;
-  live->coverpoints = loaded.coverpoints;
-  live->crosses = loaded.crosses;
-  live->options = loaded.options;
-  live->type_option = loaded.type_option;
-  live->collecting = loaded.collecting;
-  live->sample_count = loaded.sample_count;
-}
-
-// Accumulates the loaded coverpoints onto the live group: a coverpoint matched
-// by name accumulates per-bin counts, otherwise it is appended (LRM 19.9).
-static void MergeLoadedGroupCoverPoints(CoverGroup* live,
-                                        const CoverGroup& loaded) {
-  for (const auto& lcp : loaded.coverpoints) {
-    CoverPoint* match = nullptr;
-    for (auto& cp : live->coverpoints) {
-      if (cp.name == lcp.name) {
-        match = &cp;
-        break;
-      }
-    }
-    if (match != nullptr) {
-      MergeLoadedCoverPoint(match, lcp);
-    } else {
-      live->coverpoints.push_back(lcp);
-    }
-  }
-}
-
-// Accumulates the loaded crosses onto the live group, mirroring the per-cross
-// accumulation used for coverpoints (LRM 19.9).
-static void MergeLoadedGroupCrosses(CoverGroup* live,
-                                    const CoverGroup& loaded) {
-  for (const auto& lcross : loaded.crosses) {
-    CrossCover* match = nullptr;
-    for (auto& cross : live->crosses) {
-      if (cross.name == lcross.name) {
-        match = &cross;
-        break;
-      }
-    }
-    if (match != nullptr) {
-      MergeLoadedCross(match, lcross);
-    } else {
-      live->crosses.push_back(lcross);
-    }
-  }
-}
-
 void CoverageDB::MergeCumulativeCoverage(
     const std::vector<CoverGroup>& cumulative) {
-  for (const auto& loaded : cumulative) {
-    CoverGroup* live = FindGroup(loaded.name);
-    if (live == nullptr) {
-      // An instance seen only in the persisted database is added in full, as
-      // one more instance of its covergroup type.
-      live = CreateGroup(loaded.name);
-      CopyLoadedGroupInFull(live, loaded);
-      continue;
-    }
-
-    // The loaded coverage is cumulative, so its counts add to the live ones.
-    live->sample_count += loaded.sample_count;
-    MergeLoadedGroupCoverPoints(live, loaded);
-    MergeLoadedGroupCrosses(live, loaded);
-  }
+  loaded_.insert(loaded_.end(), cumulative.begin(), cumulative.end());
 }
 
 // Read a cross record of a coverage snapshot, "CR <name>" opening a cross of
@@ -229,20 +123,26 @@ static void WriteGroupItems(std::ostream& out, const CoverGroup& g) {
   }
 }
 
+// Writes one covergroup instance record, its type and its items.
+static void WriteGroup(std::ostream& out, const CoverGroup& g) {
+  out << "CG " << g.name << ' ' << g.sample_count << '\n';
+  if (!g.type_name.empty()) out << "TY " << g.type_name << '\n';
+  WriteGroupItems(out, g);
+}
+
+// The run's own instances, then the records a load brought, so the cumulative
+// coverage a later run loads keeps every earlier run's (LRM 19.9).
 void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
   std::ofstream out(path);
-  for (const CoverGroup& g : groups_) {
-    out << "CG " << g.name << ' ' << g.sample_count << '\n';
-    if (!g.type_name.empty()) out << "TY " << g.type_name << '\n';
-    WriteGroupItems(out, g);
-  }
+  for (const CoverGroup& g : groups_) WriteGroup(out, g);
+  for (const CoverGroup& g : loaded_) WriteGroup(out, g);
 }
 
 std::vector<const CoverGroup*> CoverageDB::LoadedInstancesOf(
     std::string_view type_name) const {
   std::vector<const CoverGroup*> found;
-  for (const CoverGroup& g : groups_) {
-    if (g.from_database && g.type_name == type_name) found.push_back(&g);
+  for (const CoverGroup& g : loaded_) {
+    if (g.type_name == type_name) found.push_back(&g);
   }
   return found;
 }

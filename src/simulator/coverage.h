@@ -61,12 +61,12 @@ class CoverageDB {
   const std::string& CoverageDbName() const;
 
   // $load_coverage_db(filename) loads cumulative coverage information for all
-  // coverage group types (LRM 19.9). This applies the loaded snapshot to the
-  // live database: for a covergroup type that already exists, the loaded bin
-  // hit counts and sample count accumulate onto the live ones (matching
-  // coverpoints, crosses, and bins by name); a coverpoint, cross, or bin found
-  // only in the loaded data is appended; a covergroup type absent from the live
-  // database is added in full.
+  // coverage group types (LRM 19.9). Each loaded record is kept apart from the
+  // instances built in the run, as one more instance of its covergroup type
+  // (LoadedInstancesOf), and never merged into a live instance of the same
+  // name: §19.11 gives get_inst_coverage() the coverage of the instance it is
+  // called on alone, and nothing makes a run's coverage depend on whether an
+  // instance was built before the load.
   void MergeCumulativeCoverage(const std::vector<CoverGroup>& cumulative);
 
   // Reads a persisted coverage snapshot from `path` and applies it to the live
@@ -858,6 +858,8 @@ class CoverageDB {
 
   std::deque<CoverGroup> groups_;
   std::unordered_map<std::string, size_t> name_index_;
+  // The records $load_coverage_db loaded (LRM 19.9), apart from groups_.
+  std::deque<CoverGroup> loaded_;
   // Destination file for the coverage database, set by $set_coverage_db_name
   // and written at the end of the run (LRM 19.9).
   std::string coverage_db_name_;
