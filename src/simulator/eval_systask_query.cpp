@@ -65,6 +65,10 @@ struct QueryArgInfo {
   // declared, each a dimension of its own; empty where elem_width describes
   // the one there is.
   std::vector<PackedRange> packed_dims;
+  // §20.7.1: for a fixed-size array whose elements are dynamic arrays or
+  // queues, `int a[3][][5]`, its first element's, whose shape gives the
+  // dimensions past the fixed one; null for any other argument.
+  QueueObject* element_queue = nullptr;
 };
 
 std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena) {
@@ -272,6 +276,10 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
     info.assoc = ctx.FindAssocArray(name);
     info.queue = ctx.FindQueue(name);
     info.arr = ctx.FindArrayInfo(name);
+    if (info.arr != nullptr && info.arr->elements_are_queues) {
+      info.element_queue =
+          ctx.FindQueue(name + "[" + std::to_string(info.arr->lo) + "]");
+    }
   }
   bool found =
       info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
@@ -405,6 +413,15 @@ static QueryDimBounds PackedDimBounds(const PackedRange& range) {
   return q;
 }
 
+// §20.7.1: the unpacked dimensions the dynamic array or queue `q` holds, its
+// own and, where its elements are arrays, theirs: a fixed-size element's
+// dimension and those after it, or one more for each level of queues beneath.
+static uint32_t QueueDimCount(const QueueObject* q) {
+  if (q->element_array_size > 0)
+    return 2 + static_cast<uint32_t>(q->element_inner_dims.size());
+  return q->elements_are_queues ? 2 + q->nested_queue_levels : 1;
+}
+
 // The number of unpacked dimensions the first argument contributes. A fixed
 // multidimensional array carries every extent in dim_sizes; every other
 // unpacked container (single fixed dimension, queue, dynamic array, or
@@ -413,6 +430,8 @@ static QueryDimBounds PackedDimBounds(const PackedRange& range) {
 // §7.10 with §7.4: a queue or dynamic array whose elements are fixed-size
 // arrays, `int q[$][3]`, contributes the element's dimension as its second.
 static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
+  if (info.element_queue != nullptr)
+    return 1 + QueueDimCount(info.element_queue);
   if (info.arr && info.arr->dim_sizes.size() >= 2)
     return static_cast<uint32_t>(info.arr->dim_sizes.size());
   if (info.queue != nullptr && info.queue->element_array_size > 0) return 2;
@@ -429,6 +448,29 @@ static QueryDimBounds ElementArrayDimBounds(const QueueObject* q) {
   return FixedUnpackedDimBounds(&element);
 }
 
+// §20.7.1: the dim-th unpacked dimension of a fixed-size array whose elements
+// are dynamic arrays, `int a[3][][5]`: its own first, then the elements'
+// dynamic one, read here as the first element's, then the fixed-size
+// dimensions of their elements as declared. A query naming the dynamic
+// dimension or one past it is an error the elaborator reports
+// (§20.7.1's `$size(a, 2)`), so those read a dimension of no meaning.
+static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
+                                                 uint32_t dim) {
+  QueryArgInfo element;
+  element.queue = info.element_queue;
+  std::vector<QueryDimBounds> dims = {FixedUnpackedDimBounds(info.arr),
+                                      DynamicDimBounds(element),
+                                      ElementArrayDimBounds(element.queue)};
+  for (const FixedDimShape& inner : element.queue->element_inner_dims) {
+    ArrayInfo shape;
+    shape.size = inner.size;
+    shape.lo = static_cast<uint32_t>(inner.lo);
+    shape.is_descending = inner.descending;
+    dims.push_back(FixedUnpackedDimBounds(&shape));
+  }
+  return dims[std::min<size_t>(dim - 1, dims.size() - 1)];
+}
+
 // Compute the bounds reported for the queried dimension. Dimensions are
 // numbered slowest-varying first: dimensions 1..unpacked_dims are the unpacked
 // dimensions (outermost first) and the packed element dimension, when present,
@@ -437,6 +479,8 @@ static QueryDimBounds ComputeQueryDimBounds(const QueryArgInfo& info,
                                             uint32_t dim,
                                             uint32_t unpacked_dims) {
   if (dim <= unpacked_dims) {
+    if (info.element_queue != nullptr)
+      return ElementQueueShapeDimBounds(info, dim);
     if (dim == 2 && info.queue != nullptr &&
         info.queue->element_array_size > 0) {
       return ElementArrayDimBounds(info.queue);
