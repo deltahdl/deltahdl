@@ -393,4 +393,45 @@ TEST(ProgramConstructSim, ExternProgramDefinitionRunsWithPrototypePorts) {
   EXPECT_EQ(w->value.ToUint64(), 58u);
 }
 
+// §24.3 with §25.3: a program nested in an interface is implicitly
+// instantiated once in each instance of the interface and, like one nested in
+// a module, reads the enclosing interface's variable by its simple name: the
+// 71 the module writes through `s.a`.
+TEST(ProgramConstructSim, ProgramNestedInAnInterfaceReadsItsVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface Bus;\n"
+                 "  int a;\n"
+                 "  program p;\n"
+                 "    initial #1 $display(\"%m a=%0d at %0t\", a, $time);\n"
+                 "  endprogram\n"
+                 "endinterface\n"
+                 "module top;\n"
+                 "  Bus s();\n"
+                 "  initial s.a = 71;\n"
+                 "endmodule\n",
+                 f),
+      "top.s.p a=71 at 1\n");
+}
+
+// And the interface's own port and a variable the interface itself sets.
+TEST(ProgramConstructSim, ProgramNestedInAnInterfaceReadsItsPortAndVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface Bus(input logic clk);\n"
+                 "  int a;\n"
+                 "  initial a = 71;\n"
+                 "  program p;\n"
+                 "    initial #1 $display(\"%m clk=%b a=%0d at %0t\", clk, a,\n"
+                 "                        $time);\n"
+                 "  endprogram\n"
+                 "endinterface\n"
+                 "module top;\n"
+                 "  logic clk = 1;\n"
+                 "  Bus s(clk);\n"
+                 "endmodule\n",
+                 f),
+      "top.s.p clk=1 a=71 at 1\n");
+}
+
 }  // namespace
