@@ -26,6 +26,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
@@ -192,10 +193,46 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
   }
 }
 
+// §6.20.1 (printed page 124) with §6.20.2: a parameter declared with unpacked
+// dimensions is an array of values, assigned by an assignment pattern, so it
+// is given the element variables and the ArrayInfo CreateArrayElements
+// (lowerer_var.cpp) gives a module's array variable, under the parameter's own
+// key, each element filled from the pattern by §10.9.1's rules. The value fold
+// takes no pattern and leaves such a parameter unresolved, which left it no
+// storage at all and every element reading x.
+static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
+                             SimContext& ctx, Arena& arena) {
+  ParamStorageShape shape = ParamStorageShapeOf(p);
+  const DataType& type = *p.decl_type;
+  RtlirVariable var;
+  var.name = p.name;
+  var.width = shape.width;
+  var.is_signed = shape.is_signed;
+  var.is_4state = DeclaredTypeIs4State(type, ctx);
+  var.is_real = DeclaredTypeIsReal(type, ctx);
+  var.dtype = &type;
+  var.elem_type_kind = type.kind;
+  var.init_expr = p.default_value;
+  var.unpacked_dims = p.unpacked_bounds;
+  for (const auto& dim : p.unpacked_bounds) {
+    var.unpacked_dim_sizes.push_back(dim.Size());
+  }
+  const RtlirUnpackedDim& outer = p.unpacked_bounds.front();
+  var.unpacked_lo = outer.Low();
+  var.unpacked_size = outer.Size();
+  var.is_descending = outer.left > outer.right;
+  var.num_unpacked_dims = static_cast<uint32_t>(p.unpacked_bounds.size());
+  CreateArrayElements(full, var, ctx, arena);
+}
+
 void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
   if (p.is_unbounded) {
     ctx_.RegisterUnboundedParam(full);
     ctx_.CreateVariable(full, 32);
+    return;
+  }
+  if (!p.unpacked_bounds.empty()) {
+    CreateParamArray(p, full, ctx_, arena_);
     return;
   }
   if (!p.is_resolved) return;

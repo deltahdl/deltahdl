@@ -11,6 +11,8 @@
 #include <optional>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -438,6 +440,20 @@ static void RecordUntypedRealParam(
     real_param_names.insert(item->name);
 }
 
+// §7.4.2: the bounds of every unpacked dimension the parameter declares,
+// folded against the parameters already elaborated, which a bound written in
+// terms of one needs; none where a dimension does not fold.
+static void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope) {
+  if (pd.unpacked_dims == nullptr) return;
+  std::vector<RtlirUnpackedDim> bounds;
+  for (const Expr* dim : *pd.unpacked_dims) {
+    auto folded = FoldUnpackedDimBounds(dim, scope);
+    if (!folded) return;
+    bounds.push_back(*folded);
+  }
+  pd.unpacked_bounds = std::move(bounds);
+}
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
@@ -472,6 +488,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   // The parameters already elaborated, which a range bound, a type and the
   // value written in terms of one are each folded against.
   const ScopeMap kScope = BuildParamScope(mod);
+  FoldParamUnpackedBounds(pd, kScope);
   if (!is_type) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
     // §11.5.1: a select on this parameter names bits by their index in the

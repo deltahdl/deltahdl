@@ -484,6 +484,11 @@ struct RtlirParamDecl {
   // unpacked dimensions a parameter array was declared with, null for one
   // declared without.
   const std::vector<Expr*>* unpacked_dims = nullptr;
+  // Those dimensions' bounds as declared (§7.4.2), folded against the
+  // parameters before this one, one per dimension in declaration order; empty
+  // where none was declared or one does not fold, as a dynamic dimension does
+  // not. The simulator gives the parameter an element per address from them.
+  std::vector<RtlirUnpackedDim> unpacked_bounds;
   // §23.10.2 with §6.20.2: the expression an instance's parameter value
   // assignment, or a configuration's (§33.4.3), gave this parameter, written
   // in the instantiating module, and null while the value is the declaration's
