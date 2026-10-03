@@ -17,10 +17,11 @@ TEST(DefaultNettypeSimulation, WireModuleSimulatesCorrectly) {
 }
 
 // A module p0 passing its input i to its output o.
-static const std::string kPassThrough =
-    "module p0(input logic i, output logic o);\n"
-    "  assign o = i;\n"
-    "endmodule\n";
+static std::string PassThrough() {
+  return "module p0(input logic i, output logic o);\n"
+         "  assign o = i;\n"
+         "endmodule\n";
+}
 
 // §22.8: `default_nettype governs the module definitions that follow it, so a
 // directive after the last module reaches back to none of them: t's implicit
@@ -28,7 +29,7 @@ static const std::string kPassThrough =
 // `default_nettype wire governed every module, and w read z.
 TEST(DefaultNettypeSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
   SimFixture f;
-  EXPECT_EQ(PreprocessAndCapture("`default_nettype tri1\n" + kPassThrough +
+  EXPECT_EQ(PreprocessAndCapture("`default_nettype tri1\n" + PassThrough() +
                                      "module t;\n"
                                      "  p0 u(.i(und), .o(w));\n"
                                      "  initial #1 $display(\"%b\", w);\n"
@@ -44,7 +45,7 @@ TEST(DefaultNettypeSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
 // reported as implicit nets it forbids.
 TEST(DefaultNettypeSimulation, NoneBeforeAndAfterLeavesAWireModuleItsNets) {
   SimFixture f;
-  EXPECT_EQ(PreprocessAndCapture("`default_nettype none\n" + kPassThrough +
+  EXPECT_EQ(PreprocessAndCapture("`default_nettype none\n" + PassThrough() +
                                      "`default_nettype wire\n"
                                      "module t;\n"
                                      "  p0 u(.i(und), .o(w));\n"
@@ -62,7 +63,7 @@ TEST(DefaultNettypeSimulation, NoneBeforeAndAfterLeavesAWireModuleItsNets) {
 // directive, wire, governed all three, which read z z z.
 TEST(DefaultNettypeSimulation, EachModuleTakesTheDirectiveBeforeIt) {
   SimFixture f;
-  EXPECT_EQ(PreprocessAndCapture("`default_nettype tri0\n" + kPassThrough +
+  EXPECT_EQ(PreprocessAndCapture("`default_nettype tri0\n" + PassThrough() +
                                      "module t0;\n"
                                      "  p0 u(.i(und), .o(w));\n"
                                      "endmodule\n"

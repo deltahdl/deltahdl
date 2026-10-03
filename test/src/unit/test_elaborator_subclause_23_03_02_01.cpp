@@ -191,17 +191,19 @@ TEST(OrderedPortElaboration,
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
   // Port 'a' is bound positionally; the trailing omitted port 'b' has no
-  // default, so no connection is bound for it (it is left unconnected).
+  // default, so it is left unconnected, and as a net port takes 'z
+  // (§23.3.3.3).
   bool a_connected = false;
-  bool b_connected = false;
+  bool b_high_z = false;
   for (const auto& binding : bindings) {
     if (binding.port_name == "a" && binding.connection != nullptr)
       a_connected = true;
     if (binding.port_name == "b" && binding.connection != nullptr)
-      b_connected = true;
+      b_high_z =
+          binding.connection->kind == delta::ExprKind::kUnbasedUnsizedLiteral;
   }
   EXPECT_TRUE(a_connected);
-  EXPECT_FALSE(b_connected);
+  EXPECT_TRUE(b_high_z);
 }
 
 TEST(OrderedPortElaboration, ExcessOrderedPortsWarns) {
