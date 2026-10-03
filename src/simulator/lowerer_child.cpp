@@ -351,6 +351,31 @@ static void AliasChildObjectsUnderPath(const std::string& child_prefix,
   for (std::string_view key : nets) ctx.AliasNet(under_path(key), key);
 }
 
+// The subroutines, imports and assertion declarations an instance's module
+// declares, registered for the instance whose key is `prefix`.
+static void RegisterChildInstanceDecls(const RtlirModule* mod,
+                                       const std::string& prefix,
+                                       SimContext& ctx, Arena& arena) {
+  // 21.2.1.5: register the child instance's tasks/functions so a call within
+  // its own body resolves (and %m composes the instance + subroutine path);
+  // LowerModule registers these for the top only.
+  RegisterModuleSubroutines(mod, ctx);
+  // §13.3 with §23.6: and under the instance's own prefixed key, which an
+  // enable by hierarchical name from another instance resolves by.
+  RegisterInstanceSubroutines(mod, prefix, ctx, arena);
+  // §27.4 with §13.4: and those of the instance's generate blocks under
+  // the instance's key too, "u1.blk[1].triple".
+  RegisterGenBlockSubroutines(mod, prefix, prefix, ctx, arena);
+  // §35.5.4: an import declaration defines the subroutine in the scope
+  // that writes it, an instantiated module, interface or program as much as
+  // the top; the top's are registered by LowerModule.
+  RegisterModuleDpiImports(mod, ctx);
+  // §16.12.1: an assertion of the instance that instantiates a property or
+  // sequence the instance's module declares expands it at the run, so the
+  // declarations are registered as the top's are.
+  RegisterModuleSequenceDecls(mod, ctx);
+}
+
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (child.resolved) LowerChildInstance(child);
@@ -455,26 +480,8 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   RegisterGenBlockMembers(child.resolved);
   if (!child_path.empty())
     AliasChildObjectsUnderPath(child_prefix, child_path, ctx_, arena_);
-  // 21.2.1.5: register the child instance's tasks/functions so a call within
-  // its own body resolves (and %m composes the instance + subroutine path);
-  // LowerModule registers these for the top only.
-  RegisterModuleSubroutines(child.resolved, ctx_);
-  // §13.3 with §23.6: and under the instance's own prefixed key, which an
-  // enable by hierarchical name from another instance resolves by.
-  RegisterInstanceSubroutines(child.resolved, inst_prefix_, ctx_, arena_);
-  // §27.4 with §13.4: and those of the instance's generate blocks under
-  // the instance's key too, "u1.blk[1].triple".
-  RegisterGenBlockSubroutines(child.resolved, inst_prefix_, inst_prefix_, ctx_,
-                              arena_);
-  // §35.5.4: an import declaration defines the subroutine in the scope
-  // that writes it, an instantiated module, interface or program as much as
-  // the top; the top's are registered by LowerModule.
-  RegisterModuleDpiImports(child.resolved, ctx_);
+  RegisterChildInstanceDecls(child.resolved, inst_prefix_, ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(child.resolved);
-  // §16.12.1: an assertion of the instance that instantiates a property or
-  // sequence the instance's module declares expands it at the run, so the
-  // declarations are registered as the top's are.
-  RegisterModuleSequenceDecls(child.resolved, ctx_);
 
   // Port connections resolve in the parent scope (see LowerPortBindings),
   // then restore the child prefix for the child's own body.

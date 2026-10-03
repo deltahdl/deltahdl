@@ -352,8 +352,9 @@ TEST(LoopGenerateInstanceSim, ModuleInstanceInTheBlockRunsItsBody) {
 }
 
 // Each block instance's module instance evaluates its own concurrent
-// assertion over its own bit of a, which holds 1, 0 and 1 at all five rising
-// edges of clk; the counts are read through `g[i].c`.
+// assertion over a, sampled 1, 0, 0, 1 and 1 at the five rising edges of clk,
+// and its counts are read through `g[i].c`. Every instance takes the one
+// signal: a connection the genvar indexes is #4126's.
 TEST(LoopGenerateInstanceSim, EachModuleInstanceEvaluatesItsAssertion) {
   SimFixture f;
   std::string out = RunCapture(
@@ -363,17 +364,18 @@ TEST(LoopGenerateInstanceSim, EachModuleInstanceEvaluatesItsAssertion) {
       "endmodule\n"
       "module top;\n"
       "  logic clk = 0;\n"
-      "  logic [2:0] a = 3'b101;\n"
+      "  logic a = 1;\n"
       "  initial repeat (10) #5 clk = ~clk;\n"
+      "  initial begin #12 a = 0; #20 a = 1; end\n"
       "  for (genvar i = 0; i < 3; i++) begin : g\n"
-      "    m2 c(a[i], clk);\n"
+      "    m2 c(a, clk);\n"
       "  end\n"
       "  initial #52 $display(\"%0d %0d %0d %0d %0d %0d\", g[0].c.pass,\n"
       "                       g[0].c.fail, g[1].c.pass, g[1].c.fail,\n"
       "                       g[2].c.pass, g[2].c.fail);\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "5 0 0 5 5 0\n");
+  EXPECT_EQ(out, "3 2 3 2 3 2\n");
 }
 
 // The same for a checker instantiated in each block instance.
@@ -386,17 +388,18 @@ TEST(LoopGenerateInstanceSim, EachCheckerInstanceEvaluatesItsAssertion) {
       "endchecker\n"
       "module top;\n"
       "  logic clk = 0;\n"
-      "  logic [2:0] a = 3'b101;\n"
+      "  logic a = 1;\n"
       "  initial repeat (10) #5 clk = ~clk;\n"
+      "  initial begin #12 a = 0; #20 a = 1; end\n"
       "  for (genvar i = 0; i < 3; i++) begin : g\n"
-      "    chk c(i, a[i], clk);\n"
+      "    chk c(i, a, clk);\n"
       "  end\n"
       "  initial #52 $display(\"%0d %0d %0d %0d %0d %0d\", g[0].c.pass,\n"
       "                       g[0].c.fail, g[1].c.pass, g[1].c.fail,\n"
       "                       g[2].c.pass, g[2].c.fail);\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "5 0 0 5 5 0\n");
+  EXPECT_EQ(out, "3 2 3 2 3 2\n");
 }
 
 }  // namespace
