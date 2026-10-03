@@ -17,6 +17,16 @@ TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
 }
 
+// §3.14.2.3 leaves a compilation-unit scope without a timeunit at the default
+// 1 ns / 1 ns, and §3.14.3 forms the global precision without that default, so
+// under `timescale 1us / 1us such a scope's unit is finer than the global
+// precision. 3000 ns is three ticks of 1 us, as an integer and as a real.
+TEST(DesignBuildingBlockSimulation, UnitFinerThanGlobalPrecisionDividesDown) {
+  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
+  EXPECT_EQ(DelayToTicks(3000, ts, TimeUnit::kUs), 3u);
+  EXPECT_EQ(RealDelayToTicks(3000.0, ts, TimeUnit::kUs), 3u);
+}
+
 TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
   SimFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
