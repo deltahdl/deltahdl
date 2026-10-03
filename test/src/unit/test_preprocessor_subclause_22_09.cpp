@@ -171,3 +171,29 @@ TEST(Preprocessor, NounconnectedDrive_Pull1ArgumentRejected) {
   EXPECT_NE(out.find("wire x;"), std::string::npos);
   EXPECT_EQ(out.find("pull1"), std::string::npos);
 }
+
+// §22.9: `unconnected_drive governs the module definitions that follow it,
+// and `nounconnected_drive and `resetall (§22.3) end it, so the preprocessor
+// records at each header the drive in force there.
+TEST(Preprocessor, UnconnectedDrive_RecordedAtEachHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`unconnected_drive pull1\n"
+      "module a;\nendmodule\n"
+      "`nounconnected_drive\n"
+      "module b;\nendmodule\n"
+      "`unconnected_drive pull0\n"
+      "module c;\nendmodule\n"
+      "`resetall\n"
+      "module d;\nendmodule\n"
+      "`unconnected_drive pull1\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 4u);
+  EXPECT_EQ(list[0].unconnected_drive, NetType::kTri1);
+  EXPECT_EQ(list[1].unconnected_drive, NetType::kWire);
+  EXPECT_EQ(list[2].unconnected_drive, NetType::kTri0);
+  EXPECT_EQ(list[3].unconnected_drive, NetType::kWire);
+}

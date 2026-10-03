@@ -220,7 +220,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // continuous assignment drive a variable. `int g;` outside every module with
   // `assign g = 1;` in a module got an implicit net `g` shadowing the unit's.
   if (UnitDeclaresData(unit_, name)) return true;
-  if (unit_->default_nettype == NetType::kNone) {
+  if (mod->default_nettype == NetType::kNone) {
     diag_.Error(loc,
                 std::format("implicit net '{}' forbidden by "
                             "`default_nettype none",
@@ -251,9 +251,8 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // entry would make it treat the net it just created as a variable and report
   // a second assignment to it under §10.3.2.
   std::string_view scoped = ScopedName(name);
-  RtlirNet net =
-      MakeImplicitPortNet(scoped, /*port_width=*/1, /*port_is_signed=*/false,
-                          unit_->default_nettype);
+  RtlirNet net = MakeImplicitPortNet(
+      scoped, /*port_width=*/1, /*port_is_signed=*/false, mod->default_nettype);
   // §23.4: a nested module sees the enclosing modules' names, so the reference
   // may name an outer object rather than declare a net of its own; the net is
   // pushed either way, for the assignment to lower against, and

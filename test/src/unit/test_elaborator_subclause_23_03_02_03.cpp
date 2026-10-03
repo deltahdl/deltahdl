@@ -151,8 +151,10 @@ TEST(ImplicitNamedPortConnectionElaboration, EmptyParensLeavesPortUnconnected) {
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 1u);
-  // No connection is made, and the default is present but left unused.
-  EXPECT_EQ(bindings[0].connection, nullptr);
+  // No signal is connected, and the default is present but left unused: the
+  // unconnected net port takes 'z (§23.3.3.3).
+  ASSERT_NE(bindings[0].connection, nullptr);
+  EXPECT_EQ(bindings[0].connection->kind, ExprKind::kUnbasedUnsizedLiteral);
   EXPECT_NE(mod->children[0].resolved->ports[0].default_value, nullptr);
 }
 

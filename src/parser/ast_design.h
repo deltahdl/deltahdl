@@ -259,7 +259,8 @@ inline void ApplyModuleDirectives(
     mod->has_default_trireg_strength = d->has_strength;
     mod->delay_mode = d->delay_mode;
   }
-  // §22.7: the `timescale in force at a design element's header is the one it
+  // §22.7, §22.8 and §22.9: the `timescale, `default_nettype and
+  // `unconnected_drive in force at a design element's header are the ones it
   // takes.
   for (const auto* list : {&cu->modules, &cu->interfaces, &cu->programs}) {
     for (auto* mod : *list) {
@@ -267,6 +268,9 @@ inline void ApplyModuleDirectives(
       if (d == nullptr) continue;
       mod->has_directive_timescale = d->has_timescale;
       mod->directive_timescale = d->timescale;
+      mod->has_net_directives = true;
+      mod->default_nettype = d->default_nettype;
+      mod->unconnected_drive = d->unconnected_drive;
     }
   }
   // §3.2 counts a package among the design elements the directive governs.

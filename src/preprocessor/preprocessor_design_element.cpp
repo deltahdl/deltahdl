@@ -194,14 +194,16 @@ void Preprocessor::TrackDesignElementHeader(std::string_view trimmed) {
     // it, so the decay time, charge strength and delay mode in force at this
     // header are the ones this module takes, whatever a later directive sets.
     // §22.7 (printed page 716) rules the same of `timescale, which "specifies
-    // the time unit and time precision of the design elements that follow it".
+    // the time unit and time precision of the design elements that follow it",
+    // and §22.8 and §22.9 of `default_nettype and `unconnected_drive.
     DeclaredElement element = DeclaredElementAt(trimmed);
     if (!element.name.empty()) {
       module_directives_.push_back(
           {std::string(element.name), default_decay_time_,
            default_decay_time_infinite_, default_trireg_strength_,
            has_default_trireg_strength_, delay_mode_directive_, has_timescale_,
-           current_timescale_, element.is_package});
+           current_timescale_, element.is_package, default_net_type_,
+           unconnected_drive_});
     }
     ++design_element_depth_;
   }

@@ -77,15 +77,22 @@ Expr* MakeHighZExprIn(Arena& arena) {
   return expr;
 }
 
+// §23.3.3.3: an unconnected net input "shall have the value 'z", and a port
+// is a net where §23.2.2.3 makes it one -- `input logic a`, which names a data
+// type and no port kind, among them -- which RtlirPort::net_type records
+// whatever the data type keyword.
+bool IsNetPort(const RtlirPort& port) {
+  return !port.is_var && !port.is_interface_port &&
+         port.net_type != NetType::kNone;
+}
+
 // Synthesized connection for an unconnected input port: a pull expression when
-// an unconnected drive is set, else high-Z for a net-typed (non-var) port, else
-// nullptr. Shared by the wildcard and trailing-input completion loops.
+// an unconnected drive is set, else high-Z for a net port, else nullptr.
+// Shared by the wildcard and trailing-input completion loops.
 Expr* DefaultInputConnection(Arena& arena, const RtlirPort& port, bool has_pull,
                              NetType drive) {
   if (has_pull) return MakePullExprIn(arena, drive);
-  if (!port.is_var && PortNetType(port.type_kind) != NetType::kNone) {
-    return MakeHighZExprIn(arena);
-  }
+  if (IsNetPort(port)) return MakeHighZExprIn(arena);
   return nullptr;
 }
 
@@ -726,10 +733,9 @@ void Elaborator::SynthesizeExplicitDefault(const PortBindScope& scope,
     binding.connection = port->default_value;
   }
   if (scope.has_pull && !binding.connection) {
-    binding.connection = MakePullExpr(unit_->unconnected_drive);
+    binding.connection = MakePullExpr(scope.inst.resolved->unconnected_drive);
   }
-  if (!binding.connection && port && !port->is_var &&
-      PortNetType(port->type_kind) != NetType::kNone) {
+  if (!binding.connection && port && IsNetPort(*port)) {
     binding.connection = MakeHighZExpr();
   }
 }
@@ -848,8 +854,8 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
   } else if (port.default_value) {
     binding.connection = port.default_value;
   } else if (port.direction == Direction::kInput) {
-    binding.connection = DefaultInputConnection(arena_, port, scope.has_pull,
-                                                unit_->unconnected_drive);
+    binding.connection = DefaultInputConnection(
+        arena_, port, scope.has_pull, scope.inst.resolved->unconnected_drive);
   }
 
   if (binding.connection) {
@@ -889,8 +895,8 @@ void Elaborator::BindTrailingInputPorts(const PortBindScope& scope) {
     if (port.default_value) {
       binding.connection = port.default_value;
     } else {
-      binding.connection = DefaultInputConnection(arena_, port, scope.has_pull,
-                                                  unit_->unconnected_drive);
+      binding.connection = DefaultInputConnection(
+          arena_, port, scope.has_pull, scope.inst.resolved->unconnected_drive);
     }
 
     if (binding.connection) {

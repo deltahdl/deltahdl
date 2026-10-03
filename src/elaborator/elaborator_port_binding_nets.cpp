@@ -327,7 +327,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   const auto& child_ports = inst.resolved->ports;
 
   const PortBindScope kScope{
-      inst, item, parent_mod, unit_->unconnected_drive != NetType::kWire,
+      inst, item, parent_mod,
+      inst.resolved->unconnected_drive != NetType::kWire,
       !item->inst_ports.empty() && item->inst_ports[0].first.empty()};
 
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {

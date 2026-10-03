@@ -705,6 +705,13 @@ struct RtlirModule {
   // timeprecision declarations, falling back to the compilation unit's.
   TimeScale timescale;
 
+  // §22.8 and §22.9: the default net type of this module's implicit nets and
+  // the drive of its unconnected input ports, the directives in force where
+  // the module was declared or, for a module parsed without the preprocessor,
+  // the compilation unit's.
+  NetType default_nettype = NetType::kWire;
+  NetType unconnected_drive = NetType::kWire;
+
   std::vector<RtlirPort> ports;
   std::vector<RtlirNet> nets;
   std::vector<RtlirVariable> variables;

@@ -248,33 +248,6 @@ enum class DelayModeDirective : uint8_t {
   kZero,
 };
 
-// Annex E: the compiler directives of the annex in force where a module was
-// declared, E.2's default decay time, E.3's default charge strength and the
-// delay mode of E.4 to E.7. Each directive applies to the modules that follow
-// it in the source, so the preprocessor records the values in force at each
-// module header under the module's name, and the values reach the declaration
-// by that name once the module is parsed. `decay_ticks` is the decay time as
-// the directive's argument was rounded and `decay_infinite` the state E.2's
-// keyword names, and the state before any directive; `has_strength` is whether
-// a strength directive came before the module and `strength` the last one's
-// value; `delay_mode` is the last delay mode directive before the module, or
-// kNone where none came.
-struct ModuleDirectives {
-  std::string module;
-  uint64_t decay_ticks = 0;
-  bool decay_infinite = true;
-  uint32_t strength = 0;
-  bool has_strength = false;
-  DelayModeDirective delay_mode = DelayModeDirective::kNone;
-  // §3.14.2.3 b): the `timescale directive last read before the header, which
-  // sets the element's time unit and precision where it declares neither.
-  bool has_timescale = false;
-  TimeScale timescale;
-  // Whether the header is a package's, whose name lives in a name space apart
-  // from that of modules, interfaces and programs (§3.13).
-  bool is_package = false;
-};
-
 // Which member of a min:typ:max expression is selected. §11.11 orders the
 // three as the minimum, the typical and the maximum, and has the three there
 // so a design can be tested under any one of them, so one of the three is
@@ -303,6 +276,38 @@ enum class NetType : uint8_t {
   kUwire,
   kNone,
   kInterconnect,
+};
+
+// Annex E: the compiler directives of the annex in force where a module was
+// declared, E.2's default decay time, E.3's default charge strength and the
+// delay mode of E.4 to E.7. Each directive applies to the modules that follow
+// it in the source, so the preprocessor records the values in force at each
+// module header under the module's name, and the values reach the declaration
+// by that name once the module is parsed. `decay_ticks` is the decay time as
+// the directive's argument was rounded and `decay_infinite` the state E.2's
+// keyword names, and the state before any directive; `has_strength` is whether
+// a strength directive came before the module and `strength` the last one's
+// value; `delay_mode` is the last delay mode directive before the module, or
+// kNone where none came.
+struct ModuleDirectives {
+  std::string module;
+  uint64_t decay_ticks = 0;
+  bool decay_infinite = true;
+  uint32_t strength = 0;
+  bool has_strength = false;
+  DelayModeDirective delay_mode = DelayModeDirective::kNone;
+  // §3.14.2.3 b): the `timescale directive last read before the header, which
+  // sets the element's time unit and precision where it declares neither.
+  bool has_timescale = false;
+  TimeScale timescale;
+  // Whether the header is a package's, whose name lives in a name space apart
+  // from that of modules, interfaces and programs (§3.13).
+  bool is_package = false;
+  // §22.8 and §22.9: the default net type and the drive of unconnected input
+  // ports in force at the header, kWire for `nounconnected_drive, which a
+  // directive after the element does not change.
+  NetType default_nettype = NetType::kWire;
+  NetType unconnected_drive = NetType::kWire;
 };
 
 template <typename T, size_t N = 4>

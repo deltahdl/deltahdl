@@ -880,6 +880,13 @@ struct ModuleDecl {
   // and precision it does not declare.
   bool has_directive_timescale = false;
   TimeScale directive_timescale;
+  // §22.8 and §22.9: the default net type and the drive of unconnected input
+  // ports in force at the header, put here by ApplyModuleDirectives;
+  // `has_net_directives` is false for an element parsed without the
+  // preprocessor, which then takes the compilation unit's values.
+  bool has_net_directives = false;
+  NetType default_nettype = NetType::kWire;
+  NetType unconnected_drive = NetType::kWire;
 };
 
 struct PackageDecl {

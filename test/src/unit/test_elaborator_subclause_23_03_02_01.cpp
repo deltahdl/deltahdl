@@ -5,6 +5,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
 namespace {
@@ -163,13 +164,14 @@ TEST(OrderedPortElaboration, BlankInputWithoutDefaultLeftUnconnected) {
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_GE(bindings.size(), 2u);
   EXPECT_EQ(bindings[1].port_name, "b");
-  // The blank input port carries no default, so it is left unconnected: the
-  // default-substitution rule must not manufacture a connection when the
-  // declared port has no default value.
+  // The blank input port carries no default, so it is left unconnected, and
+  // as a net port takes 'z (§23.3.3.3) rather than any default.
   ASSERT_NE(mod->children[0].resolved, nullptr);
   ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
   EXPECT_EQ(mod->children[0].resolved->ports[1].default_value, nullptr);
-  EXPECT_EQ(bindings[1].connection, nullptr);
+  ASSERT_NE(bindings[1].connection, nullptr);
+  EXPECT_EQ(bindings[1].connection->kind,
+            delta::ExprKind::kUnbasedUnsizedLiteral);
 }
 
 TEST(OrderedPortElaboration,

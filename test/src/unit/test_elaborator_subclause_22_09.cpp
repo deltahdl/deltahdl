@@ -40,10 +40,8 @@ void ElaborateUnconnectedChild(std::string_view directive, ElabFixture& f,
       "module top;\n"
       "  child c();\n"
       "endmodule\n";
-  // Leave the `unconnected_drive directive in effect for the single child
-  // instance: deltahdl models unconnected_drive as one compilation-unit-wide
-  // value taken after preprocessing, so a trailing `nounconnected_drive would
-  // reset it before elaboration. Per §22.9 an unclosed directive stays active.
+  // The child takes the drive in force at its own definition (§22.9), which
+  // the directive above it sets.
 
   auto* design = ElaborateWithPreprocessor(src, f, "top");
   ASSERT_NE(design, nullptr);

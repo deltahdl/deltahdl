@@ -78,8 +78,8 @@ TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
   // to the default. Here b's default of 5 must be discarded, so the child's
   // unconnected input propagates an unknown value rather than 15; observing the
   // result as not-known is the runtime counterpart to the elaborator's
-  // binding-level "connection == nullptr" check, confirming the default was not
-  // driven into the simulated logic.
+  // binding-level check that the connection is 'z, confirming the default was
+  // not driven into the simulated logic.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"

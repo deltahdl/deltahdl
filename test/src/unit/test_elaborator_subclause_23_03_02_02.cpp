@@ -6,6 +6,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -56,7 +57,10 @@ TEST(NamedPortConnectionElaboration, PortBindingPortMismatch) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
 
-  EXPECT_EQ(mod->children[0].port_bindings.size(), 1);
+  // The bogus connection, and a, which it leaves unconnected and which as a
+  // net port takes 'z (§23.3.3.3).
+  ASSERT_EQ(mod->children[0].port_bindings.size(), 2);
+  EXPECT_EQ(mod->children[0].port_bindings[1].port_name, "a");
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
@@ -97,7 +101,10 @@ TEST(NamedPortConnectionElaboration, EmptyNamedPortDoesNotUseDefault) {
   }
   ASSERT_NE(a_port, nullptr);
   EXPECT_NE(a_port->default_value, nullptr);
-  EXPECT_EQ(a_binding->connection, nullptr);
+  // Left unconnected, the net port a takes 'z (§23.3.3.3), not its default.
+  ASSERT_NE(a_binding->connection, nullptr);
+  EXPECT_EQ(a_binding->connection->kind, ExprKind::kUnbasedUnsizedLiteral);
+  EXPECT_EQ(a_binding->connection->text, "'z");
 }
 
 TEST(NamedPortConnectionElaboration, OmittedPortWithoutDefaultIsUnconnected) {
@@ -113,9 +120,13 @@ TEST(NamedPortConnectionElaboration, OmittedPortWithoutDefaultIsUnconnected) {
       f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
+  // b, which has no default, is unconnected, and as a net port takes 'z
+  // (§23.3.3.3).
   const auto& bindings = mod->children[0].port_bindings;
   for (const auto& b : bindings) {
-    EXPECT_NE(b.port_name, "b");
+    if (b.port_name != "b") continue;
+    ASSERT_NE(b.connection, nullptr);
+    EXPECT_EQ(b.connection->kind, ExprKind::kUnbasedUnsizedLiteral);
   }
 }
 

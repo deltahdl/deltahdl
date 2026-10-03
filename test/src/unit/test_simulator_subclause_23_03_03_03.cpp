@@ -258,4 +258,29 @@ TEST(PortConnectionRulesForNetsSimulation, NetPortsStartAtHighZ) {
             "i=zzzz vi=xxxx ii=zzzz ow=zzzz\no=zzzz\n");
 }
 
+// §23.3.3.3 with §23.2.2.3: `input logic a`, which names a data type and no
+// port kind, is a net of the default net type, so left unconnected, whether
+// off the list or as `.a()`, it reads z as a declared wire does, beside the
+// tri0 and tri1 nets that pull to 0 and 1. Its data type keyword was read as
+// making it a variable, and it read x.
+TEST(PortConnectionRulesForNetsSimulation,
+     AnInputNamingOnlyADataTypeIsANetReadingHighZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub(input logic a, output logic b);\n"
+                       "  assign b = a;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic b, e;\n"
+                       "  tri0 n0;\n"
+                       "  tri1 n1;\n"
+                       "  wire nw;\n"
+                       "  sub s(.b(b));\n"
+                       "  sub s2(.a(), .b(e));\n"
+                       "  initial #1 $display(\"unconnected=%b empty=%b "
+                       "tri0=%b tri1=%b wire=%b\", b, e, n0, n1, nw);\n"
+                       "endmodule\n",
+                       f),
+            "unconnected=z empty=z tri0=0 tri1=1 wire=z\n");
+}
+
 }  // namespace

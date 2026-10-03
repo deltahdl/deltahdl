@@ -162,6 +162,12 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
     mod->has_default_trireg_strength = unit->has_default_trireg_strength;
     mod->delay_mode = unit->delay_mode_directive;
   }
+  // §22.8 and §22.9 bind a module to the directives in force at its
+  // definition, as Annex E does above.
+  mod->default_nettype =
+      decl->has_net_directives ? decl->default_nettype : unit->default_nettype;
+  mod->unconnected_drive = decl->has_net_directives ? decl->unconnected_drive
+                                                    : unit->unconnected_drive;
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 
   // §20.4.1: capture the time unit/precision $timeunit/$timeprecision report

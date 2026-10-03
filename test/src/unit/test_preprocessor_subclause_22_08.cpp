@@ -170,3 +170,27 @@ TEST(Preprocessor, DefaultNettype_Supply1Invalid) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid net type 'supply1'",
                             1, "22.8"));
 }
+
+// §22.8: `default_nettype governs the module definitions that follow it, so
+// the preprocessor records at each header the value in force there: a reads
+// tri1, b tri0 and c wire, whatever a later directive sets.
+TEST(Preprocessor, DefaultNettype_RecordedAtEachHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`default_nettype tri1\n"
+      "module a;\nendmodule\n"
+      "`default_nettype tri0\n"
+      "interface b;\nendinterface\n"
+      "`default_nettype wire\n"
+      "program c;\nendprogram\n"
+      "`default_nettype none\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 3u);
+  EXPECT_EQ(list[0].default_nettype, NetType::kTri1);
+  EXPECT_EQ(list[1].default_nettype, NetType::kTri0);
+  EXPECT_EQ(list[2].default_nettype, NetType::kWire);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
