@@ -453,6 +453,13 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.is_resolved = false;
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
+  // A.2.1.1: a parameter port declared with unpacked dimensions is an array
+  // of values as a body parameter is (§6.20.1), and folds its bounds alike.
+  auto dims = decl->param_port_unpacked_dims.find(pname);
+  if (dims != decl->param_port_unpacked_dims.end()) {
+    pd.unpacked_dims = &dims->second;
+    FoldParamUnpackedBounds(pd, ctx.scope);
+  }
   if (has_param_type) {
     pd.decl_type = &decl->param_types[i];
     PopulateParamTypeInfo(pd, decl->param_types[i], ctx.typedefs, ctx.scope);

@@ -1,5 +1,6 @@
 #include <format>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -21,6 +22,9 @@ struct ParamPortList {
   std::unordered_set<std::string_view>& type_param_names;
   std::unordered_set<std::string_view>& localparam_port_names;
   std::vector<DataType>* param_types;
+  // Where a value parameter's unpacked dimensions go, by name; null where the
+  // declaration holding the list keeps none.
+  std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims;
 };
 
 // What one parameter_port_declaration of A.1.3's parameter_port_list hands to
@@ -131,6 +135,9 @@ struct ParserParamPortHelpers {
     DataType dtype = p.ParseDataType();
     p.ParseImplicitParamRange(dtype);
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.2"));
+    if (out.unpacked_dims != nullptr && p.Check(TokenKind::kLBracket)) {
+      p.ParseUnpackedDims((*out.unpacked_dims)[name.text]);
+    }
     Expr* default_val = nullptr;
     if (p.Match(TokenKind::kEq)) {
       default_val = p.ParseExpr();
@@ -156,10 +163,11 @@ void Parser::ParseParamPortDecls(
     std::vector<std::pair<std::string_view, Expr*>>& params,
     std::unordered_set<std::string_view>& type_param_names,
     std::unordered_set<std::string_view>& localparam_port_names,
-    std::vector<DataType>* param_types) {
+    std::vector<DataType>* param_types,
+    std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims) {
   if (Check(TokenKind::kRParen)) return;
   ParamPortList out{params, type_param_names, localparam_port_names,
-                    param_types};
+                    param_types, unpacked_dims};
   ParamPortGroup group;
   do {
     ParserParamPortHelpers::ParseParamPortDecl(*this, out, group);

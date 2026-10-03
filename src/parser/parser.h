@@ -169,7 +169,9 @@ class Parser {
       std::vector<std::pair<std::string_view, Expr*>>& params,
       std::unordered_set<std::string_view>& type_param_names,
       std::unordered_set<std::string_view>& localparam_port_names,
-      std::vector<DataType>* param_types);
+      std::vector<DataType>* param_types,
+      std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims =
+          nullptr);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);

@@ -157,4 +157,10 @@ std::vector<std::pair<std::string_view, Expr*>> AssignableConfigParams(
     const std::vector<std::pair<std::string_view, Expr*>>& override_params,
     SourceLoc loc, DiagEngine& diag);
 
+// §7.4.2: RtlirParamDecl::unpacked_bounds from the parameter's unpacked_dims,
+// each dimension folded in `scope`, the parameters elaborated before it; left
+// empty where a dimension does not fold. A parameter among a module's items
+// and a parameter port are folded alike.
+void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope);
+
 }  // namespace delta

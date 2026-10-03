@@ -440,10 +440,7 @@ static void RecordUntypedRealParam(
     real_param_names.insert(item->name);
 }
 
-// §7.4.2: the bounds of every unpacked dimension the parameter declares,
-// folded against the parameters already elaborated, which a bound written in
-// terms of one needs; none where a dimension does not fold.
-static void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope) {
+void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope) {
   if (pd.unpacked_dims == nullptr) return;
   std::vector<RtlirUnpackedDim> bounds;
   for (const Expr* dim : *pd.unpacked_dims) {

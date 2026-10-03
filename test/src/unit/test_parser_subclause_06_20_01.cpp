@@ -55,6 +55,23 @@ TEST(ParameterPortListParsing, ParamPortMixedForms) {
   EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
 }
 
+// A.2.1.1's param_assignment takes { variable_dimension } after the name in a
+// parameter port list as among the items, so A is an array of two and B, the
+// next assignment of the same declaration, one of two by three.
+TEST(ParameterPortListParsing, ParamPortUnpackedDimensions) {
+  auto r = Parse(
+      "module m #(parameter int A[2] = '{1, 2}, B[2][3] = '{default: 0},\n"
+      "           int C = 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& dims = r.cu->modules[0]->param_port_unpacked_dims;
+  ASSERT_EQ(dims.size(), 2u);
+  EXPECT_EQ(dims.at("A").size(), 1u);
+  EXPECT_EQ(dims.at("B").size(), 2u);
+  EXPECT_EQ(dims.count("C"), 0u);
+}
+
 TEST(ExpressionParsing, ParamExprBinaryOp) {
   auto r = Parse(
       "module m #(parameter int P = 2 * 8);\n"

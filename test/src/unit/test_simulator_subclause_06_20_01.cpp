@@ -67,4 +67,15 @@ TEST(ParameterArraySim, RealElementsKeepTheirFractions) {
             "1.5 0.25\n");
 }
 
+// A parameter port may be declared an array as a body parameter may, and its
+// elements take its pattern the same way.
+TEST(ParameterArraySim, ParameterPortArrayFillsTheElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t #(parameter int A[2] = '{1, 2});\n"
+                       "  initial $display(\"%0d %0d\", A[0], A[1]);\n"
+                       "endmodule\n",
+                       f),
+            "1 2\n");
+}
+
 }  // namespace
