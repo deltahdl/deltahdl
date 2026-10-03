@@ -238,6 +238,27 @@ static std::vector<PackedRange> TypeNameDims(std::string_view name,
 // type equivalent to a simple bit vector (one packed dimension); a real type
 // contributes no packed dimension.
 //
+// The element of the container `info` found for `arg0`: its width, or, where
+// `arg0` names no container, whether it is a string or a real and the width
+// of its value.
+static void DescribeElement(const Expr* arg0, SimContext& ctx, Arena& arena,
+                            QueryArgInfo& info) {
+  if (info.assoc) {
+    info.elem_width = info.assoc->elem_width;
+  } else if (info.queue) {
+    info.elem_width = info.queue->elem_width;
+  } else if (info.arr) {
+    info.elem_width = info.arr->elem_width;
+  } else if (arg0 && arg0->kind == ExprKind::kIdentifier &&
+             ctx.IsStringVariable(arg0->text)) {
+    info.is_string = true;
+  } else if (arg0) {
+    auto val = EvalExpr(arg0, ctx, arena);
+    info.elem_width = val.width;
+    info.is_real = val.is_real;
+  }
+}
+
 // §20.7 with §8.5: an unpacked array property of a class object, named bare in
 // one of its methods or through a handle, is an array too, a queue one
 // included, and so is an unpacked array member of a structure. A fixed or
@@ -271,20 +292,7 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
     info.packed_dims = TypeNameDims(arg0->text, ctx, arena);
     if (!info.packed_dims.empty()) return info;
   }
-  if (info.assoc) {
-    info.elem_width = info.assoc->elem_width;
-  } else if (info.queue) {
-    info.elem_width = info.queue->elem_width;
-  } else if (info.arr) {
-    info.elem_width = info.arr->elem_width;
-  } else if (arg0 && arg0->kind == ExprKind::kIdentifier &&
-             ctx.IsStringVariable(arg0->text)) {
-    info.is_string = true;
-  } else if (arg0) {
-    auto val = EvalExpr(arg0, ctx, arena);
-    info.elem_width = val.width;
-    info.is_real = val.is_real;
-  }
+  DescribeElement(arg0, ctx, arena, info);
   return info;
 }
 
