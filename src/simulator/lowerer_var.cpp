@@ -716,6 +716,15 @@ static std::string_view UnpackedDimsText(const RtlirVariable& var,
   return *text;
 }
 
+// §21.7.5 (Table 21-11) with §6.19: the declared type keyword a dumped
+// variable's $var masquerades by, and whether the storage is an enumeration's
+// named constant, which no dump declares.
+static void RecordVcdDeclaration(std::string_view name,
+                                 const RtlirVariable& var, SimContext& ctx) {
+  ctx.Vcd().SetVcdVarKind(name, VcdEffectiveDeclKind(var));
+  if (var.is_enum_constant) ctx.Vcd().MarkVcdEnumConstant(name);
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
@@ -741,8 +750,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // §21.7.5 (Table 21-11): remember the declared type keyword so this
   // variable's $var declaration masquerades as the matching 1364-2005 var_type
   // when dumped.
-  ctx_.Vcd().SetVcdVarKind(name, VcdEffectiveDeclKind(var));
-  if (var.is_enum_constant) ctx_.Vcd().MarkVcdEnumConstant(name);
+  RecordVcdDeclaration(name, var, ctx_);
   // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
   // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);

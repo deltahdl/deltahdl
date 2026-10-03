@@ -672,11 +672,15 @@ static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
 // queue the object holds, and a fixed-size one the elements the object holds
 // one by one (ResolveClassArray), printed from the left bound. No variable
 // stands under the argument's name, so none of the named forms found it and it
-// printed as one number, 0.
+// printed as one number, 0. Only `h.name` is asked about: every argument of
+// the call passes here, and a base that is itself a call, `q.pop_front().id`,
+// would run again to be asked.
 static std::optional<std::string> BuildFormatPClassArray(const Expr* arg,
                                                          SimContext& ctx,
                                                          Arena& arena) {
-  if (arg->kind != ExprKind::kMemberAccess) return std::nullopt;
+  if (arg->kind != ExprKind::kMemberAccess ||
+      arg->lhs->kind != ExprKind::kIdentifier)
+    return std::nullopt;
   if (const QueueObject* q = FindQueueOfBase(arg, ctx, arena))
     return FormatQueueForP(q, {}, ctx);
   ClassArrayRef ref;
@@ -707,10 +711,10 @@ std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   if (auto scoped = BuildFormatPPackageItem(arg, val, ctx, arena))
     return *scoped;
   if (auto elem = BuildFormatPElement(arg, val, ctx)) return *elem;
-  if (auto array = BuildFormatPClassArray(arg, ctx, arena)) return *array;
   if (auto member = BuildFormatPMember(arg, val, ctx)) return *member;
   if (auto slice = BuildFormatPSlice(arg, ctx, arena)) return *slice;
   if (auto found = BuildFormatPLocator(arg, ctx, arena)) return *found;
+  if (auto array = BuildFormatPClassArray(arg, ctx, arena)) return *array;
 
   // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
   // an aggregate would be formatted.
