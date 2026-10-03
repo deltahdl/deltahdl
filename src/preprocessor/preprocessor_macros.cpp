@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <string>
@@ -42,9 +43,12 @@ bool Preprocessor::EvalIfdefCondition(std::string_view name,
     return false;
   }
   if (name[0] == '(') return EvalIfdefExpr(ParenthesizedSpan(name), loc);
-  // A condition that opens with no parenthesis is a text_macro_identifier; a
+  // A condition that opens with no parenthesis is a text_macro_identifier,
+  // simple or escaped (§5.6.1, an escaped one running to white space); a
   // negation is an ifdef_macro_expression, which stands only in parentheses.
-  size_t len = 0;
+  size_t len = name[0] == '\\'
+                   ? std::min(name.find_first_of(" \t\f\r\n"), name.size())
+                   : 0;
   while (len < name.size() && IsIdentChar(name[len])) ++len;
   if (len == 0) {
     diag_.Error(loc,
