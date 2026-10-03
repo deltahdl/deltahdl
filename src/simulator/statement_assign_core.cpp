@@ -31,6 +31,7 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/modport_expression.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -764,6 +765,13 @@ static bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// §7.8 with §7.9.9: an associative array assigned another's contents by
+// map, copy or literal.
+static bool TryAssocAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  return TryAssocMapAssign(stmt, ctx, arena) || TryAssocCopyAssign(stmt, ctx) ||
+         TryAssocLiteralAssign(stmt, ctx, arena);
+}
+
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryDeconstructingPatternAssign(stmt, ctx, arena)) return true;
@@ -773,9 +781,9 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryCallResultArrayAssign(stmt, ctx, arena)) return true;
   if (TryDispatchSyncAssign(stmt, ctx, arena)) return true;
   if (TryDispatchNewAssign(stmt, ctx, arena)) return true;
-  if (TryAssocMapAssign(stmt, ctx, arena)) return true;
-  if (TryAssocCopyAssign(stmt, ctx)) return true;
-  if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
+  if (TryAssocAssign(stmt, ctx, arena)) return true;
+  // §25.5.4: a modport expression port, `i.P = v`, assigns its expression.
+  if (TryModportExpressionAssign(stmt, ctx, arena)) return true;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
   if (TryArrayObjectAssign(stmt, ctx, arena)) return true;
   if (TryEventVarAssign(stmt, ctx)) return true;
@@ -851,6 +859,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   // §10.9: a typed assignment pattern expression on the left unpacks like the
   // bare pattern it wraps.
   if (TryUnpackConcatLhs(lhs, owned, ctx, arena)) return;
+  if (TryModportExpressionWrite(lhs, owned, ctx, arena)) return;
 
   if (lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(lhs, owned, ctx, arena);

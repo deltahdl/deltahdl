@@ -199,6 +199,151 @@ std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
   return through_port.empty() ? key : std::string(through_port);
 }
 
+// The identifier at the head of an interface port's connection: the instance
+// itself, `sb`, or the instance a modport connection names, `sb` of `sb.mp`;
+// null for a connection of any other shape.
+static const Expr* ConnectedInstanceHead(const Expr* conn) {
+  if (conn == nullptr) return nullptr;
+  if (conn->kind == ExprKind::kIdentifier) return conn;
+  if (conn->kind == ExprKind::kMemberAccess && conn->lhs != nullptr &&
+      conn->lhs->kind == ExprKind::kIdentifier) {
+    return conn->lhs;
+  }
+  return nullptr;
+}
+
+// §25.3.3: the interface a port connects to and, in `instance`, the
+// identifier naming the connected instance. An interface-typed port's own
+// interface, and for a generic port, `interface a` or `interface.mp b`, which
+// names none, the interface the connected instance is an instance of, which
+// RegisterChildInstanceKeys has recorded by the time any port is bound. Null
+// where the connection names no instance of a known interface.
+const RtlirModule* Lowerer::ConnectedInterface(const RtlirPort& port,
+                                               const Expr* conn,
+                                               const Expr*& instance) const {
+  std::string_view type_name = port.interface_type_name;
+  if (type_name.empty()) {
+    instance = ConnectedInstanceHead(conn);
+    if (instance == nullptr) return nullptr;
+    type_name = ctx_.FindInstanceType(ConnectedInstanceKey(instance->text));
+  } else {
+    instance =
+        ConnectedInterfaceInstance(conn, type_name, design_->compilation_unit);
+    if (instance == nullptr) return nullptr;
+  }
+  auto it = design_->all_modules.find(type_name);
+  return it != design_->all_modules.end() ? it->second : nullptr;
+}
+
+// Registers `def` under `key`, interned by the caller, to run in the
+// instance `inst_prefix` whatever instance the call names it through.
+static void RegisterRunningIn(std::string_view key, ModuleItem* def,
+                              const std::string& inst_prefix, SimContext& ctx) {
+  ctx.RegisterFunction(key, def);
+  GenBlockSubroutineScope scope;
+  scope.inst_prefix = inst_prefix;
+  ctx.RegisterGenBlockSubroutineScope(key, std::move(scope));
+}
+
+// §25.3.2 with §25.10: the interface's variables and its parameters, the
+// `True` of `localparam True = 1;` among them, are members reached through
+// the port's name, `b.True`, so each answers under the port's prefix for the
+// connected instance's own.
+static void AliasVariableMembers(const RtlirModule* ifc,
+                                 const std::string& port_prefix,
+                                 const std::string& conn_prefix,
+                                 SimContext& ctx, Arena& arena) {
+  auto alias = [&](std::string_view name) {
+    auto* key = arena.Create<std::string>(port_prefix + std::string(name));
+    ctx.AliasVariable(*key, conn_prefix + std::string(name));
+  };
+  for (const auto& var : ifc->variables) alias(var.name);
+  for (const auto& param : ifc->params) alias(param.name);
+}
+
+// §25.5: the modport of `ifc` a port selects: the one its connection names,
+// `i1.A`, or else the one its declaration names, `I.A i`; null where neither
+// names one `ifc` declares.
+static const ModportDecl* SelectedModport(const RtlirPort& port,
+                                          const Expr* conn,
+                                          const RtlirModule* ifc,
+                                          const CompilationUnit* cu) {
+  std::string_view name;
+  if (conn != nullptr && conn->kind == ExprKind::kMemberAccess &&
+      conn->rhs != nullptr && conn->rhs->kind == ExprKind::kIdentifier) {
+    name = conn->rhs->text;
+  } else if (port.dtype != nullptr) {
+    name = port.dtype->modport_name;
+  }
+  if (name.empty() || cu == nullptr) return nullptr;
+  for (const ModuleDecl* decl : cu->interfaces) {
+    if (decl->name != ifc->name) continue;
+    for (const ModportDecl* mp : decl->modports) {
+      if (mp->name == name) return mp;
+    }
+  }
+  return nullptr;
+}
+
+// §25.5.4: each modport expression port of the modport the port `port`
+// selects, `.P(r[3:0])`, is recorded under the port's path to it,
+// "u1.i.P", with the expression and the instance it is read and written in.
+void Lowerer::RegisterModportExpressions(const RtlirPort& port,
+                                         const Expr* conn,
+                                         const RtlirModule* ifc,
+                                         const std::string& port_key,
+                                         const std::string& instance_key) {
+  const ModportDecl* modport =
+      SelectedModport(port, conn, ifc, design_->compilation_unit);
+  if (modport == nullptr) return;
+  for (const ModportPort& mp_port : modport->ports) {
+    if (!mp_port.is_named_port || mp_port.expr == nullptr) continue;
+    ctx_.RegisterModportExpression(
+        port_key + "." + std::string(mp_port.name),
+        ModportExpressionPort{mp_port.expr, instance_key + "."});
+  }
+}
+
+// §25.7.4: whether the interface `ifc` declares the task `name` extern
+// forkjoin, which more than one connected module may define.
+static bool DeclaresForkjoin(const RtlirModule* ifc, std::string_view name) {
+  for (const ModuleItem* proto : ifc->function_decls) {
+    if (proto->name == name && proto->is_extern && proto->is_forkjoin)
+      return true;
+  }
+  return false;
+}
+
+// §25.7.3: a module defines a task or function of the interface connected
+// to its port `port_name`, `task a.Read(...)`, and exports it through the
+// port's modport; the body runs in the defining instance and reads its
+// declarations. Each such body is registered under the defining instance's
+// path to it, "mem.a.Read", which a call reaches that instance's alone by
+// (§25.7.4), and under the connected instance's key, "sb_intf.Read", which a
+// call through the instance or a port bound to it resolves by. §25.7.4: a
+// task the interface declares extern forkjoin may be defined by several
+// connected modules, so each definition is added to the task's own instead,
+// and a call runs them all.
+void Lowerer::RegisterExportedSubroutines(const RtlirModuleInst& inst,
+                                          std::string_view port_name,
+                                          const RtlirModule* ifc,
+                                          const std::string& instance_key) {
+  std::string child_prefix = inst_prefix_ + std::string(inst.inst_name) + ".";
+  for (ModuleItem* def : inst.resolved->function_decls) {
+    if (def->method_class != port_name) continue;
+    std::string tail = "." + std::string(def->name);
+    auto* own = arena_.Create<std::string>(child_prefix +
+                                           std::string(port_name) + tail);
+    RegisterRunningIn(*own, def, child_prefix, ctx_);
+    if (DeclaresForkjoin(ifc, def->name)) {
+      ctx_.AddForkjoinDefinition(instance_key + tail, *own);
+    } else {
+      RegisterRunningIn(*arena_.Create<std::string>(instance_key + tail), def,
+                        child_prefix, ctx_);
+    }
+  }
+}
+
 // §25.3.2: an interface passed through a port shares its members with the
 // connected interface instance. Alias each member of the child interface port
 // (mem.a.member) onto the connected instance's member (sb_intf.member) so reads
@@ -209,27 +354,22 @@ std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
 bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
                                     const RtlirPortBinding& binding) {
   const RtlirPort* port = FindChildPort(inst, binding.port_name);
-  if (!port || !port->is_interface_port || port->interface_type_name.empty()) {
-    return false;
-  }
-  const Expr* instance = ConnectedInterfaceInstance(
-      binding.connection, port->interface_type_name, design_->compilation_unit);
-  if (instance == nullptr) return false;
-  auto it = design_->all_modules.find(port->interface_type_name);
-  if (it == design_->all_modules.end()) return false;
-  const RtlirModule* ifc = it->second;
+  if (!port || !port->is_interface_port) return false;
+  const Expr* instance = nullptr;
+  const RtlirModule* ifc =
+      ConnectedInterface(*port, binding.connection, instance);
+  if (ifc == nullptr) return false;
 
   std::string port_key = inst_prefix_ + std::string(inst.inst_name) + "." +
                          std::string(binding.port_name);
-  BindPortToInstance(port_key, ConnectedInstanceKey(instance->text), ctx_,
-                     arena_);
+  std::string instance_key = ConnectedInstanceKey(instance->text);
+  BindPortToInstance(port_key, instance_key, ctx_, arena_);
+  RegisterExportedSubroutines(inst, binding.port_name, ifc, instance_key);
+  RegisterModportExpressions(*port, binding.connection, ifc, port_key,
+                             instance_key);
   std::string port_prefix = port_key + ".";
   std::string conn_prefix = inst_prefix_ + std::string(instance->text) + ".";
-  for (const auto& var : ifc->variables) {
-    auto* alias =
-        arena_.Create<std::string>(port_prefix + std::string(var.name));
-    ctx_.AliasVariable(*alias, conn_prefix + std::string(var.name));
-  }
+  AliasVariableMembers(ifc, port_prefix, conn_prefix, ctx_, arena_);
   // A net shares one storage between its net-map entry (driver resolution)
   // and its variable-map entry (value reads). Alias both, like LowerAliases,
   // so a continuous assign driven through the port reaches the shared net and

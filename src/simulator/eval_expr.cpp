@@ -27,6 +27,7 @@
 #include "simulator/eval_string.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
+#include "simulator/modport_expression.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -756,6 +757,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (TryClockvarPathRead(expr, ctx, arena, out)) return out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
+  if (TryModportExpressionRead(expr, ctx, arena, out)) return out;
 
   if (TryObjectMemberRead(expr, ctx, arena, out)) return out;
   if (TryEvalCovergroupOptionRead(expr, ctx, arena, out)) return out;

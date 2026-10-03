@@ -239,6 +239,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/process.cpp
     simulator/variable.cpp
     simulator/virtual_interface.cpp
+    simulator/modport_expression.cpp
     simulator/eval_semaphore.cpp
     simulator/eval_class_sync.cpp
     simulator/eval_mailbox.cpp

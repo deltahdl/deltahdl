@@ -19,6 +19,7 @@ class SimContext;
 struct Expr;
 struct GenBlockSubroutineScope;
 struct ModuleItem;
+struct Stmt;
 struct Variable;
 
 // The declaration a call names and the instance its body runs in.
@@ -60,6 +61,15 @@ std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
 // declaration answers.
 SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
                                       Arena& arena);
+
+// §25.7.4: the fork-join a call of an interface's extern forkjoin task runs:
+// an enable of each definition the modules connected to the instance export,
+// by the defining instance's path, all at once, the call returning when every
+// one has; with no definition, an empty fork, the call having been reported
+// as the run-time error the clause makes it. Null for a call of any other
+// subroutine, which runs as before. Built once for a call with definitions.
+// Defined in eval_function_hier.cpp.
+const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx, Arena& arena);
 
 // Puts the running process in the instance `target` names, and in the
 // generate block instance where the target has one, keeping what it stood

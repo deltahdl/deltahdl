@@ -647,4 +647,40 @@ std::string_view DeclaredNameTables::VirtualInterfaceBinding(
   return VirtualInterfaceScope(v->value.ToUint64());
 }
 
+void DeclaredNameTables::DeclareForkjoinTask(std::string_view key) {
+  forkjoin_tasks_[std::string(key)];
+}
+
+void DeclaredNameTables::AddForkjoinDefinition(std::string_view key,
+                                               std::string_view definition) {
+  forkjoin_tasks_[std::string(key)].push_back(definition);
+}
+
+const std::vector<std::string_view>* DeclaredNameTables::FindForkjoinTask(
+    std::string_view key) const {
+  auto it = forkjoin_tasks_.find(std::string(key));
+  return it != forkjoin_tasks_.end() ? &it->second : nullptr;
+}
+
+const Stmt* DeclaredNameTables::FindForkjoinCall(const Expr* call) const {
+  auto it = forkjoin_calls_.find(call);
+  return it != forkjoin_calls_.end() ? it->second : nullptr;
+}
+
+void DeclaredNameTables::RecordForkjoinCall(const Expr* call,
+                                            const Stmt* fork) {
+  forkjoin_calls_[call] = fork;
+}
+
+void DeclaredNameTables::RegisterModportExpression(std::string key,
+                                                   ModportExpressionPort port) {
+  modport_expressions_[std::move(key)] = std::move(port);
+}
+
+const ModportExpressionPort* DeclaredNameTables::FindModportExpression(
+    std::string_view key) const {
+  auto it = modport_expressions_.find(std::string(key));
+  return it != modport_expressions_.end() ? &it->second : nullptr;
+}
+
 }  // namespace delta

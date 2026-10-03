@@ -1,13 +1,16 @@
 #include "simulator/eval_function_hier.h"
 
 #include <cstdint>
+#include <format>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -194,7 +197,8 @@ const Expr* DottedCallee(const Expr* call) {
 // through any name that denotes an instance of it -- a virtual interface,
 // `v.add(20)`, a class's `vif.write(88)` or `C::vif.add(2)`, or an interface
 // port, `b.hit(10)` -- so the callee is the subroutine registered under the
-// key of the instance that name denotes, and its body runs in that instance.
+// key of the instance that name denotes, and its body runs in that instance,
+// or, for one a connected module exports (§25.7.3), in that module.
 // Answers true with `target` filled where the head of the callee is such a
 // name and the instance declares the subroutine, and where the head is a
 // virtual interface representing no instance, which §25.9 makes a fatal
@@ -217,11 +221,13 @@ bool TryInterfaceInstanceCallee(const Expr* call, SimContext& ctx, Arena& arena,
                                           std::string(callee->lhs->text));
   }
   if (scope.empty()) return false;
-  ModuleItem* func =
-      ctx.FindFunction(scope + "." + std::string(callee->rhs->text));
+  std::string key = scope + "." + std::string(callee->rhs->text);
+  ModuleItem* func = ctx.FindFunction(key);
   if (func == nullptr) return false;
   target.func = func;
   target.inst_prefix = scope + ".";
+  // §25.7.3: a body a connected module exports runs in that module.
+  ApplyGenBlockScope(key, ctx, target);
   return true;
 }
 
@@ -326,6 +332,56 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // hierarchy or from anywhere in the design.
   if (is_hierarchical) ResolveTopHeadedPath(path, ctx, target);
   return target;
+}
+
+// §25.7.4: the fork-join a call of the extern forkjoin task `func`, whose
+// definitions are recorded under `key`, behaves as: one enable of each
+// definition by its defining instance's path, `top.mem1.a.countTargets;`,
+// passing the call's own arguments. With no definition the fork holds no
+// process, and the call is reported.
+static const Stmt* BuildForkjoinCall(const Expr* call, const ModuleItem* func,
+                                     const std::vector<std::string_view>& defs,
+                                     SimContext& ctx, Arena& arena) {
+  auto* fork = arena.Create<Stmt>();
+  fork->kind = StmtKind::kFork;
+  fork->range = call->range;
+  fork->join_kind = TokenKind::kKwJoin;
+  if (defs.empty()) {
+    ctx.GetDiag().Error(
+        call->range.start,
+        std::format("extern forkjoin task '{}' is defined by no module "
+                    "connected to the interface",
+                    func->name),
+        Subclause("25.7.4"));
+  }
+  for (std::string_view def : defs) {
+    auto* each = arena.Create<Expr>();
+    each->kind = ExprKind::kCall;
+    each->range = call->range;
+    each->callee = def;
+    if (call->kind == ExprKind::kCall) each->args = call->args;
+    auto* stmt = arena.Create<Stmt>();
+    stmt->kind = StmtKind::kExprStmt;
+    stmt->range = call->range;
+    stmt->expr = each;
+    fork->fork_stmts.push_back(stmt);
+  }
+  return fork;
+}
+
+const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx,
+                               Arena& arena) {
+  if (call == nullptr || !ctx.HasForkjoinTasks()) return nullptr;
+  if (const Stmt* built = ctx.FindForkjoinCall(call)) return built;
+  SubroutineTarget target = FindSubroutineTarget(call, ctx, arena);
+  const ModuleItem* func = target.func;
+  if (func == nullptr || !func->is_extern || !func->is_forkjoin) return nullptr;
+  const std::vector<std::string_view>* defs =
+      ctx.FindForkjoinTask(target.inst_prefix + std::string(func->name));
+  if (defs == nullptr) return nullptr;
+  const Stmt* fork = BuildForkjoinCall(call, func, *defs, ctx, arena);
+  if (!defs->empty()) ctx.RecordForkjoinCall(call, fork);
+  return fork;
 }
 
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {

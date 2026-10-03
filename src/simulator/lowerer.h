@@ -350,6 +350,16 @@ class Lowerer {
   bool TryAliasInterfacePort(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding);
   std::string ConnectedInstanceKey(std::string_view name) const;
+  const RtlirModule* ConnectedInterface(const RtlirPort& port, const Expr* conn,
+                                        const Expr*& instance) const;
+  void RegisterModportExpressions(const RtlirPort& port, const Expr* conn,
+                                  const RtlirModule* ifc,
+                                  const std::string& port_key,
+                                  const std::string& instance_key);
+  void RegisterExportedSubroutines(const RtlirModuleInst& inst,
+                                   std::string_view port_name,
+                                   const RtlirModule* ifc,
+                                   const std::string& instance_key);
 
   SimContext& ctx_;
   Arena& arena_;

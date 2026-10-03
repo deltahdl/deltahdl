@@ -18,6 +18,7 @@
 #include "simulator/class_event_property.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/eval_call_result.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
@@ -610,6 +611,11 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   // coroutine too, so its timing controls suspend this process.
   if (enables_task) {
     co_return co_await ExecInstanceTaskCall(instance_call, expr, ctx, arena);
+  }
+  // §25.7.4: an interface's extern forkjoin task runs every definition its
+  // connected modules export, as a fork-join of their enables.
+  if (const Stmt* fork = ExternForkjoinCall(expr, ctx, arena)) {
+    co_return co_await ExecStmt(fork, ctx, arena);
   }
   auto* func = ctx.EnterSubroutinePackage(SetupTaskCall(expr, ctx, arena));
   if (!func) {

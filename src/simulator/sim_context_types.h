@@ -16,6 +16,7 @@
 #include "simulator/variable.h"
 
 namespace delta {
+struct Expr;
 struct ModuleItem;
 struct Process;
 
@@ -47,6 +48,13 @@ struct EnumMemberInfo {
 // instance the block is in, as Process::inst_prefix spells it; `gen_prefixes`
 // is the block instance's name prefixes as Process::gen_prefixes holds them;
 // and `consts` is each loop's localparam, name and value.
+// §25.5.4: what a modport expression port stands for; see
+// DeclaredNameTables::RegisterModportExpression.
+struct ModportExpressionPort {
+  const Expr* expr = nullptr;
+  std::string instance_prefix;
+};
+
 struct GenBlockSubroutineScope {
   std::string inst_prefix;
   std::vector<std::string> gen_prefixes;

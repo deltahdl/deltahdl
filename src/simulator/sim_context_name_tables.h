@@ -39,9 +39,11 @@
 
 namespace delta {
 
+struct Expr;
 struct MailboxObject;
 struct ModuleItem;
 struct SemaphoreObject;
+struct Stmt;
 
 class DeclaredNameTables {
  public:
@@ -67,6 +69,33 @@ class DeclaredNameTables {
                                        GenBlockSubroutineScope scope);
   const GenBlockSubroutineScope* FindGenBlockSubroutineScope(
       std::string_view key) const;
+
+  // §25.7.4: an extern forkjoin task of an interface instance, under the key
+  // the instance's subroutines are registered by, "sb_intf.countTargets",
+  // and the keys of the definitions the modules connected to the instance
+  // export for it, each under its defining instance's path,
+  // "mem1.a.countTargets", in the order the instances are lowered.
+  // DeclareForkjoinTask records the prototype and AddForkjoinDefinition a
+  // definition, whose key must outlive the context; FindForkjoinTask answers
+  // null for a key neither recorded.
+  void DeclareForkjoinTask(std::string_view key);
+  void AddForkjoinDefinition(std::string_view key, std::string_view definition);
+  const std::vector<std::string_view>* FindForkjoinTask(
+      std::string_view key) const;
+  bool HasForkjoinTasks() const { return !forkjoin_tasks_.empty(); }
+  // The fork-join statement a call of such a task runs, built once per call.
+  const Stmt* FindForkjoinCall(const Expr* call) const;
+  void RecordForkjoinCall(const Expr* call, const Stmt* fork);
+
+  // §25.5.4: a modport expression port, `.P(r[3:0])`, as a module connected
+  // through the modport names it, under the port's path, "u1.i.P", with the
+  // expression it stands for and the prefix of the interface instance the
+  // expression is read and written in, "i1.". FindModportExpression answers
+  // null for a path no such port is registered under.
+  void RegisterModportExpression(std::string key, ModportExpressionPort port);
+  const ModportExpressionPort* FindModportExpression(
+      std::string_view key) const;
+  bool HasModportExpressions() const { return !modport_expressions_.empty(); }
 
   void RegisterLetDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindLetDecl(std::string_view name);
@@ -388,6 +417,12 @@ class DeclaredNameTables {
   // §27.4 with §13.4: see RegisterGenBlockSubroutineScope.
   std::unordered_map<std::string_view, GenBlockSubroutineScope>
       gen_block_subroutine_scopes_;
+  // §25.7.4: see DeclareForkjoinTask.
+  std::unordered_map<std::string, std::vector<std::string_view>>
+      forkjoin_tasks_;
+  std::unordered_map<const Expr*, const Stmt*> forkjoin_calls_;
+  // §25.5.4: see RegisterModportExpression.
+  std::unordered_map<std::string, ModportExpressionPort> modport_expressions_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::unordered_map<std::string_view, ModuleItem*> property_decls_;

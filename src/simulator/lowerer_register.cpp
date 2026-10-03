@@ -407,6 +407,9 @@ void RegisterInstanceSubroutines(const RtlirModule* mod,
     auto* key =
         arena.Create<std::string>(inst_prefix + std::string(func->name));
     ctx.RegisterFunction(*key, func);
+    // §25.7.4: an interface's extern forkjoin task is run through the
+    // definitions its connected modules export, which wait on the prototype.
+    if (func->is_extern && func->is_forkjoin) ctx.DeclareForkjoinTask(*key);
   }
 }
 
