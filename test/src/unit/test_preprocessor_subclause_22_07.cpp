@@ -421,4 +421,29 @@ TEST(Preprocessor, Timescale_RecordedUnderTheHeadersName) {
   }
 }
 
+// §22.7 sets the scale of every design element after the directive, a package
+// among them (§3.2), so a package's header is recorded too, marked as a
+// package's: packages have a name space of their own (§3.13), and a module of
+// the same name is another element.
+TEST(Preprocessor, Timescale_RecordedAtAPackagesHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "package automatic p;\nendpackage\n"
+      "`timescale 1ns / 1ps\n"
+      "module p;\nendmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_EQ(list[0].module, "p");
+  EXPECT_TRUE(list[0].is_package);
+  EXPECT_TRUE(list[0].has_timescale);
+  EXPECT_EQ(list[0].timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(list[1].module, "p");
+  EXPECT_FALSE(list[1].is_package);
+  EXPECT_EQ(list[1].timescale.unit, TimeUnit::kNs);
+}
+
 }  // namespace

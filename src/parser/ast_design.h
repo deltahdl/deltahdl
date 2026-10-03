@@ -223,11 +223,15 @@ inline void MarkCellModules(CompilationUnit* cu,
 }
 
 // The directives the preprocessor recorded at the header of the design element
-// named `name`, or null when it recorded none there.
+// named `name`, a package's when `is_package` is set and a module's,
+// interface's or program's otherwise, or null when it recorded none there.
+// Packages have a name space of their own (§3.13), so a package and a module
+// may share a name and are told apart by kind.
 inline const ModuleDirectives* DirectivesAtHeader(
-    std::string_view name, const std::vector<ModuleDirectives>& directives) {
+    std::string_view name, const std::vector<ModuleDirectives>& directives,
+    bool is_package = false) {
   for (const auto& d : directives) {
-    if (name == d.module) return &d;
+    if (name == d.module && d.is_package == is_package) return &d;
   }
   return nullptr;
 }
@@ -250,8 +254,8 @@ inline void ApplyModuleDirectives(
     mod->has_default_trireg_strength = d->has_strength;
     mod->delay_mode = d->delay_mode;
   }
-  // §22.7: the `timescale in force at a module's, interface's or program's
-  // header is the one it takes.
+  // §22.7: the `timescale in force at a design element's header is the one it
+  // takes.
   for (const auto* list : {&cu->modules, &cu->interfaces, &cu->programs}) {
     for (auto* mod : *list) {
       const ModuleDirectives* d = DirectivesAtHeader(mod->name, directives);
@@ -259,6 +263,13 @@ inline void ApplyModuleDirectives(
       mod->has_directive_timescale = d->has_timescale;
       mod->directive_timescale = d->timescale;
     }
+  }
+  // §3.2 counts a package among the design elements the directive governs.
+  for (auto* pkg : cu->packages) {
+    const ModuleDirectives* d = DirectivesAtHeader(pkg->name, directives, true);
+    if (d == nullptr) continue;
+    pkg->has_directive_timescale = d->has_timescale;
+    pkg->directive_timescale = d->timescale;
   }
 }
 

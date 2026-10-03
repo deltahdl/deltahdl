@@ -269,6 +269,100 @@ TEST(TimescalePrecedenceElaboration, PackageDeclaringNeitherFollowsTimescale) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §3.14.2.3 b): a package that declares only its unit takes the precision of
+// the `timescale before it, 1 ns here, coarser than its 1 ps unit, which §3.14
+// makes an error. The package was skipped and the design accepted.
+TEST(TimescalePrecedenceElaboration, PackageTakesThePrecisionBeforeIt) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "`timescale 1ns / 1ns\n"
+      "package p;\n"
+      "  timeunit 1ps;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            2, "3.14"));
+}
+
+// Packages and modules have name spaces of their own (§3.13), so a package and
+// a module may share a name, and each takes the `timescale before its own
+// header: the package 1 ns / 1 ns under its 1 ns unit, the module 1 ps / 1 ps
+// under its 1 ps unit, both legal. Given the package's directive, the module
+// would run at a 1 ns precision under its 1 ps unit and be rejected.
+TEST(TimescalePrecedenceElaboration, PackageAndModuleOfOneNameTakeTheirOwn) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "`timescale 1ns / 1ns\n"
+      "package m;\n"
+      "  timeunit 1ns;\n"
+      "endpackage\n"
+      "`timescale 1ps / 1ps\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §3.14.2.3 b) takes the `timescale that precedes an element, so a package
+// before the compilation unit's only `timescale specifies neither value, while
+// the module after it specifies both: the mix the clause forbids, reported at
+// the package. It was counted as specified because a `timescale stood anywhere.
+TEST(TimescalePrecedenceElaboration, PackageBeforeEveryTimescaleIsUnspecified) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "package p;\n"
+      "endpackage\n"
+      "`timescale 1ns / 1ps\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            1, "3.14.2.3"));
+}
+
+// The same of a module: one before the only `timescale is unspecified beside
+// one after it.
+TEST(TimescalePrecedenceElaboration, ModuleBeforeEveryTimescaleIsUnspecified) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "module a;\n"
+      "endmodule\n"
+      "`timescale 1ns / 1ps\n"
+      "module b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            1, "3.14.2.3"));
+}
+
+// A package that declares both of its own is specified whatever header record
+// the preprocessor kept for it, and it keeps none for a header after an
+// attribute instance (#4892), so this one is judged by its own 1 ns / 1 ps.
+TEST(TimescalePrecedenceElaboration,
+     AttributedPackageDeclaringBothIsSpecified) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocAndCu(
+      "`timescale 1ns / 1ps\n"
+      "(* keep *) package p;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(TimescalePrecedenceElaboration, UniformPackageAndModuleAcceptable) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocAndCu(

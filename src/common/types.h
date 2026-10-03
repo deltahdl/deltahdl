@@ -270,6 +270,9 @@ struct ModuleDirectives {
   // sets the element's time unit and precision where it declares neither.
   bool has_timescale = false;
   TimeScale timescale;
+  // Whether the header is a package's, whose name lives in a name space apart
+  // from that of modules, interfaces and programs (§3.13).
+  bool is_package = false;
 };
 
 // Which member of a min:typ:max expression is selected. §11.11 orders the
