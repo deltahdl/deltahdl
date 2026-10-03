@@ -471,6 +471,23 @@ static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
   return dims[std::min<size_t>(dim - 1, dims.size() - 1)];
 }
 
+// The bounds of the dim-th unpacked dimension, which the argument has: one of
+// an associative array, a queue or dynamic array, or a fixed-size array, the
+// last in `info.arr` when none of the others answers.
+static QueryDimBounds UnpackedQueryDimBounds(const QueryArgInfo& info,
+                                             uint32_t dim) {
+  if (info.element_queue != nullptr)
+    return ElementQueueShapeDimBounds(info, dim);
+  if (dim == 2 && info.queue != nullptr && info.queue->element_array_size > 0) {
+    return ElementArrayDimBounds(info.queue);
+  }
+  if (info.assoc) return AssocDimBounds(info.assoc);
+  if (info.dynamic_outer) return DynamicDimBounds(info);
+  if (info.arr->dim_sizes.size() >= 2)
+    return MultiDimUnpackedDimBounds(info.arr, dim);
+  return FixedUnpackedDimBounds(info.arr);
+}
+
 // Compute the bounds reported for the queried dimension. Dimensions are
 // numbered slowest-varying first: dimensions 1..unpacked_dims are the unpacked
 // dimensions (outermost first) and the packed element dimension, when present,
@@ -478,19 +495,7 @@ static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
 static QueryDimBounds ComputeQueryDimBounds(const QueryArgInfo& info,
                                             uint32_t dim,
                                             uint32_t unpacked_dims) {
-  if (dim <= unpacked_dims) {
-    if (info.element_queue != nullptr)
-      return ElementQueueShapeDimBounds(info, dim);
-    if (dim == 2 && info.queue != nullptr &&
-        info.queue->element_array_size > 0) {
-      return ElementArrayDimBounds(info.queue);
-    }
-    if (info.assoc) return AssocDimBounds(info.assoc);
-    if (info.dynamic_outer) return DynamicDimBounds(info);
-    if (info.arr && info.arr->dim_sizes.size() >= 2)
-      return MultiDimUnpackedDimBounds(info.arr, dim);
-    if (info.arr) return FixedUnpackedDimBounds(info.arr);
-  }
+  if (dim <= unpacked_dims) return UnpackedQueryDimBounds(info, dim);
   if (!info.packed_dims.empty()) {
     return PackedDimBounds(info.packed_dims[std::min<size_t>(
         dim - unpacked_dims - 1, info.packed_dims.size() - 1)]);
