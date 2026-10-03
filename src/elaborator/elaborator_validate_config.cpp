@@ -123,7 +123,9 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
     if (!config_names.try_emplace({cfg->library, cfg->name}, cfg->range)
              .second) {
       diag.Error(cfg->range.start,
-                 std::format("duplicate definition of '{}'", cfg->name),
+                 std::format("duplicate definition of '{}': a config shares "
+                             "the name space of the design elements",
+                             cfg->name),
                  Subclause("33.2"));
     }
   }
