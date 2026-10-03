@@ -428,4 +428,83 @@ TEST(ParameterizedClassSim, APackedDimensionSizedByATypeParameterFollowsIt) {
             "8 16\n");
 }
 
+// §6.20.1 with §8.25: a parameter among a class's items declared with an
+// unpacked dimension is an array the class holds once, so its elements read
+// from its pattern through the class scope and from a static method alike.
+TEST(ParameterizedClassSim, BodyParameterArrayHoldsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C;\n"
+                 "  parameter int A[2] = '{1, 2};\n"
+                 "  static function int second(); return A[1]; "
+                 "endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  initial $display(\"%0d %0d\", C::A[0], C::second());\n"
+                 "endmodule\n",
+                 f),
+      "1 2\n");
+}
+
+// Two unpacked dimensions take a nested pattern, read from an object's method.
+TEST(ParameterizedClassSim, BodyParameterArrayOfTwoDimensions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  localparam int M[2][2] = '{'{1, 2}, '{3, 4}};\n"
+                       "  function int at(); return M[1][0]; endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C c = new;\n"
+                       "  initial $display(\"%0d\", c.at());\n"
+                       "endmodule\n",
+                       f),
+            "3\n");
+}
+
+// Each specialization holds its own elements, filled with its own value
+// parameters bound, so P#(5) reads 6 where P#() reads 2.
+TEST(ParameterizedClassSim, BodyParameterArrayFollowsTheSpecialization) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class P #(int N = 1);\n"
+                       "  localparam int A[2] = '{N, N + 1};\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d %0d\", P#(5)::A[1], "
+                       "P#()::A[1]);\n"
+                       "endmodule\n",
+                       f),
+            "6 2\n");
+}
+
+// §8.25 with §6.20.1: a parameter port declared with unpacked dimensions is an
+// array too, its elements filled from its default and read through the class
+// scope and from a static method of the default specialization.
+TEST(ParameterizedClassSim, PortParameterArrayHoldsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(parameter int A[2] = '{1, 2});\n"
+                       "  static function int second(); return A[1]; "
+                       "endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d %0d\", C#()::A[0], "
+                       "C#()::second());\n"
+                       "endmodule\n",
+                       f),
+            "1 2\n");
+}
+
+// A specialization's actual for the array is its value, item by item, and one
+// overriding only another parameter keeps the array's default.
+TEST(ParameterizedClassSim, PortParameterArrayTakesTheActual) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(parameter int A[2] = '{1, 2}, int W = 3);\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d %0d\", C#('{5, 6})::A[1], "
+                       "C#(.W(4))::A[1]);\n"
+                       "endmodule\n",
+                       f),
+            "6 2\n");
+}
+
 }  // namespace

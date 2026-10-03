@@ -324,6 +324,8 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   // parameter's declared type (ClassParamSizer).
   ClassParamSizer sizer(cls->decl);
   for (size_t i = 0; i < params.size(); ++i) {
+    // §6.20.1: a local would shadow a port array's element storage.
+    if (cls->decl->param_port_unpacked_dims.count(params[i].first)) continue;
     Logic4Vec val;
     if (i < values.size()) {
       val = sizer.Value(i, values[i], ctx, arena);

@@ -230,7 +230,11 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
 static void BindStaticInitValueParams(const ClassTypeInfo* info,
                                       SimContext& ctx) {
   for (const auto& [pname, pexpr] : info->decl->params) {
-    if (info->decl->type_param_names.count(pname) != 0) continue;
+    // §6.20.1: a parameter port array is read element by element from the
+    // class's storage, which a local of its name would shadow.
+    if (info->decl->type_param_names.count(pname) != 0 ||
+        info->decl->param_port_unpacked_dims.count(pname) != 0)
+      continue;
     auto entry = info->static_properties.find(std::string(pname));
     if (entry == info->static_properties.end()) continue;
     auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
@@ -539,6 +543,24 @@ static ClassTypeInfo::PropertyInfo* OwnProperty(ClassTypeInfo* info,
   return nullptr;
 }
 
+// The array shape the unpacked dimensions `dims` give the property `name`:
+// one fixed or dynamic dimension marked on it (MarkArrayProperty), or the
+// extents of more than one (FoldMultiDimExtents), folded in `scope`.
+static void ShapeArrayProperty(ClassTypeInfo* info, std::string_view name,
+                               const std::vector<Expr*>& dims,
+                               const ScopeMap& scope, SimContext& ctx,
+                               Arena& arena) {
+  if (dims.size() > 1)
+    FoldMultiDimExtents(dims, scope, ctx, arena, OwnProperty(info, name));
+  if (dims.size() != 1) return;
+  const bool kDynamic = dims[0] == nullptr;
+  PropertyArrayDim dim =
+      kDynamic ? PropertyArrayDim{}
+               : FoldPropertyDimension(dims[0], scope, ctx, arena);
+  if (dim.size == 0 && !kDynamic) return;
+  MarkArrayProperty(info, name, dim, kDynamic);
+}
+
 // §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
 // dynamic unpacked dimension as the array it is, so the object holds its
 // elements one by one and a constraint can iterate over them or reduce them.
@@ -556,19 +578,45 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
   for (const auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kProperty) continue;
     const ModuleItem* item = PropertyTypedefItem(member, info, ctx);
-    const std::vector<Expr*>& dims =
-        item != nullptr ? item->unpacked_dims : member->unpacked_dims;
-    if (dims.size() > 1) {
-      FoldMultiDimExtents(dims, scope, ctx, arena,
-                          OwnProperty(info, member->name));
-    }
-    if (dims.size() != 1) continue;
-    const bool kDynamic = dims[0] == nullptr;
-    PropertyArrayDim dim =
-        kDynamic ? PropertyArrayDim{}
-                 : FoldPropertyDimension(dims[0], scope, ctx, arena);
-    if (dim.size == 0 && !kDynamic) continue;
-    MarkArrayProperty(info, member->name, dim, kDynamic);
+    ShapeArrayProperty(
+        info, member->name,
+        item != nullptr ? item->unpacked_dims : member->unpacked_dims, scope,
+        ctx, arena);
+  }
+}
+
+// §6.20.1 with §8.25: a class parameter declared with unpacked dimensions is
+// an array the class holds once rather than each object, so its record is
+// static: CreateStaticProperties gives it its elements in the class's static
+// map and InitStaticProperty fills them from its assignment pattern, in the
+// frame where a specialization's value parameters are bound. A parameter port
+// has no member to record it, so its record is made here, shaped as a
+// member's is (ShapeArrayProperty). The scalar StoreClassParam keeps under
+// the name is no element of either.
+static void MakeParamArraysStatic(ClassTypeInfo* info, const ClassDecl* cls,
+                                  const ScopeMap& constants, SimContext& ctx,
+                                  Arena& arena) {
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kProperty || !member->is_param)
+      continue;
+    ClassTypeInfo::PropertyInfo* prop = OwnProperty(info, member->name);
+    if (prop->IsArray() || prop->dim_sizes.size() >= 2) prop->is_static = true;
+  }
+  ScopeMap scope = ClassParamScope(cls, constants);
+  for (size_t i = 0; i < cls->params.size(); ++i) {
+    const auto& [pname, pexpr] = cls->params[i];
+    auto dims = cls->param_port_unpacked_dims.find(pname);
+    if (dims == cls->param_port_unpacked_dims.end()) continue;
+    auto* port = arena.Create<ClassMember>();
+    port->kind = ClassMemberKind::kProperty;
+    port->name = pname;
+    port->data_type = cls->param_types[i];
+    port->init_expr = pexpr;
+    port->is_static = true;
+    info->properties.push_back(PropertyRecord(
+        port, scope, PropertyTypeKey(port->data_type, *info, *cls, scope, ctx),
+        ctx));
+    ShapeArrayProperty(info, pname, dims->second, scope, ctx, arena);
   }
 }
 
@@ -586,7 +634,8 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
   // §6.20: parameters supplied through the class's parameter port list.
   for (size_t i = 0; i < cls->params.size(); ++i) {
     const auto& [pname, pexpr] = cls->params[i];
-    info->properties.push_back({pname, 32, false});
+    if (OwnProperty(info, pname) == nullptr)
+      info->properties.push_back({pname, 32, false});
     StoreClassParam(info, pname,
                     pexpr ? sizer.Value(i, pexpr, ctx, arena)
                           : MakeLogic4VecVal(arena, 32, 0));
@@ -726,6 +775,7 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   CollectClassMembers(info, cls, scope.constants, ctx);
   AttachScopeMethodBodies(info, cls, scope.items);
   RecordArrayProperties(info, cls, scope.constants, ctx, arena);
+  MakeParamArraysStatic(info, cls, scope.constants, ctx, arena);
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);

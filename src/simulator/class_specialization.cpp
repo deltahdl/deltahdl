@@ -804,6 +804,24 @@ PropertyArrayDim FoldPropertyDimension(const Expr* dim, const ScopeMap& scope,
   return {static_cast<uint32_t>(left - right + 1), right, left > right};
 }
 
+// §8.25 with §6.20.1: a parameter port array's elements are filled from the
+// specialization's actual, an assignment pattern, as the default fills the
+// generic class's (MakeParamArraysStatic in lowerer_class.cpp), so the copy of
+// its record the specialization owns is pointed at that pattern.
+static void TakeParamArrayActuals(ClassTypeInfo* spec,
+                                  const std::vector<DataType>& spelled) {
+  const ClassDecl* decl = spec->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->param_port_unpacked_dims.count(pname) == 0) continue;
+    const DataType* actual = ActualForParam(spelled, i, pname);
+    if (actual == nullptr) continue;
+    for (auto& prop : spec->properties) {
+      if (prop.name == pname) prop.init_expr = actual->type_ref_expr;
+    }
+  }
+}
+
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
                                 SimContext& ctx, Arena& arena) {
@@ -838,6 +856,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
   SizeValueParamProperties(spec, values, spelled, ctx, arena);
+  TakeParamArrayActuals(spec, spelled);
   // The values are the specialization's before its base is bound, since an
   // extends clause's list may name them, `extends Mem #(.K(W))`.
   for (auto& [pname, value] : values)
