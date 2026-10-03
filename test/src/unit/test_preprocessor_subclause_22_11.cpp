@@ -7,12 +7,17 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 
@@ -881,6 +886,58 @@ TEST(PragmaMacroInput, MacroSuppliesNonIdentifierName_Rejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`pragma pragma_name must be a simple identifier",
                             2, "22.11"));
+}
+
+// The encrypting half (EncryptEnvelopes) refuses a region's `pragma protect
+// line the §22.11 grammar rejects, as a compiling run does: the same report at
+// the same line, and nothing it says in the envelope. It read such a line with
+// a scanner of its own, writing data_keyname=""k1" and taking base64 from an
+// encoding list no compiling run accepts.
+TEST(Preprocessor, EncryptingHalfRefusesALineTheGrammarRejects) {
+  struct Case {
+    std::string_view line;
+    std::string_view message;
+    std::string_view stray;
+  };
+  for (const Case& c : {
+           Case{"`pragma protect data_keyowner=\"acme\n",
+                "`pragma directive contains an illegal token", "=\"acme"},
+           Case{"`pragma protect data_keyname=\"k1\n",
+                "`pragma directive contains an illegal token", "\"k1"},
+           Case{"`pragma protect encoding=(enctype=\"base64\", line_length=)\n",
+                "malformed pragma_expression after pragma_name", "\"base64\""},
+           Case{"`pragma protect encoding=(enctype=\"base64\", "
+                "line_length=8))\n",
+                "malformed pragma_expression after pragma_name", "\"base64\""},
+       }) {
+    std::string src = "`pragma protect begin\n";
+    src.append(c.line).append("module m; endmodule\n`pragma protect end\n");
+    SourceManager mgr;
+    DiagEngine diag(mgr);
+    std::string envelope = EncryptEnvelopes(src, "k", ProtectKeyList(), &diag,
+                                            mgr.AddFile("<test>", src));
+    EXPECT_TRUE(ReportedError(diag.Diagnostics(), c.message, 2, "22.11"))
+        << c.line;
+    EXPECT_EQ(envelope.find(c.stray), std::string::npos) << envelope;
+  }
+  // Outside a region the line is text no envelope holds, carried across as
+  // written once reported.
+  std::string src = "`pragma protect data_keyowner=\"acme\n";
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_EQ(EncryptEnvelopes(src, "k", ProtectKeyList(), &diag,
+                             mgr.AddFile("<test>", src)),
+            src);
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
+  // A macro usage is substituted before a compiling run's grammar reads the
+  // line, which this half cannot do, so such a line is not reported.
+  std::string usage = "`pragma protect `NAMES\n";
+  DiagEngine quiet(mgr);
+  EncryptEnvelopes(usage, "k", ProtectKeyList(), &quiet,
+                   mgr.AddFile("<usage>", usage));
+  EXPECT_FALSE(quiet.HasErrors());
 }
 
 }  // namespace

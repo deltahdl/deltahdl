@@ -231,9 +231,10 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
 // One id is kept per name rather than one per directive, because a
 // machine-generated source carries a `line on many of its lines and
 // registering each would leave SourceManager holding one entry per directive.
+//
+// The empty name `""` is a name too, a string literal §22.12 makes the file's
+// name like any other, so it is registered as one.
 void Preprocessor::TakeLineFileOverrideId() {
-  line_file_override_id_ = 0;
-  if (line_file_override_.empty()) return;
   auto it = line_file_override_ids_.find(line_file_override_);
   if (it == line_file_override_ids_.end()) {
     it = line_file_override_ids_

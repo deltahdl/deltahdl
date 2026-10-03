@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "preprocessor/preprocessor.h"
@@ -11,21 +12,6 @@
 // (§22.7, Annex E) and, inside `celldefine, its cell mark (§22.10).
 
 namespace delta {
-
-static std::string_view ExtractModuleName(std::string_view trimmed,
-                                          std::string_view keyword) {
-  auto rest = trimmed.substr(keyword.size());
-
-  if (rest.starts_with("automatic ")) rest = rest.substr(10);
-  // Every caller hands a trimmed line, whose last character is not white
-  // space, so the skip stops before the text runs out.
-  while (rest[0] == ' ' || rest[0] == '\t') rest.remove_prefix(1);
-  size_t end = 0;
-  while (end < rest.size() && rest[end] != ' ' && rest[end] != '\t' &&
-         rest[end] != '(' && rest[end] != ';' && rest[end] != '#')
-    ++end;
-  return rest.substr(0, end);
-}
 
 // Returns the leading whitespace-delimited word of `trimmed`.
 static std::string_view FirstWord(std::string_view trimmed) {
@@ -43,26 +29,54 @@ static bool StartsWithWord(std::string_view rest, std::string_view word) {
   return rest.size() == word.size() || !IsIdentChar(rest[word.size()]);
 }
 
+// §23.2.2.1 (Syntax 23-2) with A.2.1.3 and §5.3: what follows a header's
+// keyword `word`, past any white space -- a tab and a formfeed are as much a
+// separator as a space -- and past an optional lifetime, `static` or
+// `automatic`, and the white space after it: the identifier the header
+// declares, and whatever comes after it.
+static std::string_view PastHeaderKeyword(std::string_view trimmed,
+                                          std::string_view word) {
+  std::string_view rest = Preprocessor::Trim(trimmed.substr(word.size()));
+  for (std::string_view lifetime : {"static", "automatic"}) {
+    if (StartsWithWord(rest, lifetime))
+      rest = Preprocessor::Trim(rest.substr(lifetime.size()));
+  }
+  return rest;
+}
+
+// The identifier a header whose keyword is `word` declares: up to the white
+// space, port list, parameter list or semicolon after it.
+static std::string_view HeaderName(std::string_view trimmed,
+                                   std::string_view word) {
+  std::string_view rest = PastHeaderKeyword(trimmed, word);
+  size_t end = 0;
+  while (end < rest.size() &&
+         !std::isspace(static_cast<unsigned char>(rest[end])) &&
+         rest[end] != '(' && rest[end] != ';' && rest[end] != '#')
+    ++end;
+  return rest.substr(0, end);
+}
+
 // §3.2 names the design elements: module, macromodule, program, interface,
 // checker, package, primitive, and configuration. The keyword is matched as
 // the line's first word so that any whitespace may separate it from the name
 // that follows, and something must follow — a keyword standing alone on a line
 // names no element. An interface class is a class rather than an interface —
 // it is closed by endclass, not endinterface — so it opens no design element.
-static bool IsDesignElementStart(std::string_view trimmed) {
+static bool IsDesignElementKeyword(std::string_view word) {
   static constexpr std::string_view kKeywords[] = {
       "module",  "macromodule", "program",   "interface",
       "checker", "package",     "primitive", "config",
   };
-  auto word = FirstWord(trimmed);
-  bool is_keyword = false;
   for (auto keyword : kKeywords) {
-    if (word == keyword) {
-      is_keyword = true;
-      break;
-    }
+    if (word == keyword) return true;
   }
-  if (!is_keyword) return false;
+  return false;
+}
+
+static bool IsDesignElementStart(std::string_view trimmed) {
+  auto word = FirstWord(trimmed);
+  if (!IsDesignElementKeyword(word)) return false;
 
   auto rest = Preprocessor::Trim(trimmed.substr(word.size()));
   if (rest.empty()) return false;
@@ -133,13 +147,10 @@ static size_t PastDesignElementEnd(std::string_view text) {
 
 static void TrackCellModuleName(std::string_view trimmed,
                                 std::vector<std::string>& cell_module_names) {
-  if (trimmed.starts_with("module ")) {
-    auto name = ExtractModuleName(trimmed, "module ");
-    if (!name.empty()) cell_module_names.emplace_back(name);
-  } else if (trimmed.starts_with("macromodule ")) {
-    auto name = ExtractModuleName(trimmed, "macromodule ");
-    if (!name.empty()) cell_module_names.emplace_back(name);
-  }
+  std::string_view word = FirstWord(trimmed);
+  if (word != "module" && word != "macromodule") return;
+  std::string_view name = HeaderName(trimmed, word);
+  if (!name.empty()) cell_module_names.emplace_back(name);
 }
 
 // The design element a header line declares, with an empty name for a header
@@ -155,17 +166,28 @@ struct DeclaredElement {
 }  // namespace
 
 static DeclaredElement DeclaredElementAt(std::string_view trimmed) {
+  std::string_view word = FirstWord(trimmed);
+  if (word == "package") return {HeaderName(trimmed, word), true};
   for (std::string_view keyword :
-       {"module ", "macromodule ", "interface ", "program "}) {
-    if (trimmed.starts_with(keyword))
-      return {ExtractModuleName(trimmed, keyword), false};
+       {"module", "macromodule", "interface", "program"}) {
+    if (word == keyword) return {HeaderName(trimmed, word), false};
   }
-  if (trimmed.starts_with("package "))
-    return {ExtractModuleName(trimmed, "package "), true};
   return {};
 }
 
+// A header whose keyword, and lifetime if any, end the line, its name on a
+// line after: §5.3 makes the newline only a separator between them.
+static bool IsHeaderAwaitingItsName(std::string_view trimmed) {
+  std::string_view word = FirstWord(trimmed);
+  return IsDesignElementKeyword(word) &&
+         PastHeaderKeyword(trimmed, word).empty();
+}
+
 void Preprocessor::TrackDesignElementHeader(std::string_view trimmed) {
+  if (IsHeaderAwaitingItsName(trimmed)) {
+    pending_header_ = std::string(trimmed);
+    return;
+  }
   if (IsDesignElementStart(trimmed)) {
     if (in_celldefine_) TrackCellModuleName(trimmed, cell_module_names_);
     // Annex E: each of its directives applies to the modules that follow
@@ -189,6 +211,14 @@ void Preprocessor::TrackDesignElementHeader(std::string_view trimmed) {
 // an earlier element may end on the same line. So the line is taken element by
 // element, each piece starting where the previous one's end keyword left off.
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
+  // A header held from the line before, its keyword alone there, is read on
+  // with this line as the rest of it.
+  if (!pending_header_.empty()) {
+    std::string header = std::move(pending_header_);
+    pending_header_.clear();
+    TrackDesignElement(header + " " + std::string(trimmed));
+    return;
+  }
   while (true) {
     TrackDesignElementHeader(
         AfterAttributeInstances(trimmed, in_attribute_instance_));

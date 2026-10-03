@@ -251,3 +251,27 @@ TEST(TimescaleSimulation, ClauseExampleRealParameterDelaysAssignments) {
       "lit 1.60\nparam 3.20\nrealparam 4.80\nrealvar 6.40\n"
       "int 10.00\n");
 }
+
+// §22.7 with §3.2 and §3.14.2.3: the `timescale before a package is the
+// package's, so a task of a class the package declares reads its #3 in the
+// package's nanoseconds, 3000 of the module's picoseconds. It was read in the
+// calling module's unit, 3.
+TEST(TimescaleSimulation, APackageClassTaskRunsInThePackagesUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ns\n"
+                                 "package p;\n"
+                                 "  class C;\n"
+                                 "    task t(); #3; endtask\n"
+                                 "  endclass\n"
+                                 "endpackage\n"
+                                 "`timescale 1ps / 1ps\n"
+                                 "module m;\n"
+                                 "  p::C c = new;\n"
+                                 "  initial begin\n"
+                                 "    c.t();\n"
+                                 "    $display(\"%0d\", $time);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "3000\n");
+}

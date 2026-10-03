@@ -52,6 +52,20 @@ struct PragmaKeywordExpression {
   std::string_view value_list;
 };
 
+// What §22.11's grammar makes of a `pragma directive's text after the word
+// `pragma: the report it calls for, empty when the text is well formed, and
+// otherwise its pragma_name and the pragma_expressions of its list, which
+// point into the text read. `block_comment_open` says the text ends in a
+// block comment left open, which runs on past the directive.
+struct PragmaReading {
+  std::string_view error;
+  std::string_view name;
+  std::vector<PragmaKeywordExpression> keywords;
+  bool block_comment_open = false;
+};
+
+PragmaReading ReadPragmaDirective(std::string_view rest);
+
 struct PreprocConfig {
   std::vector<std::string> include_dirs;
   std::vector<std::pair<std::string, std::string>> defines;
@@ -74,6 +88,10 @@ struct CondState {
   bool active;
   bool any_taken;
   bool parent_active;
+  // §22.6 (Syntax 22-5): where the `ifdef or `ifndef opening the conditional
+  // stands, and whether its one `else group has been read.
+  SourceLoc opened = {};
+  bool else_seen = false;
 };
 
 // Which of §34.5's three blocks a run of lines is being gathered for, each
@@ -199,15 +217,22 @@ class Preprocessor {
   bool IsActive() const;
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);
-  void HandleIfdef(std::string_view rest, bool inverted);
-  void HandleElsif(std::string_view rest);
-  bool EvalIfdefExpr(std::string_view expr);
+  void HandleIfdef(std::string_view rest, bool inverted, SourceLoc loc);
+  void HandleElsif(std::string_view rest, SourceLoc loc);
+  // §22.6 (Syntax 22-5): the truth of the ifdef_condition `name` after
+  // `directive`, a macro name or a parenthesized expression, reporting one
+  // that is neither, or missing.
+  bool EvalIfdefCondition(std::string_view name, std::string_view directive,
+                          SourceLoc loc);
+  bool EvalIfdefExpr(std::string_view expr, SourceLoc loc);
   bool EvalIfdefEquiv(std::string_view& expr);
   bool EvalIfdefOr(std::string_view& expr);
   bool EvalIfdefAnd(std::string_view& expr);
   bool EvalIfdefUnary(std::string_view& expr);
-  void HandleElse();
-  void HandleEndif();
+  void HandleElse(SourceLoc loc);
+  void HandleEndif(SourceLoc loc);
+  // §22.6: reports each conditional the source left open, and closes it.
+  void ReportUnclosedConditionals();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
                      std::string& output, bool angle_bracket);
   void HandleTimescale(std::string_view rest, SourceLoc loc);
@@ -232,7 +257,7 @@ class Preprocessor {
   bool ExpandFunctionLikeMacro(const MacroDef& def, std::string_view macro_name,
                                SourceLoc loc, std::string& expanded,
                                std::string_view& rest);
-  std::string ExpandInlineConditionals(std::string_view line);
+  std::string ExpandInlineConditionals(std::string_view line, SourceLoc loc);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
   std::string ExpandSubstitutedBody(std::string_view body, uint32_t file_id,
@@ -680,6 +705,12 @@ class Preprocessor {
   // An attribute instance opened on a line and not yet closed (A.1.2), so the
   // next line starts inside it.
   bool in_attribute_instance_ = false;
+  // A design element header whose keyword, and lifetime if any, ended its
+  // line, held until the line naming the element (§5.3).
+  std::string pending_header_;
+  // §22.6: set while an ifdef_macro_expression is evaluated when it is found
+  // to be no expression Syntax 22-5 admits.
+  bool ifdef_expr_malformed_ = false;
   std::vector<std::string> cell_module_names_;
   std::vector<ModuleDirectives> module_directives_;
   bool in_block_comment_ = false;

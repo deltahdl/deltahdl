@@ -239,3 +239,18 @@ TEST(FileAndLineMacroPreprocessing, Include_LineRevertsWithLongInclude) {
   std::remove(inc_path.c_str());
   std::remove(tmp_dir.c_str());
 }
+
+// §22.12 makes the `line directive's string literal the file's new name, and
+// "" is a string literal, so after `line 5 "" 0 `__FILE__ (§22.13) gives "",
+// alone on a line and within one. It gave the path the tool opened.
+TEST(Preprocessor, FileAfterALineNamingTheEmptyNameIsEmpty) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`line 5 \"\" 0\n"
+      "`__FILE__\n"
+      "x = `__FILE__;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("\n\"\"\n"), std::string::npos) << out;
+  EXPECT_NE(out.find("x = \"\";"), std::string::npos) << out;
+}

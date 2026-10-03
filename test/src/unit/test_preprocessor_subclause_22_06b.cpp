@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -327,4 +328,139 @@ TEST(Preprocessor, IfdefExprImplicationWithATrueLeftSideTakesItsRightSide) {
       f, std::move(cfg));
   EXPECT_NE(result.find("right_true"), std::string::npos);
   EXPECT_EQ(result.find("only_a"), std::string::npos);
+}
+
+// §22.6 (Syntax 22-5): `elsif, `else and `endif are parts of a conditional
+// that an `ifdef or `ifndef opens, so none stands on its own; each is
+// reported at its line. Each was accepted without a word.
+TEST(Preprocessor, EndifWithoutIfdef) {
+  PreprocFixture f;
+  Preprocess("`endif\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`endif with no `ifdef or `ifndef open before it",
+                            1, "22.6"));
+}
+
+TEST(Preprocessor, ElseWithoutIfdef) {
+  PreprocFixture f;
+  Preprocess("text\n`else\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`else with no `ifdef or `ifndef open before it", 2,
+                            "22.6"));
+}
+
+TEST(Preprocessor, ElsifWithoutIfdef) {
+  PreprocFixture f;
+  Preprocess("`elsif A\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`elsif with no `ifdef or `ifndef open before it",
+                            1, "22.6"));
+}
+
+// §22.6 (Syntax 22-5) closes every conditional with `endif, so one the source
+// leaves open is reported at the `ifdef that opened it.
+TEST(Preprocessor, IfdefWithoutEndif) {
+  PreprocFixture f;
+  Preprocess("text\n`ifdef SOMETHING\ntext\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`ifdef or `ifndef with no closing `endif", 2,
+                            "22.6"));
+}
+
+// §22.6 (Syntax 22-5): `ifdef, `ifndef and `elsif each take an ifdef_condition,
+// a macro name or a parenthesized expression, which cannot be empty. A bare
+// `ifdef silently compiled its block out and a bare `ifndef silently in.
+TEST(Preprocessor, ConditionalMissingItsConditionIsReported) {
+  PreprocFixture f;
+  Preprocess(
+      "`ifdef\n"
+      "`endif\n"
+      "`ifndef\n"
+      "`elsif\n"
+      "`endif\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`ifdef is missing its condition", 1, "22.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`ifndef is missing its condition", 3, "22.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`elsif is missing its condition", 4, "22.6"));
+}
+
+// §22.6 (Syntax 22-5) gives a conditional at most one `else group, so a
+// second is reported, whether the conditional stands on lines of its own or
+// within one line. The text after the second was silently dropped.
+TEST(Preprocessor, SecondElseIsReported) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", ""}};
+  Preprocess(
+      "`ifdef A\n"
+      "a1\n"
+      "`else\n"
+      "a2\n"
+      "`else\n"
+      "a3\n"
+      "`endif\n"
+      "x `ifdef A b1 `else b2 `else b3 `endif y\n",
+      f, cfg);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a second `else in one `ifdef or `ifndef", 5,
+                            "22.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a second `else in one `ifdef or `ifndef", 8,
+                            "22.6"));
+}
+
+// §22.6 (Syntax 22-5): an ifdef_condition is a macro name or a parenthesized
+// ifdef_macro_expression, so a negation outside parentheses, `ifdef !A, is
+// neither and is reported. It was evaluated as `ifdef (!A).
+TEST(Preprocessor, NegationOutsideParenthesesIsNoIfdefCondition) {
+  PreprocFixture f;
+  Preprocess(
+      "`ifdef !A\n"
+      "module taken_m; endmodule\n"
+      "`endif\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'!A' after `ifdef is no ifdef_condition", 1,
+                            "22.6"));
+}
+
+// §22.6 (Syntax 22-5) builds an ifdef_macro_expression of names, `!`,
+// parentheses and &&, ||, -> and <->, so a character that begins an operator
+// but completes none, an operand left out and a parenthesis never closed are
+// each reported. Each silently selected or skipped its block.
+TEST(Preprocessor, MalformedIfdefExpressionIsReported) {
+  for (const char* condition :
+       {"(A & B)", "(A | B)", "(A - B)", "(A <- B)", "(A &&)", "()", "(A"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`ifdef ") + condition + "\nx\n`endif\n", f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("malformed ifdef_macro_expression '") + condition + "'", 1,
+        "22.6"))
+        << condition;
+  }
+}
+
+// A well-formed expression, nested parentheses and text after the closing one
+// on the same line among it, is read as before, with no report.
+TEST(Preprocessor, WellFormedIfdefExpressionIsAccepted) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", ""}};
+  auto out = Preprocess("`ifdef ((A) && !(B))\nkept\n`endif\n", f, cfg);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("kept"), std::string::npos) << out;
+}
+
+// Within one line, a parenthesis never closed leaves no condition to read, and
+// is reported under §22.6. Its backticks reached the lexer instead.
+TEST(Preprocessor, UnclosedInlineIfdefExpressionIsReported) {
+  PreprocFixture f;
+  Preprocess("wire w = 1 `ifdef (A a `endif ;\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "malformed ifdef_macro_expression '(A a `endif ;",
+                            1, "22.6"));
 }

@@ -1,8 +1,12 @@
 #include <cctype>
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 
 namespace delta {
@@ -95,14 +99,21 @@ static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
 }
 
 struct InlineCondBounds {
+  // §22.6 (Syntax 22-5): where each `elsif group of the conditional opens, in
+  // order, ahead of its `else.
+  std::vector<size_t> elsif_pos;
   size_t else_pos;
   size_t endif_pos;
+  // §22.6 (Syntax 22-5): whether a second `else stands in the conditional.
+  bool second_else;
 };
 
 static InlineCondBounds FindElseAndEndif(const std::string& result,
                                          size_t search_start) {
+  std::vector<size_t> elsif_pos;
   size_t else_pos = std::string::npos;
   size_t endif_pos = std::string::npos;
+  bool second_else = false;
   int depth = 1;
   for (size_t j = search_start; j < result.size(); ++j) {
     if (result[j] != '`') continue;
@@ -115,27 +126,44 @@ static InlineCondBounds FindElseAndEndif(const std::string& result,
         endif_pos = j;
         break;
       }
+    } else if (depth == 1 && MatchesDirective(jr, "elsif")) {
+      elsif_pos.push_back(j);
     } else if (depth == 1 && MatchesDirective(jr, "else")) {
+      second_else = second_else || else_pos != std::string::npos;
       if (else_pos == std::string::npos) else_pos = j;
     }
   }
-  return {else_pos, endif_pos};
+  return {elsif_pos, else_pos, endif_pos, second_else};
 }
 
-static std::string SelectConditionalBlock(const std::string& result,
-                                          bool cond_result, size_t cond_end,
-                                          size_t else_pos, size_t endif_pos) {
-  if (cond_result) {
-    size_t text_end = (else_pos != std::string::npos) ? else_pos : endif_pos;
-    return result.substr(cond_end, text_end - cond_end);
+// §22.6 (Syntax 22-5): the text of the group a conditional selects -- the
+// first whose condition holds, the `ifdef's own (`cond_result`, its text from
+// `cond_end`) and then each `elsif's in order, `eval` answering the truth of
+// the condition an `elsif writes, and else the `else group, or nothing. Each
+// group's text runs to the next group's directive.
+static std::string SelectConditionalBlock(
+    const std::string& result, bool cond_result, size_t cond_end,
+    const InlineCondBounds& bounds,
+    const std::function<bool(std::string_view, bool)>& eval) {
+  std::vector<size_t> group_ends = bounds.elsif_pos;
+  if (bounds.else_pos != std::string::npos)
+    group_ends.push_back(bounds.else_pos);
+  group_ends.push_back(bounds.endif_pos);
+  if (cond_result) return result.substr(cond_end, group_ends[0] - cond_end);
+  for (size_t k = 0; k < bounds.elsif_pos.size(); ++k) {
+    size_t start = SkipWhitespace(result, bounds.elsif_pos[k] + 6);
+    bool has_expr = false;
+    size_t end = ParseInlineCondition(result, start, has_expr);
+    if (eval(std::string_view(result).substr(start, end - start), has_expr))
+      return result.substr(end, group_ends[k + 1] - end);
   }
-  if (else_pos != std::string::npos) {
-    return result.substr(else_pos + 5, endif_pos - (else_pos + 5));
-  }
-  return {};
+  if (bounds.else_pos == std::string::npos) return {};
+  return result.substr(bounds.else_pos + 5,
+                       bounds.endif_pos - (bounds.else_pos + 5));
 }
 
-std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
+std::string Preprocessor::ExpandInlineConditionals(std::string_view line,
+                                                   SourceLoc loc) {
   std::string result(line);
 
   while (true) {
@@ -153,15 +181,31 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
 
     auto condition =
         std::string_view(result).substr(cond_start, cond_end - cond_start);
+    // §22.6: a parenthesis the line never closes leaves no condition to read.
+    if (has_expr && cond_end == result.size()) {
+      diag_.Error(
+          loc,
+          "malformed ifdef_macro_expression '" + std::string(condition) + "'",
+          Subclause("22.6"));
+      break;
+    }
     bool cond_result =
-        has_expr ? EvalIfdefExpr(condition) : macros_.IsDefined(condition);
+        has_expr ? EvalIfdefExpr(condition, loc) : macros_.IsDefined(condition);
     if (is_ifndef) cond_result = !cond_result;
 
     auto bounds = FindElseAndEndif(result, cond_end);
     if (bounds.endif_pos == std::string::npos) break;
+    if (bounds.second_else) {
+      diag_.Error(loc, "a second `else in one `ifdef or `ifndef",
+                  Subclause("22.6"));
+    }
 
     auto replacement = SelectConditionalBlock(
-        result, cond_result, cond_end, bounds.else_pos, bounds.endif_pos);
+        result, cond_result, cond_end, bounds,
+        [this, loc](std::string_view condition, bool has_expr) {
+          return has_expr ? EvalIfdefExpr(condition, loc)
+                          : macros_.IsDefined(condition);
+        });
 
     size_t span_end = bounds.endif_pos + 6;
     result.erase(ifdef_pos, span_end - ifdef_pos);

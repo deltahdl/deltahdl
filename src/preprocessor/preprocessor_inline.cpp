@@ -41,7 +41,7 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
                                       uint32_t line_num) {
   if (name == "__FILE__") {
     output.append("\"");
-    if (has_line_override_ && !line_file_override_.empty()) {
+    if (has_line_override_) {
       output.append(line_file_override_);
     } else {
       output.append(src_mgr_.FilePath(file_id));
@@ -230,12 +230,20 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
+// Whether the character at `i` opens or closes a string literal, given whether
+// one is open before it. §22.5.1's `" is a macro-quote rather than a string's
+// quote: macro usages between `" and `" are expanded, so outside a string it
+// leaves the state alone.
+static bool TogglesString(std::string_view line, size_t i, bool in_string) {
+  if (line[i] != '"' || i == 0) return line[i] == '"';
+  if (line[i - 1] == '\\') return false;
+  return in_string || line[i - 1] != '`';
+}
+
 static size_t FindNextBacktick(std::string_view line, size_t pos,
                                bool& in_string) {
   for (size_t i = pos; i < line.size(); ++i) {
-    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
-      in_string = !in_string;
-    }
+    if (TogglesString(line, i, in_string)) in_string = !in_string;
     if (!in_string && line[i] == '`') return i;
   }
   return std::string_view::npos;
@@ -313,7 +321,7 @@ bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
                                              std::string& result) {
   if (name == "__FILE__") {
     result += '"';
-    if (has_line_override_ && !line_file_override_.empty()) {
+    if (has_line_override_) {
       result += line_file_override_;
     } else {
       result += src_mgr_.FilePath(file_id);
@@ -438,9 +446,7 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
     // backtick.
     in_string = false;
     for (size_t i = 0; i < copied; ++i) {
-      if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
-        in_string = !in_string;
-      }
+      if (TogglesString(line, i, in_string)) in_string = !in_string;
     }
 
     size_t bt = FindNextBacktick(line, copied, in_string);
@@ -467,7 +473,9 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
 std::string Preprocessor::ExpandSubstitutedBody(std::string_view body,
                                                 uint32_t file_id,
                                                 uint32_t line_num) {
-  return ExpandInlineMacros(ExpandInlineConditionals(body), file_id, line_num);
+  return ExpandInlineMacros(
+      ExpandInlineConditionals(body, SourceLoc{file_id, line_num, 1}), file_id,
+      line_num);
 }
 
 bool Preprocessor::IsActive() const {
@@ -475,16 +483,21 @@ bool Preprocessor::IsActive() const {
                      [](const CondState& s) { return s.active; });
 }
 
-static void SkipBlockComment(std::string_view body, size_t& i) {
+// Steps past the block comment opening at `i`, answering whether a `*/`
+// closed it before the text ran out.
+static bool SkipBlockComment(std::string_view body, size_t& i) {
   i += 2;
   while (i + 1 < body.size() && (body[i] != '*' || body[i + 1] != '/')) {
     ++i;
   }
-  if (i + 1 < body.size()) i += 2;
+  if (i + 1 >= body.size()) return false;
+  i += 2;
+  return true;
 }
 
 static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
-                                 bool& in_string, std::string& result) {
+                                 bool& in_string, bool& unclosed_comment,
+                                 std::string& result) {
   if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) {
     if (i > 0 && body[i - 1] == '`') {
       result += body[i++];
@@ -505,7 +518,7 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
   }
 
   if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '*') {
-    SkipBlockComment(body, i);
+    if (!SkipBlockComment(body, i)) unclosed_comment = true;
     return true;
   }
 
@@ -513,14 +526,20 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
   return true;
 }
 
-static std::string StripMacroBodyComments(std::string_view body) {
+// The macro text `body` with its comments removed; `unclosed_comment` says
+// whether a block comment in it ran to the end of the text unclosed, which the
+// joiner reading the `define on (JoinDefineBody) leaves only at the end of the
+// source.
+static std::string StripMacroBodyComments(std::string_view body,
+                                          bool& unclosed_comment) {
   std::string result;
   result.reserve(body.size());
   bool in_string = false;
   size_t i = 0;
 
   while (i < body.size()) {
-    if (!ProcessMacroBodyChar(body, i, in_string, result)) break;
+    if (!ProcessMacroBodyChar(body, i, in_string, unclosed_comment, result))
+      break;
   }
 
   while (!result.empty() &&
@@ -553,7 +572,12 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
 
   MacroDef def;
   def.def_loc = loc;
-  if (name_end == 0) return;
+  // §22.5.1 (Syntax 22-2): the text_macro_name is required, and opens with an
+  // identifier, simple or escaped.
+  if (name_end == 0) {
+    diag_.Error(loc, "`define is missing its macro name", Subclause("22.5.1"));
+    return;
+  }
 
   def.name = std::string(rest.substr(0, name_end));
 
@@ -568,16 +592,31 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   auto after_name = rest.substr(name_end);
   if (escaped && !after_name.empty()) after_name.remove_prefix(1);
 
+  bool unclosed_comment = false;
   if (!after_name.empty() && after_name[0] == '(') {
+    // §22.5.1 (Syntax 22-2): a `(` after the name opens a list of formal
+    // arguments the `)` closes; with none, the directive is neither form.
     auto close = FindMacroParamListClose(after_name);
-    if (close != std::string_view::npos) {
-      def.is_function_like = true;
-      def.params =
-          ParseMacroParams(after_name.substr(1, close - 1), def.param_defaults);
-      def.body = StripMacroBodyComments(Trim(after_name.substr(close + 1)));
+    if (close == std::string_view::npos) {
+      diag_.Error(
+          loc,
+          "formal argument list of `define " + def.name + " is never closed",
+          Subclause("22.5.1"));
+      return;
     }
+    def.is_function_like = true;
+    def.params =
+        ParseMacroParams(after_name.substr(1, close - 1), def.param_defaults);
+    def.body = StripMacroBodyComments(Trim(after_name.substr(close + 1)),
+                                      unclosed_comment);
   } else {
-    def.body = StripMacroBodyComments(Trim(after_name));
+    def.body = StripMacroBodyComments(Trim(after_name), unclosed_comment);
+  }
+  // §5.4: a block comment is closed by */, so one the source never closes is
+  // reported here as it is outside a `define.
+  if (unclosed_comment) {
+    diag_.Error(loc, "unterminated block comment", Subclause("5.4"));
+    return;
   }
   if (HasUnterminatedString(def.body)) {
     diag_.Error(loc, "unterminated string literal in macro body",
@@ -610,56 +649,77 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
   macros_.Undefine(name);
 }
 
-static bool IsIfdefExpr(std::string_view text) {
-  return !text.empty() && (text[0] == '(' || text[0] == '!');
+// §22.6 (Syntax 22-5): `elsif, `else and `endif are parts of a conditional an
+// `ifdef or `ifndef opened, none standing on its own.
+static bool ReportNoOpenConditional(bool none_open, std::string_view directive,
+                                    SourceLoc loc, DiagEngine& diag) {
+  if (!none_open) return false;
+  diag.Error(loc,
+             "`" + std::string(directive) +
+                 " with no `ifdef or `ifndef open before it",
+             Subclause("22.6"));
+  return true;
 }
 
-void Preprocessor::HandleIfdef(std::string_view rest, bool inverted) {
-  auto name = Trim(rest);
-  bool cond = IsIfdefExpr(name) ? EvalIfdefExpr(name) : macros_.IsDefined(name);
+void Preprocessor::HandleIfdef(std::string_view rest, bool inverted,
+                               SourceLoc loc) {
+  bool cond =
+      EvalIfdefCondition(Trim(rest), inverted ? "ifndef" : "ifdef", loc);
   if (inverted) cond = !cond;
   bool parent = IsActive();
   bool active = parent && cond;
-  cond_stack_.push_back({active, active, parent});
+  cond_stack_.push_back({active, active, parent, loc});
 }
 
-void Preprocessor::HandleElsif(std::string_view rest) {
-  if (cond_stack_.empty()) return;
+void Preprocessor::HandleElsif(std::string_view rest, SourceLoc loc) {
+  if (ReportNoOpenConditional(cond_stack_.empty(), "elsif", loc, diag_)) return;
   auto& top = cond_stack_.back();
-  auto name = Trim(rest);
-  bool defined =
-      IsIfdefExpr(name) ? EvalIfdefExpr(name) : macros_.IsDefined(name);
+  bool defined = EvalIfdefCondition(Trim(rest), "elsif", loc);
   top.active = top.parent_active && !top.any_taken && defined;
   if (top.active) top.any_taken = true;
 }
 
-void Preprocessor::HandleElse() {
-  if (cond_stack_.empty()) return;
+void Preprocessor::HandleElse(SourceLoc loc) {
+  if (ReportNoOpenConditional(cond_stack_.empty(), "else", loc, diag_)) return;
   auto& top = cond_stack_.back();
+  // §22.6 (Syntax 22-5): a conditional has at most one `else group.
+  if (top.else_seen) {
+    diag_.Error(loc, "a second `else in one `ifdef or `ifndef",
+                Subclause("22.6"));
+  }
+  top.else_seen = true;
   top.active = top.parent_active && !top.any_taken;
   top.any_taken = true;
 }
 
-void Preprocessor::HandleEndif() {
-  if (!cond_stack_.empty()) {
-    cond_stack_.pop_back();
+void Preprocessor::HandleEndif(SourceLoc loc) {
+  if (ReportNoOpenConditional(cond_stack_.empty(), "endif", loc, diag_)) return;
+  cond_stack_.pop_back();
+}
+
+// §22.6 (Syntax 22-5) closes every conditional with `endif, so one the source
+// leaves open is reported at the `ifdef or `ifndef that opened it.
+void Preprocessor::ReportUnclosedConditionals() {
+  for (const CondState& open : cond_stack_) {
+    diag_.Error(open.opened, "`ifdef or `ifndef with no closing `endif",
+                Subclause("22.6"));
   }
+  cond_stack_.clear();
 }
 
 // The one caller, HandleInclude, has already refused a name that opens with
 // neither a double quote nor an angle bracket.
-static void StripIncludeQuotes(std::string_view& fn,
+// §22.4 (printed page 705) writes the file name between double quotes or angle
+// brackets, so one never closed is neither form: answers false, leaving `fn`.
+static bool StripIncludeQuotes(std::string_view& fn,
                                std::string_view& after_close) {
   after_close = {};
-  if (fn.size() < 2) return;
   char close = (fn.front() == '"') ? '"' : '>';
   auto end = fn.find(close, 1);
-  if (end != std::string_view::npos) {
-    after_close = Preprocessor::Trim(fn.substr(end + 1));
-    fn = fn.substr(1, end - 1);
-  } else {
-    fn = fn.substr(1, fn.size() - 2);
-  }
+  if (end == std::string_view::npos) return false;
+  after_close = Preprocessor::Trim(fn.substr(end + 1));
+  fn = fn.substr(1, end - 1);
+  return true;
 }
 
 static void ValidateIncludeTrailing(std::string_view after_close,
@@ -716,7 +776,13 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   }
 
   std::string_view after_close;
-  StripIncludeQuotes(fn, after_close);
+  if (!StripIncludeQuotes(fn, after_close)) {
+    diag_.Error(loc,
+                std::string("`include file name is missing its closing ") +
+                    (fn.front() == '"' ? "\"" : ">"),
+                Subclause("22.4"));
+    return;
+  }
   ValidateIncludeTrailing(after_close, diag_, loc);
 
   if (fn.empty()) {

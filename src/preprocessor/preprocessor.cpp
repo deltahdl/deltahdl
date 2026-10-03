@@ -118,6 +118,7 @@ std::string Preprocessor::Preprocess(uint32_t file_id) {
   recording_origins_ = true;
   auto output = ProcessSource(content, file_id, 0);
   recording_origins_ = false;
+  ReportUnclosedConditionals();
   return output;
 }
 
@@ -131,7 +132,7 @@ void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
   // after it and keeps the position it really has.
   if (has_line_override_ && line > line_override_src_line_) {
     line = line_offset_ + (line - line_override_src_line_ - 1);
-    if (line_file_override_id_ != 0) file_id = line_file_override_id_;
+    file_id = line_file_override_id_;
   }
   line_origins_.push_back({file_id, line});
 }
@@ -436,7 +437,8 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
 void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
                                        uint32_t line_num, std::string& output) {
   auto stripped = StripComments(line, in_block_comment_, in_triple_string_);
-  auto conditioned = ExpandInlineConditionals(stripped);
+  auto conditioned =
+      ExpandInlineConditionals(stripped, SourceLoc{file_id, line_num, 1});
   auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
   TrackDesignElement(Trim(expanded));
   output.append(expanded);
@@ -620,9 +622,17 @@ static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
   std::string joined;
   uint32_t usage_lines = 0;
   if (DefineSpansMultipleLines(line)) {
+    // The `define is run as the directive on the line it opens on, which is
+    // where a report about it belongs; the lines it was joined from are the
+    // loop's to count past afterwards.
+    uint32_t opened = cursor.line_num;
     joined = JoinDefineBody(cursor);
-    line = joined;
-  } else if (ops.is_active()) {
+    uint32_t last = std::exchange(cursor.line_num, opened);
+    ops.run_directive(joined);
+    cursor.line_num = last;
+    return usage_lines;
+  }
+  if (ops.is_active()) {
     usage_lines = JoinMacroUsage(cursor, ops.end_of_macro_usage, joined);
     if (usage_lines > 0) line = joined;
   }
@@ -743,7 +753,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // track any design element it introduces, then emit it.
   ActiveLineEmit emit;
   emit.expand_and_emit = [&](std::string_view fragment) {
-    auto conditioned = ExpandInlineConditionals(std::string(fragment));
+    auto conditioned = ExpandInlineConditionals(
+        std::string(fragment), SourceLoc{file_id, line_num, 1});
     auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
     TrackDesignElement(Trim(expanded));
     output.append(expanded);

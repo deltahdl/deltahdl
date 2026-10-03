@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_envelope.h"
@@ -550,6 +551,55 @@ std::string ClosedRegionText(const ReadRegion& region,
   return DecryptionEnvelopeText(envelope, how);
 }
 
+// The reports a region owes where it closes, once the key it is encrypted
+// under is settled.
+void ReportClosedRegion(const RegionKeyReader& in_effect,
+                        const RegionEncryption& how, const ProtectKeyList& keys,
+                        DiagEngine* diag, uint32_t file_id) {
+  // §34.5.27 has every key block of one envelope encode the same data
+  // decryption key data, so a region whose data decryption pragma expressions
+  // changed value between two of them is reported rather than left carrying
+  // blocks that open onto different accounts of one key. The report stands at
+  // the block that stopped agreeing rather than here, where the region merely
+  // closed.
+  if (diag != nullptr && how.key_blocks.data_changed_line != 0) {
+    diag->Error(LineOf(file_id, how.key_blocks.data_changed_line),
+                "protect pragma data decryption expressions change value "
+                "between the key_block pragma expressions of one encryption "
+                "envelope",
+                Subclause("34.5.27"));
+  }
+  ReportUnprovidedDataMethod(in_effect, diag, file_id);
+  ReportUnavailableDigestMethod(in_effect, diag, file_id);
+  ReportUnprovidedKeyMethod(in_effect, how, diag, file_id);
+  ReportKeynamesReachingNoKey(in_effect, keys, diag, file_id);
+}
+
+// §22.11 has a compiling run reject a `pragma protect line its grammar does
+// not admit, so the encrypting half reports the same line with the same
+// message and reads nothing from it: nothing it says reaches an envelope, and
+// outside a region it is carried across as written, like any text there.
+// Answers whether the line was one such.
+//
+// A line holding a backtick is left to be read as before. A compiling run
+// substitutes the macro usages of a directive's text before the grammar reads
+// it (§22.5.1), and this half holds no macro table, so it cannot know what
+// the grammar would be handed and would report a line the compiling run takes.
+bool SetAsideRejectedPragmaLine(std::string_view line, SourceLoc loc,
+                                bool in_envelope, DiagEngine* diag,
+                                std::string* transformed) {
+  std::string_view body;
+  if (!ProtectPragmaLine(line, &body) || body.contains('`')) return false;
+  std::string text = std::string(kProtectPragmaName) + " " + std::string(body);
+  std::string_view error = ReadPragmaDirective(text).error;
+  if (error.empty()) return false;
+  if (diag != nullptr) {
+    diag->Error(loc, std::string(error), Subclause("22.11"));
+  }
+  if (!in_envelope) transformed->append(line);
+  return true;
+}
+
 }  // namespace
 
 std::string EncryptEnvelopes(std::string_view source_text,
@@ -599,6 +649,10 @@ std::string EncryptEnvelopes(std::string_view source_text,
   for (std::string_view line : SplitLines(source_text)) {
     ++line_num;
     SourceLoc loc = LineOf(file_id, line_num);
+    if (SetAsideRejectedPragmaLine(line, loc, in_envelope, diag,
+                                   &transformed)) {
+      continue;
+    }
     InputLine input = ReadInputLine(line, &previously_protected, diag, loc);
     TakeKeyNamesOutsideProtectedBlock(line, line_num,
                                       input.previously_protected, &in_effect);
@@ -611,23 +665,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
       RegionEncryption how =
           RegionEncryptionFor(in_effect, region, exchange_key, keys, line_num);
-      // §34.5.27 has every key block of one envelope encode the same data
-      // decryption key data, so a region whose data decryption pragma
-      // expressions changed value between two of them is reported rather than
-      // left carrying blocks that open onto different accounts of one key. The
-      // report stands at the block that stopped agreeing rather than here,
-      // where the region merely closed.
-      if (diag != nullptr && how.key_blocks.data_changed_line != 0) {
-        diag->Error(
-            LineOf(file_id, how.key_blocks.data_changed_line),
-            "protect pragma data decryption expressions change value between "
-            "the key_block pragma expressions of one encryption envelope",
-            Subclause("34.5.27"));
-      }
-      ReportUnprovidedDataMethod(in_effect, diag, file_id);
-      ReportUnavailableDigestMethod(in_effect, diag, file_id);
-      ReportUnprovidedKeyMethod(in_effect, how, diag, file_id);
-      ReportKeynamesReachingNoKey(in_effect, keys, diag, file_id);
+      ReportClosedRegion(in_effect, how, keys, diag, file_id);
       transformed.append(
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;

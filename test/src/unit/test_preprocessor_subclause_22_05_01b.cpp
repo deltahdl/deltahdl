@@ -571,3 +571,114 @@ TEST(Preprocessor, FunctionLikeNameEndingTheSourceAfterTextIsRejected) {
                             "'FUNC'",
                             2, "22.5.1"));
 }
+
+// §22.5.1 (Syntax 22-2): a text macro definition names its macro, with an
+// identifier, simple or escaped, so a `define with nothing after it or with a
+// name no identifier can open is reported. Each was accepted without a word.
+TEST(Preprocessor, DefineMissingItsNameIsReported) {
+  for (const char* directive : {"`define\n", "`define 5 x\n"}) {
+    PreprocFixture f;
+    Preprocess(directive, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`define is missing its macro name", 1, "22.5.1"))
+        << directive;
+  }
+}
+
+// §22.5.1 (Syntax 22-2): a `(` after the macro name opens a formal argument
+// list a `)` closes, so one never closed is reported and defines nothing. M was
+// defined as an empty object-like macro, its usage expanding to nothing.
+TEST(Preprocessor, UnclosedFormalArgumentListIsReported) {
+  PreprocFixture f;
+  Preprocess("`define M(a, b\nx y\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument list of `define M is never closed",
+                            1, "22.5.1"));
+}
+
+// §5.4: a block comment is closed by */, so the macro text of a `define on the
+// last line opening one is reported as the same text outside a `define is.
+// The comment was dropped and M defined as a.
+TEST(Preprocessor, UnterminatedBlockCommentInMacroTextIsReported) {
+  PreprocFixture f;
+  Preprocess("`define M a /* x", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unterminated block comment",
+                            1, "5.4"));
+}
+
+// §22.5.1: an unclosed triple-quoted string leaves the `define open to the end
+// of the source, and the report belongs at the `define, line 2, as an unclosed
+// ordinary string's is. It was given at line 6, past the end of the file.
+TEST(Preprocessor, UnclosedTripleQuoteReportedAtTheDefine) {
+  PreprocFixture f;
+  Preprocess(
+      "module m;\n"
+      "`define M \"\"\"abc\"\n"
+      "wire a;\n"
+      "wire b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unterminated string literal in macro body", 2,
+                            "22.5.1"));
+}
+
+// §22.5.1 with §5.9: a newline inside a triple-quoted string is part of the
+// string and does not end the macro text, so the expansion carries the string
+// with its newlines. Each was dropped, joining the lines into one.
+TEST(Preprocessor, TripleQuotedStringInMacroTextKeepsItsNewlines) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define TEST \"\"\"\n"
+      "many\n"
+      "more\n"
+      "lines\"\"\"\n"
+      "x = `TEST;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("\"\"\"\nmany\nmore\nlines\"\"\""), std::string::npos)
+      << out;
+}
+
+// §22.5.1: between `" and `" a macro usage is expanded, as a formal is
+// substituted, so `N in `"N=`N`" gives N=7. It reached the lexer unexpanded,
+// the `" taken for a string's opening quote.
+TEST(Preprocessor, UsageBetweenMacroQuotesIsExpanded) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define N 7\n"
+      "`define T `\"N=`N`\"\n"
+      "x = `T;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("N=7"), std::string::npos) << out;
+  EXPECT_EQ(out.find("`N"), std::string::npos) << out;
+}
+
+// §22.6 with §22.5.1: a conditional in macro text is read at each usage, and
+// an `elsif whose condition holds selects its group, a name or a
+// parenthesized expression; with none holding and no `else, nothing. The
+// `else group was taken whenever the `ifdef failed.
+TEST(Preprocessor, ElsifInMacroTextSelectsItsGroup) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define PICK(x) `ifdef DOUBLE (x)*2 `elsif TRIPLE (x)*3 `else (x) "
+      "`endif\n"
+      "`define PICK2 `ifdef DOUBLE 2 `elsif (TRIPLE) 3 `endif\n"
+      "`define PICK3 `ifdef DOUBLE 2 `elsif QUAD 4 `endif\n"
+      "`define TRIPLE\n"
+      "a = `PICK(10);\n"
+      "b = `PICK2;\n"
+      "c = `PICK3;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // The text a usage left on its line, `name = ` up to the semicolon.
+  auto line_of = [&out](const std::string& name) {
+    size_t at = out.find(name + " =");
+    return at == std::string::npos ? std::string("<missing>")
+                                   : out.substr(at, out.find(';', at) - at);
+  };
+  EXPECT_NE(line_of("a").find("(10)*3"), std::string::npos) << out;
+  EXPECT_NE(line_of("b").find('3'), std::string::npos) << out;
+  EXPECT_EQ(line_of("c").find_first_of("24"), std::string::npos) << out;
+}

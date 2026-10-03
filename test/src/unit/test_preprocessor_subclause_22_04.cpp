@@ -694,3 +694,24 @@ TEST(Preprocessor, Include_BothFormsInSameFile) {
   EXPECT_NE(result.find("wire local_w;"), std::string::npos);
   EXPECT_NE(result.find("wire system_w;"), std::string::npos);
 }
+
+// §22.4 (printed page 705) writes the file name between double quotes or
+// angle brackets, so one never closed is neither form, reported with no file
+// searched for. Its first and last characters were dropped and abc.sv sought.
+TEST(Preprocessor, UnclosedIncludeFileNameIsReported) {
+  struct Case {
+    const char* directive;
+    const char* message;
+  };
+  for (const Case& c : {Case{"`include \"abc.svh\n",
+                             "`include file name is missing its closing \""},
+                        Case{"`include <abc.svh\n",
+                             "`include file name is missing its closing >"},
+                        Case{"`include \"\n",
+                             "`include file name is missing its closing \""}}) {
+    PreprocFixture f;
+    Preprocess(c.directive, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), c.message, 1, "22.4"))
+        << c.directive;
+  }
+}

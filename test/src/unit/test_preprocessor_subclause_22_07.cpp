@@ -531,4 +531,60 @@ TEST(Preprocessor, Timescale_IllegalInsideASecondElementOnTheLine) {
                             "22.7"));
 }
 
+// §5.3 makes any run of spaces, tabs or formfeeds a separator, and Syntax 23-2
+// with A.2.1.3 puts an optional lifetime, static or automatic, between a
+// header's keyword and its name, so every header below records the name it
+// declares. A tab or formfeed after the keyword, two spaces before automatic,
+// a tab after it, and static recorded no name or the lifetime as the name.
+TEST(Preprocessor, Timescale_RecordedPastAnyWhiteSpaceAndLifetime) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "module\tm1;\nendmodule\n"
+      "module\fm2;\nendmodule\n"
+      "module  automatic m3;\nendmodule\n"
+      "module automatic\tm4;\nendmodule\n"
+      "module static m5;\nendmodule\n"
+      "interface static i1;\nendinterface\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 6u);
+  const char* names[] = {"m1", "m2", "m3", "m4", "m5", "i1"};
+  for (size_t i = 0; i < list.size(); ++i) {
+    EXPECT_EQ(list[i].module, names[i]);
+    EXPECT_EQ(list[i].timescale.unit, TimeUnit::kUs);
+  }
+}
+
+// The newline is a separator too, so a header whose keyword, and lifetime,
+// end their line declares the name on the line after. Nothing was recorded.
+TEST(Preprocessor, Timescale_RecordedForAHeaderSplitAcrossLines) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "module\n  m;\nendmodule\n"
+      "module automatic\n  n;\nendmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_EQ(list[0].module, "m");
+  EXPECT_EQ(list[1].module, "n");
+  EXPECT_EQ(list[1].timescale.unit, TimeUnit::kUs);
+}
+
+// The element such a header opens is open until its end, so a directive
+// before that end is inside it. It was accepted.
+TEST(Preprocessor, Timescale_IllegalInsideAHeaderSplitAcrossLines) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("module\n  m;\n`timescale 1ns / 1ps\nendmodule\n", f, pp);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 3,
+                            "22.7"));
+}
+
 }  // namespace

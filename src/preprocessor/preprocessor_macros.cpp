@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor.h"
@@ -20,9 +21,57 @@ static void SkipSpaces(std::string_view& s) {
   }
 }
 
-bool Preprocessor::EvalIfdefExpr(std::string_view expr) {
+// The parenthesized condition `name` opens with, up to the parenthesis that
+// closes it, the block of text standing after it; the whole of `name` where no
+// parenthesis closes it, which EvalIfdefExpr reports.
+static std::string_view ParenthesizedSpan(std::string_view name) {
+  int depth = 0;
+  for (size_t i = 0; i < name.size(); ++i) {
+    if (name[i] == '(') ++depth;
+    if (name[i] == ')' && --depth == 0) return name.substr(0, i + 1);
+  }
+  return name;
+}
+
+bool Preprocessor::EvalIfdefCondition(std::string_view name,
+                                      std::string_view directive,
+                                      SourceLoc loc) {
+  if (name.empty()) {
+    diag_.Error(loc, "`" + std::string(directive) + " is missing its condition",
+                Subclause("22.6"));
+    return false;
+  }
+  if (name[0] == '(') return EvalIfdefExpr(ParenthesizedSpan(name), loc);
+  // A condition that opens with no parenthesis is a text_macro_identifier; a
+  // negation is an ifdef_macro_expression, which stands only in parentheses.
+  size_t len = 0;
+  while (len < name.size() && IsIdentChar(name[len])) ++len;
+  if (len == 0) {
+    diag_.Error(loc,
+                "'" + std::string(name) + "' after `" + std::string(directive) +
+                    " is no ifdef_condition",
+                Subclause("22.6"));
+    return false;
+  }
+  return macros_.IsDefined(name.substr(0, len));
+}
+
+// §22.6 (Syntax 22-5) builds an ifdef_macro_expression of names, `!`,
+// parentheses and `&&`, `||`, `->` and `<->`, so one with an operand missing,
+// a parenthesis left open or text the grammar does not read, `&` alone, is
+// reported rather than read as far as it goes.
+bool Preprocessor::EvalIfdefExpr(std::string_view expr, SourceLoc loc) {
   auto e = Trim(expr);
-  return EvalIfdefEquiv(e);
+  ifdef_expr_malformed_ = false;
+  bool result = EvalIfdefEquiv(e);
+  SkipSpaces(e);
+  if (ifdef_expr_malformed_ || !e.empty()) {
+    diag_.Error(
+        loc,
+        "malformed ifdef_macro_expression '" + std::string(Trim(expr)) + "'",
+        Subclause("22.6"));
+  }
+  return result;
 }
 
 // §22.6 resolves an ifdef expression by §11.8's rules, and Table 11-2 in
@@ -77,13 +126,17 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
     expr.remove_prefix(1);
     bool result = EvalIfdefEquiv(expr);
     SkipSpaces(expr);
-    if (!expr.empty() && expr[0] == ')') expr.remove_prefix(1);
+    if (!expr.starts_with(')')) {
+      ifdef_expr_malformed_ = true;
+      return result;
+    }
+    expr.remove_prefix(1);
     return result;
   }
 
-  SkipSpaces(expr);
   size_t len = 0;
   while (len < expr.size() && IsIdentChar(expr[len])) ++len;
+  if (len == 0) ifdef_expr_malformed_ = true;
   auto id = expr.substr(0, len);
   expr.remove_prefix(len);
   return macros_.IsDefined(id);

@@ -472,37 +472,38 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
 // recognize: it is reserved for describing protected envelopes, so its
 // expressions -- and no other pragma's, however they are spelled -- decide
 // which regions of text an envelope covers.
-void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
+PragmaReading ReadPragmaDirective(std::string_view rest) {
+  PragmaReading reading;
   PragmaTokens toks;
-  bool block_comment_open = false;
-  bool tokenized = TokenizePragma(rest, toks, block_comment_open);
-  // The directive ends where the comment begins, but the comment itself keeps
-  // running, so the lines after it are not source text either.
-  if (block_comment_open) in_block_comment_ = true;
-  if (!tokenized) {
-    diag_.Error(loc, "`pragma directive contains an illegal token",
-                Subclause("22.11"));
-    return;
-  }
-  if (toks.empty()) {
-    diag_.Error(loc, "`pragma requires a pragma_name", Subclause("22.11"));
-    return;
-  }
-  if (toks.front().kind != PragmaTokenKind::kSimpleIdentifier) {
-    diag_.Error(loc, "`pragma pragma_name must be a simple identifier",
-                Subclause("22.11"));
-    return;
-  }
-  std::vector<PragmaKeywordExpression> keywords;
-  size_t i = 1;
-  if (i != toks.size()) {
-    if (!ParsePragmaExpressionList(toks, i, &keywords) || i != toks.size()) {
-      diag_.Error(loc, "malformed pragma_expression after pragma_name",
-                  Subclause("22.11"));
-      return;
+  if (!TokenizePragma(rest, toks, reading.block_comment_open)) {
+    reading.error = "`pragma directive contains an illegal token";
+  } else if (toks.empty()) {
+    reading.error = "`pragma requires a pragma_name";
+  } else if (toks.front().kind != PragmaTokenKind::kSimpleIdentifier) {
+    reading.error = "`pragma pragma_name must be a simple identifier";
+  } else {
+    reading.name = toks.front().text;
+    size_t i = 1;
+    if (i != toks.size() &&
+        (!ParsePragmaExpressionList(toks, i, &reading.keywords) ||
+         i != toks.size())) {
+      reading.error = "malformed pragma_expression after pragma_name";
     }
   }
-  std::string_view name = toks.front().text;
+  return reading;
+}
+
+void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
+  PragmaReading reading = ReadPragmaDirective(rest);
+  // The directive ends where the comment begins, but the comment itself keeps
+  // running, so the lines after it are not source text either.
+  if (reading.block_comment_open) in_block_comment_ = true;
+  if (!reading.error.empty()) {
+    diag_.Error(loc, std::string(reading.error), Subclause("22.11"));
+    return;
+  }
+  const std::vector<PragmaKeywordExpression>& keywords = reading.keywords;
+  std::string_view name = reading.name;
   if (name == kProtectPragmaName) {
     ApplyProtectKeywords(keywords, loc);
     return;
@@ -806,26 +807,27 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line,
                                                uint32_t file_id,
                                                uint32_t line_num,
                                                std::string& output) {
+  SourceLoc loc{file_id, line_num, 1};
   if (StartsWithDirective(line, "ifdef")) {
-    HandleIfdef(AfterDirective(line, "ifdef"), false);
+    HandleIfdef(AfterDirective(line, "ifdef"), false, loc);
     return true;
   }
   if (StartsWithDirective(line, "ifndef")) {
-    HandleIfdef(AfterDirective(line, "ifndef"), true);
+    HandleIfdef(AfterDirective(line, "ifndef"), true, loc);
     return true;
   }
   if (StartsWithDirective(line, "elsif")) {
-    HandleElsif(AfterDirective(line, "elsif"));
+    HandleElsif(AfterDirective(line, "elsif"), loc);
     return true;
   }
   if (StartsWithDirective(line, "else")) {
-    HandleElse();
+    HandleElse(loc);
 
     if (IsActive()) OutputRemainder(line, "else", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "endif")) {
-    HandleEndif();
+    HandleEndif(loc);
 
     if (IsActive()) OutputRemainder(line, "endif", file_id, line_num, output);
     return true;

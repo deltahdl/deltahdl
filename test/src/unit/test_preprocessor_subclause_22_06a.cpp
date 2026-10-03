@@ -451,27 +451,6 @@ TEST(Preprocessor, ChainedElsifWithNestedIfndef) {
   EXPECT_EQ(result.find("not_first"), std::string::npos);
 }
 
-TEST(Preprocessor, EndifWithoutIfdef) {
-  PreprocFixture f;
-  Preprocess("`endif\n", f);
-
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, ElseWithoutIfdef) {
-  PreprocFixture f;
-  Preprocess("`else\ntext\n`endif\n", f);
-
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, IfdefWithoutEndif) {
-  PreprocFixture f;
-  Preprocess("`ifdef SOMETHING\ntext\n", f);
-
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, IfdefEmptyBlocks) {
   PreprocFixture f;
   PreprocConfig cfg;

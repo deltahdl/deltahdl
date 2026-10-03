@@ -554,3 +554,16 @@ TEST(Preprocessor, ReportInsideAMultiLineExpansionStandsAtTheLineOfTheUse) {
                             "expected top-level declaration", 4, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "design.sv:4:1");
 }
+
+// The empty name `line 5 "" 0 gives is a name like any other, so a report on
+// the line after names it, at the line the directive set. It named the file the
+// tool opened.
+TEST(Preprocessor, ReportBelowALineDirectiveNamingTheEmptyName) {
+  PreprocFixture f;
+  Arena arena;
+  PreprocessAndParseUnder("generated.sv",
+                          "`line 5 \"\" 0\n"
+                          "%\n",
+                          f, arena);
+  EXPECT_EQ(FirstErrorLocation(f), ":5:1");
+}

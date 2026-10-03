@@ -134,8 +134,10 @@ std::string JoinDefineBody(LineCursor& cursor) {
     // exception is a backslash-newline that falls inside a double-quoted string
     // literal, where both the backslash and the newline are omitted (see 5.9);
     // HasUnterminatedString(joined) reports that in-string state. A `""" span
-    // keeps its embedded newlines the same way.
-    if (HasOpenBacktickTripleQuote(joined) ||
+    // keeps its embedded newlines the same way, and so does a triple-quoted
+    // string (§5.9), whose newlines are part of it and which §22.5.1 lets run
+    // on past the end of the line.
+    if (HasOpenBacktickTripleQuote(joined) || HasOpenTripleQuote(joined) ||
         (backslash_join && !HasUnterminatedString(joined))) {
       joined += '\n';
     }

@@ -743,33 +743,34 @@ TEST(ProtectEncodingSyntax, AnEscapedQuoteInsideTheSchemeNameEndsNothing) {
   EXPECT_FALSE(Carries(stated, "line_length=9")) << stated;
 }
 
-// §34.5.9.1 writes the length as a number, so a word holding a letter, no
-// value at all, or a number with a stray parenthesis after it carries no
-// length, and the scheme beside it is still taken.
+// §34.5.9.1 writes the length as a number, so a word holding a letter
+// carries no length, and the scheme beside it is still taken.
 TEST(ProtectEncodingSyntax, ALengthSpelledOtherThanInDigitsIsNoLength) {
-  constexpr std::string_view kSchemeAlone =
-      "`pragma protect encoding=(enctype=\"base64\")";
   EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=x8)"),
-            kSchemeAlone);
-  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=)"),
-            kSchemeAlone);
-  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=8))"),
-            kSchemeAlone);
+            "`pragma protect encoding=(enctype=\"base64\")");
 }
 
-// The spellings of the list that name no scheme, each of which leaves the
-// length written beside it qualifying nothing: a bare word where the string
-// belongs, a string opened and never closed -- once ending on a backslash --
-// and a list opened and never closed.
+// A bare word where the string belongs names no scheme, which leaves the
+// length written beside it qualifying nothing.
 TEST(ProtectEncodingSyntax, ARegionsListNamingNoSchemeIsNotTaken) {
   EXPECT_EQ(StatedForARegionWriting("(enctype=b, line_length=8)"),
             kStatesNothingTaken);
-  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64, line_length=8)"),
-            kStatesNothingTaken);
-  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\\"),
-            kStatesNothingTaken);
-  EXPECT_EQ(StatedForARegionWriting("(enctype=\"base64\", line_length=8"),
-            kStatesNothingTaken);
+}
+
+// A list §22.11's grammar rejects -- a length with no value, a stray
+// parenthesis after one, a string opened and never closed, once ending on a
+// backslash, and a list opened and never closed -- is on a line the encrypting
+// half sets aside unread, so neither its scheme nor its length is taken.
+TEST(ProtectEncodingSyntax, AListTheGrammarRejectsStatesNothing) {
+  for (std::string_view list : {
+           "(enctype=\"base64\", line_length=)",
+           "(enctype=\"base64\", line_length=8))",
+           "(enctype=\"base64, line_length=8)",
+           "(enctype=\"base64\\",
+           "(enctype=\"base64\", line_length=8",
+       }) {
+    EXPECT_EQ(StatedForARegionWriting(list), kStatesNothingTaken) << list;
+  }
 }
 
 // The keyword written as an escaped identifier. A pragma_keyword is the simple

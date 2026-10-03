@@ -749,4 +749,22 @@ TEST(CelldefinePreprocessing, CelldefineAfterResetallOpensNewRegion) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "afterreset"));
 }
 
+// §22.10 marks each module after `celldefine a cell, however its header
+// separates the keyword from the name (§5.3): a tab, a lifetime, a newline.
+TEST(Preprocessor, CellMarkPastAnyWhiteSpaceAndLifetime) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`celldefine\n"
+      "module\tc1;\nendmodule\n"
+      "macromodule static c2;\nendmodule\n"
+      "module\n  c3;\nendmodule\n"
+      "`endcelldefine\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(IsTaggedAsCell(pp, "c1"));
+  EXPECT_TRUE(IsTaggedAsCell(pp, "c2"));
+  EXPECT_TRUE(IsTaggedAsCell(pp, "c3"));
+}
+
 }  // namespace
