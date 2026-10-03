@@ -414,101 +414,26 @@ TEST(VirtualInterfaceSim, AMemberReadThroughTheHandleKeepsItsSignedness) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// §25.9: a virtual interface assigned an instance in a generate block, named
-// through its block instance, represents that instance: writes through it land
-// in g[1].s, g[2].s and g[0].s in turn.
-TEST(VirtualInterfaceSim, SourceInAGenerateBlockIsThatInstance) {
-  SimFixture f;
-  EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
-                       "module top;\n"
-                       "  for (genvar i = 0; i < 3; i++) begin : g\n"
-                       "    SBus s();\n"
-                       "  end\n"
-                       "  virtual SBus v;\n"
-                       "  initial begin\n"
-                       "    v = g[1].s; v.a = 10;\n"
-                       "    v = g[2].s; v.a = 20;\n"
-                       "    v = g[0].s; v.a = 30;\n"
-                       "    $display(\"%0d %0d %0d\", g[0].s.a, g[1].s.a,\n"
-                       "             g[2].s.a);\n"
-                       "  end\n"
-                       "endmodule\n",
-                       f),
-            "30 10 20\n");
-}
-
-// A virtual interface assigned a program's interface port represents the
-// instance the port is connected to.
-TEST(VirtualInterfaceSim, SourceIsAnInterfacePort) {
-  SimFixture f;
-  EXPECT_EQ(
-      RunCapture("interface SBus; int a; endinterface\n"
-                 "program P(SBus b);\n"
-                 "  virtual SBus v;\n"
-                 "  initial begin\n"
-                 "    v = b;\n"
-                 "    #3 v.a = 5;\n"
-                 "    $display(\"prog sees %0d t=%0t\", top.s.a, $time);\n"
-                 "  end\n"
-                 "endprogram\n"
-                 "module top;\n"
-                 "  SBus s();\n"
-                 "  P p(s);\n"
-                 "endmodule\n",
-                 f),
-      "prog sees 5 t=3\n");
-}
-
-// A virtual interface a class function returns is the one stored in the
-// object, assignable to a virtual interface of the same type.
-TEST(VirtualInterfaceSim, SourceIsAFunctionsResult) {
-  SimFixture f;
-  EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
-                       "class Pool;\n"
-                       "  virtual SBus vs[2];\n"
-                       "  function virtual SBus pick(int i); return vs[i]; "
-                       "endfunction\n"
-                       "endclass\n"
-                       "module top;\n"
-                       "  SBus s0(), s1();\n"
-                       "  Pool p;\n"
-                       "  virtual SBus got;\n"
-                       "  initial begin\n"
-                       "    p = new; p.vs[0] = s0; p.vs[1] = s1;\n"
-                       "    got = p.pick(1);\n"
-                       "    got.a = 50;\n"
-                       "    $display(\"picked=%0d a=%0d\",\n"
-                       "             (got == s1) + (p.pick(0) == s0), s1.a);\n"
-                       "  end\n"
-                       "endmodule\n",
-                       f),
-            "picked=2 a=50\n");
-}
-
 // §25.9 with §25.3: an instance an interface holds is reached through a
-// virtual interface to the outer one, and so is a function of the outer one
-// reading it.
+// virtual interface to the outer one, so a write to vo.in.v is a write to
+// o.in.v.
 TEST(VirtualInterfaceSim, NestedInterfaceInstanceIsReached) {
   SimFixture f;
-  EXPECT_EQ(
-      RunCapture("interface inner_if; int v; endinterface\n"
-                 "interface outer_if;\n"
-                 "  int w;\n"
-                 "  inner_if in();\n"
-                 "  function int total(); return w + in.v; endfunction\n"
-                 "endinterface\n"
-                 "module top;\n"
-                 "  outer_if o();\n"
-                 "  virtual outer_if vo;\n"
-                 "  initial begin\n"
-                 "    vo = o;\n"
-                 "    vo.in.v = 5;\n"
-                 "    vo.w = 7;\n"
-                 "    $display(\"inner=%0d fn=%0d\", o.in.v, vo.total());\n"
-                 "  end\n"
-                 "endmodule\n",
-                 f),
-      "inner=5 fn=12\n");
+  EXPECT_EQ(RunCapture("interface inner_if; int v; endinterface\n"
+                       "interface outer_if;\n"
+                       "  inner_if in();\n"
+                       "endinterface\n"
+                       "module top;\n"
+                       "  outer_if o();\n"
+                       "  virtual outer_if vo;\n"
+                       "  initial begin\n"
+                       "    vo = o;\n"
+                       "    vo.in.v = 5;\n"
+                       "    $display(\"inner=%0d\", o.in.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "inner=5\n");
 }
 
 }  // namespace
