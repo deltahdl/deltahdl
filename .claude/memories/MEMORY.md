@@ -65,18 +65,15 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — never run a gate CI runs; push and read the run. A local build to investigate a defect is allowed.
+- [Verifying through CI](verifying-through-ci.md) — run locally only what cannot be run in CI; a build, a test binary or a probe of a defect is pushed and read from the run.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
-- [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a build, a probe batch, a `gh` sweep) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
+- [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a `gh` sweep, a CI watch) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands.
 - [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next batch.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
-- [The sv-tests build exception](the-sv-tests-build-exception.md) — build only to run one already-failing file, only for the stdout the log drops.
-- [A stash round trip leaves the build stale](stale-build-after-a-stash.md) — build the unchanged binary for a comparison in a worktree or scratch directory, never by stash, build and pop in build/.
-- [A local coverage build](local-coverage-build.md) — per-line coverage of one file needs an instrumented build with the flags passed by hand; DELTAHDL_COVERAGE=ON wants lld, which the Mac lacks; compare missed regions, as CI counts a line missed where a zero region starts.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.
 
