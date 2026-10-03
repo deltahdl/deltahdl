@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -263,6 +264,12 @@ struct ClassDecl {
   // and a default type is not an expression. ModuleDecl::param_types is the
   // same list for a module's parameter_port_list.
   std::vector<DataType> param_types;
+  // A.2.1.1's param_assignment gives a parameter port { variable_dimension }:
+  // the unpacked dimensions each value parameter of the header declared with
+  // any was written with, by name, as ModuleDecl::param_port_unpacked_dims
+  // keeps a module's.
+  std::unordered_map<std::string_view, std::vector<Expr*>>
+      param_port_unpacked_dims;
   std::unordered_set<std::string_view> type_param_names;
   std::unordered_set<std::string_view> localparam_port_names;
 };

@@ -22,8 +22,7 @@ struct ParamPortList {
   std::unordered_set<std::string_view>& type_param_names;
   std::unordered_set<std::string_view>& localparam_port_names;
   std::vector<DataType>* param_types;
-  // Where a value parameter's unpacked dimensions go, by name; null where the
-  // declaration holding the list keeps none.
+  // Where a value parameter's unpacked dimensions go, by name.
   std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims;
 };
 
@@ -135,7 +134,7 @@ struct ParserParamPortHelpers {
     DataType dtype = p.ParseDataType();
     p.ParseImplicitParamRange(dtype);
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.2"));
-    if (out.unpacked_dims != nullptr && p.Check(TokenKind::kLBracket)) {
+    if (p.Check(TokenKind::kLBracket)) {
       p.ParseUnpackedDims((*out.unpacked_dims)[name.text]);
     }
     Expr* default_val = nullptr;

@@ -22,6 +22,25 @@ TEST(ClassParsing, ParameterizedClass) {
   EXPECT_EQ(cls->params[0].first, "DEPTH");
 }
 
+// §8.25 gives a class the parameter_port_list a module header takes, whose
+// param_assignment (A.2.1.1) may carry unpacked dimensions after the name, so
+// A is an array of two and B, the next assignment of the same declaration,
+// one of two by three.
+TEST(ClassParsing, ClassParamPortUnpackedDimensions) {
+  auto r = Parse(
+      "class C #(parameter int A[2] = '{1, 2}, B[2][3] = '{default: 0},\n"
+      "          int D = 3);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  const auto& dims = r.cu->classes[0]->param_port_unpacked_dims;
+  ASSERT_EQ(dims.size(), 2u);
+  EXPECT_EQ(dims.at("A").size(), 1u);
+  EXPECT_EQ(dims.at("B").size(), 2u);
+  EXPECT_EQ(dims.count("D"), 0u);
+}
+
 TEST(ClassParsing, ParameterizedClassMultipleParams) {
   auto r = Parse(
       "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
