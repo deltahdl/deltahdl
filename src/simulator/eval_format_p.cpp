@@ -667,19 +667,25 @@ static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
   return FormatStructValueForP(*layout, val, ctx);
 }
 
+// Whether `e` names a handle by identifiers and member selects alone, `h` or
+// `o.inner`, so that resolving it runs nothing.
+static bool IsCallFreeHandlePath(const Expr* e) {
+  while (e->kind == ExprKind::kMemberAccess) e = e->lhs;
+  return e->kind == ExprKind::kIdentifier;
+}
+
 // §21.2.1.6 with §8.5: an unpacked array property of a class object, through a
 // handle, is an aggregate as an array variable is: a queue property is the
 // queue the object holds, and a fixed-size one the elements the object holds
 // one by one (ResolveClassArray), printed from the left bound. No variable
 // stands under the argument's name, so none of the named forms found it and it
-// printed as one number, 0. Only `h.name` is asked about: every argument of
-// the call passes here, and a base that is itself a call, `q.pop_front().id`,
-// would run again to be asked.
+// printed as one number, 0. Only a chain of handles is asked about, `h.q` or
+// `o.inner.q` (IsCallFreeHandlePath): every argument of the call passes here,
+// and a base holding a call, `q.pop_front().id`, would run again to be asked.
 static std::optional<std::string> BuildFormatPClassArray(const Expr* arg,
                                                          SimContext& ctx,
                                                          Arena& arena) {
-  if (arg->kind != ExprKind::kMemberAccess ||
-      arg->lhs->kind != ExprKind::kIdentifier)
+  if (arg->kind != ExprKind::kMemberAccess || !IsCallFreeHandlePath(arg->lhs))
     return std::nullopt;
   if (const QueueObject* q = FindQueueOfBase(arg, ctx, arena))
     return FormatQueueForP(q, {}, ctx);

@@ -876,4 +876,25 @@ TEST(FormatPSim, ArrayPropertyThroughAHandlePrintsItsElements) {
             "'{5, 2, 9} '{1, 2, 3} 3\n");
 }
 
+// The handle may itself be a property of another object: o.inner.q is the
+// queue the object o.inner refers to holds. A chain of handles printed 0.
+TEST(FormatPSim, ArrayPropertyTwoHandlesDownPrintsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class In;\n"
+                       "  int q[$];\n"
+                       "endclass\n"
+                       "class Out;\n"
+                       "  In inner = new;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    automatic Out o = new;\n"
+                       "    o.inner.q = '{5, 2, 9};\n"
+                       "    $display(\"%p\", o.inner.q);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "'{5, 2, 9}\n");
+}
+
 }  // namespace
