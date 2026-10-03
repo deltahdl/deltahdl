@@ -280,4 +280,16 @@ TEST(HierarchicalNameFormat, InstanceInAGenerateBlockIsNamedThroughIt) {
             "top.g[0].c.m.l\ntop.g[0].c.m.h[0].l2\ntop.g[0].c.m.h[1].l2\n");
 }
 
+// §21.2.1.5 with §23.3.3.5: each element of an array of instances is named by
+// its index, `u[0]` and `u[1]`. %m printed the array's name, `top.u`, for both.
+TEST(HierarchicalNameFormat, ElementOfAnArrayOfInstancesIsNamedByItsIndex) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf; initial $display(\"%m\"); endmodule\n"
+                       "module top;\n"
+                       "  leaf u[1:0]();\n"
+                       "endmodule\n",
+                       f),
+            "top.u[0]\ntop.u[1]\n");
+}
+
 }  // namespace

@@ -276,31 +276,79 @@ void Lowerer::LowerParallelTop(const RtlirModule* mod) {
   LowerChildInstance(inst);
 }
 
+// The level RegisterChildInstancePath names `child` by: its name as written,
+// carrying the index of the element when it is one of an array of instances.
+// §23.3.3.5 names each element `u[1]`, and PushInstanceArray
+// (src/elaborator/elaborator_module_inst.cpp) appends that index to
+// RtlirModuleInst::inst_name alone, leaving simple_inst_name the array's name.
+static std::string ChildInstanceLevel(const RtlirModuleInst& child) {
+  std::string_view simple =
+      child.simple_inst_name.empty() ? child.inst_name : child.simple_inst_name;
+  std::string level(simple);
+  size_t bracket = child.inst_name.rfind('[');
+  if (!simple.ends_with(']') && child.inst_name.ends_with(']') &&
+      bracket != std::string_view::npos) {
+    level += child.inst_name.substr(bracket);
+  }
+  return level;
+}
+
 // §23.6 with §27.4 (printed page 820): an instance a generate block holds is
 // named through the block instance, `g[0].pi`, while its storage is keyed on
 // the one flat name the elaborator gives it (RtlirModuleInst::inst_name,
 // "g_0_pi"). The path is the parent's path, the block instances and the name
 // as written, recorded for the child's key wherever it differs from the key,
 // so an instance below one inside a generate block is named through it too.
-static void RegisterChildInstancePath(const std::string& parent_prefix,
-                                      const std::string& child_prefix,
-                                      const RtlirModuleInst& child,
-                                      SimContext& ctx) {
+// Returns the path where it differs from the key, and the empty string where
+// the key already spells it.
+static std::string RegisterChildInstancePath(const std::string& parent_prefix,
+                                             const std::string& child_prefix,
+                                             const RtlirModuleInst& child,
+                                             SimContext& ctx) {
   std::string path(ctx.FindInstancePath(parent_prefix));
   if (path.empty()) {
     path = parent_prefix;
     if (!path.empty()) path.pop_back();
   }
   std::string gen = GenBlockName(child.gen_block_path);
+  std::string own = ChildInstanceLevel(child);
   for (std::string_view level :
-       {std::string_view(gen), child.simple_inst_name.empty()
-                                   ? child.inst_name
-                                   : child.simple_inst_name}) {
+       {std::string_view(gen), std::string_view(own)}) {
     if (level.empty()) continue;
     if (!path.empty()) path += '.';
     path += level;
   }
-  if (path + "." != child_prefix) ctx.RegisterInstancePath(child_prefix, path);
+  if (path + "." == child_prefix) return {};
+  ctx.RegisterInstancePath(child_prefix, path);
+  return path;
+}
+
+// §23.6 with §27.4: a hierarchical name reaches what such an instance declares
+// through the same path, `g.c.pass` or `g[0].c.pass`, while the instance stores
+// it under its flat key, "g_c.pass". Every variable and net stored under the
+// key is therefore answered under the path as well, shared rather than copied,
+// as a generate block's own members are (RegisterGenBlockMembers in
+// lowerer_gen_block_members.cpp). The keys are gathered before any alias is
+// added, an alias being an insertion into the map walked.
+static void AliasChildObjectsUnderPath(const std::string& child_prefix,
+                                       const std::string& path, SimContext& ctx,
+                                       Arena& arena) {
+  auto under_path = [&](std::string_view key) -> std::string_view {
+    return *arena.Create<std::string>(
+        path + "." + std::string(key.substr(child_prefix.size())));
+  };
+  std::vector<std::pair<std::string_view, Variable*>> vars;
+  for (const auto& [key, var] : ctx.GetVariables())
+    if (key.starts_with(child_prefix)) vars.emplace_back(key, var);
+  std::vector<std::string_view> nets;
+  for (const auto& [key, net] : ctx.GetNets())
+    if (key.starts_with(child_prefix)) nets.push_back(key);
+  for (const auto& [key, var] : vars) {
+    std::string_view alias = under_path(key);
+    ctx.AliasVariable(alias, var);
+    AliasVariableKinds(alias, key, ctx, arena);
+  }
+  for (std::string_view key : nets) ctx.AliasNet(under_path(key), key);
 }
 
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
@@ -350,7 +398,8 @@ void Lowerer::LowerChildBody(const RtlirModule* mod) {
 void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   auto saved_prefix = inst_prefix_;
   auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
-  RegisterChildInstancePath(saved_prefix, child_prefix, child, ctx_);
+  std::string child_path =
+      RegisterChildInstancePath(saved_prefix, child_prefix, child, ctx_);
   inst_prefix_ = child_prefix;
   if (child.resolved->is_interface) {
     interface_instance_prefixes_.push_back(child_prefix);
@@ -404,6 +453,8 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
   CreateChildModuleNets(inst_prefix_, child, ctx_, arena_);
   RegisterGenBlockMembers(child.resolved);
+  if (!child_path.empty())
+    AliasChildObjectsUnderPath(child_prefix, child_path, ctx_, arena_);
   // 21.2.1.5: register the child instance's tasks/functions so a call within
   // its own body resolves (and %m composes the instance + subroutine path);
   // LowerModule registers these for the top only.

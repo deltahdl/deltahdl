@@ -240,4 +240,33 @@ TEST(HierarchicalNames, MemberOfATypeParameterStructureIsWritten) {
             "A=9\n");
 }
 
+// §23.6 with §27.4 and §27.5: a hierarchical name reaches a variable of an
+// instance a generate block holds through the block instance, `g.c.n` and
+// `h[1].d.n`, and a write through it is a write to the instance's own n, which
+// the instance's always procedure doubles into dbl.
+TEST(HierarchicalNames, NameThroughAGenerateBlockReachesAnInstancesVariable) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m2;\n"
+      "  int n = 3;\n"
+      "  int dbl;\n"
+      "  always @(n) dbl = n * 2;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    m2 c();\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : h\n"
+      "    m2 d();\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 h[1].d.n = 7;\n"
+      "    #1 $display(\"%0d %0d %0d %0d\", g.c.n, h[0].d.n, h[1].d.n,\n"
+      "                h[1].d.dbl);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 3 7 14\n");
+}
+
 }  // namespace
