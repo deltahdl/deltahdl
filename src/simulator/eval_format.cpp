@@ -1,5 +1,7 @@
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -263,15 +265,26 @@ static std::string FormatUnformatted4Value(const Logic4Vec& val) {
   return out;
 }
 
-// Apply the $timeformat configuration (20.4.3) to a raw time value. The
-// number is rendered with the configured decimal precision, padded with
-// leading spaces to the minimum field width, and tagged with the suffix
-// string.
+// Apply the $timeformat configuration (20.4.3) to a time value, integral or
+// real, expressed in units of 10**value_order s. The value is converted to the
+// configured units_number, rendered with the configured decimal precision,
+// padded with leading spaces to the minimum field width, and tagged with the
+// suffix string.
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
-                                      const TimeFormatSpec& spec) {
-  auto ticks = static_cast<double>(val.ToUint64());
+                                      const TimeFormatSpec& spec,
+                                      int value_order) {
+  long double time = 0;
+  if (val.is_real) {
+    double d = 0;
+    uint64_t bits = val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(d));
+    time = d;
+  } else {
+    time = static_cast<long double>(val.ToUint64());
+  }
+  time *= std::pow(10.0L, value_order - spec.units_number);
   char buf[64];
-  std::snprintf(buf, sizeof(buf), "%.*f", spec.precision_number, ticks);
+  std::snprintf(buf, sizeof(buf), "%.*Lf", spec.precision_number, time);
   std::string body(buf);
   int pad = spec.minimum_field_width -
             static_cast<int>(body.size() + spec.suffix_string.size());
@@ -780,7 +793,14 @@ static void AppendRenderedValue(char spec, char norm,
     if (field.has_width) {
       widened.minimum_field_width = static_cast<int>(field.width);
     }
-    out += FormatTimeUnderTimeformat(args.vals[args.vi++], widened);
+    // §20.4.3: the value is a time in the unit of the scope that formats it.
+    int value_order = widened.units_number;
+    if (args.ctx != nullptr) {
+      const TimeScale& scale = ActiveInstanceTimeScale(*args.ctx);
+      value_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
+    }
+    out +=
+        FormatTimeUnderTimeformat(args.vals[args.vi++], widened, value_order);
     return;
   }
   if (IsRealSpec(norm) &&

@@ -121,21 +121,18 @@ Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   bool want_precision = (name == "$timeprecision");
   const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
-  bool use_sim_time_unit = false;
   if (!expr->args.empty() && expr->args[0] != nullptr) {
+    // $root is the time scope of the simulation time unit (§3.14.3), which
+    // the lowerer registers beside the design elements'.
     std::string_view target = TimescaleArgName(expr->args[0]);
-    if (target == "$root") {
-      use_sim_time_unit = true;
-    } else if (target == "$unit") {
+    if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
     } else if (const TimeScale* found = ctx.FindScopeTimeScale(target)) {
       scale = found;
     }
   }
   int order = 0;
-  if (use_sim_time_unit) {
-    order = static_cast<int>(ctx.StepTimeUnit());
-  } else if (want_precision) {
+  if (want_precision) {
     order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
   } else {
     order = EffectiveTimeOrder(scale->unit, scale->magnitude);
@@ -189,9 +186,13 @@ static std::string TimeOrderToUnitString(int order) {
 // `timescale directive", so a subroutine it declares -- a method of a class it
 // declares among them -- runs in that unit whichever instance calls it.
 const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
-  if (const Scope* frame = ctx.PackageFrame();
-      frame != nullptr && frame->package == "$unit") {
-    return ctx.CompUnitTimeScale();
+  if (const Scope* frame = ctx.PackageFrame()) {
+    if (frame->package == "$unit") return ctx.CompUnitTimeScale();
+    // §3.14.2.2: a package that declares its time unit is a time scope of its
+    // own, registered by the lowerer under the package's name and "::".
+    std::string key(frame->package);
+    key += "::";
+    if (const TimeScale* found = ctx.FindScopeTimeScale(key)) return *found;
   }
   std::string prefix = ctx.ActiveInstancePrefix();
   if (!prefix.empty()) prefix.pop_back();
@@ -210,13 +211,12 @@ const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
   std::string name;
   const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
-  bool use_sim_time_unit = false;
   if (!expr->args.empty() && expr->args[0] != nullptr) {
+    // $root names the time scope of the simulation time unit, whose unit and
+    // precision are both the global precision (§3.14.3), registered by the
+    // lowerer beside the design elements'.
     std::string_view target = TimescaleArgName(expr->args[0]);
-    if (target == "$root") {
-      use_sim_time_unit = true;
-      name = "$root";
-    } else if (target == "$unit") {
+    if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
       name = "$unit";
     } else {
@@ -235,17 +235,8 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
       name += "." + prefix;
     }
   }
-  int unit_order = 0;
-  int prec_order = 0;
-  if (use_sim_time_unit) {
-    // The simulation time unit and the global precision are synonymous, so
-    // $root reports the same value for both fields (see 3.14.3).
-    unit_order = static_cast<int>(ctx.StepTimeUnit());
-    prec_order = unit_order;
-  } else {
-    unit_order = EffectiveTimeOrder(scale->unit, scale->magnitude);
-    prec_order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
-  }
+  int unit_order = EffectiveTimeOrder(scale->unit, scale->magnitude);
+  int prec_order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
   return "Time scale of (" + name + ") is " +
          TimeOrderToUnitString(unit_order) + " / " +
          TimeOrderToUnitString(prec_order);

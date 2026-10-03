@@ -336,4 +336,18 @@ TEST(DistributionFunctions, NonPositiveArgumentWarningNames20_14_2) {
       "argument of a distribution function shall be greater", 6, "20.14.2"));
 }
 
+// §20.14.2: the distribution functions return integers, which are signed, so
+// a negative draw compares below 0 and prints negative used directly.
+TEST(DistributionFunctions, ADrawIsASignedInteger) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int seed = 5;\n"
+                 "  initial $display(\"%0d\", $dist_uniform(seed, -3, -1) < "
+                 "0);\n"
+                 "endmodule\n",
+                 f),
+      "1\n");
+}
+
 }  // namespace

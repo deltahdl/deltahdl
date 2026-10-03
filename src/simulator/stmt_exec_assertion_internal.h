@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/assert_control_log.h"
 #include "simulator/class_object.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/process.h"
@@ -158,10 +159,13 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena);
 
-// §20.11: Kill aborts the attempts in flight of every concurrent assertion
-// whose assertion type and directive type the masks select, in whichever
-// process keeps them; the aborted attempts reach no verdict.
-void AbortKilledAttempts(uint32_t assertion_type, uint32_t directive_type,
-                         SimContext& ctx);
+// §20.11: the Kill `call` aborts the attempts in flight of every concurrent
+// assertion it selects, in whichever process keeps them; the aborted attempts
+// reach no verdict.
+void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx);
+
+// §20.11: the status the assertion control tasks called so far leave the
+// assertion `stmt` in, written where the running process stands.
+AssertionStatus AssertionControlStatus(const Stmt* stmt, SimContext& ctx);
 
 }  // namespace delta

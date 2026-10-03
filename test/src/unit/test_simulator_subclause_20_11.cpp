@@ -565,13 +565,17 @@ TEST(AssertControlSim, FailOffSuppressesDefaultErrorButStillCounts) {
   EXPECT_EQ(g.ctx.LastSeverity(), "ERROR");
 }
 
-// §20.11: a control that names a scope list targets those scopes rather than
-// the whole design; immediate assertions are not registered by hierarchical
-// name, so such a task leaves them checking (it does not turn off the whole
-// design).
-TEST(AssertControlSim, ScopedOffDoesNotStopWholeDesignChecking) {
-  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+// §20.11: a control that names a scope list affects the assertions of those
+// scopes alone: turning off the instance `u` leaves the assertion of `t`
+// itself checked, and turning off `t` reaches it.
+TEST(AssertControlSim, AScopeListSelectsTheAssertionsOfItsScopes) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module m;\n"
+                                        "endmodule\n"
+                                        "module t;\n"
+                                        "  m u();\n"
                                         "  initial begin\n"
+                                        "    $assertoff(0, t.u);\n"
+                                        "    assert(0);\n"
                                         "    $assertoff(0, t);\n"
                                         "    assert(0);\n"
                                         "  end\n"
@@ -729,6 +733,122 @@ TEST(AssertControlSim, AssertKillAbortsAFutureSampledValueAttemptInFlight) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "f=8\n");
+}
+
+// §20.11: FailOff (9) stops the fail action and PassOff (7) the pass action
+// of the assertions selected, immediate ones among them by the default
+// assertion_type, until FailOn (8) and PassOn (6) restore them.
+TEST(AssertControlSim, FailOffAndPassOffStopTheActionBlocks) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $assertcontrol(9);\n"
+                       "    assert (1) $display(\"pass1\"); "
+                       "else $display(\"fail1\");\n"
+                       "    assert (0) $display(\"pass1b\"); "
+                       "else $display(\"fail1b\");\n"
+                       "    $assertcontrol(8);\n"
+                       "    $assertcontrol(7);\n"
+                       "    assert (1) $display(\"pass2\"); "
+                       "else $display(\"fail2\");\n"
+                       "    assert (0) $display(\"pass2b\"); "
+                       "else $display(\"fail2b\");\n"
+                       "    $assertcontrol(6);\n"
+                       "    assert (1) $display(\"pass3\"); "
+                       "else $display(\"fail3\");\n"
+                       "    assert (0) $display(\"pass4\"); "
+                       "else $display(\"fail4\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "pass1\nfail2b\npass3\nfail4\n");
+}
+
+// §20.11 with Table 20-6: the assertion_type argument selects the assertions
+// a control affects, so Off of simple immediate assertions (2) leaves the
+// concurrent `a1` failing at 3, Off of concurrent ones (1) stops it at 5, and
+// On restores it at 7.
+TEST(AssertControlSim, TheAssertionTypeSelectsTheAssertionsControlled) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic a = 0;\n"
+                       "  always #1 clk = ~clk;\n"
+                       "  a1: assert property (@(posedge clk) a) "
+                       "else $display(\"cfail %0d\", $time);\n"
+                       "  initial begin\n"
+                       "    @(negedge clk);\n"
+                       "    $assertcontrol(4, 2);\n"
+                       "    assert (0) else $display(\"ifail\");\n"
+                       "    @(negedge clk);\n"
+                       "    $assertcontrol(4, 1);\n"
+                       "    @(negedge clk);\n"
+                       "    $assertcontrol(3);\n"
+                       "    @(negedge clk);\n"
+                       "    $finish(0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "cfail 1\ncfail 3\ncfail 7\n");
+}
+
+// §20.11: an assertion named in the list_of_scopes_or_assertions is the one
+// the task acts on: `ay` is off from 0 until its $asserton at 6, and `ax` is
+// killed at 2 and on again at 4.
+TEST(AssertControlSim, ANamedAssertionInTheListIsControlledAlone) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic a = 0;\n"
+                       "  always #1 clk = ~clk;\n"
+                       "  ax: assert property (@(posedge clk) a) "
+                       "else $display(\"xfail %0d\", $time);\n"
+                       "  ay: assert property (@(posedge clk) a) "
+                       "else $display(\"yfail %0d\", $time);\n"
+                       "  initial begin\n"
+                       "    $assertoff(0, ay);\n"
+                       "    @(negedge clk);\n"
+                       "    $assertkill(0, ax);\n"
+                       "    @(negedge clk);\n"
+                       "    $asserton(0, ax);\n"
+                       "    @(negedge clk);\n"
+                       "    $asserton(0, ay);\n"
+                       "    @(negedge clk);\n"
+                       "    $finish(0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "xfail 1\nxfail 5\nxfail 7\nyfail 7\n");
+}
+
+// §20.11 with Table 20-5: Lock (1) holds an assertion against every later
+// control until Unlock (2), so the $assertoff at 0 leaves the locked `a1`
+// failing at 1, and the one after the unlock at 2 stops it with `a2` until
+// the $asserton at 4.
+TEST(AssertControlSim, ALockedAssertionIsUnaffectedUntilUnlocked) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic a = 0;\n"
+                       "  always #1 clk = ~clk;\n"
+                       "  a1: assert property (@(posedge clk) a) "
+                       "else $display(\"a1 %0d\", $time);\n"
+                       "  a2: assert property (@(posedge clk) a) "
+                       "else $display(\"a2 %0d\", $time);\n"
+                       "  initial begin\n"
+                       "    $assertcontrol(1, 31, 7, 0, a1);\n"
+                       "    $assertoff;\n"
+                       "    @(negedge clk);\n"
+                       "    $assertcontrol(2, 31, 7, 0, a1);\n"
+                       "    $assertoff;\n"
+                       "    @(negedge clk);\n"
+                       "    $asserton;\n"
+                       "    @(negedge clk);\n"
+                       "    $finish(0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a1 1\na1 5\na2 5\n");
 }
 
 }  // namespace

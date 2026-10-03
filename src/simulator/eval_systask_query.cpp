@@ -22,6 +22,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -60,22 +61,28 @@ struct QueryArgInfo {
   uint32_t elem_width = 32;  // packed element dimension [n-1:0]
   bool is_real = false;
   bool is_string = false;
-  // §7.4.4: the packed dimensions of an element with more than one, outermost
-  // first, each a dimension of its own; empty where elem_width describes the
-  // one there is.
+  // §7.4.4: the packed dimensions of an element, outermost first and as
+  // declared, each a dimension of its own; empty where elem_width describes
+  // the one there is.
   std::vector<PackedRange> packed_dims;
 };
 
-// §20.7 with §23.6: the array is named by an identifier, bare or a
-// hierarchical reference such as u.mem naming an instance's array; the empty
-// name for any other argument.
-static std::string QueryArgName(const Expr* arg0) {
+std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena) {
   if (arg0 == nullptr) return {};
   if (arg0->kind == ExprKind::kIdentifier) return std::string(arg0->text);
-  if (arg0->kind == ExprKind::kMemberAccess && !arg0->is_scope_resolution) {
-    return FlattenHierPath(arg0);
+  if (arg0->kind != ExprKind::kMemberAccess || arg0->is_scope_resolution) {
+    return {};
   }
-  return {};
+  // §25.9: a member of the instance a virtual interface represents, named by
+  // its full path, `top.i1.mem` for `vif.mem`.
+  if (arg0->lhs != nullptr && arg0->rhs != nullptr) {
+    VirtualInterfaceBase vi =
+        ResolveVirtualInterfaceBaseExpr(arg0->lhs, ctx, arena);
+    if (vi.is_virtual_interface && vi.handle != kNullVirtualInterface) {
+      return VirtualInterfaceComponentName(vi.handle, arg0->rhs->text, ctx);
+    }
+  }
+  return FlattenHierPath(arg0);
 }
 
 // §20.7 with §8.5: describes into `class_array` the dimension of the unpacked
@@ -160,25 +167,70 @@ static void ClassifyUnnamedArray(const Expr* arg0, SimContext& ctx,
 }
 
 // §20.7 with §7.4.4: the packed dimensions the argument `arg0` names, or an
-// element of the fixed-size array it names, declares where it declares more
-// than one, outermost first, `[3:0]` then `[7:0]` for `bit [3:0][7:0] joe
-// [1:10]`; empty otherwise, and for a queue or an associative array.
-static std::vector<PackedRange> PackedDimsOf(const Expr* arg0,
+// element of the fixed-size array it names, declares, as declared and
+// outermost first, `[3:0]` then `[7:0]` for `bit [3:0][7:0] joe [1:10]` and
+// `[0:3]` for `logic [0:3] u`; empty where it declares none, and for a queue
+// or an associative array.
+static std::vector<PackedRange> PackedDimsOf(const Expr* arg0, Arena& arena,
                                              const QueryArgInfo& info,
                                              SimContext& ctx) {
-  std::string name = QueryArgName(arg0);
+  std::string name = ArrayArgPath(arg0, ctx, arena);
   if (name.empty() || info.assoc != nullptr || info.queue != nullptr) return {};
   const Variable* v = ctx.FindVariable(name);
-  if ((v == nullptr || v->inner_packed_dims.empty()) && info.arr != nullptr &&
+  if ((v == nullptr || !v->has_packed_range) && info.arr != nullptr &&
       info.arr->dim_sizes.empty()) {
     v = ctx.FindVariable(name + "[" + std::to_string(info.arr->lo) + "]");
   }
-  if (v == nullptr || !v->has_packed_range || v->inner_packed_dims.empty())
-    return {};
+  if (v == nullptr || !v->has_packed_range) return {};
   std::vector<PackedRange> dims{v->packed_range};
   dims.insert(dims.end(), v->inner_packed_dims.begin(),
               v->inner_packed_dims.end());
   return dims;
+}
+
+// §20.7: an integer type with a predefined width is a packed array of one
+// `[n-1:0]` dimension, and a single-bit vector type a simple bit vector of one
+// bit; 0 for a name that is no integral type keyword.
+static uint32_t IntegralKeywordBits(std::string_view name) {
+  if (name == "bit" || name == "logic" || name == "reg") return 1;
+  if (name == "byte") return 8;
+  if (name == "shortint") return 16;
+  if (name == "int" || name == "integer") return 32;
+  if (name == "longint" || name == "time") return 64;
+  return 0;
+}
+
+// §20.7 with §6.18: the packed dimensions of the data type a typedef name, or
+// an integral type keyword, stands for, as declared and outermost first --
+// `[16:1]` for `typedef logic [16:1] Word` -- the typedef followed through
+// any name it renames; empty where `name` names no such type.
+static std::vector<PackedRange> TypeNameDims(std::string_view name,
+                                             SimContext& ctx, Arena& arena) {
+  if (uint32_t bits = IntegralKeywordBits(name); bits > 0) {
+    return {PackedRange{static_cast<int64_t>(bits) - 1, 0}};
+  }
+  const DataType* type = ctx.FindTypeDeclaration(name);
+  for (int hops = 0; type != nullptr && hops < 16; ++hops) {
+    std::vector<PackedRange> dims;
+    auto bound = [&](const Expr* e) {
+      return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+    };
+    if (type->packed_dim_left != nullptr && type->packed_dim_right != nullptr) {
+      dims.push_back(
+          {bound(type->packed_dim_left), bound(type->packed_dim_right)});
+    }
+    for (const auto& [left, right] : type->extra_packed_dims) {
+      dims.push_back({bound(left), bound(right)});
+    }
+    if (!dims.empty()) return dims;
+    if (type->kind != DataTypeKind::kNamed) {
+      uint32_t width = DeclaredTypeWidth(*type, ctx);
+      if (width == 0) return {};
+      return {PackedRange{static_cast<int64_t>(width) - 1, 0}};
+    }
+    type = ctx.FindTypeDeclaration(type->type_name);
+  }
+  return {};
 }
 
 // Resolve the first argument to an unpacked container (if any) and determine
@@ -195,7 +247,7 @@ static std::vector<PackedRange> PackedDimsOf(const Expr* arg0,
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
                                      Arena& arena, ArrayInfo& class_array) {
   QueryArgInfo info;
-  if (std::string name = QueryArgName(arg0); !name.empty()) {
+  if (std::string name = ArrayArgPath(arg0, ctx, arena); !name.empty()) {
     info.assoc = ctx.FindAssocArray(name);
     info.queue = ctx.FindQueue(name);
     info.arr = ctx.FindArrayInfo(name);
@@ -210,7 +262,15 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
   info.has_unpacked =
       info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
 
-  info.packed_dims = PackedDimsOf(arg0, info, ctx);
+  info.packed_dims = PackedDimsOf(arg0, arena, info, ctx);
+  // §20.7: the argument may be a data type, a type keyword or a typedef name
+  // naming no variable.
+  if (!info.has_unpacked && arg0 != nullptr &&
+      arg0->kind == ExprKind::kIdentifier &&
+      ctx.FindVariable(arg0->text) == nullptr) {
+    info.packed_dims = TypeNameDims(arg0->text, ctx, arena);
+    if (!info.packed_dims.empty()) return info;
+  }
   if (info.assoc) {
     info.elem_width = info.assoc->elem_width;
   } else if (info.queue) {
@@ -229,12 +289,16 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
 }
 
 // Bounds for an associative array dimension with an integral index type.
+// §20.7: $right is the highest index value the index type can hold, which for
+// a signed type is its largest positive value, 2**31-1 for `int`.
 static QueryDimBounds AssocDimBounds(AssocArrayObject* assoc) {
   QueryDimBounds q;
   uint32_t iw = assoc->index_width ? assoc->index_width : 32;
+  uint32_t value_bits = assoc->is_index_signed ? iw - 1 : iw;
   q.left = 0;
-  q.right = (iw >= 64) ? static_cast<int64_t>(~uint64_t{0})
-                       : static_cast<int64_t>((uint64_t{1} << iw) - 1);
+  q.right = (value_bits >= 64)
+                ? static_cast<int64_t>(~uint64_t{0})
+                : static_cast<int64_t>((uint64_t{1} << value_bits) - 1);
   q.increment = -1;
   q.size = assoc->Size();
   if (assoc->int_data.empty()) {
@@ -462,9 +526,15 @@ static int64_t FixedDimCount(const Expr* dim, SimContext& ctx, Arena& arena) {
 
 uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
                      int depth) {
+  if (uint32_t bits = IntegralKeywordBits(name); bits > 0) return bits;
   const ModuleItem* item = ctx.FindTypedefItem(name);
-  if (item == nullptr || item->unpacked_dims.empty() || depth > 8)
-    return ctx.FindTypeWidth(name);
+  if (item == nullptr || item->unpacked_dims.empty() || depth > 8) {
+    // §20.6.2 with §6.18: a typedef's width as its declared type folds now,
+    // a range naming a parameter included, or else as recorded.
+    uint32_t width =
+        item != nullptr ? DeclaredTypeWidth(item->typedef_type, ctx) : 0;
+    return width > 0 ? width : ctx.FindTypeWidth(name);
+  }
   const DataType& elem = item->typedef_type;
   uint64_t bits = elem.kind == DataTypeKind::kNamed && elem.scope_name.empty()
                       ? TypedefBits(elem.type_name, ctx, arena, depth + 1)

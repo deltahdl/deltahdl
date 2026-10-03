@@ -9,8 +9,10 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
@@ -315,6 +317,37 @@ void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,
     if (b.value != nullptr) ctx.BindLocalVariable(b.name, b.value);
     if (b.type != nullptr) ctx.BindScopeTypeActual(b.name, b.type);
   }
+}
+
+// The typedef `type` names, and the one that names in turn, each under its
+// own name, as far as the table of the run's typedefs follows them.
+static void AddNamedTypedefs(const DataType& type, const SimContext& ctx,
+                             TypedefMap& types) {
+  const DataType* named = &type;
+  while (named->kind == DataTypeKind::kNamed &&
+         types.count(named->type_name) == 0) {
+    const ModuleItem* item = ctx.FindTypedefItem(named->type_name);
+    if (item == nullptr) return;
+    types.emplace(named->type_name, item->typedef_type);
+    named = &item->typedef_type;
+  }
+}
+
+TypedefMap TypeParamTypes(const ClassDecl* decl,
+                          const std::vector<DataType>& actuals,
+                          const SimContext& ctx) {
+  TypedefMap types;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->type_param_names.count(pname) == 0) continue;
+    const DataType* type = ActualForParam(actuals, i, pname);
+    if (type == nullptr && i < decl->param_types.size())
+      type = &decl->param_types[i];
+    if (type == nullptr || type->kind == DataTypeKind::kImplicit) continue;
+    types.emplace(pname, *type);
+    AddNamedTypedefs(*type, ctx, types);
+  }
+  return types;
 }
 
 }  // namespace delta

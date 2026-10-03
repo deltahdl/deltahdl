@@ -5,6 +5,7 @@
 namespace delta {
 
 class SimContext;
+struct Process;
 
 // §21.2.1.5: the hierarchical name of the scope the running statement stands
 // in -- the design element, subroutine, named block or labeled statement that
@@ -15,5 +16,9 @@ class SimContext;
 // reports it under §20.10, and an immediate cover statement's §16.3 result is
 // keyed by it. Empty when no scope is registered at all.
 std::string ScopeHierName(const SimContext& ctx);
+
+// The same name for the process `proc` as it stands, without the named-block
+// and labeled-statement scopes only a running process tracks.
+std::string ProcessHierName(const Process& proc, const SimContext& ctx);
 
 }  // namespace delta

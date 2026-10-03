@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 #include "elaborator/elaborator.h"
@@ -107,8 +109,9 @@ TEST(TimeformatSysTask, FormatPersistsAcrossDisplays) {
   EXPECT_EQ(out, "4.0ns\n6.0ns\n");
 }
 
-// §20.4.3: a later $timeformat replaces the configuration; the same raw value
-// then renders with the new precision and suffix.
+// §20.4.3: a later $timeformat replaces the configuration; a value then
+// renders with the new precision and suffix, converted to the new units: 8 in
+// the module's 1 ns unit is 8000 ps.
 TEST(TimeformatSysTask, ReinvocationReplacesFormat) {
   SimFixture f;
   std::string out = RunCapture(
@@ -121,7 +124,7 @@ TEST(TimeformatSysTask, ReinvocationReplacesFormat) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "4.0ns\n8.00ps\n");
+  EXPECT_EQ(out, "4.0ns\n8000.00ps\n");
 }
 
 // Table 20-3, first row: the default units_number is the smallest time
@@ -297,6 +300,64 @@ TEST(TimeformatSysTask, OutOfRangeArgumentNames20_4_3) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "out of range [2 .. -15]", 2,
                             "20.4.3"));
+}
+
+// The output of a run of `src` through the preprocessor, so that a `timescale
+// directive in it sets the module's time unit and the global precision.
+std::string PreprocRunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = PreprocElaborate(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
+
+// §20.4.3: %t prints a time converted to the units_number $timeformat set, so
+// 7000 ns under a -6 units_number is 7.0 us, not 7000.0 with the us suffix.
+TEST(TimeformatSysTask, PercentTConvertsToTheUnitsNumber) {
+  SimFixture f;
+  EXPECT_EQ(PreprocRunCapture("`timescale 1ns/1ps\n"
+                              "module t;\n"
+                              "  initial begin\n"
+                              "    $timeformat(-6, 1, \"us\", 0);\n"
+                              "    #7000 $display(\"[%t]\", $time);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f),
+            "[7.0us]\n");
+}
+
+// §20.4.3, Table 20-3: with no $timeformat call the units_number is the
+// smallest time precision in the design, so 5 ns under 1ns/1ps prints as 5000
+// in the default field of 20 columns.
+TEST(TimeformatSysTask, PercentTDefaultsToTheGlobalPrecision) {
+  SimFixture f;
+  EXPECT_EQ(PreprocRunCapture("`timescale 1ns/1ps\n"
+                              "module t;\n"
+                              "  initial #5 $display(\"[%t]\", $time);\n"
+                              "endmodule\n",
+                              f),
+            "[" + std::string(16, ' ') + "5000]\n");
+}
+
+// §20.4.3: %t formats a real time as it formats an integral one, by its value
+// rather than its bit pattern: $realtime 5.0 ns under " ns" with precision 2,
+// and a real 2.5 in a module of 1 ns converted to picoseconds.
+TEST(TimeformatSysTask, PercentTFormatsARealTimeByItsValue) {
+  SimFixture f;
+  EXPECT_EQ(PreprocRunCapture("`timescale 1ns/1ps\n"
+                              "module t;\n"
+                              "  real r = 2.5;\n"
+                              "  initial begin\n"
+                              "    $timeformat(-9, 2, \" ns\", 10);\n"
+                              "    #5 $display(\"[%t]\", $realtime);\n"
+                              "    $timeformat(-12, 1, \" ps\", 0);\n"
+                              "    $display(\"[%t]\", r);\n"
+                              "  end\n"
+                              "endmodule\n",
+                              f),
+            "[   5.00 ns]\n[2500.0 ps]\n");
 }
 
 }  // namespace

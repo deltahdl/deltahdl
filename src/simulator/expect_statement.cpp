@@ -1,5 +1,3 @@
-#include <cstdint>
-
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/awaiters_event_control.h"
@@ -12,7 +10,6 @@
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
-#include "simulator/sva_engine_queues.h"
 
 namespace delta {
 
@@ -27,15 +24,12 @@ namespace delta {
 // it executes the pass statement or the else clause, a failure with no
 // else clause having been reported through $error where it was concluded
 // (§20.11 having $assertcontrol able to suppress that). A statement whose
-// spec this tool does not evaluate, or whose checking $assertcontrol has
-// turned off, blocks nothing.
+// spec this tool does not evaluate blocks nothing; §20.11's On, Off and Kill
+// do not affect an expect statement, so none turns its checking off.
 ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   Process* proc = ctx.CurrentProcess();
   bool evaluated = proc != nullptr && stmt->is_concurrent_clocked &&
-                   !stmt->assert_clock.empty() &&
-                   ctx.AssertCheckingEnabled(
-                       static_cast<uint32_t>(AssertionTypeBit::kExpect),
-                       static_cast<uint32_t>(DirectiveTypeBit::kAssert));
+                   !stmt->assert_clock.empty();
   if (!evaluated) co_return StmtResult::kDone;
   proc->expect_decided = false;
   bool begun = false;
@@ -50,7 +44,12 @@ ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_await RegionAwaiter{ctx, Region::kReactive};
   const Stmt* action =
       proc->expect_holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
-  if (action != nullptr) co_return co_await ExecStmt(action, ctx, arena);
+  // §20.11: PassOff and FailOff stop the action block of an expect statement
+  // as they stop an assertion's.
+  if (action != nullptr &&
+      AssertionControlStatus(stmt, ctx).RunsAction(proc->expect_holds, false)) {
+    co_return co_await ExecStmt(action, ctx, arena);
+  }
   co_return StmtResult::kDone;
 }
 

@@ -32,6 +32,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "simulator/assert_control_log.h"
 #include "simulator/class_object.h"
 #include "simulator/cover_results.h"
 #include "simulator/coverage.h"
@@ -692,23 +693,10 @@ class SimContext : public DeclaredNameTables,
   ImmediateCoverResults& ImmediateCovers() { return immediate_covers_; }
   ConcurrentCoverResults& ConcurrentCovers() { return concurrent_covers_; }
 
-  // §20.11: whole-design assertion control applied by an assertion control
-  // system task ($assertcontrol/$asserton/$assertoff/$assertkill and the action
-  // control tasks) that names no scope list. Two independent controls are held:
-  // On/Off/Kill toggle whether an immediate assertion is checked at all, while
-  // FailOn/FailOff toggle its default fail action ($error, §16.3). Each stores
-  // the assertion_type (Table 20-6) and directive_type (Table 20-7) masks the
-  // controlling task carried, so an assertion is affected only when its own
-  // type and directive bits are both set in the stored masks, as plain
-  // integers to keep this header free of the SVA engine's enums.
-  void SetGlobalAssertCheckingOff(uint32_t assertion_type,
-                                  uint32_t directive_type);
-  void SetGlobalAssertCheckingOn() { assert_checking_off_ = false; }
-  bool AssertCheckingEnabled(uint32_t type_bit, uint32_t directive_bit) const;
-  void SetGlobalAssertFailActionOff(uint32_t assertion_type,
-                                    uint32_t directive_type);
-  void SetGlobalAssertFailActionOn() { assert_fail_off_ = false; }
-  bool AssertFailActionEnabled(uint32_t type_bit, uint32_t directive_bit) const;
+  // §20.11: the assertion control system tasks the run has called, which an
+  // assertion reads its status from.
+  AssertControlLog& AssertControls() { return assert_controls_; }
+  const AssertControlLog& AssertControls() const { return assert_controls_; }
 
   // §20.10: record the last severity system task's tool-specific message parts
   // so a harness can confirm the required call-site information was reported --
@@ -921,12 +909,7 @@ class SimContext : public DeclaredNameTables,
   ConcurrentCoverResults concurrent_covers_;
 
   // §20.11: whole-design assertion control state (see the accessor comment).
-  bool assert_checking_off_ = false;
-  uint32_t assert_checking_off_atype_ = 0;
-  uint32_t assert_checking_off_dtype_ = 0;
-  bool assert_fail_off_ = false;
-  uint32_t assert_fail_off_atype_ = 0;
-  uint32_t assert_fail_off_dtype_ = 0;
+  AssertControlLog assert_controls_;
 
   std::string last_severity_;
   std::string last_severity_msg_;

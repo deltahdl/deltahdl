@@ -115,27 +115,6 @@ const TimeScale* SimContext::FindScopeTimeScale(std::string_view name) const {
   return it == scope_timescales_.end() ? nullptr : &it->second;
 }
 
-void SimContext::SetGlobalAssertCheckingOff(uint32_t assertion_type,
-                                            uint32_t directive_type) {
-  assert_checking_off_ = true;
-  assert_checking_off_atype_ = assertion_type;
-  assert_checking_off_dtype_ = directive_type;
-}
-
-void SimContext::SetGlobalAssertFailActionOff(uint32_t assertion_type,
-                                              uint32_t directive_type) {
-  assert_fail_off_ = true;
-  assert_fail_off_atype_ = assertion_type;
-  assert_fail_off_dtype_ = directive_type;
-}
-
-bool SimContext::AssertFailActionEnabled(uint32_t type_bit,
-                                         uint32_t directive_bit) const {
-  if (!assert_fail_off_) return true;
-  return (assert_fail_off_atype_ & type_bit) == 0 ||
-         (assert_fail_off_dtype_ & directive_bit) == 0;
-}
-
 void SimContext::SetLastSeverity(std::string_view sev, std::string_view msg,
                                  SimTime t, std::string_view scope,
                                  uint32_t line) {

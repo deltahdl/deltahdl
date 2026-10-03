@@ -214,4 +214,37 @@ TEST(SysTaskTime, HierarchicallyCalledFunctionReadsItsModulesUnit) {
   EXPECT_EQ(out, "a 10\nb 10000\n");
 }
 
+// §3.14.2.2 with §20.3.1: a package is a time scope of its own, so a function
+// it declares and a method of a class it declares report $time and $realtime
+// in the package's 1 ps, and a task's #3 waits 3 ps, whatever the calling
+// module's 1 ns.
+TEST(SysTaskTime, APackagesSubroutinesRunInThePackagesTimeUnit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  timeunit 1ps / 1ps;\n"
+                       "  class C;\n"
+                       "    function void show();\n"
+                       "      $display(\"cls %0d %f\", $time, $realtime);\n"
+                       "    endfunction\n"
+                       "    task wait3(); #3; endtask\n"
+                       "  endclass\n"
+                       "  function void fshow();\n"
+                       "    $display(\"fn %0d\", $time);\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  timeunit 1ns / 1ps;\n"
+                       "  initial begin\n"
+                       "    automatic p::C c = new;\n"
+                       "    #3;\n"
+                       "    c.show();\n"
+                       "    p::fshow();\n"
+                       "    c.wait3();\n"
+                       "    $display(\"after %0d %f\", $time, $realtime);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "cls 3000 3000.000000\nfn 3000\nafter 3 3.003000\n");
+}
+
 }  // namespace

@@ -226,4 +226,36 @@ TEST(SysTask, ItorAndBitstorealResultsAreReal) {
             "5.000000 6.000000 1.500000\n");
 }
 
+// §20.5: $rtoi returns an integer, which is signed, so a negative result
+// prints negative and compares below 0 used directly, with no intermediate
+// variable.
+TEST(ConversionSim, RtoiResultIsASignedInteger) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real b = -2.7;\n"
+                       "  initial $display(\"%0d %0d %0d\", $rtoi(b), "
+                       "$rtoi(-2.7), $rtoi(b) < 0);\n"
+                       "endmodule\n",
+                       f),
+            "-2 -2 1\n");
+}
+
+// §20.5: $itor and $bitstoreal return reals wherever they are used: assigned
+// to a real, nested in a real function and compared with a real.
+TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  real r;\n"
+                 "  int k = 16;\n"
+                 "  initial begin\n"
+                 "    r = $itor(k);\n"
+                 "    $display(\"%f %0d %0d\", r, $rtoi($sqrt($itor(k))), "
+                 "$bitstoreal($realtobits(0.1)) == 0.1);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "16.000000 4 1\n");
+}
+
 }  // namespace

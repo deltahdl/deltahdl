@@ -175,4 +175,148 @@ TEST(TypenameSim, AStringParameterInitializedByTypenameHoldsTheName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §20.6.1, step a: a typedef name resolves back to the type it names, both
+// alone and as the type of a variable with ranges of its own, here a typedef
+// a package declares that an import makes visible.
+TEST(TypenameSim, ATypedefNameResolvesToTheTypeItNames) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package A;\n"
+                       "  typedef bit node;\n"
+                       "endpackage\n"
+                       "import A::*;\n"
+                       "module top;\n"
+                       "  node [2:0] Xv;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(node));\n"
+                       "    $display(\"%s\", $typename(Xv));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "bit\nbit[2:0]\n");
+}
+
+// §20.6.1, steps a and g: a variable of a package's typedef of a ranged vector
+// writes the range as declared, its sized bound as an unsized decimal.
+TEST(TypenameSim, APackageTypedefsRangeIsWrittenAsDeclared) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package A;\n"
+                       "  typedef bit [9:1'b1] word;\n"
+                       "endpackage\n"
+                       "import A::*;\n"
+                       "module top;\n"
+                       "  word w;\n"
+                       "  initial $display(\"%s\", $typename(w));\n"
+                       "endmodule\n",
+                       f),
+            "bit[9:1]\n");
+}
+
+// §20.6.1, steps c, e and f: an enumeration writes each constant with its
+// value, and its name behind its scope: a system-generated one for the
+// anonymous enumeration of a package's variable, the typedef's for a module's.
+TEST(TypenameSim, AnEnumerationWritesItsConstantsAndScopedName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package A;\n"
+                       "  enum {A, B, C = 99} X;\n"
+                       "endpackage\n"
+                       "import A::*;\n"
+                       "module top;\n"
+                       "  typedef enum {RED, GREEN = 5} col_t;\n"
+                       "  col_t c;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(X));\n"
+                       "    $display(\"%s\", $typename(c));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "enum{A=32'sd0,B=32'sd1,C=32'sd99}A::e$X\n"
+            "enum{RED=32'sd0,GREEN=32'sd5}top.col_t\n");
+}
+
+// §20.6.1: a string variable's type is string.
+TEST(TypenameSim, AStringVariableIsAString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  string s;\n"
+                       "  initial $display(\"%s\", $typename(s));\n"
+                       "endmodule\n",
+                       f),
+            "string\n");
+}
+
+// §20.6.1, steps d and f: a structure writes its members and the typedef's
+// name behind the module; an unpacked array of them appends "$" and its
+// range, and one element of it is the structure again.
+TEST(TypenameSim, AStructureWritesItsMembersAndScopedName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef struct {bit A, B;} AB_t;\n"
+                       "  AB_t AB[10];\n"
+                       "  AB_t one;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(AB));\n"
+                       "    $display(\"%s\", $typename(one));\n"
+                       "    $display(\"%s\", $typename(AB[2]));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "struct{bit A;bit B;}top.AB_t$[0:9]\n"
+            "struct{bit A;bit B;}top.AB_t\nstruct{bit A;bit B;}top.AB_t\n");
+}
+
+// §20.6.1: inside a method, a property, an element of a queue property and a
+// formal are written by the types they were declared with.
+TEST(TypenameSim, APropertyAndAFormalAreWrittenByTheirDeclaredTypes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  int n;\n"
+                       "  bit [7:0] b;\n"
+                       "  string q[$];\n"
+                       "  function void show(real r);\n"
+                       "    $display(\"%s %s %s %s\", $typename(n), "
+                       "$typename(b), $typename(q[0]), $typename(r));\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C c = new;\n"
+                       "  initial c.show(1.0);\n"
+                       "endmodule\n",
+                       f),
+            "int bit[7:0] string real\n");
+}
+
+// §20.6.1 with §8.25: a type parameter names the type the specialization
+// binds it to.
+TEST(TypenameSim, ATypeParameterNamesTheTypeItIsBoundTo) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(type T = int);\n"
+                       "  function void show();\n"
+                       "    $display(\"%s\", $typename(T));\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C #() a = new;\n"
+                       "  C #(bit [7:0]) b = new;\n"
+                       "  initial begin\n"
+                       "    a.show();\n"
+                       "    b.show();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "int\nbit[7:0]\n");
+}
+
+// §20.6.1, step f: a class handle is of its class, named behind the scope
+// declaring it, the compilation unit here.
+TEST(TypenameSim, AClassHandleIsOfItsScopedClass) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class R; endclass\n"
+                       "module t;\n"
+                       "  R y;\n"
+                       "  initial $display(\"%s\", $typename(y));\n"
+                       "endmodule\n",
+                       f),
+            "$unit::R\n");
+}
+
 }  // namespace

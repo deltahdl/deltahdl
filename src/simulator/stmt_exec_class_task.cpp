@@ -30,6 +30,9 @@ ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
       outcome = result;
       break;
     }
+    // §20.2: no statement of the process runs after a $finish, nor after a
+    // $stop, as a sequential block's own statements do not.
+    if (ctx.StopRequested()) break;
   }
   TeardownInstanceTaskCall(call, expr, ctx, arena);
   co_return outcome;

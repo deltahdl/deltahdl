@@ -225,6 +225,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
   // §19.3: a local of a covergroup type holds a handle, its instance built by
   // a `new` initializer.
+  v->declared_type = &type;
   if (TryCreateCovergroupLocal(type, init, v, ctx, arena)) return v;
   v->is_4state = DeclaredTypeIs4State(type, ctx);
   v->is_virtual_interface = is_virtual_interface;

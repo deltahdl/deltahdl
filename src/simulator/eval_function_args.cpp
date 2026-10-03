@@ -790,6 +790,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // body converts, which it could not while every formal was left at Variable's
   // 4-state default.
   var->is_4state = DeclaredTypeIs4State(param.data_type, ctx);
+  var->declared_type = &param.data_type;
   // §6.16 with §13.5.1: a formal declared string, `input string s` or
   // `output string o`, is a string the body reads and writes as one, and the
   // mark is what every reader of a string reads (SimContext::IsStringVariable)

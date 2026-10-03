@@ -334,4 +334,23 @@ TEST(ProgramConstructSim, ProgramWithDrivenInputPortEndsTheRunAtItsEnd) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
 }
 
+// §24.3 with §4.4.2: a program's initial procedure runs in the Reactive
+// region, so at one time it runs after a module's, which runs in the Active
+// region, whatever time unit either reads its delay in.
+TEST(ProgramSim, AProgramInitialRunsAfterAModuleInitialAtOneTime) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  timeunit 1ps / 1ps;\n"
+                       "  pr p();\n"
+                       "  initial #2000 $display(\"mod %0d\", $time);\n"
+                       "endmodule\n"
+                       "program pr;\n"
+                       "  timeunit 1ns / 1ps;\n"
+                       "  initial #2 $display(\"prog %0d %f\", $time, "
+                       "$realtime);\n"
+                       "endprogram\n",
+                       f),
+            "mod 2000\nprog 2 2.000000\n");
+}
+
 }  // namespace

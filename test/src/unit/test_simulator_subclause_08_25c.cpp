@@ -410,4 +410,22 @@ TEST(ParameterizedClassSim, SpecializationStaticArrayIsItsOwn) {
   EXPECT_EQ(out, "6 9\n11 22 11 3 0\n");
 }
 
+// §8.25 with §20.6.2: a property's packed dimension sized by `$bits` of a type
+// parameter is as wide as the type the specialization binds it to, eight bits
+// for `C #(byte)` and the default's sixteen for `C #()`.
+TEST(ParameterizedClassSim, APackedDimensionSizedByATypeParameterFollowsIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(type T = logic [15:0]);\n"
+                       "  bit [$bits(T)-1:0] mirror;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C #(byte) b = new;\n"
+                       "  C #() d = new;\n"
+                       "  initial $display(\"%0d %0d\", $bits(b.mirror), "
+                       "$bits(d.mirror));\n"
+                       "endmodule\n",
+                       f),
+            "8 16\n");
+}
+
 }  // namespace

@@ -476,6 +476,10 @@ static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
                                 const ScopeMap& constants, SimContext& ctx) {
   ScopeMap params = ClassParamScope(cls, constants);
+  // §8.25 with §20.6.2: a packed dimension `$bits(T)` sizes is folded with T
+  // at the default the class declares for it.
+  TypedefMap type_params = TypeParamTypes(cls, {}, ctx);
+  TypedefRegistryGuard type_param_guard(&type_params, nullptr);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       info->properties.push_back(PropertyRecord(

@@ -1,5 +1,6 @@
 #include "simulator/lowerer.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -614,6 +615,28 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   ScheduleProcess(p, ctx_);
 }
 
+// §3.14.3: the order of the smallest time precision of `mod` and of the
+// modules instantiated under it.
+static int FinestPrecisionOrder(const RtlirModule* mod) {
+  int order = EffectiveTimeOrder(mod->timescale.precision,
+                                 mod->timescale.prec_magnitude);
+  for (const auto& child : mod->children) {
+    if (child.resolved != nullptr) {
+      order = std::min(order, FinestPrecisionOrder(child.resolved));
+    }
+  }
+  return order;
+}
+
+// A time scale whose unit and precision are both 10**order s, as a TimeUnit
+// and a magnitude of 1, 10 or 100.
+static TimeScale ScaleOfOrder(int order) {
+  int base = order >= 0 ? (order / 3) * 3 : -(((-order) + 2) / 3) * 3;
+  int magnitude = order - base == 2 ? 100 : (order - base == 1 ? 10 : 1);
+  auto unit = static_cast<TimeUnit>(base);
+  return TimeScale{unit, magnitude, unit, magnitude};
+}
+
 // §20.4.1: publish each design element's resolved timescale under its module
 // name and instance name so a $timeunit/$timeprecision argument that names the
 // element (e.g. $timeunit(dut)) reports that element's value. Annex D.10 adds
@@ -799,11 +822,30 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
     ctx.SetCurrentTimeScale(top->timescale);
     ctx.SetCurrentScopeName(top->name);
   }
+  int finest = 2;
   for (auto* top : design->top_modules) {
     // A later top is keyed under its name, as an instance (LowerParallelTop).
     std::string below_top =
         top == design->top_modules.front() ? "" : std::string(top->name);
     RegisterScopeTimescales(top, ctx, std::string(top->name), below_top);
+    finest = std::min(finest, FinestPrecisionOrder(top));
+  }
+  // §3.14.3: $root is the time scope of the simulation time unit, the
+  // smallest time precision of the design, which is its unit and its precision
+  // both (§20.4.1, §20.4.2).
+  ctx.SetScopeTimeScale("$root", ScaleOfOrder(finest));
+  // §3.14.2.2: a package that declares a time unit is a time scope of its
+  // own, which its subroutines run in; its precision, where it declares none,
+  // is taken to be its unit.
+  for (const PackageDecl* pkg : design->packages) {
+    if (!pkg->has_timeunit) continue;
+    TimeScale scale{pkg->time_unit, pkg->time_unit_magnitude, pkg->time_unit,
+                    pkg->time_unit_magnitude};
+    if (pkg->has_timeprecision) {
+      scale.precision = pkg->time_prec;
+      scale.prec_magnitude = pkg->time_prec_magnitude;
+    }
+    ctx.SetScopeTimeScale(std::string(pkg->name) + "::", scale);
   }
 }
 

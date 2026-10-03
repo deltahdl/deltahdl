@@ -544,6 +544,12 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
   if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
+  // §20.6.1: what $typename reads of the declaration.
+  var->declared_type = &item->data_type;
+  if (pkg != kUnitScope) {
+    auto* scope = arena.Create<std::string>(std::string(pkg) + "::");
+    var->declared_scope = *scope;
+  }
   RegisterPackageDataEnumType(item, pkg, *qname, ctx);
   // §21.7.2.1: a package's parameter, dumped, is declared parameter as a
   // module's is (Lowerer::LowerParams).

@@ -285,6 +285,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_free_variables.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
+    simulator/eval_typename.cpp
     simulator/eval_systask_cast.cpp
     simulator/eval_expr.cpp
     simulator/eval_hierarchical_name.cpp
@@ -370,6 +371,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/checker_instance_scheduling.cpp
     simulator/checker_scheduling_semantics.cpp
     simulator/checker_variable_randomization.cpp
+    simulator/assert_control_log.cpp
     simulator/assertion.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp

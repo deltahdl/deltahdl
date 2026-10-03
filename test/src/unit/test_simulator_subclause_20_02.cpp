@@ -279,4 +279,38 @@ TEST(SimControlSim, FinishLeavesItsStepsDeferredReportsUnmatured) {
   EXPECT_EQ(final_fails->value.ToUint64(), 1u);
 }
 
+// §20.2: no statement of the calling process runs after $finish, inside an
+// instance class task enabled through a handle as in a sequential block.
+TEST(SimControlSim, FinishInAClassTaskEndsTheTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  task run();\n"
+                       "    $display(\"before\");\n"
+                       "    $finish(0);\n"
+                       "    $display(\"after\");\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C c = new;\n"
+                       "  initial c.run();\n"
+                       "endmodule\n",
+                       f),
+            "before\n");
+}
+
+// §20.2: the same inside a module task, after a delay.
+TEST(SimControlSim, FinishInAModuleTaskEndsTheTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  task run();\n"
+                       "    #1 $display(\"before\");\n"
+                       "    $finish(0);\n"
+                       "    $display(\"after\");\n"
+                       "  endtask\n"
+                       "  initial run();\n"
+                       "endmodule\n",
+                       f),
+            "before\n");
+}
+
 }  // namespace

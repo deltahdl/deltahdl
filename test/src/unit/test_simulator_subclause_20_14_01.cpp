@@ -160,4 +160,35 @@ TEST(RandomFunction, SameSeedReplaysStream) {
   EXPECT_EQ(lines[1], lines[3]);  // second draw matches too
 }
 
+// §20.14.1: the seed is inout whatever variable it is: an instance property
+// read in its own method, a static property named through its class, and an
+// element of a queue each hold the new seed after the call, the one a module
+// variable seeded alike holds.
+TEST(RandomSim, TheSeedIsWrittenBackToAPropertyAndAQueueElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  int seed = 99;\n"
+                       "  static int sseed = 99;\n"
+                       "  function int draw();\n"
+                       "    return $random(seed);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C c = new;\n"
+                       "  int a, b, d, e, s = 99;\n"
+                       "  int qm[$] = '{99};\n"
+                       "  initial begin\n"
+                       "    a = c.draw();\n"
+                       "    b = $random(C::sseed);\n"
+                       "    d = $random(qm[0]);\n"
+                       "    e = $random(s);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d\", a == e, "
+                       "b == e, d == e, c.seed == s, C::sseed == s, "
+                       "qm[0] == s && s != 99);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1 1 1 1 1\n");
+}
+
 }  // namespace

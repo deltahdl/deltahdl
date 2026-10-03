@@ -11,7 +11,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/probabilistic_distribution.h"
 #include "simulator/sim_context.h"
-#include "simulator/variable.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -374,14 +374,20 @@ int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
 // produced by the §N.2 algorithm is written back, so consecutive calls walk the
 // stream while a run that re-initializes the seed to its original value replays
 // identically. Declared in simulator/probabilistic_distribution.h, since
-// $random's seed is written back the same way.
+// $random's seed is written back the same way. Whatever variable the seed
+// names takes it, as an assignment to it would: a class property, a static
+// one through its class scope, and an element of a queue or an array among
+// them.
 void WriteBackDistributionSeed(const Expr* seed_arg, int32_t seed,
                                SimContext& ctx, Arena& arena) {
-  if (seed_arg->kind != ExprKind::kIdentifier) return;
-  Variable* var = ctx.FindVariable(seed_arg->text);
-  if (var == nullptr) return;
-  var->value =
-      MakeLogic4VecVal(arena, var->value.width, static_cast<uint32_t>(seed));
+  if (seed_arg->kind != ExprKind::kIdentifier &&
+      seed_arg->kind != ExprKind::kMemberAccess &&
+      seed_arg->kind != ExprKind::kSelect) {
+    return;
+  }
+  PerformBlockingAssign(
+      seed_arg, MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(seed)), ctx,
+      arena);
 }
 
 // §20.14.2: mean, degree_of_freedom, and k_stage shall be greater than 0 for
@@ -486,8 +492,11 @@ static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
   }
 
   WriteBackDistributionSeed(expr->args[0], seed, ctx, arena);
-  return MakeLogic4VecVal(arena, 32,
-                          static_cast<uint64_t>(static_cast<uint32_t>(result)));
+  // §20.14.2: each function returns an integer, which is signed.
+  Logic4Vec out = MakeLogic4VecVal(
+      arena, 32, static_cast<uint64_t>(static_cast<uint32_t>(result)));
+  out.is_signed = true;
+  return out;
 }
 
 static bool IsBasicMathCall(std::string_view n) {

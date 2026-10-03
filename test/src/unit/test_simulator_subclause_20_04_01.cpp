@@ -152,4 +152,49 @@ TEST(TimescaleSystemFunctions, ReturnValueSpansTableRange) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
+// §20.4.1 with §3.14.3: the simulation time unit is the smallest time
+// precision in the design, magnitude and all, so a design whose finest
+// precision is 100 ps answers -10 for $root, from two modules whose precisions
+// are 100 ps and 1 ns; and $printtimescale($root) names it for both fields.
+TEST(TimescaleSystemFunctions, RootArgumentKeepsThePrecisionsMagnitude) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module leaf;\n"
+      "  timeunit 10ns / 100ps;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  timeunit 1us / 1ns;\n"
+      "  leaf l();\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", $timeunit($root), $timeprecision($root));\n"
+      "    $printtimescale($root);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-10 -10\nTime scale of ($root) is 100ps / 100ps\n");
+}
+
+// §20.4.1, §20.4.2: an instance named as the argument answers that element's
+// unit and precision, and the process goes on to the statements after the
+// call: $timeunit(s1) and $timeprecision(s1) are the instance's -9 and -12,
+// $printtimescale(s1) reports it, and the display after them runs.
+TEST(TimescaleSystemFunctions, AnInstanceArgumentReportsItAndTheProcessGoesOn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module s;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  timeunit 10ns / 100ps;\n"
+      "  s s1();\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", $timeunit(s1), $timeprecision(s1));\n"
+      "    $printtimescale(s1);\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-9 -12\nTime scale of (s1) is 1ns / 1ps\ndone\n");
+}
+
 }  // namespace

@@ -234,6 +234,10 @@ class DeclaredNameTables {
   // recorded (FindTypedefItem), and its type is read off the item.
   void RegisterTypeDeclaration(std::string_view name, const ModuleItem* item);
   const DataType* FindTypeDeclaration(std::string_view name) const;
+  // §26.3: the key, "pkg::name", of a typedef a package declares under the
+  // bare `name`, which an import makes visible by that name; empty where no
+  // package declares one.
+  std::string_view FindPackageTypedefKey(std::string_view name) const;
   // §7.4.4: `type` followed through the typedefs a name written alone stands
   // for, to the first declaration writing a packed dimension or naming no
   // type -- `logic [1:0][3:0]` for `T` under `typedef logic [1:0][3:0] T`.

@@ -515,6 +515,9 @@ static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
       }
       co_return StmtResult::kDisable;
     }
+    // §20.2: no statement of the process runs after a $finish, nor after a
+    // $stop, as a sequential block's own statements do not.
+    if (ctx.StopRequested()) co_return StmtResult::kDone;
   }
   if (has_name) SampleAtBlockEvent(func->name, false, ctx, arena);
   co_return StmtResult::kDone;

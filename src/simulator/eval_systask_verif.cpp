@@ -4,16 +4,19 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/assertion_control_task.h"
 #include "parser/ast_expr.h"
+#include "simulator/assert_control_log.h"
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/stmt_exec_assertion_internal.h"
@@ -471,73 +474,65 @@ static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
                            /*str_arg_index=*/1);
 }
 
-// §20.11: apply an assertion control system task that names no scope list, so
-// it affects the whole design (the LRM's own examples note that whole-design
-// tasks name no modules). Only this whole-design form is modeled against
-// immediate assertions, which are not registered by hierarchical name; a task
-// that names specific scopes leaves them unaffected. On/Off/Kill toggle
-// checking and FailOn/FailOff toggle the default fail action, each carrying the
-// Table 20-6 assertion_type and Table 20-7 directive_type masks that select
-// which assertions are affected.
-static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
-                                            Arena& arena,
-                                            std::string_view name) {
-  AssertControlInvocation inv;
-  bool has_scope_list = false;
-  if (name == "$assertcontrol") {
-    // Argument order: control_type, assertion_type, directive_type, levels,
-    // then the scope list. control_type is required; the type masks default to
-    // 255 and 7 when omitted.
-    if (expr->args.empty() || !expr->args[0]) return;
-    inv.control_type =
-        static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-    inv.assertion_type =
-        (expr->args.size() > 1 && expr->args[1])
-            ? static_cast<uint32_t>(
-                  EvalExpr(expr->args[1], ctx, arena).ToUint64())
-            : kAssertionTypeDefault;
-    inv.directive_type =
-        (expr->args.size() > 2 && expr->args[2])
-            ? static_cast<uint32_t>(
-                  EvalExpr(expr->args[2], ctx, arena).ToUint64())
-            : kDirectiveTypeDefault;
-    has_scope_list = expr->args.size() > 4;  // levels at [3], scopes at [4..]
-  } else {
-    // A convenience/backward-compatibility task expands to a fixed
-    // $assertcontrol invocation; its own arguments are (levels, scope...).
-    if (!EquivalentAssertControlForTask(name, inv)) return;
-    has_scope_list = expr->args.size() > 1;
+// §20.11: the full hierarchical names the scope list item `item` may stand
+// for where it is written in the scope `caller`: the name as written, and the
+// name as read from `caller` and from each scope above it, as §23.8 resolves a
+// name upward.
+static std::vector<std::string> ScopeItemNames(const Expr* item,
+                                               std::string_view caller) {
+  std::string written = item->kind == ExprKind::kIdentifier
+                            ? std::string(item->text)
+                            : FlattenHierPath(item);
+  std::vector<std::string> names{written};
+  for (std::string_view scope = caller; !scope.empty();) {
+    names.push_back(std::string(scope) + "." + written);
+    size_t dot = scope.rfind('.');
+    scope = dot == std::string_view::npos ? std::string_view{}
+                                          : scope.substr(0, dot);
   }
-  if (has_scope_list) return;
+  return names;
+}
 
-  switch (static_cast<AssertControlType>(inv.control_type)) {
-    case AssertControlType::kOn:
-      // §20.11: On re-enables checking and violation reporting.
-      ctx.SetGlobalAssertCheckingOn();
-      ctx.SetGlobalAssertFailActionOn();
-      break;
-    case AssertControlType::kOff:
-      // §20.11: Off stops the checking of the selected assertions.
-      ctx.SetGlobalAssertCheckingOff(inv.assertion_type, inv.directive_type);
-      break;
-    case AssertControlType::kKill:
-      // §20.11: Kill stops it too, and aborts their attempts in flight.
-      ctx.SetGlobalAssertCheckingOff(inv.assertion_type, inv.directive_type);
-      AbortKilledAttempts(inv.assertion_type, inv.directive_type, ctx);
-      break;
-    case AssertControlType::kFailOn:
-      ctx.SetGlobalAssertFailActionOn();
-      break;
-    case AssertControlType::kFailOff:
-      // §20.11: FailOff stops the fail action, including the default $error.
-      ctx.SetGlobalAssertFailActionOff(inv.assertion_type, inv.directive_type);
-      break;
-    default:
-      // Lock/Unlock and the pass/vacuity action controls do not change
-      // whole-design checking or the default fail action of immediate
-      // assertions; their semantics are exercised on AssertionControl directly.
-      break;
+// §20.11: an assertion control system task, recorded in the terms of the
+// $assertcontrol call it is or expands to (Syntax 20-12): control_type, then
+// assertion_type and directive_type, defaulting to 255 and 7, then levels,
+// defaulting to 0, and the list_of_scopes_or_assertions, which a convenience
+// task begins its own arguments with. A Kill also aborts the attempts in
+// flight of the assertions it selects.
+static void ApplyAssertionControlTask(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, std::string_view name) {
+  auto arg_or = [&](size_t i, uint32_t fallback) {
+    if (i >= expr->args.size() || expr->args[i] == nullptr) return fallback;
+    return static_cast<uint32_t>(
+        EvalExpr(expr->args[i], ctx, arena).ToUint64());
+  };
+  AssertControlCall call;
+  size_t levels_at = 0;
+  if (name == "$assertcontrol") {
+    if (expr->args.empty() || expr->args[0] == nullptr) return;
+    call.control_type = arg_or(0, 0);
+    call.assertion_type = arg_or(1, kAssertionTypeDefault);
+    call.directive_type = arg_or(2, kDirectiveTypeDefault);
+    levels_at = 3;
+  } else {
+    AssertControlInvocation inv;
+    if (!EquivalentAssertControlForTask(name, inv)) return;
+    call.control_type = inv.control_type;
+    call.assertion_type = inv.assertion_type;
+    call.directive_type = inv.directive_type;
   }
+  call.levels = arg_or(levels_at, 0);
+  std::string caller;
+  if (expr->args.size() > levels_at + 1) caller = ScopeHierName(ctx);
+  for (size_t i = levels_at + 1; i < expr->args.size(); ++i) {
+    if (expr->args[i] != nullptr) {
+      call.scopes.push_back(ScopeItemNames(expr->args[i], caller));
+    }
+  }
+  if (call.control_type == static_cast<uint32_t>(AssertControlType::kKill)) {
+    AbortKilledAttempts(call, ctx);
+  }
+  ctx.AssertControls().Apply(std::move(call));
 }
 
 // §16.5.1's sampled value of `arg`: the store answers a variable read with the
@@ -805,7 +800,7 @@ static std::optional<Logic4Vec> EvalSampledValueOrAssert(
   if (IsAssertionControlTaskName(name)) {
     // §20.11: an assertion control system task takes effect when executed; the
     // call itself yields no meaningful value.
-    ApplyGlobalAssertionControlTask(expr, ctx, arena, name);
+    ApplyAssertionControlTask(expr, ctx, arena, name);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

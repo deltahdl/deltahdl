@@ -864,6 +864,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   Variable* local = ctx.FindLocalVariable(stmt->var_name);
   CreateSyncObjectForLocal(stmt, local, ctx, arena);
   if (local != nullptr) {
+    local->declared_type = &stmt->var_decl_type;
     TryCreateCovergroupLocal(stmt->var_decl_type, stmt->var_init, local, ctx,
                              arena);
   }

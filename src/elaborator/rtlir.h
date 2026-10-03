@@ -276,6 +276,9 @@ struct RtlirVariable {
   // declaration, which its initializer reads as the loop index.
   GenBlockConsts gen_block_consts;
   const DataType* dtype = nullptr;
+  // §20.6.1: the type as the declaration wrote it, a typedef name kept as the
+  // name, which `dtype` replaces by the aggregate it resolves to.
+  const DataType* written_type = nullptr;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
   // §36.12.1 Table 36-10 rows 3 and 4: what the declaration named this
   // variable, which is the box §37.17 draws it in - an integer var, a time var,

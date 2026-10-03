@@ -7,6 +7,7 @@
 
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/type_eval.h"
 
 namespace delta {
 
@@ -99,5 +100,15 @@ void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
 // its parameters, the static storage of the class or a specialization.
 ParamValueLookup ClassStaticLookup(const ClassTypeInfo* info);
 ParamValueStore ClassStaticStore(ClassTypeInfo* info);
+
+// §8.25 with §20.6.2: the type each type parameter of `decl` stands for
+// under the actuals `actuals` -- the one an actual gives it, else the default
+// the class declares -- keyed by the parameter's name, with the typedef such a
+// type names in turn under its own name, so a TypedefRegistryGuard holding
+// the table folds `bit [$bits(T)-1:0]` as wide as T. A parameter given
+// neither an actual nor a default is left out.
+TypedefMap TypeParamTypes(const ClassDecl* decl,
+                          const std::vector<DataType>& actuals,
+                          const SimContext& ctx);
 
 }  // namespace delta

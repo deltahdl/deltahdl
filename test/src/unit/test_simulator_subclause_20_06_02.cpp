@@ -296,4 +296,40 @@ TEST(PrimarySim, BitsOfAnUnpackedArrayTypedefName) {
   EXPECT_EQ(out, "36 36 8 48 72\n");
 }
 
+// §20.6.2: $bits of a data type named at run time is the type's width: an
+// integer type keyword's and a typedef's whose range a parameter sizes.
+TEST(BitsSim, ATypeNameAtRunTimeIsItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  parameter W = 10;\n"
+                       "  typedef logic [W-1:0] word_t;\n"
+                       "  word_t arr[3];\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", $bits(word_t), "
+                       "$bits(arr), $bits(int), $bits(byte));\n"
+                       "endmodule\n",
+                       f),
+            "10 30 32 8\n");
+}
+
+// §20.6.2: $bits determines its result without evaluating the expression it
+// encloses, so a call is sized by the function's return type and not made.
+TEST(BitsSim, ACallIsSizedWithoutBeingMade) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int calls = 0;\n"
+                       "  function int f();\n"
+                       "    calls++;\n"
+                       "    return 5;\n"
+                       "  endfunction\n"
+                       "  function logic [11:0] g();\n"
+                       "    calls++;\n"
+                       "    return 0;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d %0d\", $bits(f()), "
+                       "$bits(g()), calls);\n"
+                       "endmodule\n",
+                       f),
+            "32 12 0\n");
+}
+
 }  // namespace

@@ -935,6 +935,7 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
     var.class_type_name = item->data_type.type_name;
     var.class_data_type = &item->data_type;
   }
+  var.written_type = &item->data_type;
   SetEnumTypeInfo(item, var, typedefs_, arena_, inline_enum_list_key_);
   SetPackedTypedefTypeInfo(item, var, typedefs_, arena_);
   if (!var.dtype && (item->data_type.packed_dim_left != nullptr ||

@@ -35,17 +35,26 @@ void AppendProcessLevels(std::string& name, const Process& proc,
 
 }  // namespace
 
-std::string ScopeHierName(const SimContext& ctx) {
-  // The empty instance prefix is the top level; its registered type name is
-  // the first top module's name, which doubles as the top instance name. A
-  // later top's processes carry its name at the head of their prefix
-  // (Lowerer::LowerParallelTop), which is the whole path then.
-  Process* proc = ctx.CurrentProcess();
-  std::string_view prefix =
-      proc != nullptr ? std::string_view(proc->inst_prefix) : "";
+// The empty instance prefix is the top level; its registered type name is
+// the first top module's name, which doubles as the top instance name. A
+// later top's processes carry its name at the head of their prefix
+// (Lowerer::LowerParallelTop), which is the whole path then.
+static std::string TopLevelName(std::string_view prefix,
+                                const SimContext& ctx) {
   bool parallel = ctx.IsParallelTop(prefix.substr(0, prefix.find('.')));
-  std::string name(parallel ? "" : ctx.FindInstanceType(""));
-  if (proc != nullptr) AppendProcessLevels(name, *proc, ctx);
+  return std::string(parallel ? "" : ctx.FindInstanceType(""));
+}
+
+std::string ProcessHierName(const Process& proc, const SimContext& ctx) {
+  std::string name = TopLevelName(proc.inst_prefix, ctx);
+  AppendProcessLevels(name, proc, ctx);
+  return name;
+}
+
+std::string ScopeHierName(const SimContext& ctx) {
+  Process* proc = ctx.CurrentProcess();
+  std::string name =
+      proc != nullptr ? ProcessHierName(*proc, ctx) : TopLevelName("", ctx);
   for (std::string_view scope : ctx.ActiveNamedScopes()) {
     AppendLevel(name, scope);
   }

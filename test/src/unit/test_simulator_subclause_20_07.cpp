@@ -325,7 +325,8 @@ TEST(ArrayQuerySim, DynamicArrayBounds) {
 
 // §20.7: on an associative array with an integral index type, $left is 0,
 // $increment is -1, $right is the highest possible index value for that type
-// (255 for a byte index), $size is the number of elements currently allocated,
+// (127 for a byte index, byte being signed), $size is the number of elements
+// currently allocated,
 // and $low/$high are the lowest/largest currently allocated index values.
 TEST(ArrayQuerySim, AssocIntegralIndexBounds) {
   SimFixture f;
@@ -343,7 +344,7 @@ TEST(ArrayQuerySim, AssocIntegralIndexBounds) {
       f);
   LowerRunAndCheck(f, design,
                    {{"l", 0},
-                    {"r", 255},
+                    {"r", 127},
                     {"inc", kNegOne},
                     {"lo", 3},
                     {"hi", 9},
@@ -697,6 +698,81 @@ TEST(ArrayQuerySim, AParameterFoldsWithTheDimensionsOfItsType) {
                        "endmodule\n",
                        f),
             "32 7 2 32 0 0\n");
+}
+
+// §20.7: a single packed dimension is queried as declared, ascending or
+// descending, of a vector and of the elements of an unpacked array.
+TEST(ArrayQuerySim, ASinglePackedDimensionIsQueriedAsDeclared) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [0:3] u;\n"
+                       "  logic [7:4] w;\n"
+                       "  bit [1:4] N [3:1];\n"
+                       "  initial $display(\"%0d:%0d %0d:%0d %0d %0d:%0d\", "
+                       "$left(u), $right(u), $left(w), $right(w), "
+                       "$increment(u), $left(N, 2), $right(N, 2));\n"
+                       "endmodule\n",
+                       f),
+            "0:3 7:4 -1 1:4\n");
+}
+
+// §20.7: $right of an associative array dimension is the highest index value
+// its index type holds, the largest positive value for a signed `int`.
+TEST(ArrayQuerySim, AnAssociativeDimensionsRightIsItsIndexTypesHighest) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int aa[int];\n"
+                       "  int ua[int unsigned];\n"
+                       "  initial $display(\"%0d %0d\", $right(aa), "
+                       "$right(ua) == 32'hffffffff);\n"
+                       "endmodule\n",
+                       f),
+            "2147483647 1\n");
+}
+
+// §20.7: an array query on a data type at run time answers for its
+// dimensions -- a typedef's as declared, two of them for a typedef of two,
+// and an integer type keyword's [n-1:0] -- as a type written out does.
+TEST(ArrayQuerySim, AQueryOnATypeNameAtRunTimeAnswersForItsDimensions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef logic [16:1] Word;\n"
+                       "  typedef logic [3:0][2:1] packed_reg;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d\", "
+                       "$size(Word), $left(int), $size(packed_reg, 2), "
+                       "$dimensions(packed_reg), $size(logic [5:0]));\n"
+                       "endmodule\n",
+                       f),
+            "16 31 2 2 6\n");
+}
+
+// §20.7 with §25.9: an unpacked array member of an interface instance reached
+// through a virtual interface answers for its dimensions, and $bits for its
+// whole bit stream (§20.6.2).
+TEST(ArrayQuerySim, AnArrayReachedThroughAVirtualInterfaceIsQueried) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface ifc;\n"
+                 "  logic [7:0] mem [0:15];\n"
+                 "endinterface\n"
+                 "class Drv;\n"
+                 "  virtual ifc vif;\n"
+                 "  function void show();\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d\", $size(vif.mem), "
+                 "$bits(vif.mem), $left(vif.mem, 2), $left(vif.mem), "
+                 "$right(vif.mem), $dimensions(vif.mem));\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  ifc i1();\n"
+                 "  Drv d = new;\n"
+                 "  initial begin\n"
+                 "    d.vif = i1;\n"
+                 "    d.show();\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "16 128 7 0 15 2\n");
 }
 
 }  // namespace

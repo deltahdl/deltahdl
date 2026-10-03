@@ -14,6 +14,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/assert_control_log.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/cover_results.h"
 #include "simulator/cover_statement.h"
@@ -349,12 +350,16 @@ static void RecordConcurrentCoverVerdict(const Stmt* stmt,
   record->vacuous += CoverPropertyVacuousSuccessDelta(outcome);
 }
 
-// §20.11: the Table 20-6 assertion_type bit that identifies an immediate
-// assertion statement -- simple immediate, observed deferred, or final deferred
-// -- so a $assertcontrol assertion_type mask can select whether it is checked.
-static uint32_t ImmediateAssertionTypeBit(const Stmt* stmt) {
+// §20.11: the Table 20-6 assertion_type bit that identifies an assertion
+// statement -- an expect statement, a concurrent assertion, or a simple
+// immediate, observed deferred or final deferred one -- so a $assertcontrol
+// assertion_type mask can select whether it is controlled.
+static uint32_t AssertionTypeBitOf(const Stmt* stmt) {
   if (stmt->kind == StmtKind::kExpect) {
     return static_cast<uint32_t>(AssertionTypeBit::kExpect);
+  }
+  if (stmt->is_concurrent_clocked) {
+    return static_cast<uint32_t>(AssertionTypeBit::kConcurrent);
   }
   if (!stmt->is_deferred) {
     return static_cast<uint32_t>(AssertionTypeBit::kSimpleImmediate);
@@ -368,7 +373,7 @@ static uint32_t ImmediateAssertionTypeBit(const Stmt* stmt) {
 // §20.11: the Table 20-7 directive_type bit for an immediate assertion -- an
 // assert, cover, or assume directive -- used the same way against a
 // $assertcontrol directive_type mask.
-static uint32_t ImmediateDirectiveTypeBit(const Stmt* stmt) {
+static uint32_t DirectiveTypeBitOf(const Stmt* stmt) {
   switch (stmt->kind) {
     case StmtKind::kCoverImmediate:
       return static_cast<uint32_t>(DirectiveTypeBit::kCover);
@@ -379,19 +384,36 @@ static uint32_t ImmediateDirectiveTypeBit(const Stmt* stmt) {
   }
 }
 
+// §20.11: the assertion `stmt` as a control selects it, written in the scope
+// named `scope`, its own name, where it is labelled, kept in `name`. An empty
+// scope leaves both names out, for a run whose controls name no scope list.
+static AssertionIdentity IdentityOf(const Stmt* stmt, std::string_view scope,
+                                    std::string& name) {
+  if (!scope.empty() && !stmt->label.empty()) {
+    name = std::string(scope) + "." + std::string(stmt->label);
+  }
+  return {AssertionTypeBitOf(stmt), DirectiveTypeBitOf(stmt), scope, name};
+}
+
+AssertionStatus AssertionControlStatus(const Stmt* stmt, SimContext& ctx) {
+  AssertControlLog& controls = ctx.AssertControls();
+  std::string scope;
+  if (controls.NamesScopes()) scope = ScopeHierName(ctx);
+  std::string name;
+  return controls.StatusOf(IdentityOf(stmt, scope, name));
+}
+
 // §16.3 / §20.11: with no else clause the tool reports the violation via
 // $error, unless $assertcontrol FailOff ($assertfailoff) has suppressed the
-// fail action for this assertion's type and directive. The fail-action controls
+// fail action for this assertion. The fail-action controls
 // do not affect the statistics counters, so the failure is still counted even
 // when its report is suppressed. §16.4.1: for a deferred assertion the default
 // report is a pending report, scheduled with the process's other deferred
 // reports rather than emitted here; a simple immediate assertion reports at
 // once.
-static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
-                                          uint32_t directive_bit,
-                                          SimContext& ctx) {
+static void ReportDefaultAssertionFailure(const Stmt* stmt, SimContext& ctx) {
   ctx.IncrementAssertionFailCount();
-  if (!ctx.AssertFailActionEnabled(type_bit, directive_bit)) return;
+  if (!AssertionControlStatus(stmt, ctx).fail_action) return;
   // §20.10: the tool-specific message carries the line of the statement, as
   // it carries a severity task's own line.
   uint32_t line = stmt->range.start.line;
@@ -442,12 +464,17 @@ static const Stmt* ConcludeAssertion(const Stmt* stmt, PropertyVerdict verdict,
       proc->expect_holds = is_true;
     }
     if (!is_true && action == nullptr) {
-      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
-                                    ImmediateDirectiveTypeBit(stmt), ctx);
+      ReportDefaultAssertionFailure(stmt, ctx);
     }
     return nullptr;
   }
   if (action != nullptr) {
+    // §20.11: PassOff, VacuousOff and FailOff stop the action block of the
+    // verdict they apply to.
+    if (!AssertionControlStatus(stmt, ctx).RunsAction(is_true,
+                                                      verdict.vacuous)) {
+      return nullptr;
+    }
     if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
         TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
       return nullptr;
@@ -455,8 +482,7 @@ static const Stmt* ConcludeAssertion(const Stmt* stmt, PropertyVerdict verdict,
     return action;
   }
   if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
-    ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
-                                  ImmediateDirectiveTypeBit(stmt), ctx);
+    ReportDefaultAssertionFailure(stmt, ctx);
   }
   return nullptr;
 }
@@ -474,9 +500,7 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   // $assertoff/$assertkill) has stopped checking for this assertion's type and
   // directive, the assertion is not evaluated, records nothing, and runs no
   // action on this activation.
-  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
-  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
-  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return nullptr;
+  if (!AssertionControlStatus(stmt, ctx).checking) return nullptr;
   RecordConcurrentCoverAttempt(stmt, ctx);
 
   // §16.12: an attempt at which the disable condition, read as the variables
@@ -515,11 +539,12 @@ static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
   size_t pending = PendingSequenceAttempts(*state);
   for (size_t i = 0; i < pending; ++i) {
     RecordCoverImmediateSample(stmt, false, ctx);
-    if (stmt->assert_fail_stmt != nullptr) {
+    if (stmt->assert_fail_stmt == nullptr) {
+      if (stmt->kind != StmtKind::kCoverImmediate) {
+        ReportDefaultAssertionFailure(stmt, ctx);
+      }
+    } else if (AssertionControlStatus(stmt, ctx).fail_action) {
       co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
-    } else if (stmt->kind != StmtKind::kCoverImmediate) {
-      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
-                                    ImmediateDirectiveTypeBit(stmt), ctx);
     }
   }
   PendingReportScope::Restore(ctx, saved);
@@ -552,13 +577,15 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
     RecordConcurrentCoverVerdict(stmt, verdict, ctx);
     const Stmt* action =
         verdict.holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
-    if (action != nullptr) {
+    if (action == nullptr) {
+      if (!verdict.holds && stmt->kind != StmtKind::kCoverImmediate) {
+        ReportDefaultAssertionFailure(stmt, ctx);
+      }
+    } else if (AssertionControlStatus(stmt, ctx).RunsAction(verdict.holds,
+                                                            verdict.vacuous)) {
       ctx.AssertionSamples().SetInstanceBindings(verdict.bindings);
       co_await ExecStmt(action, ctx, arena);
       ctx.AssertionSamples().SetInstanceBindings(nullptr);
-    } else if (!verdict.holds && stmt->kind != StmtKind::kCoverImmediate) {
-      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
-                                    ImmediateDirectiveTypeBit(stmt), ctx);
     }
   }
   PendingReportScope::Restore(ctx, saved);
@@ -567,10 +594,7 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
 static void ExecPropertyTreeTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
-  if (!ctx.AssertCheckingEnabled(ImmediateAssertionTypeBit(stmt),
-                                 ImmediateDirectiveTypeBit(stmt))) {
-    return;
-  }
+  if (!AssertionControlStatus(stmt, ctx).checking) return;
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   PropertyTreeState*& state = proc->property_tree_states[stmt];
@@ -608,9 +632,7 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
 static void ExecSequencePropertyTick(const Stmt* stmt,
                                      const AttemptInstances& instances,
                                      SimContext& ctx, Arena& arena) {
-  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
-  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
-  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return;
+  if (!AssertionControlStatus(stmt, ctx).checking) return;
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   SequencePropertyState*& state = proc->sequence_property_states[stmt];
@@ -781,42 +803,37 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
   }
 }
 
-// §20.11: the assertion_type and directive_type masks of a Kill, and whether
-// they select an assertion.
-struct KillMasks {
-  uint32_t assertion_type;
-  uint32_t directive_type;
-  bool Selects(const Stmt* stmt) const {
-    return (ImmediateAssertionTypeBit(stmt) & assertion_type) != 0 &&
-           (ImmediateDirectiveTypeBit(stmt) & directive_type) != 0;
-  }
-};
-
-// The attempts in flight that `proc` keeps of the assertions `kill` selects,
-// aborted. §16.9.4: an attempt waiting in a process of its own for the global
-// clocking tick is aborted with the process.
-static void AbortProcessAttempts(Process& proc, const KillMasks& kill) {
+// The attempts in flight that `proc` keeps of the assertions the Kill `call`
+// selects and no Lock holds, aborted. §16.9.4: an attempt waiting in a
+// process of its own for the global clocking tick is aborted with the
+// process.
+static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
+                                 const SimContext& ctx) {
+  std::string scope;
+  if (!call.scopes.empty()) scope = ProcessHierName(proc, ctx);
+  auto selects = [&](const Stmt* stmt) {
+    std::string name;
+    AssertionIdentity identity = IdentityOf(stmt, scope, name);
+    return CallSelects(call, identity) &&
+           !ctx.AssertControls().StatusOf(identity).locked;
+  };
   if (proc.future_gclk_attempt_of != nullptr &&
-      kill.Selects(proc.future_gclk_attempt_of)) {
+      selects(proc.future_gclk_attempt_of)) {
     proc.active = false;
   }
   for (auto& [stmt, state] : proc.property_tree_states) {
-    if (state != nullptr && kill.Selects(stmt)) {
-      AbortPropertyTreeAttempts(*state);
-    }
+    if (state != nullptr && selects(stmt)) AbortPropertyTreeAttempts(*state);
   }
   for (auto& [stmt, state] : proc.sequence_property_states) {
-    if (state != nullptr && kill.Selects(stmt)) {
+    if (state != nullptr && selects(stmt)) {
       AbortSequencePropertyAttempts(*state);
     }
   }
 }
 
-void AbortKilledAttempts(uint32_t assertion_type, uint32_t directive_type,
-                         SimContext& ctx) {
-  KillMasks kill{assertion_type, directive_type};
+void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx) {
   for (Process* proc : ctx.GetScheduler().Threads()) {
-    AbortProcessAttempts(*proc, kill);
+    AbortProcessAttempts(*proc, call, ctx);
   }
 }
 

@@ -606,8 +606,11 @@ std::string FormatArg(const Logic4Vec& val, char spec);
 // the expression's bit width admits, leading zeros replaced by spaces.
 std::string FormatArgAutoSized(const Logic4Vec& val, char spec);
 std::string FormatStrength(const NetStrength& ns);
+// §20.4.3: `val`, a time in units of 10**value_order s, as %t renders it
+// under `spec`.
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
-                                      const TimeFormatSpec& spec);
+                                      const TimeFormatSpec& spec,
+                                      int value_order);
 std::string FormatValueAsString(const Logic4Vec& val);
 // The format template a string literal argument of a display task supplies:
 // the literal's text between its delimiters, escapes undecoded. Defined in

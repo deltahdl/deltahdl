@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -12,6 +13,8 @@
 #include "common/types.h"
 
 namespace delta {
+
+struct DataType;
 
 struct Expr;
 struct StructTypeInfo;
@@ -165,6 +168,16 @@ struct Variable {
   bool is_signed = false;
   bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
+
+  // §20.6.1: the data type the declaration gave the variable, null where none
+  // was recorded, and what $typename writes before a user-defined type the
+  // declaration's scope declares: "pkg::" for a package's variable, empty for
+  // a module's or a subroutine's. `declared_unpacked` is the unpacked
+  // dimensions the declaration wrote, as `$typename` appends them, "$[0:9]"
+  // for `AB_t AB[10]`, and empty for none.
+  const DataType* declared_type = nullptr;
+  std::string_view declared_scope;
+  std::string_view declared_unpacked;
 
   // §7.4.1: for a packed multidimensional array stored as one flat vector (e.g.
   // `logic [1:0][7:0]`), the bit width of one outermost element. A single-index

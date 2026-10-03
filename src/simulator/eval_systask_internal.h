@@ -143,4 +143,19 @@ Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
 // §20.4.3 $timeformat.
 Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §20.6.1: $typename of its argument, built from the declared type of what
+// the argument names (eval_typename.cpp); and the reading of an argument no
+// declaration was recorded for, from a variable's width alone or a type
+// keyword written with a range (eval_systask.cpp).
+Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena);
+Logic4Vec EvalTypenameOfExpression(const Expr* expr, SimContext& ctx,
+                                   Arena& arena);
+
+// §20.6.2 and §20.7 with §23.6 and §25.9: the name the array an argument of
+// $bits or an array query names is held under -- the identifier, a
+// hierarchical path, or a member of the instance a virtual interface
+// represents by its full path; empty for any other argument.
+// Defined in eval_systask_query.cpp.
+std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena);
+
 }  // namespace delta

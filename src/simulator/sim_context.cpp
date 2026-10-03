@@ -210,13 +210,6 @@ Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
   return nullptr;
 }
 
-bool SimContext::AssertCheckingEnabled(uint32_t type_bit,
-                                       uint32_t directive_bit) const {
-  if (!assert_checking_off_) return true;
-  return (assert_checking_off_atype_ & type_bit) == 0 ||
-         (assert_checking_off_dtype_ & directive_bit) == 0;
-}
-
 void SimContext::SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
   deferred_arg_snapshots_[arg] = val;
 }

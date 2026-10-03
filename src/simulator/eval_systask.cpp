@@ -18,6 +18,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_scope_types.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -78,21 +79,15 @@ static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
 // §20.6.2 with §23.6: the name of the array `arg` names -- an identifier's
 // own, or the dotted path of a hierarchical reference such as u.mem naming an
 // instance's array -- and empty where `arg` is neither.
-static std::string ArrayArgName(const Expr* arg) {
-  if (arg->kind == ExprKind::kIdentifier) return std::string(arg->text);
-  if (arg->kind == ExprKind::kMemberAccess && !arg->is_scope_resolution)
-    return FlattenHierPath(arg);
-  return {};
-}
 
-static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx) {
+static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   size_t depth = 0;
   while (arg->kind == ExprKind::kSelect && arg->base != nullptr &&
          arg->index_end == nullptr) {
     arg = arg->base;
     ++depth;
   }
-  std::string name = ArrayArgName(arg);
+  std::string name = ArrayArgPath(arg, ctx, arena);
   if (name.empty()) return 0;
   const ArrayInfo* info = ctx.FindArrayInfo(name);
   if (info == nullptr || info->is_dynamic || info->is_queue ||
@@ -150,18 +145,28 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   // every element's bits -- 16 for `logic [7:0] m [0:1]`, of a net array as
   // of a variable one. Read as an expression the name is one element's worth,
   // so it is sized from the array's shape instead.
-  if (uint64_t bits = FixedArrayBits(arg, ctx); bits > 0) {
+  if (uint64_t bits = FixedArrayBits(arg, ctx, arena); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
   if (uint64_t tw = NamedTypeBits(arg, ctx, arena); tw > 0) {
     return MakeLogic4VecVal(arena, 32, tw);
+  }
+  // §20.6.2: the value "shall be determined without actual evaluation of the
+  // expression it encloses", so a call of a function is sized by the type it
+  // is declared to return and is not made.
+  if (arg->kind == ExprKind::kCall) {
+    SubroutineTarget target = FindSubroutineTarget(arg, ctx, arena);
+    if (target.func != nullptr) {
+      return MakeLogic4VecVal(arena, 32,
+                              DeclaredTypeWidth(target.func->return_type, ctx));
+    }
   }
   // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
   // expression. Its current bit-stream size is the live element count times
   // the per-element width, so an empty one reports 0. Both kinds keep their
   // elements in a QueueObject, so this one lookup covers each, named bare or
   // hierarchically.
-  if (std::string name = ArrayArgName(arg); !name.empty()) {
+  if (std::string name = ArrayArgPath(arg, ctx, arena); !name.empty()) {
     if (auto* q = ctx.FindQueue(name)) {
       uint64_t bits = static_cast<uint64_t>(q->elements.size()) * q->elem_width;
       return MakeLogic4VecVal(arena, 32, bits);
@@ -576,7 +581,8 @@ static bool IsBuiltinTypeKeyword(std::string_view name) {
   return false;
 }
 
-static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
+Logic4Vec EvalTypenameOfExpression(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
   if (expr->args.empty()) {
     return StringToLogic4Vec(arena, "logic");
   }
@@ -777,7 +783,10 @@ static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
   auto truncated = static_cast<int64_t>(RealVecToDouble(val));
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
+  // §20.5: the result is an integer, which is signed.
+  Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
+  out.is_signed = true;
+  return out;
 }
 
 static Logic4Vec EvalBitstoreal(const Expr* expr, SimContext& ctx,

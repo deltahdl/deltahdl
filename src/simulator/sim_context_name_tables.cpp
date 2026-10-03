@@ -426,6 +426,17 @@ const DataType* DeclaredNameTables::FindTypeDeclaration(
   return item != nullptr ? &item->typedef_type : nullptr;
 }
 
+std::string_view DeclaredNameTables::FindPackageTypedefKey(
+    std::string_view name) const {
+  for (const auto& [key, item] : type_declarations_) {
+    if (key.size() > name.size() + 2 && key.ends_with(name) &&
+        key.substr(key.size() - name.size() - 2, 2) == "::") {
+      return key;
+    }
+  }
+  return {};
+}
+
 const DataType* DeclaredNameTables::PackedTypeBehind(
     const DataType& type) const {
   const DataType* d = &type;

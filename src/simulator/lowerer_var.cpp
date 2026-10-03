@@ -698,6 +698,24 @@ static void RecordClassSpecialization(std::string_view name,
                           var.class_data_type->type_params, ctx);
 }
 
+// §20.6.1, step d: the fixed unpacked dimensions `var` was declared with, as
+// $typename writes them after the "$" standing for the array's name, "$[0:9]"
+// for `AB_t AB[10]`; empty for a variable with none, or with one that did not
+// fold to fixed bounds.
+static std::string_view UnpackedDimsText(const RtlirVariable& var,
+                                         Arena& arena) {
+  if (var.num_unpacked_dims == 0 ||
+      var.unpacked_dims.size() != var.num_unpacked_dims) {
+    return {};
+  }
+  auto* text = arena.Create<std::string>("$");
+  for (const RtlirUnpackedDim& dim : var.unpacked_dims) {
+    *text +=
+        "[" + std::to_string(dim.left) + ":" + std::to_string(dim.right) + "]";
+  }
+  return *text;
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
@@ -711,6 +729,8 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
 
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   v->is_4state = var.is_4state;
+  v->declared_type = var.written_type != nullptr ? var.written_type : var.dtype;
+  v->declared_unpacked = UnpackedDimsText(var, arena_);
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(name);

@@ -739,9 +739,14 @@ void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
 // folded again the same way, so `Box #(string, 6)` holds six elements where
 // the default specialization holds three.
 void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
+                              const std::vector<DataType>& actuals,
                               SimContext& ctx, Arena& arena) {
-  if (values.empty()) return;
+  if (values.empty() && actuals.empty()) return;
   ScopeMap scope = SpecializationParamScope(spec, values);
+  // §8.25 with §20.6.2: a packed dimension `$bits(T)` sizes is folded with T
+  // at the type the specialization's actual gives it.
+  TypedefMap type_params = TypeParamTypes(spec->decl, actuals, ctx);
+  TypedefRegistryGuard type_param_guard(&type_params, nullptr);
   for (auto& prop : spec->properties) {
     const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
     if (member == nullptr) continue;
@@ -832,7 +837,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
-  SizeValueParamProperties(spec, values, ctx, arena);
+  SizeValueParamProperties(spec, values, spelled, ctx, arena);
   // The values are the specialization's before its base is bound, since an
   // extends clause's list may name them, `extends Mem #(.K(W))`.
   for (auto& [pname, value] : values)
