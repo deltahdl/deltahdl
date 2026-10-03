@@ -582,6 +582,8 @@ static void CollectProcRhsIdentsIn(
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     read = s->rhs;
+  } else if (s->kind == StmtKind::kReturn) {
+    read = s->expr;
   } else if (const Expr* call = SubroutineCallOfStmt(s);
              call != nullptr && IsValueListSystemTask(call)) {
     read = call;
@@ -597,7 +599,9 @@ static void CollectProcRhsIdentsIn(
   // the expressions a randsequence statement holds outside its code blocks: an
   // rs_if_else condition, an rs_case expression and its arms, a rule's weight,
   // a rand join's expression and a production item's actual arguments
-  // (ForEachRandsequenceExpr in elaborator_validate_internal.h). Left to the
+  // (ForEachRandsequenceExpr in elaborator_validate_internal.h), and a return
+  // statement's expression, the value §13.4.1 has the function return, read
+  // above in place of a right side. Left to the
   // right side alone, `if (undeclared) x = 1;` elaborated clean. A statement's
   // delay, event control, disable target, initializer and assertion are not
   // read here.

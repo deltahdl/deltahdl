@@ -168,4 +168,47 @@ TEST(ReadPositions, APatternBindingInAMatchesConditionIsNotReported) {
              "endmodule\n"));
 }
 
+// §13.4.1 makes a return statement's expression the value the function
+// returns, a read like any other, so a name nothing declares there is
+// unresolved, in a module's function (line 3) and in a class method (line 7).
+// The return's expression was never collected, and h() returned 0.
+TEST(ReadPositions, UndeclaredNameInAReturnStatementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  function int h();\n"
+      "    return nosuch;\n"
+      "  endfunction\n"
+      "  initial $display(\"%0d\", h());\n"
+      "  class k;\n"
+      "    function int g(); return other; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'nosuch'", 3,
+                            "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'other'", 7,
+                            "23.9"));
+}
+
+// A return of what the function can see is no such read: a formal, a local
+// of the body, the module's variable, and in a method the class's property
+// and the object itself.
+TEST(ReadPositions, ReturnOfADeclaredNameIsNotReported) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int mv;\n"
+             "  function int f1(int a); return a; endfunction\n"
+             "  function int f2(); int l; l = 1; return l; endfunction\n"
+             "  function int f3(); return mv; endfunction\n"
+             "  class k;\n"
+             "    int p;\n"
+             "    function int g(); return p; endfunction\n"
+             "    function k self(); return this; endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

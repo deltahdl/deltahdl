@@ -24,8 +24,8 @@ namespace {
 // §23.9 with §3.12.1: a function at compilation-unit scope reading a name
 // declared nowhere. Line 3 is the read; the module beside it declares nothing
 // of the name either, so the module is not what answers. The read stands on an
-// assignment's right side because that is the position the collector reads
-// (CollectProcRhsIdents); a return's expression is #4358's.
+// assignment's right side; the other positions a statement reads in are
+// test_elaborator_subclause_23_09d.cpp's.
 TEST(UnitScopeSubroutineReads, UndeclaredNameInAUnitFunctionIsReported) {
   ElabFixture f;
   ElabOk(
