@@ -1,12 +1,14 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/class_method_reads.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -338,6 +340,142 @@ void Elaborator::CheckHierRefUndeclaredMember(
                   ma->lhs->text, ma->rhs->text, ma->rhs->text,
                   it->second->name),
       Subclause("23.6"));
+}
+
+UnitHierHeadNames::UnitHierHeadNames(const CompilationUnit* unit)
+    : declared_(unit) {
+  for (const auto* scopes :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const ModuleDecl* scope : *scopes) AddScope(scope);
+  }
+  for (const ModuleItem* item : unit->cu_items) AddItem(item);
+  for (const BindDirective* bd : unit->bind_directives) {
+    if (bd->instantiation != nullptr) AddItem(bd->instantiation);
+  }
+}
+
+// §27.6: "All unnamed generate blocks will be given the name genblk<n>", a
+// name the source does not write and the elaborator gives, so one of that
+// form is the name of a generate block wherever the elaborator gave it.
+static bool IsImplicitGenerateBlockName(std::string_view name) {
+  constexpr std::string_view kPrefix = "genblk";
+  if (!name.starts_with(kPrefix) || name.size() == kPrefix.size()) return false;
+  return std::all_of(name.begin() + kPrefix.size(), name.end(),
+                     [](char c) { return c >= '0' && c <= '9'; });
+}
+
+bool UnitHierHeadNames::Admits(std::string_view name) const {
+  return declared_.Declares(name) || scope_names_.contains(name) ||
+         IsImplicitGenerateBlockName(name);
+}
+
+void UnitHierHeadNames::AddScope(const ModuleDecl* scope) {
+  scope_names_.insert(scope->name);
+  for (const PortDecl& port : scope->ports) scope_names_.insert(port.name);
+  for (const ModportDecl* mp : scope->modports) scope_names_.insert(mp->name);
+  for (const ModuleItem* item : scope->items) AddItem(item);
+  for (const BindDirective* bd : scope->bind_directives) {
+    if (bd->instantiation != nullptr) AddItem(bd->instantiation);
+  }
+}
+
+void UnitHierHeadNames::AddItem(const ModuleItem* item) {
+  if (item == nullptr) return;
+  for (std::string_view name :
+       {item->name, item->inst_name, item->gate_inst_name}) {
+    if (!name.empty()) scope_names_.insert(name);
+  }
+  if (item->nested_module_decl != nullptr) AddScope(item->nested_module_decl);
+  for (const ModuleItem* sub : item->gen_body) AddItem(sub);
+  AddItem(item->gen_else);
+  for (const auto& ci : item->gen_case_items) {
+    if (!ci.label.empty()) scope_names_.insert(ci.label);
+    for (const ModuleItem* sub : ci.body) AddItem(sub);
+  }
+  if (item->gen_init != nullptr) AddStmt(item->gen_init);
+  AddStmt(item->body);
+  for (const auto& arg : item->func_args) scope_names_.insert(arg.name);
+  for (const Stmt* s : item->func_body_stmts) AddStmt(s);
+}
+
+void UnitHierHeadNames::AddStmt(const Stmt* s) {
+  if (s == nullptr) return;
+  for (std::string_view name : {s->label, s->var_name}) {
+    if (!name.empty()) scope_names_.insert(name);
+  }
+  if (s->decl_item != nullptr) AddItem(s->decl_item);
+  ForEachChildStmt(s, [&](Stmt* const& sub) { AddStmt(sub); });
+}
+
+namespace {
+
+// The leftmost name of the hierarchical name `e` heads, through its member
+// selects and the bit-selects of an instance array, or null where it is no
+// hierarchical name a scope has to answer: a `pkg::` or class scope
+// resolution, a `$root.` or `$unit::` prefix, `this` or `super`, or a call.
+const Expr* HierHead(const Expr* e) {
+  while (e != nullptr) {
+    if (e->kind == ExprKind::kMemberAccess) {
+      if (e->is_scope_resolution) return nullptr;
+      e = e->lhs;
+    } else if (e->kind == ExprKind::kSelect) {
+      e = e->base;
+    } else {
+      break;
+    }
+  }
+  if (e == nullptr || e->kind != ExprKind::kIdentifier) return nullptr;
+  if (!e->scope_prefix.empty() || e->text.starts_with('$')) return nullptr;
+  if (e->text == "this" || e->text == "super") return nullptr;
+  return e;
+}
+
+// The heads of the hierarchical names `e` holds. A `with` clause is left
+// alone: an array method's reads its iterator, `item` unless it names
+// another, which no scope declares (§7.12).
+void CollectHierHeads(const Expr* e, std::vector<const Expr*>& out) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kMemberAccess) {
+    if (const Expr* head = HierHead(e)) out.push_back(head);
+    return;
+  }
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->repeat_count}) {
+    CollectHierHeads(child, out);
+  }
+  for (const Expr* child : e->args) CollectHierHeads(child, out);
+  for (const Expr* child : e->elements) CollectHierHeads(child, out);
+}
+
+void CollectStmtHierHeads(const Stmt* s, std::vector<const Expr*>& out) {
+  if (s == nullptr) return;
+  ForEachChildExpr(s, [&](const Expr* e) { CollectHierHeads(e, out); });
+  ForEachChildStmt(s,
+                   [&](Stmt* const& sub) { CollectStmtHierHeads(sub, out); });
+}
+
+}  // namespace
+
+void ReportUnresolvedHierHeads(
+    const ModuleDecl* decl, const std::function<bool(std::string_view)>& admits,
+    DiagEngine& diag) {
+  std::vector<const Expr*> heads;
+  for (const ModuleItem* item : decl->items) {
+    if (IsProceduralItemKind(item->kind))
+      CollectStmtHierHeads(item->body, heads);
+    bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
+                         item->kind == ModuleItemKind::kFunctionDecl;
+    if (!is_subroutine || !item->method_class.empty()) continue;
+    for (const Stmt* s : item->func_body_stmts) CollectStmtHierHeads(s, heads);
+  }
+  for (const Expr* head : heads) {
+    if (admits(head->text)) continue;
+    diag.Error(head->range.start,
+               std::format("hierarchical name '{}' resolves to no declaration",
+                           head->text),
+               Subclause("23.8"));
+  }
 }
 
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,

@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <format>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -12,6 +13,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_name_rules.h"
+#include "elaborator/class_method_reads.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
@@ -765,6 +767,18 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       diag_);
   ReportSubroutineUnresolved(decl->items, declared, unit_, pkg_provided_names_,
                              diag_);
+  // §23.8: a hierarchical name's first name may resolve upward to a name the
+  // module's own scope chain does not hold, so it is also asked of every
+  // declaration of the unit, and one neither answers names nothing.
+  if (!unit_hier_head_names_) {
+    unit_hier_head_names_ = std::make_shared<const UnitHierHeadNames>(unit_);
+  }
+  ReportUnresolvedHierHeads(
+      decl,
+      [this, &declared](std::string_view n) {
+        return declared(n) || unit_hier_head_names_->Admits(n);
+      },
+      diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,

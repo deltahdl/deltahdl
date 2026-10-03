@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -29,6 +30,8 @@
 #include "parser/expr_substitute.h"
 
 namespace delta {
+
+class UnitHierHeadNames;
 
 class Arena;
 class DiagEngine;
@@ -401,6 +404,10 @@ class ElaboratorData {
   // The names each package makes directly visible, each with the package
   // declaring it (elaborator_scope_rules_names.h), filled on first use.
   ProvidedNameCache pkg_provided_names_;
+  // §23.8: the names of the whole unit a hierarchical name's first name may
+  // resolve to (UnitHierHeadNames, class_method_reads.h), built when the
+  // first module's references are checked.
+  std::shared_ptr<const UnitHierHeadNames> unit_hier_head_names_;
 
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
       explicit_imports_;
