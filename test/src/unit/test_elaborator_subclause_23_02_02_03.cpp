@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_type.h"
@@ -166,6 +168,29 @@ TEST(PortKindDataTypeDirection, RefPortElaboratesAsVariable) {
   auto& port = design->top_modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_TRUE(port.is_var);
+}
+
+// §23.2.2.3 makes an input or inout with no port kind a net, and §6.7.1 gives
+// a net only a 4-state integral type or an unpacked aggregate of such types,
+// so `input string s`, `input real r` and `inout event e` each declare an
+// illegal net and are reported at their own line, where `input var string v`
+// declares a variable and is not. Only integral and aggregate types were
+// judged, and none of the three was reported.
+TEST(PortKindDataTypeDirection, ANetPortOfATypeNoNetCanHaveIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input string s,\n"
+      "         input real r,\n"
+      "         inout event e,\n"
+      "         input var string v);\n"
+      "endmodule\n",
+      f, "m");
+  for (uint32_t line : {1u, 2u, 3u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net data type must be 4-state", line, "6.7.1"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "net data type must be 4-state", 4, "6.7.1"));
 }
 
 }  // namespace

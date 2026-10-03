@@ -58,10 +58,12 @@ TEST(PortDeclaration, UnionPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kUnion);
 }
 
+// The port is a variable: with no port kind §23.2.2.3 would make it a net,
+// whose data type §6.7.1 does not let be an event.
 TEST(PortDeclaration, EventPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m(input event e);\n"
+      "module m(input var event e);\n"
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);

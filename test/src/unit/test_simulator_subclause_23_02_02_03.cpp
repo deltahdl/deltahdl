@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -105,6 +106,39 @@ TEST(PortKindSimulation, HeaderInputPortIsANet) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_NE(f.ctx.FindNet("i"), nullptr);
+}
+
+// §23.2.2.3: a port with no port kind is a net of the default net type, the
+// one `default_nettype set where its module is defined (§22.8), so s0's
+// unconnected `input logic a` is a tri0 net nothing drives and reads 0, while
+// s1's `input wire logic a` names its net type and stays a wire reading z, and
+// s2's `input tri1 logic a` is the tri1 net it names and reads 1. Every port
+// was a wire, and s0's and s2's read z.
+TEST(PortKindSimulation, APortWithNoPortKindIsANetOfTheDefaultNetType) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`default_nettype tri0\n"
+                           "module s0(input logic a, output logic b);\n"
+                           "  assign b = a;\n"
+                           "endmodule\n"
+                           "module s1(input wire logic a, "
+                           "output logic b);\n"
+                           "  assign b = a;\n"
+                           "endmodule\n"
+                           "`default_nettype wire\n"
+                           "module s2(input tri1 logic a, "
+                           "output logic b);\n"
+                           "  assign b = a;\n"
+                           "endmodule\n"
+                           "module t;\n"
+                           "  logic x, y, z;\n"
+                           "  s0 u0(.b(x));\n"
+                           "  s1 u1(.b(y));\n"
+                           "  s2 u2(.b(z));\n"
+                           "  initial #1 $display(\"%b %b %b\", x, y, z);\n"
+                           "endmodule\n",
+                           f),
+      "0 z 1\n");
 }
 
 }  // namespace

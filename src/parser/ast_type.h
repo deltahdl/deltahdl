@@ -136,6 +136,12 @@ struct DataType {
   // member for member but declared apart do not match. Unset for any other
   // type, and for one no declaration wrote.
   SourceLoc decl_loc;
+
+  // The net type keyword the declaration wrote, `tri0` of `tri0 logic n`, kept
+  // where `kind` gives way to the data type written after it (§6.7.1);
+  // kImplicit where none was written, as for a port §23.2.2.3 makes a net of
+  // the default net type.
+  DataTypeKind net_keyword = DataTypeKind::kImplicit;
 };
 
 struct FunctionArg {

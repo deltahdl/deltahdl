@@ -347,6 +347,7 @@ DataType Parser::ParseNamedType() {
 
 static void ApplyNetInfo(DataType& inner, const DataType& net) {
   inner.is_net = true;
+  inner.net_keyword = net.net_keyword;
   inner.is_vectored = net.is_vectored;
   inner.is_scalared = net.is_scalared;
   inner.drive_strength0 = net.drive_strength0;
@@ -532,6 +533,7 @@ DataType Parser::ParseDataType() {
   if (!kind) return dtype;
   dtype.kind = *kind;
   dtype.is_net = IsNetTypeToken(tok_kind);
+  if (dtype.is_net) dtype.net_keyword = dtype.kind;
   dtype.type_name = CurrentToken().text;
   dtype.is_signed = IsDefaultSigned(dtype.kind);
   Consume();

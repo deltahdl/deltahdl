@@ -383,11 +383,13 @@ TEST(SingularAggregateTypes, TypedefUnpackedUnionPortDefaultRejected) {
 }
 
 // The string data type is singular (a distinct claim from the integral types),
-// so a string port default is accepted. Built from real syntax end to end.
+// so a string port default is accepted. Built from real syntax end to end; the
+// port is a variable, since §23.2.2.3 would make a string port with no port
+// kind a net, which §6.7.1 does not allow.
 TEST(SingularAggregateTypes, StringPortDefaultAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module t(input string p = \"hi\");\n"
+      "module t(input var string p = \"hi\");\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

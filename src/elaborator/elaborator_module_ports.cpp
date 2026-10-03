@@ -215,14 +215,11 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
   }
 }
 
-// Which port data types the §6.7.1 net rules can decide. Item a of that clause
-// judges "a 4-state integral type" and item b an unpacked aggregate whose
-// elements are themselves valid net types, so an integral or aggregate data
-// type is one the rule speaks about. A port naming an event, a string, a real,
-// a chandle or an interface raises a prior question instead -- whether
-// §23.2.2.3's "net of default net type" makes such a port a net at all -- and
-// nothing here answers it, so those are left where they were. A net written as
-// a net declaration is not in doubt that way and is judged in full.
+// Which data types the §6.7.1 net rules admit for a net: item a of that clause
+// names a 4-state integral type and item b an unpacked aggregate of valid net
+// types, so an integral or aggregate data type is one a net may have. A checker
+// formal of any other type -- an event, a string, a real -- holds its actual as
+// a variable does (§17.2).
 static bool PortDataTypeIsJudgedByNetRules(const DataType& dtype) {
   return IsIntegralType(dtype.kind) || dtype.kind == DataTypeKind::kStruct ||
          dtype.kind == DataTypeKind::kUnion;
@@ -336,7 +333,7 @@ static void ValidateNetPortDataType(const ModuleDecl* decl,
                                     const PortDecl& port, bool port_is_var,
                                     const PortElabContext& ctx) {
   if (decl->decl_kind == ModuleDeclKind::kChecker) return;
-  if (port_is_var || !PortDataTypeIsJudgedByNetRules(port.data_type)) return;
+  if (port_is_var) return;
   ValidateNetDataTypeIs4State(port.data_type, ctx.typedefs, ctx.diag, port.loc);
 }
 
@@ -421,14 +418,17 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;
   // §23.2.2.3: a port the clause makes a net is a net of the type its
-  // declaration names, and of the default net type where it names none --
-  // DataTypeToNetType answers both, an implicit or explicit-data-type kind
-  // falling through to wire. An interconnect port is its own net type
-  // (§6.6.8), as it is for a net declaration.
+  // declaration names, the net type keyword where a data type follows it, and
+  // of the default net type where it names none, which ElaborateOnePort puts
+  // in place of the wire DataTypeToNetType answers for a data type alone. An
+  // interconnect port is its own net type (§6.6.8), as it is for a net
+  // declaration.
   if (!port_is_var) {
-    rp.net_type = port.data_type.is_interconnect
-                      ? NetType::kInterconnect
-                      : DataTypeToNetType(port.data_type.kind);
+    DataTypeKind written = port.data_type.net_keyword != DataTypeKind::kImplicit
+                               ? port.data_type.net_keyword
+                               : port.data_type.kind;
+    rp.net_type = port.data_type.is_interconnect ? NetType::kInterconnect
+                                                 : DataTypeToNetType(written);
   }
   // Syntax 23-4's one `= constant_expression` is an initializer on a variable
   // output port and a default value on an input port (§23.2.2.2, footnote 2),
@@ -468,8 +468,20 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   ValidateNetPortDataType(decl, port, port_is_var, ctx);
 
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
-  return BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope,
-                            ctx.diag);
+  RtlirPort rp =
+      BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope, ctx.diag);
+  // §23.2.2.3: a port whose port kind is omitted defaults to a net of the
+  // default net type, the one in force where the module is defined (§22.8). A
+  // module under `default_nettype none has no default net type to give, so its
+  // port keeps the wire; a checker's formals are no ports (§17.2).
+  if (decl->decl_kind != ModuleDeclKind::kChecker && !port_is_var &&
+      !port.data_type.is_interconnect &&
+      port.data_type.net_keyword == DataTypeKind::kImplicit &&
+      DataTypeToNetType(port.data_type.kind) == NetType::kWire &&
+      ctx.mod->default_nettype != NetType::kNone) {
+    rp.net_type = ctx.mod->default_nettype;
+  }
+  return rp;
 }
 
 // 23.2.2.4: a default input-port value is a constant expression evaluated in
