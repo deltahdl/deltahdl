@@ -556,6 +556,47 @@ TEST(DynamicArrayNewSimulation, NewSizesADynamicSubarrayOfAFixedArray) {
   EXPECT_EQ(out, "4 2 77 0 0\n");
 }
 
+// §7.5.1 with §7.4.5: each element of `int a[3][][5]`, §20.7.1's own shape, is
+// a dynamic array whose elements are int [5], so new[4] on a[2] gives it four
+// of them, a write through all three dimensions reads back, and the array
+// itself keeps its three elements.
+TEST(DynamicArrayNewSimulation,
+     NewSizesADynamicArrayOfFixedArraysInAFixedArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a[3][][5];\n"
+      "  initial begin\n"
+      "    a[2] = new[4];\n"
+      "    a[2][1][3] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d\", a[2][1][3], $size(a), a[2].size(),\n"
+      "             a[0].size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 3 4 0\n");
+}
+
+// The element's elements may themselves have more than one fixed dimension,
+// and a dimension written from its higher bound down, [3:1], still addresses
+// its elements by the bounds it declares.
+TEST(DynamicArrayNewSimulation, NewSizesAMultiDimFixedElementOfAFixedArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int b[2][][2][3:1];\n"
+      "  initial begin\n"
+      "    b[1] = new[2];\n"
+      "    b[1][1][0][1] = 9;\n"
+      "    b[1][1][1][3] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d\", b[1][1][0][1], b[1][1][1][3],\n"
+      "             b[1][1][0][2], b[1].size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 4 0 2\n");
+}
+
 // §7.5.1 with §7.4: a dynamic array of dynamic arrays and a fixed array of
 // dynamic arrays size each element by new[] on its select, declared among a
 // module's items and among a block's statements alike, and each element keeps

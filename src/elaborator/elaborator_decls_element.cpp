@@ -62,15 +62,24 @@ static std::optional<RtlirFixedDim> FixedDimOf(const Expr* dim,
 // `shape` how many elements it holds and its bounds, each such element being
 // kept as a queue of that many elements (RtlirElementShape::array_size), and
 // the dimensions of a multidimensional element after its first
-// (inner_array_dims); nothing for any other declaration.
+// (inner_array_dims). §7.4.5 lets a fixed-size array's element be such an
+// array in turn, `int a[3][][5]` (§20.7.1's own example), whose element a[i]
+// is a dynamic array of int [5]: there the shape recorded is that of the
+// element's elements, read from the dimensions after the dynamic one.
+// Nothing for any other declaration.
 static void RecordFixedElementArray(const ModuleItem* item,
                                     const ScopeMap& scope, bool first_is_assoc,
                                     RtlirElementShape& shape) {
   const std::vector<Expr*>& dims = item->unpacked_dims;
   if (dims.size() < 2) return;
-  if (dims[0] != nullptr && !IsQueueDim(dims[0]) && !first_is_assoc) return;
+  size_t first_fixed = 1;
+  if (dims[0] != nullptr && !IsQueueDim(dims[0]) && !first_is_assoc) {
+    if (dims[1] != nullptr && !IsQueueDim(dims[1])) return;
+    first_fixed = 2;
+  }
+  if (first_fixed >= dims.size()) return;
   std::vector<RtlirFixedDim> fixed;
-  for (size_t i = 1; i < dims.size(); ++i) {
+  for (size_t i = first_fixed; i < dims.size(); ++i) {
     std::optional<RtlirFixedDim> dim = FixedDimOf(dims[i], scope);
     if (!dim) return;
     fixed.push_back(*dim);

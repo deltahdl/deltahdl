@@ -42,6 +42,29 @@ static void RecordAssocElemInit(std::string_view name, const RtlirVariable& var,
   aa->elem_init = OwnRhsWords(elem->value, arena);
 }
 
+// §7.4.4: the dimensions of a multidimensional element after its first, as
+// the element queues below each level are made with.
+static std::vector<FixedDimShape> InnerDimsOf(const RtlirElementShape& shape) {
+  std::vector<FixedDimShape> dims;
+  dims.reserve(shape.inner_array_dims.size());
+  for (const RtlirFixedDim& dim : shape.inner_array_dims)
+    dims.push_back(FixedDimShape{dim.size, dim.lo, dim.descending});
+  return dims;
+}
+
+// §7.4 with §7.5 and §7.10: what each element of the queue `q` is where it is
+// an array itself -- the levels of queues it holds and, for a fixed-size
+// element, `int d[][5]`, its size, bounds and further dimensions -- as the
+// elaborator recorded it in `element`.
+static void ApplyElementShape(QueueObject* q,
+                              const RtlirElementShape& element) {
+  q->nested_queue_levels = element.nested_queue_levels;
+  q->element_array_size = element.array_size;
+  q->element_array_lo = element.array_lo;
+  q->element_array_descending = element.array_descending;
+  q->element_inner_dims = InnerDimsOf(element);
+}
+
 // §7.4 with §7.10: each element of a fixed-size array whose elements are
 // queues, `q_t fx[2]` under `typedef int q_t[$];`, is a queue, created under
 // the element's own name, `fx[1]`, where ElementQueueOfSelect
@@ -60,6 +83,15 @@ static void CreateFixedElementQueues(std::string_view name,
         ctx.CreateQueue(*key, var.width, /*max_size=*/-1, var.is_4state);
     q->is_signed = var.is_signed;
     q->holds_class_handles = !var.class_type_name.empty();
+    // §7.4.5 with §7.5: in `int a[3][][5]` the element's queue, a[2], is a
+    // dynamic array of int [5], each of its elements a queue of five as a
+    // declared `int d[][5]`'s are, so it carries the shape the elaborator
+    // recorded for them.
+    if (var.element.array_size > 0) {
+      q->elements_are_queues = true;
+      ApplyElementShape(q, var.element);
+      continue;
+    }
     // §7.4 with §7.5: in `int arr[2][][]` the element's queue, arr[0], holds
     // queues itself.
     q->elements_are_queues = var.element.nested_queue_levels > 0;
@@ -88,16 +120,6 @@ static const AssocArrayObject* ElementAssocTemplate(
   return inner;
 }
 
-// §7.4.4: the dimensions of a multidimensional element after its first, as
-// the element queues below each level are made with.
-static std::vector<FixedDimShape> InnerDimsOf(const RtlirElementShape& shape) {
-  std::vector<FixedDimShape> dims;
-  dims.reserve(shape.inner_array_dims.size());
-  for (const RtlirFixedDim& dim : shape.inner_array_dims)
-    dims.push_back(FixedDimShape{dim.size, dim.lo, dim.descending});
-  return dims;
-}
-
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
@@ -112,11 +134,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // in eval_array_class_queue.h).
     q->holds_class_handles = !var.class_type_name.empty();
     q->elements_are_queues = var.elements_are_queues;
-    q->nested_queue_levels = var.element.nested_queue_levels;
-    q->element_array_size = var.element.array_size;
-    q->element_array_lo = var.element.array_lo;
-    q->element_array_descending = var.element.array_descending;
-    q->element_inner_dims = InnerDimsOf(var.element);
+    ApplyElementShape(q, var.element);
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
@@ -127,11 +145,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     auto* q = ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
     q->is_signed = var.is_signed;
     q->elements_are_queues = var.elements_are_queues;
-    q->nested_queue_levels = var.element.nested_queue_levels;
-    q->element_array_size = var.element.array_size;
-    q->element_array_lo = var.element.array_lo;
-    q->element_array_descending = var.element.array_descending;
-    q->element_inner_dims = InnerDimsOf(var.element);
+    ApplyElementShape(q, var.element);
     LowerDynArrayInit(q, var);
 
     ArrayInfo info;
