@@ -127,15 +127,16 @@ static void ReportProgramSignalRef(SourceLoc loc, DiagEngine& diag) {
              Subclause("24.3"));
 }
 
-// The subroutine a statement calls or enables as a whole, `pi.t;`, `f(x);` or
-// `$display(x);`, or nullptr. Its name is a subroutine's, §24.5's subject
-// rather than §24.3's, so only the arguments it is handed are read as
-// references.
-static const Expr* SubroutineCallOfStmt(const Stmt* s) {
-  if (s->kind != StmtKind::kExprStmt || s->expr == nullptr) return nullptr;
-  ExprKind k = s->expr->kind;
-  if (k == ExprKind::kMemberAccess || k == ExprKind::kCall ||
-      k == ExprKind::kSystemCall)
+// The subroutine a statement calls or enables as a whole, or nullptr: a call
+// SubroutineCallOfStmt (src/parser/ast_stmt.h) answers, `f(x);` or
+// `$display(x);`, or a task enable written without its parentheses, `pi.t;`,
+// which A.6.9 admits and which leaves the statement a bare hierarchical name.
+// Its name is a subroutine's, §24.5's subject rather than §24.3's, so only the
+// arguments it is handed are read as references.
+static const Expr* SubroutineEnableOfStmt(const Stmt* s) {
+  if (const Expr* call = SubroutineCallOfStmt(s)) return call;
+  if (s->kind == StmtKind::kExprStmt && s->expr != nullptr &&
+      s->expr->kind == ExprKind::kMemberAccess)
     return s->expr;
   return nullptr;
 }
@@ -171,9 +172,9 @@ static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
   // this report reaches. ForEachChildExpr and ForEachChildStmt in
   // elaborator_validate_internal.h state those positions once for the whole
   // elaborator.
-  const Expr* call = SubroutineCallOfStmt(s);
+  const Expr* call = SubroutineEnableOfStmt(s);
   ForEachChildExpr(s, [&](Expr* const& e) {
-    if (e != call && ExprRefersToProgram(e, scopes))
+    if ((call == nullptr || e != s->expr) && ExprRefersToProgram(e, scopes))
       ReportProgramSignalRef(s->range.start, diag);
   });
   if (call != nullptr && AnyExprChild(call, [&](const Expr* arg) {
@@ -492,7 +493,7 @@ static void WalkStmtForProgramCall(
   auto loc = s->range.start;
   // A.6.9 lets a task enable stand without its parentheses, `pi.t;`, which
   // leaves the statement a bare hierarchical name rather than a call.
-  if (const Expr* call = SubroutineCallOfStmt(s);
+  if (const Expr* call = SubroutineEnableOfStmt(s);
       call != nullptr && call->kind == ExprKind::kMemberAccess &&
       program_names.count(HierRefLeftmost(call)) != 0)
     diag.Error(loc,
