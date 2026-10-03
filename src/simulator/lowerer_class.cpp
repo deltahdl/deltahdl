@@ -572,22 +572,6 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
   }
 }
 
-// §6.20.1 with §8.25: a parameter among the class's items declared with
-// unpacked dimensions is an array the class holds once rather than each object,
-// so its record is made static: CreateStaticProperties then gives it its
-// elements in the class's static map and InitStaticProperty fills them from
-// its assignment pattern, in the frame where a specialization's value
-// parameters are bound. The scalar StoreClassParam keeps under its name is no
-// element of it.
-static void MakeParamArraysStatic(ClassTypeInfo* info, const ClassDecl* cls) {
-  for (const auto* member : cls->members) {
-    if (member->kind != ClassMemberKind::kProperty || !member->is_param)
-      continue;
-    ClassTypeInfo::PropertyInfo* prop = OwnProperty(info, member->name);
-    if (prop->IsArray() || prop->dim_sizes.size() >= 2) prop->is_static = true;
-  }
-}
-
 static void StoreClassParam(ClassTypeInfo* info, std::string_view pname,
                             const Logic4Vec& value) {
   info->static_properties[std::string(pname)] = value;
@@ -742,7 +726,6 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   CollectClassMembers(info, cls, scope.constants, ctx);
   AttachScopeMethodBodies(info, cls, scope.items);
   RecordArrayProperties(info, cls, scope.constants, ctx, arena);
-  MakeParamArraysStatic(info, cls);
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);
