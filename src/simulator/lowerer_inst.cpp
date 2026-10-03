@@ -174,6 +174,21 @@ static const Expr* ConnectedInterfaceInstance(const Expr* conn,
   return nullptr;
 }
 
+// §25.3.2: the interface port keyed `port_key` denotes the instance keyed
+// `instance_key`, which is recorded for the port's name to stand for that
+// instance as the head of a call through it (§25.7). §25.9: where a value is
+// wanted, `v = b` or `v == b`, the port's name is that instance, so the
+// storage CreatePortStorage gave the port holds the instance's handle.
+static void BindPortToInstance(const std::string& port_key,
+                               const std::string& instance_key, SimContext& ctx,
+                               Arena& arena) {
+  ctx.RegisterInterfacePortInstance(port_key, instance_key);
+  if (Variable* own = ctx.FindVariable(port_key)) {
+    own->value =
+        MakeLogic4VecVal(arena, 64, ctx.VirtualInterfaceHandle(instance_key));
+  }
+}
+
 // §25.3.2: the key of the interface instance a connection's head `name`
 // denotes from the instance being lowered: the instance of that name, or,
 // where `name` is an interface port of that instance, passed down a level,
@@ -206,15 +221,8 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
 
   std::string port_key = inst_prefix_ + std::string(inst.inst_name) + "." +
                          std::string(binding.port_name);
-  std::string instance_key = ConnectedInstanceKey(instance->text);
-  ctx_.RegisterInterfacePortInstance(port_key, instance_key);
-  // §25.9 with §25.3.2: where a value is wanted, `v = b` or `v == b`, the
-  // port's name stands for the connected instance, so the storage
-  // CreatePortStorage gave the port holds that instance's handle.
-  if (Variable* own = ctx_.FindVariable(port_key)) {
-    own->value =
-        MakeLogic4VecVal(arena_, 64, ctx_.VirtualInterfaceHandle(instance_key));
-  }
+  BindPortToInstance(port_key, ConnectedInstanceKey(instance->text), ctx_,
+                     arena_);
   std::string port_prefix = port_key + ".";
   std::string conn_prefix = inst_prefix_ + std::string(instance->text) + ".";
   for (const auto& var : ifc->variables) {

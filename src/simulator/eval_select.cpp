@@ -839,6 +839,19 @@ static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §7.4.2: an element of a class property declared as an array, which the
+// object holds one by one rather than as a value under the property's name.
+// §25.9 with §23.3.3.5: an element of an array of interface instances,
+// `s[1]`, is an instance, whose handle the select stands for.
+static bool TryPropertyElementOrInstanceSelect(const Expr* expr,
+                                               const Logic4Vec& idx_val,
+                                               SimContext& ctx, Arena& arena,
+                                               Logic4Vec& result) {
+  return TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
+                                    result) ||
+         TryInterfaceInstancePathHandle(expr, ctx, arena, result);
+}
+
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryStructArrayMemberSelect(expr, ctx, arena, result)) return result;
@@ -860,15 +873,8 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
-  // §7.4.2: an element of a class property declared as an array, which the
-  // object holds one by one rather than as a value under the property's name.
-  if (TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
-                                 result)) {
+  if (TryPropertyElementOrInstanceSelect(expr, idx_val, ctx, arena, result))
     return result;
-  }
-  // §25.9 with §23.3.3.5: an element of an array of interface instances,
-  // `s[1]`, is an instance, whose handle the select stands for.
-  if (TryInterfaceInstancePathHandle(expr, ctx, arena, result)) return result;
   // §13.4.1: a call used as an expression is an implicit variable of its
   // return type, so an index on a call that returned a queue, a dynamic array
   // or a fixed-size unpacked array reads an element of it (§7.10.1, §7.4.5),

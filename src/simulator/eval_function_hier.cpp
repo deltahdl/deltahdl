@@ -225,6 +225,29 @@ bool TryInterfaceInstanceCallee(const Expr* call, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §26.3: a subroutine called through the package scope resolution operator,
+// `pk::f(x)`, and, §13.5.5 (printed page 351), enabled as `p::t;`, its empty
+// parentheses being optional, which runs where the caller stands. Answers
+// true for a callee of either form, with `target.func` null where no package
+// subroutine answers the scoped name; false for any other callee.
+bool TryPackageScopedCallee(const Expr* call, SimContext& ctx, Arena& arena,
+                            SubroutineTarget& target) {
+  const Expr* scoped = nullptr;
+  if (call->kind == ExprKind::kCall && call->callee.empty() &&
+      IsPackageScopedCall(call)) {
+    scoped = call->lhs;
+  } else if (call->kind == ExprKind::kMemberAccess &&
+             call->is_scope_resolution) {
+    if (call->lhs == nullptr || !call->lhs->elements.empty()) return true;
+    scoped = call;
+  } else {
+    return false;
+  }
+  target.func = ctx.FindFunction(ScopedClassKey(scoped, arena));
+  target.inst_prefix = ctx.ActiveInstancePrefix();
+  return true;
+}
+
 }  // namespace
 
 std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
@@ -254,22 +277,8 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   SubroutineTarget target;
   if (call == nullptr) return target;
   if (TryInterfaceInstanceCallee(call, ctx, arena, target)) return target;
+  if (TryPackageScopedCallee(call, ctx, arena, target)) return target;
   std::string active = ctx.ActiveInstancePrefix();
-  if (call->kind == ExprKind::kCall && call->callee.empty() &&
-      IsPackageScopedCall(call)) {
-    target.func = ctx.FindFunction(ScopedClassKey(call->lhs, arena));
-    target.inst_prefix = std::move(active);
-    return target;
-  }
-  // §13.5.5 (printed page 351): `p::t;` enables the package task `p::t()`
-  // does, its empty parentheses being optional.
-  if (call->kind == ExprKind::kMemberAccess && call->is_scope_resolution) {
-    if (call->lhs != nullptr && call->lhs->elements.empty()) {
-      target.func = ctx.FindFunction(ScopedClassKey(call, arena));
-      target.inst_prefix = std::move(active);
-    }
-    return target;
-  }
   std::string path = CalleePath(call, ctx, arena);
   if (path.empty()) return target;
   bool is_hierarchical = path.find('.') != std::string::npos;

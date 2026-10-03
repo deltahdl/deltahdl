@@ -76,12 +76,21 @@ static VirtualInterfaceBase PropertyBase(const ClassTypeInfo* scope,
   return base;
 }
 
+// §7: whether the variable `name` is a container -- an array, a queue or an
+// associative array -- whose elements, not the variable itself, are what a
+// declaration with virtual interface elements makes virtual interfaces.
+static bool NamesAContainer(std::string_view name, SimContext& ctx) {
+  return ctx.FindArrayInfo(name) != nullptr || ctx.FindQueue(name) != nullptr ||
+         ctx.FindAssocArray(name) != nullptr;
+}
+
 VirtualInterfaceBase ResolveVirtualInterfaceBase(std::string_view name,
                                                  SimContext& ctx,
                                                  Arena& arena) {
   VirtualInterfaceBase base;
   if (const Variable* var = ctx.FindVariable(name); var != nullptr) {
-    base.is_virtual_interface = var->is_virtual_interface;
+    base.is_virtual_interface =
+        var->is_virtual_interface && !NamesAContainer(name, ctx);
     if (base.is_virtual_interface) base.handle = var->value.ToUint64();
     return base;
   }
@@ -157,8 +166,15 @@ static VirtualInterfaceBase SelectedElementBase(const Expr* select,
   const Expr* container = select->base;
   while (container != nullptr && container->kind == ExprKind::kSelect)
     container = container->base;
-  VirtualInterfaceBase base =
-      ResolveVirtualInterfaceBaseExpr(container, ctx, arena);
+  VirtualInterfaceBase base;
+  const Variable* var =
+      container != nullptr && container->kind == ExprKind::kIdentifier
+          ? ctx.FindVariable(container->text)
+          : nullptr;
+  base.is_virtual_interface =
+      var != nullptr ? var->is_virtual_interface
+                     : ResolveVirtualInterfaceBaseExpr(container, ctx, arena)
+                           .is_virtual_interface;
   if (!base.is_virtual_interface) return base;
   Logic4Vec element = EvalExpr(select, ctx, arena);
   base.handle = element.IsKnown() ? element.ToUint64() : kNullVirtualInterface;
