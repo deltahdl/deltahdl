@@ -84,9 +84,6 @@ static void CollectModulePrecisions(const ModuleDecl* mod, TimeUnit& current,
                                     bool& found) {
   if (mod->has_timeprecision) {
     UpdateMin(mod->time_prec, current, found);
-  } else if (mod->has_directive_timescale) {
-    // §3.14.2.3 b): the `timescale in force at the header gives the precision.
-    UpdateMin(mod->directive_timescale.precision, current, found);
   }
 
   for (const auto* item : mod->items) {
