@@ -374,19 +374,6 @@ static uint32_t SelectPortWidth(const Expr* expr, const ScopeMap& scope) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// §23.2.2.3: a port the clause makes a net is a net of the type its
-// declaration names, the net type keyword where a data type follows it, and
-// of the default net type where it names none, which ElaborateOnePort puts in
-// place of the wire DataTypeToNetType answers for a data type alone. An
-// interconnect port is its own net type (§6.6.8), as it is for a net
-// declaration.
-static NetType WrittenPortNetType(const DataType& dtype) {
-  if (dtype.is_interconnect) return NetType::kInterconnect;
-  return DataTypeToNetType(dtype.net_keyword != DataTypeKind::kImplicit
-                               ? dtype.net_keyword
-                               : dtype.kind);
-}
-
 // Fill the base (non-interface) fields of an RtlirPort from its declaration,
 // including the folded unpacked-dimension sizes.
 static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
@@ -430,7 +417,9 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.is_signed = port.data_type.is_signed;
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;
-  if (!port_is_var) rp.net_type = WrittenPortNetType(port.data_type);
+  // §23.2.2.3: where a port names no net type, ElaborateOnePort puts the
+  // default net type in place of the wire WrittenNetType answers.
+  if (!port_is_var) rp.net_type = WrittenNetType(port.data_type);
   // Syntax 23-4's one `= constant_expression` is an initializer on a variable
   // output port and a default value on an input port (§23.2.2.2, footnote 2),
   // so each kind of port carries it in the field its readers look in: the

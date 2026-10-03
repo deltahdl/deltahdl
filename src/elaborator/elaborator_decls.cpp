@@ -782,12 +782,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // and vpiLineNo and vpiFile report it once the net is an object.
   net.loc = item->loc;
 
-  if (item->data_type.is_interconnect) {
-    net.net_type = NetType::kInterconnect;
-    interconnect_names_.insert(item->name);
-  } else {
-    net.net_type = DataTypeToNetType(item->data_type.kind);
-  }
+  if (item->data_type.is_interconnect) interconnect_names_.insert(item->name);
+  net.net_type = WrittenNetType(item->data_type);
   // §6.20.2: a parameter is a constant, so it is legal in the packed dimension
   // of a declaration and has to be folded for the range to have a size. The
   // module's parameter scope is what carries the values, and without it a range

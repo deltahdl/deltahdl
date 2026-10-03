@@ -59,6 +59,13 @@ NetType DataTypeToNetType(DataTypeKind kind) {
   }
 }
 
+NetType WrittenNetType(const DataType& dtype) {
+  if (dtype.is_interconnect) return NetType::kInterconnect;
+  return DataTypeToNetType(dtype.net_keyword != DataTypeKind::kImplicit
+                               ? dtype.net_keyword
+                               : dtype.kind);
+}
+
 static std::string_view AggregateOperandName(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier) return e->text;

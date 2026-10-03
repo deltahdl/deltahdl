@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -79,6 +80,27 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xF, 0xFu);
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
+}
+
+// §6.7.1: a net declaration names its net type first and may go on to name a
+// data type, and the net type still decides how the net resolves (§6.6.3,
+// §6.6.5): undriven tri0 logic and tri1 logic [3:0] nets read 0 and 1111, and
+// a wand logic net driven 1 and 0 reads their wired AND, 0. The net type
+// keyword was dropped for the data type, so all three were wires reading z,
+// zzzz and x.
+TEST(NetDefaultValue, NetTypeKeywordBeforeADataTypeDecidesResolution) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  tri0 logic n0;\n"
+                       "  tri1 logic [3:0] n1;\n"
+                       "  wand logic w;\n"
+                       "  assign w = 1'b1;\n"
+                       "  assign w = 1'b0;\n"
+                       "  initial #1 $display(\"%b %b %b\", n0, n1, w);\n"
+                       "endmodule\n",
+                       f),
+            "0 1111 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 // §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure

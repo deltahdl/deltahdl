@@ -76,9 +76,18 @@ void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                             const ImportedEnumCtx& ctx);
 
 // Maps a net data-type kind to its RTLIR net type, defaulting to kWire for any
-// kind that is not a net type. Defined once in elaborator_decls.cpp and shared
-// by the translation units that lower net declarations and validate operations.
+// kind that is not a net type. Defined once in
+// elaborator_validate_operations.cpp and shared by the translation units that
+// lower net declarations and validate operations.
 NetType DataTypeToNetType(DataTypeKind kind);
+
+// §6.7.1 and §23.2.2.3: the net type a net or net port declaration wrote. The
+// net type keyword comes first and decides it even where a data type follows,
+// as in tri0 logic n, whose `kind` the parser has made the data type; with no
+// keyword, the wire DataTypeToNetType answers for the data type alone. An
+// interconnect is its own net type (§6.6.8). Defined in
+// elaborator_validate_operations.cpp.
+NetType WrittenNetType(const DataType& dtype);
 
 // §13.3: a formal takes any data_type, an inline structure or union among
 // them, and §7.2.1 lays one out member by member, a member naming a typedef of
