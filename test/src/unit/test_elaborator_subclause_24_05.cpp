@@ -490,4 +490,23 @@ TEST(ProgramSubroutineCall,
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.6.9 lets a task enable stand without parentheses, `pi.t;`, and §24.5 bars
+// the call from a design module in that form as in `pi.t();`.
+TEST(ProgramSubroutineCall, ModuleEnablingProgramTaskWithoutParensIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program p;\n"
+      "  task t; $display(\"t\"); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  initial pi.t;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
 }  // namespace

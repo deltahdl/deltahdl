@@ -24,26 +24,120 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 namespace delta {
 
-static bool ExprRefersToProgram(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
+static void CollectHierPathComponents(const Expr* e,
+                                      std::vector<std::string_view>& out) {
+  if (!e) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    out.push_back(e->text);
+    return;
+  }
+  if (e->kind == ExprKind::kMemberAccess) {
+    CollectHierPathComponents(e->lhs, out);
+    CollectHierPathComponents(e->rhs, out);
+  }
+}
+
+// What a hierarchical name may not reach from the scope it is written in.
+// `names` holds the program instances and nested programs of that scope, which
+// a name's first component is matched against, and `locals` the names a nested
+// scope has declared over them (§23.9), which match nothing. Where `unit` is
+// set, a name whose first component is a design element's, or an instance of
+// `scope`, is also followed down the instances it names, and reaches a program
+// where one of them is a program instance: `top.qi.v` reaches the program
+// instance qi of module top, a name no first component gives away.
+struct ProgramScopes {
+  std::unordered_set<std::string_view> names;
+  std::unordered_set<std::string_view> locals;
+  const CompilationUnit* unit = nullptr;
+  const ModuleDecl* scope = nullptr;
+
+  void Shadow(std::string_view name) {
+    names.erase(name);
+    locals.insert(name);
+  }
+};
+
+// The module, program or interface `name` names, or nullptr. An extern header
+// is a prototype and holds no instances.
+static const ModuleDecl* FindDesignElement(const CompilationUnit* unit,
+                                           std::string_view name) {
+  for (const auto* decls :
+       {&unit->modules, &unit->programs, &unit->interfaces}) {
+    for (const auto* d : *decls)
+      if (!d->is_extern && d->name == name) return d;
+  }
+  return nullptr;
+}
+
+// The design element the instance `inst_name` among `decl`'s items
+// instantiates, or nullptr.
+static const ModuleDecl* FindInstanceElement(const ModuleDecl* decl,
+                                             std::string_view inst_name,
+                                             const CompilationUnit* unit) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_name == inst_name)
+      return FindDesignElement(unit, item->inst_module);
+  }
+  return nullptr;
+}
+
+// §23.6 reads a hierarchical name one scope at a time, so the name reaches a
+// program scope where any scope its components step through is a program.
+static bool PathReachesProgram(const Expr* e, const ProgramScopes& scopes) {
+  std::vector<std::string_view> path;
+  CollectHierPathComponents(e, path);
+  if (path.size() < 2) return false;
+  const ModuleDecl* decl = nullptr;
+  if (scopes.scope != nullptr)
+    decl = FindInstanceElement(scopes.scope, path[0], scopes.unit);
+  if (decl == nullptr) decl = FindDesignElement(scopes.unit, path[0]);
+  for (size_t i = 1; decl != nullptr; ++i) {
+    if (decl->decl_kind == ModuleDeclKind::kProgram) return true;
+    if (i + 1 >= path.size()) return false;
+    decl = FindInstanceElement(decl, path[i], scopes.unit);
+  }
+  return false;
+}
+
+static bool ExprRefersToProgram(const Expr* e, const ProgramScopes& scopes) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) {
     auto leftmost = HierRefLeftmost(e);
-    if (!leftmost.empty() && program_names.count(leftmost)) return true;
+    if (!leftmost.empty() && scopes.locals.count(leftmost) == 0 &&
+        (scopes.names.count(leftmost) != 0 ||
+         (scopes.unit != nullptr && PathReachesProgram(e, scopes))))
+      return true;
   }
-  if (ExprRefersToProgram(e->lhs, program_names)) return true;
-  if (ExprRefersToProgram(e->rhs, program_names)) return true;
-  if (ExprRefersToProgram(e->base, program_names)) return true;
-  for (auto* elem : e->elements) {
-    if (ExprRefersToProgram(elem, program_names)) return true;
-  }
-  return false;
+  return AnyExprChild(
+      e, [&](const Expr* c) { return ExprRefersToProgram(c, scopes); });
+}
+
+static void ReportProgramSignalRef(SourceLoc loc, DiagEngine& diag) {
+  diag.Error(loc,
+             "hierarchical reference to program signal from outside the "
+             "program is not permitted",
+             Subclause("24.3"));
+}
+
+// The subroutine a statement calls or enables as a whole, `pi.t;`, `f(x);` or
+// `$display(x);`, or nullptr. Its name is a subroutine's, §24.5's subject
+// rather than §24.3's, so only the arguments it is handed are read as
+// references.
+static const Expr* SubroutineCallOfStmt(const Stmt* s) {
+  if (s->kind != StmtKind::kExprStmt || s->expr == nullptr) return nullptr;
+  ExprKind k = s->expr->kind;
+  if (k == ExprKind::kMemberAccess || k == ExprKind::kCall ||
+      k == ExprKind::kSystemCall)
+    return s->expr;
+  return nullptr;
 }
 
 // §24.3 bars a reference to a "program signal", which the clause defines as a
@@ -63,32 +157,31 @@ static bool ExprRefersToProgram(
 // `a` is not. A block's declarations are erased before its statements are read,
 // since a declaration and the use it shadows are siblings under the block
 // rather than one inside the other.
-static void WalkStmtsForProgramRef(
-    const Stmt* s, std::unordered_set<std::string_view> program_names,
-    DiagEngine& diag) {
+static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
+                                   DiagEngine& diag) {
   if (!s) return;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
-      program_names.erase(sub->var_name);
+      scopes.Shadow(sub->var_name);
   });
-  if (s->lhs && ExprRefersToProgram(s->lhs, program_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
-  if (s->rhs && ExprRefersToProgram(s->rhs, program_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
   // §24.3 says "References to program signals from outside any program block
   // shall be an error" with no condition on where the reference is written, so
-  // every position a statement holds a statement in is one this report reaches.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForProgramRef(sub, program_names, diag);
+  // every expression a statement holds, a return's value and a display task's
+  // arguments among them, and every position it holds a statement in, are ones
+  // this report reaches. ForEachChildExpr and ForEachChildStmt in
+  // elaborator_validate_internal.h state those positions once for the whole
+  // elaborator.
+  const Expr* call = SubroutineCallOfStmt(s);
+  ForEachChildExpr(s, [&](Expr* const& e) {
+    if (e != call && ExprRefersToProgram(e, scopes))
+      ReportProgramSignalRef(s->range.start, diag);
   });
+  if (call != nullptr && AnyExprChild(call, [&](const Expr* arg) {
+        return arg != call->lhs && ExprRefersToProgram(arg, scopes);
+      }))
+    ReportProgramSignalRef(s->range.start, diag);
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForProgramRef(sub, scopes, diag); });
 }
 
 // §23.9 makes a task and a function scopes of their own, so a formal argument
@@ -96,16 +189,16 @@ static void WalkStmtsForProgramRef(
 // block-local declaration does. Both reach the body by a route no statement
 // walk sees, so both are erased here, where the subroutine is read, rather than
 // where its statements are.
-static void WalkSubroutineBodyForProgramRef(
-    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
-    DiagEngine& diag) {
-  for (const auto& arg : item->func_args) program_names.erase(arg.name);
+static void WalkSubroutineBodyForProgramRef(const ModuleItem* item,
+                                            ProgramScopes scopes,
+                                            DiagEngine& diag) {
+  for (const auto& arg : item->func_args) scopes.Shadow(arg.name);
   for (const auto* s : item->func_body_stmts) {
     if (s != nullptr && s->kind == StmtKind::kVarDecl)
-      program_names.erase(s->var_name);
+      scopes.Shadow(s->var_name);
   }
   for (const auto* s : item->func_body_stmts) {
-    WalkStmtsForProgramRef(s, program_names, diag);
+    WalkStmtsForProgramRef(s, scopes, diag);
   }
 }
 
@@ -113,20 +206,13 @@ static void WalkSubroutineBodyForProgramRef(
 // either side of a continuous assignment is one it reaches. This arm is a
 // function of its own because holding it inside the item walk put that walk
 // past the cognitive complexity threshold once the subroutine bodies joined it.
-static void CheckContAssignForProgramRef(
-    const ModuleItem* item,
-    const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
-  if (ExprRefersToProgram(item->assign_lhs, program_names))
-    diag.Error(item->loc,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
-  if (ExprRefersToProgram(item->assign_rhs, program_names))
-    diag.Error(item->loc,
-               "hierarchical reference to program signal from outside the "
-               "program is not permitted",
-               Subclause("24.3"));
+static void CheckContAssignForProgramRef(const ModuleItem* item,
+                                         const ProgramScopes& scopes,
+                                         DiagEngine& diag) {
+  if (ExprRefersToProgram(item->assign_lhs, scopes))
+    ReportProgramSignalRef(item->loc, diag);
+  if (ExprRefersToProgram(item->assign_rhs, scopes))
+    ReportProgramSignalRef(item->loc, diag);
 }
 
 // A class declared in a module, and a class an anonymous program declares, both
@@ -147,23 +233,30 @@ static void CheckContAssignForProgramRef(
 // The §24.6 rule below keeps a class arm of its own rather than sharing this
 // one, because it reads the other direction -- a reference into an anonymous
 // program rather than out of one.
-static void CheckClassMethodsForProgramRef(
-    const ClassDecl* cls,
-    const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
+static void CheckClassMethodsForProgramRef(const ClassDecl* cls,
+                                           const ProgramScopes& scopes,
+                                           DiagEngine& diag) {
   if (cls == nullptr) return;
   for (const auto* member : cls->members) {
     if (member == nullptr) continue;
     if (member->method != nullptr)
-      WalkSubroutineBodyForProgramRef(member->method, program_names, diag);
+      WalkSubroutineBodyForProgramRef(member->method, scopes, diag);
     if (member->kind == ClassMemberKind::kClassDecl)
-      CheckClassMethodsForProgramRef(member->nested_class, program_names, diag);
+      CheckClassMethodsForProgramRef(member->nested_class, scopes, diag);
   }
 }
 
+// True when the unit declares a program a path could reach.
+static bool UnitDeclaresNamedProgram(const CompilationUnit* unit) {
+  for (const auto* p : unit->programs)
+    if (!p->name.empty() && !p->is_extern) return true;
+  return false;
+}
+
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
-  if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  if (program_inst_names_.empty() && !UnitDeclaresNamedProgram(unit_)) return;
+  const ProgramScopes kScopes{program_inst_names_, {}, unit_, decl};
   // No name is erased at module level, where the walk below erases the names a
   // block declares: program_inst_names_ holds instance and nested-program names
   // of this very module, so an item of the module declaring one of them again
@@ -172,10 +265,10 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   // could reach. Only a scope below the module can hold that other thing.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign)
-      CheckContAssignForProgramRef(item, program_inst_names_, diag_);
+      CheckContAssignForProgramRef(item, kScopes, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
-      WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
+      WalkStmtsForProgramRef(item->body, kScopes, diag_);
     // §24.3 says "References to program signals from outside any program block
     // shall be an error" and names no position the reference may stand in.
     // §23.9 makes a task and a function scopes within the module rather than
@@ -186,9 +279,8 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
     // func_body_stmts rather than in body.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
-      WalkSubroutineBodyForProgramRef(item, program_inst_names_, diag_);
-    CheckClassMethodsForProgramRef(item->class_decl, program_inst_names_,
-                                   diag_);
+      WalkSubroutineBodyForProgramRef(item, kScopes, diag_);
+    CheckClassMethodsForProgramRef(item->class_decl, kScopes, diag_);
   }
 }
 
@@ -200,8 +292,7 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
 // items and the compilation unit's items are two lists this one body reads
 // rather than two rules.
 static void CheckScopeItemsForAnonymousProgramHierRefs(
-    const std::vector<ModuleItem*>& items,
-    const std::unordered_set<std::string_view>& program_names,
+    const std::vector<ModuleItem*>& items, const ProgramScopes& scopes,
     DiagEngine& diag) {
   for (const auto* item : items) {
     if (!item->from_anonymous_program) continue;
@@ -218,36 +309,25 @@ static void CheckScopeItemsForAnonymousProgramHierRefs(
     // with a body for this walk to miss.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
-      WalkSubroutineBodyForProgramRef(item, program_names, diag);
+      WalkSubroutineBodyForProgramRef(item, scopes, diag);
     }
-    CheckClassMethodsForProgramRef(item->class_decl, program_names, diag);
+    CheckClassMethodsForProgramRef(item->class_decl, scopes, diag);
   }
 }
 
 void Elaborator::ValidateAnonymousProgramHierRefs() {
-  std::unordered_set<std::string_view> program_names;
+  // §24.3 bars "hierarchical references to other program scopes", and such a
+  // reference names a program declaration first, `q.v`, or reaches a program
+  // instance through the design, `top.qi.v`, which ProgramScopes follows.
+  ProgramScopes scopes;
+  scopes.unit = unit_;
   for (const auto* p : unit_->programs) {
-    if (!p->name.empty()) program_names.insert(p->name);
+    if (!p->name.empty() && !p->is_extern) scopes.names.insert(p->name);
   }
-  if (program_names.empty()) return;
-  CheckScopeItemsForAnonymousProgramHierRefs(unit_->cu_items, program_names,
-                                             diag_);
+  if (scopes.names.empty()) return;
+  CheckScopeItemsForAnonymousProgramHierRefs(unit_->cu_items, scopes, diag_);
   for (const auto* pkg : unit_->packages) {
-    CheckScopeItemsForAnonymousProgramHierRefs(pkg->items, program_names,
-                                               diag_);
-  }
-}
-
-static void CollectHierPathComponents(const Expr* e,
-                                      std::vector<std::string_view>& out) {
-  if (!e) return;
-  if (e->kind == ExprKind::kIdentifier) {
-    out.push_back(e->text);
-    return;
-  }
-  if (e->kind == ExprKind::kMemberAccess) {
-    CollectHierPathComponents(e->lhs, out);
-    CollectHierPathComponents(e->rhs, out);
+    CheckScopeItemsForAnonymousProgramHierRefs(pkg->items, scopes, diag_);
   }
 }
 
@@ -410,6 +490,15 @@ static void WalkStmtForProgramCall(
       program_names.erase(sub->var_name);
   });
   auto loc = s->range.start;
+  // A.6.9 lets a task enable stand without its parentheses, `pi.t;`, which
+  // leaves the statement a bare hierarchical name rather than a call.
+  if (const Expr* call = SubroutineCallOfStmt(s);
+      call != nullptr && call->kind == ExprKind::kMemberAccess &&
+      program_names.count(HierRefLeftmost(call)) != 0)
+    diag.Error(loc,
+               "calling a program subroutine from within a design module is "
+               "not permitted",
+               Subclause("24.5"));
   WalkExprForProgramCall(s->lhs, program_names, diag, loc);
   WalkExprForProgramCall(s->rhs, program_names, diag, loc);
   WalkExprForProgramCall(s->expr, program_names, diag, loc);
