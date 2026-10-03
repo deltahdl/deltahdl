@@ -496,19 +496,6 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   }
 }
 
-// Gives the property named `name` the unpacked dimension RecordArrayProperties
-// read for it.
-static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
-                              const PropertyArrayDim& dim, bool dynamic) {
-  for (auto& prop : info->properties) {
-    if (prop.name != name) continue;
-    prop.array_size = dim.size;
-    prop.array_lo = dim.lo;
-    prop.array_descending = dim.descending;
-    prop.is_dynamic = dynamic;
-  }
-}
-
 // §7.4.2 with §20.7: gives `prop` the extents of the unpacked dimensions
 // `dims` declares where it declares more than one and each folds to a fixed
 // one, which is what the array query functions read, and which way each was
@@ -543,22 +530,25 @@ static ClassTypeInfo::PropertyInfo* OwnProperty(ClassTypeInfo* info,
   return nullptr;
 }
 
-// The array shape the unpacked dimensions `dims` give the property `name`:
-// one fixed or dynamic dimension marked on it (MarkArrayProperty), or the
-// extents of more than one (FoldMultiDimExtents), folded in `scope`.
-static void ShapeArrayProperty(ClassTypeInfo* info, std::string_view name,
+// The array shape the unpacked dimensions `dims` give the property `prop`:
+// one fixed or dynamic dimension, the count and the bounds an element select
+// reads, or the extents of more than one (FoldMultiDimExtents), folded in
+// `scope`.
+static void ShapeArrayProperty(ClassTypeInfo::PropertyInfo* prop,
                                const std::vector<Expr*>& dims,
                                const ScopeMap& scope, SimContext& ctx,
                                Arena& arena) {
-  if (dims.size() > 1)
-    FoldMultiDimExtents(dims, scope, ctx, arena, OwnProperty(info, name));
+  if (dims.size() > 1) FoldMultiDimExtents(dims, scope, ctx, arena, prop);
   if (dims.size() != 1) return;
   const bool kDynamic = dims[0] == nullptr;
   PropertyArrayDim dim =
       kDynamic ? PropertyArrayDim{}
                : FoldPropertyDimension(dims[0], scope, ctx, arena);
   if (dim.size == 0 && !kDynamic) return;
-  MarkArrayProperty(info, name, dim, kDynamic);
+  prop->array_size = dim.size;
+  prop->array_lo = dim.lo;
+  prop->array_descending = dim.descending;
+  prop->is_dynamic = kDynamic;
 }
 
 // §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
@@ -579,7 +569,7 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
     if (member->kind != ClassMemberKind::kProperty) continue;
     const ModuleItem* item = PropertyTypedefItem(member, info, ctx);
     ShapeArrayProperty(
-        info, member->name,
+        OwnProperty(info, member->name),
         item != nullptr ? item->unpacked_dims : member->unpacked_dims, scope,
         ctx, arena);
   }
@@ -616,7 +606,8 @@ static void MakeParamArraysStatic(ClassTypeInfo* info, const ClassDecl* cls,
     info->properties.push_back(PropertyRecord(
         port, scope, PropertyTypeKey(port->data_type, *info, *cls, scope, ctx),
         ctx));
-    ShapeArrayProperty(info, pname, dims->second, scope, ctx, arena);
+    ShapeArrayProperty(&info->properties.back(), dims->second, scope, ctx,
+                       arena);
   }
 }
 
