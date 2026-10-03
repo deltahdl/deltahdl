@@ -452,6 +452,22 @@ struct ParserPortHelpers {
     p.lexer_.RestorePos(saved);
     return false;
   }
+
+  // A port declaration a non-ANSI module's body holds at the current token, or
+  // false where the token begins some other module item: one with a direction,
+  // one behind attribute_instances (A.1.3), or the generic interface reference
+  // §25.3.3 forbids in that style.
+  static bool TryParseNonAnsiBodyPortDecl(Parser& p, ModuleDecl& mod) {
+    if (IsPortDirection(p.CurrentToken().kind)) {
+      p.ParseNonAnsiPortDecls(mod);
+      return true;
+    }
+    if (p.Check(TokenKind::kAttrStart))
+      return TryParseAttributedNonAnsiPortDecls(p, mod);
+    if (p.Check(TokenKind::kKwInterface))
+      return TryParseNonAnsiGenericInterfacePort(p, mod);
+    return false;
+  }
 };
 
 static Direction TokenToDirection(TokenKind kind) {
@@ -767,21 +783,8 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    if (non_ansi && IsPortDirection(CurrentToken().kind)) {
-      ParseNonAnsiPortDecls(mod);
+    if (non_ansi && ParserPortHelpers::TryParseNonAnsiBodyPortDecl(*this, mod))
       continue;
-    }
-    // §A.1.3: a non-ANSI body port_declaration may carry leading
-    // attribute_instances. Peek past them; if a port direction follows, this is
-    // a port declaration rather than a generic module item.
-    if (non_ansi && Check(TokenKind::kAttrStart) &&
-        ParserPortHelpers::TryParseAttributedNonAnsiPortDecls(*this, mod)) {
-      continue;
-    }
-    if (non_ansi && Check(TokenKind::kKwInterface) &&
-        ParserPortHelpers::TryParseNonAnsiGenericInterfacePort(*this, mod)) {
-      continue;
-    }
     ParseModuleItem(mod.items);
   }
   current_module_ = prev_module;
