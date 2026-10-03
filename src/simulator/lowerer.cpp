@@ -834,13 +834,19 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   // smallest time precision of the design, which is its unit and its precision
   // both (§20.4.1, §20.4.2).
   ctx.SetScopeTimeScale("$root", ScaleOfOrder(finest));
-  // §3.14.2.2: a package that declares a time unit is a time scope of its
-  // own, which its subroutines run in; its precision, where it declares none,
-  // is taken to be its unit.
+  // §3.14.2.2: a package is a time scope of its own, which its subroutines run
+  // in. §3.14.2.3 (printed page 60) gives it each of its unit and precision
+  // from its own declaration, else from the `timescale before its header,
+  // else from the compilation unit's, which cu_timescale holds where the unit
+  // declares one and the default where it does not. A package is never
+  // nested, so no enclosing element stands ahead of those.
   for (const PackageDecl* pkg : design->packages) {
-    if (!pkg->has_timeunit) continue;
-    TimeScale scale{pkg->time_unit, pkg->time_unit_magnitude, pkg->time_unit,
-                    pkg->time_unit_magnitude};
+    TimeScale scale = pkg->has_directive_timescale ? pkg->directive_timescale
+                                                   : design->cu_timescale;
+    if (pkg->has_timeunit) {
+      scale.unit = pkg->time_unit;
+      scale.magnitude = pkg->time_unit_magnitude;
+    }
     if (pkg->has_timeprecision) {
       scale.precision = pkg->time_prec;
       scale.prec_magnitude = pkg->time_prec_magnitude;
