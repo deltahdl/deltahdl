@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-09-30T02:54:59.959Z
+  modified: 2026-10-03T01:52:38.467Z
 ---
 
 # A question the rules answer is not a decision
@@ -33,5 +33,12 @@ places is the whole grant. Questions of order or priority
 between issues the loop selects are answered that way. A concern the
 standard does not raise, such as the hazard of loading a library a source
 file names under §34.5.28.2, does not make a shall optional: the shall is
-implemented and the concern, if worth keeping, is filed as its own issue. Once the answer stands,
+implemented and the concern, if worth keeping, is filed as its own issue.
+Test the question's premise as well as its options: when it asks how two
+of deltahdl's own entities relate, first check that the standard defines
+both. If one is only an artifact of the implementation, the standard does
+not leave the question open; the question does not arise, and the issue is a
+defect. For example, §19.9 loads coverage per covergroup type, so "is a saved
+instance the same as the live instance of its name" has no standard answer to
+lack. Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.

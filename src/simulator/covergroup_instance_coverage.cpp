@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -51,60 +52,75 @@ CovergroupType TypeOf(const CovergroupInstance& inst) {
   return {inst.decl, inst.declaring_class};
 }
 
-// §19.9, §19.11.3: the instances of the covergroup type `type`, those built in
-// the run and then those a coverage database loaded.
-std::vector<const CoverGroup*> TypeInstances(const CovergroupType& type,
-                                             SimContext& ctx) {
-  std::vector<const CoverGroup*> instances =
-      ctx.Covergroups().InstancesOf(type.decl, type.declaring_class);
-  for (const CoverGroup* loaded :
-       ctx.CoverageData().LoadedInstancesOf(type.decl->name)) {
-    instances.push_back(loaded);
+// §19.9, §19.11: the records the coverage of the covergroup type `type` is
+// computed over, the instances built in the run joined by the cumulative
+// coverage a coverage database loaded for the type. Merged (§19.11.3), the
+// loaded bins are one more member of the union, ahead of the instances so that
+// their type weights stand; averaged, the average is over the instances alone,
+// each with the loaded counts added to its bins of the same name (§19.11.1),
+// and the loaded coverage stands in for them where the run built none.
+std::deque<CoverGroup> TypeRecords(const CovergroupType& type, bool merge,
+                                   SimContext& ctx) {
+  std::deque<CoverGroup> records;
+  for (const CoverGroup* group :
+       ctx.Covergroups().InstancesOf(type.decl, type.declaring_class)) {
+    records.push_back(*group);
   }
-  return instances;
+  const CoverGroup* cumulative =
+      ctx.CoverageData().LoadedCoverageOf(type.decl->name);
+  if (cumulative == nullptr) return records;
+  if (merge || records.empty()) {
+    records.push_front(*cumulative);
+    return records;
+  }
+  for (CoverGroup& group : records) {
+    CoverageDB::AddCumulativeCounts(group, *cumulative);
+  }
+  return records;
 }
 
 bool MergesInstances(const CovergroupInstance& inst) {
   return inst.group->type_option.merge_instances;
 }
 
-// §19.11.3: the coverage of the covergroup type, over every instance of it,
-// with the covered and defined bins of them all.
+// §19.11.3: the coverage of the covergroup type `type`, over every instance of
+// it, with the covered and defined bins of them all.
 double TypeCoverage(const CovergroupType& type, bool merge, SimContext& ctx,
                     int32_t& covered, int32_t& total) {
-  std::vector<const CoverGroup*> instances = TypeInstances(type, ctx);
+  std::deque<CoverGroup> records = TypeRecords(type, merge, ctx);
+  std::vector<const CoverGroup*> instances;
+  instances.reserve(records.size());
   covered = 0;
   total = 0;
-  for (const CoverGroup* group : instances) {
+  for (const CoverGroup& group : records) {
     int32_t n = 0;
     int32_t t = 0;
-    CoverageDB::GetCoverage(group, n, t);
+    CoverageDB::GetCoverage(&group, n, t);
     covered += n;
     total += t;
+    instances.push_back(&group);
   }
   return CoverageDB::ComputeTypeCoverage(instances, merge);
 }
 
-// The same item of every instance of the covergroup type `type`: its
-// coverpoint or cross of one name.
-std::vector<const CoverPoint*> PointsOfType(const CovergroupType& type,
-                                            const std::string& name,
-                                            SimContext& ctx) {
+// The same item of every record of a covergroup type: its coverpoint or cross
+// of one name.
+std::vector<const CoverPoint*> PointsNamed(
+    const std::deque<CoverGroup>& records, const std::string& name) {
   std::vector<const CoverPoint*> found;
-  for (const CoverGroup* group : TypeInstances(type, ctx)) {
-    for (const CoverPoint& cp : group->coverpoints) {
+  for (const CoverGroup& group : records) {
+    for (const CoverPoint& cp : group.coverpoints) {
       if (cp.name == name) found.push_back(&cp);
     }
   }
   return found;
 }
 
-std::vector<const CrossCover*> CrossesOfType(const CovergroupType& type,
-                                             const std::string& name,
-                                             SimContext& ctx) {
+std::vector<const CrossCover*> CrossesNamed(
+    const std::deque<CoverGroup>& records, const std::string& name) {
   std::vector<const CrossCover*> found;
-  for (const CoverGroup* group : TypeInstances(type, ctx)) {
-    for (const CrossCover& cross : group->crosses) {
+  for (const CoverGroup& group : records) {
+    for (const CrossCover& cross : group.crosses) {
       if (cross.name == name) found.push_back(&cross);
     }
   }
@@ -126,7 +142,8 @@ CoverageReading ItemTypeReading(const CovergroupType& type,
                                 const std::string& name, bool merge,
                                 SimContext& ctx) {
   CoverageReading r;
-  std::vector<const CoverPoint*> points = PointsOfType(type, name, ctx);
+  std::deque<CoverGroup> records = TypeRecords(type, merge, ctx);
+  std::vector<const CoverPoint*> points = PointsNamed(records, name);
   for (const CoverPoint* cp : points) {
     int32_t n = 0;
     int32_t t = 0;
@@ -138,7 +155,7 @@ CoverageReading ItemTypeReading(const CovergroupType& type,
     r.coverage = CoverageDB::ComputePointTypeCoverage(points, merge);
     return r;
   }
-  std::vector<const CrossCover*> crosses = CrossesOfType(type, name, ctx);
+  std::vector<const CrossCover*> crosses = CrossesNamed(records, name);
   for (const CrossCover* cross : crosses) {
     int32_t n = 0;
     int32_t t = 0;
@@ -235,7 +252,8 @@ bool TryEvalTypeCoverageCall(const Expr* expr, SimContext& ctx, Arena& arena,
   const CovergroupDecl* decl = CovergroupTypeNamed(access->lhs, ctx, item_name);
   if (decl == nullptr) return false;
   const CovergroupType kType{decl, nullptr};
-  std::vector<const CoverGroup*> instances = TypeInstances(kType, ctx);
+  std::vector<const CoverGroup*> instances =
+      ctx.Covergroups().InstancesOf(decl, nullptr);
   bool merge = !instances.empty() && instances[0]->type_option.merge_instances;
   CoverageReading r;
   if (item_name.empty()) {

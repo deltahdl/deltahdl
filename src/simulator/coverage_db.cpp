@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <istream>
 #include <ostream>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,9 +25,61 @@ const std::string& CoverageDB::CoverageDbName() const {
   return coverage_db_name_;
 }
 
+// Adds the hit counts of `from`'s bins to `into`'s of the same name and, where
+// `unite` is set, appends the bins `into` lacks (LRM 19.11.3).
+template <typename Bins>
+static void AddBinCounts(Bins& into, const Bins& from, bool unite) {
+  for (const auto& bin : from) {
+    auto it = std::find_if(into.begin(), into.end(),
+                           [&](const auto& b) { return b.name == bin.name; });
+    if (it != into.end()) {
+      it->hit_count += bin.hit_count;
+    } else if (unite) {
+      into.push_back(bin);
+    }
+  }
+}
+
+// AddBinCounts applied to each coverpoint or cross of `from` and that of
+// `into` of the same name; where `unite` is set, the items `into` lacks are
+// appended.
+template <typename Items>
+static void AddItemCounts(Items& into, const Items& from, bool unite) {
+  for (const auto& item : from) {
+    auto it = std::find_if(into.begin(), into.end(),
+                           [&](const auto& i) { return i.name == item.name; });
+    if (it != into.end()) {
+      AddBinCounts(it->bins, item.bins, unite);
+    } else if (unite) {
+      into.push_back(item);
+    }
+  }
+}
+
+static void AddGroupCounts(CoverGroup& into, const CoverGroup& from,
+                           bool unite) {
+  AddItemCounts(into.coverpoints, from.coverpoints, unite);
+  AddItemCounts(into.crosses, from.crosses, unite);
+}
+
+void CoverageDB::AddCumulativeCounts(CoverGroup& group,
+                                     const CoverGroup& cumulative) {
+  AddGroupCounts(group, cumulative, false);
+}
+
 void CoverageDB::MergeCumulativeCoverage(
     const std::vector<CoverGroup>& cumulative) {
-  loaded_.insert(loaded_.end(), cumulative.begin(), cumulative.end());
+  for (const CoverGroup& record : cumulative) {
+    auto it = std::find_if(loaded_.begin(), loaded_.end(), [&](const auto& g) {
+      return !record.type_name.empty() && g.type_name == record.type_name;
+    });
+    if (it == loaded_.end()) {
+      loaded_.push_back(record);
+      continue;
+    }
+    it->sample_count += record.sample_count;
+    AddGroupCounts(*it, record, true);
+  }
 }
 
 // Read a cross record of a coverage snapshot, "CR <name>" opening a cross of
@@ -138,13 +192,40 @@ void CoverageDB::SaveCoverageDbFile(const std::string& path) const {
   for (const CoverGroup& g : loaded_) WriteGroup(out, g);
 }
 
-std::vector<const CoverGroup*> CoverageDB::LoadedInstancesOf(
+const CoverGroup* CoverageDB::LoadedCoverageOf(
     std::string_view type_name) const {
-  std::vector<const CoverGroup*> found;
+  if (type_name.empty()) return nullptr;
   for (const CoverGroup& g : loaded_) {
-    if (g.type_name == type_name) found.push_back(&g);
+    if (g.type_name == type_name) return &g;
   }
-  return found;
+  return nullptr;
+}
+
+double CoverageDB::GetGlobalCoverage() const {
+  // $get_coverage reports the overall coverage of all covergroup types as the
+  // weighted average of their per-covergroup coverage. Per LRM 19.11, a
+  // covergroup whose own denominator is zero does not contribute to the overall
+  // score (it is dropped from both the numerator and the denominator), and a
+  // design with no contributing covergroups — none exist, or every covergroup
+  // has a weight of zero — reports 100.0. ComputeOverallCoverage applies
+  // exactly those rules, so $get_coverage routes through it.
+  // The cumulative coverage loaded for a type adds its bin counts to each
+  // instance of it the run built (LRM 19.9, 19.11.1), and stands in for the
+  // type where the run built none.
+  std::deque<CoverGroup> terms(groups_.begin(), groups_.end());
+  std::set<std::string_view> built;
+  for (CoverGroup& g : terms) {
+    const CoverGroup* cumulative = LoadedCoverageOf(g.type_name);
+    if (cumulative != nullptr) AddCumulativeCounts(g, *cumulative);
+    built.insert(g.type_name);
+  }
+  for (const CoverGroup& g : loaded_) {
+    if (g.type_name.empty() || !built.contains(g.type_name)) terms.push_back(g);
+  }
+  std::vector<const CoverGroup*> instances;
+  instances.reserve(terms.size());
+  for (const CoverGroup& g : terms) instances.push_back(&g);
+  return ComputeOverallCoverage(instances);
 }
 
 void CoverageDB::SaveNamedCoverageDb() const {

@@ -61,10 +61,13 @@ class CoverageDB {
   const std::string& CoverageDbName() const;
 
   // $load_coverage_db(filename) loads cumulative coverage information for all
-  // coverage group types (LRM 19.9). Each loaded record is kept apart from the
-  // instances built in the run, as one more instance of its covergroup type
-  // (LoadedInstancesOf), and never merged into a live instance of the same
-  // name: §19.11 gives get_inst_coverage() the coverage of the instance it is
+  // coverage group types (LRM 19.9). The records of one covergroup type are
+  // united into the cumulative coverage of the type (LoadedCoverageOf): an
+  // item and a bin of one are matched by name, and a matched bin's hit counts
+  // summed, as LRM 19.11.1 accumulates a bin's counts across instances and
+  // LRM 19.11.3 matches bins by name. A record that names no type stands
+  // alone. The loaded coverage is kept apart from the instances built in the
+  // run: §19.11 gives get_inst_coverage() the coverage of the instance it is
   // called on alone, and nothing makes a run's coverage depend on whether an
   // instance was built before the load.
   void MergeCumulativeCoverage(const std::vector<CoverGroup>& cumulative);
@@ -87,11 +90,16 @@ class CoverageDB {
   void SaveCoverageDbFile(const std::string& path) const;
   void SaveNamedCoverageDb() const;
 
-  // The instances of the covergroup type `type_name` a coverage database
-  // loaded, which its type coverage counts beside those built in the run
-  // (LRM 19.9, 19.11.3).
-  std::vector<const CoverGroup*> LoadedInstancesOf(
-      std::string_view type_name) const;
+  // The cumulative coverage a coverage database loaded for the covergroup type
+  // `type_name`, or null where none was loaded (LRM 19.9).
+  const CoverGroup* LoadedCoverageOf(std::string_view type_name) const;
+
+  // Adds the hit counts of the bins of `cumulative` to the bins of `group` of
+  // the same name in its coverpoint or cross of the same name, leaving out a
+  // bin or item `group` lacks: the cumulative counts of a covergroup type
+  // joined to an instance of it (LRM 19.11.1, 19.11.3).
+  static void AddCumulativeCounts(CoverGroup& group,
+                                  const CoverGroup& cumulative);
 
   // §19.7, Table 19-1: for each cross whose cross_num_print_missing is greater
   // than 0, the number of its cross bins not covered and the first that many
