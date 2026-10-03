@@ -117,4 +117,41 @@ TEST(HierarchicalNameParsing, InstanceSelectFollowedByMoreThanOneMember) {
               "endmodule\n"));
 }
 
+// §23.6 lets $root head a hierarchical name, and A.8.4 gives the name any
+// number of selects: `$root.top.arr[1][0]` was read with one select, and the
+// second `[` was reported where the argument list's `)` was expected.
+TEST(HierarchicalNameParsing, RootedNameTakesSeveralSelects) {
+  EXPECT_TRUE(
+      ParseOk("module sub;\n"
+              "  initial #1 $display(\"v=%0d\", $root.top.arr[1][0]);\n"
+              "endmodule\n"
+              "module top;\n"
+              "  logic arr [1:0][1:0];\n"
+              "  sub c();\n"
+              "endmodule\n"));
+}
+
+// §23.6 with A.8.2: a call through a $root-headed name, as an expression, as
+// a statement, and as a randomize() with a `with` clause. The tail stopped at
+// the name, and each `(` was reported where a ';' was expected.
+TEST(HierarchicalNameParsing, RootedNameTakesACall) {
+  EXPECT_TRUE(
+      ParseOk("class D;\n"
+              "  rand int x;\n"
+              "  function int f(); return 1; endfunction\n"
+              "endclass\n"
+              "module child;\n"
+              "  D d = new;\n"
+              "endmodule\n"
+              "module m;\n"
+              "  int i;\n"
+              "  child u();\n"
+              "  initial begin\n"
+              "    i = $root.m.u.d.f();\n"
+              "    $root.m.u.d.f();\n"
+              "    i = $root.m.u.d.randomize() with { x > 0; };\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -6,6 +6,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "parser/display_format_check.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -31,6 +32,21 @@ Expr* Parser::ParseSysRootTail(Expr* expr) {
   }
   if (AtSelectBracket()) expr = ParseSelectExpr(expr);
   return expr;
+}
+
+// A.8.4 gives a name primary, whether a bare identifier, `this` or `super`, or
+// `$root.` (§23.6) heads it, one tail: the calls and selects of
+// ParseIdentifierPostfixChain, then a postfix increment or decrement (§11.4.2),
+// or a `with` clause (§18.7) and the members and selects that follow it.
+Expr* Parser::ParseNameTail(Expr* result) {
+  result = ParseIdentifierPostfixChain(result);
+  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
+    auto op_tok = Consume();
+    return MakePostfixUnary(arena_, op_tok.kind, result);
+  }
+  result = ParseWithClause(result);
+  if (!result->with_expr) return result;
+  return ParseWithClauseTail(result);
 }
 
 // Consumes one "@event" clocking-event argument. Annex C.2.2: the clocking
@@ -100,9 +116,13 @@ Expr* Parser::ParseSystemCall() {
     return ParseIdentifierPostfixChain(
         ParseSysRootTail(MakeSysScopePrefix(tok)));
   }
+  // §23.6 lets `$root` head a hierarchical name, and the name takes the tail
+  // any name primary takes: `$root.top.arr[1][0]` and `$root.m.u.d.f()` were
+  // read up to their first select and stopped there, the second `[` and the
+  // call's `(` reported as unexpected.
   if (tok.text == "$root" && Check(TokenKind::kDot)) {
     Consume();
-    return ParseSysRootTail(MakeSysScopePrefix(tok));
+    return ParseNameTail(ParseSysRootTail(MakeSysScopePrefix(tok)));
   }
 
   auto* call = arena_.Create<Expr>();

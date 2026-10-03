@@ -374,14 +374,7 @@ Expr* Parser::ParseThisOrSuperExpr() {
   // loop ParseIdentifierExpr uses. Reading one call and one select then
   // stopping left the `.` before kill unread, and the statement was reported as
   // missing its ';'.
-  result = ParseIdentifierPostfixChain(result);
-  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
-    auto op_tok = Consume();
-    return MakePostfixUnary(arena_, op_tok.kind, result);
-  }
-  result = ParseWithClause(result);
-  if (!result->with_expr) return result;
-  return ParseWithClauseTail(result);
+  return ParseNameTail(result);
 }
 
 // Declared in parser/expr_parser_internal.h, because the literal parsing in
@@ -767,17 +760,7 @@ Expr* Parser::ParseIdentifierExpr() {
   Expr* cast = TryParseIdentifierCast(result, &cast_handled);
   if (cast_handled) return cast;
 
-  result = ParseIdentifierPostfixChain(result);
-
-  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
-    auto op_tok = Consume();
-    return MakePostfixUnary(arena_, op_tok.kind, result);
-  }
-
-  result = ParseWithClause(result);
-  if (!result->with_expr) return result;
-
-  return ParseWithClauseTail(result);
+  return ParseNameTail(result);
 }
 
 void Parser::ParseTrailingNamedArgs(Expr* call) {
