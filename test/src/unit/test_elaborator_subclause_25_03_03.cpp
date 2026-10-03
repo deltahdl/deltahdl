@@ -116,4 +116,30 @@ TEST(GenericInterfaceReference, FullExampleEndToEnd) {
   EXPECT_EQ(top->children[2].module_name, "cpuMod");
 }
 
+// §25.3.3's refusal of `.*` for a generic port is the one error the source
+// draws: the port it leaves unconnected is not reported again under
+// §23.3.3.4.
+TEST(GenericInterfaceReference, ImplicitGenericPortIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic x; endinterface\n"
+      "module memMod(interface sb_intf, input logic clk);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf();\n"
+      "  memMod mem(.*);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit .* port connection cannot reference generic interface "
+      "port 'sb_intf' of module 'memMod'",
+      7, "25.3.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "interface port 'sb_intf' of module 'memMod' "
+                             "cannot be left unconnected",
+                             7, "23.3.3.4"));
+}
+
 }  // namespace

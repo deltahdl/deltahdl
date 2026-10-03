@@ -197,6 +197,10 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
     }
   }
   if (!conn) {
+    // §25.3.3 bars `.*` from reaching a generic interface port, and
+    // BindOneWildcardPort has already reported that for this port; the port is
+    // unconnected because of it, which is the one error the clause names.
+    if (ctx.item->inst_wildcard && port.interface_type_name.empty()) return;
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' of module '{}' cannot be "
                                "left unconnected",

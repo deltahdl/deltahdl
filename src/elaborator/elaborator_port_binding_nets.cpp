@@ -357,6 +357,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
+  ValidateGenericPortModportAccess(child_decl, inst);
   CheckNamedInterfaceTypePorts(kPortCtx, child_decl, inst, unit_);
   CheckMatchingNettypePorts(kPortCtx, child_decl, inst, nettype_canonical_);
 

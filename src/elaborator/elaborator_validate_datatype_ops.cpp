@@ -697,7 +697,16 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
   auto rhs_name = ExprIdent(s->rhs);
   bool rhs_is_iface_inst =
       !rhs_name.empty() && ctx.interface_inst_types.count(rhs_name) != 0;
-  if (lhs_vi && !rhs_vi && !rhs_is_iface_inst && !IsNullLiteral(s->rhs)) {
+  // §25.9 admits another virtual interface, an interface instance or null as
+  // the source, and an interface instance is reached in more ways than its
+  // simple name: an element of an instance array, `s[1]`, one in a generate
+  // block, `g[1].s`, an interface port, and the value a function returns. The
+  // source is refused only where it is plainly none of the three, a literal or
+  // a variable of another type, as the comparison rule above reads its operand.
+  bool rhs_plainly_not_vi = !IsNullLiteral(s->rhs) &&
+                            (IsLiteralExpr(s->rhs) ||
+                             IsNonVirtualInterfaceVar(s->rhs, ctx.var_types));
+  if (lhs_vi && !rhs_vi && !rhs_is_iface_inst && rhs_plainly_not_vi) {
     diag.Error(s->range.start,
                "virtual interface can only be assigned from another "
                "virtual interface, an interface instance, or null",

@@ -257,4 +257,57 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
+// §25.10's own example: through a generic `interface.mp` port connected to
+// `ebus.mp`, i.I names an object the modport mp does not list, as through a
+// named `ebus_i.mp` port.
+TEST(InterfaceObjectAccessElaboration,
+     GenericModportPortAccessOutsideModport_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ebus_i;\n"
+      "  integer I;\n"
+      "  logic Q;\n"
+      "  modport mp(input Q);\n"
+      "endinterface\n"
+      "module sub(interface.mp i);\n"
+      "  integer P;\n"
+      "  initial P = i.I;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ebus_i ebus();\n"
+      "  sub s1(ebus.mp);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'I' is not accessible through modport 'mp' of interface "
+                    "'ebus_i'",
+                    8, "25.5"));
+}
+
+// The listed object Q is reached through the same port with nothing reported.
+TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ebus_i;\n"
+      "  integer I;\n"
+      "  logic Q;\n"
+      "  modport mp(input Q);\n"
+      "endinterface\n"
+      "module sub(interface.mp i);\n"
+      "  logic P;\n"
+      "  initial P = i.Q;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ebus_i ebus();\n"
+      "  sub s1(ebus.mp);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'Q' is not accessible through modport 'mp' of interface "
+                    "'ebus_i'",
+                    8, "25.5"));
+}
+
 }  // namespace

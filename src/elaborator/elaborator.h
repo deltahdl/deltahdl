@@ -584,6 +584,8 @@ class Elaborator : public ElaboratorClassRules {
 
  private:
   void ValidateInterfaceObjectAccess(const ModuleDecl* decl);
+  void ValidateGenericPortModportAccess(const ModuleDecl* child,
+                                        const RtlirModuleInst& inst);
 
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 

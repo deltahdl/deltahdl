@@ -467,4 +467,28 @@ TEST(InterfaceModportAccess,
       9, "25.5"));
 }
 
+// §25.5 holds a nested interface declaration's modport to that interface's own
+// declarations: x and y belong to the enclosing interface i, which §23.4 makes
+// visible inside illegal_i without making them illegal_i's.
+TEST(InterfaceModport, NestedInterfaceModportNamingOuterSignalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  wire x, y;\n"
+      "  interface illegal_i;\n"
+      "    wire a, b, c, d;\n"
+      "    modport initiator(input a, b, x, output c, d, y);\n"
+      "  endinterface : illegal_i\n"
+      "  illegal_i ii();\n"
+      "endinterface : i\n"
+      "module top;\n"
+      "  i u();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'initiator' references 'x', which "
+                            "interface 'illegal_i' does not declare",
+                            5, "25.5"));
+}
+
 }  // namespace

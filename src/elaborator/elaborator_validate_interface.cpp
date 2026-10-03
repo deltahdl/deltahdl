@@ -10,6 +10,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -140,6 +141,11 @@ const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
         it->name == block_name) {
       member_exists = true;
     }
+    // §25.9: every component of the instance a virtual interface represents is
+    // reached through it, and §25.3 lets an interface instantiate another, so
+    // `vo.in.v` reaches the instance `in` holds as `o.in.v` does.
+    if (it->kind == ModuleItemKind::kModuleInst && it->inst_name == block_name)
+      member_exists = true;
     if ((it->kind == ModuleItemKind::kGenerateIf ||
          it->kind == ModuleItemKind::kGenerateFor ||
          it->kind == ModuleItemKind::kGenerateCase) &&
@@ -594,6 +600,66 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
                                 module_mps,  unit_,    diag_};
   for (const auto* item : decl->items) {
     CheckInterfaceObjectAccessItem(item, module_ctx, typedefs_);
+  }
+}
+
+// The interface instance and the modport a generic interface port reaches
+// through `conn`, the instantiation's connection to it: `ebus` or `ebus.mp`,
+// the instance one of `instances` names. The port's own `interface.mp` names
+// the modport ahead of the connection's.
+static bool GenericPortActual(
+    const PortDecl& port, const Expr* conn,
+    const std::unordered_map<std::string_view, std::string_view>& instances,
+    std::string_view& iface_type, std::string_view& modport) {
+  if (conn == nullptr) return false;
+  std::string_view inst_name;
+  std::string_view conn_modport;
+  if (conn->kind == ExprKind::kIdentifier) {
+    inst_name = conn->text;
+  } else if (conn->kind == ExprKind::kMemberAccess && conn->lhs != nullptr &&
+             conn->lhs->kind == ExprKind::kIdentifier && conn->rhs != nullptr) {
+    inst_name = conn->lhs->text;
+    conn_modport = conn->rhs->text;
+  }
+  auto it = instances.find(inst_name);
+  if (inst_name.empty() || it == instances.end()) return false;
+  iface_type = it->second;
+  modport = port.data_type.modport_name.empty() ? conn_modport
+                                                : port.data_type.modport_name;
+  return !modport.empty();
+}
+
+// §25.10: a modport restricts what a port connection reaches of an interface to
+// the objects the modport lists. A generic interface port, `interface.mp i`,
+// names no interface, so ValidateInterfaceObjectAccess, which reads the module
+// alone, cannot tell what `i.I` reaches; the instantiation connecting the port
+// can, and the module's body is checked against the connected interface's
+// modport here, as a named `ebus_i.mp` port's is there.
+void Elaborator::ValidateGenericPortModportAccess(const ModuleDecl* child,
+                                                  const RtlirModuleInst& inst) {
+  if (child == nullptr) return;
+  IfacePortTypeMap iface_ports;
+  IfacePortModportMap port_mps;
+  for (const auto& port : child->ports) {
+    if (!port.is_interface_port || !port.data_type.type_name.empty()) continue;
+    const Expr* conn = nullptr;
+    for (const auto& binding : inst.port_bindings)
+      if (binding.port_name == port.name) conn = binding.connection;
+    std::string_view iface_type;
+    std::string_view modport;
+    if (!GenericPortActual(port, conn, interface_inst_types_, iface_type,
+                           modport))
+      continue;
+    iface_ports[port.name] = iface_type;
+    port_mps[port.name] = modport;
+  }
+  if (iface_ports.empty()) return;
+  const VifTypeMap kNoVifs;
+  const VifModportMap kNoVifModports;
+  const IfaceAccessContext kCtx{iface_ports,    port_mps, kNoVifs,
+                                kNoVifModports, unit_,    diag_};
+  for (const auto* item : child->items) {
+    CheckInterfaceObjectAccessItem(item, kCtx, typedefs_);
   }
 }
 

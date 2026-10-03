@@ -708,15 +708,31 @@ void ValidateOneModport(const ModuleDecl* iface, const ModportDecl* mp,
   }
 }
 
+// The modports of `decl`, where it is an interface, and of every interface
+// declared inside it at any depth. §25.5 holds a nested interface declaration's
+// modport to that interface's own declarations as it holds a top-level one's:
+// §23.4 makes the enclosing scope's names visible inside the nested
+// declaration, but they are not its declarations, so a modport naming one would
+// create a port.
+void ValidateModportsOf(const ModuleDecl* decl, DiagEngine& diag) {
+  if (decl->decl_kind == ModuleDeclKind::kInterface) {
+    ModportNameScope scope;
+    CollectModportDeclaredNames(decl, scope);
+    for (auto* mp : decl->modports) ValidateOneModport(decl, mp, scope, diag);
+  }
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl != nullptr)
+      ValidateModportsOf(item->nested_module_decl, diag);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateModports() {
-  for (auto* iface : unit_->interfaces) {
-    ModportNameScope scope;
-    CollectModportDeclaredNames(iface, scope);
-    for (auto* mp : iface->modports) {
-      ValidateOneModport(iface, mp, scope, diag_);
-    }
+  for (const auto* decls :
+       {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
+    for (const auto* decl : *decls) ValidateModportsOf(decl, diag_);
   }
 }
 

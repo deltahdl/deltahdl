@@ -490,4 +490,107 @@ TEST(VirtualInterfaceElaboration, CallWithoutComponentInContAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §25.9 admits an interface instance as a virtual interface's source, and an
+// interface instance is reached in more ways than its simple name. Each case
+// below assigns one, and none is the "can only be assigned from" refusal.
+
+constexpr const char* kViSourceRefusal =
+    "virtual interface can only be assigned from another virtual interface, an "
+    "interface instance, or null";
+
+// An element of an array of interface instances.
+TEST(VirtualInterfaceElaboration, SourceIsAnInstanceArrayElement_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface SBus; int a; endinterface\n"
+      "module top;\n"
+      "  SBus s[0:1]();\n"
+      "  virtual SBus v;\n"
+      "  initial v = s[1];\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kViSourceRefusal, 5, "25.9"));
+}
+
+// An instance in a loop generate block, named through the block instance.
+TEST(VirtualInterfaceElaboration, SourceIsAGenerateBlockInstance_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface SBus; int a; endinterface\n"
+      "module top;\n"
+      "  for (genvar i = 0; i < 3; i++) begin : g\n"
+      "    SBus s();\n"
+      "  end\n"
+      "  virtual SBus v;\n"
+      "  initial v = g[1].s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kViSourceRefusal, 7, "25.9"));
+}
+
+// A program's interface port, which denotes the instance it is connected to.
+TEST(VirtualInterfaceElaboration, SourceIsAnInterfacePort_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface SBus; int a; endinterface\n"
+      "program P(SBus b);\n"
+      "  virtual SBus v;\n"
+      "  initial v = b;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  SBus s();\n"
+      "  P p(s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kViSourceRefusal, 4, "25.9"));
+}
+
+// The virtual interface a class function returns.
+TEST(VirtualInterfaceElaboration, SourceIsAFunctionsResult_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface SBus; int a; endinterface\n"
+      "class Pool;\n"
+      "  virtual SBus vs[2];\n"
+      "  function virtual SBus pick(int i); return vs[i]; endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  Pool p;\n"
+      "  virtual SBus got;\n"
+      "  initial got = p.pick(1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kViSourceRefusal, 9, "25.9"));
+}
+
+// §25.9 reaches every component of the instance a virtual interface
+// represents, and §25.3 lets an interface hold an instance of another, so
+// `vo.in.v` names a member of outer_if.
+TEST(VirtualInterfaceElaboration, NestedInterfaceInstanceIsAMember_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface inner_if; int v; endinterface\n"
+      "interface outer_if;\n"
+      "  int w;\n"
+      "  inner_if in();\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer_if o();\n"
+      "  virtual outer_if vo;\n"
+      "  initial begin\n"
+      "    vo = o;\n"
+      "    vo.in.v = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'in' is not a clocking block or member of "
+                             "interface 'outer_if'",
+                             11, "25.9"));
+}
+
 }  // namespace
