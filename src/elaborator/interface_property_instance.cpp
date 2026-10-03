@@ -21,7 +21,7 @@ namespace {
 const ModuleDecl* FindInterface(std::string_view name,
                                 const CompilationUnit* unit) {
   for (const ModuleDecl* ifc : unit->interfaces) {
-    if (ifc->name == name) return ifc;
+    if (ifc->name == name && !ifc->is_extern) return ifc;
   }
   return nullptr;
 }

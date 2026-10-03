@@ -9,6 +9,7 @@
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 
 using namespace delta;
@@ -874,6 +875,61 @@ TEST(ProgramConstruct, AnInstantiatedProgramIsNoTopLevelProgram) {
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "t");
+}
+
+// Syntax 24-1's extern program header is a prototype as §23.5 describes: the
+// program p defines comes after it with no duplicate definition, and its `.*`
+// takes the prototype's port.
+TEST(ProgramConstruct, ExternProgramPrototypeIsNoDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern program p(input logic a);\n"
+      "program p(.*);\n"
+      "endprogram\n"
+      "module t;\n"
+      "  logic a;\n"
+      "  p u(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  auto* prog = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(prog, nullptr);
+  ASSERT_EQ(prog->ports.size(), 1u);
+  EXPECT_EQ(prog->ports[0].direction, Direction::kInput);
+}
+
+// Nor is an uninstantiated extern program header a top-level program beside
+// the program it declares.
+TEST(ProgramConstruct, ExternProgramPrototypeIsNoTopLevelProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern program p;\n"
+      "program p;\n"
+      "  int b;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  ASSERT_FALSE(design->top_modules[0]->variables.empty());
+  EXPECT_EQ(design->top_modules[0]->variables[0].name, "b");
+}
+
+// The definition is held to the prototype's header as a module is (§23.5).
+TEST(ProgramConstruct, ExternProgramPortCountMismatchIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern program p(input logic a, input logic b);\n"
+      "program p(input logic a);\n"
+      "endprogram\n",
+      f, "p");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "program 'p' port count (1) does not match extern declaration (2)", 2,
+      "23.5"));
 }
 
 }  // namespace

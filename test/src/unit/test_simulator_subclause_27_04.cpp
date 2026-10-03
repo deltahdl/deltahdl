@@ -326,4 +326,77 @@ TEST(LoopGenerateIndexSim, DeclarationInitializerReadsItsInstanceIndex) {
             "e 20 21\n");
 }
 
+// §27.4 with §23.3: an instance written in a loop generate block is an
+// ordinary instance of its module in every block instance, so the module's
+// own variable is declared and its procedures run: n counts the five rising
+// edges of clk before 52.
+TEST(LoopGenerateInstanceSim, ModuleInstanceInTheBlockRunsItsBody) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m2(input logic clk);\n"
+      "  int n = 0;\n"
+      "  always @(posedge clk) n <= n + 1;\n"
+      "  initial #52 $display(\"n=%0d\", n);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (10) #5 clk = ~clk;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 1; i++) begin : g\n"
+      "      m2 c(clk);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "n=5\n");
+}
+
+// Each block instance's module instance evaluates its own concurrent
+// assertion over its own bit of a, which holds 1, 0 and 1 at all five rising
+// edges of clk.
+TEST(LoopGenerateInstanceSim, EachModuleInstanceEvaluatesItsAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m2(input logic a, input logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  logic [2:0] a = 3'b101;\n"
+      "  initial repeat (10) #5 clk = ~clk;\n"
+      "  for (genvar i = 0; i < 3; i++) begin : g\n"
+      "    m2 c(a[i], clk);\n"
+      "  end\n"
+      "  initial #52 $display(\"%0d %0d %0d %0d %0d %0d\", g[0].c.pass,\n"
+      "                       g[0].c.fail, g[1].c.pass, g[1].c.fail,\n"
+      "                       g[2].c.pass, g[2].c.fail);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 0 0 5 5 0\n");
+}
+
+// The same for a checker instantiated in each block instance.
+TEST(LoopGenerateInstanceSim, EachCheckerInstanceEvaluatesItsAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "checker chk(int id, logic a, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  logic [2:0] a = 3'b101;\n"
+      "  initial repeat (10) #5 clk = ~clk;\n"
+      "  for (genvar i = 0; i < 3; i++) begin : g\n"
+      "    chk c(i, a[i], clk);\n"
+      "  end\n"
+      "  initial #52 $display(\"%0d %0d %0d %0d %0d %0d\", g[0].c.pass,\n"
+      "                       g[0].c.fail, g[1].c.pass, g[1].c.fail,\n"
+      "                       g[2].c.pass, g[2].c.fail);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 0 0 5 5 0\n");
+}
+
 }  // namespace

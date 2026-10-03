@@ -329,4 +329,51 @@ TEST(ConditionalGenerateHierarchicalNameSim, VirtualInterfaceReachesIt) {
             "vif 55 55\n");
 }
 
+// §27.5 with §23.3: an instance written in the generate block a conditional
+// generate construct selects is an ordinary instance of its module, so the
+// module's own variable is declared and its procedures run: n counts the five
+// rising edges of clk before 52.
+TEST(GenerateSimulation, ModuleInstanceInTheSelectedBlockRunsItsBody) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m2(input logic clk);\n"
+      "  int n = 0;\n"
+      "  always_ff @(posedge clk) n <= n + 1;\n"
+      "  initial #52 $display(\"n=%0d\", n);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  initial repeat (10) #5 clk = ~clk;\n"
+      "  if (1) begin : g\n"
+      "    m2 c(clk);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "n=5\n");
+}
+
+// A checker instantiated in the selected block evaluates its concurrent
+// assertion as one written outside it does: a is sampled 1, 0, 0, 1 and 1 at
+// the five rising edges of clk.
+TEST(GenerateSimulation, CheckerInstanceInTheSelectedBlockEvaluatesIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "checker chk(logic a, logic clk);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  parameter bit USE = 1;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  initial repeat (10) #5 clk = ~clk;\n"
+      "  if (USE) begin : g\n"
+      "    chk c(a, clk);\n"
+      "  end\n"
+      "  initial begin #12 a = 0; #20 a = 1; end\n"
+      "  initial #52 $display(\"pass=%0d fail=%0d\", g.c.pass, g.c.fail);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "pass=3 fail=2\n");
+}
+
 }  // namespace

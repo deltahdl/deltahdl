@@ -373,4 +373,24 @@ TEST(ProgramConstructSim, NestedProgramReadsItsModuleInstanceParameter) {
             "k=2\nk=7\n");
 }
 
+// Syntax 24-1's extern program header is a prototype as §23.5 describes: the
+// definition after it takes its ports through `.*`, and the instance runs
+// that definition with the port values the module connects.
+TEST(ProgramConstructSim, ExternProgramDefinitionRunsWithPrototypePorts) {
+  SimFixture f;
+  auto* w = RunAndFindVar(
+      "extern program p(input int v, output int w);\n"
+      "program p(.*);\n"
+      "  initial #1 w = v + 1;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  int v = 57;\n"
+      "  int w;\n"
+      "  p pi(v, w);\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->value.ToUint64(), 58u);
+}
+
 }  // namespace

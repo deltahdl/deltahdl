@@ -71,7 +71,7 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
                                           std::string_view name) {
   if (!unit) return nullptr;
   for (const auto* i : unit->interfaces) {
-    if (i && i->name == name) return i;
+    if (i && i->name == name && !i->is_extern) return i;
   }
   for (const auto* m : unit->modules) {
     if (m && m->name == name && m->decl_kind == ModuleDeclKind::kInterface) {
@@ -400,7 +400,7 @@ const ModuleDecl* LookupInterfaceDecl(const CompilationUnit* unit,
                                       std::string_view name) {
   if (!unit) return nullptr;
   for (const auto* i : unit->interfaces) {
-    if (i && i->name == name) return i;
+    if (i && i->name == name && !i->is_extern) return i;
   }
   for (const auto* m : unit->modules) {
     if (m && m->name == name && m->decl_kind == ModuleDeclKind::kInterface) {

@@ -1,14 +1,16 @@
 // §23.5 (printed page 752): an extern module declaration gives a module's
 // name, parameters and ports ahead of its definition, and the definition has
 // to match it -- port count, port kinds and types, and parameters -- or take
-// its header wholesale through `.*`. ResolveExternModules checks each
-// module that has such a declaration against it. Split out of
-// elaborator_resolve.cpp, which resolves the rest of the compilation unit's
-// cross-references.
+// its header wholesale through `.*`. Syntax 24-1 and Syntax 25-1 give a
+// program and an interface the same extern header. ResolveExternModules
+// checks each module, interface and program that has such a declaration
+// against it. Split out of elaborator_resolve.cpp, which resolves the rest of
+// the compilation unit's cross-references.
 
 #include <cstddef>
 #include <format>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -28,10 +30,25 @@ static bool ExternPortTypesEquivalent(const DataType& a, const DataType& b) {
          a.type_name == b.type_name;
 }
 
-// Returns the matching extern declaration for an actual module, or nullptr.
+// The noun a diagnostic names the design element by: Syntax 24-1 and Syntax
+// 25-1 give a program and an interface the extern header §23.5 describes for
+// a module, so the definition being matched can be any of the three.
+static std::string_view ElementWord(const ModuleDecl* mod) {
+  switch (mod->decl_kind) {
+    case ModuleDeclKind::kInterface:
+      return "interface";
+    case ModuleDeclKind::kProgram:
+      return "program";
+    default:
+      return "module";
+  }
+}
+
+// Returns the matching extern declaration for an actual design element among
+// the declarations of its own kind, or nullptr.
 static ModuleDecl* FindExternDeclFor(const ModuleDecl* mod,
-                                     CompilationUnit* unit) {
-  for (auto* other : unit->modules) {
+                                     const std::vector<ModuleDecl*>& decls) {
+  for (auto* other : decls) {
     if (other->is_extern && other->name == mod->name) return other;
   }
   return nullptr;
@@ -48,9 +65,9 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
     const PortDecl& mp = mod->ports[i];
     if (!mp.name.empty() && !ep.name.empty() && mp.name != ep.name) {
       diag.Error(mod->range.start,
-                 std::format("module '{}' port '{}' at position {} does not "
+                 std::format("{} '{}' port '{}' at position {} does not "
                              "match extern declaration port '{}'",
-                             mod->name, mp.name, i, ep.name),
+                             ElementWord(mod), mod->name, mp.name, i, ep.name),
                  Subclause("23.5"));
       break;
     }
@@ -62,9 +79,9 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
     if (ep.direction != Direction::kNone && mp.direction != Direction::kNone &&
         ep.direction != mp.direction) {
       diag.Error(mp.loc,
-                 std::format("module '{}' port '{}' direction does not match "
+                 std::format("{} '{}' port '{}' direction does not match "
                              "extern declaration",
-                             mod->name, mp.name),
+                             ElementWord(mod), mod->name, mp.name),
                  Subclause("23.5"));
       break;
     }
@@ -72,9 +89,9 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
         mp.data_type.kind != DataTypeKind::kImplicit &&
         !ExternPortTypesEquivalent(ep.data_type, mp.data_type)) {
       diag.Error(mp.loc,
-                 std::format("module '{}' port '{}' type does not match "
+                 std::format("{} '{}' port '{}' type does not match "
                              "extern declaration",
-                             mod->name, mp.name),
+                             ElementWord(mod), mod->name, mp.name),
                  Subclause("23.5"));
       break;
     }
@@ -88,12 +105,12 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
                                   const ModuleDecl* extern_decl,
                                   DiagEngine& diag) {
   if (extern_decl->params.size() != mod->params.size()) {
-    diag.Error(
-        mod->range.start,
-        std::format("module '{}' parameter count ({}) does not match "
-                    "extern declaration ({})",
-                    mod->name, mod->params.size(), extern_decl->params.size()),
-        Subclause("23.5"));
+    diag.Error(mod->range.start,
+               std::format("{} '{}' parameter count ({}) does not match "
+                           "extern declaration ({})",
+                           ElementWord(mod), mod->name, mod->params.size(),
+                           extern_decl->params.size()),
+               Subclause("23.5"));
     return;
   }
   // The parameter lists must also correspond by name and position.
@@ -102,10 +119,10 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
     std::string_view ep_name = extern_decl->params[i].first;
     if (!mp_name.empty() && !ep_name.empty() && mp_name != ep_name) {
       diag.Error(mod->range.start,
-                 std::format("module '{}' parameter '{}' at position {} "
+                 std::format("{} '{}' parameter '{}' at position {} "
                              "does not match extern declaration "
                              "parameter '{}'",
-                             mod->name, mp_name, i, ep_name),
+                             ElementWord(mod), mod->name, mp_name, i, ep_name),
                  Subclause("23.5"));
       break;
     }
@@ -117,10 +134,10 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
     bool ep_is_type = extern_decl->type_param_names.count(ep_name) != 0;
     if (mp_is_type != ep_is_type) {
       diag.Error(mod->range.start,
-                 std::format("module '{}' parameter '{}' at position {} "
+                 std::format("{} '{}' parameter '{}' at position {} "
                              "does not match the parameter kind of the "
                              "extern declaration",
-                             mod->name, mp_name, i),
+                             ElementWord(mod), mod->name, mp_name, i),
                  Subclause("23.5"));
       break;
     }
@@ -146,29 +163,38 @@ static void ImportExternWildcardHeader(ModuleDecl* mod,
   mod->has_param_port_list = extern_decl->has_param_port_list;
 }
 
+// §23.5: matches one design element against the extern declaration of its
+// name among `decls`, or takes that declaration's header through `.*`.
+static void ResolveExternDecl(ModuleDecl* mod,
+                              const std::vector<ModuleDecl*>& decls,
+                              DiagEngine& diag) {
+  if (mod->is_extern) return;
+
+  ModuleDecl* extern_decl = FindExternDeclFor(mod, decls);
+  if (!extern_decl) return;
+
+  if (mod->has_wildcard_ports) {
+    ImportExternWildcardHeader(mod, extern_decl);
+    return;
+  }
+
+  if (extern_decl->ports.size() != mod->ports.size()) {
+    diag.Error(mod->range.start,
+               std::format("{} '{}' port count ({}) does not match "
+                           "extern declaration ({})",
+                           ElementWord(mod), mod->name, mod->ports.size(),
+                           extern_decl->ports.size()),
+               Subclause("23.5"));
+    return;
+  }
+  CheckExternPortMatch(mod, extern_decl, diag);
+  CheckExternParamMatch(mod, extern_decl, diag);
+}
+
 void Elaborator::ResolveExternModules() {
-  for (auto* mod : unit_->modules) {
-    if (mod->is_extern) continue;
-
-    ModuleDecl* extern_decl = FindExternDeclFor(mod, unit_);
-    if (!extern_decl) continue;
-
-    if (mod->has_wildcard_ports) {
-      ImportExternWildcardHeader(mod, extern_decl);
-      continue;
-    }
-
-    if (extern_decl->ports.size() != mod->ports.size()) {
-      diag_.Error(
-          mod->range.start,
-          std::format("module '{}' port count ({}) does not match "
-                      "extern declaration ({})",
-                      mod->name, mod->ports.size(), extern_decl->ports.size()),
-          Subclause("23.5"));
-      continue;
-    }
-    CheckExternPortMatch(mod, extern_decl, diag_);
-    CheckExternParamMatch(mod, extern_decl, diag_);
+  for (const auto* decls :
+       {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
+    for (auto* mod : *decls) ResolveExternDecl(mod, *decls, diag_);
   }
 }
 

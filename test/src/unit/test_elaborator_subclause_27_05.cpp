@@ -761,4 +761,30 @@ TEST(GenerateElaboration,
   EXPECT_EQ(y->width, 2u);
 }
 
+// §27.5 with §23.9: a module instantiated in the block a conditional generate
+// construct selects is a scope of its own, so the names its body declares
+// resolve in its procedures, each with its initializer form, uninitialized
+// and written by an initial procedure, read by always and by always_ff.
+TEST(GenerateElaboration, InstanceInTheSelectedBlockDeclaresItsBodysNames) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m2(input logic clk);\n"
+      "  int p = 0, q = 0, n = 0;\n"
+      "  int k;\n"
+      "  initial k = 0;\n"
+      "  always @(posedge clk) k <= k + p + q;\n"
+      "  always_ff @(posedge clk) n <= n + 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter P = 1;\n"
+      "  logic clk = 0;\n"
+      "  generate if (P == 1) begin : g\n"
+      "    m2 c(clk);\n"
+      "  end endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

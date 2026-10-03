@@ -337,4 +337,31 @@ TEST(ArrayedInterfaceDefparam, NonArrayedInstanceIsUnconstrained) {
       DefparamReach::kOutsideInstance));
 }
 
+// Syntax 25-1's extern interface header is a prototype as §23.5 describes: the
+// interface ifc defines comes after it with no duplicate definition, an
+// instance resolves to that definition and not the bodiless prototype, and
+// its `.*` takes the prototype's port.
+TEST(InterfaceDefinitions, ExternInterfacePrototypeIsNoDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern interface ifc(input logic clk);\n"
+      "interface ifc(.*);\n"
+      "  logic data;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  ifc i(clk);\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  auto* ifc = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(ifc, nullptr);
+  ASSERT_EQ(ifc->ports.size(), 1u);
+  EXPECT_EQ(ifc->ports[0].name, "clk");
+  ASSERT_FALSE(ifc->variables.empty());
+  EXPECT_EQ(ifc->variables[0].name, "data");
+}
+
 }  // namespace

@@ -114,8 +114,10 @@ std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   std::vector<ModuleDecl*> tops;
   for (auto* mod : unit->modules)
     if (!instantiated.contains(mod->name)) tops.push_back(mod);
+  // An extern program header (Syntax 24-1) is a prototype and no program.
   for (auto* prog : unit->programs)
-    if (!instantiated.contains(prog->name)) tops.push_back(prog);
+    if (!prog->is_extern && !instantiated.contains(prog->name))
+      tops.push_back(prog);
   return tops;
 }
 

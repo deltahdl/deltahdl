@@ -98,12 +98,13 @@ std::optional<ModuleDecl*> FindInstanceUseOverride(
 }
 
 // Appends every declaration in `decls` whose name matches `name` to
-// `candidates`.
+// `candidates`. An extern program or interface header (Syntax 24-1, Syntax
+// 25-1) is a prototype as §23.5 describes, defining nothing to instantiate.
 template <typename Decls>
 static void AppendNamedDecls(const Decls& decls, std::string_view name,
                              std::vector<ModuleDecl*>& candidates) {
   for (auto* d : decls) {
-    if (d->name == name) candidates.push_back(d);
+    if (d->name == name && !d->is_extern) candidates.push_back(d);
   }
 }
 
@@ -162,12 +163,14 @@ ModuleDecl* PickByLibraryOrder(const std::vector<ModuleDecl*>& candidates,
 // Resolves `name` to a program, interface, or checker (in that order) when no
 // module matched, returning nullptr if none exists.
 ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
-  auto pit = std::find_if(unit->programs.begin(), unit->programs.end(),
-                          [name](auto* p) { return p->name == name; });
+  auto pit = std::find_if(
+      unit->programs.begin(), unit->programs.end(),
+      [name](auto* p) { return p->name == name && !p->is_extern; });
   if (pit != unit->programs.end()) return *pit;
 
-  auto iit = std::find_if(unit->interfaces.begin(), unit->interfaces.end(),
-                          [name](auto* i) { return i->name == name; });
+  auto iit = std::find_if(
+      unit->interfaces.begin(), unit->interfaces.end(),
+      [name](auto* i) { return i->name == name && !i->is_extern; });
   if (iit != unit->interfaces.end()) return *iit;
 
   auto cit = std::find_if(unit->checkers.begin(), unit->checkers.end(),

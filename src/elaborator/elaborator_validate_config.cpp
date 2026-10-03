@@ -90,15 +90,19 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   };
   // §23.5: an extern module declaration declares a module's ports without
   // defining the module itself, so it is a prototype rather than a definition
-  // and does not participate in the duplicate-definition check. The prototype
-  // is matched against its actual definition in elaborator_resolve.
+  // and does not participate in the duplicate-definition check. Syntax 24-1
+  // and Syntax 25-1 give a program and an interface the same extern header.
+  // The prototype is matched against its actual definition in
+  // elaborator_extern_modules.
   for (auto* m : unit->modules)
     if (!m->is_extern)
       check_def(m->library, m->name, m->range, Subclause("3.13"));
   for (auto* p : unit->programs)
-    check_def(p->library, p->name, p->range, Subclause("3.13"));
+    if (!p->is_extern)
+      check_def(p->library, p->name, p->range, Subclause("3.13"));
   for (auto* i : unit->interfaces)
-    check_def(i->library, i->name, i->range, Subclause("3.13"));
+    if (!i->is_extern)
+      check_def(i->library, i->name, i->range, Subclause("3.13"));
   // Syntax 29-1's extern UDP declaration is a prototype in the same way.
   for (auto* u : unit->udps)
     if (!u->is_extern)
