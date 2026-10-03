@@ -128,10 +128,10 @@ inline CompilationUnit* PreprocessAndParseCu(ElabFixture& f, uint32_t fid,
   return parser.Parse();
 }
 
-// Propagates the decay-time, trireg-strength, and delay-mode directives from
-// the preprocessor onto the CompilationUnit.
-inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
-                                       Preprocessor& preproc) {
+// Propagates the decay-time, trireg-strength, delay-mode and `timescale
+// directives from the preprocessor onto the CompilationUnit.
+inline void PropagateDirectivesToCu(CompilationUnit* cu,
+                                    Preprocessor& preproc) {
   cu->default_decay_time = preproc.DefaultDecayTime();
   cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
   cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
@@ -139,6 +139,11 @@ inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
   cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
   cu->delay_mode_directive = preproc.DelayModeDirective();
+  // As the driver's ApplyPreprocMetadata does, so §3.14's resolutions and
+  // §3.14.3's global precision see every `timescale the source holds.
+  cu->preproc_timescale = preproc.CurrentTimescale();
+  cu->has_preproc_timescale = preproc.HasTimescale();
+  cu->preproc_global_precision = preproc.GlobalPrecision();
 }
 
 // Preprocesses, parses and elaborates `src`, reporting through `parse_failed`
@@ -176,7 +181,7 @@ inline RtlirDesign* ElaborateWithPreprocessorReportingParse(
       }
     }
   }
-  PropagateDecayAndDelayToCu(cu, preproc);
+  PropagateDirectivesToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
   if (f.configure) f.configure(elab);
   // See ElaborateSrc: with no explicit top and no top-level module, pass an

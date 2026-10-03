@@ -23,7 +23,7 @@ static RtlirDesign* ElaborateWithIncludes(IncludeTestDir& tmp,
   Preprocessor preproc(f.mgr, f.diag, {});
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
   cu->default_nettype = preproc.DefaultNetType();
-  PropagateDecayAndDelayToCu(cu, preproc);
+  PropagateDirectivesToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
   auto name = top.empty() ? cu->modules.back()->name : top;
   auto* design = elab.Elaborate(name);
