@@ -534,14 +534,65 @@ static bool IsDesignElementStart(std::string_view trimmed) {
   return true;
 }
 
-static bool IsDesignElementEnd(std::string_view trimmed) {
-  return trimmed.find("endmodule") != std::string_view::npos ||
-         trimmed.find("endprogram") != std::string_view::npos ||
-         trimmed.find("endinterface") != std::string_view::npos ||
-         trimmed.find("endchecker") != std::string_view::npos ||
-         trimmed.find("endpackage") != std::string_view::npos ||
-         trimmed.find("endprimitive") != std::string_view::npos ||
-         trimmed.find("endconfig") != std::string_view::npos;
+// A.1.2 lets attribute instances stand before a design element's keyword, and
+// one may run across lines. The text after those that open `trimmed`, or
+// nothing while one is still open; `open` says on entry whether one was left
+// open on an earlier line, and on return whether one is open at this line's
+// end. An attribute_instance's first attr_spec is a name, so `(*)` is the
+// event control of §9.4.2.2 rather than the opening of one.
+static std::string_view AfterAttributeInstances(std::string_view trimmed,
+                                                bool& open) {
+  if (open) {
+    size_t close = trimmed.find("*)");
+    if (close == std::string_view::npos) return {};
+    open = false;
+    trimmed = Preprocessor::Trim(trimmed.substr(close + 2));
+  }
+  while (trimmed.starts_with("(*") && !trimmed.starts_with("(*)")) {
+    size_t close = trimmed.find("*)", 2);
+    if (close == std::string_view::npos) {
+      open = true;
+      return {};
+    }
+    trimmed = Preprocessor::Trim(trimmed.substr(close + 2));
+  }
+  return trimmed;
+}
+
+// The position just past the `: name` that may label an end keyword ending at
+// `pos`, or `pos` itself when no label follows.
+static size_t PastEndLabel(std::string_view text, size_t pos) {
+  size_t i = pos;
+  while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+  if (i == text.size() || text[i] != ':') return pos;
+  ++i;
+  while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+  while (i < text.size() && IsIdentChar(text[i])) ++i;
+  return i;
+}
+
+// The position just past the first word of `text` that ends a design element,
+// and past its label, or npos when no word of `text` ends one.
+static size_t PastDesignElementEnd(std::string_view text) {
+  static constexpr std::string_view kEndKeywords[] = {
+      "endmodule",  "endprogram",   "endinterface", "endchecker",
+      "endpackage", "endprimitive", "endconfig",
+  };
+  size_t i = 0;
+  while (i < text.size()) {
+    if (!IsIdentChar(text[i])) {
+      ++i;
+      continue;
+    }
+    size_t end = i;
+    while (end < text.size() && IsIdentChar(text[end])) ++end;
+    auto word = text.substr(i, end - i);
+    for (auto keyword : kEndKeywords) {
+      if (word == keyword) return PastEndLabel(text, end);
+    }
+    i = end;
+  }
+  return std::string_view::npos;
 }
 
 static void TrackCellModuleName(std::string_view trimmed,
@@ -578,7 +629,7 @@ static DeclaredElement DeclaredElementAt(std::string_view trimmed) {
   return {};
 }
 
-void Preprocessor::TrackDesignElement(std::string_view trimmed) {
+void Preprocessor::TrackDesignElementHeader(std::string_view trimmed) {
   if (IsDesignElementStart(trimmed)) {
     if (in_celldefine_) TrackCellModuleName(trimmed, cell_module_names_);
     // Annex E: each of its directives applies to the modules that follow
@@ -596,9 +647,19 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
     }
     ++design_element_depth_;
   }
+}
 
-  if (IsDesignElementEnd(trimmed)) {
+// A header need not open its line: attribute instances may come before it, and
+// an earlier element may end on the same line. So the line is taken element by
+// element, each piece starting where the previous one's end keyword left off.
+void Preprocessor::TrackDesignElement(std::string_view trimmed) {
+  while (true) {
+    TrackDesignElementHeader(
+        AfterAttributeInstances(trimmed, in_attribute_instance_));
+    size_t past_end = PastDesignElementEnd(trimmed);
+    if (past_end == std::string_view::npos) return;
     if (design_element_depth_ > 0) --design_element_depth_;
+    trimmed = Trim(trimmed.substr(past_end));
   }
 }
 

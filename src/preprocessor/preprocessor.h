@@ -255,6 +255,7 @@ class Preprocessor {
                              const std::string& src_dir, bool quoted);
   void DefinePredefined(std::string name, std::string body);
   void TrackDesignElement(std::string_view trimmed);
+  void TrackDesignElementHeader(std::string_view trimmed);
   void ExpandAndAppendLine(std::string_view line, uint32_t file_id,
                            uint32_t line_num, std::string& output);
   bool ProcessBlockCommentLine(std::string_view line, uint32_t file_id,
@@ -676,6 +677,9 @@ class Preprocessor {
   std::vector<KeywordRegion> keyword_version_stack_;
   std::vector<std::string> expansion_stack_;
   uint32_t design_element_depth_ = 0;
+  // An attribute instance opened on a line and not yet closed (A.1.2), so the
+  // next line starts inside it.
+  bool in_attribute_instance_ = false;
   std::vector<std::string> cell_module_names_;
   std::vector<ModuleDirectives> module_directives_;
   bool in_block_comment_ = false;

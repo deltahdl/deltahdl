@@ -446,4 +446,87 @@ TEST(Preprocessor, Timescale_RecordedAtAPackagesHeader) {
   EXPECT_EQ(list[1].timescale.unit, TimeUnit::kNs);
 }
 
+// A.1.2 lets attribute instances stand before a design element's keyword, and
+// the element they precede is still one §22.7's directive governs.
+TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstance) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "(* keep *) (* a = 1, b *) module t;\nendmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 1u);
+  EXPECT_EQ(list[0].module, "t");
+  EXPECT_TRUE(list[0].has_timescale);
+  EXPECT_EQ(list[0].timescale.unit, TimeUnit::kUs);
+}
+
+// An attribute instance may run across lines, and the header after its close is
+// still the element the directive governs.
+TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstanceAcrossLines) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "(* keep,\n  a = 1,\n  b *) module t;\nendmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 1u);
+  EXPECT_EQ(list[0].module, "t");
+  EXPECT_EQ(list[0].timescale.unit, TimeUnit::kUs);
+}
+
+// `(*)` opening a line is §9.4.2.2's event control, not an attribute instance,
+// so it leaves the header that follows on the line to be recorded.
+TEST(Preprocessor, Timescale_RecordedAfterAnEventControlOpeningTheLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "module a;\n  logic x, y;\n  always @\n(*) x = y; endmodule module b;\n"
+      "endmodule\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_EQ(list[0].module, "a");
+  EXPECT_EQ(list[1].module, "b");
+}
+
+// A header that shares its line with the end of an earlier element, whether or
+// not that end carries a label, is as much a header as one opening a line.
+TEST(Preprocessor, Timescale_RecordedAfterAnEarlierElementOnTheLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1us / 1ns\n"
+      "module a; endmodule package p; endpackage : p (* keep *) interface i;\n"
+      "endinterface\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 3u);
+  EXPECT_EQ(list[0].module, "a");
+  EXPECT_EQ(list[1].module, "p");
+  EXPECT_TRUE(list[1].is_package);
+  EXPECT_EQ(list[2].module, "i");
+  for (const auto& d : list) EXPECT_EQ(d.timescale.unit, TimeUnit::kUs);
+}
+
+// The second element on a line is open until its own end, so the directive
+// placed before that end is inside it.
+TEST(Preprocessor, Timescale_IllegalInsideASecondElementOnTheLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "module a; endmodule module b;\n`timescale 1ns / 1ps\nendmodule\n", f,
+      pp);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 2,
+                            "22.7"));
+}
+
 }  // namespace
