@@ -50,3 +50,23 @@ struct ScratchDir {
     return full;
   }
 };
+
+// A ScratchDir that is the process's working directory for as long as it
+// lives, so a file a test's source names by a relative path -- a §21.7.1.1
+// dump file, "dump.vcd" or "module1.dump" -- lands in it, apart from any
+// concurrently running test, and is removed with it rather than left in the
+// directory the test binary was started in. The entry directory is restored
+// before the scratch directory is removed.
+struct ScratchWorkingDir : ScratchDir {
+  std::filesystem::path entry = std::filesystem::current_path();
+
+  ScratchWorkingDir() { std::filesystem::current_path(dir); }
+
+  ~ScratchWorkingDir() {
+    std::error_code ec;
+    std::filesystem::current_path(entry, ec);
+  }
+
+  ScratchWorkingDir(const ScratchWorkingDir&) = delete;
+  ScratchWorkingDir& operator=(const ScratchWorkingDir&) = delete;
+};

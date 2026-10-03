@@ -37,13 +37,6 @@
 // test ends.
 class VcdDumpFromSourceTestBase : public ::testing::Test {
  protected:
-  void SetUp() override {
-    entry_dir_ = std::filesystem::current_path();
-    std::filesystem::current_path(scratch_.dir);
-  }
-
-  void TearDown() override { std::filesystem::current_path(entry_dir_); }
-
   // Runs `src` the way the simulation driver runs a design -- elaboration,
   // lowering, then the scheduler -- supplying no VcdWriter, so whatever the
   // run leaves in the working directory the source's own tasks put there.
@@ -108,7 +101,6 @@ class VcdDumpFromSourceTestBase : public ::testing::Test {
     return joined;
   }
 
-  ScratchDir scratch_;
+  ScratchWorkingDir scratch_;
   SimFixture f_;
-  std::filesystem::path entry_dir_;
 };
