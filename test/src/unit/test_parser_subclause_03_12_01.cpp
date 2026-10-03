@@ -174,11 +174,12 @@ TEST(CompilationUnitParsing, DollarUnitScopeResolutionExpr) {
 }
 
 // The right-hand side of the one initial procedure's assignment in the
-// module `src` parses -- `y = <expr>;` -- with the compilation unit accepted
+// module `r` holds -- `y = <expr>;` -- with the compilation unit accepted
 // whole, or null where the source is refused, so that a case reads the
-// expression's shape rather than a placeholder the recovery left.
-static const Expr* ParsedInitialRhs(const char* src) {
-  auto r = Parse(src);
+// expression's shape rather than a placeholder the recovery left. The tree
+// lives in `r`'s arena and its names in `r`'s source buffer, so the caller
+// keeps `r` alive for as long as it reads the expression.
+static const Expr* InitialRhs(const ParseResult& r) {
   EXPECT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   if (r.cu == nullptr || r.has_errors || r.cu->modules.size() != 1u)
@@ -220,24 +221,26 @@ static void ExpectUnitPrefixedMethodCall(const Expr* call, const char* var,
 // returned the identifier with no postfix chain, so the statement was
 // reported "expected ';'" at the `.`.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAMethodCall) {
-  const Expr* rhs = ParsedInitialRhs(
+  auto r = Parse(
       "int q[$];\n"
       "module m;\n"
       "  int y;\n"
       "  initial y = $unit::q.size();\n"
       "endmodule\n");
+  const Expr* rhs = InitialRhs(r);
   ExpectUnitPrefixedMethodCall(rhs, "q", "size");
 }
 
 // The same chain on a string: `$unit::s.len()` is a call of len on the
 // prefixed identifier s, which §6.16's method takes with no argument.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAStringMethodCall) {
-  const Expr* rhs = ParsedInitialRhs(
+  auto r = Parse(
       "string s;\n"
       "module m;\n"
       "  int y;\n"
       "  initial y = $unit::s.len();\n"
       "endmodule\n");
+  const Expr* rhs = InitialRhs(r);
   ExpectUnitPrefixedMethodCall(rhs, "s", "len");
 }
 
@@ -245,12 +248,13 @@ TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAStringMethodCall) {
 // whose base is the `$unit`-prefixed arr and whose index is the literal,
 // with no part-select end. Reported "expected ';'" at the `[` before.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAnIndexSelect) {
-  const Expr* rhs = ParsedInitialRhs(
+  auto r = Parse(
       "int arr[4];\n"
       "module m;\n"
       "  int y;\n"
       "  initial y = $unit::arr[0];\n"
       "endmodule\n");
+  const Expr* rhs = InitialRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ExpectUnitPrefixedIdentifier(rhs->base, "arr");
