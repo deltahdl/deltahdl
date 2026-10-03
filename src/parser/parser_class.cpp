@@ -577,6 +577,9 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
     m->kind = ClassMemberKind::kProperty;
     m->is_param = true;
     m->data_type = param_items[i]->data_type;
+    // §6.20.1: a parameter declared with unpacked dimensions is an array of
+    // values, and the member is where every later reader looks for them.
+    m->unpacked_dims = param_items[i]->unpacked_dims;
     m->init_expr = param_items[i]->init_expr;
     members.push_back(m);
   }
