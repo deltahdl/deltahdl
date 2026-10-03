@@ -561,14 +561,14 @@ static std::string_view AfterAttributeInstances(std::string_view trimmed,
 
 // The position just past the `: name` that may label an end keyword ending at
 // `pos`, or `pos` itself when no label follows.
+// `text` is trimmed, so a trimmed tail of it keeps its end where `text` does.
 static size_t PastEndLabel(std::string_view text, size_t pos) {
-  size_t i = pos;
-  while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
-  if (i == text.size() || text[i] != ':') return pos;
-  ++i;
-  while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
-  while (i < text.size() && IsIdentChar(text[i])) ++i;
-  return i;
+  auto rest = Preprocessor::Trim(text.substr(pos));
+  if (!rest.starts_with(':')) return pos;
+  rest = Preprocessor::Trim(rest.substr(1));
+  size_t name = 0;
+  while (name < rest.size() && IsIdentChar(rest[name])) ++name;
+  return text.size() - rest.size() + name;
 }
 
 // The position just past the first word of `text` that ends a design element,

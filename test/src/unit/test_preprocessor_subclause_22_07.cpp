@@ -497,14 +497,16 @@ TEST(Preprocessor, Timescale_RecordedAfterAnEventControlOpeningTheLine) {
 }
 
 // A header that shares its line with the end of an earlier element, whether or
-// not that end carries a label, is as much a header as one opening a line.
+// not that end carries a label, is as much a header as one opening a line; and
+// once the last of them ends, labelled, a directive after it is outside them.
 TEST(Preprocessor, Timescale_RecordedAfterAnEarlierElementOnTheLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
       "`timescale 1us / 1ns\n"
       "module a; endmodule package p; endpackage : p (* keep *) interface i;\n"
-      "endinterface\n",
+      "endinterface : i\n"
+      "`timescale 1ns / 1ps\n",
       f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   const auto& list = pp.ModuleDirectivesList();

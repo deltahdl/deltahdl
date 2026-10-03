@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -152,6 +154,22 @@ TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
               "  input data;\n"
               "  logic data;\n"
               "endmodule\n"));
+}
+
+// §3.13 keeps package names in a name space apart from module names, so the
+// directives recorded at a module's header never reach a package of the same
+// name, which keeps none when no package header was recorded.
+TEST(NameSpaceParsing, ModuleHeaderRecordSkipsPackageOfSameName) {
+  auto r = Parse("package p;\nendpackage\nmodule p;\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ModuleDirectives record;
+  record.module = "p";
+  record.has_timescale = true;
+  ApplyModuleDirectives(r.cu, {record});
+  EXPECT_FALSE(r.cu->packages[0]->has_directive_timescale);
+  EXPECT_TRUE(r.cu->modules[0]->has_directive_timescale);
 }
 
 }  // namespace
