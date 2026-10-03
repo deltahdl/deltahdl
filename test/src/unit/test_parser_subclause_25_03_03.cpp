@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_type.h"
@@ -51,6 +54,35 @@ TEST(GenericInterfaceReference, NonAnsiDeclarationIsError) {
                             "ANSI-style port declarations, not the non-ANSI "
                             "port style",
                             2, "25.3.3"));
+}
+
+// The same reference written with no direction, `interface a;`, begins as a
+// nested interface declaration would; naming a port of the non-ANSI header,
+// it is the reference §25.3.3 forbids there, reported once under the clause.
+TEST(GenericInterfaceReference, NonAnsiBareReferenceIsError) {
+  auto r = Parse(
+      "module memMod(a);\n"
+      "  interface a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "generic interface port must be declared with "
+                            "ANSI-style port declarations, not the non-ANSI "
+                            "port style",
+                            2, "25.3.3"));
+  size_t errors = 0;
+  for (const auto& d : r.diags) errors += d.severity == DiagSeverity::kError;
+  EXPECT_EQ(errors, 1u);
+}
+
+// A nested interface declaration whose name is no port of the header is still
+// read as one.
+TEST(GenericInterfaceReference, NestedInterfaceInNonAnsiModuleIsNotAPort) {
+  auto r = Parse(
+      "module memMod(a);\n"
+      "  input a;\n"
+      "  interface inner; endinterface\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

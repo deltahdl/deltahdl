@@ -410,6 +410,38 @@ struct ParserPortHelpers {
   // this is a non-ANSI body port declaration, which is parsed and reported via
   // the true return. Otherwise the lexer position is restored and false is
   // returned so the caller treats it as a generic module item.
+  // §25.3.3: a generic interface reference is a port type of the ANSI
+  // list_of_port_declarations alone. In a module whose header is a non-ANSI
+  // list_of_ports, `interface a;` or `interface.mp a;` naming one of those
+  // ports is that reference written in the style the clause forbids, though it
+  // begins as a nested interface declaration would. Reports it and reads it to
+  // its `;`; where the name is no port of the header, the text is left to the
+  // module item it begins.
+  static bool TryParseNonAnsiGenericInterfacePort(Parser& p, ModuleDecl& mod) {
+    auto saved = p.lexer_.SavePos();
+    SourceLoc loc = p.CurrentLoc();
+    p.Consume();
+    if (p.Match(TokenKind::kDot) && p.CheckIdentifier()) p.Consume();
+    bool names_port = false;
+    if (p.CheckIdentifier()) {
+      for (const auto& port : mod.ports)
+        names_port |= port.name == p.CurrentToken().text;
+    }
+    if (!names_port) {
+      p.lexer_.RestorePos(saved);
+      return false;
+    }
+    p.diag_.Error(loc,
+                  "generic interface port must be declared with ANSI-style "
+                  "port declarations, not the non-ANSI port style",
+                  Subclause("25.3.3"));
+    while (!p.Check(TokenKind::kSemicolon) &&
+           !p.Check(TokenKind::kKwEndmodule) && !p.AtEnd())
+      p.Consume();
+    p.Match(TokenKind::kSemicolon);
+    return true;
+  }
+
   static bool TryParseAttributedNonAnsiPortDecls(Parser& p, ModuleDecl& mod) {
     auto saved = p.lexer_.SavePos();
     p.ParseAttributes();
@@ -744,6 +776,10 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
     // a port declaration rather than a generic module item.
     if (non_ansi && Check(TokenKind::kAttrStart) &&
         ParserPortHelpers::TryParseAttributedNonAnsiPortDecls(*this, mod)) {
+      continue;
+    }
+    if (non_ansi && Check(TokenKind::kKwInterface) &&
+        ParserPortHelpers::TryParseNonAnsiGenericInterfacePort(*this, mod)) {
       continue;
     }
     ParseModuleItem(mod.items);
