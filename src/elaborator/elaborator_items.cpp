@@ -787,7 +787,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // sequence, which it fills and takes back the same way.
       pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_,
                                     func_decls_, property_registry_,
-                                    config_inst_path_, current_library_});
+                                    config_inst_path_, current_library_,
+                                    interface_inst_types_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:

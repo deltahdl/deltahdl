@@ -493,6 +493,10 @@ class ElaboratorData {
     // inside the block is matched against and a search there starts from.
     std::string config_inst_path;
     std::string library;
+    // §25.3 with §23.9: the module's interface instances by name, which an
+    // interface port connection written in the selected body may name;
+    // interface_inst_types_ is per-module state as func_decls_ is.
+    std::unordered_map<std::string_view, std::string_view> interface_inst_types;
   };
   std::vector<PendingGenerate> pending_generates_;
 

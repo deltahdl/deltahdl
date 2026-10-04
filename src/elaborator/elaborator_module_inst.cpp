@@ -803,6 +803,11 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // name any path can be matched against.
   inst.simple_inst_name = item->inst_name;
   inst.gen_block_path = gen_block_path_;
+  // §27.4: set here, ahead of BindPorts, as well as stamped afterwards by
+  // ElaborateGenerateBlockItem, since an interface port's actual is resolved
+  // through the blocks the instance stands in while its ports are bound.
+  inst.gen_block_consts = gen_loop_consts_;
+  inst.gen_block_prefixes = gen_prefix_scopes_;
 
   std::string saved_inst_path = current_inst_path_;
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
@@ -826,6 +831,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     return;
   }
 
+  // §25.3 with §27.4: an interface instance a generate block declares is
+  // registered under the flattened name it is stored under, which an interface
+  // port's actual written in or through the block resolves to.
+  if (child_decl->decl_kind == ModuleDeclKind::kInterface &&
+      !gen_prefix_scopes_.empty()) {
+    interface_inst_types_.emplace(scoped_inst_name, item->inst_module);
+  }
   auto parent_scope = BuildParamScope(mod);
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);

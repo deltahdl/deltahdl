@@ -525,4 +525,95 @@ TEST(GenerateSimulation, EachIterationReadsItsSelectedBlocksLocalparam) {
             "cs5 7\ncs5 8\n");
 }
 
+// §27.4 lets a loop block hold an interface instance and a module instance
+// like any module item, and a name a block writes resolves in the block
+// first (§23.9), so each iteration's `cons c(i)` connects its own `i`
+// (§25.3). The test fails on an elaborator that knows no block's interface
+// instances, which refuses the connection under §23.3.3.4.
+TEST(GenerateSimulation, InterfaceInstanceInALoopBlockIsConnected) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  int d;\n"
+                       "endinterface\n"
+                       "module cons(ifc i);\n"
+                       "  initial #1 $display(\"ifp %0d\", i.d);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  genvar k;\n"
+                       "  for (k = 0; k < 2; k = k + 1) begin : g\n"
+                       "    ifc i();\n"
+                       "    cons c(i);\n"
+                       "    initial i.d = 32 + k;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ifp 32\nifp 33\n");
+}
+
+// The same in a conditional block, through a modport of the block's instance.
+TEST(GenerateSimulation, InterfaceModportInAConditionalBlockIsConnected) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  int d;\n"
+                       "  modport m(input d);\n"
+                       "endinterface\n"
+                       "module cons(ifc.m p);\n"
+                       "  initial #1 $display(\"mp %0d\", p.d);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  if (1) begin : g\n"
+                       "    ifc i();\n"
+                       "    cons c(i.m);\n"
+                       "    initial i.d = 70;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "mp 70\n");
+}
+
+// A connection inside a block naming the module's interface instance finds it
+// in the enclosing scope (§23.9). The test fails on an elaborator that
+// elaborates the block with none of the module's interface instances known.
+TEST(GenerateSimulation, ModuleInterfaceInstanceIsConnectedInsideABlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  int d;\n"
+                       "endinterface\n"
+                       "module cons(ifc p);\n"
+                       "  initial #1 $display(\"oi %0d\", p.d);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  ifc i();\n"
+                       "  initial i.d = 72;\n"
+                       "  if (1) begin : g\n"
+                       "    cons c(i);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "oi 72\n");
+}
+
+// §23.6 reaches a block's interface instance through the block's name, and an
+// interface port's actual may be such a name (§25.3), so `cons c(g.i)` at
+// module level connects the instance in block g. The test fails on an
+// elaborator that takes only the first name `g` of the actual.
+TEST(GenerateSimulation, BlockInterfaceInstanceIsConnectedByItsPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  int d;\n"
+                       "endinterface\n"
+                       "module cons(ifc p);\n"
+                       "  initial #1 $display(\"io %0d\", p.d);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  if (1) begin : g\n"
+                       "    ifc i();\n"
+                       "    initial i.d = 71;\n"
+                       "  end\n"
+                       "  cons c(g.i);\n"
+                       "endmodule\n",
+                       f),
+            "io 71\n");
+}
+
 }  // namespace

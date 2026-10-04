@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_bind_scope.h"
+#include "elaborator/elaborator_gen_block_interfaces.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
@@ -351,6 +352,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         arena_);
   }
 
+  // §25.3 with §27.4: an interface port's actual naming an interface instance
+  // a generate block declares is rewritten to that instance's stored name
+  // before the checks below look the instance up by it.
+  ResolveGenBlockInterfaceActuals(inst, interface_inst_types_,
+                                  BuildParamScope(parent_mod), arena_);
   // §23.3.3 shared port-binding context for the post-bind connectivity checks.
   const PortBindCtx kPortCtx{
       diag_,      item,       parent_mod,          nettype_net_names_,

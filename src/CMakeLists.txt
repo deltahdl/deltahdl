@@ -455,6 +455,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_module_ports.cpp
     elaborator/elaborator_port_binding.cpp
     elaborator/elaborator_port_binding_nets.cpp
+    elaborator/elaborator_gen_block_interfaces.cpp
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp

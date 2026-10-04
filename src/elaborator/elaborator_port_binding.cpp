@@ -14,6 +14,7 @@
 #include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_bind_scope.h"
+#include "elaborator/elaborator_gen_block_interfaces.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
@@ -540,9 +541,15 @@ void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
                                         const ExplicitPortBind& bind) {
   const Expr* conn_expr = bind.conn_expr;
   if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) return;
+  // §23.9: an interface instance a generate block declares is found from a
+  // connection written in that block by its own name.
+  bool names_interface =
+      !FindBlockInterface(conn_expr->text, gen_prefix_scopes_,
+                          interface_inst_types_)
+           .empty();
   if (bind.is_implicit) {
     if (!IsNameDeclared(conn_expr->text, scope.parent_mod) &&
-        !interface_inst_types_.count(conn_expr->text)) {
+        !names_interface) {
       diag_.Error(
           scope.item->loc,
           std::format("implicit named port connection '.{}' requires "
@@ -550,7 +557,7 @@ void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
                       bind.port_name, conn_expr->text),
           Subclause("23.3.2.3"));
     }
-  } else if (!interface_inst_types_.count(conn_expr->text)) {
+  } else if (!names_interface) {
     MaybeCreateImplicitNet(conn_expr->text, scope.item->loc, scope.parent_mod);
   }
 }

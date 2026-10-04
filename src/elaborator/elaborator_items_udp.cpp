@@ -18,6 +18,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_gen_block_interfaces.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/interface_property_instance.h"
@@ -800,6 +801,10 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ClassifyAndCheckItems(
       decl, {kParentScope, BuildParamScope(mod), diag_}, inst_class_tables,
       [&](std::string_view name) { return FindModuleInScope(name); });
+  RegisterConditionalBlockInterfaces(
+      decl->items,
+      [&](std::string_view name) { return FindModuleInScope(name); },
+      interface_inst_types_, arena_);
 
   for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
     const_names_.insert(pname);
