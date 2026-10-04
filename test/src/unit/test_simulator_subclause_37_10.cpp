@@ -1,12 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "elaborator/rtlir.h"
-#include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -359,52 +357,9 @@ TEST(InstanceModel, NullHandleNonTimePropertyReturnsZero) {
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
 }
 
-PLI_INT32 DoNothingCalltf(PLI_BYTE8* /*user_data*/) { return 0; }
-
-// A design run with a PLI application registered, which is what has the run
-// build its VPI model, read back from the test once the run is over.
-class InstanceObjectsOfARun : public ::testing::Test {
- protected:
-  void SetUp() override {
-    SetGlobalVpiContext(&vpi_);
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("$noop");
-    data.calltf = &DoNothingCalltf;
-    ASSERT_NE(vpi_register_systf(&data), nullptr);
-  }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  void Run(const std::string& src) {
-    RtlirDesign* design = ElaborateSrc(src, f_);
-    ASSERT_NE(design, nullptr);
-    ASSERT_FALSE(f_.has_errors);
-    LowerAndRun(design, f_);
-  }
-
-  // The names of the objects of `type` `ref` reaches, sorted.
-  static std::vector<std::string> NamesOf(int type, vpiHandle ref) {
-    std::vector<std::string> names;
-    vpiHandle it = vpi_iterate(type, ref);
-    if (it == nullptr) return names;
-    while (vpiHandle obj = vpi_scan(it)) {
-      names.emplace_back(vpi_get_str(vpiName, obj));
-    }
-    std::ranges::sort(names);
-    return names;
-  }
-
-  // The full name of the child of `scope` named `name`, read off the object.
-  static std::string FullNameOfChild(vpiHandle scope, std::string_view name) {
-    for (VpiObject* child : VpiObjectOf(scope)->children) {
-      if (child->name == name) return child->full_name;
-    }
-    return "";
-  }
-
-  VpiContext vpi_;
-  SimFixture f_;
-};
+// A design run with a PLI application registered, its VPI model read back
+// once the run is over.
+class InstanceObjectsOfARun : public VpiDesignRun {};
 
 constexpr const char* kEmptyInstances =
     "module leafm; endmodule\n"
