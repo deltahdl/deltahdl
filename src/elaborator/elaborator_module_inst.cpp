@@ -882,7 +882,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
   // shared typedef map so its dependent declarations resolve against the chosen
   // types, then restore the map once the child has been elaborated.
-  auto saved_type_params = ApplyChildTypeParams(
+  auto applied_type_params = ApplyChildTypeParams(
       TypeParamSourcesFor(item, instance_param_overrides_, config_inst_path_),
       child_decl, typedefs_, unit_, diag_);
   // §16.15: the default disable iff extends to a nested declaration and not
@@ -905,8 +905,9 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
         BindCheckerActuals(item, child_decl, parent_scope);
     pending_checker_tree_actuals_ = CheckerTreeActuals(item, child_decl);
   }
+  pending_type_param_types_ = std::move(applied_type_params.written);
   inst.resolved = ElaborateModule(child_decl, child_params);
-  RestoreChildTypeParams(typedefs_, saved_type_params);
+  RestoreChildTypeParams(typedefs_, applied_type_params.saved);
   nested_module_decls_ = std::move(saved_nested);
   MarkConfigLockedParams(inst, config_locked);
 }

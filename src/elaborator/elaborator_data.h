@@ -259,6 +259,11 @@ class ElaboratorData {
   // ones are taken by Elaborator::ElaborateModule.
   ActualsByFormal pending_checker_tree_actuals_;
   std::unordered_map<const RtlirModule*, ActualsByFormal> checker_tree_actuals_;
+  // §37.28 detail 2: the types the type parameters of the module about to be
+  // elaborated were given, as written (AppliedTypeParams::written); set by the
+  // two sites calling ApplyChildTypeParams and taken by
+  // Elaborator::ElaborateParamPortList.
+  TypedefMap pending_type_param_types_;
 
   std::unordered_set<std::string_view> declared_names_;
   // §23.9: the declared names of each elaborated module scope, keyed by the

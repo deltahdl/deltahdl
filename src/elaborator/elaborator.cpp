@@ -494,15 +494,16 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     // published as ElaborateModuleInst publishes a child's, for `$bits(T)` and
     // a declaration of type T to read. A type parameter with no default is
     // reported among the top's parameters, and none is published then.
-    std::vector<SavedTypedef> saved_type_params;
+    AppliedTypeParams applied_type_params;
     if (AllTypeParamsHaveDefaults(mod_decl)) {
-      saved_type_params = ApplyChildTypeParams(
+      applied_type_params = ApplyChildTypeParams(
           TypeParamSourcesFor(&top_item, instance_param_overrides_,
                               config_inst_path_),
           mod_decl, typedefs_, unit_, diag_);
     }
+    pending_type_param_types_ = std::move(applied_type_params.written);
     auto* top = ElaborateModule(mod_decl, top_params);
-    RestoreChildTypeParams(typedefs_, saved_type_params);
+    RestoreChildTypeParams(typedefs_, applied_type_params.saved);
     current_inst_path_ = std::move(saved_path);
     config_inst_path_ = std::move(saved_config_path);
     if (!top) return false;

@@ -338,12 +338,16 @@ constexpr const char* kTypeParameterTypes =
     "endmodule\n"
     "module d #(parameter type T = shortint);\n"
     "endmodule\n"
+    "module e #(parameter type T = ue_t);\n"
+    "endmodule\n"
     "module top;\n"
     "  typedef enum {A, B, C} e_t;\n"
     "  parameter type L = e_t;\n"
     "  parameter type U = ue_t;\n"
     "  c #(.T(ue_t)) u();\n"
     "  d v();\n"
+    "  d #(.T(ue_t)) w();\n"
+    "  e x();\n"
     "endmodule\n";
 
 // Detail 2: a type parameter's vpiTypespec is the typespec of the type it has
@@ -379,6 +383,22 @@ TEST_F(ParametersOfARun, ATypeParametersTypespecIsOfItsTypesKind) {
 TEST_F(ParametersOfARun, AParameterPortsTypespecIsOfItsTypesKind) {
   Run(kTypeParameterTypes);
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("top.v", "T")), vpiShortIntTypespec);
+}
+
+// A parameter port's typedef is left unresolved too, whether an instance's
+// parameter value assignment named it...
+TEST_F(ParametersOfARun,
+       AnOverriddenParameterPortsTypespecIsTheTypedefItNames) {
+  Run(kTypeParameterTypes);
+  vpiHandle typespec = TypespecOf("top.w", "T");
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiEnumTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "ue_t");
+}
+
+// ...or its default.
+TEST_F(ParametersOfARun, AParameterPortsTypespecIsTheTypedefItsDefaultNames) {
+  Run(kTypeParameterTypes);
+  EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top.x", "T")), "ue_t");
 }
 
 }  // namespace

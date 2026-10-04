@@ -135,12 +135,14 @@ static DataType InInstantiatingScope(DataType dt, const TypedefMap& typedefs) {
 // nothing, so the child's declarations that depend on it are left unresolved
 // rather than bound to a type the instantiation did not ask for. Returns the
 // prior entries so the caller can restore the shared map after the child is
-// elaborated.
-std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
-                                               const ModuleDecl* child_decl,
-                                               TypedefMap& typedefs,
-                                               const CompilationUnit* unit,
-                                               DiagEngine& diag) {
+// elaborated, and each type as it was written before InInstantiatingScope
+// replaced a typedef name in it, for §37.28 detail 2.
+AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
+                                       const ModuleDecl* child_decl,
+                                       TypedefMap& typedefs,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag) {
+  AppliedTypeParams applied;
   std::vector<std::pair<std::string_view, DataType>> resolved_params;
   for (size_t i = 0; i < child_decl->params.size(); ++i) {
     std::string_view pname = child_decl->params[i].first;
@@ -149,18 +151,18 @@ std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
     if (!resolved) continue;
     resolved_params.emplace_back(pname,
                                  InInstantiatingScope(*resolved, typedefs));
+    applied.written[pname] = *resolved;
   }
-  std::vector<SavedTypedef> saved;
   for (auto& [pname, type] : resolved_params) {
     SavedTypedef s;
     s.name = pname;
     auto it = typedefs.find(pname);
     s.existed = it != typedefs.end();
     if (s.existed) s.prev = it->second;
-    saved.push_back(s);
+    applied.saved.push_back(s);
     typedefs[pname] = std::move(type);
   }
-  return saved;
+  return applied;
 }
 
 bool AllTypeParamsHaveDefaults(const ModuleDecl* decl) {

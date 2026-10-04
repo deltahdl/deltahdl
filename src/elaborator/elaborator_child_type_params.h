@@ -55,18 +55,28 @@ TypeParamAssignments TypeParamSourcesFor(const ModuleItem* item,
   return from;
 }
 
+// What ApplyChildTypeParams did: the prior typedef-map entries it replaced, for
+// RestoreChildTypeParams to put back, and the type each type parameter it
+// published was given as the assignment or default wrote it, a typedef name
+// left unresolved, which §37.28 detail 2 has the parameter's vpiTypespec stand
+// for.
+struct AppliedTypeParams {
+  std::vector<SavedTypedef> saved;
+  TypedefMap written;
+};
+
 // §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
 // type and publish it in `typedefs` so the child's dependent declarations
 // elaborate against the chosen type. A type parameter whose type could not be
 // settled publishes nothing, so the child's declarations that depend on it are
 // left unresolved rather than bound to a type the instantiation did not ask
 // for. Returns the prior entries so the caller can restore the shared map after
-// the child is elaborated.
-std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
-                                               const ModuleDecl* child_decl,
-                                               TypedefMap& typedefs,
-                                               const CompilationUnit* unit,
-                                               DiagEngine& diag);
+// the child is elaborated, and the types as written.
+AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
+                                       const ModuleDecl* child_decl,
+                                       TypedefMap& typedefs,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag);
 
 // Whether every type parameter `decl` declares has a default type (§6.20.3).
 bool AllTypeParamsHaveDefaults(const ModuleDecl* decl);
