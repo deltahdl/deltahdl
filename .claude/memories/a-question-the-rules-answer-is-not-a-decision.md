@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-03T01:52:38.467Z
+  modified: 2026-10-04T14:12:04.418Z
 ---
 
 # A question the rules answer is not a decision
@@ -40,5 +40,11 @@ both. If one is only an artifact of the implementation, the standard does
 not leave the question open; the question does not arise, and the issue is a
 defect. For example, §19.9 loads coverage per covergroup type, so "is a saved
 instance the same as the live instance of its name" has no standard answer to
-lack. Once the answer stands,
+lack. An "implementation-specific" or "left open" sentence covers only what
+it names: read every other sentence of the clause and the definition of each
+term it uses before calling anything beside it open. §34.5.32.2 makes only a
+viewport's access value implementation-specific; its shall that the object be
+contained within the envelope, with §34.4's definition of an envelope as a
+lexical region, settles that the object name resolves against the envelope's
+own declarations, not as an elaborated hierarchical path. Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
