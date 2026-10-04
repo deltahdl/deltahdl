@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "helpers_precedence_rhs.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/operator_binding_power.h"
 
 using namespace delta;
 namespace {
@@ -132,6 +135,38 @@ TEST(Precedence, AllPrecedenceLevelsInOneExpression) {
       "endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
+}
+
+// Table 11-2 read through the binding powers the parser parses by, which a
+// reader outside the parser rebuilding an expression's text has to agree
+// with: an operator listed higher binds tighter...
+TEST(OperatorBindingPower, HigherRowsBindTighter) {
+  EXPECT_GT(InfixBindingPower(TokenKind::kStar).first,
+            InfixBindingPower(TokenKind::kPlus).first);
+  EXPECT_GT(InfixBindingPower(TokenKind::kPower).first,
+            InfixBindingPower(TokenKind::kStar).first);
+  EXPECT_GT(InfixBindingPower(TokenKind::kAmpAmp).first,
+            InfixBindingPower(TokenKind::kPipePipe).first);
+}
+
+// ...a unary operator tighter than every binary one...
+TEST(OperatorBindingPower, UnaryOperatorsBindTightest) {
+  EXPECT_GT(PrefixBindingPower(TokenKind::kMinus),
+            InfixBindingPower(TokenKind::kPower).second);
+}
+
+// ...the implication operators group to the right and the rest to the left...
+TEST(OperatorBindingPower, AssociativityFollowsTheTable) {
+  const auto kImplies = InfixBindingPower(TokenKind::kArrow);
+  EXPECT_GT(kImplies.first, kImplies.second);
+  const auto kPlus = InfixBindingPower(TokenKind::kPlus);
+  EXPECT_LT(kPlus.first, kPlus.second);
+}
+
+// ...and a token that is no operator has no binding power.
+TEST(OperatorBindingPower, ANonOperatorHasNone) {
+  EXPECT_EQ(InfixBindingPower(TokenKind::kSemicolon).first, -1);
+  EXPECT_EQ(PrefixBindingPower(TokenKind::kStar), -1);
 }
 
 }  // namespace

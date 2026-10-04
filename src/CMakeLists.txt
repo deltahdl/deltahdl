@@ -75,6 +75,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_class_override.cpp
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp
+    parser/operator_binding_power.cpp
     parser/expr_substitute.cpp
     parser/parser_property_spec.cpp
     parser/parser_assertion_reads.cpp
