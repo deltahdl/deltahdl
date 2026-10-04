@@ -836,4 +836,29 @@ TEST(BindDirective, HierarchicalNameReachesABoundInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §23.9 stops the search for a variable named without a hierarchical path at
+// a module boundary, and §23.11 places a bound instance in its target rather
+// than making the target a scope the bound module's names resolve through, so
+// `a` read in `mon` names no declaration: `leaf` declares it, not `mon`. The
+// test fails on an elaborator that lets the bound module's bare reads see the
+// target's names.
+TEST(BindDirective, BoundModuleReadingItsTargetsVariableByBareNameErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf;\n"
+      "  int a = 36;\n"
+      "endmodule\n"
+      "module mon;\n"
+      "  initial #1 $display(\"bnd %0d\", a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf u();\n"
+      "  bind leaf mon m();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'a'", 5,
+                            "23.9"));
+}
+
 }  // namespace
