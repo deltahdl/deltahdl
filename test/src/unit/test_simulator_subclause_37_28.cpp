@@ -1,11 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -253,6 +259,68 @@ TEST_F(Parameter, RangedValueParameterReachesRangeBounds) {
   other.explicit_param_range = true;
   EXPECT_EQ(VpiParameterLeftRange(&other), nullptr);
   EXPECT_EQ(VpiParameterRightRange(nullptr), nullptr);
+}
+
+// A design run with a PLI application registered, its parameters read back
+// once the run is over.
+class ParametersOfARun : public VpiDesignRun {};
+
+constexpr const char* kParameters =
+    "module top;\n"
+    "  parameter int P = 5;\n"
+    "  localparam int L = 7;\n"
+    "  parameter type T = logic [3:0];\n"
+    "endmodule\n";
+
+// The object `scope` holds under `name`, among those `type` reaches.
+vpiHandle ChildOf(int type, vpiHandle scope, std::string_view name) {
+  vpiHandle it = vpi_iterate(type, scope);
+  if (it == nullptr) return nullptr;
+  while (vpiHandle obj = vpi_scan(it)) {
+    if (vpi_get_str(vpiName, obj) == name) {
+      vpi_free_object(it);
+      return obj;
+    }
+  }
+  return nullptr;
+}
+
+// Detail 1: a module's value parameters are what its vpiParameter iteration
+// reaches...
+TEST_F(ParametersOfARun, AModulesValueParametersAreParameters) {
+  Run(kParameters);
+  EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("top"), nullptr)),
+            (std::vector<std::string>{"L", "P"}));
+}
+
+// ...each saying through vpiLocalParam whether it is a localparam...
+TEST_F(ParametersOfARun, ALocalparamIsALocalParam) {
+  Run(kParameters);
+  EXPECT_EQ(
+      vpi_get(vpiLocalParam, vpi_handle_by_name(VpiText("top.L"), nullptr)), 1);
+}
+
+TEST_F(ParametersOfARun, AParameterIsNotALocalParam) {
+  Run(kParameters);
+  EXPECT_EQ(
+      vpi_get(vpiLocalParam, vpi_handle_by_name(VpiText("top.P"), nullptr)), 0);
+}
+
+// ...and holding its value.
+TEST_F(ParametersOfARun, AParametersValueIsRead) {
+  Run(kParameters);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(vpi_handle_by_name(VpiText("top.P"), nullptr), &value);
+  EXPECT_EQ(value.value.integer, 5);
+}
+
+// Detail 2: a type parameter is a vpiTypeParameter of its scope.
+TEST_F(ParametersOfARun, ATypeParameterIsATypeParameter) {
+  Run(kParameters);
+  EXPECT_NE(ChildOf(vpiTypeParameter,
+                    vpi_handle_by_name(VpiText("top"), nullptr), "T"),
+            nullptr);
 }
 
 }  // namespace

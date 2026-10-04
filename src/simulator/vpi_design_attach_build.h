@@ -76,6 +76,11 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
 void AttachTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build);
 
+// §37.28 details 1 and 2: make each value parameter a vpiParameter and each
+// type parameter a vpiTypeParameter, each saying whether it is a localparam.
+void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
+                      const VpiAttachBuild& build);
+
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
 void AttachVariableRanges(const RtlirDesign* design,

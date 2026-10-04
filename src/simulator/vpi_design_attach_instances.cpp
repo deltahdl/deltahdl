@@ -124,6 +124,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachArrayElements(design, object_map_, kBuild);
     AttachStructMembers(design, object_map_, *sim_ctx_, kBuild);
     AttachTypespecs(design, object_map_, kBuild);
+    AttachParameters(design, object_map_, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design);
