@@ -589,7 +589,7 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallOnABlockVariableIsAnObject) {
   Run("module top;\n"
       "  class C; task run(); endtask endclass\n"
       "  int obj;\n"
-      "  initial begin : b C obj = new; obj.run(); end\n"
+      "  initial begin : b C obj; obj = new; obj.run(); end\n"
       "endmodule\n");
   vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "run");
   ASSERT_NE(call, nullptr);
