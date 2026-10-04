@@ -628,12 +628,18 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_assertion_cb.cpp
     simulator/vpi_assertion_control.cpp
     simulator/vpi_callbacks.cpp
+    simulator/vpi_collection_elements.cpp
     simulator/vpi_compatibility.cpp
     simulator/vpi_control.cpp
     simulator/vpi_design_attach.cpp
     simulator/vpi_design_attach_assigns.cpp
     simulator/vpi_design_attach_bits.cpp
+    simulator/vpi_design_attach_build.cpp
+    simulator/vpi_design_attach_elements.cpp
     simulator/vpi_design_attach_instances.cpp
+    simulator/vpi_design_attach_members.cpp
+    simulator/vpi_design_attach_ranges.cpp
+    simulator/vpi_design_attach_typespecs.cpp
     simulator/vpi_design_attach_vars.cpp
     simulator/vpi_design_viewports.cpp
     simulator/vpi_handle.cpp

@@ -2,8 +2,10 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/envelope_viewport.h"
@@ -11,10 +13,13 @@
 
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -74,12 +79,7 @@ VpiHandle ResolveNamePathComponent(
   if (within->type == vpiClassVar && within->referenced_object) {
     search = within->referenced_object;
   }
-  for (auto* child : search->children) {
-    if (child->name == step.part) {
-      return child;
-    }
-  }
-  return nullptr;
+  return ChildNamed(search, step.part);
 }
 
 // §38.21: a hierarchical name that passes through a protected scope is an
@@ -191,9 +191,20 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
 
   // §38.19: return the sub-object selected by the index number. When no
   // sub-object carries the index, the selection is not a legal SystemVerilog
-  // index select expression, so the result is a null handle.
+  // index select expression, so the result is a null handle. An element of a
+  // queue, dynamic or associative array lives in the run's store of the array
+  // and is made when first selected (§37.17).
+  if ((parent->queue != nullptr || parent->assoc != nullptr) && sim_ctx_) {
+    return VpiCollectionElement(*parent, index,
+                                {[this] { return AllocObject(); },
+                                 [this](std::string name) {
+                                   name_pool_.push_back(std::move(name));
+                                   return std::string_view(name_pool_.back());
+                                 },
+                                 sim_ctx_->GetArena()});
+  }
   for (auto* child : parent->children) {
-    if (child->index == index) return child;
+    if (VpiIndexSelects(*child, index)) return child;
   }
   return nullptr;
 }
@@ -231,7 +242,7 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
   for (int i = 0; i < num_index; ++i) {
     VpiHandle next = nullptr;
     for (auto* child : current->children) {
-      if (child->index == index_array[i]) {
+      if (VpiIndexSelects(*child, index_array[i])) {
         next = child;
         break;
       }

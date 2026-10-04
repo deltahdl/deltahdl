@@ -1,5 +1,6 @@
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
@@ -9,6 +10,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
@@ -109,9 +111,21 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
 void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   AttachInstanceDefinitions(design);
   AttachVariableFacts(design);
-  // A continuous assignment's bit select is the bit made here, so the bits
-  // come first.
-  AttachVectorBits(design);
+  if (design != nullptr && sim_ctx_ != nullptr) {
+    const VpiAttachBuild kBuild{[this] { return AllocObject(); },
+                                [this](std::string name) {
+                                  name_pool_.push_back(std::move(name));
+                                  return std::string_view(name_pool_.back());
+                                },
+                                sim_ctx_->GetArena()};
+    // A continuous assignment's bit select is the bit made here, so the bits
+    // come first.
+    AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);
+    AttachArrayElements(design, object_map_, kBuild);
+    AttachStructMembers(design, object_map_, *sim_ctx_, kBuild);
+    AttachTypespecs(design, object_map_, kBuild);
+    AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
+  }
   AttachContinuousAssignments(design);
 }
 

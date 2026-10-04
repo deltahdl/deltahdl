@@ -20,6 +20,7 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
@@ -516,6 +517,7 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     ++obj->side_effect_count;
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
+  VpiRefreshElementCopy(*obj);
   if (!obj->var) return;
   DispatchGetValueByFormat(obj, value, str_pool_, vec_pool_, strength_pool_);
 }
@@ -800,6 +802,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   }
 
   PutValueApplyWriteAndForce(obj, value, mode, scheduler_);
+  if (!has_delay) VpiStoreElementCopy(*obj);
 
   // §38.34: a handle to the scheduled event is returned only when
   // vpiReturnEvent was requested and a delay actually scheduled an event; in

@@ -399,6 +399,20 @@ struct VpiObject {
   QueueObject* queue = nullptr;
   AssocArrayObject* assoc = nullptr;
 
+  // §37.17 and §38.19: of an element of a queue, a dynamic array or an
+  // associative array, the store it lives in, which `index` selects it from (a
+  // key, for an associative array). `var` holds a copy of its value, which a
+  // read refreshes from the store and a write is copied back into.
+  QueueObject* element_of_queue = nullptr;
+  AssocArrayObject* element_of_assoc = nullptr;
+
+  // §37.17 detail 3 and §37.26: of a member of an unpacked struct or union
+  // var, the var it is a member of and where its bits start in that var's
+  // value, above the least significant end. `var` holds a copy of them,
+  // refreshed and copied back as an element's is.
+  VpiObject* member_of = nullptr;
+  uint32_t member_offset = 0;
+
   // §38.35: for a static unpacked array, the declared index values of each
   // unpacked dimension in left-to-right (declaration) order - so a[2:0][3:5]
   // holds {{2,1,0},{3,4,5}}. The size of this list is the number of unpacked

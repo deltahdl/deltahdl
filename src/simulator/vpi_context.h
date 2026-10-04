@@ -770,14 +770,13 @@ class VpiContext {
   // §37.10: every instance's object, each package's, and once the tops are
   // made what each instance holds (vpi_design_attach_instances.cpp): what it
   // takes from its definition, its variables' declared facts (§37.17,
-  // vpi_design_attach_vars.cpp), its vectors' bits (§37.16, §37.17,
-  // vpi_design_attach_bits.cpp) and its continuous assignments (§37.47,
+  // vpi_design_attach_vars.cpp), the objects the steps of
+  // vpi_design_attach_build.h add and its continuous assignments (§37.47,
   // vpi_design_attach_assigns.cpp).
   void AttachInstanceObjects(const RtlirDesign* design);
   void AttachPackages(const RtlirDesign* design);
   void AttachInstanceContents(const RtlirDesign* design);
   void AttachInstanceDefinitions(const RtlirDesign* design);
-  void AttachVectorBits(const RtlirDesign* design);
   void AttachContinuousAssignments(const RtlirDesign* design);
   void AttachVariableFacts(const RtlirDesign* design);
 

@@ -233,9 +233,13 @@ void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
   // §37.19 (figure): the var select's vpiIndex arrows reach expr, the same
   // shape one dimension level up. Nothing recognized the relation, so the index
   // expressions a select was written with were reachable from it by nothing.
-  // §37.58 (figure) draws the same vpiIndex edge from a bit select to expr.
+  // §37.58 (figure) draws the same vpiIndex edge from a bit select to expr,
+  // and §37.17 details 13 and 18 one from a var bit and from an element of an
+  // array var to their indices.
   m.var_select_index = ref && type == vpiIndex &&
-                       (ref->type == vpiVarSelect || ref->type == vpiBitSelect);
+                       (ref->type == vpiVarSelect ||
+                        ref->type == vpiBitSelect || ref->type == vpiRegBit ||
+                        (ref->array_member && VpiIsVariablesType(ref->type)));
 }
 
 // §37.24 details 1 and 2: classify the interconnect special modes. An
@@ -492,6 +496,9 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   // declarations, whose own type is the vpiNettypeDecl of Annex M; the tag the
   // diagram writes on the iteration is not the type of what it reaches.
   if (type == vpiNetTypedef) return obj_type == vpiNettypeDecl;
+  // §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs.
+  if (type == vpiTypedef)
+    return VpiIsTypespecType(obj_type) && obj_type != vpiTypeParameter;
   // §37.11/§37.5: the module's edges to `instance array` and to the `primitive
   // array` nested inside it are drawn to those class enclosures, so they reach
   // the module, interface, program, gate, switch and udp arrays the two group.

@@ -32,6 +32,14 @@ bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
 
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (TryResolveBitRelation(type, ref, out)) return true;
+  // §37.17 detail 6 and §37.22: a variable's leftmost bounds and a range's
+  // bounds, recorded where the declaration has them and null where the range
+  // is empty.
+  if ((type == vpiLeftRange || type == vpiRightRange) &&
+      (ref->type == vpiRange || VpiIsVariablesType(ref->type))) {
+    out = type == vpiLeftRange ? ref->left_range : ref->right_range;
+    return true;
+  }
   if (ref->type == vpiPartSelect) {
     if (type == vpiLeftRange) {
       out = ref->left_range;

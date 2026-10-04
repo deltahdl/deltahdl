@@ -12,6 +12,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 // §36.10: how a pass that has something to say about an elaborated design finds
 // the objects the run built for it. "VPI routines provide access to objects in
@@ -31,11 +32,31 @@ namespace delta {
 // makes each instance's objects "uniquely accessible", so one component of a
 // flat name is matched against the children of the scope reached so far rather
 // than against every object of the design.
+//
+// §37.17: an element of an array var hangs from the array, a subarray's from
+// the subarray, and a bit from its vector, each named with its indices, so a
+// name such as `arr[1][2]` is found under the child whose name it extends by an
+// index.
 inline VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
   for (auto* child : parent->children) {
     if (child->name == name) return child;
   }
+  for (auto* child : parent->children) {
+    const std::size_t kLength = child->name.size();
+    if (kLength > 0 && name.size() > kLength && name.starts_with(child->name) &&
+        name[kLength] == '[') {
+      return ChildNamed(child, name);
+    }
+  }
   return nullptr;
+}
+
+// Whether `child` is the sub-object an index select of `index` names (§38.19).
+// A range object describes a dimension (§37.22) and an index constant locates
+// its holder (§37.17 details 13 and 18), so no index selects either.
+inline bool VpiIndexSelects(const VpiObject& child, int index) {
+  return child.type != vpiRange && child.type != vpiConstant &&
+         child.index == index;
 }
 
 // The object a flat design name already stands for, and null where the name
