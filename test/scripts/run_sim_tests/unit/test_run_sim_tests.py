@@ -495,3 +495,37 @@ def test_running_the_package_as_a_module_calls_main(
     calls_made_by_running_as_a_module: Callable[[ModuleType], list[str]],
 ) -> None:
     assert calls_made_by_running_as_a_module(rst) == ["main"]
+
+
+def test_copies_the_case_files_into_the_working_directory(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    supplied = tmp_path / "supplied.files"
+    (supplied / "nested").mkdir(parents=True)
+    (supplied / "lib.map").write_text("library rtlLib *.v;\n")
+    (supplied / "nested" / "leaf.v").write_text("module leaf; endmodule\n")
+    seen: dict[str, str] = {}
+
+    def fake_run(_cmd: list[str], **kwargs: object) -> MagicMock:
+        work_dir = Path(str(kwargs["cwd"]))
+        seen["cwd"] = str(work_dir)
+        seen["map"] = (work_dir / "lib.map").read_text()
+        seen["leaf"] = (work_dir / "nested" / "leaf.v").read_text()
+        stub = MagicMock()
+        stub.stdout = "ran\n"
+        stub.stderr = ""
+        stub.returncode = 0
+        return stub
+
+    sv = tmp_path / "supplied.sv"
+    sv.write_text("module supplied; endmodule\n")
+    expected_path = tmp_path / "supplied.expected"
+    expected_path.write_text("ran\n")
+    with patch.object(rst.subprocess, "run", side_effect=fake_run):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+
+    assert outcome == (True, "")
+    assert seen["map"] == "library rtlLib *.v;\n"
+    assert seen["leaf"] == "module leaf; endmodule\n"
+    assert Path(seen["cwd"]) != supplied
+    assert not Path(seen["cwd"]).exists()

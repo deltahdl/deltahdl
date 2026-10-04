@@ -1,6 +1,7 @@
 import contextlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,8 @@ TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 STATUS_TEXT = re.compile(r"[+-]?[0-9]+")
 
 BEFORE_SUFFIX = ".before"
+
+FILES_SUFFIX = ".files"
 
 ARTIFACT_SUFFIX = ".artifact"
 ARTIFACT_RECORD_SUFFIX = ".artifact.expected"
@@ -102,6 +105,23 @@ def compare_artifact(sv_path: Path, artifact: Path, work_dir: str) -> str | None
     return f"{artifact} expected:\n{recorded}got:\n{actual}"
 
 
+def case_files(sv_path: Path) -> Path | None:
+    files = sv_path.with_suffix(FILES_SUFFIX)
+    if not files.is_dir():
+        return None
+    return files
+
+
+def needs_work_dir(sv_path: Path, wants_dir: bool) -> bool:
+    return wants_dir or case_files(sv_path) is not None
+
+
+def copy_case_files(sv_path: Path, work_dir: str) -> None:
+    files = case_files(sv_path)
+    if files is not None:
+        shutil.copytree(files, work_dir, dirs_exist_ok=True)
+
+
 def collect_tests() -> list[tuple[Path, Path]]:
     tests: list[tuple[Path, Path]] = []
     for sv in sorted(TEST_DIR.glob("*.sv")):
@@ -139,8 +159,9 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     artifact_detail: str | None = None
     with contextlib.ExitStack() as stack:
         work_dir = ""
-        if before is not None or artifact is not None:
+        if needs_work_dir(sv_path, before is not None or artifact is not None):
             work_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            copy_case_files(sv_path, work_dir)
         if before is not None:
             detail = run_before(sv_path, before, work_dir)
             if detail is not None:
