@@ -188,17 +188,18 @@ void SynthLower::InstallScopeConstant(std::string_view name,
       shadowed_signals_.begin(), shadowed_signals_.end(),
       [name](const ShadowedSignal& held) { return held.name == name; });
   auto it = signal_bits_.find(name);
-  if (!kept && it == signal_bits_.end()) {
-    shadowed_signals_.push_back(ShadowedSignal{.name = name});
-  } else if (!kept) {
-    shadowed_signals_.push_back(
-        ShadowedSignal{.name = name,
-                       .recorded = true,
-                       .is_unpacked = unpacked_arrays_.count(name) != 0,
-                       .width = signal_widths_[name],
-                       .is_signed = signal_signed_[name],
-                       .range = signal_ranges_[name],
-                       .bits = it->second});
+  if (!kept) {
+    ShadowedSignal held;
+    held.name = name;
+    if (it != signal_bits_.end()) {
+      held.recorded = true;
+      held.is_unpacked = unpacked_arrays_.count(name) != 0;
+      held.width = signal_widths_[name];
+      held.is_signed = signal_signed_[name];
+      held.range = signal_ranges_[name];
+      held.bits = it->second;
+    }
+    shadowed_signals_.push_back(std::move(held));
   }
   unpacked_arrays_.erase(name);
   signal_widths_[name] = static_cast<uint32_t>(bits.size());
