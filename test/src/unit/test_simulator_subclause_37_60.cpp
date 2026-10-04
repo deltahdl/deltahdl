@@ -50,6 +50,7 @@ TEST_F(AtomicStatement, DiagramMembersAreAtomicStatements) {
                    vpiDisable,
                    vpiTaskCall,
                    vpiSysTaskCall,
+                   vpiMethodTaskCall,
                    vpiForever,
                    vpiForce,
                    vpiRelease,

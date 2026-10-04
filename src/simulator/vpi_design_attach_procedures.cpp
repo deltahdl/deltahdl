@@ -1,18 +1,23 @@
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -84,14 +89,19 @@ struct BlockParent {
   const std::string& path;
 };
 
-// What a walk of one procedure body builds with: the objects the instance's
-// declarations stand as, keyed under its prefix, the process the body runs in
-// (null for an assertion the elaborator carries as a process), and the build.
+// What a walk of one procedure body builds with: the design and the instance's
+// module, which a call's subroutine is found among; the objects the instance's
+// declarations stand as, keyed under its prefix; what a call statement is
+// built with; the build; and the process the body runs in (null for an
+// assertion the elaborator carries as a process).
 struct BodyWalk {
+  const RtlirDesign& design;
+  const RtlirModule& mod;
   const VpiObjectMap& objects;
   const std::string& prefix;
-  VpiObject* process;
+  const VpiCallBuild& calls;
   const VpiAttachBuild& build;
+  VpiObject* process = nullptr;
 };
 
 // §9.7: the name the trigger names its event by, which is an identifier in the
@@ -149,6 +159,226 @@ int BareAtomicKind(StmtKind kind) {
     default:
       return 0;
   }
+}
+
+// §37.42: what a call statement stands as. `type` is the kind of tf call, zero
+// for a statement that calls no task; `name` is the subroutine it calls;
+// `prefix` is the object a method is applied to (detail 2); `user_defined`
+// is the figure's vpiUserDefn; `systf` is the systf object a call of a
+// registered system task reaches.
+struct CallShape {
+  int type = 0;
+  std::string_view name;
+  VpiObject* prefix = nullptr;
+  bool user_defined = false;
+  VpiObject* systf = nullptr;
+};
+
+// §13.3: whether `decls` declares a task named `name`.
+bool DeclaresTask(const std::vector<ModuleItem*>& decls,
+                  std::string_view name) {
+  return std::ranges::any_of(decls, [name](const ModuleItem* decl) {
+    return decl != nullptr && decl->kind == ModuleItemKind::kTaskDecl &&
+           decl->name == name;
+  });
+}
+
+// §13.3: whether `name` is a task the instance's module, one of its generate
+// blocks or the compilation unit declares.
+bool NamesTask(const BodyWalk& walk, std::string_view name) {
+  if (DeclaresTask(walk.mod.function_decls, name) ||
+      DeclaresTask(walk.design.cu_function_decls, name)) {
+    return true;
+  }
+  return std::ranges::any_of(walk.mod.gen_block_subroutines,
+                             [name](const RtlirGenBlockSubroutine& sub) {
+                               return sub.decl != nullptr &&
+                                      sub.decl->kind ==
+                                          ModuleItemKind::kTaskDecl &&
+                                      sub.decl->name == name;
+                             });
+}
+
+// The class among `decls` named `name`, null for none.
+const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
+                            std::string_view name) {
+  for (const ClassDecl* decl : decls) {
+    if (decl != nullptr && decl->name == name) return decl;
+  }
+  return nullptr;
+}
+
+// The class the design declares under `name`, in the instance's module or the
+// compilation unit; null for one it does not, a built-in class among them.
+const ClassDecl* FindClassDecl(const BodyWalk& walk, std::string_view name) {
+  const ClassDecl* decl = ClassNamed(walk.mod.class_decls, name);
+  return decl != nullptr ? decl : ClassNamed(walk.design.cu_class_decls, name);
+}
+
+// §8.3: the method `cls` declares under `name`, null for none.
+const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
+  for (const ClassMember* member : cls.members) {
+    if (member != nullptr && member->kind == ClassMemberKind::kMethod &&
+        member->method != nullptr && member->method->name == name) {
+      return member->method;
+    }
+  }
+  return nullptr;
+}
+
+// §9.7, §15.3.3, §15.4.3, §15.4.5 and §15.4.7: the methods the built-in
+// classes declare as tasks, every other method of theirs being a function.
+bool IsBuiltInClassTask(std::string_view cls, std::string_view method) {
+  static constexpr std::pair<std::string_view, std::string_view> kTasks[] = {
+      {"process", "await"}, {"semaphore", "get"}, {"mailbox", "put"},
+      {"mailbox", "get"},   {"mailbox", "peek"},
+  };
+  return std::ranges::any_of(kTasks, [&](const auto& task) {
+    return task.first == cls && task.second == method;
+  });
+}
+
+// What the method a call names is: no task, a task of a class the design
+// declares, or a task of a built-in class.
+enum class MethodTask : uint8_t { kNone, kDeclared, kBuiltIn };
+
+// The kind of task `method` of the class `cls` is, found in the class or, by
+// §8.13, in the classes it extends. A class the design declares answers ahead
+// of a built-in one of its name, which §15.2 lets user code redefine. The
+// bound stops a chain of extensions that loops.
+MethodTask ClassMethodTask(const BodyWalk& walk, std::string_view cls,
+                           std::string_view method) {
+  constexpr int kMaxDepth = 64;
+  for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
+    const ClassDecl* decl = FindClassDecl(walk, cls);
+    if (decl == nullptr) {
+      return IsBuiltInClassTask(cls, method) ? MethodTask::kBuiltIn
+                                             : MethodTask::kNone;
+    }
+    const ModuleItem* found = MethodNamed(*decl, method);
+    if (found != nullptr) {
+      return found->kind == ModuleItemKind::kTaskDecl ? MethodTask::kDeclared
+                                                      : MethodTask::kNone;
+    }
+    cls = decl->base_class;
+  }
+  return MethodTask::kNone;
+}
+
+// §8.4: the class a variable of the instance's module named `name` holds a
+// handle of, empty for a variable of no class type and for no variable.
+std::string_view ClassOfVariable(const RtlirModule& mod,
+                                 std::string_view name) {
+  for (const RtlirVariable& var : mod.variables) {
+    if (var.name == name) return var.class_type_name;
+  }
+  return {};
+}
+
+// §37.42: a system task call, named after the system task it calls. A system
+// function an application registered stays a function where a statement calls
+// it, and the evaluator runs it as one (§36.5), so it is no system task call.
+CallShape SystemTaskCallShape(const Expr& call, const BodyWalk& walk) {
+  const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
+  if (kSystf.type == vpiSysFunc) return {};
+  CallShape shape{vpiSysTaskCall, call.callee};
+  shape.user_defined = kSystf.type == vpiSysTask;
+  shape.systf = kSystf.object;
+  return shape;
+}
+
+// §37.42: a method task call, applied through `access` to a class var of the
+// instance's module.
+CallShape MethodTaskCallShape(const Expr& access, const BodyWalk& walk) {
+  if (access.is_scope_resolution || access.lhs == nullptr ||
+      access.rhs == nullptr || access.lhs->kind != ExprKind::kIdentifier ||
+      access.rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  const MethodTask kTask = ClassMethodTask(
+      walk, ClassOfVariable(walk.mod, access.lhs->text), access.rhs->text);
+  if (kTask == MethodTask::kNone) return {};
+  CallShape shape{vpiMethodTaskCall, access.rhs->text};
+  shape.prefix = FindObjectForFlatName(
+      walk.objects, VpiFlatName(walk.prefix, access.lhs->text));
+  // Detail 11 tells a built-in method call apart from the rest, and the
+  // figure's vpiUserDefn is what says which a method call is.
+  shape.user_defined = kTask == MethodTask::kDeclared;
+  return shape;
+}
+
+// §37.42 with §37.60: what the expression statement `expr` calls. A task is
+// enabled with or without an argument list (§13.3), so the callee is the
+// expression itself where no list follows it.
+CallShape CallShapeOf(const Expr& expr, const BodyWalk& walk) {
+  if (expr.kind == ExprKind::kSystemCall) {
+    return SystemTaskCallShape(expr, walk);
+  }
+  const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
+  if (callee == nullptr) return {};
+  if (callee->kind == ExprKind::kIdentifier) {
+    if (!NamesTask(walk, callee->text)) return {};
+    return CallShape{vpiTaskCall, callee->text};
+  }
+  if (callee->kind == ExprKind::kMemberAccess) {
+    return MethodTaskCallShape(*callee, walk);
+  }
+  return {};
+}
+
+// Whether `obj` is `call` or stands around it.
+bool StandsAround(const VpiObject* obj, const VpiObject* call) {
+  for (const VpiObject* at = call; at != nullptr; at = at->parent) {
+    if (at == obj) return true;
+  }
+  return false;
+}
+
+// §37.42: the arguments `expr` was written with, in order, each the
+// expression object the instance's names resolve it to (§37.58, §37.59), an
+// empty position being detail 8's empty argument. An expression of a kind the
+// model builds no object for is passed over, and so is a scope standing around
+// the call, which hung below it would make the model a loop.
+void MakeCallArguments(VpiObject* call, const Expr& expr,
+                       const BodyWalk& walk) {
+  if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
+    return;
+  }
+  for (const Expr* actual : expr.args) {
+    VpiObject* arg = nullptr;
+    if (actual == nullptr) {
+      arg = walk.build.alloc();
+      VpiMakeEmptyArgument(arg);
+    } else {
+      arg = VpiInstanceExpression(actual, walk.objects, walk.prefix,
+                                  walk.calls.ctx, walk.build);
+    }
+    if (arg != nullptr && !StandsAround(arg, call)) {
+      call->children.push_back(arg);
+    }
+  }
+}
+
+// §37.42 with §37.60: the call statement `stmt` stands as, null for a
+// statement that calls no task. A call is named after what it calls; a label
+// written on it names the begin §9.3.5 makes around it instead. A system task
+// call is recorded as the call statement it is, which a run's invocation of a
+// registered system task stands as (detail 3).
+VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
+                             const BodyWalk& walk) {
+  if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
+  const CallShape kShape = CallShapeOf(*stmt.expr, walk);
+  if (kShape.type == 0) return nullptr;
+  VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
+  call->name = walk.build.keep(std::string(kShape.name));
+  call->tf_prefix = kShape.prefix;
+  call->user_defined = kShape.user_defined;
+  call->user_systf = kShape.systf;
+  MakeCallArguments(call, *stmt.expr, walk);
+  if (kShape.type == vpiSysTaskCall) {
+    walk.calls.sites[{stmt.expr, walk.prefix}] = call;
+  }
+  return call;
 }
 
 // §9.3.5: whether the label on `stmt` creates a named begin around it. A label
@@ -218,6 +448,8 @@ VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
   }
   const int kAtomic = BareAtomicKind(stmt.kind);
   if (kAtomic != 0) return MakeAtomicStatement(stmt, kAtomic, parent, walk);
+  VpiObject* call = MakeCallStatement(stmt, parent, walk);
+  if (call != nullptr) return call;
   const int kScope = BlockScopeKind(stmt);
   if (kScope != 0) return MakeBlockScope(stmt, kScope, parent, walk);
   WalkSubStmts(stmt, parent, walk);
@@ -283,29 +515,28 @@ VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
   return process;
 }
 
-// The procedures one instance declares, each with the objects its body holds.
-// An assertion the elaborator carries as a process is no procedure the source
+// The procedures one instance declares, each with the objects its body holds,
+// walked with `instance_walk`, whose process each procedure's own replaces. An
+// assertion the elaborator carries as a process is no procedure the source
 // wrote, so it stands as none, though the statements of its action blocks are
 // statements of the design all the same.
-void AttachInstanceProcedures(const RtlirModule& mod, VpiObject* instance,
-                              const std::string& prefix,
-                              const VpiObjectMap& objects,
-                              const VpiAttachBuild& build) {
-  for (const RtlirProcess& proc : mod.processes) {
+void AttachInstanceProcedures(VpiObject* instance,
+                              const BodyWalk& instance_walk) {
+  for (const RtlirProcess& proc : instance_walk.mod.processes) {
     VpiObject* scope = ProcessScope(instance, proc.gen_block_path);
     if (scope == nullptr) continue;
     const bool kIsAssertion =
         proc.is_static_assertion || proc.is_concurrent_clocked;
-    VpiObject* process =
-        kIsAssertion ? nullptr : MakeProcess(proc, scope, build);
-    const BodyWalk kWalk{objects, prefix, process, build};
+    BodyWalk walk = instance_walk;
+    walk.process =
+        kIsAssertion ? nullptr : MakeProcess(proc, scope, instance_walk.build);
     const BlockParent kParent{scope, scope->full_name};
-    if (process != nullptr) {
-      process->body = WalkStmt(proc.body, kParent, kWalk);
+    if (walk.process != nullptr) {
+      walk.process->body = WalkStmt(proc.body, kParent, walk);
     } else if (proc.body != nullptr) {
       // The body of such a process is the assertion itself, whose label names
       // the assertion (§16.5) rather than a block around it.
-      WalkSubStmts(*proc.body, kParent, kWalk);
+      WalkSubStmts(*proc.body, kParent, walk);
     }
   }
 }
@@ -313,14 +544,15 @@ void AttachInstanceProcedures(const RtlirModule& mod, VpiObject* instance,
 }  // namespace
 
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
-                      const VpiAttachBuild& build) {
+                      const VpiCallBuild& calls, const VpiAttachBuild& build) {
   // §37.63: each procedure an instance declares is a process of it, reaching
   // the statement it runs; §37.12 detail 1: a named begin or fork, and an
   // unnamed one declaring a block item, is a scope of the instance whose
   // procedure writes it; §37.62: each event trigger is an event statement of
-  // the scope it stands in. No procedure was made, so none was reached, and
-  // the event statements all hung from the instance whatever block they were
-  // written in.
+  // the scope it stands in, and §37.42: each call of a task, a method task or
+  // a system task a call statement of it. No procedure was made, so none was
+  // reached, the event statements all hung from the instance whatever block
+  // they were written in, and no call a procedure wrote was an object.
   if (design == nullptr || design->top_modules.empty() ||
       design->top_modules.front() == nullptr) {
     return;
@@ -332,7 +564,8 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
         VpiObject* instance =
             FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
         if (instance != nullptr) {
-          AttachInstanceProcedures(*mod, instance, prefix, objects, build);
+          AttachInstanceProcedures(
+              instance, BodyWalk{*design, *mod, objects, prefix, calls, build});
         }
       });
 }

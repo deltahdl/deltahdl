@@ -73,14 +73,16 @@ bool VpiIsAtomicStmtType(int type) {
   // enclosure reaches the kinds that class groups, and those three were outside
   // it. Both groupings are named here in full.
   //
-  // `tf call` is still the task call and the system-task call alone. §37.42
-  // draws four more kinds in it, and every one of them is a call that returns a
-  // value, which §37.59 also draws inside `expr`. A kind in both classes is
-  // reached by the condition scans and the body scans alike, and the objects
-  // that carry a condition and a body carry them as children in one list, so
-  // admitting the four here would have a loop's condition answer for its body.
-  // Telling the two apart is §37.60's reading to settle, not a line in this
-  // switch.
+  // `tf call` is held here as its three kinds that call a task: the task call,
+  // the method task call and the system-task call. §37.42 draws three more
+  // kinds in it, and every one of them is a call that returns a value, which
+  // §37.59 also draws inside `expr`. A kind in both classes is reached by the
+  // condition scans and the body scans alike, and the objects that carry a
+  // condition and a body carry them as children in one list, so admitting the
+  // three here would have a loop's condition answer for its body. Telling the
+  // two apart is §37.60's reading to settle, not a line in this switch. A
+  // method task call returns no value and §37.59 draws it nowhere in `expr`,
+  // so it is a statement and nothing else, as the other two task calls are.
   if (VpiIsWaitType(type) || VpiIsDisableType(type)) return true;
   switch (type) {
     case vpiIf:
@@ -95,8 +97,9 @@ bool VpiIsAtomicStmtType(int type) {
     case vpiAssignment:
     case vpiAssignStmt:
     case vpiDeassign:
-    case vpiTaskCall:     // the "tf call" grouping: a task call ...
-    case vpiSysTaskCall:  // ... or a system-task call
+    case vpiTaskCall:        // the "tf call" grouping: a task call ...
+    case vpiSysTaskCall:     // ... or a system-task call
+    case vpiMethodTaskCall:  // ... or a method task call
     case vpiForever:
     case vpiForce:
     case vpiRelease:

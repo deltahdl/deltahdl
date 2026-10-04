@@ -487,6 +487,11 @@ struct VpiObject {
   // the original source. Empty when the call carries no decompiled form.
   std::string decompile;
 
+  // §37.42 (figure): the systf object vpi_register_systf returned for the
+  // registration a system task or function call is a call of, which the call
+  // reaches through vpiUserSystf; null for a call of a built-in one.
+  VpiObject* user_systf = nullptr;
+
   // §37.47 detail 3: the bit offset a cont assign bit reports through
   // vpi_get(vpiOffset). The offset is measured from the least significant bit,
   // so the LSB carries offset zero and the bit n positions above it carries

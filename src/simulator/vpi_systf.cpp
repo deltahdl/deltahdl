@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -12,24 +11,17 @@
 #include "common/lexical_limits.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
-#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi_user.h"
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation, and
-// §37.59's vpiRefObj -- the reference an expression naming a variable is -- is
-// there with them.
-#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
-#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -138,219 +130,6 @@ const s_vpi_systf_data* VpiContext::ResolveSystf(const char* name) const {
     }
   }
   return nullptr;
-}
-
-namespace {
-
-// §36.4: one task/function argument as the application reaches it. An actual
-// that names a variable is carried by that variable itself, so a write through
-// vpi_put_value lands where the design will read it and a read sees whatever
-// the design last wrote -- the clause asks for both, "PLI routines are provided
-// that allow the PLI applications to read and write to the task/function
-// arguments". Anything else is an expression rather than a name: its value goes
-// into a holder of its own, which reads correctly and which a write cannot
-// carry back to a call site with nowhere to put it.
-//
-// §37.42 detail 8 spells an omitted argument, which a call site writes as an
-// empty position, and VpiMakeEmptyArgument is what sets that shape.
-//
-// `evaluate` is what separates the two periods a call object is built in.
-// §36.8.3 has the calltf called "each time the associated user-defined system
-// task or system function is executed", so an actual that is an expression has
-// a value there and the holder is filled with it. §36.8.2 has the compiletf
-// called "when the user-defined system task or system function name is
-// encountered during parsing or compiling", where the design has not run: there
-// is no value to read, and reading one would mean running the source's own
-// functions once per call site before the simulation started, so the holder is
-// left empty and the argument stands for what the source wrote rather than for
-// what it will produce.
-VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
-                             SimContext& ctx, Arena& arena, bool evaluate) {
-  if (actual == nullptr) {
-    VpiMakeEmptyArgument(arg);
-    return arg;
-  }
-  Variable* named = actual->kind == ExprKind::kIdentifier
-                        ? ctx.FindVariable(actual->text)
-                        : nullptr;
-  if (named != nullptr) {
-    arg->type = vpiRefObj;
-    // Expr::text is a view into the source buffer, which does not end where the
-    // identifier does, so the name is copied into the run's arena to be the
-    // standalone string VpiObject::name has to hold. Without the copy
-    // vpi_get_str(vpiName, arg) reported the rest of the source file.
-    arg->name = std::string_view(
-        arena.AllocString(actual->text.data(), actual->text.size()),
-        actual->text.size());
-    arg->var = named;
-  } else {
-    arg->type = vpiOperation;
-    auto* holder = arena.Create<Variable>();
-    if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
-    arg->var = holder;
-  }
-  // §37.3.5: "VPI gives applications access to arbitrarily complex expressions
-  // from the SystemVerilog source, either as arguments to system tasks or
-  // functions (see 36.4) or by traversing the design hierarchy. Expressions may
-  // have side effects when evaluated." This is that first way, and
-  // VpiObject::has_side_effects is the mark the value, property and relation
-  // routines settle the subclause's rules by. No pass wrote it, so no argument
-  // an application was ever handed was an expression with side effects and
-  // every one of those rules stood over an empty set.
-  arg->has_side_effects = VpiSourceExprHasSideEffects(actual);
-  arg->size = static_cast<int>(arg->var->value.width);
-  return arg;
-}
-
-// §37.61 detail 1: "The vpiPrefix relation shall be non-NULL when the object
-// represents an expression or task call in the SystemVerilog source code
-// prefixed by a virtual interface or a clocking block". A system task or
-// function argument written `vif.sig` is such an expression and `vif` is the
-// virtual interface var prefixing it, so this answers that variable and
-// nullptr for an actual written any other way. It is what decides whether the
-// argument object is built as a dynamically prefixed one at all: nothing in the
-// run ever wrote VpiObject::prefix, so vpi_handle(vpiPrefix, arg) reported NULL
-// for every object any design produced and the whole subclause stood over
-// objects a test had built by hand.
-Variable* DynamicPrefixBaseVar(const Expr* actual, SimContext& ctx) {
-  if (actual == nullptr || actual->kind != ExprKind::kMemberAccess) {
-    return nullptr;
-  }
-  if (actual->lhs == nullptr || actual->lhs->kind != ExprKind::kIdentifier) {
-    return nullptr;
-  }
-  Variable* base = ctx.FindVariable(actual->lhs->text);
-  return ctx.IsVirtualInterfaceVar(base) ? base : nullptr;
-}
-
-// §25.9: the interface member a prefixed argument names, which is the right
-// side of the member access when that is a plain name and the access's own text
-// otherwise -- the shape the expression evaluator reads such a reference in.
-std::string_view DynamicPrefixFieldName(const Expr* actual) {
-  return (actual->rhs != nullptr && actual->rhs->kind == ExprKind::kIdentifier)
-             ? actual->rhs->text
-             : actual->text;
-}
-
-// §37.61: what a dynamically prefixed argument is made from. `base` is the
-// virtual interface var the source wrote as the prefix; `member` is the
-// interface instance's variable the named member resolves to; `actual` is the
-// instance the prefix holds at the current simulation time, which §37.61 detail
-// 3 reads as whether the prefix "has a corresponding actual". The last two are
-// null exactly while the virtual interface holds null.
-struct DynamicPrefix {
-  Variable* base = nullptr;
-  Variable* member = nullptr;
-  VpiHandle actual = nullptr;
-};
-
-// §25.9: resolve the prefix against the run. An unbound virtual interface
-// denotes no instance, so it reaches neither a member variable nor an actual.
-DynamicPrefix ResolveDynamicPrefix(const Expr* actual, Variable* base,
-                                   SimContext& ctx, VpiContext& vpi) {
-  DynamicPrefix prefix;
-  prefix.base = base;
-  if (!ctx.VirtualInterfaceIsBound(base)) return prefix;
-  std::string scope(ctx.VirtualInterfaceBinding(base));
-  prefix.member = ctx.FindVariable(scope + "." +
-                                   std::string(DynamicPrefixFieldName(actual)));
-  prefix.actual = vpi.HandleByName(scope.c_str(), nullptr);
-  return prefix;
-}
-
-// The run's arena is where a string a VpiObject holds has to live: Expr::text
-// is a view into the source buffer, which does not end where the name does, and
-// a joined name is a temporary that the object would outlive.
-std::string_view ArenaName(Arena& arena, const std::string& name) {
-  return std::string_view(arena.AllocString(name.data(), name.size()),
-                          name.size());
-}
-
-// §37.61 (figure): fill `arg` as the dynamically prefixed object the actual
-// stands for and `prefix` as the object it is prefixed by. The figure draws the
-// vpiPrefix arrow from a simple expression -- §37.58's reference -- to the
-// virtual interface var, and gives the prefixed object the "-> has actual"
-// property that detail 3 answers off the prefix.
-void FillPrefixedArgument(VpiObject* arg, VpiObject* prefix, const Expr* actual,
-                          const DynamicPrefix& resolved, Arena& arena) {
-  prefix->type = vpiVirtualInterfaceVar;
-  prefix->name = ArenaName(arena, std::string(actual->lhs->text));
-  prefix->var = resolved.base;
-  // §37.29 (figure, Example 2): vpiActual of a virtual interface var is the
-  // interface instance it holds, and NULL while it holds none.
-  prefix->actual = resolved.actual;
-
-  arg->type = vpiRefObj;
-  arg->name = ArenaName(arena, std::string(actual->lhs->text) + "." +
-                                   std::string(DynamicPrefixFieldName(actual)));
-  arg->prefix = prefix;
-  // §36.4: an actual that names a variable is carried by that variable itself,
-  // so an application reads and writes the interface instance's own storage. An
-  // unbound prefix names none, and a holder of its own stands where it would.
-  arg->var =
-      resolved.member != nullptr ? resolved.member : arena.Create<Variable>();
-  arg->size = static_cast<int>(arg->var->value.width);
-}
-
-}  // namespace
-
-// §37.42: the object standing for one system task or system function call,
-// carrying the arguments the call site wrote and, where the registration is a
-// system function, the storage its return value is written through. Both
-// periods that call a PLI application build one, and `evaluate_args` is the
-// whole of the difference between them: an execution-time call reads each
-// actual's value, a build-period call has none to read.
-VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
-                                          const Expr* call_site,
-                                          SimContext& ctx, Arena& arena,
-                                          bool evaluate_args) {
-  // §37.42: the system task or function call a PLI application is run for,
-  // which the application reaches with vpi_handle(vpiSysTfCall, NULL). It is
-  // also where a system function's return value is put: vpi_put_value writes
-  // through the object's own storage, so the call carries a variable of its own
-  // for the application to write and for this routine's caller to read back.
-  auto* call = AllocObject();
-  call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
-  call->name = data.tfname != nullptr ? std::string_view(data.tfname)
-                                      : std::string_view();
-  auto* value_holder = arena.Create<Variable>();
-  // §36.8.1: "The value returned by the sizetf routine shall be the number of
-  // bits that the calltf routine shall provide as the return value for the
-  // system function", so the holder the application writes through is that
-  // wide. §38.37.1's default is what SystfResultSizeBits answers where no
-  // sizetf is provided: "a user-defined system function of type vpiSizedFunc or
-  // vpiSizedSignedFunc shall return 32 bits". A sizetf answering with no bits
-  // at all describes no value, so the default stands rather than a width
-  // nothing can hold.
-  int result_bits = SystfResultSizeBits(data);
-  auto width = static_cast<uint32_t>(
-      result_bits > 0 ? result_bits : kVpiDefaultSizedFuncBits);
-  value_holder->value = MakeLogic4VecVal(arena, width, 0);
-  call->var = value_holder;
-  call->size = static_cast<int>(width);
-
-  // §36.4: the arguments the call site wrote, hung on the call so §37.42's
-  // vpiArgument iteration reaches them. They are attached before the routine
-  // runs, because the application reads them from inside it.
-  if (call_site != nullptr) {
-    for (const Expr* actual : call_site->args) {
-      auto* arg = AllocObject();
-      // §37.61 detail 1: an actual the source prefixed by a virtual interface
-      // is the prefixed object the clause is written about, and it is built as
-      // one rather than as the anonymous expression holder every non-identifier
-      // actual used to become.
-      Variable* base = DynamicPrefixBaseVar(actual, ctx);
-      if (base != nullptr) {
-        FillPrefixedArgument(arg, AllocObject(), actual,
-                             ResolveDynamicPrefix(actual, base, ctx, *this),
-                             arena);
-      } else {
-        SystfCallArgument(arg, actual, ctx, arena, evaluate_args);
-      }
-      call->children.push_back(arg);
-    }
-  }
-  return call;
 }
 
 bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,

@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -111,12 +113,40 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
+// §37.42: a system task or function an application registered, as a call
+// that names it finds it: the systf object vpi_register_systf returned for it
+// and the vpiSysTask or vpiSysFunc type it was registered with. A name no
+// registration claims finds a null object and a zero type.
+struct VpiRegisteredSystf {
+  VpiObject* object = nullptr;
+  int type = 0;
+};
+
+// §37.42 detail 3: the model's object for each call statement of a run, keyed
+// by the call the statement writes and the flat name of the instance writing
+// it, since every instance of a module carries the one parsed call.
+using VpiCallSiteObjects =
+    std::map<std::pair<const Expr*, std::string>, VpiObject*>;
+
+// What the procedure walk builds a call statement with: the run, which an
+// argument's value is read through; the
+// registration a system call's name resolves to; and the record of the call
+// statements made, which a run's invocation of a registered system task finds
+// its own call among.
+struct VpiCallBuild {
+  SimContext& ctx;
+  std::function<VpiRegisteredSystf(std::string_view)> systf;
+  VpiCallSiteObjects& sites;
+};
+
 // §37.63: give each instance a process per procedure it declares, reaching the
 // statement it runs; §37.12: an object per block its procedures write that is
-// a scope, nested as the blocks are, each with the variables it declares; and
-// §37.62: an event statement per trigger, hung from the scope it stands in.
+// a scope, nested as the blocks are, each with the variables it declares;
+// §37.62: an event statement per trigger, and §37.42: a call statement per
+// task, method task and system task call, each hung from the scope it stands
+// in.
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
-                      const VpiAttachBuild& build);
+                      const VpiCallBuild& calls, const VpiAttachBuild& build);
 
 // §37.7: give each interface instance a modport per modport its interface
 // declares, each with an io decl per port it gives a direction, and §37.13:

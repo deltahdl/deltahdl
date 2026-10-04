@@ -61,9 +61,22 @@ bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
+// §37.42 (figure): the arrow from a system task or function call to the user
+// systf whose registration it calls, which a call of a built-in system task or
+// function has none of.
+bool TryResolveUserSystfRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiUserSystf ||
+      (ref->type != vpiSysTaskCall && ref->type != vpiSysFuncCall)) {
+    return false;
+  }
+  out = ref->user_systf;
+  return true;
+}
+
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveForAndBodyStmtRelation(type, ref, out) ||
-         TryResolveStmtProcessRelation(type, ref, out);
+         TryResolveStmtProcessRelation(type, ref, out) ||
+         TryResolveUserSystfRelation(type, ref, out);
 }
 
 }  // namespace delta

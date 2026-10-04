@@ -661,6 +661,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_query.cpp
     simulator/vpi_query_str.cpp
     simulator/vpi_systf.cpp
+    simulator/vpi_systf_call.cpp
     simulator/vpi_systf_build.cpp
     simulator/vpi_value_array.cpp
     simulator/vpi_value.cpp

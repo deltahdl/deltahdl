@@ -13,6 +13,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -200,7 +201,22 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
-    AttachProcedures(design, object_map_, kBuild);
+    // §37.42: a system call finds the registration its name resolves to, and
+    // with it the systf object that registration returned.
+    const VpiCallBuild kCalls{*sim_ctx_,
+                              [this](std::string_view name) {
+                                VpiRegisteredSystf found;
+                                const s_vpi_systf_data* data =
+                                    ResolveSystf(std::string(name).c_str());
+                                if (data == nullptr) return found;
+                                found.type = data->type;
+                                found.object = VpiSystfObjectAt(
+                                    all_objects_,
+                                    static_cast<int>(data - systfs_.data()));
+                                return found;
+                              },
+                              call_site_objects_};
+    AttachProcedures(design, object_map_, kCalls, kBuild);
   }
   AttachContinuousAssignments(design);
 }

@@ -54,8 +54,9 @@ void VpiCollectForHeaderStmts(int type, VpiHandle for_stmt, VpiHandle iter);
 
 // §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74/§37.75: the body statement
 // the object model draws an untagged arrow to `stmt` for, §37.74's two single
-// arrows to a for statement's header, and the process a statement runs in.
-// Defined in vpi_handle_statements.cpp, used by vpi_handle.cpp.
+// arrows to a for statement's header, and the process a statement runs in;
+// §37.42: the user systf a system task or function call is a call of. Defined
+// in vpi_handle_statements.cpp, used by vpi_handle.cpp.
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out);
 
 // §37.80 (figure): whether an object is one of the kinds the callback diagram
@@ -107,5 +108,11 @@ int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode);
 
 // Defined in vpi_systf.cpp, used by vpi_handle.cpp.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
+
+// §37.42: the systf object vpi_register_systf returned for the registration at
+// `index` among those the context holds, found among the context's `objects`
+// by the mark and position it was made with; null where none is. Defined in
+// vpi_systf_call.cpp, used by vpi_design_attach_instances.cpp.
+VpiObject* VpiSystfObjectAt(const std::vector<VpiObject*>& objects, int index);
 
 }  // namespace delta

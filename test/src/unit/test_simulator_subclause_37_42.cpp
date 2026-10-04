@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -387,6 +388,168 @@ TEST_F(CallsOfARun, ASystemFunctionCallIsASysFuncCallObject) {
   Run("module top; wire [7:0] a; wire [31:0] y; assign y = $countones(a); "
       "endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, CallOnTheRight()), vpiSysFuncCall);
+}
+
+// What the calltf of $probe read each time it ran: the call that invoked it
+// (detail 3) and whether that call is user-defined (detail 5).
+struct ProbeSighting {
+  vpiHandle call;
+  int user_defn;
+};
+std::vector<ProbeSighting> g_probe_sightings;
+
+PLI_INT32 ProbeCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  g_probe_sightings.push_back({call, vpi_get(vpiUserDefn, call)});
+  return 0;
+}
+
+// A design run with the system task $probe registered beside the fixture's
+// own, whose call statements are read back from the model the run built.
+class CallStatementsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    g_probe_sightings.clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = &ProbeCalltf;
+    probe_ = vpi_register_systf(&data);
+    ASSERT_NE(probe_, nullptr);
+  }
+
+  // The statement the first procedure `scope` declares runs.
+  static vpiHandle BodyOf(const std::string& scope) {
+    vpiHandle it = vpi_iterate(vpiProcess, By(scope));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiStmt, vpi_scan(it));
+  }
+
+  vpiHandle probe_ = nullptr;
+};
+
+// A system task call a procedure writes is a sys task call of the run, named
+// after the system task, standing in the scope that writes it and running in
+// its procedure (#5011).
+TEST_F(CallStatementsOfARun, ASystemTaskCallIsAnObjectOfTheRun) {
+  Run("module top; initial $display(\"hi\"); endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiSysTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "$display");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
+  EXPECT_NE(vpi_handle(vpiProcess, call), nullptr);
+}
+
+// A call of a task is a task call named after the task it calls (#5016)...
+TEST_F(CallStatementsOfARun, ATaskCallIsAnObjectOfTheRun) {
+  Run("module top; task t; endtask initial t; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
+}
+
+// ...and a call of a void function written as a statement is none.
+TEST_F(CallStatementsOfARun, AFunctionCallStatementIsNoTaskCall) {
+  Run("module top; function void f(); endfunction initial f(); endmodule\n");
+  EXPECT_EQ(BodyOf("top"), nullptr);
+}
+
+constexpr const char* kMethodTaskCall =
+    "module top;\n"
+    "  class C; task run(); endtask endclass\n"
+    "  C obj = new;\n"
+    "  initial obj.run();\n"
+    "endmodule\n";
+
+// A call of a class's task method is a method task call named after the
+// method, whose vpiPrefix is the class var it is applied to (#5017, detail 2)
+// and which, the class being the design's own, is user-defined.
+TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
+  Run(kMethodTaskCall);
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "run");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "obj");
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
+}
+
+// A semaphore's get is a task of the built-in class (§15.3.3), so a call of it
+// is a method task call that is not user-defined...
+TEST_F(CallStatementsOfARun, ABuiltInClassTaskCallIsNotUserDefined) {
+  Run("module top; semaphore s = new(1); initial s.get(1); endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
+}
+
+// ...while its put is a function (§15.3.2), and a call of it no task call.
+TEST_F(CallStatementsOfARun, ABuiltInClassFunctionCallIsNoMethodTaskCall) {
+  Run("module top; semaphore s = new(1); initial s.put(1); endmodule\n");
+  EXPECT_EQ(BodyOf("top"), nullptr);
+}
+
+// A call statement reaches the arguments it was written with, in order
+// (#5018).
+TEST_F(CallStatementsOfARun, ACallStatementReachesItsArguments) {
+  Run("module top; int x; task t(input int a, input int b); endtask\n"
+      "  initial begin $display(\"%d\", x); t(1, x); end endmodule\n");
+  vpiHandle display = Named(vpiSysTaskCall, By("top"), "$display");
+  vpiHandle task = Named(vpiTaskCall, By("top"), "t");
+  ASSERT_NE(display, nullptr);
+  ASSERT_NE(task, nullptr);
+  vpiHandle it = vpi_iterate(vpiArgument, display);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_scan(it)), vpiConstant);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_scan(it)), "x");
+  EXPECT_EQ(KindsOf(vpiArgument, task).size(), 2U);
+}
+
+// The call a registered system task's calltf reaches is the model's object
+// for the statement that invoked it (#5019), one per instance writing it.
+TEST_F(CallStatementsOfARun, TheInvokingCallIsTheModelsCallStatement) {
+  Run("module m; initial $probe; endmodule\n"
+      "module top; m u1(); m u2(); endmodule\n");
+  std::vector<VpiObject*> seen;
+  for (const ProbeSighting& sighting : g_probe_sightings) {
+    seen.push_back(VpiObjectOf(sighting.call));
+  }
+  std::vector<VpiObject*> want{VpiObjectOf(BodyOf("top.u1")),
+                               VpiObjectOf(BodyOf("top.u2"))};
+  ASSERT_NE(want[0], nullptr);
+  std::ranges::sort(seen);
+  std::ranges::sort(want);
+  EXPECT_EQ(seen, want);
+}
+
+// A call of a registered system task is user-defined, read from inside its
+// calltf and off the model alike, and a call of a built-in one is not (#5020).
+TEST_F(CallStatementsOfARun, ARegisteredSystemTaskCallIsUserDefined) {
+  Run("module top; initial begin $probe; $display(\"hi\"); end endmodule\n");
+  ASSERT_EQ(g_probe_sightings.size(), 1U);
+  EXPECT_EQ(g_probe_sightings[0].user_defn, 1);
+  EXPECT_EQ(vpi_get(vpiUserDefn, Named(vpiSysTaskCall, By("top"), "$probe")),
+            1);
+  EXPECT_EQ(vpi_get(vpiUserDefn, Named(vpiSysTaskCall, By("top"), "$display")),
+            0);
+}
+
+// A call of a registered system task reaches the systf its registration
+// returned, and a call of a built-in one reaches none (#5022).
+TEST_F(CallStatementsOfARun, ASystemTaskCallReachesItsUserSystf) {
+  Run("module top; initial begin $probe; $display(\"hi\"); end endmodule\n");
+  ASSERT_EQ(g_probe_sightings.size(), 1U);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUserSystf, g_probe_sightings[0].call)),
+            VpiObjectOf(probe_));
+  EXPECT_EQ(
+      vpi_handle(vpiUserSystf, Named(vpiSysTaskCall, By("top"), "$display")),
+      nullptr);
 }
 
 }  // namespace

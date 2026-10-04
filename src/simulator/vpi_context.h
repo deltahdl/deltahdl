@@ -14,6 +14,7 @@
 #include "simulator/vpi_channel_state.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -839,6 +840,9 @@ class VpiContext {
   // §37.42 detail 3: the system task or function call currently invoking a PLI
   // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;
+  // §37.42 detail 3: the model's call statements, which an invocation of a
+  // registered system task stands as where it was made from one of them.
+  VpiCallSiteObjects call_site_objects_;
 
   // §37.82: the $timeformat() call that set the active time format, returned by
   // vpi_handle(vpiActiveTimeFormat, NULL). Null until $timeformat() is called.
