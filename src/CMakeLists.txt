@@ -652,7 +652,20 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
 target_include_directories(deltahdl_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(deltahdl main.cpp)
-target_link_libraries(deltahdl PRIVATE deltahdl_lib)
+# §36.6 makes a PLI application's C functions part of the tool, and Annexes
+# K.1, M.1 and I have the tool provide the routines vpi_user.h, sv_vpi_user.h
+# and svdpi.h declare, which code deltahdl loads (-sv_lib, Annex J.4) calls as
+# the tool's own. Nothing main.cpp reaches calls most of them, so a static
+# deltahdl_lib is linked whole to keep their objects, and the executable
+# exports its symbols to the libraries it loads. A shared deltahdl_lib holds
+# them in a shared object already.
+if(DELTAHDL_LIB_LINKAGE STREQUAL "STATIC")
+    target_link_libraries(deltahdl PRIVATE
+        "$<LINK_LIBRARY:WHOLE_ARCHIVE,deltahdl_lib>")
+else()
+    target_link_libraries(deltahdl PRIVATE deltahdl_lib)
+endif()
+set_target_properties(deltahdl PROPERTIES ENABLE_EXPORTS ON)
 
 # A shared deltahdl_lib has to be found at run time, and the executable is
 # published on its own and unpacked wherever its consumer put it. $ORIGIN

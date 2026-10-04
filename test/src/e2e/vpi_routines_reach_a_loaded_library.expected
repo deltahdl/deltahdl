@@ -1,0 +1,7 @@
+sv 1
+SYMBOL vpi_register_systf: found
+SYMBOL vpi_register_cb: found
+SYMBOL vpi_handle: found
+SYMBOL vpi_printf: found
+SYMBOL svDpiVersion: found
+SYMBOL svGetScope: found
