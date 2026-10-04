@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -26,10 +27,15 @@ struct CompilationUnit;
 // encrypted models. §34.5.29.2 has each asked before the model is executed,
 // and a precompiled model is executed by the binding run, not by the compile
 // that decrypted it.
+//
+// And the lines of the text that came out of a decryption envelope, numbered
+// from 1: §37.3.6 makes the objects of that code protected in whichever run
+// executes it.
 struct PrecompiledDirectives {
   std::vector<ModuleDirectives> modules;
   std::vector<std::string> cell_modules;
   std::vector<ProtectLicense> runtime_licenses;
+  std::vector<uint32_t> protected_lines;
 };
 
 // A file holding compiled cells, in a format and at a location this tool

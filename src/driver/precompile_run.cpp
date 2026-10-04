@@ -97,6 +97,14 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
        Since(preproc.RuntimeLicenses(), licenses)) {
     out.directives.runtime_licenses.push_back(met.license);
   }
+  // §37.3.6 has the objects of code a decryption envelope contained protected
+  // in the run that executes it, so the lines that came out of one go too.
+  for (std::size_t i = 0; i < out.line_origins.size(); ++i) {
+    const OutputLineOrigin& origin = out.line_origins[i];
+    if (src_mgr.IsProtected(SourceLoc{origin.file_id, origin.line, 1})) {
+      out.directives.protected_lines.push_back(static_cast<uint32_t>(i + 1));
+    }
+  }
   return out;
 }
 

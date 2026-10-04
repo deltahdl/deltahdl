@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <fstream>
 #include <string>
 #include <string_view>
 
@@ -8,8 +9,12 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "driver/cli_options.h"
+#include "driver/precompile_run.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/separate_compilation_bind.h"
+#include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
@@ -238,13 +243,12 @@ PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
+constexpr std::string_view kKey = "protection-exchange-key";
+
 // A design instantiating a module sealed in a decryption envelope and one
-// written in the clear, encrypted by this tool and read back as a compile
-// reads it: preprocessed under the exchange key, its text registered with
-// the origin of each line, elaborated from the top and run.
-void RunADesignWithASealedModule(SimFixture& f) {
-  constexpr std::string_view kKey = "protection-exchange-key";
-  std::string authored =
+// written in the clear, encrypted by this tool under kKey.
+std::string SealedDesignSource() {
+  const std::string kAuthored =
       "`pragma protect begin\n"
       "module secret(input a, output y);\n"
       "  wire inner;\n"
@@ -260,11 +264,18 @@ void RunADesignWithASealedModule(SimFixture& f) {
       "  clear c(.a(a));\n"
       "  initial $probe;\n"
       "endmodule\n";
+  return EncryptEnvelopes(kAuthored, kKey);
+}
+
+// The sealed design read back as a compile reads it: preprocessed under the
+// exchange key, its text registered with the origin of each line, elaborated
+// from the top and run.
+void RunADesignWithASealedModule(SimFixture& f) {
   PreprocConfig config;
   config.protect_key = std::string(kKey);
   Preprocessor pp(f.mgr, f.diag, config);
   std::string text =
-      pp.Preprocess(f.mgr.AddFile("<test>", EncryptEnvelopes(authored, kKey)));
+      pp.Preprocess(f.mgr.AddFile("<test>", SealedDesignSource()));
   uint32_t fid = f.mgr.AddPreprocessedFile("<test>", text, pp.LineOrigins());
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag,
               TextOrigin::kPreprocessorOutput);
@@ -276,16 +287,44 @@ void RunADesignWithASealedModule(SimFixture& f) {
   LowerAndRun(design, f);
 }
 
+// The sealed design compiled into a library by one invocation (§33.5.3) and
+// bound and run by another (§33.5.4), which reads the library's compiled form
+// and never the source.
+void RunTheSealedDesignBoundFromALibrary(SimFixture& f) {
+  ScratchDir tmp;
+  const std::string kSource = (tmp.dir / "sealed.sv").string();
+  std::ofstream(kSource) << SealedDesignSource();
+  CliOptions opts;
+  opts.source_files = {kSource};
+  opts.precompile_library = "ip";
+  opts.precompile_output = (tmp.dir / "ip.dpl").string();
+  opts.protect.exchange_key = std::string(kKey);
+  SourceManager precompile_mgr;
+  DiagEngine precompile_diag{precompile_mgr};
+  ASSERT_EQ(RunPrecompile(opts, precompile_mgr, precompile_diag), 0);
+  SeparateCompilationBinder binder(f.mgr, f.arena, f.diag);
+  ASSERT_TRUE(binder.LoadLibrary(opts.precompile_output));
+  RtlirDesign* design = binder.Bind({"t"});
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+}
+
+// Registers the $probe whose calltf reads the design's protection into g_seen.
+void RegisterProtectionProbe() {
+  g_seen = ProtectionSeen();
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$probe");
+  data.calltf = &ReadProtectionCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
 class VpiProtectionInARun : public ::testing::Test {
  protected:
   void SetUp() override {
     SetGlobalVpiContext(&ctx_);
-    g_seen = ProtectionSeen();
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("$probe");
-    data.calltf = &ReadProtectionCalltf;
-    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    RegisterProtectionProbe();
     RunADesignWithASealedModule(f_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -326,6 +365,37 @@ TEST_F(VpiProtectionInARun, AnInstanceOfACleartextModuleIsNot) {
 TEST_F(VpiProtectionInARun, ACleartextInstancesNetsAreReached) {
   EXPECT_TRUE(g_seen.clear_nets_reached);
 }
+
+class VpiProtectionInABoundRun : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    RegisterProtectionProbe();
+    RunTheSealedDesignBoundFromALibrary(f_);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext ctx_;
+  SimFixture f_;
+};
+
+// §37.3.6: the code is the code the envelope contained whichever invocation
+// runs it, so the instance of the sealed module is protected in a run that
+// binds it from a library as in one that compiles it.
+TEST_F(VpiProtectionInABoundRun, AnInstanceOfASealedModuleIsProtected) {
+  EXPECT_EQ(g_seen.sealed_protected, 1);
+}
+
+// And the net declared inside it.
+TEST_F(VpiProtectionInABoundRun, ANetDeclaredInsideItIsProtected) {
+  EXPECT_EQ(g_seen.inner_net_protected, 1);
+}
+
+// The library holds the cleartext module beside it, and its instance is not.
+TEST_F(VpiProtectionInABoundRun, AnInstanceOfACleartextModuleIsNot) {
+  EXPECT_EQ(g_seen.clear_protected, 0);
+}
+
 // A variable the design holds, its VPI object marked protected as one
 // declared in a decryption envelope is, for the value routines to be asked of.
 class VpiProtectedValueAccess : public ::testing::Test {

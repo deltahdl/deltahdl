@@ -1,6 +1,7 @@
 #include "parser/precompiled_library.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -16,6 +17,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/lexer.h"
@@ -27,10 +29,11 @@ namespace delta {
 
 namespace {
 
-// DPLIB003 records carry the directive state and the runtime licences beside
-// the text; a DPLIB002 file, which held no licences, and a DPLIB001 file, which
-// held the text alone, are not read.
-constexpr char kMagic[] = "DPLIB003";
+// DPLIB004 records carry the directive state, the runtime licences and the
+// protected lines beside the text; a DPLIB003 file, which held no protected
+// lines, a DPLIB002 file, which held no licences either, and a DPLIB001 file,
+// which held the text alone, are not read.
+constexpr char kMagic[] = "DPLIB004";
 constexpr std::streamsize kMagicLen = 8;
 
 void WriteU32(std::ofstream& os, uint32_t v) {
@@ -187,6 +190,8 @@ void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   for (const ProtectLicense& license : d.runtime_licenses) {
     WriteRuntimeLicense(os, license);
   }
+  WriteU32(os, static_cast<uint32_t>(d.protected_lines.size()));
+  for (uint32_t line : d.protected_lines) WriteU32(os, line);
 }
 
 // Each entry is read before it is kept, so a damaged count ends the read at the
@@ -210,6 +215,12 @@ bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
     ProtectLicense license;
     if (!ReadRuntimeLicense(is, license)) return false;
     d.runtime_licenses.push_back(std::move(license));
+  }
+  if (!ReadU32(is, count)) return false;
+  for (uint32_t i = 0; i < count; ++i) {
+    uint32_t line = 0;
+    if (!ReadU32(is, line)) return false;
+    d.protected_lines.push_back(line);
   }
   return true;
 }
@@ -349,12 +360,33 @@ void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
   DropCells(target.packages, library, packages);
 }
 
+// Registers one record's text under `path`. Where lines of it came out of a
+// decryption envelope, the text is registered beside a copy marked protected
+// and those lines take their origin from the copy, so a position on one
+// resolves to protected code (§37.3.6) at the same path and line as before.
+uint32_t RegisterRecordText(const std::filesystem::path& path, Record& record,
+                            SourceManager& mgr) {
+  const std::vector<uint32_t>& sealed = record.directives.protected_lines;
+  if (sealed.empty())
+    return mgr.AddFile(path.string(), std::move(record.source));
+  const uint32_t kCopy = mgr.AddFile(path.string(), record.source);
+  mgr.MarkProtected(kCopy);
+  std::vector<OutputLineOrigin> origins(
+      static_cast<std::size_t>(std::ranges::count(record.source, '\n')) + 1);
+  for (uint32_t line : sealed) {
+    if (line == 0 || line > origins.size()) continue;
+    origins[line - 1] = OutputLineOrigin{kCopy, line};
+  }
+  return mgr.AddPreprocessedFile(path.string(), std::move(record.source),
+                                 std::move(origins));
+}
+
 // Parses one record's source into the target compilation unit, applying the
 // directive state it recorded and tagging cells with the record's library name.
 // Returns false on parse failure.
 bool LoadRecord(const std::filesystem::path& path, Record& record,
                 LoadContext& ctx) {
-  uint32_t fid = ctx.mgr.AddFile(path.string(), std::move(record.source));
+  uint32_t fid = RegisterRecordText(path, record, ctx.mgr);
   Lexer lex(ctx.mgr.FileContent(fid), fid, ctx.diag,
             TextOrigin::kPreprocessorOutput);
   Parser parser(lex, ctx.arena, ctx.diag);
