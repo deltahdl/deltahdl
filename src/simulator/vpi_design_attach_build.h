@@ -42,6 +42,10 @@ VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build);
 // drawn for here, such as a name standing for another type.
 int VpiTypespecKind(DataTypeKind kind);
 
+// §37.17: the object kind of a variable declared with a type of `kind`, a
+// logic var for a type §37.17 draws no box of its own for.
+int VpiDataTypeVariableKind(DataTypeKind kind);
+
 // The packed dimensions of a value, outermost first, each a declared range.
 using PackedDims = std::vector<PackedRange>;
 
@@ -106,6 +110,11 @@ void AttachVariableRanges(const RtlirDesign* design,
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
+
+// §37.12: give each instance an object per block its procedures write that is
+// a scope, nested as the blocks are, each with the variables it declares.
+void AttachBlockScopes(const RtlirDesign* design, const VpiObjectMap& objects,
+                       const VpiAttachBuild& build);
 
 // §37.7: give each interface instance a modport per modport its interface
 // declares, each with an io decl per port it gives a direction, and §37.13:

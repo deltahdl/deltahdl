@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -454,6 +457,204 @@ TEST(ScopePublic, VirtualInterfaceIterationUnsupportedInClassDefn) {
 
   EXPECT_EQ(ctx.Iterate(vpiVirtualInterfaceVar, &class_defn), nullptr);
 
+  SetGlobalVpiContext(nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// The scopes of a run: the blocks a design's procedures write, built from the
+// elaborated design rather than by hand.
+// ---------------------------------------------------------------------------
+
+class BlockScopesOfARun : public VpiDesignRun {
+ protected:
+  // The object `name` reaches from the top of the design, null for none.
+  static vpiHandle By(const std::string& name) {
+    return vpi_handle_by_name(VpiText(name.c_str()), nullptr);
+  }
+  static std::string FullName(vpiHandle obj) {
+    const char* full_name = vpi_get_str(vpiFullName, obj);
+    return full_name == nullptr ? "" : full_name;
+  }
+  // The kinds of the objects `type` reaches from `ref`, in the order reached.
+  static std::vector<int> KindsOf(int type, vpiHandle ref) {
+    std::vector<int> kinds;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return kinds;
+    while (vpiHandle obj = vpi_scan(it)) kinds.push_back(vpi_get(vpiType, obj));
+    return kinds;
+  }
+};
+
+// D1: a named begin is always a scope, so a procedure's named block is an
+// object of the run, named under the instance whose procedure wrote it.
+TEST_F(BlockScopesOfARun, ANamedBeginIsAnObjectOfTheRun) {
+  Run("module top; int x; initial begin : blk x = 1; end endmodule\n");
+  vpiHandle blk = By("top.blk");
+  ASSERT_NE(blk, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, blk), vpiNamedBegin);
+  EXPECT_STREQ(vpi_get_str(vpiName, blk), "blk");
+  EXPECT_EQ(FullName(blk), "top.blk");
+}
+
+// D1: a named fork is always a scope as well.
+TEST_F(BlockScopesOfARun, ANamedForkIsAnObjectOfTheRun) {
+  Run("module top; initial fork : fk #1; join_any endmodule\n");
+  vpiHandle fk = By("top.fk");
+  ASSERT_NE(fk, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, fk), vpiNamedFork);
+  EXPECT_EQ(FullName(fk), "top.fk");
+}
+
+// A named block inside another is named under the block around it.
+TEST_F(BlockScopesOfARun, ANestedNamedBlockIsNamedUnderTheBlockAroundIt) {
+  Run("module top; initial begin : outer begin : inner end end endmodule\n");
+  vpiHandle inner = By("top.outer.inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inner), vpiNamedBegin);
+  EXPECT_EQ(FullName(inner), "top.outer.inner");
+  EXPECT_EQ(By("top.inner"), nullptr);
+}
+
+// The blocks a procedure writes in the branches of an if, the items of a case
+// and the body of a loop are scopes of the run all the same.
+TEST_F(BlockScopesOfARun, ABlockInsideAnotherStatementIsAnObjectOfTheRun) {
+  Run("module top; int x;\n"
+      "  initial if (x == 0) begin : t end else begin : e end\n"
+      "  initial case (x) 0: begin : c0 end default: begin : cd end endcase\n"
+      "  initial for (int i = 0; i < 1; i++) begin : lp end\n"
+      "endmodule\n");
+  const std::vector<std::string> kNames{"top.t", "top.e", "top.c0", "top.cd",
+                                        "top.lp"};
+  for (const std::string& name : kNames) {
+    vpiHandle blk = By(name);
+    ASSERT_NE(blk, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiType, blk), vpiNamedBegin) << name;
+  }
+}
+
+// A block of a submodule's procedure is a scope of that instance.
+TEST_F(BlockScopesOfARun, ABlockOfASubmoduleIsNamedUnderItsInstance) {
+  Run("module sub; initial begin : sb end endmodule\n"
+      "module top; sub u(); endmodule\n");
+  vpiHandle sb = By("top.u.sb");
+  ASSERT_NE(sb, nullptr);
+  EXPECT_EQ(FullName(sb), "top.u.sb");
+}
+
+// D6: a fork reports the join keyword that closed it.
+TEST_F(BlockScopesOfARun, AForkReportsTheJoinKeywordThatClosedIt) {
+  Run("module top;\n"
+      "  initial fork : fj #1; join\n"
+      "  initial fork : fa #1; join_any\n"
+      "  initial fork : fn #1; join_none\n"
+      "endmodule\n");
+  ASSERT_NE(By("top.fj"), nullptr);
+  EXPECT_EQ(vpi_get(vpiJoinType, By("top.fj")), vpiJoin);
+  EXPECT_EQ(vpi_get(vpiJoinType, By("top.fa")), vpiJoinAny);
+  EXPECT_EQ(vpi_get(vpiJoinType, By("top.fn")), vpiJoinNone);
+}
+
+// The variables a named block declares hang beneath it, each of the kind its
+// type gives (§37.17), and a block parameter is none of them.
+TEST_F(BlockScopesOfARun, ANamedBlocksVariablesHangBeneathIt) {
+  Run("module top; initial begin : blk\n"
+      "  parameter int P = 1; int v = 3; logic [3:0] w; int a [2];\n"
+      "end endmodule\n");
+  vpiHandle blk = By("top.blk");
+  ASSERT_NE(blk, nullptr);
+  EXPECT_EQ(NamesOf(vpiVariables, blk),
+            (std::vector<std::string>{"a", "v", "w"}));
+  vpiHandle v = By("top.blk.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v), vpiIntVar);
+  EXPECT_EQ(FullName(v), "top.blk.v");
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.w")), vpiLogicVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.a")), vpiRegArray);
+}
+
+// D1: an unnamed begin or fork that directly declares a block item is a scope,
+// with the declared variable beneath it.
+TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresIsAScope) {
+  Run("module top;\n"
+      "  initial begin int v; v = 1; end\n"
+      "  initial fork int f; join_none\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(KindsOf(vpiInternalScope, top),
+            (std::vector<int>{vpiBegin, vpiFork}));
+  vpiHandle it = vpi_iterate(vpiInternalScope, top);
+  ASSERT_NE(it, nullptr);
+  vpiHandle begin = vpi_scan(it);
+  ASSERT_NE(begin, nullptr);
+  EXPECT_EQ(NamesOf(vpiVariables, begin), (std::vector<std::string>{"v"}));
+}
+
+// D1: an unnamed begin that declares nothing directly is no scope, though a
+// named block inside it declares a variable; the named block stands in the
+// instance itself, as in the detail's example.
+TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresNothingIsNoScope) {
+  Run("module top; initial begin\n"
+      "  begin : BLK var logic v; v = 1'b1; end\n"
+      "end endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(KindsOf(vpiInternalScope, top), (std::vector<int>{vpiNamedBegin}));
+  EXPECT_NE(By("top.BLK"), nullptr);
+}
+
+// The vpiInternalScope relation is drawn to the scope class, so it reaches the
+// instances and blocks a scope holds and none of its variables.
+TEST_F(BlockScopesOfARun, InternalScopesAreTheScopesAScopeHolds) {
+  Run("module sub; endmodule\n"
+      "module top; int x; sub u();\n"
+      "  initial begin : blk begin : inner end end\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(NamesOf(vpiInternalScope, top),
+            (std::vector<std::string>{"blk", "u"}));
+  EXPECT_EQ(NamesOf(vpiInternalScope, By("top.blk")),
+            (std::vector<std::string>{"inner"}));
+}
+
+// A block reaches the scope it stands in through vpiScope: the block around
+// it, or the instance.
+TEST_F(BlockScopesOfARun, ABlockReachesTheScopeItStandsIn) {
+  Run("module top; initial begin : outer begin : inner end end endmodule\n");
+  vpiHandle outer = By("top.outer");
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, By("top.outer.inner"))),
+            VpiObjectOf(outer));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, outer)), VpiObjectOf(By("top")));
+}
+
+// A statement's scope is the nearest object around it that is a scope: an
+// unnamed begin declaring nothing is passed over (D1).
+TEST(ScopePublic, AStatementsScopeSkipsABlockThatIsNoScope) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject plain_begin;
+  plain_begin.type = vpiBegin;
+  plain_begin.parent = &module;
+  VpiObject assignment;
+  assignment.type = vpiAssignment;
+  assignment.parent = &plain_begin;
+  plain_begin.children.push_back(&assignment);
+  EXPECT_EQ(ctx.Handle(vpiScope, &assignment), &module);
+  EXPECT_EQ(ctx.Handle(vpiScope, &module), nullptr);
+  SetGlobalVpiContext(nullptr);
+}
+
+// A statement standing in no scope at all reaches none.
+TEST(ScopePublic, AStatementInNoScopeReachesNone) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject assignment;
+  assignment.type = vpiAssignment;
+  EXPECT_EQ(ctx.Handle(vpiScope, &assignment), nullptr);
   SetGlobalVpiContext(nullptr);
 }
 

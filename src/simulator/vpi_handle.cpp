@@ -713,11 +713,12 @@ bool TryResolveLoopControlScopeRelation(int type, VpiHandle ref,
 // §37.79/§37.76/§37.71/§37.69/§37.77/§37.12: the lhs/rhs of the procedural
 // continuous assignment family and alias statements, an if-else's else branch,
 // repeat-control and disable expressions, a task/func body, and a loop control
-// variable's enclosing scope.
+// variable's or a statement's enclosing scope.
 bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveAssignLhsRhsRelation(type, ref, out) ||
          TryResolveElseExprStmtRelation(type, ref, out) ||
-         TryResolveLoopControlScopeRelation(type, ref, out);
+         TryResolveLoopControlScopeRelation(type, ref, out) ||
+         TryResolveStmtScopeRelation(type, ref, out);
 }
 
 // §37.35/§37.9/§37.6/§37.5/§37.85: the reference object types whose vpiIndex

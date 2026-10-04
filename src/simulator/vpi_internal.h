@@ -25,6 +25,14 @@ inline PLI_BYTE8* VpiText(const char* text) {
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
+// §37.12: the kinds the scope class groups, which vpiInternalScope reaches.
+// Defined in vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
+bool VpiIsInternalScopeType(int type);
+
+// §37.12/§37.63: a statement's vpiScope, the nearest scope around it. Defined
+// in vpi_helpers_scopes.cpp, used by vpi_handle.cpp.
+bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out);
+
 // §37.63/§37.66/§37.67/§37.70: the kinds that reach a body statement through
 // the object model's untagged arrow to `stmt`. Defined in
 // vpi_helpers_statements.cpp, used by vpi_handle.cpp.

@@ -634,6 +634,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach.cpp
     simulator/vpi_design_attach_assigns.cpp
     simulator/vpi_design_attach_bits.cpp
+    simulator/vpi_design_attach_blocks.cpp
     simulator/vpi_design_attach_build.cpp
     simulator/vpi_design_attach_elements.cpp
     simulator/vpi_design_attach_instances.cpp
@@ -651,6 +652,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_helpers_loops.cpp
     simulator/vpi_helpers_net_type.cpp
     simulator/vpi_helpers_nets.cpp
+    simulator/vpi_helpers_scopes.cpp
     simulator/vpi_helpers_statements.cpp
     simulator/vpi_helpers_timing_controls.cpp
     simulator/vpi_helpers_variables.cpp

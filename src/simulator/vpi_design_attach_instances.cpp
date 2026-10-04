@@ -200,6 +200,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
+    AttachBlockScopes(design, object_map_, kBuild);
   }
   AttachContinuousAssignments(design);
 }

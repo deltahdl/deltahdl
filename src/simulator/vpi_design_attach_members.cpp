@@ -16,12 +16,7 @@
 
 namespace delta {
 
-namespace {
-
-// §37.17: the object kind of a member declared with `kind`, as a variable of
-// that type would be; a logic var for a type §37.17 draws no box of its own
-// for.
-int MemberKind(DataTypeKind kind) {
+int VpiDataTypeVariableKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
       return vpiByteVar;
@@ -46,6 +41,8 @@ int MemberKind(DataTypeKind kind) {
   }
 }
 
+namespace {
+
 // §37.26: the member variable of `holder` the field `field` lays out: its
 // vpiParent is the struct or union var, it is named after the field, and its
 // value is the field's bits of the holder's value, a copy that a read
@@ -53,7 +50,7 @@ int MemberKind(DataTypeKind kind) {
 void MakeMember(VpiObject* holder, const StructFieldInfo& field,
                 const VpiAttachBuild& build) {
   VpiObject* member = build.alloc();
-  member->type = MemberKind(field.type_kind);
+  member->type = VpiDataTypeVariableKind(field.type_kind);
   member->parent = holder;
   member->name = build.keep(std::string(field.name));
   member->full_name = holder->full_name + "." + std::string(field.name);
