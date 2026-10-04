@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -11,6 +10,7 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_element_shape.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
@@ -22,12 +22,6 @@
 #include "parser/ast_type.h"
 
 namespace delta {
-
-struct ResolvedAttribute {
-  std::string_view name;
-  std::optional<int64_t> resolved_value;
-  std::string_view string_value;
-};
 
 enum class RtlirNodeKind : uint8_t {
   kModule,
@@ -588,6 +582,9 @@ struct RtlirParamDecl {
   // parameter and for a parameter port declared with no type. The AST owns
   // it.
   const DataType* decl_type = nullptr;
+  // §37.28 detail 2: the type a type parameter has at the end of elaboration,
+  // null for a value parameter. The arena owns it.
+  const DataType* resolved_type = nullptr;
   // §23.10.1 (printed pages 764-765) with §6.20.2 (printed 126): the
   // right-hand side of the defparam that gave this parameter its value, the
   // values in scope where that statement stands, the generate blocks it

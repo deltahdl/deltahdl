@@ -323,5 +323,63 @@ TEST_F(ParametersOfARun, ATypeParameterIsATypeParameter) {
             nullptr);
 }
 
+// The typespec the type parameter `name` of the scope `scope` names reaches
+// through vpiTypespec.
+vpiHandle TypespecOf(const char* scope, std::string_view name) {
+  return vpi_handle(vpiTypespec,
+                    ChildOf(vpiTypeParameter,
+                            vpi_handle_by_name(VpiText(scope), nullptr), name));
+}
+
+constexpr const char* kTypeParameterTypes =
+    "typedef enum {X, Y} ue_t;\n"
+    "module c;\n"
+    "  parameter type T = int;\n"
+    "endmodule\n"
+    "module d #(parameter type T = shortint);\n"
+    "endmodule\n"
+    "module top;\n"
+    "  typedef enum {A, B, C} e_t;\n"
+    "  parameter type L = e_t;\n"
+    "  parameter type U = ue_t;\n"
+    "  c #(.T(ue_t)) u();\n"
+    "  d v();\n"
+    "endmodule\n";
+
+// Detail 2: a type parameter's vpiTypespec is the typespec of the type it has
+// at the end of elaboration, the typedef it names left unresolved...
+TEST_F(ParametersOfARun, ATypeParametersTypespecIsTheTypedefItNames) {
+  Run(kTypeParameterTypes);
+  EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top", "L")), "e_t");
+}
+
+// ...one of the compilation unit among them...
+TEST_F(ParametersOfARun, ATypeParametersTypespecIsTheUnitsTypedefItNames) {
+  Run(kTypeParameterTypes);
+  EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top", "U")), "ue_t");
+}
+
+// ...the one an instance's parameter value assignment gave it over its
+// default...
+TEST_F(ParametersOfARun,
+       AnOverriddenTypeParametersTypespecIsTheTypeItWasGiven) {
+  Run(kTypeParameterTypes);
+  vpiHandle typespec = TypespecOf("top.u", "T");
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiEnumTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "ue_t");
+}
+
+// ...and, of a type no typedef names, a typespec of its kind, for a
+// parameter declared among the items or as a parameter port.
+TEST_F(ParametersOfARun, ATypeParametersTypespecIsOfItsTypesKind) {
+  Run(kParameters);
+  EXPECT_EQ(vpi_get(vpiType, TypespecOf("top", "T")), vpiLogicTypespec);
+}
+
+TEST_F(ParametersOfARun, AParameterPortsTypespecIsOfItsTypesKind) {
+  Run(kTypeParameterTypes);
+  EXPECT_EQ(vpi_get(vpiType, TypespecOf("top.v", "T")), vpiShortIntTypespec);
+}
+
 }  // namespace
 }  // namespace delta

@@ -475,11 +475,14 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   if (is_type) {
     // The type the instantiation gives the parameter, or the default, is
     // what the declaration's restriction judges and what the declarations
-    // written in terms of the parameter elaborate against.
+    // written in terms of the parameter elaborate against. It is also the
+    // type §37.28 detail 2 has the parameter's vpiTypespec stand for, a
+    // typedef it names left unresolved.
     if (auto type = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
       CheckTypeParamConformsToForwardKind(
           item, *type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
       typedefs_[item->name] = *type;
+      pd.resolved_type = arena_.Create<DataType>(*type);
     }
   }
   // The parameters already elaborated, which a range bound, a type and the

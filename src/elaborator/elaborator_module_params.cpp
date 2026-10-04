@@ -419,15 +419,35 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   return true;
 }
 
-// What a parameter port declaration is built against, and the name table it is
-// registered into. The three travel together because a parameter port cannot be
-// built without the first two nor judged under §11.5.1 without the third, and
-// etc/clang_tidy/src.yml caps a function at five parameters.
+// What a parameter port declaration is built against, the name table it is
+// registered into, and the arena a type parameter's type is kept in. They
+// travel together because a parameter port cannot be built without the first
+// two nor judged under §11.5.1 without the third, a type parameter port keeps
+// its type for §37.28 in the fourth, and etc/clang_tidy/src.yml caps a
+// function at five parameters.
 struct ParamPortCtx {
   const TypedefMap& typedefs;
   const ScopeMap& scope;
   std::unordered_set<std::string_view>& real_param_names;
+  Arena& arena;
 };
+
+// §37.28 detail 2: the type the type parameter port at index `i` of `decl`
+// has for the instantiation being elaborated, as ApplyChildTypeParams
+// published it in `ctx.typedefs`, or its default where nothing was published.
+// Null where it has neither.
+static const DataType* PortTypeParamType(const ModuleDecl* decl, size_t i,
+                                         const ParamPortCtx& ctx) {
+  auto published = ctx.typedefs.find(decl->params[i].first);
+  if (published != ctx.typedefs.end()) {
+    return ctx.arena.Create<DataType>(published->second);
+  }
+  if (i < decl->param_types.size() &&
+      decl->param_types[i].kind != DataTypeKind::kImplicit) {
+    return ctx.arena.Create<DataType>(decl->param_types[i]);
+  }
+  return nullptr;
+}
 
 // Build the non-value identity/type fields of a parameter declaration (name,
 // localparam/type-param flags, declared-type info), and record a real-typed one
@@ -452,6 +472,7 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.default_value = pval;
   pd.is_resolved = false;
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
+  if (pd.is_type_param) pd.resolved_type = PortTypeParamType(decl, i, ctx);
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
   // A.2.1.1: a parameter port declared with unpacked dimensions is an array
   // of values as a body parameter is (§6.20.1), and folds its bounds alike.
@@ -485,7 +506,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     bool has_param_type = i < decl->param_types.size() &&
                           decl->type_param_names.count(pname) == 0;
     RtlirParamDecl pd = BuildParamDeclShell(
-        decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
+        decl, i, {typedefs_, scope, real_param_names_, arena_}, has_param_type);
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
     ApplyParamOverride(pd, kAssigns, pname, param_type, arena_);

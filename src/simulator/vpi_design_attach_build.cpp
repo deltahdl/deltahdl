@@ -10,6 +10,7 @@
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -48,6 +49,43 @@ VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build) {
   constant->var = storage;
   constant->size = 32;
   return constant;
+}
+
+int VpiTypespecKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kEnum:
+      return vpiEnumTypespec;
+    case DataTypeKind::kStruct:
+      return vpiStructTypespec;
+    case DataTypeKind::kUnion:
+      return vpiUnionTypespec;
+    case DataTypeKind::kImplicit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return vpiLogicTypespec;
+    case DataTypeKind::kBit:
+      return vpiBitTypespec;
+    case DataTypeKind::kByte:
+      return vpiByteTypespec;
+    case DataTypeKind::kShortint:
+      return vpiShortIntTypespec;
+    case DataTypeKind::kInt:
+      return vpiIntTypespec;
+    case DataTypeKind::kLongint:
+      return vpiLongIntTypespec;
+    case DataTypeKind::kInteger:
+      return vpiIntegerTypespec;
+    case DataTypeKind::kTime:
+      return vpiTimeTypespec;
+    case DataTypeKind::kReal:
+      return vpiRealTypespec;
+    case DataTypeKind::kShortreal:
+      return vpiShortRealTypespec;
+    case DataTypeKind::kString:
+      return vpiStringTypespec;
+    default:
+      return 0;
+  }
 }
 
 int64_t PackedDimsWidth(const PackedDims& dims) {

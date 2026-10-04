@@ -15,6 +15,7 @@ namespace delta {
 class Arena;
 class SimContext;
 struct DataType;
+enum class DataTypeKind : uint8_t;
 struct RtlirDesign;
 struct VpiObject;
 
@@ -35,6 +36,10 @@ using VpiObjectMap = std::unordered_map<std::string_view, VpiObject*>;
 // An integer as the vpiIntConst constant a relation such as vpiIndex or
 // vpiLeftRange reaches.
 VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build);
+
+// §37.25: the typespec kind of a type of `kind`; 0 for a kind no typespec is
+// drawn for here, such as a name standing for another type.
+int VpiTypespecKind(DataTypeKind kind);
 
 // The packed dimensions of a value, outermost first, each a declared range.
 using PackedDims = std::vector<PackedRange>;
@@ -77,7 +82,9 @@ void AttachTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build);
 
 // §37.28 details 1 and 2: make each value parameter a vpiParameter and each
-// type parameter a vpiTypeParameter, each saying whether it is a localparam.
+// type parameter a vpiTypeParameter, each saying whether it is a localparam,
+// and relate a type parameter to the typespec of the type it has. Runs after
+// AttachTypespecs, whose typespecs a type parameter naming a typedef reaches.
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiAttachBuild& build);
 

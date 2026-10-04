@@ -23,45 +23,6 @@ namespace {
 // The typespecs one scope declares, by typedef name.
 using TypespecsByName = std::unordered_map<std::string_view, VpiObject*>;
 
-// §37.25: the typespec kind of a type of `kind`; 0 for a kind it draws none
-// for here, such as a name standing for another type.
-int TypespecKind(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kEnum:
-      return vpiEnumTypespec;
-    case DataTypeKind::kStruct:
-      return vpiStructTypespec;
-    case DataTypeKind::kUnion:
-      return vpiUnionTypespec;
-    case DataTypeKind::kImplicit:
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-      return vpiLogicTypespec;
-    case DataTypeKind::kBit:
-      return vpiBitTypespec;
-    case DataTypeKind::kByte:
-      return vpiByteTypespec;
-    case DataTypeKind::kShortint:
-      return vpiShortIntTypespec;
-    case DataTypeKind::kInt:
-      return vpiIntTypespec;
-    case DataTypeKind::kLongint:
-      return vpiLongIntTypespec;
-    case DataTypeKind::kInteger:
-      return vpiIntegerTypespec;
-    case DataTypeKind::kTime:
-      return vpiTimeTypespec;
-    case DataTypeKind::kReal:
-      return vpiRealTypespec;
-    case DataTypeKind::kShortreal:
-      return vpiShortRealTypespec;
-    case DataTypeKind::kString:
-      return vpiStringTypespec;
-    default:
-      return 0;
-  }
-}
-
 // What making one scope's typespecs reads: the scope object they hang from,
 // the enumerations the run resolved under each typedef name, and the model to
 // build in.
@@ -103,7 +64,7 @@ void MakeTypespecMember(VpiObject* typespec, const StructMember& member,
 // type it draws no typespec for here.
 VpiObject* MakeTypespec(const ModuleItem& item, const ScopeTypespecs& at) {
   const DataType& type = item.typedef_type;
-  const int kKind = TypespecKind(type.kind);
+  const int kKind = VpiTypespecKind(type.kind);
   if (kKind == 0) return nullptr;
   VpiObject* typespec = at.build.alloc();
   typespec->type = kKind;
