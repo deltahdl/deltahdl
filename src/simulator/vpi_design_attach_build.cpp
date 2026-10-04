@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <optional>
-#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
