@@ -103,12 +103,17 @@ void SourceManager::AddViewport(EnvelopeViewport viewport) {
 bool SourceManager::StandsInEnvelope(SourceLoc loc,
                                      const EnvelopeViewport& viewport) const {
   if (!loc.IsValid()) return false;
+  auto in_region = [&viewport](SourceLoc at) {
+    return at.file_id == viewport.region_source &&
+           at.line >= viewport.first_line && at.line <= viewport.last_line;
+  };
+  // A region of a precompiled library record's text holds positions in the
+  // record as they stand, its sealed lines among them, which resolve to the
+  // record's protected copy.
+  if (in_region(loc)) return true;
   const SourceLoc kAt = ResolveToOrigin(loc);
   if (kAt.file_id == 0) return false;
-  if (kAt.file_id == viewport.region_source &&
-      kAt.line >= viewport.first_line && kAt.line <= viewport.last_line) {
-    return true;
-  }
+  if (in_region(kAt)) return true;
   return kAt.file_id >= viewport.first_source &&
          kAt.file_id <= viewport.last_source;
 }

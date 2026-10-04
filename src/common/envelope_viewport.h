@@ -42,6 +42,11 @@ inline ViewportAccess ViewportAccessOf(std::string_view access) {
 // them, `region_source` from `first_line` to `last_line`, and the sources
 // registered between the two, which its included files and nested decryption
 // envelopes recovered to. `region_source` is 0 for a decryption envelope.
+//
+// An envelope a precompiled library record carries, of either kind, is the
+// lines of the record's text that came out of it, so a run binding the record
+// keeps it as `region_source`, the record's text, from `first_line` to
+// `last_line`, with no sources beside.
 struct EnvelopeViewport {
   std::string object;
   std::string access;

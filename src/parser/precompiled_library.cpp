@@ -17,6 +17,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/envelope_viewport.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
@@ -29,11 +30,12 @@ namespace delta {
 
 namespace {
 
-// DPLIB004 records carry the directive state, the runtime licences and the
-// protected lines beside the text; a DPLIB003 file, which held no protected
-// lines, a DPLIB002 file, which held no licences either, and a DPLIB001 file,
+// DPLIB005 records carry the directive state, the runtime licences, the
+// protected lines and the envelopes' viewports beside the text; a DPLIB004
+// file, which held no viewports, a DPLIB003 file, which held no protected lines
+// either, a DPLIB002 file, which held no licences either, and a DPLIB001 file,
 // which held the text alone, are not read.
-constexpr char kMagic[] = "DPLIB004";
+constexpr char kMagic[] = "DPLIB005";
 constexpr std::streamsize kMagicLen = 8;
 
 void WriteU32(std::ofstream& os, uint32_t v) {
@@ -181,6 +183,20 @@ bool ReadRuntimeLicense(std::ifstream& is, ProtectLicense& license) {
   return true;
 }
 
+void WriteViewport(std::ofstream& os, const PrecompiledViewport& viewport) {
+  WriteString(os, viewport.object);
+  WriteString(os, viewport.access);
+  WriteU32(os, viewport.line);
+  WriteU32(os, viewport.first_line);
+  WriteU32(os, viewport.last_line);
+}
+
+bool ReadViewport(std::ifstream& is, PrecompiledViewport& viewport) {
+  return ReadString(is, viewport.object) && ReadString(is, viewport.access) &&
+         ReadU32(is, viewport.line) && ReadU32(is, viewport.first_line) &&
+         ReadU32(is, viewport.last_line);
+}
+
 void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   WriteU32(os, static_cast<uint32_t>(d.modules.size()));
   for (const ModuleDirectives& m : d.modules) WriteModuleDirectives(os, m);
@@ -192,6 +208,10 @@ void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   }
   WriteU32(os, static_cast<uint32_t>(d.protected_lines.size()));
   for (uint32_t line : d.protected_lines) WriteU32(os, line);
+  WriteU32(os, static_cast<uint32_t>(d.viewports.size()));
+  for (const PrecompiledViewport& viewport : d.viewports) {
+    WriteViewport(os, viewport);
+  }
 }
 
 // Reads a count and that many entries into `out`, each with `read_one`. Each
@@ -213,7 +233,8 @@ bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
   return ReadList(is, d.modules, ReadModuleDirectives) &&
          ReadList(is, d.cell_modules, ReadString) &&
          ReadList(is, d.runtime_licenses, ReadRuntimeLicense) &&
-         ReadList(is, d.protected_lines, ReadU32);
+         ReadList(is, d.protected_lines, ReadU32) &&
+         ReadList(is, d.viewports, ReadViewport);
 }
 
 // Parses `source`, the preprocessor's output, with every report suppressed, and
@@ -372,12 +393,30 @@ uint32_t RegisterRecordText(const std::filesystem::path& path, Record& record,
                                  std::move(origins));
 }
 
+// §34.5.32: the viewports of the envelopes a record's text came out of, each
+// envelope restated as the lines of `fid`, the record's registered text, and
+// each viewport standing where its pragma expression stood in it.
+void AddRecordViewports(const Record& record, uint32_t fid,
+                        SourceManager& mgr) {
+  for (const PrecompiledViewport& kept : record.directives.viewports) {
+    EnvelopeViewport viewport;
+    viewport.object = kept.object;
+    viewport.access = kept.access;
+    viewport.loc = SourceLoc{fid, kept.line, 1};
+    viewport.region_source = fid;
+    viewport.first_line = kept.first_line;
+    viewport.last_line = kept.last_line;
+    mgr.AddViewport(std::move(viewport));
+  }
+}
+
 // Parses one record's source into the target compilation unit, applying the
 // directive state it recorded and tagging cells with the record's library name.
 // Returns false on parse failure.
 bool LoadRecord(const std::filesystem::path& path, Record& record,
                 LoadContext& ctx) {
   uint32_t fid = RegisterRecordText(path, record, ctx.mgr);
+  AddRecordViewports(record, fid, ctx.mgr);
   Lexer lex(ctx.mgr.FileContent(fid), fid, ctx.diag,
             TextOrigin::kPreprocessorOutput);
   Parser parser(lex, ctx.arena, ctx.diag);

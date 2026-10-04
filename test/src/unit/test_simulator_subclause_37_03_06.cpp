@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <fstream>
 #include <string>
 #include <string_view>
 
@@ -9,16 +7,8 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
-#include "driver/cli_options.h"
-#include "driver/precompile_run.h"
-#include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
-#include "elaborator/separate_compilation_bind.h"
-#include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
+#include "helpers_sealed_design_run.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -267,49 +257,6 @@ std::string SealedDesignSource() {
   return EncryptEnvelopes(kAuthored, kKey);
 }
 
-// The sealed design read back as a compile reads it: preprocessed under the
-// exchange key, its text registered with the origin of each line, elaborated
-// from the top and run.
-void RunADesignWithASealedModule(SimFixture& f) {
-  PreprocConfig config;
-  config.protect_key = std::string(kKey);
-  Preprocessor pp(f.mgr, f.diag, config);
-  std::string text =
-      pp.Preprocess(f.mgr.AddFile("<test>", SealedDesignSource()));
-  uint32_t fid = f.mgr.AddPreprocessedFile("<test>", text, pp.LineOrigins());
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag,
-              TextOrigin::kPreprocessorOutput);
-  Parser parser(lexer, f.arena, f.diag);
-  Elaborator elab(f.arena, f.diag, parser.Parse());
-  RtlirDesign* design = elab.Elaborate("t");
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.diag.HasErrors());
-  LowerAndRun(design, f);
-}
-
-// The sealed design compiled into a library by one invocation (§33.5.3) and
-// bound and run by another (§33.5.4), which reads the library's compiled form
-// and never the source.
-void RunTheSealedDesignBoundFromALibrary(SimFixture& f) {
-  ScratchDir tmp;
-  const std::string kSource = (tmp.dir / "sealed.sv").string();
-  std::ofstream(kSource) << SealedDesignSource();
-  CliOptions opts;
-  opts.source_files = {kSource};
-  opts.precompile_library = "ip";
-  opts.precompile_output = (tmp.dir / "ip.dpl").string();
-  opts.protect.exchange_key = std::string(kKey);
-  SourceManager precompile_mgr;
-  DiagEngine precompile_diag{precompile_mgr};
-  ASSERT_EQ(RunPrecompile(opts, precompile_mgr, precompile_diag), 0);
-  SeparateCompilationBinder binder(f.mgr, f.arena, f.diag);
-  ASSERT_TRUE(binder.LoadLibrary(opts.precompile_output));
-  RtlirDesign* design = binder.Bind({"t"});
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.diag.HasErrors());
-  LowerAndRun(design, f);
-}
-
 // Registers the $probe whose calltf reads the design's protection into g_seen.
 void RegisterProtectionProbe() {
   g_seen = ProtectionSeen();
@@ -325,7 +272,7 @@ class VpiProtectionInARun : public ::testing::Test {
   void SetUp() override {
     SetGlobalVpiContext(&ctx_);
     RegisterProtectionProbe();
-    RunADesignWithASealedModule(f_);
+    RunUnderKey(SealedDesignSource(), kKey, f_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -371,7 +318,7 @@ class VpiProtectionInABoundRun : public ::testing::Test {
   void SetUp() override {
     SetGlobalVpiContext(&ctx_);
     RegisterProtectionProbe();
-    RunTheSealedDesignBoundFromALibrary(f_);
+    RunBoundFromALibrary(SealedDesignSource(), kKey, f_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 

@@ -161,7 +161,7 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   ScratchDir tmp;
   auto path = tmp.dir / "truncated.dpl";
   std::ofstream os(path, std::ios::binary);
-  os.write("DPLIB004", 8);
+  os.write("DPLIB005", 8);
 
   unsigned char bad[4] = {0x10, 0x00, 0x00, 0x00};
   os.write(reinterpret_cast<const char*>(bad), 4);

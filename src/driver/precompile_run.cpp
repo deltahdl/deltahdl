@@ -13,6 +13,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/envelope_viewport.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "driver/cli_options.h"
@@ -71,6 +72,33 @@ std::vector<T> Since(const std::vector<T>& all, size_t before) {
   return {all.begin() + static_cast<std::ptrdiff_t>(before), all.end()};
 }
 
+// §34.5.32: a viewport of an envelope a file's reading closed, restated
+// against `origins`, the origin of each line of the text the reading produced:
+// the line its pragma expression stood on, and the first and last lines that
+// came out of its envelope. A pragma expression that left no line of its own
+// stands at the envelope's first line.
+PrecompiledViewport RecordedViewport(
+    const EnvelopeViewport& viewport,
+    const std::vector<OutputLineOrigin>& origins,
+    const SourceManager& src_mgr) {
+  PrecompiledViewport kept;
+  kept.object = viewport.object;
+  kept.access = viewport.access;
+  for (std::size_t i = 0; i < origins.size(); ++i) {
+    const auto kLine = static_cast<uint32_t>(i + 1);
+    const SourceLoc kOrigin{origins[i].file_id, origins[i].line, 1};
+    if (kept.line == 0 && kOrigin.file_id == viewport.loc.file_id &&
+        kOrigin.line == viewport.loc.line) {
+      kept.line = kLine;
+    }
+    if (!src_mgr.StandsInEnvelope(kOrigin, viewport)) continue;
+    if (kept.first_line == 0) kept.first_line = kLine;
+    kept.last_line = kLine;
+  }
+  if (kept.line == 0) kept.line = kept.first_line;
+  return kept;
+}
+
 // Preprocesses the file at `path` with `preproc`, which carries macros and
 // directive state from the files before it as an ordinary compile's does, and
 // keeps the parts of the preprocessor's records this file added, its runtime
@@ -85,6 +113,7 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
   size_t modules = preproc.ModuleDirectivesList().size();
   size_t cells = preproc.CellModuleNames().size();
   size_t licenses = preproc.RuntimeLicenses().size();
+  size_t viewports = src_mgr.Viewports().size();
   PreprocessedSource out;
   out.path = path;
   out.text = preproc.Preprocess(file_id);
@@ -104,6 +133,14 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
     if (src_mgr.IsProtected(SourceLoc{origin.file_id, origin.line, 1})) {
       out.directives.protected_lines.push_back(static_cast<uint32_t>(i + 1));
     }
+  }
+  // §34.5.32.2's containment check and the access each viewport asks belong to
+  // the run that binds the record, so the viewports go with the text, their
+  // envelopes restated as its lines.
+  for (const EnvelopeViewport& viewport :
+       Since(src_mgr.Viewports(), viewports)) {
+    out.directives.viewports.push_back(
+        RecordedViewport(viewport, out.line_origins, src_mgr));
   }
   return out;
 }

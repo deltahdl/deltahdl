@@ -1,17 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
+#include "helpers_sealed_design_run.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -110,30 +103,23 @@ std::string SealedDesignSource() {
   return EncryptEnvelopes(kAuthored, kKey);
 }
 
+// Registers the $probe whose calltf reads the sealed module's variables into
+// g_seen.
+void RegisterViewportProbe() {
+  g_seen = ViewportSeen();
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$probe");
+  data.calltf = &ReadViewportsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
 class ViewportGrantInARun : public ::testing::Test {
  protected:
   void SetUp() override {
     SetGlobalVpiContext(&ctx_);
-    g_seen = ViewportSeen();
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("$probe");
-    data.calltf = &ReadViewportsCalltf;
-    ASSERT_NE(vpi_register_systf(&data), nullptr);
-    PreprocConfig config;
-    config.protect_key = std::string(kKey);
-    Preprocessor pp(f_.mgr, f_.diag, config);
-    std::string text =
-        pp.Preprocess(f_.mgr.AddFile("<test>", SealedDesignSource()));
-    uint32_t fid = f_.mgr.AddPreprocessedFile("<test>", text, pp.LineOrigins());
-    Lexer lexer(f_.mgr.FileContent(fid), fid, f_.diag,
-                TextOrigin::kPreprocessorOutput);
-    Parser parser(lexer, f_.arena, f_.diag);
-    Elaborator elab(f_.arena, f_.diag, parser.Parse());
-    RtlirDesign* design = elab.Elaborate("t");
-    ASSERT_NE(design, nullptr);
-    ASSERT_FALSE(f_.diag.HasErrors());
-    LowerAndRun(design, f_);
+    RegisterViewportProbe();
+    RunUnderKey(SealedDesignSource(), kKey, f_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
@@ -177,6 +163,41 @@ TEST_F(ViewportGrantInARun, AReadWriteObjectTakesAWrite) {
 TEST_F(ViewportGrantInARun, AnObjectNoViewportNamesIsNotReached) {
   EXPECT_FALSE(g_seen.shut_reached);
   EXPECT_TRUE(g_seen.shut_refused);
+}
+
+class ViewportGrantInABoundRun : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    RegisterViewportProbe();
+    RunBoundFromALibrary(SealedDesignSource(), kKey, f_);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext ctx_;
+  SimFixture f_;
+};
+
+// The viewports are the envelope's whichever invocation runs the code it
+// contained, so a run binding the sealed module from a library reaches an "r"
+// viewport's object by name as a run compiling it does.
+TEST_F(ViewportGrantInABoundRun, AReadObjectIsReachedByName) {
+  EXPECT_TRUE(g_seen.read_reached);
+}
+
+// And still refuses a write to it.
+TEST_F(ViewportGrantInABoundRun, AReadObjectRefusesAWrite) {
+  EXPECT_TRUE(g_seen.read_put_refused);
+}
+
+// An "rw" viewport's object takes a write.
+TEST_F(ViewportGrantInABoundRun, AReadWriteObjectTakesAWrite) {
+  EXPECT_EQ(g_seen.read_write_value, 9);
+}
+
+// And the variable no viewport names stays sealed.
+TEST_F(ViewportGrantInABoundRun, AnObjectNoViewportNamesIsNotReached) {
+  EXPECT_FALSE(g_seen.shut_reached);
 }
 
 }  // namespace

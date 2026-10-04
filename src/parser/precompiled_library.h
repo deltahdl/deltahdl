@@ -31,11 +31,27 @@ struct CompilationUnit;
 // And the lines of the text that came out of a decryption envelope, numbered
 // from 1: §37.3.6 makes the objects of that code protected in whichever run
 // executes it.
+//
+// And the viewports of the envelopes the text came out of (§34.5.32): the
+// binding run is the one that checks each object is contained within its
+// envelope and grants the access each asks.
+struct PrecompiledViewport {
+  std::string object;
+  std::string access;
+  // The line of the text the viewport pragma expression stood on, and the
+  // first and last lines of the text that came out of its envelope, numbered
+  // from 1.
+  uint32_t line = 0;
+  uint32_t first_line = 0;
+  uint32_t last_line = 0;
+};
+
 struct PrecompiledDirectives {
   std::vector<ModuleDirectives> modules;
   std::vector<std::string> cell_modules;
   std::vector<ProtectLicense> runtime_licenses;
   std::vector<uint32_t> protected_lines;
+  std::vector<PrecompiledViewport> viewports;
 };
 
 // A file holding compiled cells, in a format and at a location this tool

@@ -8,6 +8,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/separate_compilation_bind.h"
+#include "fixture_scratch_dir.h"
+#include "helpers_bound_from_library.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
@@ -69,14 +72,30 @@ struct CompiledDesign {
     Elaborator elab(arena, diag, parser.Parse());
     elab.Elaborate("t");
   }
+};
 
-  bool Reported() const {
-    for (const auto& d : diag.Diagnostics()) {
-      if (d.message.find(kContainsNothing) != std::string::npos) return true;
-    }
-    return false;
+// A text compiled into library "ip" under kKey by one invocation and bound from
+// `t` by another (§33.5.3, §33.5.4), which has the envelopes' viewports from
+// the library's record alone and checks them where it elaborates.
+struct BoundDesign {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  Arena arena;
+
+  explicit BoundDesign(const std::string& source) {
+    ScratchDir tmp;
+    SeparateCompilationBinder binder(mgr, arena, diag);
+    BoundFromALibrary(tmp, source, kKey, binder);
   }
 };
+
+// Whether a viewport was reported as naming nothing its envelope contains.
+bool ContainsNothingReported(const DiagEngine& diag) {
+  for (const auto& d : diag.Diagnostics()) {
+    if (d.message.find(kContainsNothing) != std::string::npos) return true;
+  }
+  return false;
+}
 
 // An envelope holding module `secret` whole, whose first line is a viewport
 // naming `object`. The line the viewport stands on is the first of the text a
@@ -123,20 +142,20 @@ std::string EnvelopeInsideModuleNaming(std::string_view object) {
 // element, and is contained within the envelope.
 TEST(ViewportContainment, AnItemOfASealedElementIsContained) {
   CompiledDesign design(Sealed(ModuleEnvelopeNaming("secret.inner")));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // A port of the element is one of its declarations too.
 TEST(ViewportContainment, APortOfASealedElementIsContained) {
   CompiledDesign design(Sealed(ModuleEnvelopeNaming("secret.y")));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // An instance the element declares leads on into the element it instantiates,
 // which the envelope declares as well.
 TEST(ViewportContainment, AnItemReachedThroughASealedInstanceIsContained) {
   CompiledDesign design(Sealed(ModuleEnvelopeNaming("secret.u.q")));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // A name of something the element does not declare names nothing the envelope
@@ -160,14 +179,14 @@ TEST(ViewportContainment, APathToACleartextObjectIsReported) {
 // declares an item of the same name.
 TEST(ViewportContainment, AnItemOfACleartextElementIsReported) {
   CompiledDesign design(Sealed(ModuleEnvelopeNaming("other.q")));
-  EXPECT_TRUE(design.Reported());
+  EXPECT_TRUE(ContainsNothingReported(design.diag));
 }
 
 // Where the envelope stands inside a design element, an item it declares there
 // is named bare.
 TEST(ViewportContainment, ABareNameOfAnItemTheEnvelopeDeclaresIsContained) {
   CompiledDesign design(Sealed(EnvelopeInsideModuleNaming("inner")));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // An item of the same element declared outside the envelope is not contained
@@ -187,7 +206,7 @@ TEST(ViewportContainment, ABareNameOfAnItemOutsideTheEnvelopeIsReported) {
 TEST(ViewportContainment,
      AnItemOfAnElementACleartextEnvelopeDeclaresIsContained) {
   CompiledDesign design(ModuleEnvelopeNaming("secret.inner"));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // A name of something the element does not declare is reported where the
@@ -211,7 +230,7 @@ TEST(ViewportContainment, AnElementAfterACleartextEnvelopeIsNotContained) {
 TEST(ViewportContainment,
      ABareNameOfAnItemACleartextEnvelopeDeclaresIsContained) {
   CompiledDesign design(EnvelopeInsideModuleNaming("inner"));
-  EXPECT_FALSE(design.Reported());
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 // An item declared before the envelope's begin stands outside it.
@@ -219,6 +238,34 @@ TEST(ViewportContainment, ABareNameOfAnItemBeforeACleartextEnvelopeIsReported) {
   CompiledDesign design(EnvelopeInsideModuleNaming("outer"));
   EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), kContainsNothing, 4,
                             "34.5.32.2"));
+}
+
+// A design bound from a library has the viewports its record carries, each
+// envelope restated as the lines of the record's text that came out of it, and
+// they are held to those lines as in the run that compiled the text.
+
+// An item of an element a cleartext envelope declares is contained within it.
+TEST(ViewportContainment,
+     AnItemACleartextEnvelopeDeclaresIsContainedWhenBound) {
+  BoundDesign design(ModuleEnvelopeNaming("secret.inner"));
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
+}
+
+// A name it does not declare is reported where the viewport stands in the
+// record's text.
+TEST(ViewportContainment,
+     ANameACleartextEnvelopeDoesNotDeclareIsReportedWhenBound) {
+  BoundDesign design(ModuleEnvelopeNaming("secret.missing"));
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), kContainsNothing, 2,
+                            "34.5.32.2"));
+}
+
+// An item reached through an instance a sealed element declares is contained
+// too, the record's sealed lines standing in the envelope though they come from
+// its protected copy.
+TEST(ViewportContainment, AnItemOfASealedElementIsContainedWhenBound) {
+  BoundDesign design(Sealed(ModuleEnvelopeNaming("secret.u.q")));
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
 }  // namespace
