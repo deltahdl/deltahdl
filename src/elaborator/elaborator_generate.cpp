@@ -70,6 +70,14 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // a select is addressed over [width-1:0] and a string operation recovers no
   // characters.
   ParamRangeRegistryGuard param_range_guard(pg.mod);
+  // §20.6.2 with §27.5: `$bits` of a type is a constant expression, and a
+  // generate construct's condition, selector or bounds may be one, as may a
+  // declaration in the block. The folder sizes the type from the typedef table
+  // a TypedefRegistryGuard installs, which Elaborator::ElaborateItems installs
+  // for a module's own items, so the same is installed here over the scope put
+  // back above. aggregate_typedef_names_ is never taken back between modules,
+  // so it already holds this scope's unpacked aggregate names.
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
   // §8.25.1: the same for a constant expression that reads a specialization's
   // parameter through the scope resolution operator, as in `localparam W =
   // C#(4)::p`. The registry is built from the compilation unit rather than
@@ -663,7 +671,7 @@ static bool RegisterGenerateForArrayName(
                std::format("generate block array '{}' conflicts with an "
                            "existing declaration in the same scope",
                            item->name),
-               Subclause("23.9"));
+               Subclause("27.4"));
     return false;
   }
   return true;

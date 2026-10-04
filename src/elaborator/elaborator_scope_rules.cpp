@@ -434,12 +434,35 @@ void CheckStringNumericAssigns(
   });
 }
 
+// The genvars declared among `items`. §27.4 lets a genvar be referenced only
+// within a loop generate scheme, so one of these read by the items themselves,
+// outside every loop generate construct, is a misuse rather than a name that
+// resolves.
+std::unordered_set<std::string_view> DeclaredGenvars(
+    const std::vector<ModuleItem*>& items) {
+  std::unordered_set<std::string_view> genvars;
+  for (const auto* item : items) {
+    if (item->is_genvar && !item->name.empty()) genvars.insert(item->name);
+  }
+  return genvars;
+}
+
 // §23.9: reports every collected read that names no declaration the reference
-// can reach.
+// can reach, and §27.4 every read of one of `genvars`, which are declared but
+// may not be read where these reads stand.
 template <typename Pred>
 void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
-                          DiagEngine& diag) {
+                          DiagEngine& diag,
+                          const std::unordered_set<std::string_view>& genvars) {
   for (const auto* e : refs) {
+    if (genvars.contains(e->text)) {
+      diag.Error(e->range.start,
+                 std::format("genvar '{}' is referenced outside a loop "
+                             "generate scheme",
+                             e->text),
+                 Subclause("27.4"));
+      continue;
+    }
     if (declared(e->text)) continue;
     diag.Error(e->range.start,
                std::format("reference to unresolved identifier '{}'", e->text),
@@ -464,7 +487,7 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
       CollectProcRhsIdents(item->body, locals, refs);
     }
   }
-  ReportUnresolvedRefs(refs, declared, diag);
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
 // §23.9: rejects an unresolved bare identifier read in the initializer of a
@@ -481,7 +504,7 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
     if (!is_data_decl || item->init_expr == nullptr) continue;
     CollectBareIdents(item->init_expr, refs);
   }
-  ReportUnresolvedRefs(refs, declared, diag);
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
 // The package import declarations a subroutine body opens with. A.2.8 admits
@@ -542,7 +565,7 @@ void ReportSubroutineUnresolved(const std::vector<ModuleItem*>& items,
       return declared(n) ||
              ImportsProvideName(unit, provided_cache, body_imports, n);
     };
-    ReportUnresolvedRefs(refs, declared_in_body, diag);
+    ReportUnresolvedRefs(refs, declared_in_body, diag, DeclaredGenvars(items));
   }
 }
 
@@ -710,7 +733,7 @@ static void ReportContAssignUnresolved(const ModuleDecl* decl,
     if (item->kind != ModuleItemKind::kContAssign) continue;
     CollectBareIdents(item->assign_rhs, refs);
   }
-  ReportUnresolvedRefs(refs, declared, diag);
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
 void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
@@ -771,6 +794,23 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // module's own scope chain does not hold, so it is also asked of every
   // declaration of the unit, and one neither answers names nothing.
   if (!unit_hier_head_names_) {
+    // §27.6 gives each unnamed generate block a genblk<n> name, which
+    // Elaborator::ElaborateModule assigns as it reaches each module, so the
+    // modules not yet reached are named here, nested declarations among them,
+    // for the names to be collected. Naming a scope a second time leaves it as
+    // it was, since only a block with no name is given one.
+    std::function<void(const ModuleDecl*)> name_blocks =
+        [&](const ModuleDecl* scope) {
+          AssignGenerateBlockNames(scope);
+          for (const ModuleItem* item : scope->items) {
+            if (item->nested_module_decl != nullptr)
+              name_blocks(item->nested_module_decl);
+          }
+        };
+    for (const auto* scopes : {&unit_->modules, &unit_->interfaces,
+                               &unit_->programs, &unit_->checkers}) {
+      for (const ModuleDecl* scope : *scopes) name_blocks(scope);
+    }
     unit_hier_head_names_ = std::make_shared<const UnitHierHeadNames>(unit_);
   }
   ReportUnresolvedHierHeads(
@@ -779,6 +819,10 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
         return declared(n) || unit_hier_head_names_->Admits(n);
       },
       diag_);
+  // §23.6 with §27.4 and §27.5: a first name that is one of the module's
+  // generate blocks resolves, and the name after it is then one the block has
+  // to declare.
+  ReportUndeclaredGenerateBlockMembers(decl, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,

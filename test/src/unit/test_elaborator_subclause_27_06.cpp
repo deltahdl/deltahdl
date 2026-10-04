@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "fixture_elaborator.h"
 #include "helpers_generate_elab.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -293,6 +295,87 @@ TEST(GenerateBlockNaming, NestedConstructNumberingRestartsInBlockScope) {
   EXPECT_EQ(mod->variables[1].name, "outer_4_genblk1_5_y");
   EXPECT_EQ(mod->variables[2].name, "outer_5_genblk1_4_y");
   EXPECT_EQ(mod->variables[3].name, "outer_5_genblk1_5_y");
+}
+
+// §27.6 names the one unnamed generate block below genblk1, and that is the
+// only way a genblk<n> name comes to exist, so `genblk2` names nothing and
+// §23.8 reports a first name no declaration gives. The test fails on an
+// elaborator that admits every name of the genblk<n> form as a first name.
+TEST(GenerateBlockNaming, GenblkNameNoConstructIsGivenIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin\n"
+      "    int a;\n"
+      "  end\n"
+      "  initial $display(\"%0d\", genblk2.a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'genblk2' resolves to no "
+                            "declaration",
+                            5, "23.8"));
+}
+
+// The name §27.6 does give, genblk1, is a declaration a first name resolves
+// to, so §23.8 reports nothing of it. The test fails on a fix that drops the
+// genblk<n> admission without collecting the names §27.6 assigns.
+TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsAFirstName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin\n"
+      "    int a;\n"
+      "  end\n"
+      "  initial $display(\"%0d\", genblk1.a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "hierarchical name 'genblk1' resolves to no "
+                             "declaration",
+                             5, "23.8"));
+}
+
+// The genblk<n> name of a block in a module the elaborator has not reached
+// when the first module is checked is collected as well. `top` is elaborated
+// before `other`, which it does not instantiate.
+TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsAFirstName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  initial $display(\"%0d\", genblk3.a);\n"
+      "endmodule\n"
+      "module other;\n"
+      "  int x;\n"
+      "  if (1) begin end\n"
+      "  if (1) begin end\n"
+      "  if (1) begin\n"
+      "    int a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "hierarchical name 'genblk3' resolves to no "
+                             "declaration",
+                             2, "23.8"));
+}
+
+// §27.4 makes a loop's unnamed block reachable by no user-chosen name, and
+// `g` is declared nowhere, so §23.8 reports the first name.
+TEST(GenerateBlockNaming, UserNameOnAnUnnamedLoopBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin\n"
+      "    int a;\n"
+      "  end\n"
+      "  initial $display(\"%0d\", g[0].a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'g' resolves to no declaration",
+                            6, "23.8"));
 }
 
 }  // namespace

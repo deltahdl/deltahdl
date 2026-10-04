@@ -557,21 +557,33 @@ RtlirDesign* Elaborator::ElaborateTops(
   defparam_top_roots_ = design->top_modules;
   ResolveDefparamsAndGenerates(design);
 
-  // §27.5 puts the items of a selected generate block into the enclosing
-  // module, and ProcessPendingGenerate appends them to RtlirModule::assigns,
-  // ::udp_insts and ::nets after ElaborateItems has run over that module. So
-  // the net delays are given to their drivers here, where a module's items are
-  // complete: run during ElaborateItems, the pass saw neither a driver written
-  // in a generate block nor a net declared in one, and `wire #5 w;` was
-  // honoured at module level and ignored one `if` away.
-  for (auto* top : design->top_modules) {
-    ApplyNetDelaysInModuleTree(top);
-  }
-
   for (auto* top : design->top_modules) WarnUnresolvedDefparams(top);
   // §23.11: a bind directive's target is read against the whole design, so
   // every top is walked before a target that matched nothing is reported.
   ApplyBindDirectives(design->top_modules);
+  // §23.11 elaborates a bound instance as though it were written in its
+  // target, and ApplyBindInstance does so through ElaborateModule, which queues
+  // the bound module's generate constructs as any module's are. The queue was
+  // drained above, before any bind was applied, so what the bound modules
+  // queued is drained here, each batch in turn as a block's own generates
+  // queue more (§27.3, §27.5).
+  while (!pending_generates_.empty()) {
+    std::vector<PendingGenerate> batch;
+    batch.swap(pending_generates_);
+    for (const auto& pg : batch) ProcessPendingGenerate(pg);
+  }
+
+  // §27.5 puts the items of a selected generate block into the enclosing
+  // module, and ProcessPendingGenerate appends them to RtlirModule::assigns,
+  // ::udp_insts and ::nets after ElaborateItems has run over that module. So
+  // the net delays are given to their drivers here, where a module's items are
+  // complete, a bound module's among them: run during ElaborateItems, the pass
+  // saw neither a driver written in a generate block nor a net declared in
+  // one, and `wire #5 w;` was honoured at module level and ignored one `if`
+  // away.
+  for (auto* top : design->top_modules) {
+    ApplyNetDelaysInModuleTree(top);
+  }
 
   for (auto* top : design->top_modules) {
     ValidateModportExportConflicts(top);

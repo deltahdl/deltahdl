@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -12,6 +14,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -19,6 +22,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -346,70 +350,230 @@ UnitHierHeadNames::UnitHierHeadNames(const CompilationUnit* unit)
     : declared_(unit) {
   for (const auto* scopes :
        {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
-    for (const ModuleDecl* scope : *scopes) AddScope(scope);
+    for (const ModuleDecl* scope : *scopes) scope_names_.AddScope(scope);
   }
-  for (const ModuleItem* item : unit->cu_items) AddItem(item);
+  for (const ModuleItem* item : unit->cu_items) scope_names_.AddItem(item);
   for (const BindDirective* bd : unit->bind_directives) {
-    if (bd->instantiation != nullptr) AddItem(bd->instantiation);
+    if (bd->instantiation != nullptr) scope_names_.AddItem(bd->instantiation);
   }
 }
 
-// §27.6: "All unnamed generate blocks will be given the name genblk<n>", a
-// name the source does not write and the elaborator gives, so one of that
-// form is the name of a generate block wherever the elaborator gave it.
-static bool IsImplicitGenerateBlockName(std::string_view name) {
-  constexpr std::string_view kPrefix = "genblk";
-  if (!name.starts_with(kPrefix) || name.size() == kPrefix.size()) return false;
-  return std::all_of(name.begin() + kPrefix.size(), name.end(),
-                     [](char c) { return c >= '0' && c <= '9'; });
-}
-
+// A genblk<n> name §27.6 gives an unnamed generate block is among
+// scope_names_, because Elaborator::ValidateUnresolvedReferences has every
+// scope of the unit named before this is built.
 bool UnitHierHeadNames::Admits(std::string_view name) const {
-  return declared_.Declares(name) || scope_names_.contains(name) ||
-         IsImplicitGenerateBlockName(name);
+  return declared_.Declares(name) || scope_names_.Contains(name);
 }
 
-void UnitHierHeadNames::AddScope(const ModuleDecl* scope) {
-  scope_names_.insert(scope->name);
-  for (const PortDecl& port : scope->ports) scope_names_.insert(port.name);
-  for (const ModportDecl* mp : scope->modports) scope_names_.insert(mp->name);
+void ScopeNameSet::Insert(std::string_view name) {
+  if (!name.empty()) names_.insert(name);
+}
+
+bool ScopeNameSet::Contains(std::string_view name) const {
+  if (names_.contains(name)) return true;
+  size_t digits = name.find_last_not_of("0123456789");
+  if (digits == std::string_view::npos || digits + 1 == name.size()) {
+    return false;
+  }
+  return numbered_enum_names_.contains(name.substr(0, digits + 1));
+}
+
+void ScopeNameSet::AddScope(const ModuleDecl* scope) {
+  Insert(scope->name);
+  for (const PortDecl& port : scope->ports) Insert(port.name);
+  for (const ModportDecl* mp : scope->modports) Insert(mp->name);
   for (const ModuleItem* item : scope->items) AddItem(item);
   for (const BindDirective* bd : scope->bind_directives) {
     if (bd->instantiation != nullptr) AddItem(bd->instantiation);
   }
 }
 
-void UnitHierHeadNames::AddItem(const ModuleItem* item) {
+void ScopeNameSet::AddItem(const ModuleItem* item) {
   if (item == nullptr) return;
-  for (std::string_view name :
-       {item->name, item->inst_name, item->gate_inst_name}) {
-    if (!name.empty()) scope_names_.insert(name);
-  }
+  AddItemOwnNames(item);
   if (item->nested_module_decl != nullptr) AddScope(item->nested_module_decl);
   for (const ModuleItem* sub : item->gen_body) AddItem(sub);
   AddItem(item->gen_else);
   for (const auto& ci : item->gen_case_items) {
-    if (!ci.label.empty()) scope_names_.insert(ci.label);
+    Insert(ci.label);
     for (const ModuleItem* sub : ci.body) AddItem(sub);
   }
   if (item->gen_init != nullptr) AddStmt(item->gen_init);
   AddStmt(item->body);
-  for (const auto& arg : item->func_args) scope_names_.insert(arg.name);
+  for (const auto& arg : item->func_args) Insert(arg.name);
   for (const Stmt* s : item->func_body_stmts) AddStmt(s);
 }
 
-void UnitHierHeadNames::AddStmt(const Stmt* s) {
-  if (s == nullptr) return;
-  for (std::string_view name : {s->label, s->var_name}) {
-    if (!name.empty()) scope_names_.insert(name);
+// What the item itself declares. §6.19 declares an enumeration's members in
+// the scope its type is written in. §6.10 declares an implicit net for an
+// undeclared identifier written as a continuous assignment's target or in a
+// port expression of an instance or a gate, so every identifier written there
+// is taken as one: it is a name the scope declares whether or not something
+// else declares it first.
+void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
+  for (std::string_view name :
+       {item->name, item->inst_name, item->gate_inst_name}) {
+    Insert(name);
   }
+  AddEnumerations(item->data_type);
+  if (item->kind == ModuleItemKind::kTypedef) {
+    AddEnumerations(item->typedef_type);
+  }
+  if (item->kind == ModuleItemKind::kContAssign) {
+    AddImplicitNets(item->assign_lhs);
+  }
+  for (const auto& [port, conn] : item->inst_ports) AddImplicitNets(conn);
+  for (const Expr* terminal : item->gate_terminals) AddImplicitNets(terminal);
+}
+
+void ScopeNameSet::AddEnumerations(const DataType& type) {
+  for (const EnumMember& member : type.enum_members) {
+    if (member.range_start != nullptr) {
+      numbered_enum_names_.insert(member.name);
+    } else {
+      Insert(member.name);
+    }
+  }
+}
+
+void ScopeNameSet::AddImplicitNets(const Expr* e) {
+  std::vector<const Expr*> idents;
+  CollectBareIdents(e, idents);
+  for (const Expr* ident : idents) Insert(ident->text);
+}
+
+void ScopeNameSet::AddStmt(const Stmt* s) {
+  if (s == nullptr) return;
+  for (std::string_view name : {s->label, s->var_name}) Insert(name);
   // §12.7.3: a foreach loop declares its loop variables, and a key of a
   // class-keyed associative array is a handle a member is selected through.
-  for (std::string_view name : s->foreach_vars) {
-    if (!name.empty()) scope_names_.insert(name);
-  }
+  for (std::string_view name : s->foreach_vars) Insert(name);
   if (s->decl_item != nullptr) AddItem(s->decl_item);
   ForEachChildStmt(s, [&](Stmt* const& sub) { AddStmt(sub); });
+}
+
+namespace {
+
+// The names a module's named generate blocks declare, by block name. The
+// alternatives of one conditional construct may share a name (§27.5), and
+// only one of them is instantiated, so a name holds what any of them declares.
+using GenerateBlockScopes = std::unordered_map<std::string_view, ScopeNameSet>;
+
+void AddConstructBlocks(const ModuleItem* item, GenerateBlockScopes& blocks);
+
+// One block of a conditional construct. §27.5 makes a block that holds only a
+// conditional construct, written without begin-end, belong to the outer
+// construct, so the nested construct's blocks are named in this scope. A
+// block §27.6 named is left out: §23.6 lets no path written outside it reach
+// in by that name.
+void AddConditionalBlock(std::string_view name, bool name_is_generated,
+                         const std::vector<ModuleItem*>& body,
+                         bool has_begin_end, GenerateBlockScopes& blocks) {
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    AddConstructBlocks(body[0], blocks);
+    return;
+  }
+  if (name.empty() || name_is_generated) return;
+  ScopeNameSet& names = blocks[name];
+  for (const ModuleItem* sub : body) names.AddItem(sub);
+}
+
+// The blocks of an if-generate and of every else-if after it.
+void AddIfBlocks(const ModuleItem* item, GenerateBlockScopes& blocks) {
+  AddConditionalBlock(item->name, item->name_is_generated, item->gen_body,
+                      item->gen_body_has_begin_end, blocks);
+  const ModuleItem* other = item->gen_else;
+  if (other == nullptr) return;
+  if (other->gen_cond != nullptr) {
+    AddIfBlocks(other, blocks);
+    return;
+  }
+  AddConditionalBlock(other->name, other->name_is_generated, other->gen_body,
+                      other->gen_body_has_begin_end, blocks);
+}
+
+// §27.4 gives each block of a loop an implicit localparam named after the
+// genvar, so the genvar is a name the block declares.
+void AddLoopBlock(const ModuleItem* item, GenerateBlockScopes& blocks) {
+  if (item->name.empty() || item->name_is_generated) return;
+  ScopeNameSet& names = blocks[item->name];
+  for (const ModuleItem* sub : item->gen_body) names.AddItem(sub);
+  const Stmt* init = item->gen_init;
+  if (init == nullptr) return;
+  names.Insert(init->var_name);
+  if (init->lhs != nullptr && init->lhs->kind == ExprKind::kIdentifier) {
+    names.Insert(init->lhs->text);
+  }
+}
+
+void AddConstructBlocks(const ModuleItem* item, GenerateBlockScopes& blocks) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      AddIfBlocks(item, blocks);
+      return;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items) {
+        AddConditionalBlock(ci.label, ci.name_is_generated, ci.body,
+                            ci.has_begin_end, blocks);
+      }
+      return;
+    case ModuleItemKind::kGenerateFor:
+      AddLoopBlock(item, blocks);
+      return;
+    default:
+      return;
+  }
+}
+
+// A block name the module also gives something else, or a procedure declares
+// as a local, may be what a reference names, so such a block is not checked.
+void DropShadowedBlocks(const ModuleDecl* decl, GenerateBlockScopes& blocks) {
+  for (const PortDecl& port : decl->ports) blocks.erase(port.name);
+  std::unordered_set<std::string_view> locals;
+  for (const ModuleItem* item : decl->items) {
+    if (IsProceduralItemKind(item->kind)) {
+      CollectProcReadableNames(item->body, locals);
+      continue;
+    }
+    if (item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase ||
+        item->kind == ModuleItemKind::kGenerateFor) {
+      continue;
+    }
+    for (std::string_view name :
+         {item->name, item->inst_name, item->gate_inst_name}) {
+      blocks.erase(name);
+    }
+  }
+  for (std::string_view name : locals) blocks.erase(name);
+}
+
+}  // namespace
+
+void ReportUndeclaredGenerateBlockMembers(const ModuleDecl* decl,
+                                          DiagEngine& diag) {
+  GenerateBlockScopes blocks;
+  for (const ModuleItem* item : decl->items) AddConstructBlocks(item, blocks);
+  DropShadowedBlocks(decl, blocks);
+  if (blocks.empty()) return;
+  std::vector<const Expr*> accesses;
+  CollectModuleMemberAccesses(decl, accesses);
+  for (const Expr* ma : accesses) {
+    if (ma->is_scope_resolution || ma->rhs == nullptr ||
+        ma->rhs->kind != ExprKind::kIdentifier) {
+      continue;
+    }
+    std::string_view block;
+    const Expr* select_index = nullptr;
+    if (!DecodeInstanceArrayBase(ma, block, select_index)) continue;
+    auto it = blocks.find(block);
+    if (it == blocks.end() || it->second.Contains(ma->rhs->text)) continue;
+    diag.Error(ma->range.start,
+               std::format("hierarchical reference '{}.{}' is unresolved: '{}' "
+                           "is not declared in generate block '{}'",
+                           block, ma->rhs->text, ma->rhs->text, block),
+               Subclause("23.6"));
+  }
 }
 
 namespace {

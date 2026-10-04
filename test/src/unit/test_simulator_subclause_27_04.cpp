@@ -402,4 +402,97 @@ TEST(LoopGenerateInstanceSim, EachCheckerInstanceEvaluatesItsAssertion) {
   EXPECT_EQ(out, "3 2 3 2 3 2\n");
 }
 
+// §27.4's implicit localparam stands wherever a parameter may, so a localparam
+// a loop block declares from it is a constant with a distinct value in each
+// instance, read through the instance's name. The test fails on an elaborator
+// that folds the declaration without the genvar's value, which leaves it
+// unresolved and reads 0 in every instance.
+TEST(LoopGenerateIndexSim, LocalparamFromTheIndexHoldsEachInstanceValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 0; i < 3; i = i + 1) begin : g\n"
+                       "    localparam int K = i * 10;\n"
+                       "  end\n"
+                       "  initial $display(\"lp %0d %0d %0d\", g[0].K, g[1].K, "
+                       "g[2].K);\n"
+                       "endmodule\n",
+                       f),
+            "lp 0 10 20\n");
+}
+
+// The implicit localparam sizes a declared dimension as a parameter does, so
+// each instance's variable is as wide as its own index gives. The test fails
+// on an elaborator that sizes the dimension without the genvar's value, which
+// falls back to one bit in every instance.
+TEST(LoopGenerateIndexSim, IndexSizesEachInstanceDimension) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 1; i < 4; i = i + 1) begin : g\n"
+                       "    logic [i-1:0] w;\n"
+                       "    initial #(i) $write(\"%s%0d\", i == 1 ? \"dim \" : "
+                       "\" \", $bits(w));\n"
+                       "  end\n"
+                       "  initial #4 $display(\"\");\n"
+                       "endmodule\n",
+                       f),
+            "dim 1 2 3\n");
+}
+
+// The same through a localparam of the index, which is folded per instance
+// before it sizes the dimension.
+TEST(LoopGenerateIndexSim, LocalparamOfTheIndexSizesEachInstanceDimension) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 1; i < 4; i = i + 1) begin : g\n"
+                       "    localparam int K = i * 2;\n"
+                       "    logic [K-1:0] w;\n"
+                       "    initial #(i) $write(\"%s%0d\", i == 1 ? \"lw \" : "
+                       "\" \", $bits(w));\n"
+                       "  end\n"
+                       "  initial #4 $display(\"\");\n"
+                       "endmodule\n",
+                       f),
+            "lw 2 4 6\n");
+}
+
+// §27.4 Example 5 overrides an instance's parameter from the implicit
+// localparam, and §23.10 takes any constant expression of the instantiating
+// scope, so each instance receives its own index. The test fails on an
+// elaborator that resolves the override without the genvar's value, which
+// leaves P at its default 0 in both instances.
+TEST(LoopGenerateInstanceSim, NamedOverrideFromTheIndexReachesEachInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf #(parameter int P = 0);\n"
+                       "  initial #(P - 99) $display(\"ip %0d\", P);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 100; i < 102; i = i + 1) begin : g\n"
+                       "    leaf #(.P(i)) u();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ip 100\nip 101\n");
+}
+
+// The same through a positional override computed from the index.
+TEST(LoopGenerateInstanceSim,
+     PositionalOverrideFromTheIndexReachesEachInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf #(parameter int P = 0);\n"
+                       "  initial #(P - 6) $display(\"ip %0d\", P);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+                       "    leaf #(i * 2 + 7) u();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ip 7\nip 9\n");
+}
+
 }  // namespace

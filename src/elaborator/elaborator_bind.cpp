@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/rtlir.h"
@@ -200,12 +201,20 @@ static bool BindAppliesToModule(const BindDirectiveSite& site,
 }
 
 // Build the dotted hierarchical path of a child instance from its parent path.
+// §23.11 names a bind target by its hierarchical path, which reaches an
+// instance in a generate block through the block's name (§27.3, §23.6), so the
+// path is built from the instance's own name and the generate block steps
+// above it rather than from RtlirModuleInst::inst_name, which flattens the
+// two into the one identifier the simulator keys storage on.
 static std::string BindChildPath(const std::string& hier_path,
-                                 std::string_view inst_name) {
-  std::string child_path = hier_path;
-  child_path.push_back('.');
-  child_path.append(inst_name.data(), inst_name.size());
-  return child_path;
+                                 const RtlirModuleInst& child) {
+  std::string path =
+      HierInstancePath(hier_path, child.gen_block_path, child.simple_inst_name);
+  // PushInstanceArray names an element of a §23.3.3.5 instance array `u[1]` on
+  // inst_name alone, and the element's index is part of the path that names it.
+  std::string_view flat = child.inst_name;
+  if (flat.ends_with(']')) path.append(flat.substr(flat.rfind('[')));
+  return path;
 }
 
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
@@ -231,8 +240,7 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
   for (auto& c : mod->children) {
     if (!c.resolved) continue;
     bool child_under_bind = under_bind || c.is_bound;
-    WalkForBind(c.resolved, BindChildPath(hier_path, c.inst_name),
-                child_under_bind, ctx);
+    WalkForBind(c.resolved, BindChildPath(hier_path, c), child_under_bind, ctx);
   }
 }
 

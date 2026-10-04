@@ -399,4 +399,69 @@ TEST(GenerateSimulation, CheckerInstanceInTheSelectedBlockEvaluatesIt) {
   EXPECT_EQ(out, "pass=3 fail=2\n");
 }
 
+// §27.5 folds a conditional generate's condition at elaboration, and §20.6.2
+// makes `$bits` of a type parameter a constant expression, so the wide block
+// is the one elaborated. The test fails on an elaborator that folds the
+// condition without the scope's typedefs, which warns that the condition is
+// not constant and elaborates neither block.
+TEST(GenerateSimulation, BitsOfATypeParameterGatesAGenerateIf) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top #(parameter type T = logic [15:0]);\n"
+                       "  if ($bits(T) > 8) begin : g\n"
+                       "    initial $display(\"bits wide\");\n"
+                       "  end else begin : g\n"
+                       "    initial $display(\"bits narrow\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "bits wide\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §23.11 lets a bind directive target an instance by its hierarchical path,
+// and §27.3 with §23.6 reaches an instance in a generate block through the
+// block's name, so `top.g.u` names the leaf in block g. The test fails on an
+// elaborator that walks the hierarchy by the flattened instance name `g_u`,
+// which never meets the path and refuses the target.
+TEST(GenerateSimulation, BindTargetsAnInstanceInsideAGenerateBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf(input logic [7:0] a);\n"
+                       "endmodule\n"
+                       "module mon(input logic [7:0] a);\n"
+                       "  initial #1 $display(\"bnd %0d\", a);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [7:0] x = 35;\n"
+                       "  if (1) begin : g\n"
+                       "    leaf u(x);\n"
+                       "  end\n"
+                       "  bind top.g.u mon m(.a(a));\n"
+                       "endmodule\n",
+                       f),
+            "bnd 35\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §23.11 elaborates a bound instance as though it were written in its target,
+// and §27.5 instantiates the block its conditional generate selects, so the
+// block's initial runs in the bound instance. The test fails on an elaborator
+// that drains the queued generate constructs before applying the binds, which
+// never elaborates the bound module's block.
+TEST(GenerateSimulation, GenerateBlockOfABoundModuleRuns) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "endmodule\n"
+                       "module mon;\n"
+                       "  if (1) begin : g\n"
+                       "    initial #1 $display(\"bnd gen\");\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  leaf u();\n"
+                       "  bind leaf mon m();\n"
+                       "endmodule\n",
+                       f),
+            "bnd gen\n");
+}
+
 }  // namespace

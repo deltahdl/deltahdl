@@ -13,7 +13,15 @@
 namespace delta {
 
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
-  return BuildParamScope(mod, gen_prefix_scopes_);
+  ScopeMap scope = BuildParamScope(mod, gen_prefix_scopes_);
+  // §27.4 gives each instance of a loop generate block an implicit localparam
+  // named after the genvar, holding that instance's value, which may stand
+  // wherever a parameter may: a localparam's value, a declared dimension, an
+  // instance's parameter override. gen_prefix_scopes_ places this fold in the
+  // blocks being elaborated, so their genvar values are entered beside their
+  // parameters, outermost first so that an inner loop's genvar wins.
+  for (const auto& [name, value] : gen_loop_consts_) scope[name] = value;
+  return scope;
 }
 
 ScopeMap Elaborator::BuildParamScope(

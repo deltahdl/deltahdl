@@ -12,6 +12,7 @@ class DiagEngine;
 struct ClassDecl;
 struct CompilationUnit;
 struct DataType;
+struct Expr;
 struct ModuleDecl;
 struct ModuleItem;
 struct Stmt;
@@ -42,6 +43,32 @@ class UnitDeclaredNames {
   std::unordered_set<std::string_view> numbered_enum_names_;
 };
 
+// The names the items of a scope declare, with those of every scope nested in
+// it: each named item, instance and gate, generate block and case label,
+// procedural block label, loop and foreach variable, formal and procedural
+// local, enumeration constant (§6.19) and implicit net (§6.10), and what a
+// nested declaration declares. It holds more than any one scope declares, so a
+// check consults it only to leave a name unreported.
+class ScopeNameSet {
+ public:
+  void AddScope(const ModuleDecl* scope);
+  void AddItem(const ModuleItem* item);
+  void AddStmt(const Stmt* s);
+  void Insert(std::string_view name);
+
+  // Whether the set gives `name`. A §6.19.2 member written `name[N]` gives
+  // the constants its name with a number appended.
+  bool Contains(std::string_view name) const;
+
+ private:
+  void AddItemOwnNames(const ModuleItem* item);
+  void AddEnumerations(const DataType& type);
+  void AddImplicitNets(const Expr* e);
+
+  std::unordered_set<std::string_view> names_;
+  std::unordered_set<std::string_view> numbered_enum_names_;
+};
+
 // §23.8: the names the first name of a hierarchical name may resolve to. The
 // search goes downward and then upward, through the scopes enclosing the
 // reference and the modules instantiating them, and can end at an instance, a
@@ -58,12 +85,8 @@ class UnitHierHeadNames {
   bool Admits(std::string_view name) const;
 
  private:
-  void AddScope(const ModuleDecl* scope);
-  void AddItem(const ModuleItem* item);
-  void AddStmt(const Stmt* s);
-
   UnitDeclaredNames declared_;
-  std::unordered_set<std::string_view> scope_names_;
+  ScopeNameSet scope_names_;
 };
 
 // §23.8: reports the first name of each hierarchical name the procedural
@@ -72,6 +95,13 @@ class UnitHierHeadNames {
 void ReportUnresolvedHierHeads(
     const ModuleDecl* decl, const std::function<bool(std::string_view)>& admits,
     DiagEngine& diag);
+
+// §23.6 with §27.4 and §27.5: reports each `g.m` or `g[k].m` the continuous
+// assignments and procedural blocks of `decl` write where `g` names a generate
+// block of `decl` and nothing else of it, and no block of that name declares
+// `m`. Defined in elaborator_scope_rules_hier.cpp.
+void ReportUndeclaredGenerateBlockMembers(const ModuleDecl* decl,
+                                          DiagEngine& diag);
 
 // §23.9: reports each name a method of a class of `unit` reads that neither
 // the method declares, as a formal or in its body, nor any declaration of the

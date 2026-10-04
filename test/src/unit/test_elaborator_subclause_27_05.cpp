@@ -345,7 +345,7 @@ TEST(GenerateElaboration, BlockNameCollidesAcrossConstructsIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block 'dup' has the same name as a "
                             "generate block in another generate construct",
-                            2, "23.9"));
+                            2, "27.5"));
 }
 
 TEST(GenerateElaboration, BlockNameCollidesWithDeclarationIsError) {
@@ -364,7 +364,7 @@ TEST(GenerateElaboration, BlockNameCollidesWithDeclarationIsError) {
       f.diag.Diagnostics(),
       "generate block 'dup' conflicts with another declaration in the same "
       "scope",
-      3, "23.9"));
+      3, "27.5"));
 }
 
 TEST(GenerateElaboration, CaseBlockNameCollidesWithDeclarationIsError) {
@@ -386,7 +386,7 @@ TEST(GenerateElaboration, CaseBlockNameCollidesWithDeclarationIsError) {
       f.diag.Diagnostics(),
       "generate block 'dup' conflicts with another declaration in the same "
       "scope",
-      3, "23.9"));
+      3, "27.5"));
 }
 
 TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
@@ -408,7 +408,7 @@ TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block 'shared' has the same name as a "
                             "generate block in another generate construct",
-                            2, "23.9"));
+                            2, "27.5"));
 }
 
 TEST(GenerateElaboration, GenvarSelectsConditionalBranchPerIteration) {
@@ -465,7 +465,7 @@ TEST(GenerateElaboration, BlockNameCollidesWithLoopGenerateIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block 'shared' has the same name as a "
                             "generate block in another generate construct",
-                            2, "23.9"));
+                            2, "27.5"));
 }
 
 // §27.5: a generate block "may consist of only one item, which need not be
@@ -785,6 +785,58 @@ TEST(GenerateElaboration, InstanceInTheSelectedBlockDeclaresItsBodysNames) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §27.5 makes a generate block a scope holding what is written in it, and
+// §23.6 resolves `g.nothere` through g to a name g does not declare, which is
+// an error. The test fails on an elaborator that admits the first name and
+// never looks at what the block declares, which reads the path as 0.
+TEST(GenerateElaboration, MemberAGenerateBlockDoesNotDeclareIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    int a;\n"
+      "  end\n"
+      "  initial $display(\"%0d\", g.nothere);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'g.nothere' is unresolved: "
+                            "'nothere' is not declared in generate block 'g'",
+                            5, "23.6"));
+}
+
+// What a block does declare is reached through it: a variable, an instance and
+// a function of a conditional block, and of a loop block its genvar (§27.4's
+// implicit localparam) and a variable. The test fails on a check that knows
+// only a block's variables.
+TEST(GenerateElaboration, MembersAGenerateBlockDeclaresAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf;\n"
+      "  int v;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    int a;\n"
+      "    leaf u();\n"
+      "    function int f();\n"
+      "      return 1;\n"
+      "    endfunction\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : h\n"
+      "    int b;\n"
+      "  end\n"
+      "  int x;\n"
+      "  initial x = g.a + g.u.v + g.f() + h[0].i + h[1].b;\n"
+      "endmodule\n",
+      f);
+  for (const auto& diag : f.diag.Diagnostics()) {
+    EXPECT_EQ(diag.message.find("is not declared in generate block"),
+              std::string::npos)
+        << diag.message;
+  }
 }
 
 }  // namespace

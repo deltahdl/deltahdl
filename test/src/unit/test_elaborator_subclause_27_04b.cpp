@@ -515,4 +515,40 @@ TEST(GenerateElaboration, ReportedHeaderElaboratesAsALoopThatBuildsNothing) {
   EXPECT_TRUE(design->top_modules[0]->variables.empty());
 }
 
+// §27.4 lets a genvar be referenced only within a loop generate scheme, so a
+// module-level genvar read by an initial procedure is an error. The test fails
+// on an elaborator that admits every genvar as a declared name wherever it is
+// read, which accepts the read with nothing said.
+TEST(GenerateElaboration, GenvarReadOutsideALoopSchemeErrors) {
+  ElabFixture f;
+  ElabOk(
+      "module top;\n"
+      "  genvar i;\n"
+      "  int k;\n"
+      "  initial k = i;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "genvar 'i' is referenced outside a loop generate "
+                            "scheme",
+                            4, "27.4"));
+}
+
+// The same genvar read in its loop's scheme and in the block the loop
+// generates is the use §27.4 allows, and nothing is reported.
+TEST(GenerateElaboration, GenvarReadInItsLoopIsAccepted) {
+  ElabFixture f;
+  ElabOk(
+      "module top;\n"
+      "  genvar i;\n"
+      "  int k;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "    int v = i;\n"
+      "    initial k = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

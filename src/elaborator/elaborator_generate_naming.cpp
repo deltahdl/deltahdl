@@ -152,20 +152,25 @@ void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
 // name labelling more than one alternative of one conditional construct counts
 // only once -- at most one alternative is ever instantiated, so reusing a name
 // across the alternatives of a single conditional construct is permitted.
+// §27.5 states the rule of the named generate blocks, so a genblk<n> name
+// §27.6 assigned an unnamed block is not collected: that name is chosen so as
+// not to conflict.
 static void CollectGenerateBlockNames(
     const ModuleItem* item, std::unordered_set<std::string_view>& out) {
   switch (item->kind) {
     case ModuleItemKind::kGenerateIf:
-      if (!item->name.empty()) out.insert(item->name);
+      if (!item->name.empty() && !item->name_is_generated)
+        out.insert(item->name);
       if (item->gen_else) CollectGenerateBlockNames(item->gen_else, out);
       break;
     case ModuleItemKind::kGenerateCase:
       for (const auto& ci : item->gen_case_items) {
-        if (!ci.label.empty()) out.insert(ci.label);
+        if (!ci.label.empty() && !ci.name_is_generated) out.insert(ci.label);
       }
       break;
     case ModuleItemKind::kGenerateFor:
-      if (!item->name.empty()) out.insert(item->name);
+      if (!item->name.empty() && !item->name_is_generated)
+        out.insert(item->name);
       break;
     default:
       break;
@@ -222,14 +227,14 @@ static void ReportConditionalGenerateNameConflicts(
                  std::format("generate block '{}' conflicts with another "
                              "declaration in the same scope",
                              n),
-                 Subclause("23.9"));
+                 Subclause("27.5"));
     } else if (construct_uses[n] > 1) {
       diag.Error(item->loc,
                  std::format("generate block '{}' has the same name as a "
                              "generate block in another generate construct "
                              "in the same scope",
                              n),
-                 Subclause("23.9"));
+                 Subclause("27.5"));
     }
   }
 }

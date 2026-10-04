@@ -31,7 +31,9 @@ namespace {
 // Elaborator::RegisterGenerateForArrayName in
 // src/elaborator/elaborator_generate.cpp is the emission site: it formats
 // "generate block array '{}' conflicts with an existing declaration in the
-// same scope" and passes Subclause("23.9").
+// same scope" and passes Subclause("27.4"): §23.9 rules that a name declares
+// one item in a scope, generate blocks included, and §27.4 states the same
+// for a generate block instance array in its own words.
 void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
   ElabFixture f;
   ElabOk(
@@ -50,7 +52,7 @@ void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'a' conflicts with an "
                             "existing declaration in the same scope",
-                            6, "23.9"));
+                            6, "27.4"));
 }
 
 // §23.9: an identifier shall be used to declare only one item within a

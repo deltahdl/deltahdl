@@ -285,7 +285,7 @@ TEST(GenerateElaboration, GenerateForNamedBlockConflictsWithVariableErrors) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'a' conflicts with an "
                             "existing declaration in the same scope",
-                            5, "23.9"));
+                            5, "27.4"));
 }
 
 // §27.4: the conflict rule explicitly covers a clash between two generate block
@@ -311,7 +311,7 @@ TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'a' conflicts with an "
                             "existing declaration in the same scope",
-                            7, "23.9"));
+                            7, "27.4"));
 }
 
 // §27.4: a generate block "comprises a separate scope and a new level of
@@ -364,7 +364,7 @@ TEST(GenerateElaboration, SiblingBlockArrayNamesInsideOneBlockConflictErrors) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'h' conflicts with an "
                             "existing declaration in the same scope",
-                            8, "23.9"));
+                            8, "27.4"));
 }
 
 // §27.4: it shall be an error if any bit of the genvar is set to x or z
