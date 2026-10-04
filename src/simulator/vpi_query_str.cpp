@@ -393,8 +393,10 @@ static const char* VpiDefNameStr(VpiHandle obj) {
   // §38.11: an instance reports what it is an instance of, which the design
   // recorded against its path; a module object standing for a definition rather
   // than an instance has no such record and its own name is its definition
-  // name.
-  if (obj->type == kVpiModule) {
+  // name. An interface or program instance is an instance as a module's is
+  // (§37.6, §37.9).
+  if (obj->type == kVpiModule || obj->type == vpiInterface ||
+      obj->type == vpiProgram) {
     return obj->def_name.empty() ? obj->name.data() : obj->def_name.c_str();
   }
   // §37.15 detail 6: a ref obj whose actual is an interface or modport
