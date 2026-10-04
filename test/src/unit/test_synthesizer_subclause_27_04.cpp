@@ -21,17 +21,19 @@ TEST(GenvarOperandSynthesis, GenvarBitIsItsInstancesValue) {
       16, [](uint64_t a) -> uint64_t { return a & 0xAu; });
 }
 
-// The implicit localparam is a signed integer, so `i - 1 < 0` holds in the
-// first instance alone. It fails on a lowering that reads the genvar unsigned,
-// where `i - 1` of the first instance wraps and the comparison never holds.
+// The implicit localparam is a signed integer, so beside the signed int M = -1
+// the comparison `M < i` is signed (§11.4.4) and holds in every instance. It
+// fails on a lowering that reads the genvar unsigned, which makes the
+// comparison unsigned, where -1 is the largest value and `M < i` never holds.
 TEST(GenvarOperandSynthesis, GenvarOperandIsASignedInteger) {
   ExpectInputSweep(
       "module m (input [3:0] a, output logic [3:0] y);\n"
+      "  localparam int M = -1;\n"
       "  for (genvar i = 0; i < 4; i++) begin : g\n"
-      "    assign y[i] = (i - 1 < 0) ? 1'b1 : a[i];\n"
+      "    assign y[i] = (M < i) ? a[i] : 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      16, [](uint64_t a) -> uint64_t { return (a & 0xEu) | 1u; });
+      16, [](uint64_t a) -> uint64_t { return a; });
 }
 
 // §27.4 allows a localparam inside a generate block, and §23.9 makes each
