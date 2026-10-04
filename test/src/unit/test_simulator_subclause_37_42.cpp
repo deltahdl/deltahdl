@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -343,6 +347,46 @@ TEST_F(TaskFuncCall, DecompileReportedForSystemCalls) {
   method.type = vpiMethodTaskCall;
   method.decompile = "packet.send()";
   EXPECT_EQ(vpi_get_str(vpiDecompile, VpiHandleOf(&method)), nullptr);
+}
+
+// A design whose one continuous assignment's right side is a call, run with a
+// PLI application registered.
+class CallsOfARun : public VpiDesignRun {
+ protected:
+  // The right side of the top's continuous assignment.
+  static vpiHandle CallOnTheRight() {
+    vpiHandle it =
+        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_scan(it));
+  }
+};
+
+constexpr const char* kFunctionCall =
+    "module top;\n"
+    "  function automatic int f(int x); return x; endfunction\n"
+    "  wire [31:0] a, y;\n"
+    "  assign y = f(a);\n"
+    "endmodule\n";
+
+// §37.59: a call of a function is a func call...
+TEST_F(CallsOfARun, AFunctionCallIsAFuncCallObject) {
+  Run(kFunctionCall);
+  EXPECT_EQ(vpi_get(vpiType, CallOnTheRight()), vpiFuncCall);
+}
+
+// ...and §37.42 reaches its arguments in order through vpiArgument.
+TEST_F(CallsOfARun, AFunctionCallsArgumentIsTheNetPassed) {
+  Run(kFunctionCall);
+  EXPECT_EQ(NamesOf(vpiArgument, CallOnTheRight()),
+            (std::vector<std::string>{"a"}));
+}
+
+// A call of a system function is a sys func call.
+TEST_F(CallsOfARun, ASystemFunctionCallIsASysFuncCallObject) {
+  Run("module top; wire [7:0] a; wire [31:0] y; assign y = $countones(a); "
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, CallOnTheRight()), vpiSysFuncCall);
 }
 
 }  // namespace

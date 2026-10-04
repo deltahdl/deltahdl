@@ -179,6 +179,14 @@ struct VpiObject {
   // descends (-:). Zero when unset.
   int indexed_part_select_type = 0;
 
+  // §37.59: a part select's two range bounds, reached through vpiLeftRange and
+  // vpiRightRange, and an indexed part select's base and width, reached through
+  // vpiBaseExpr and vpiWidthExpr. Null on every other object.
+  VpiObject* left_range = nullptr;
+  VpiObject* right_range = nullptr;
+  VpiObject* base_expr = nullptr;
+  VpiObject* width_expr = nullptr;
+
   // §37.52 detail 3: whether an operation reports the strong version of its
   // operator through vpi_get(vpiOpStrong). Meaningful only for the operators
   // VpiIsOpStrongValidOp accepts (and for sequence expressions); false

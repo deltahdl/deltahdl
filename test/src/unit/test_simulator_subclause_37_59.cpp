@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -353,6 +355,158 @@ TEST(ExpressionModel, ProtectedNonExpressionStillGuardsVpiSize) {
 
   EXPECT_EQ(ctx.Get(vpiSize, &reg), vpiUndefined);
   EXPECT_NE(ctx.LastError().level, 0);
+}
+
+// A design whose one continuous assignment's right side is the expression a
+// case is about, run with a PLI application registered.
+class ExpressionsOfARun : public VpiDesignRun {
+ protected:
+  // The right side of the top's continuous assignment.
+  static vpiHandle Rhs() {
+    vpiHandle it =
+        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_scan(it));
+  }
+
+  // The integer value of an expression object.
+  static int IntOf(vpiHandle expr) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(expr, &value);
+    return value.value.integer;
+  }
+
+  // The operands of an operation, in order.
+  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
+    std::vector<vpiHandle> operands;
+    vpiHandle it = vpi_iterate(vpiOperand, op);
+    if (it == nullptr) return operands;
+    while (vpiHandle operand = vpi_scan(it)) operands.push_back(operand);
+    return operands;
+  }
+};
+
+constexpr const char* kPartSelect =
+    "module top; wire [7:0] a; wire [3:0] y; assign y = a[7:4]; endmodule\n";
+
+// §37.59: a part select is an expression of its own...
+TEST_F(ExpressionsOfARun, APartSelectIsAPartSelectObject) {
+  Run(kPartSelect);
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiPartSelect);
+}
+
+// ...whose parent is the object it selects into...
+TEST_F(ExpressionsOfARun, APartSelectsParentIsWhatItSelectsInto) {
+  Run(kPartSelect);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiParent, Rhs())), "a");
+}
+
+// ...and whose range is the two bounds the source wrote.
+TEST_F(ExpressionsOfARun, APartSelectsLeftRangeIsItsFirstBound) {
+  Run(kPartSelect);
+  EXPECT_EQ(IntOf(vpi_handle(vpiLeftRange, Rhs())), 7);
+}
+
+TEST_F(ExpressionsOfARun, APartSelectsRightRangeIsItsSecondBound) {
+  Run(kPartSelect);
+  EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, Rhs())), 4);
+}
+
+constexpr const char* kIndexedPartSelect =
+    "module top; wire [7:0] a; wire [3:0] y; assign y = a[2 +: 4]; "
+    "endmodule\n";
+
+// §37.59: an indexed part select is an expression of its own, ascending for
+// +:, with the base and width the source wrote.
+TEST_F(ExpressionsOfARun, AnIndexedPartSelectIsAnIndexedPartSelectObject) {
+  Run(kIndexedPartSelect);
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiIndexedPartSelect);
+}
+
+TEST_F(ExpressionsOfARun, AnAscendingIndexedPartSelectIsPosIndexed) {
+  Run(kIndexedPartSelect);
+  EXPECT_EQ(vpi_get(vpiIndexedPartSelectType, Rhs()), vpiPosIndexed);
+}
+
+TEST_F(ExpressionsOfARun, ADescendingIndexedPartSelectIsNegIndexed) {
+  Run("module top; wire [7:0] a; wire [3:0] y; assign y = a[5 -: 4]; "
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiIndexedPartSelectType, Rhs()), vpiNegIndexed);
+}
+
+TEST_F(ExpressionsOfARun, AnIndexedPartSelectsBaseIsItsStart) {
+  Run(kIndexedPartSelect);
+  EXPECT_EQ(IntOf(vpi_handle(vpiBaseExpr, Rhs())), 2);
+}
+
+TEST_F(ExpressionsOfARun, AnIndexedPartSelectsWidthIsItsWidth) {
+  Run(kIndexedPartSelect);
+  EXPECT_EQ(IntOf(vpi_handle(vpiWidthExpr, Rhs())), 4);
+}
+
+TEST_F(ExpressionsOfARun, AnIndexedPartSelectsParentIsWhatItSelectsInto) {
+  Run(kIndexedPartSelect);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiParent, Rhs())), "a");
+}
+
+constexpr const char* kReplication =
+    "module top; wire a; wire [1:0] y; assign y = {2{a}}; endmodule\n";
+
+// §37.59: a replication is a multiple concatenation operation...
+TEST_F(ExpressionsOfARun, AReplicationIsAMultiConcatOperation) {
+  Run(kReplication);
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiMultiConcatOp);
+}
+
+// ...whose first operand is the multiplier (detail 1)...
+TEST_F(ExpressionsOfARun, AReplicationsFirstOperandIsTheMultiplier) {
+  Run(kReplication);
+  std::vector<vpiHandle> operands = OperandsOf(Rhs());
+  ASSERT_EQ(operands.size(), 2U);
+  EXPECT_EQ(IntOf(operands[0]), 2);
+}
+
+// ...and whose remaining operands are the concatenated expressions.
+TEST_F(ExpressionsOfARun, AReplicationsLaterOperandsAreTheElements) {
+  Run(kReplication);
+  std::vector<vpiHandle> operands = OperandsOf(Rhs());
+  ASSERT_EQ(operands.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiName, operands[1]), "a");
+}
+
+// §37.59: a cast, an inside expression, a streaming concatenation in either
+// direction, a min:typ:max and an implication are operations of their own.
+TEST_F(ExpressionsOfARun, ACastIsACastOperation) {
+  Run("module top; wire [7:0] a; wire [31:0] y; assign y = int'(a); "
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiCastOp);
+}
+
+TEST_F(ExpressionsOfARun, AnInsideExpressionIsAnInsideOperation) {
+  Run("module top; wire [7:0] a; wire y; assign y = a inside {1, 2}; "
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiInsideOp);
+}
+
+TEST_F(ExpressionsOfARun, ARightToLeftStreamIsAStreamRLOperation) {
+  Run("module top; wire [7:0] a, y; assign y = {<<{a}}; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiStreamRLOp);
+}
+
+TEST_F(ExpressionsOfARun, ALeftToRightStreamIsAStreamLROperation) {
+  Run("module top; wire [7:0] a, y; assign y = {>>{a}}; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiStreamLROp);
+}
+
+TEST_F(ExpressionsOfARun, AMinTypMaxIsAMinTypMaxOperation) {
+  Run("module top; wire a, b, c, y; assign y = (a:b:c); endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiMinTypMaxOp);
+}
+
+TEST_F(ExpressionsOfARun, AnImplicationIsAnImplyOperation) {
+  Run("module top; wire a, b, y; assign y = (a -> b); endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiImplyOp);
 }
 
 }  // namespace

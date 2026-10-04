@@ -852,7 +852,8 @@ bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
 // in `out`) when one fired; false when none did, leaving the caller to fall
 // back on the generic child/parent traversal.
 bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
-  return TryResolveConnectionRelation(type, ref, out) ||
+  return TryResolveSelectRelation(type, ref, out) ||
+         TryResolveConnectionRelation(type, ref, out) ||
          TryResolveClassAndActualRelation(type, ref, out) ||
          TryResolveClockingAndParentRelation(type, ref, out) ||
          TryResolveParameterRelation(type, ref, out) ||

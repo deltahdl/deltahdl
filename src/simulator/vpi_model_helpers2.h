@@ -147,6 +147,17 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // to the class reaches.
 bool VpiIsVariablesType(int type);
 
+// §37.58: whether an object of `type` can stand where §37.59 draws an expr --
+// an expr kind, or a net or variable, which simple expr holds beside them.
+// VpiIsExprType leaves the two out for the protection rule it serves.
+bool VpiIsExprOperandType(int type);
+
+// §37.59: the relations of a part select (vpiLeftRange, vpiRightRange,
+// vpiParent) and an indexed part select (vpiBaseExpr, vpiWidthExpr,
+// vpiParent). Answers whether `ref` is one and `type` one of its relations,
+// with the target in `out`.
+bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out);
+
 // §37.21 detail 1: a structure, union, or class variable owns the additional
 // driver/load collection behaviour, so the relation must also reach the
 // drivers/loads of its bit/part-selects and nested members.

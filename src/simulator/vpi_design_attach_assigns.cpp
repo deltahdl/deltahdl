@@ -83,6 +83,8 @@ int BinaryOpType(TokenKind op) {
       return vpiArithLShiftOp;
     case TokenKind::kGtGtGt:
       return vpiArithRShiftOp;
+    case TokenKind::kArrow:
+      return vpiImplyOp;
     default:
       return 0;
   }
@@ -180,9 +182,75 @@ VpiObject* ConstantObject(const Expr* expr, const AssignBuild& build) {
   return constant;
 }
 
+// `first` followed by `rest`, as the operands of an operation.
+std::vector<const Expr*> Operands(const Expr* first,
+                                  const std::vector<Expr*>& rest) {
+  std::vector<const Expr*> operands{first};
+  operands.insert(operands.end(), rest.begin(), rest.end());
+  return operands;
+}
+
+// §37.59: a part select or an indexed part select, which reaches the object it
+// selects into through vpiParent and the bounds, or the base and width, it
+// was written with. A select of one bit is not modelled and gives null.
+VpiObject* SelectObject(const Expr* expr, const AssignBuild& build) {
+  if (expr->index_end == nullptr) return nullptr;
+  VpiObject* select = build.alloc();
+  select->parent = ExpressionObject(expr->base, build);
+  VpiObject* first = ExpressionObject(expr->index, build);
+  VpiObject* second = ExpressionObject(expr->index_end, build);
+  if (expr->is_part_select_plus || expr->is_part_select_minus) {
+    select->type = vpiIndexedPartSelect;
+    select->indexed_part_select_type =
+        expr->is_part_select_plus ? vpiPosIndexed : vpiNegIndexed;
+    select->base_expr = first;
+    select->width_expr = second;
+  } else {
+    select->type = vpiPartSelect;
+    select->left_range = first;
+    select->right_range = second;
+  }
+  return select;
+}
+
+// §37.42 with §37.59: a call of a function or system function, carrying its
+// arguments in order, which vpiArgument reaches.
+VpiObject* CallObject(const Expr* expr, const AssignBuild& build) {
+  VpiObject* call = build.alloc();
+  call->type =
+      expr->kind == ExprKind::kSystemCall ? vpiSysFuncCall : vpiFuncCall;
+  for (const Expr* arg : expr->args) {
+    VpiObject* obj = ExpressionObject(arg, build);
+    if (obj != nullptr) call->children.push_back(obj);
+  }
+  return call;
+}
+
+// §37.59: the operations whose operands the source writes as a list -- a
+// replication, its multiplier first (detail 1); an inside expression, its
+// value first; and a streaming concatenation, whose direction is its operator.
+VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
+  switch (expr->kind) {
+    case ExprKind::kReplicate:
+      return OperationObject(vpiMultiConcatOp,
+                             Operands(expr->repeat_count, expr->elements),
+                             build);
+    case ExprKind::kInside:
+      return OperationObject(vpiInsideOp, Operands(expr->lhs, expr->elements),
+                             build);
+    default:
+      return OperationObject(
+          expr->op == TokenKind::kLtLt ? vpiStreamRLOp : vpiStreamLROp,
+          std::vector<const Expr*>(expr->elements.begin(),
+                                   expr->elements.end()),
+          build);
+  }
+}
+
 // The object standing for one side of an assignment: the net or variable a
-// name stands for, a constant, or an operation over these. A select, a call
-// and the other kinds of expression are not modelled and give null.
+// name stands for, a constant, a select, a call, or an operation over these.
+// A bit select (#4970) and the kinds of expression the switch does not name
+// are not modelled and give null.
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   switch (expr->kind) {
@@ -207,6 +275,20 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
                              std::vector<const Expr*>(expr->elements.begin(),
                                                       expr->elements.end()),
                              build);
+    case ExprKind::kReplicate:
+    case ExprKind::kInside:
+    case ExprKind::kStreamingConcat:
+      return ListOperationObject(expr, build);
+    case ExprKind::kCast:
+      return OperationObject(vpiCastOp, {expr->lhs}, build);
+    case ExprKind::kMinTypMax:
+      return OperationObject(vpiMinTypMaxOp,
+                             {expr->lhs, expr->condition, expr->rhs}, build);
+    case ExprKind::kSelect:
+      return SelectObject(expr, build);
+    case ExprKind::kCall:
+    case ExprKind::kSystemCall:
+      return CallObject(expr, build);
     default:
       return nullptr;
   }

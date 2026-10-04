@@ -228,10 +228,7 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
   std::vector<VpiHandle> operands;
   if (!operation || operation->type != vpiOperation) return operands;
   for (auto* child : operation->children) {
-    if (VpiIsExprType(child->type) || VpiIsNetsType(child->type) ||
-        VpiIsVariablesType(child->type)) {
-      operands.push_back(child);
-    }
+    if (VpiIsExprOperandType(child->type)) operands.push_back(child);
   }
   return operands;
 }
@@ -739,7 +736,10 @@ bool VpiIsTfCallArgumentType(int type) {
   // expr, a scope, a primitive, a named event, or a named event array. An expr
   // and an interface expr are themselves groupings, so defer to their
   // classifiers; the rest are concrete kinds.
-  if (VpiIsExprType(type) || VpiIsInterfaceExprType(type)) return true;
+  //
+  // §37.58 holds nets and variables in simple expr, so a net or variable passed
+  // as an argument is one too.
+  if (VpiIsExprOperandType(type) || VpiIsInterfaceExprType(type)) return true;
   switch (type) {
     case vpiScope:
     case vpiNamedEvent:
