@@ -695,8 +695,8 @@ class NetTypesOfARun : public VpiDesignRun {
 };
 
 constexpr const char* kNetKinds =
-    "nettype logic mynet;\n"
     "module top;\n"
+    "  nettype logic mynet;\n"
     "  wire w; tri t; wand wa; supply0 s0; trireg tr; uwire u; mynet n;\n"
     "endmodule\n";
 
