@@ -86,4 +86,35 @@ ProtectLicense ParseProtectLicense(std::string_view value) {
   return license;
 }
 
+bool ProtectLicenseGranted(const ProtectLicense& license,
+                           const ProtectLicenseAnswer& answer) {
+  return answer.called && answer.returned >= 0 &&
+         static_cast<uint64_t>(answer.returned) == license.match;
+}
+
+std::string ProtectLicenseRefusal(std::string_view keyword,
+                                  const ProtectLicense& license,
+                                  const ProtectLicenseAnswer& answer) {
+  std::string message("protect pragma ");
+  message.append(keyword).append(" entry function \"").append(license.entry);
+  message.append("\" in \"").append(license.library).append("\"");
+  if (answer.called) {
+    message.append(" returned ")
+        .append(std::to_string(answer.returned))
+        .append(" for feature \"")
+        .append(license.feature)
+        .append("\", not the match value ")
+        .append(std::to_string(license.match));
+  } else {
+    message.append(" was not called for feature \"")
+        .append(license.feature)
+        .append("\": ")
+        .append(answer.why_not_called);
+  }
+  message.append(keyword == kDecryptLicenseKeyword
+                     ? ", so this tool is not licensed to decrypt the model"
+                     : ", so this tool is not licensed to execute the model");
+  return message;
+}
+
 }  // namespace delta

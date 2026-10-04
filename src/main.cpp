@@ -31,6 +31,7 @@
 #include "common/types.h"
 #include "driver/cli_options.h"
 #include "driver/precompile_run.h"
+#include "driver/protect_license_libraries.h"
 #include "elaborator/command_line_bind.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -175,12 +176,17 @@ struct PreprocResult {
   // element belongs to the file named on the command line whose text holds
   // it, whichever file an `include put the element's own lines in.
   std::vector<std::pair<uint32_t, std::string>> file_first_lines;
+  // The runtime_license expressions met in encrypted models, which §34.5.29.2
+  // has asked before the model is executed.
+  std::vector<delta::ProtectRuntimeLicense> runtime_licenses;
 };
 
 PreprocResult PreprocessSources(const delta::CliOptions& opts,
                                 delta::SourceManager& src_mgr,
-                                delta::DiagEngine& diag) {
-  delta::Preprocessor preproc(src_mgr, diag, delta::PreprocConfigFor(opts));
+                                delta::DiagEngine& diag,
+                                delta::ProtectLicenseLibraries& licenses) {
+  delta::Preprocessor preproc(src_mgr, diag,
+                              delta::PreprocConfigFor(opts, licenses.Asker()));
 
   PreprocResult result;
   for (const auto& path : opts.source_files) {
@@ -211,6 +217,7 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   result.timescale = preproc.CurrentTimescale();
   result.has_timescale = preproc.HasTimescale();
   result.global_precision = preproc.GlobalPrecision();
+  result.runtime_licenses = preproc.RuntimeLicenses();
   return result;
 }
 
@@ -773,10 +780,13 @@ bool ForeignCodeIsLoaded(const delta::CliOptions& opts,
 // source only the elaborator rejects passes, which is what a file meant to
 // test the preprocessor or the parser alone asks for; --lint-only elaborates
 // and stops; --synth synthesizes; and with none of them the design is
-// simulated.
+// simulated. Synthesis and simulation both evaluate the model, which §34.5.29.2
+// NOTE 1 counts as executing it, so each begins only once `licensed` has
+// answered that every runtime licence the model states is granted.
 int RunParsedUnit(const delta::CliOptions& opts,
                   const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
-                  delta::DiagEngine& diag) {
+                  delta::DiagEngine& diag,
+                  const std::function<bool()>& licensed) {
   if (opts.dump_ast) {
     DumpAst(cu);
   }
@@ -789,6 +799,7 @@ int RunParsedUnit(const delta::CliOptions& opts,
   if (opts.lint_only) {
     return RunLint(opts, lib_map, cu, diag, elab_arena);
   }
+  if (!licensed()) return 1;
   if (opts.synth_mode) {
     return RunSynthesis(opts, lib_map, cu, diag, elab_arena);
   }
@@ -856,7 +867,11 @@ int main(int argc, char* argv[]) {
   delta::LibraryMap lib_map;
   if (!LoadLibraryMaps(opts, src_mgr, lib_map)) return 1;
 
-  auto pp = PreprocessSources(opts, src_mgr, diag);
+  // §34.5.28.2 and §34.5.29.2: the libraries a protected model's licences are
+  // asked through, whose exit functions are called as this object goes, when
+  // main returns.
+  delta::ProtectLicenseLibraries licenses;
+  auto pp = PreprocessSources(opts, src_mgr, diag, licenses);
   if (pp.source.empty() || diag.HasErrors()) {
     return 1;
   }
@@ -868,5 +883,7 @@ int main(int argc, char* argv[]) {
   }
   ApplyPreprocMetadata(cu, pp);
   if (!TagDesignElementLibraries(*cu, pp, lib_map, diag)) return 1;
-  return RunParsedUnit(opts, lib_map, cu, diag);
+  return RunParsedUnit(opts, lib_map, cu, diag, [&] {
+    return delta::RuntimeLicensesGranted(pp.runtime_licenses, licenses, diag);
+  });
 }

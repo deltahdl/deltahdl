@@ -16,14 +16,17 @@
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "driver/cli_options.h"
+#include "driver/protect_license_libraries.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "parser/precompiled_library.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_license.h"
 
 namespace delta {
 
-PreprocConfig PreprocConfigFor(const CliOptions& opts) {
+PreprocConfig PreprocConfigFor(const CliOptions& opts,
+                               ProtectLicenseAsk ask_license) {
   PreprocConfig config;
   config.include_dirs = opts.include_dirs;
   config.defines = opts.defines;
@@ -33,6 +36,7 @@ PreprocConfig PreprocConfigFor(const CliOptions& opts) {
   // an --encrypt run seals them under the same two.
   config.protect_key = opts.protect.exchange_key;
   config.protect_keys = opts.protect.keys;
+  config.ask_license = std::move(ask_license);
   return config;
 }
 
@@ -137,7 +141,11 @@ int RunPrecompile(const CliOptions& opts, SourceManager& src_mgr,
     std::cerr << "--precompile-into and --precompile-out are used together\n";
     return 1;
   }
-  Preprocessor preproc(src_mgr, diag, PreprocConfigFor(opts));
+  // §34.5.28.2: a model a precompiled source carries in an envelope is
+  // decrypted only where its decrypt_license is granted, and the exit functions
+  // those licences name are called as this object goes, before the run ends.
+  ProtectLicenseLibraries licenses;
+  Preprocessor preproc(src_mgr, diag, PreprocConfigFor(opts, licenses.Asker()));
   std::vector<PreprocessedSource> sources;
   for (const auto& path : opts.source_files) {
     std::optional<PreprocessedSource> source =

@@ -4,13 +4,17 @@
 #include "common/source_mgr.h"
 #include "driver/cli_options.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_license.h"
 
 namespace delta {
 
 // The preprocessor configuration the command line asks for: its include
 // directories and macro definitions, and the keys §34.3 has a reading run open
-// decryption envelopes with, which an --encrypt run seals under as well.
-PreprocConfig PreprocConfigFor(const CliOptions& opts);
+// decryption envelopes with, which an --encrypt run seals under as well. A
+// decrypt_license met in an encrypted model is asked through `ask_license`
+// (§34.5.28.2).
+PreprocConfig PreprocConfigFor(const CliOptions& opts,
+                               ProtectLicenseAsk ask_license);
 
 // §33.5.3's separate compilation tool: the invocation that compiles source
 // descriptions into a library rather than binding a design. "It is essential

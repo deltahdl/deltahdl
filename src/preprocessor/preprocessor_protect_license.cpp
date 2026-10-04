@@ -1,5 +1,6 @@
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -10,31 +11,23 @@
 namespace delta {
 namespace {
 
-// The subclause defining the spelling of `keyword`'s value, and the one
-// defining what a tool does with it. §34.5.28 and §34.5.29 write the same list
-// and put the same question, so what a report cites is the only thing that
+// The subclause defining the spelling of `keyword`'s value. §34.5.28 and
+// §34.5.29 write the same list, so what a report cites is the only thing that
 // separates one keyword's reports from the other's.
 std::string_view SyntaxSubclause(std::string_view keyword) {
   return keyword == kDecryptLicenseKeyword ? "34.5.28.1" : "34.5.29.1";
-}
-
-std::string_view DescriptionSubclause(std::string_view keyword) {
-  return keyword == kDecryptLicenseKeyword ? "34.5.28.2" : "34.5.29.2";
-}
-
-// What the tool goes on to do with the model it never asked a licence for.
-// §34.5.28.2 has an unlicensed tool perform no decryption, and §34.5.29.2 has
-// it not begin execution, so those are the two things a run that skipped the
-// check does anyway.
-std::string_view WhatIsDoneUnasked(std::string_view keyword) {
-  return keyword == kDecryptLicenseKeyword ? "decrypts the model"
-                                           : "goes on to execute the model";
 }
 
 }  // namespace
 
 void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
                                 SourceLoc loc) {
+  // A refusal speaks for the envelope it was met in, so it lapses once the
+  // reading has left that envelope, whichever expression closed it.
+  if (decryption_refused_depth_ >
+      protect_envelopes_.DecryptionEnvelopeDepth()) {
+    decryption_refused_depth_ = 0;
+  }
   if (expr.keyword != kDecryptLicenseKeyword &&
       expr.keyword != kRuntimeLicenseKeyword) {
     return;
@@ -61,37 +54,27 @@ void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
   // pair so that it is encrypted into the output the author ships, and it
   // speaks to whoever reads that output rather than to whoever wrote it.
   if (!protect_envelopes_.InProtectedRegion()) return;
-  // The check itself is performed by nothing, and the expression is reported
-  // for that reason. §34.5.28.2 has the tool load the library the value names,
-  // call the entry function in it with the feature string, compare what comes
-  // back against the match value, and refuse to decrypt where the two differ;
-  // §34.5.29.2 asks the same before the model is executed. This tool loads no
-  // library named by a text it reads, and #3443 carries what it would take to:
-  // loading a shared object a source file chooses is a capability this program
-  // has nowhere else, and giving it one is a decision about what a source file
-  // may make the tool do rather than about protect pragmas.
-  //
-  // Both subclauses close with a NOTE saying the mechanism provides only
-  // limited security, the end user holding the shared library and being able to
-  // produce an equivalent one that returns a 0 and avoids the check. So what an
-  // author is owed here is an honest account of what the run did, and silence
-  // is the one answer that leaves the author believing the licence was
-  // consulted.
-  diag_.Warning(loc,
-                std::string("protect pragma ")
-                    .append(expr.keyword)
-                    .append(" expression is not acted on: this tool loads no "
-                            "library a source text names, so the entry "
-                            "function \"")
-                    .append(license.entry)
-                    .append("\" in \"")
-                    .append(license.library)
-                    .append("\" is not called for feature \"")
-                    .append(license.feature)
-                    .append("\" and this run ")
-                    .append(WhatIsDoneUnasked(expr.keyword))
-                    .append(" unlicensed"),
-                Subclause(DescriptionSubclause(expr.keyword)));
+  // §34.5.29.2 asks its question before the model is executed, which is the
+  // run's business once preprocessing is over.
+  if (expr.keyword == kRuntimeLicenseKeyword) {
+    runtime_licenses_.push_back({std::move(license), loc});
+    return;
+  }
+  // §34.5.28.2 asks its question before the decrypted text is processed: the
+  // library is loaded, its entry function called with the feature string, and
+  // the value it returns compared with the match value.
+  ProtectLicenseAnswer answer;
+  if (config_.ask_license) {
+    answer = config_.ask_license(license);
+  } else {
+    answer.why_not_called = "this reading loads no library";
+  }
+  if (ProtectLicenseGranted(license, answer)) return;
+  diag_.Error(loc, ProtectLicenseRefusal(expr.keyword, license, answer),
+              Subclause("34.5.28.2"));
+  if (decryption_refused_depth_ == 0) {
+    decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
+  }
 }
 
 }  // namespace delta

@@ -16,6 +16,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     common/types.cpp
     driver/cli_options.cpp
     driver/precompile_run.cpp
+    driver/protect_license_libraries.cpp
     common/diagnostic.cpp
     common/source_mgr.cpp
     preprocessor/macro_table.cpp

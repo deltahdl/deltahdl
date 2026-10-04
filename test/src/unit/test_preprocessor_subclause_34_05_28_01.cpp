@@ -121,9 +121,9 @@ TEST_F(ProtectDecryptLicenseSyntaxTest,
 // ParseProtectLicense (src/preprocessor/protect_license.h) separates the five
 // names, and Preprocessor::ApplyLicense
 // (src/preprocessor/preprocessor_protect_license.cpp) reports a value written
-// in any other spelling than this one. What is still done with the names is
-// nothing: #3443 records that no library is loaded, no entry function is
-// called and no return value is compared.
+// in any other spelling than this one. What is done with the names is the
+// Description's: §34.5.28.2 has them asked before the decrypted text is
+// processed (test_preprocessor_subclause_34_05_28_02.cpp).
 
 // The value in the shape the syntax line writes it: the three required names
 // with strings against them, and `after` standing where the two optional names
@@ -310,16 +310,12 @@ TEST(ProtectDecryptLicenseSyntax,
   EXPECT_EQ(license.feature, "decrypt");
 }
 
-// The two optional names left out. §34.4 has a tool use a keyword's default
-// value where the keyword is absent, and no default is stated for either of
-// these: not in §34.5.28.1, not in the Description beside it, and not in Table
-// 34-1, which carries a name and a description and no default column at all.
-// So the absence is recorded as an absence rather than filled in.
-//
-// It matters most for the number. Zero is the value the NOTE in the
-// Description has a forged library return in order to pass the check, so a
-// licence read as stating zero would be read as asking for exactly the
-// comparison that NOTE describes.
+// The two optional names left out. No default is stated for either of them:
+// not in the Syntax subclause, not in the Description beside it, and not in
+// Table 34-1. So the absence is recorded as an absence rather than filled in,
+// and what the Description makes of a licence writing no match value -- it is
+// held to 0, the value the NOTE has a forged library return to avoid the
+// check -- is read in its own file.
 TEST(ProtectDecryptLicenseSyntax,
      TheOptionalNamesAreAbsentWhereTheTextOmitsThem) {
   ProtectLicense license = ParseProtectLicense(LicenseList(""));

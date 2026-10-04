@@ -12,6 +12,7 @@
 // Preprocessor::ReadEncodedProtectValue turns the characters into bytes under
 // the coding scheme in effect and spends the byte count that scheme stated.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -440,6 +441,10 @@ void Preprocessor::SpendEncodedValueSize() {
 // any key is offered to it, and so never reported as a key that does not fit.
 void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
                                         int depth, std::string& output) {
+  // §34.5.28.2: a tool not licensed to decrypt the model performs no
+  // decryption, and a licence refused in this envelope, or in one enclosing
+  // it, has already found it unlicensed.
+  if (decryption_refused_depth_ != 0) return;
   std::string block;
   // Text that cannot be read out of the scheme in effect carries no block, and
   // the lines are spent either way: the keyword above them said the block
@@ -515,7 +520,16 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
                            std::string(src_mgr_.FilePath(loc.file_id)) + ":" +
                            std::to_string(loc.line) + ">";
   uint32_t block_id = src_mgr_.AddFile(std::move(block_name), cleartext);
-  output.append(ProcessSource(cleartext, block_id, depth));
+  size_t origins = line_origins_.size();
+  std::string recovered = ProcessSource(cleartext, block_id, depth);
+  // §34.5.28.2: a decrypt_license the recovered text carried was refused, so
+  // nothing of the model is processed on, and the lines it would have written
+  // take their origins with them.
+  if (decryption_refused_depth_ != 0) {
+    line_origins_.resize(origins);
+    return;
+  }
+  output.append(recovered);
   digest_target_ = std::move(target);
 }
 

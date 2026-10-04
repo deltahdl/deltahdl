@@ -20,6 +20,7 @@
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_license.h"
 #include "preprocessor/protect_viewport.h"
 
 namespace delta {
@@ -82,6 +83,19 @@ struct PreprocConfig {
   // need not say which region each belongs to. Left empty, no key was supplied
   // under a name and `protect_key` is what every region is read with.
   ProtectKeyList protect_keys;
+  // How a decrypt_license expression met in an encrypted model is answered
+  // (§34.5.28.2): the run supplies the loading of the library it names and the
+  // call into it. Left empty, nothing can be loaded, so no such licence is
+  // granted and the model it guards is not decrypted.
+  ProtectLicenseAsk ask_license;
+};
+
+// A runtime_license expression met in an encrypted model, and where. §34.5.29.2
+// has the tool ask it before the model is executed, which is past the end of
+// preprocessing, so it is carried to the run that executes.
+struct ProtectRuntimeLicense {
+  ProtectLicense license;
+  SourceLoc loc;
 };
 
 struct CondState {
@@ -369,10 +383,10 @@ class Preprocessor {
   // Syntax subclause defines is reported rather than stored as though it named
   // something.
   //
-  // A licence written in the spelling and met in an encrypted model is reported
-  // as well. Both Description subclauses have the tool load the library the
-  // value names and call into it, this tool loads no library a source text
-  // names, and #3443 carries what it would take to.
+  // A decrypt_license met in an encrypted model is asked through the
+  // configuration's ask_license and, where it is not granted, reported and the
+  // envelope's decryption refused (§34.5.28.2). A runtime_license met there is
+  // recorded for the run that executes the model (§34.5.29.2).
   void ApplyLicense(const PragmaKeywordExpression& expr, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
@@ -592,6 +606,12 @@ class Preprocessor {
   const std::vector<ProtectViewport>& ProtectViewports() const {
     return protect_viewports_;
   }
+  // The runtime_license expressions met in encrypted models, in the order the
+  // text wrote them, for the run that executes the design to ask before it
+  // begins (§34.5.29.2).
+  const std::vector<ProtectRuntimeLicense>& RuntimeLicenses() const {
+    return runtime_licenses_;
+  }
   // The key that opens the digest of whatever the reading has reached, which
   // §34.5.18 has selected by combining the entity in effect for the digest
   // with the name in effect for its key. Empty where that pair selects none of
@@ -728,6 +748,14 @@ class Preprocessor {
   // held here while an inner one is open and taken back when it closes.
   // protect_viewports_ above is the current envelope's alone.
   std::vector<std::vector<ProtectViewport>> protect_viewport_stack_;
+  // What RuntimeLicenses() answers with.
+  std::vector<ProtectRuntimeLicense> runtime_licenses_;
+  // The decryption envelope depth at which a decrypt_license expression was
+  // refused, or 0 where none stands refused. §34.5.28.2 has an unlicensed tool
+  // perform no decryption, so a data block read at or below that depth
+  // recovers nothing into the output, and the refusal lapses once the envelope
+  // it was met in closes.
+  size_t decryption_refused_depth_ = 0;
   // The designations the source text has written for the keys of the entities
   // it names. They are unique for the entity they are written under, so they
   // accumulate across the whole compilation input alongside the keyword values

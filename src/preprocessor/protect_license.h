@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -59,14 +60,12 @@ struct ProtectLicense {
   bool has_exit = false;
   // The value §34.5.28.2 compares the entry function's return against.
   //
-  // `has_match` stands apart for the same reason and more sharply. Zero is the
-  // value the NOTE in both subclauses has a forged library return in order to
-  // pass the check, so a licence that omitted the number and was read as
-  // stating zero would be read as asking for exactly the comparison the NOTE
-  // describes. §34.4 says a tool uses a keyword's default value where the
-  // keyword is absent, and neither Syntax subclause, neither Description, nor
-  // Table 34-1 states a default for this number, so there is none to fall back
-  // on and the absence is recorded as an absence.
+  // `has_match` says whether the text wrote the number. Neither Syntax
+  // subclause, neither Description, nor Table 34-1 states a default for it, and
+  // the NOTE closing both subclauses has a user defeat the check with a library
+  // "that returns a 0", which avoids it only where 0 is the answer a licence
+  // asks for. So a licence that writes no number is held to 0, the value
+  // `match` holds when `has_match` is false.
   uint64_t match = 0;
   bool has_match = false;
   // Whether the value read was written in the spelling the Syntax subclauses
@@ -99,5 +98,37 @@ struct ProtectLicense {
 // list of pragma expressions, which name what they carry rather than standing
 // at a position, and §34.5.9.1's and §34.5.32.1's values are read the same way.
 ProtectLicense ParseProtectLicense(std::string_view value);
+
+// What asking a licence's library came to: whether its entry function was
+// called with the feature string and what it returned, or, where it was not
+// called, why -- the library could not be loaded, or defines no entry function
+// of that name. §34.5.28.2 and §34.5.29.2 have the tool report the value the
+// entry function returned, so the value travels with the answer.
+struct ProtectLicenseAnswer {
+  bool called = false;
+  int64_t returned = 0;
+  std::string why_not_called;
+};
+
+// Asks the library a licence names, as §34.5.28.2 and §34.5.29.2 have a tool
+// do on meeting the licence in an encrypted model. The preprocessor reads
+// source text and loads no object code itself, so the run reading it supplies
+// the asking.
+using ProtectLicenseAsk =
+    std::function<ProtectLicenseAnswer(const ProtectLicense&)>;
+
+// Whether `answer` licenses the tool: §34.5.28.2 and §34.5.29.2 have the
+// returned value compare equal to the match value where the tool is licensed
+// and nonequal otherwise. An entry function never called returned nothing to
+// compare, so it licenses nothing.
+bool ProtectLicenseGranted(const ProtectLicense& license,
+                           const ProtectLicenseAnswer& answer);
+
+// The error a tool the licence `keyword` states does not license is reported
+// with. Both subclauses have it include the value the entry function returned;
+// where the function was not called, it says why instead.
+std::string ProtectLicenseRefusal(std::string_view keyword,
+                                  const ProtectLicense& license,
+                                  const ProtectLicenseAnswer& answer);
 
 }  // namespace delta

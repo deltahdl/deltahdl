@@ -1,5 +1,4 @@
-// §34.5.29.2 runtime_license, Description, on the one rule its own file has
-// left to state.
+// §34.5.29.2 runtime_license, Description.
 //
 // The subclause states three things.
 //
@@ -28,23 +27,23 @@
 // Restating them here under this subclause's name would add a second copy of a
 // claim already made and nothing else.
 //
-// What those two leave open is the one case below. They show the expression
+// What those two leave open is the first case below. They show the expression
 // treated one way inside a region and another way outside it, which is
 // consistent with a tool that lifts nothing out of a region at all. §34.5.5 has
 // the author's name lifted out and written in the clear, so a licence and a
 // name written in the same place coming out differently is what says the
 // subclause decided this rather than the position.
 //
-// The third rule is performed by nothing, and it is where the two licence
-// keywords part: §34.5.28.2's check stands before the decrypted text is
-// processed, which is inside the preprocessor, and this one stands before the
-// model is executed, which is a later phase this value never reaches. What
-// happens instead is the second case below. Preprocessor::ApplyLicense
-// (src/preprocessor/preprocessor_protect_license.cpp) reports the expression
-// where it meets one in an encrypted model, naming the library, the entry
-// function and the feature that no call was made with. #3443 records what is
-// still not done -- the call itself, and carrying the value out of the
-// preprocessor to the phase §34.5.29.2 names.
+// The third rule is where the two licence keywords part: §34.5.28.2's check
+// stands before the decrypted text is processed, which is inside the
+// preprocessor, and this one stands before the model is executed, which is
+// past it. So Preprocessor::ApplyLicense
+// (src/preprocessor/preprocessor_protect_license.cpp) records each such
+// expression it meets in an encrypted model, and the run asks them before
+// synthesis or simulation begins (RuntimeLicensesGranted in
+// src/driver/protect_license_libraries.h, whose cases are in
+// test_simulator_subclause_34_05_29_02.cpp). The cases after the first state
+// what the reading records.
 
 #include <gtest/gtest.h>
 
@@ -57,6 +56,7 @@
 #include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -136,35 +136,38 @@ std::string EnvelopeStatingTheLicence() {
   return envelope;
 }
 
-// §34.5.29.2 has the tool load the library, call the entry function with the
-// feature string, and refuse to begin execution where what comes back does not
-// match. None of that is done, and this is what a reader of the run is told
-// instead: the expression is answered with a warning naming the library, the
-// entry function and the feature no call was made with.
-//
-// The line is the licence's own line inside the recovered text, that being what
-// the reading of that text numbers from, so the report stands at the directive
-// rather than at the block that carried it.
-TEST(ProtectRuntimeLicenseDescription, TheLicenceNotCheckedIsReported) {
+// The licence met in the encrypted model is recorded for the run that executes
+// it, at the licence's own line inside the recovered text, that being what the
+// reading of that text numbers from.
+TEST(ProtectRuntimeLicenseDescription, TheLicenceIsRecordedForTheRun) {
   std::string envelope = EnvelopeStatingTheLicence();
   std::string cleartext;
   ASSERT_TRUE(
       DecryptProtectedRegion(DataBlockOf(envelope), kTheKey, &cleartext));
   ReadSource run(envelope, ReadSource::KeysConfig(TheKey()));
-  EXPECT_TRUE(ReportedWarning(
-      run.diag.Diagnostics(),
-      "protect pragma runtime_license expression is not acted on: this tool "
-      "loads no library a source text names, so the entry function "
-      "\"checkout\" in \"liblic.so\" is not called for feature \"simulate\"",
-      LineHolding(cleartext, kLicense), "34.5.29.2"));
+  ASSERT_EQ(run.pp.RuntimeLicenses().size(), 1U);
+  const ProtectRuntimeLicense& recorded = run.pp.RuntimeLicenses()[0];
+  EXPECT_EQ(recorded.license.library, kLibrary);
+  EXPECT_EQ(recorded.license.entry, "checkout");
+  EXPECT_EQ(recorded.license.feature, "simulate");
+  EXPECT_EQ(recorded.license.match, 1U);
+  EXPECT_EQ(recorded.loc.line, LineHolding(cleartext, kLicense));
 }
 
-// And the model is run all the same. §34.5.29.2 has execution not begin where
-// the tool is not licensed; a run that never asked reports no error, so nothing
-// holds the design back and the warning above is the whole of what it produced.
-TEST(ProtectRuntimeLicenseDescription, NoErrorStopsTheModelBeingReached) {
+// The model is read all the same. Execution is what the licence guards, and
+// reading the model is not executing it, so nothing is reported and the design
+// reaches the step after.
+TEST(ProtectRuntimeLicenseDescription, TheModelIsReadAllTheSame) {
   ReadSource run(EnvelopeStatingTheLicence(), ReadSource::KeysConfig(TheKey()));
   EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
+  EXPECT_TRUE(run.diag.Diagnostics().empty());
+}
+
+// A licence in cleartext the tool is about to encrypt is the ENCRYPTION INPUT
+// case, met in no encrypted model, so it is not recorded.
+TEST(ProtectRuntimeLicenseDescription, ALicenceInCleartextIsNotRecorded) {
+  ReadSource run(std::string(kLicense));
+  EXPECT_TRUE(run.pp.RuntimeLicenses().empty());
 }
 
 }  // namespace

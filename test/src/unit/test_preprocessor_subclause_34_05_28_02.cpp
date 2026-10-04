@@ -23,16 +23,15 @@
 // naming a key are, so it rides into the data block with the design and comes
 // back with it.
 //
-// The third is not performed. The five names inside the value are separated
-// from the text around them by ParseProtectLicense
-// (src/preprocessor/protect_license.h), and Preprocessor::ApplyLicense
-// (src/preprocessor/preprocessor_protect_license.cpp) reports the expression
-// rather than acting on it; #3443 records what is still not done, which is the
-// whole of the call: no library is loaded, no entry function is called, and no
-// return value is compared. The last three cases here state that consequence --
-// a licensed model decrypts for a reader who was never asked for a licence, the
-// run says so, and it says so only where the expression stood in an encrypted
-// model.
+// The third is Preprocessor::ApplyLicense's
+// (src/preprocessor/preprocessor_protect_license.cpp). The preprocessor loads
+// no object code itself, so the asking is the configuration's ask_license,
+// which a run supplies (src/driver/protect_license_libraries.h) and which the
+// cases here answer with a stub: what the entry function returned, or why it
+// was not called. The cases after the encryption ones state what the reading
+// does with each answer -- a match decrypts, anything else is reported with
+// the value and decrypts nothing, an absent match is held to 0, and a licence
+// in cleartext asks nothing.
 //
 // Which spelling the expression is written in is §34.5.28.1's and is stated in
 // test_preprocessor_subclause_34_05_28_01.cpp.
@@ -40,16 +39,19 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
-#include "fixture_preprocessor.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_license.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -97,21 +99,58 @@ std::string Writes(std::string_view keyword, std::string_view value) {
   return text;
 }
 
-// A region reaching the author's own key, with `described` written inside it.
-std::string Region(std::string_view described) {
+// A region reaching the author's own key, with `described` written inside it
+// ahead of `design`.
+std::string Region(std::string_view described,
+                   std::string_view design = kEncodingSealedDesign) {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kEntity));
   text.append(Writes("data_keyname", kKeyName));
-  text.append(described).append(kEncodingSealedDesign);
+  text.append(described).append(design);
   text.append("`pragma protect end\n");
   return text;
 }
 
 // The envelope this tool writes for that region.
-std::string EnvelopeOf(std::string_view described) {
-  std::string envelope = EncryptEnvelopes(Region(described), {}, TheKey());
-  EXPECT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
+std::string EnvelopeOf(std::string_view described,
+                       std::string_view design = kEncodingSealedDesign) {
+  std::string envelope =
+      EncryptEnvelopes(Region(described, design), {}, TheKey());
+  EXPECT_FALSE(Holds(envelope, design)) << envelope;
   return envelope;
+}
+
+// The licences a stub asking was handed, in the order it was handed them.
+struct Asked {
+  std::vector<ProtectLicense> licenses;
+};
+
+// A reading holding the author's key whose licences are answered with
+// `answer`, each one asked being kept in `asked`.
+PreprocConfig Answering(const ProtectLicenseAnswer& answer, Asked* asked) {
+  PreprocConfig config = ReadSource::KeysConfig(TheKey());
+  config.ask_license = [answer, asked](const ProtectLicense& license) {
+    asked->licenses.push_back(license);
+    return answer;
+  };
+  return config;
+}
+
+// An entry function that was called and returned `value`.
+ProtectLicenseAnswer Returning(int64_t value) {
+  ProtectLicenseAnswer answer;
+  answer.called = true;
+  answer.returned = value;
+  return answer;
+}
+
+// The line of the recovered text the licence stands on, which is what the
+// reading of that text numbers a report about it from.
+uint32_t LicenceLine(const std::string& envelope, std::string_view license) {
+  std::string cleartext;
+  EXPECT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(envelope), kTheKey,
+                                     &cleartext));
+  return LineHolding(cleartext, license);
 }
 
 // -- The expression rides into the block -------------------------------------
@@ -166,60 +205,117 @@ TEST(ProtectDecryptLicenseDescription, ALicenceOutsideTheRegionStaysWhereItIs) {
   EXPECT_TRUE(Holds(envelope, kLibrary)) << envelope;
 }
 
-// -- What the licence is not consulted for -----------------------------------
+// -- What the licence is asked and what its answer decides -------------------
 
-// §34.5.28.2 has the tool load the library, call the entry function and refuse
-// to decrypt where what comes back does not match. #3281 records that none of
-// that happens, and this is what it costs: a reader holding the key reaches the
-// design, the licence the author stated deciding nothing.
-TEST(ProtectDecryptLicenseDescription, TheDesignIsReachedWithNoLicenceChecked) {
-  ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
+// §34.5.28.2: on meeting the expression in an encrypted model the tool loads
+// the library the value names and calls the entry function in it, passing the
+// feature string. The one asking made is for the three the value wrote.
+TEST(ProtectDecryptLicenseDescription, TheLibraryIsAskedAboutTheFeature) {
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicense), Answering(Returning(1), &asked));
+  ASSERT_EQ(asked.licenses.size(), 1U);
+  EXPECT_EQ(asked.licenses[0].library, "liblic.so");
+  EXPECT_EQ(asked.licenses[0].entry, "checkout");
+  EXPECT_EQ(asked.licenses[0].feature, "decrypt");
+}
+
+// A returned value equal to the match value licenses the tool, so the model is
+// decrypted and its design reaches the step after, with nothing reported.
+TEST(ProtectDecryptLicenseDescription, AMatchingAnswerDecryptsTheModel) {
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicense), Answering(Returning(1), &asked));
+  EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(run.diag.Diagnostics().empty());
+}
+
+// Any other value leaves the tool unlicensed, and the error includes the value
+// the entry function returned. The report stands at the licence's own line in
+// the recovered text.
+TEST(ProtectDecryptLicenseDescription, AnotherAnswerIsReportedWithItsValue) {
+  std::string envelope = EnvelopeOf(kLicense);
+  Asked asked;
+  ReadSource run(envelope, Answering(Returning(7), &asked));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" returned 7 for feature \"decrypt\", not the match value "
+      "1, so this tool is not licensed to decrypt the model",
+      LicenceLine(envelope, kLicense), "34.5.28.2"));
+}
+
+// And no decryption is performed: nothing of the model reaches the step after.
+TEST(ProtectDecryptLicenseDescription, AnotherAnswerDecryptsNothing) {
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicense), Answering(Returning(7), &asked));
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+}
+
+// A licence writing no match value is held to 0, the value the NOTE closing the
+// subclause has a forged library return to avoid the check. An entry function
+// returning 0 licenses the tool.
+constexpr std::string_view kLicenseWithoutMatch =
+    "`pragma protect decrypt_license=(library=\"liblic.so\", "
+    "entry=\"checkout\", feature=\"decrypt\")\n";
+
+TEST(ProtectDecryptLicenseDescription, NoMatchValueIsAnsweredByZero) {
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicenseWithoutMatch),
+                 Answering(Returning(0), &asked));
   EXPECT_TRUE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
-// And the run says so. §34.5.28.2 has an unlicensed tool produce an error
-// carrying the value the entry function returned; a tool that called no
-// function has no such value to carry, so what it can say is which call it did
-// not make, and the report names the library, the entry function and the
-// feature the value asked about.
-//
-// The line is the licence's own line inside the recovered text, that being what
-// the reading of that text numbers from, so the report stands at the directive
-// rather than at the block that carried it.
-TEST(ProtectDecryptLicenseDescription, TheLicenceNotCheckedIsReported) {
+// And one returning anything else does not.
+TEST(ProtectDecryptLicenseDescription, NoMatchValueRefusesAnyOtherAnswer) {
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicenseWithoutMatch),
+                 Answering(Returning(1), &asked));
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+}
+
+// An entry function that could not be called returned no value that could
+// compare equal, so the tool is unlicensed and the error says why.
+TEST(ProtectDecryptLicenseDescription, AnUncalledEntryFunctionIsReported) {
   std::string envelope = EnvelopeOf(kLicense);
-  std::string cleartext;
-  ASSERT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(envelope), kTheKey,
-                                     &cleartext));
-  ReadSource run(envelope, ReadSource::KeysConfig(TheKey()));
-  EXPECT_TRUE(ReportedWarning(
+  ProtectLicenseAnswer unloaded;
+  unloaded.why_not_called = "liblic.so: cannot open shared object file";
+  Asked asked;
+  ReadSource run(envelope, Answering(unloaded, &asked));
+  EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
-      "protect pragma decrypt_license expression is not acted on: this tool "
-      "loads no library a source text names, so the entry function "
-      "\"checkout\" in \"liblic.so\" is not called for feature \"decrypt\"",
-      LineHolding(cleartext, kLicense), "34.5.28.2"));
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" was not called for feature \"decrypt\": liblic.so: "
+      "cannot open shared object file, so this tool is not licensed to "
+      "decrypt the model",
+      LicenceLine(envelope, kLicense), "34.5.28.2"));
 }
 
-// The control on where that report is made. §34.5.28.2 puts its question on
-// meeting the expression in an encrypted model, so a licence standing in
-// cleartext the tool is about to encrypt asks nothing of this run: that is the
-// ENCRYPTION INPUT case the subclause opens with, and the expression speaks to
-// whoever reads the shipped output rather than to whoever wrote it. Without
-// this the case above would hold of a reading that reported every licence it
-// ever met.
-TEST(ProtectDecryptLicenseDescription, ALicenceInCleartextIsNotReportedOn) {
-  PreprocFixture f;
-  Preprocess(std::string(kLicense), f);
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
-}
-
-// And no error stops the design being reached. §34.5.28.2 has an unlicensed
-// tool perform no decryption, so a run that decrypted is a run that did not
-// find the tool unlicensed -- it never asked -- and the warning above is the
-// whole of what it produced.
-TEST(ProtectDecryptLicenseDescription, NoErrorStopsTheDesignBeingReached) {
+// A reading given no way to ask loads no library, so it is unlicensed as well:
+// the model stays sealed rather than being decrypted unasked.
+TEST(ProtectDecryptLicenseDescription, AReadingThatCannotAskDecryptsNothing) {
   ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
-  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+}
+
+// The refusal belongs to the envelope that stated the licence. An envelope
+// after it states none, so its design is decrypted all the same.
+TEST(ProtectDecryptLicenseDescription, TheRefusalEndsWithItsEnvelope) {
+  constexpr std::string_view kLaterDesign = "module later_m; endmodule\n";
+  Asked asked;
+  ReadSource run(EnvelopeOf(kLicense) + EnvelopeOf("", kLaterDesign),
+                 Answering(Returning(7), &asked));
+  EXPECT_TRUE(Holds(run.text, kLaterDesign)) << run.text;
+}
+
+// The control on where the question is put. §34.5.28.2 puts it on meeting the
+// expression in an encrypted model, so a licence standing in cleartext the
+// tool is about to encrypt asks nothing of this run: that is the ENCRYPTION
+// INPUT case the subclause opens with, and the expression speaks to whoever
+// reads the shipped output rather than to whoever wrote it.
+TEST(ProtectDecryptLicenseDescription, ALicenceInCleartextIsNotAsked) {
+  Asked asked;
+  ReadSource run(std::string(kLicense), Answering(Returning(7), &asked));
+  EXPECT_TRUE(asked.licenses.empty());
+  EXPECT_TRUE(run.diag.Diagnostics().empty());
 }
 
 }  // namespace
