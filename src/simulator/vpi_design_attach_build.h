@@ -99,4 +99,9 @@ void AttachVariableRanges(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
+// §37.7: give each interface instance a modport per modport its interface
+// declares, each with an io decl per port it gives a direction.
+void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
+                    const VpiAttachBuild& build);
+
 }  // namespace delta

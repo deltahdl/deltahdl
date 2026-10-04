@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -144,6 +149,109 @@ TEST_F(Modport, IoDeclWithoutEnclosingModportReachesNone) {
   io_decl.type = vpiIODecl;
 
   EXPECT_EQ(vpi_handle(vpiModport, VpiHandleOf(&io_decl)), nullptr);
+}
+
+// An interface declaring two modports, the second naming as an input a port
+// the first names as an output, instantiated once, run with a PLI application
+// registered.
+class ModportsOfARun : public VpiDesignRun {
+ protected:
+  static constexpr const char* kTwoModports =
+      "interface ifc; logic a, b;\n"
+      "  modport mp(input a, output b);\n"
+      "  modport mq(input b);\n"
+      "endinterface\n"
+      "module top; ifc i0(); endmodule\n";
+
+  // The names of the objects of `type` `ref` reaches, in the order they are
+  // scanned.
+  static std::vector<std::string> ScannedNames(int type, vpiHandle ref) {
+    std::vector<std::string> names;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return names;
+    while (vpiHandle obj = vpi_scan(it)) {
+      names.emplace_back(vpi_get_str(vpiName, obj));
+    }
+    return names;
+  }
+
+  // The object of `type` named `name` that `ref` reaches.
+  static vpiHandle Named(int type, vpiHandle ref, const std::string& name) {
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return nullptr;
+    while (vpiHandle obj = vpi_scan(it)) {
+      if (name == vpi_get_str(vpiName, obj)) return obj;
+    }
+    return nullptr;
+  }
+
+  static vpiHandle Instance() {
+    return vpi_handle_by_name(VpiText("top.i0"), nullptr);
+  }
+};
+
+// §37.7: an interface instance reaches a modport per modport its interface
+// declares, each named as it was declared, in the order they were written.
+TEST_F(ModportsOfARun, AnInterfaceInstanceIteratesItsModports) {
+  Run(kTwoModports);
+  EXPECT_EQ(ScannedNames(vpiModport, Instance()),
+            (std::vector<std::string>{"mp", "mq"}));
+}
+
+// §37.7: a modport reaches back the interface instance it belongs to.
+TEST_F(ModportsOfARun, AModportReachesItsInterfaceInstance) {
+  Run(kTwoModports);
+  vpiHandle mp = Named(vpiModport, Instance(), "mp");
+  ASSERT_NE(mp, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInterface, mp)), VpiObjectOf(Instance()));
+}
+
+// §37.7: a modport reaches an io decl per port it names, in the order they
+// were written.
+TEST_F(ModportsOfARun, AModportIteratesItsIoDecls) {
+  Run(kTwoModports);
+  EXPECT_EQ(ScannedNames(vpiIODecl, Named(vpiModport, Instance(), "mp")),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(ScannedNames(vpiIODecl, Named(vpiModport, Instance(), "mq")),
+            (std::vector<std::string>{"b"}));
+}
+
+// §37.13 detail 1 with §37.7: an io decl of a modport reports the direction
+// that modport gave the port, so one port reads as an output through one
+// modport and an input through another.
+TEST_F(ModportsOfARun, AnIoDeclReportsItsModportsDirection) {
+  Run(kTwoModports);
+  vpiHandle mp = Named(vpiModport, Instance(), "mp");
+  vpiHandle mq = Named(vpiModport, Instance(), "mq");
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mp, "a")), vpiInput);
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mp, "b")), vpiOutput);
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mq, "b")), vpiInput);
+}
+
+// §37.13 detail 1 with §37.7: an io decl of a modport's ref port reports
+// vpiRef.
+TEST_F(ModportsOfARun, AnIoDeclOfARefPortReportsVpiRef) {
+  Run("interface ifc; logic a; modport mr(ref a); endinterface\n"
+      "module top; ifc i0(); endmodule\n");
+  vpiHandle mr = Named(vpiModport, Instance(), "mr");
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mr, "a")), vpiRef);
+}
+
+// §37.7: an io decl of a modport reaches back the modport it belongs to.
+TEST_F(ModportsOfARun, AnIoDeclReachesItsModport) {
+  Run(kTwoModports);
+  vpiHandle mq = Named(vpiModport, Instance(), "mq");
+  ASSERT_NE(mq, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModport, Named(vpiIODecl, mq, "b"))),
+            VpiObjectOf(mq));
+}
+
+// §37.7: a module instance has no modports.
+TEST_F(ModportsOfARun, AModuleInstanceHasNoModports) {
+  Run(kTwoModports);
+  EXPECT_EQ(
+      vpi_iterate(vpiModport, vpi_handle_by_name(VpiText("top"), nullptr)),
+      nullptr);
 }
 
 }  // namespace

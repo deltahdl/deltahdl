@@ -7,12 +7,15 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -67,6 +70,42 @@ void MakePackageScope(VpiObject* obj, std::string_view name) {
 void MarkInCompilationUnit(VpiObject* obj) {
   obj->in_compilation_unit = true;
   for (auto* child : obj->children) MarkInCompilationUnit(child);
+}
+
+// §37.13 detail 1: the vpiDirection of the io decl a modport port is, the
+// direction the modport gave it, and vpiRef for a ref port.
+int ModportPortDirection(Direction direction) {
+  int declared = vpiNoDirection;
+  if (direction == Direction::kInput) declared = vpiInput;
+  if (direction == Direction::kOutput) declared = vpiOutput;
+  if (direction == Direction::kInout) declared = vpiInout;
+  return VpiIoDeclDirection(declared, direction == Direction::kRef,
+                            /*expr_is_ref_obj_to_interface_or_modport=*/false,
+                            /*expr_is_virtual_interface_var=*/false);
+}
+
+// §37.7: the modport `decl` declares, under the interface instance `iface`,
+// with an io decl per port it gives a direction. An imported or exported
+// task or function (§25.7) and a clocking block (§25.5.5) a modport names are
+// no io decls.
+void MakeModport(VpiObject* iface, const ModportDecl& decl,
+                 const VpiAttachBuild& build) {
+  VpiObject* modport = build.alloc();
+  modport->type = vpiModport;
+  modport->parent = iface;
+  modport->name = build.keep(std::string(decl.name));
+  modport->full_name = iface->full_name + "." + std::string(decl.name);
+  iface->children.push_back(modport);
+  for (const ModportPort& port : decl.ports) {
+    if (port.is_import || port.is_export || port.is_clocking) continue;
+    VpiObject* io_decl = build.alloc();
+    io_decl->type = vpiIODecl;
+    io_decl->parent = modport;
+    io_decl->name = build.keep(std::string(port.name));
+    io_decl->full_name = modport->full_name + "." + std::string(port.name);
+    io_decl->direction = ModportPortDirection(port.direction);
+    modport->children.push_back(io_decl);
+  }
 }
 
 // The scope the lowerer's keys put a compilation unit's data items under
@@ -127,8 +166,32 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         AttachTypespecs(design, object_map_, kBuild);
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
+    AttachModports(design, object_map_, kBuild);
   }
   AttachContinuousAssignments(design);
+}
+
+void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
+                    const VpiAttachBuild& build) {
+  // §37.7: an interface instance has a modport per modport its interface
+  // declares, in the order they were written; none was made, so
+  // vpi_iterate(vpiModport, interface) reached nothing.
+  if (design == nullptr || design->top_modules.empty() ||
+      design->top_modules.front() == nullptr) {
+    return;
+  }
+  // The first top carries the empty prefix and is keyed under its own name.
+  const std::string kFirstTop(design->top_modules.front()->name);
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        if (mod->modports.empty()) return;
+        VpiObject* iface =
+            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
+        if (iface == nullptr) return;
+        for (const ModportDecl* decl : mod->modports) {
+          if (decl != nullptr) MakeModport(iface, *decl, build);
+        }
+      });
 }
 
 void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
