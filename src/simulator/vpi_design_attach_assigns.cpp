@@ -190,11 +190,45 @@ std::vector<const Expr*> Operands(const Expr* first,
   return operands;
 }
 
+// §37.58: a select of one bit. Of an integer var, a time var or a parameter it
+// is a bit select reaching the object through vpiParent and its index through
+// vpiIndex; of a vector net or a logic or bit variable it is that object's own
+// bit (§37.16, §37.17), which a constant index names. A bit a varying index
+// selects is not modelled and gives null.
+VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
+  VpiObject* base = ExpressionObject(expr->base, build);
+  if (base == nullptr) return nullptr;
+  if (base->type == vpiIntegerVar || base->type == vpiTimeVar ||
+      base->type == vpiParameter || base->type == vpiSpecParam) {
+    VpiObject* select = build.alloc();
+    select->type = vpiBitSelect;
+    select->parent = base;
+    select->size = 1;
+    select->index_expr = ExpressionObject(expr->index, build);
+    if (select->index_expr != nullptr) {
+      select->index_expressions.push_back(select->index_expr);
+    }
+    return select;
+  }
+  if (expr->index == nullptr ||
+      expr->index->kind != ExprKind::kIntegerLiteral) {
+    return nullptr;
+  }
+  const auto kIndex = static_cast<int>(expr->index->int_val);
+  for (VpiObject* child : base->children) {
+    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
+        child->index == kIndex) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 // §37.59: a part select or an indexed part select, which reaches the object it
 // selects into through vpiParent and the bounds, or the base and width, it
-// was written with. A select of one bit is not modelled and gives null.
+// was written with.
 VpiObject* SelectObject(const Expr* expr, const AssignBuild& build) {
-  if (expr->index_end == nullptr) return nullptr;
+  if (expr->index_end == nullptr) return BitSelectObject(expr, build);
   VpiObject* select = build.alloc();
   select->parent = ExpressionObject(expr->base, build);
   VpiObject* first = ExpressionObject(expr->index, build);
@@ -249,8 +283,8 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
 
 // The object standing for one side of an assignment: the net or variable a
 // name stands for, a constant, a select, a call, or an operation over these.
-// A bit select (#4970) and the kinds of expression the switch does not name
-// are not modelled and give null.
+// The kinds of expression the switch does not name are not modelled and give
+// null.
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   switch (expr->kind) {
@@ -354,6 +388,9 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
 
   VpiObject* obj = build.alloc();
   obj->type = vpiContAssign;
+  // It hangs among a net's children as a driver or a load, where an index
+  // selects a bit (§38.19); it is no bit, so it answers no index.
+  obj->index = -1;
   obj->net_decl_assign = kDecl;
   obj->parent = scope;
   scope->children.push_back(obj);

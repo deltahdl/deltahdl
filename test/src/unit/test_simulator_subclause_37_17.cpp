@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -590,6 +592,95 @@ TEST(VariableModel, NameFormsIncludeOwnIndexSuffix) {
   EXPECT_EQ(VpiVariableName(vec), "vec[5]");
   EXPECT_EQ(VpiVariableDecompile(vec), "str1.vec[5]");
   EXPECT_EQ(VpiVariableFullName(vec), "top.str1.vec[5]");
+}
+
+// A design run with a PLI application registered, its variables' bits read
+// back once the run is over.
+class VarBitsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of an object.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // How many objects of `type` `ref` reaches.
+  static int CountOf(int type, vpiHandle ref) {
+    int count = 0;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return 0;
+    while (vpi_scan(it) != nullptr) ++count;
+    return count;
+  }
+
+  static vpiHandle Var(const char* name) {
+    return vpi_handle_by_name(VpiText(name), nullptr);
+  }
+};
+
+constexpr const char* kPackedVariables =
+    "module top;\n"
+    "  logic [7:0] v = 8'b0000_1000;\n"
+    "  logic [15:10] w = 6'b00_0100;\n"
+    "endmodule\n";
+
+// §37.17 details 12 and 13: a packed logic variable has one var bit per bit.
+TEST_F(VarBitsOfARun, APackedVariableHasOneBitPerBit) {
+  Run(kPackedVariables);
+  EXPECT_EQ(CountOf(vpiBit, Var("top.v")), 8);
+}
+
+// §38.19: a bit is reached by its index, and holds that bit's value...
+TEST_F(VarBitsOfARun, TheBitAtAnIndexHoldsThatBit) {
+  Run(kPackedVariables);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(Var("top.v"), 3)), 1);
+}
+
+TEST_F(VarBitsOfARun, TheBitBesideItHoldsItsOwn) {
+  Run(kPackedVariables);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(Var("top.v"), 2)), 0);
+}
+
+// ...addressed by the range the variable was declared with: index 12 of
+// [15:10] is the third bit from the right.
+TEST_F(VarBitsOfARun, ABitIsAddressedByTheDeclaredRange) {
+  Run(kPackedVariables);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(Var("top.w"), 12)), 1);
+}
+
+// Detail 13: vpiIndex is the bit's index.
+TEST_F(VarBitsOfARun, ABitsIndexIsItsDeclaredIndex) {
+  Run(kPackedVariables);
+  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, vpi_handle_by_index(Var("top.w"), 12))),
+            12);
+}
+
+// Detail 9: a var bit's size is 1.
+TEST_F(VarBitsOfARun, ABitsSizeIsOne) {
+  Run(kPackedVariables);
+  EXPECT_EQ(vpi_get(vpiSize, vpi_handle_by_index(Var("top.v"), 3)), 1);
+}
+
+// A bit's parent is its variable.
+TEST_F(VarBitsOfARun, ABitsParentIsItsVariable) {
+  Run(kPackedVariables);
+  EXPECT_STREQ(
+      vpi_get_str(vpiName,
+                  vpi_handle(vpiParent, vpi_handle_by_index(Var("top.v"), 3))),
+      "v");
+}
+
+// A value put to a bit is put to that bit of the variable.
+TEST_F(VarBitsOfARun, WritingABitWritesThatBitOfTheVariable) {
+  Run(kPackedVariables);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 1;
+  vpi_put_value(vpi_handle_by_index(Var("top.v"), 0), &value, nullptr,
+                vpiNoDelay);
+  EXPECT_EQ(IntOf(Var("top.v")), 9);
 }
 
 }  // namespace

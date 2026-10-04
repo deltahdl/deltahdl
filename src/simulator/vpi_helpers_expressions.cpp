@@ -11,7 +11,15 @@ bool VpiIsExprOperandType(int type) {
 }
 
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (ref->type == vpiPartSelect) {
+  // §37.58 for a bit select, §37.16 and §37.17 detail 13 for a net bit and a
+  // var bit: the bit's index, and the object it is a bit of.
+  if (ref->type == vpiBitSelect || ref->type == vpiNetBit ||
+      ref->type == vpiRegBit) {
+    if (type == vpiIndex) {
+      out = ref->index_expr;
+      return true;
+    }
+  } else if (ref->type == vpiPartSelect) {
     if (type == vpiLeftRange) {
       out = ref->left_range;
       return true;

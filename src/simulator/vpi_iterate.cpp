@@ -453,6 +453,12 @@ bool VpiIterateMatchesEdgeMode(int obj_type, int type, VpiHandle ref,
     *matched = VpiIsTfCallArgumentType(obj_type);
     return true;
   }
+  // §37.16, §37.17 detail 12: vpiBit reaches a net's net bits and a
+  // variable's var bits; no object's own type is the relation's.
+  if (type == vpiBit) {
+    *matched = obj_type == vpiNetBit || obj_type == vpiRegBit;
+    return true;
+  }
   if (type == vpiConstraintItem) {
     *matched = VpiIsConstraintItemType(obj_type);
     return true;

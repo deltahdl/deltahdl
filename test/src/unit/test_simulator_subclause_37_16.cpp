@@ -3,9 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -634,6 +636,53 @@ TEST(NetModel, MemberNetNameForms) {
   no_scope.member = "w";
   EXPECT_EQ(VpiNetFullName(no_scope), VpiNetDecompile(no_scope));
   EXPECT_EQ(VpiNetFullName(no_scope), "w");
+}
+
+// A design run with a PLI application registered, its nets' bits read back
+// once the run is over.
+class NetBitsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of an object.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // How many objects of `type` `ref` reaches.
+  static int CountOf(int type, vpiHandle ref) {
+    int count = 0;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return 0;
+    while (vpi_scan(it) != nullptr) ++count;
+    return count;
+  }
+
+  static vpiHandle Net() {
+    return vpi_handle_by_name(VpiText("top.n"), nullptr);
+  }
+};
+
+constexpr const char* kVectorNet =
+    "module top; wire [3:0] n = 4'b0100; endmodule\n";
+
+// §37.16: a vector net has one net bit per bit...
+TEST_F(NetBitsOfARun, AVectorNetHasOneBitPerBit) {
+  Run(kVectorNet);
+  EXPECT_EQ(CountOf(vpiBit, Net()), 4);
+}
+
+// ...of type vpiNetBit...
+TEST_F(NetBitsOfARun, ANetsBitIsANetBit) {
+  Run(kVectorNet);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(Net(), 2)), vpiNetBit);
+}
+
+// ...holding its bit of the net's value.
+TEST_F(NetBitsOfARun, ANetBitHoldsItsBit) {
+  Run(kVectorNet);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(Net(), 2)), 1);
 }
 
 }  // namespace

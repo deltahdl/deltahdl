@@ -2,8 +2,10 @@
 
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -145,6 +147,57 @@ TEST_F(BitSelectObject, IndexReachesTheSelectsIndexExpression) {
       ScanAll(vpi_iterate(vpiIndex, VpiHandleOf(&select_)));
   ASSERT_EQ(seen.size(), 1u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &index_);
+}
+
+// A design whose one continuous assignment's right side is a bit select, run
+// with a PLI application registered.
+class BitSelectsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of an object.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // The right side of the top's continuous assignment.
+  static vpiHandle Rhs() {
+    vpiHandle it =
+        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_scan(it));
+  }
+};
+
+constexpr const char* kIntegerBit =
+    "module top; integer i = 8; wire y; assign y = i[3]; endmodule\n";
+
+// §37.58: a select of one bit of an integer var is a bit select...
+TEST_F(BitSelectsOfARun, ABitOfAnIntegerIsABitSelect) {
+  Run(kIntegerBit);
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiBitSelect);
+}
+
+// ...whose parent is the variable...
+TEST_F(BitSelectsOfARun, ABitSelectsParentIsTheVariable) {
+  Run(kIntegerBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiParent, Rhs())), "i");
+}
+
+// ...and whose index is the expression the source wrote.
+TEST_F(BitSelectsOfARun, ABitSelectsIndexIsTheWrittenIndex) {
+  Run(kIntegerBit);
+  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, Rhs())), 3);
+}
+
+// A select of one bit of a vector net is no bit select: it is that net's bit
+// (§37.16), the object the index reaches.
+TEST_F(BitSelectsOfARun, ABitOfANetIsTheNetsBit) {
+  Run("module top; wire [7:0] a = 8'h08; wire y; assign y = a[3]; "
+      "endmodule\n");
+  EXPECT_EQ(Rhs(), vpi_handle_by_index(
+                       vpi_handle_by_name(VpiText("top.a"), nullptr), 3));
 }
 
 }  // namespace

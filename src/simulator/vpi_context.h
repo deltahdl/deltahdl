@@ -21,6 +21,7 @@
 namespace delta {
 
 struct Expr;
+struct PackedRange;
 struct RtlirDesign;
 struct RtlirNet;
 
@@ -775,6 +776,11 @@ class VpiContext {
   // §37.47: each instance's continuous assignments, hung on their nets as
   // drivers and loads (§37.46). In vpi_design_attach_assigns.cpp.
   void AttachContinuousAssignments(const RtlirDesign* design);
+  // §37.16, §37.17: vector nets' and packed variables' bits. In
+  // vpi_design_attach_bits.cpp.
+  void AttachVectorBits(const RtlirDesign* design);
+  void MakeVectorBits(VpiObject* parent, int bit_type,
+                      const PackedRange& range);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.

@@ -723,6 +723,8 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   AttachPackages(design);
   AttachTopModules(design);
   AttachInstanceDefinitions(design);
+  // A continuous assignment's bit select is the bit made here.
+  AttachVectorBits(design);
   AttachContinuousAssignments(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   // §37.62: the event statements hang in the scope the top has just adopted, so

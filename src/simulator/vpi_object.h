@@ -182,6 +182,11 @@ struct VpiObject {
   // §37.59: a part select's two range bounds, reached through vpiLeftRange and
   // vpiRightRange, and an indexed part select's base and width, reached through
   // vpiBaseExpr and vpiWidthExpr. Null on every other object.
+  // §37.16, §37.17: for a net bit or var bit, the offset from the least
+  // significant end of its parent's storage of the bit it stands for, which its
+  // value is read from and written to; -1 on every other object.
+  int bit_offset = -1;
+
   VpiObject* left_range = nullptr;
   VpiObject* right_range = nullptr;
   VpiObject* base_expr = nullptr;

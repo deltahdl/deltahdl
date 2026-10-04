@@ -435,10 +435,29 @@ static void DispatchIntegerFormat(
   }
 }
 
+// §37.16, §37.17: the one bit at `offset` of `whole`, as a value of its own.
+static Logic4Word BitOfValue(const Logic4Vec& whole, int offset) {
+  const auto kWord = static_cast<uint32_t>(offset) / 64;
+  const uint32_t kShift = static_cast<uint32_t>(offset) % 64;
+  if (kWord >= whole.nwords) return Logic4Word{0, 1};
+  return Logic4Word{(whole.words[kWord].aval >> kShift) & 1,
+                    (whole.words[kWord].bval >> kShift) & 1};
+}
+
 static void DispatchGetValueByFormat(
     VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
     std::vector<std::vector<s_vpi_vecval>>& vec_pool,
     std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
+  // A net bit or var bit reads its own bit of its parent's storage.
+  if (obj->bit_offset >= 0) {
+    Logic4Word bit = BitOfValue(obj->var->value, obj->bit_offset);
+    Logic4Vec bit_view;
+    bit_view.width = 1;
+    bit_view.nwords = 1;
+    bit_view.words = &bit;
+    DispatchIntegerFormat(bit_view, value, str_pool, vec_pool, strength_pool);
+    return;
+  }
   const Logic4Vec& v = obj->var->value;
   if (v.is_real) {
     // §38.15: a real object is read as its floating-point value only in the
@@ -602,7 +621,38 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
 // §38.34: stores the supplied scalar/integer/real value into the target
 // variable's first four-state word. Formats with no direct word encoding here
 // (e.g. string/vector) are left for the caller's other paths and are ignored.
+// §37.16, §37.17: a value put to a net bit or var bit is put to its bit of the
+// parent's storage, which the low bit of the scalar, integer or real value the
+// caller supplied gives.
+static void PutValueWriteBit(VpiHandle obj, const s_vpi_value* value) {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  if (value->format == kVpiIntVal) {
+    aval = static_cast<uint64_t>(value->value.integer) & 1;
+  } else if (value->format == kVpiRealVal) {
+    aval = static_cast<uint64_t>(value->value.real) & 1;
+  } else if (value->format == kVpiScalarVal) {
+    int s = value->value.scalar;
+    aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
+    bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
+  } else {
+    return;
+  }
+  Logic4Vec& whole = obj->var->value;
+  const auto kWord = static_cast<uint32_t>(obj->bit_offset) / 64;
+  if (kWord >= whole.nwords) return;
+  const uint64_t kMask = uint64_t{1}
+                         << (static_cast<uint32_t>(obj->bit_offset) % 64);
+  Logic4Word& word = whole.words[kWord];
+  word.aval = (word.aval & ~kMask) | (aval != 0 ? kMask : 0);
+  word.bval = (word.bval & ~kMask) | (bval != 0 ? kMask : 0);
+}
+
 static void PutValueWriteWord(VpiHandle obj, const s_vpi_value* value) {
+  if (obj->bit_offset >= 0) {
+    PutValueWriteBit(obj, value);
+    return;
+  }
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;

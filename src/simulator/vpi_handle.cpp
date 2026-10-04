@@ -145,6 +145,7 @@ bool VpiHasAccessByIndex(int type) {
     case kVpiPort:           // a port indexes its bits
     case kVpiNet:            // a net indexes its bits
     case kVpiReg:            // a reg indexes its bits
+    case vpiBitVar:          // §37.17: so does a bit variable
     case vpiMemory:          // a memory indexes its words
     case vpiNetArray:        // an array net indexes its elements
     case vpiRegArray:        // a reg array indexes its elements
