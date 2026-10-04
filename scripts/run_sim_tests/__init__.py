@@ -17,6 +17,8 @@ BEFORE_SUFFIX = ".before"
 
 FILES_SUFFIX = ".files"
 
+LIBRARY_SOURCE_SUFFIX = ".c"
+
 ARTIFACT_SUFFIX = ".artifact"
 ARTIFACT_RECORD_SUFFIX = ".artifact.expected"
 
@@ -112,14 +114,61 @@ def case_files(sv_path: Path) -> Path | None:
     return files
 
 
+def library_source(sv_path: Path) -> Path | None:
+    source = sv_path.with_suffix(LIBRARY_SOURCE_SUFFIX)
+    if not source.exists():
+        return None
+    return source
+
+
+def shared_library_extension() -> str:
+    if sys.platform == "darwin":
+        return ".dylib"
+    return ".so"
+
+
+def library_command(source: Path, output: Path) -> list[str]:
+    command = ["cc", "-shared", "-fPIC"]
+    if sys.platform == "darwin":
+        command.append("-Wl,-undefined,dynamic_lookup")
+    include = str(REPO_ROOT / "src" / "simulator")
+    return [*command, "-I", include, "-o", str(output), str(source)]
+
+
+def build_case_library(sv_path: Path, work_dir: str) -> str | None:
+    source = library_source(sv_path)
+    if source is None:
+        return None
+    output = Path(work_dir) / f"{sv_path.stem}{shared_library_extension()}"
+    result = subprocess.run(
+        library_command(source, output),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if result.returncode == 0:
+        return None
+    return f"{source.name}: cc exited {result.returncode}\n{result.stderr}"
+
+
 def needs_work_dir(sv_path: Path, wants_dir: bool) -> bool:
-    return wants_dir or case_files(sv_path) is not None
+    return (
+        wants_dir
+        or case_files(sv_path) is not None
+        or library_source(sv_path) is not None
+    )
 
 
 def copy_case_files(sv_path: Path, work_dir: str) -> None:
     files = case_files(sv_path)
     if files is not None:
         shutil.copytree(files, work_dir, dirs_exist_ok=True)
+
+
+def prepare_work_dir(sv_path: Path, work_dir: str) -> str | None:
+    copy_case_files(sv_path, work_dir)
+    return build_case_library(sv_path, work_dir)
 
 
 def collect_tests() -> list[tuple[Path, Path]]:
@@ -161,7 +210,9 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
         work_dir = ""
         if needs_work_dir(sv_path, before is not None or artifact is not None):
             work_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            copy_case_files(sv_path, work_dir)
+            prepared = prepare_work_dir(sv_path, work_dir)
+            if prepared is not None:
+                return False, prepared
         if before is not None:
             detail = run_before(sv_path, before, work_dir)
             if detail is not None:

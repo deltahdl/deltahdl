@@ -547,3 +547,105 @@ def test_the_working_directory_holding_case_files_is_removed(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
     assert not Path(_run_with_case_files(rst, tmp_path)[1]["cwd"]).exists()
+
+
+def _run_with_library(
+    rst: ModuleType, tmp_path: Path, cc_returncode: int,
+) -> tuple[tuple[bool, str], list[list[str]]]:
+    (tmp_path / "linked.c").write_text("int linked(void) { return 1; }\n")
+    sv = tmp_path / "linked.sv"
+    sv.write_text("module linked; endmodule\n")
+    expected_path = tmp_path / "linked.expected"
+    expected_path.write_text("ran\n")
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_: object) -> MagicMock:
+        calls.append(list(cmd))
+        stub = MagicMock()
+        compiling = cmd[0] == "cc"
+        stub.stdout = "" if compiling else "ran\n"
+        stub.stderr = "cc said no\n" if compiling else ""
+        stub.returncode = cc_returncode if compiling else 0
+        return stub
+
+    with patch.object(rst.subprocess, "run", side_effect=fake_run):
+        outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return outcome, calls
+
+
+def test_a_case_with_a_library_source_passes(rst: ModuleType, tmp_path: Path) -> None:
+    assert _run_with_library(rst, tmp_path, 0)[0] == (True, "")
+
+
+def test_the_library_is_built_before_the_run(rst: ModuleType, tmp_path: Path) -> None:
+    assert _run_with_library(rst, tmp_path, 0)[1][0][0] == "cc"
+
+
+def test_the_library_is_built_from_the_case_source(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    command = _run_with_library(rst, tmp_path, 0)[1][0]
+    assert command[-1] == str(tmp_path / "linked.c")
+
+
+def test_the_library_is_named_after_the_case(rst: ModuleType, tmp_path: Path) -> None:
+    command = _run_with_library(rst, tmp_path, 0)[1][0]
+    output = Path(command[command.index("-o") + 1])
+    assert output.name == f"linked{rst.shared_library_extension()}"
+
+
+def test_the_library_is_built_in_the_working_directory_of_the_run(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    command = _run_with_library(rst, tmp_path, 0)[1][0]
+    output = Path(command[command.index("-o") + 1])
+    assert output.parent != tmp_path
+
+
+def test_a_library_that_does_not_build_fails_the_case(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    assert not _run_with_library(rst, tmp_path, 1)[0][0]
+
+
+def test_a_library_that_does_not_build_is_named_in_the_detail(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    assert "linked.c: cc exited 1" in _run_with_library(rst, tmp_path, 1)[0][1]
+
+
+def test_the_case_does_not_run_after_its_library_fails_to_build(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    assert len(_run_with_library(rst, tmp_path, 1)[1]) == 1
+
+
+def test_a_shared_library_on_macos_is_a_dylib(rst: ModuleType) -> None:
+    with patch.object(rst.sys, "platform", "darwin"):
+        assert rst.shared_library_extension() == ".dylib"
+
+
+def test_a_shared_library_elsewhere_is_an_so(rst: ModuleType) -> None:
+    with patch.object(rst.sys, "platform", "linux"):
+        assert rst.shared_library_extension() == ".so"
+
+
+def test_a_library_on_macos_leaves_the_tools_symbols_to_load_time(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    with patch.object(rst.sys, "platform", "darwin"):
+        command = rst.library_command(tmp_path / "a.c", tmp_path / "a.dylib")
+    assert "-Wl,-undefined,dynamic_lookup" in command
+
+
+def test_a_library_elsewhere_needs_no_flag_for_the_tools_symbols(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    with patch.object(rst.sys, "platform", "linux"):
+        command = rst.library_command(tmp_path / "a.c", tmp_path / "a.so")
+    assert "-Wl,-undefined,dynamic_lookup" not in command
+
+
+def test_a_library_sees_the_tools_headers(rst: ModuleType, tmp_path: Path) -> None:
+    command = rst.library_command(tmp_path / "a.c", tmp_path / "a.so")
+    assert str(rst.REPO_ROOT / "src" / "simulator") in command
