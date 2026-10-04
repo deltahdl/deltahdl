@@ -4,7 +4,10 @@
 #include <string>
 #include <string_view>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
@@ -12,6 +15,9 @@
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -320,5 +326,104 @@ TEST_F(VpiProtectionInARun, AnInstanceOfACleartextModuleIsNot) {
 TEST_F(VpiProtectionInARun, ACleartextInstancesNetsAreReached) {
   EXPECT_TRUE(g_seen.clear_nets_reached);
 }
+// A variable the design holds, its VPI object marked protected as one
+// declared in a decryption envelope is, for the value routines to be asked of.
+class VpiProtectedValueAccess : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&vpi_);
+    var_ = sim_.CreateVariable("sealed_v", 32);
+    var_->value = MakeLogic4VecVal(arena_, 32, 5);
+    vpi_.Attach(sim_);
+    handle_ = vpi_handle_by_name(VpiText("sealed_v"), nullptr);
+    ASSERT_NE(handle_, nullptr);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  void Protect() { VpiObjectOf(handle_)->is_protected = true; }
+
+  // The message of the error the last routine recorded, empty for none.
+  std::string LastError() {
+    s_vpi_error_info info = {};
+    if (vpi_chk_error(&info) == 0 || info.message == nullptr) return "";
+    return info.message;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  Scheduler scheduler_{arena_};
+  DiagEngine diag_{mgr_};
+  SimContext sim_{scheduler_, arena_, diag_};
+  VpiContext vpi_;
+  Variable* var_ = nullptr;
+  vpiHandle handle_ = nullptr;
+};
+
+// §37.3.6: a protected object's value is not read: vpi_get_value records an
+// error and leaves the caller's value as it was.
+TEST_F(VpiProtectedValueAccess, GetValueLeavesTheCallersValue) {
+  Protect();
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 99;
+  vpi_get_value(handle_, &value);
+  EXPECT_EQ(value.value.integer, 99);
+}
+
+TEST_F(VpiProtectedValueAccess, GetValueIsAnError) {
+  Protect();
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(handle_, &value);
+  EXPECT_NE(LastError().find("protected"), std::string::npos);
+}
+
+// §37.3.6: nor is it written: vpi_put_value records an error, changes nothing
+// and schedules no event.
+TEST_F(VpiProtectedValueAccess, PutValueChangesNothing) {
+  Protect();
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 77;
+  EXPECT_EQ(vpi_put_value(handle_, &value, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(var_->value.ToUint64(), 5U);
+}
+
+TEST_F(VpiProtectedValueAccess, PutValueIsAnError) {
+  Protect();
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 77;
+  vpi_put_value(handle_, &value, nullptr, vpiNoDelay);
+  EXPECT_NE(LastError().find("protected"), std::string::npos);
+}
+
+// The array forms refuse a protected object the same way.
+TEST_F(VpiProtectedValueAccess, GetValueArrayIsAnError) {
+  Protect();
+  s_vpi_arrayvalue values = {};
+  values.format = vpiIntVal;
+  int index = 0;
+  vpi_get_value_array(handle_, &values, &index, 1);
+  EXPECT_NE(LastError().find("protected"), std::string::npos);
+}
+
+TEST_F(VpiProtectedValueAccess, PutValueArrayIsAnError) {
+  Protect();
+  s_vpi_arrayvalue values = {};
+  values.format = vpiIntVal;
+  int index = 0;
+  vpi_put_value_array(handle_, &values, &index, 1);
+  EXPECT_NE(LastError().find("protected"), std::string::npos);
+}
+
+// An object no envelope sealed is read as ever, with no error.
+TEST_F(VpiProtectedValueAccess, AnUnprotectedObjectIsRead) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(handle_, &value);
+  EXPECT_EQ(value.value.integer, 5);
+}
+
 }  // namespace
 }  // namespace delta

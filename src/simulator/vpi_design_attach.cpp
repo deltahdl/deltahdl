@@ -46,8 +46,12 @@ namespace {
 void RecordSourceLocation(VpiHandle obj, SourceLoc loc,
                           const SourceManager* sources) {
   if (obj == nullptr || sources == nullptr || !loc.IsValid()) return;
-  obj->line_no = static_cast<int>(loc.line);
-  obj->file = std::string(sources->FilePath(loc.file_id));
+  // A declaration read through the preprocessor stands in the text it joined
+  // from the sources, and its position is reported where it was written: the
+  // file and line that line of the joined text came from.
+  const SourceLoc kWritten = sources->ResolveToOrigin(loc);
+  obj->line_no = static_cast<int>(kWritten.line);
+  obj->file = std::string(sources->FilePath(kWritten.file_id));
 }
 
 // §37.3.6: mark `obj` protected where `loc` stands in code a decryption

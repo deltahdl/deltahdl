@@ -1,8 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "common/source_loc.h"
+#include "common/source_mgr.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -163,6 +172,37 @@ void RunADesignOfLocatedDeclarations(SimFixture& f) {
   LowerAndRun(design, f);
 }
 
+// A design joined from two source files as the preprocessor joins the sources
+// a command line names: the module m written on lines 3 and 7 to 9 of b.sv,
+// the top on lines 1 to 5 of a.sv, the joined text registered with the origin
+// of each of its lines, as a compile registers it.
+void RunAJoinedDesign(SimFixture& f) {
+  const uint32_t kA = f.mgr.AddFile("a.sv", "");
+  const uint32_t kB = f.mgr.AddFile("b.sv", "");
+  const std::string kText =
+      "module m(input a);\n"
+      "  wire w;\n"
+      "  reg r;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire top_sig;\n"
+      "  m m1(top_sig);\n"
+      "  initial $probe;\n"
+      "endmodule\n";
+  std::vector<OutputLineOrigin> origins = {{kB, 3}, {kB, 7}, {kB, 8},
+                                           {kB, 9}, {kA, 1}, {kA, 2},
+                                           {kA, 3}, {kA, 4}, {kA, 5}};
+  const uint32_t kJoined =
+      f.mgr.AddPreprocessedFile("<preprocessed>", kText, std::move(origins));
+  Lexer lexer(f.mgr.FileContent(kJoined), kJoined, f.diag,
+              TextOrigin::kPreprocessorOutput);
+  Parser parser(lexer, f.arena, f.diag);
+  Elaborator elab(f.arena, f.diag, parser.Parse());
+  RtlirDesign* design = elab.Elaborate("t");
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
 class VpiLocationInARun : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -227,6 +267,39 @@ TEST_F(VpiLocationInARun, ANetOfTheTopModuleReportsItsOwnLine) {
   RunADesignOfLocatedDeclarations(f);
 
   EXPECT_EQ(g_top_net_line, 6);
+}
+
+// §37.3.3: the file and line an object reports are where its declaration was
+// written, which for a design read through the preprocessor is the source file
+// a line of the joined text came from, not the joined text itself.
+TEST_F(VpiLocationInARun, ADeclarationReportsTheFileItWasWrittenIn) {
+  RegisterLocationProbe();
+
+  SimFixture f;
+  RunAJoinedDesign(f);
+
+  EXPECT_EQ(g_net_file, "b.sv");
+}
+
+// And the line is its line in that file, 7, where the joined text has it at 2.
+TEST_F(VpiLocationInARun, ADeclarationReportsItsLineInItsOwnFile) {
+  RegisterLocationProbe();
+
+  SimFixture f;
+  RunAJoinedDesign(f);
+
+  EXPECT_EQ(g_net_line, 7);
+}
+
+// A declaration of the other file reports that file's line, the top's net at
+// line 2 of a.sv where the joined text has it at 6.
+TEST_F(VpiLocationInARun, ADeclarationOfTheOtherFileReportsItsOwnLine) {
+  RegisterLocationProbe();
+
+  SimFixture f;
+  RunAJoinedDesign(f);
+
+  EXPECT_EQ(g_top_net_line, 2);
 }
 
 }  // namespace

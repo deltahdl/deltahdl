@@ -479,6 +479,15 @@ static void DispatchGetValueByFormat(
 
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
+  // §37.3.6: an object a decryption envelope sealed gives up no value; the
+  // caller's buffer is left as it was.
+  if (obj->is_protected) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        VpiText("vpi_get_value() on a protected object is an error");
+    return;
+  }
   // §37.3.5: applying vpi_get_value() to an expression with side effects shall
   // fully evaluate the expression together with its side effects. Reading the
   // value performs that evaluation, so record that the side effect occurred
@@ -693,6 +702,14 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
 VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
                                s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
+  // §37.3.6: nor is a value written to one; nothing is scheduled.
+  if (obj->is_protected) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        VpiText("vpi_put_value() on a protected object is an error");
+    return nullptr;
+  }
 
   if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;
 

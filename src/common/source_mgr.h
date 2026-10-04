@@ -37,6 +37,11 @@ class SourceManager {
   // for a position that has an origin.
   std::string_view GetLineText(SourceLoc loc) const;
 
+  // `loc` restated in the source it came from, or `loc` unchanged when it
+  // stands in a file the user wrote. One hop answers it, because an origin
+  // names a real source file and a real source file has no origins of its own.
+  SourceLoc ResolveToOrigin(SourceLoc loc) const;
+
   // §37.3.6: an object is protected when it represents code contained in a
   // decryption envelope. The text a reading recovers from an envelope is
   // registered as a source of its own and marked here, and a position is
@@ -54,11 +59,6 @@ class SourceManager {
     std::vector<OutputLineOrigin> line_origins;
     bool is_protected = false;
   };
-
-  // `loc` restated in the source it came from, or `loc` unchanged when it
-  // stands in a file the user wrote. One hop answers it, because an origin
-  // names a real source file and a real source file has no origins of its own.
-  SourceLoc ResolveToOrigin(SourceLoc loc) const;
 
   void ComputeLineOffsets(FileEntry& entry);
 

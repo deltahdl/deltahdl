@@ -118,6 +118,11 @@ bool RecordArrayError(s_vpi_error_info* err, const char* msg) {
 bool ValidatePutValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                                   int* index_p, long long* out_start_ordinal,
                                   s_vpi_error_info* err) {
+  // §37.3.6: nor is a value written to an object a decryption envelope sealed.
+  if (obj->is_protected) {
+    return RecordArrayError(
+        err, "vpi_put_value_array() on a protected object is an error");
+  }
   // §38.35: the routine modifies only static unpacked variable or net arrays -
   // arrays whose vpiArrayType is vpiStaticArray, which also have a static
   // lifetime and contain no dynamic array or dynamic element. A handle that is
@@ -339,6 +344,11 @@ bool VpiArrayFormatSuitsElementType(int fmt, int elem_type) {
 bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                                   int* index_p, long long* out_start_ordinal,
                                   const char** out_err_msg) {
+  // §37.3.6: an object a decryption envelope sealed gives up no value.
+  if (obj->is_protected) {
+    *out_err_msg = "vpi_get_value_array() on a protected object is an error";
+    return false;
+  }
   // §38.16: the routine retrieves values only from static unpacked variable or
   // net arrays - arrays whose vpiArrayType is vpiStaticArray, with static
   // lifetimes and no dynamic array or dynamic element. Anything else has no
