@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -56,20 +57,54 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
   EXPECT_EQ(std::string(mod_name), "vpiModule");
 }
 
-// Edge of the vpiType string rule: vpi_get_str names the type only for the
-// object kinds the simulator actually models. For a handle whose type code the
-// model does not yet carry a spelling for, the string accessor reports no name
-// (a null pointer) rather than inventing one - the same null the routine yields
-// for any property it cannot supply.
-TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForUnmodelledType) {
-  VpiObject mem;
-  mem.type =
-      vpiMemory;  // a valid object type, but one with no modelled spelling
+// Edge of the vpiType string rule: a value neither Annex K nor Annex M defines
+// as an object type has no type constant to name, so the string accessor
+// reports no name (a null pointer) rather than inventing one - the same null
+// the routine yields for any property it cannot supply.
+TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForAnUndefinedType) {
+  VpiObject odd;
+  odd.type = 9999;  // no object type of either annex
+  EXPECT_EQ(vpi_get_str(vpiType, VpiHandleOf(&odd)), nullptr);
+}
 
-  // The integer type is still reported faithfully...
-  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mem)), vpiMemory);
-  // ...while the string form has no name to hand back.
-  EXPECT_EQ(vpi_get_str(vpiType, VpiHandleOf(&mem)), nullptr);
+// The string form names every object type the annexes define, each by its
+// own constant's spelling: the first and last of Annex K's list, kinds of
+// Annex M's, and its last.
+std::string TypeNameOf(int type) {
+  VpiObject obj;
+  obj.type = type;
+  const char* name = vpi_get_str(vpiType, VpiHandleOf(&obj));
+  return name == nullptr ? "" : name;
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesTheFirstAnnexKType) {
+  EXPECT_EQ(TypeNameOf(vpiAlways), "vpiAlways");
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAMemory) {
+  EXPECT_EQ(TypeNameOf(vpiMemory), "vpiMemory");
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAnIntVar) {
+  EXPECT_EQ(TypeNameOf(vpiIntVar), "vpiIntVar");
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAGenScope) {
+  EXPECT_EQ(TypeNameOf(vpiGenScope), "vpiGenScope");
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAClassDefn) {
+  EXPECT_EQ(TypeNameOf(vpiClassDefn), "vpiClassDefn");
+}
+
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesTheLastAnnexMType) {
+  EXPECT_EQ(TypeNameOf(vpiLetExpr), "vpiLetExpr");
+}
+
+// §37.17 detail 19: a var bit may be named vpiRegBit, the spelling of the
+// shared value Annex K defines.
+TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAVarBitByItsAnnexKSpelling) {
+  EXPECT_EQ(TypeNameOf(vpiVarBit), "vpiRegBit");
 }
 
 // Claim: some objects expose additional type properties shown in the data model

@@ -30,70 +30,241 @@ namespace delta {
 
 // §37.3.2: vpi_get_str(vpiType, ...) hands back the name of the type constant,
 // and that name is derived from the object's name in the data model diagram
-// (§37.3) - i.e. it is the very identifier of the type constant. This maps the
-// object-type codes the simulator models onto those spellings; an unmodelled
-// type yields no name (null), leaving room for other subclauses' types.
+// (§37.3) - i.e. it is the very identifier of the type constant. These are the
+// object types the OBJECT TYPES sections of Annex K (vpi_user.h) and Annex M
+// (sv_vpi_user.h) define, each under its own spelling. Where two constants
+// share a value - vpiLogicNet and vpiNet, vpiArrayNet and vpiNetArray (§37.16
+// details 27 and 29), vpiLogicVar and vpiReg, vpiVarBit and vpiRegBit,
+// vpiArrayVar and vpiRegArray (§37.17 detail 19) - the clause lets either be
+// reported, and the IEEE 1364 spelling Annex K defines is.
+struct VpiTypeName {
+  int type;
+  const char* name;
+};
+
+constexpr VpiTypeName kVpiTypeNames[] = {
+    {vpiAlways, "vpiAlways"},
+    {vpiAssignStmt, "vpiAssignStmt"},
+    {vpiAssignment, "vpiAssignment"},
+    {vpiBegin, "vpiBegin"},
+    {vpiCase, "vpiCase"},
+    {vpiCaseItem, "vpiCaseItem"},
+    {vpiConstant, "vpiConstant"},
+    {vpiContAssign, "vpiContAssign"},
+    {vpiDeassign, "vpiDeassign"},
+    {vpiDefParam, "vpiDefParam"},
+    {vpiDelayControl, "vpiDelayControl"},
+    {vpiDisable, "vpiDisable"},
+    {vpiEventControl, "vpiEventControl"},
+    {vpiEventStmt, "vpiEventStmt"},
+    {vpiFor, "vpiFor"},
+    {vpiForce, "vpiForce"},
+    {vpiForever, "vpiForever"},
+    {vpiFork, "vpiFork"},
+    {vpiFuncCall, "vpiFuncCall"},
+    {vpiFunction, "vpiFunction"},
+    {vpiGate, "vpiGate"},
+    {vpiIf, "vpiIf"},
+    {vpiIfElse, "vpiIfElse"},
+    {vpiInitial, "vpiInitial"},
+    {vpiIntegerVar, "vpiIntegerVar"},
+    {vpiInterModPath, "vpiInterModPath"},
+    {vpiIterator, "vpiIterator"},
+    {vpiIODecl, "vpiIODecl"},
+    {vpiMemory, "vpiMemory"},
+    {vpiMemoryWord, "vpiMemoryWord"},
+    {vpiModPath, "vpiModPath"},
+    {vpiModule, "vpiModule"},
+    {vpiNamedBegin, "vpiNamedBegin"},
+    {vpiNamedEvent, "vpiNamedEvent"},
+    {vpiNamedFork, "vpiNamedFork"},
+    {vpiNet, "vpiNet"},
+    {vpiNetBit, "vpiNetBit"},
+    {vpiNullStmt, "vpiNullStmt"},
+    {vpiOperation, "vpiOperation"},
+    {vpiParamAssign, "vpiParamAssign"},
+    {vpiParameter, "vpiParameter"},
+    {vpiPartSelect, "vpiPartSelect"},
+    {vpiPathTerm, "vpiPathTerm"},
+    {vpiPort, "vpiPort"},
+    {vpiPortBit, "vpiPortBit"},
+    {vpiPrimTerm, "vpiPrimTerm"},
+    {vpiRealVar, "vpiRealVar"},
+    {vpiReg, "vpiReg"},
+    {vpiRegBit, "vpiRegBit"},
+    {vpiRelease, "vpiRelease"},
+    {vpiRepeat, "vpiRepeat"},
+    {vpiRepeatControl, "vpiRepeatControl"},
+    {vpiSchedEvent, "vpiSchedEvent"},
+    {vpiSpecParam, "vpiSpecParam"},
+    {vpiSwitch, "vpiSwitch"},
+    {vpiSysFuncCall, "vpiSysFuncCall"},
+    {vpiSysTaskCall, "vpiSysTaskCall"},
+    {vpiTableEntry, "vpiTableEntry"},
+    {vpiTask, "vpiTask"},
+    {vpiTaskCall, "vpiTaskCall"},
+    {vpiTchk, "vpiTchk"},
+    {vpiTchkTerm, "vpiTchkTerm"},
+    {vpiTimeVar, "vpiTimeVar"},
+    {vpiTimeQueue, "vpiTimeQueue"},
+    {vpiUdp, "vpiUdp"},
+    {vpiUdpDefn, "vpiUdpDefn"},
+    {vpiUserSystf, "vpiUserSystf"},
+    {vpiVarSelect, "vpiVarSelect"},
+    {vpiWait, "vpiWait"},
+    {vpiWhile, "vpiWhile"},
+    {vpiAttribute, "vpiAttribute"},
+    {vpiBitSelect, "vpiBitSelect"},
+    {vpiCallback, "vpiCallback"},
+    {vpiDelayTerm, "vpiDelayTerm"},
+    {vpiDelayDevice, "vpiDelayDevice"},
+    {vpiFrame, "vpiFrame"},
+    {vpiGateArray, "vpiGateArray"},
+    {vpiModuleArray, "vpiModuleArray"},
+    {vpiPrimitiveArray, "vpiPrimitiveArray"},
+    {vpiNetArray, "vpiNetArray"},
+    {vpiRange, "vpiRange"},
+    {vpiRegArray, "vpiRegArray"},
+    {vpiSwitchArray, "vpiSwitchArray"},
+    {vpiUdpArray, "vpiUdpArray"},
+    {vpiContAssignBit, "vpiContAssignBit"},
+    {vpiNamedEventArray, "vpiNamedEventArray"},
+    {vpiIndexedPartSelect, "vpiIndexedPartSelect"},
+    {vpiGenScopeArray, "vpiGenScopeArray"},
+    {vpiGenScope, "vpiGenScope"},
+    {vpiGenVar, "vpiGenVar"},
+    {vpiPackage, "vpiPackage"},
+    {vpiInterface, "vpiInterface"},
+    {vpiProgram, "vpiProgram"},
+    {vpiInterfaceArray, "vpiInterfaceArray"},
+    {vpiProgramArray, "vpiProgramArray"},
+    {vpiTypespec, "vpiTypespec"},
+    {vpiModport, "vpiModport"},
+    {vpiInterfaceTfDecl, "vpiInterfaceTfDecl"},
+    {vpiRefObj, "vpiRefObj"},
+    {vpiTypeParameter, "vpiTypeParameter"},
+    {vpiLongIntVar, "vpiLongIntVar"},
+    {vpiShortIntVar, "vpiShortIntVar"},
+    {vpiIntVar, "vpiIntVar"},
+    {vpiShortRealVar, "vpiShortRealVar"},
+    {vpiByteVar, "vpiByteVar"},
+    {vpiClassVar, "vpiClassVar"},
+    {vpiStringVar, "vpiStringVar"},
+    {vpiEnumVar, "vpiEnumVar"},
+    {vpiStructVar, "vpiStructVar"},
+    {vpiUnionVar, "vpiUnionVar"},
+    {vpiBitVar, "vpiBitVar"},
+    {vpiClassObj, "vpiClassObj"},
+    {vpiChandleVar, "vpiChandleVar"},
+    {vpiPackedArrayVar, "vpiPackedArrayVar"},
+    {vpiVirtualInterfaceVar, "vpiVirtualInterfaceVar"},
+    {vpiLongIntTypespec, "vpiLongIntTypespec"},
+    {vpiShortRealTypespec, "vpiShortRealTypespec"},
+    {vpiByteTypespec, "vpiByteTypespec"},
+    {vpiShortIntTypespec, "vpiShortIntTypespec"},
+    {vpiIntTypespec, "vpiIntTypespec"},
+    {vpiClassTypespec, "vpiClassTypespec"},
+    {vpiStringTypespec, "vpiStringTypespec"},
+    {vpiChandleTypespec, "vpiChandleTypespec"},
+    {vpiEnumTypespec, "vpiEnumTypespec"},
+    {vpiEnumConst, "vpiEnumConst"},
+    {vpiIntegerTypespec, "vpiIntegerTypespec"},
+    {vpiTimeTypespec, "vpiTimeTypespec"},
+    {vpiRealTypespec, "vpiRealTypespec"},
+    {vpiStructTypespec, "vpiStructTypespec"},
+    {vpiUnionTypespec, "vpiUnionTypespec"},
+    {vpiBitTypespec, "vpiBitTypespec"},
+    {vpiLogicTypespec, "vpiLogicTypespec"},
+    {vpiArrayTypespec, "vpiArrayTypespec"},
+    {vpiVoidTypespec, "vpiVoidTypespec"},
+    {vpiTypespecMember, "vpiTypespecMember"},
+    {vpiPackedArrayTypespec, "vpiPackedArrayTypespec"},
+    {vpiSequenceTypespec, "vpiSequenceTypespec"},
+    {vpiPropertyTypespec, "vpiPropertyTypespec"},
+    {vpiEventTypespec, "vpiEventTypespec"},
+    {vpiInterfaceTypespec, "vpiInterfaceTypespec"},
+    {vpiClockingBlock, "vpiClockingBlock"},
+    {vpiClockingIODecl, "vpiClockingIODecl"},
+    {vpiClassDefn, "vpiClassDefn"},
+    {vpiConstraint, "vpiConstraint"},
+    {vpiConstraintOrdering, "vpiConstraintOrdering"},
+    {vpiDistItem, "vpiDistItem"},
+    {vpiAliasStmt, "vpiAliasStmt"},
+    {vpiThread, "vpiThread"},
+    {vpiMethodFuncCall, "vpiMethodFuncCall"},
+    {vpiMethodTaskCall, "vpiMethodTaskCall"},
+    {vpiAssert, "vpiAssert"},
+    {vpiAssume, "vpiAssume"},
+    {vpiCover, "vpiCover"},
+    {vpiRestrict, "vpiRestrict"},
+    {vpiDisableCondition, "vpiDisableCondition"},
+    {vpiClockingEvent, "vpiClockingEvent"},
+    {vpiPropertyDecl, "vpiPropertyDecl"},
+    {vpiPropertySpec, "vpiPropertySpec"},
+    {vpiPropertyExpr, "vpiPropertyExpr"},
+    {vpiMulticlockSequenceExpr, "vpiMulticlockSequenceExpr"},
+    {vpiClockedSeq, "vpiClockedSeq"},
+    {vpiClockedProp, "vpiClockedProp"},
+    {vpiPropertyInst, "vpiPropertyInst"},
+    {vpiSequenceDecl, "vpiSequenceDecl"},
+    {vpiCaseProperty, "vpiCaseProperty"},
+    {vpiCasePropertyItem, "vpiCasePropertyItem"},
+    {vpiSequenceInst, "vpiSequenceInst"},
+    {vpiImmediateAssert, "vpiImmediateAssert"},
+    {vpiImmediateAssume, "vpiImmediateAssume"},
+    {vpiImmediateCover, "vpiImmediateCover"},
+    {vpiReturn, "vpiReturn"},
+    {vpiAnyPattern, "vpiAnyPattern"},
+    {vpiTaggedPattern, "vpiTaggedPattern"},
+    {vpiStructPattern, "vpiStructPattern"},
+    {vpiDoWhile, "vpiDoWhile"},
+    {vpiOrderedWait, "vpiOrderedWait"},
+    {vpiWaitFork, "vpiWaitFork"},
+    {vpiDisableFork, "vpiDisableFork"},
+    {vpiExpectStmt, "vpiExpectStmt"},
+    {vpiForeachStmt, "vpiForeachStmt"},
+    {vpiReturnStmt, "vpiReturnStmt"},
+    {vpiFinal, "vpiFinal"},
+    {vpiExtends, "vpiExtends"},
+    {vpiDistribution, "vpiDistribution"},
+    {vpiSeqFormalDecl, "vpiSeqFormalDecl"},
+    {vpiPropFormalDecl, "vpiPropFormalDecl"},
+    {vpiEnumNet, "vpiEnumNet"},
+    {vpiIntegerNet, "vpiIntegerNet"},
+    {vpiTimeNet, "vpiTimeNet"},
+    {vpiUnionNet, "vpiUnionNet"},
+    {vpiShortRealNet, "vpiShortRealNet"},
+    {vpiRealNet, "vpiRealNet"},
+    {vpiByteNet, "vpiByteNet"},
+    {vpiShortIntNet, "vpiShortIntNet"},
+    {vpiIntNet, "vpiIntNet"},
+    {vpiLongIntNet, "vpiLongIntNet"},
+    {vpiBitNet, "vpiBitNet"},
+    {vpiInterconnectNet, "vpiInterconnectNet"},
+    {vpiInterconnectArray, "vpiInterconnectArray"},
+    {vpiStructNet, "vpiStructNet"},
+    {vpiBreak, "vpiBreak"},
+    {vpiContinue, "vpiContinue"},
+    {vpiPackedArrayNet, "vpiPackedArrayNet"},
+    {vpiNettypeDecl, "vpiNettypeDecl"},
+    {vpiConstraintExpr, "vpiConstraintExpr"},
+    {vpiElseConst, "vpiElseConst"},
+    {vpiImplication, "vpiImplication"},
+    {vpiConstrIf, "vpiConstrIf"},
+    {vpiConstrIfElse, "vpiConstrIfElse"},
+    {vpiConstrForEach, "vpiConstrForEach"},
+    {vpiSoftDisable, "vpiSoftDisable"},
+    {vpiLetDecl, "vpiLetDecl"},
+    {vpiLetExpr, "vpiLetExpr"},
+};
+
+// The spelling of `type`, or null for a value neither annex defines as an
+// object type.
 static const char* VpiTypeConstantName(int type) {
-  switch (type) {
-    case vpiModule:
-      return "vpiModule";
-    // §37.16 details 27 and 29: vpiLogicNet is #defined the same as vpiNet and
-    // vpiArrayNet the same as vpiNetArray, so vpi_get_str(vpiType) may report
-    // either spelling for those kinds. The simulator returns the IEEE 1364 net
-    // spellings, which are among the permitted names.
-    case vpiNet:  // == vpiLogicNet
-      return "vpiNet";
-    case vpiNetArray:  // == vpiArrayNet
-      return "vpiNetArray";
-    case vpiNetBit:
-      return "vpiNetBit";
-    case vpiStructNet:
-      return "vpiStructNet";
-    case vpiUnionNet:
-      return "vpiUnionNet";
-    case vpiEnumNet:
-      return "vpiEnumNet";
-    case vpiIntegerNet:
-      return "vpiIntegerNet";
-    case vpiTimeNet:
-      return "vpiTimeNet";
-    case vpiBitNet:
-      return "vpiBitNet";
-    case vpiPackedArrayNet:
-      return "vpiPackedArrayNet";
-    case vpiInterconnectNet:
-      return "vpiInterconnectNet";
-    case vpiInterconnectArray:
-      return "vpiInterconnectArray";
-    case vpiReg:
-      return "vpiReg";
-    case vpiPort:
-      return "vpiPort";
-    case vpiParameter:
-      return "vpiParameter";
-    case vpiConstant:
-      return "vpiConstant";
-    case vpiNamedEvent:
-      return "vpiNamedEvent";
-    case vpiOperation:
-      return "vpiOperation";
-    case vpiPrimitive:
-      return "vpiPrimitive";
-    case vpiIterator:
-      return "vpiIterator";
-    case vpiTypespec:
-      return "vpiTypespec";
-    case vpiFrame:
-      return "vpiFrame";
-    case vpiThread:
-      return "vpiThread";
-    case kVpiCallback:
-      return "vpiCallback";
-    case kVpiTimeQueue:
-      return "vpiTimeQueue";
-    default:
-      return nullptr;
+  for (const VpiTypeName& entry : kVpiTypeNames) {
+    if (entry.type == type) return entry.name;
   }
+  return nullptr;
 }
 
 // §37.3.2: an operation's vpiOpType is one of the additional type properties;
