@@ -123,8 +123,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);
     AttachArrayElements(design, object_map_, kBuild);
     AttachStructMembers(design, object_map_, *sim_ctx_, kBuild);
-    AttachTypespecs(design, object_map_, kBuild);
-    AttachParameters(design, object_map_, kBuild);
+    const VpiObjectMap kUnitTypespecs =
+        AttachTypespecs(design, object_map_, kBuild);
+    AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design);

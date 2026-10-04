@@ -29,16 +29,18 @@ VpiObject* TypespecNamed(const VpiObject& scope, std::string_view name) {
 // `scope` has at the end of elaboration, its typedef aliases left unresolved:
 // for a typedef's name, the typespec of the typedef, which `scope`, an
 // instance enclosing it, where a parameter value assignment naming it stands,
-// or the compilation unit `unit` declares; and for a type no typedef names, a
-// typespec of its kind. Null for a type neither gives one.
+// or the compilation unit, whose typespecs are `unit`, declares; and for a
+// type no typedef names, a typespec of its kind. Null for a type neither gives
+// one.
 VpiObject* TypeParameterTypespec(const DataType& type, VpiObject* scope,
-                                 const VpiObject* unit,
+                                 const VpiObjectMap& unit,
                                  const VpiAttachBuild& build) {
   if (type.kind == DataTypeKind::kNamed) {
     for (const VpiObject* at = scope; at != nullptr; at = at->parent) {
       if (VpiObject* found = TypespecNamed(*at, type.type_name)) return found;
     }
-    return unit == nullptr ? nullptr : TypespecNamed(*unit, type.type_name);
+    auto in_unit = unit.find(type.type_name);
+    return in_unit == unit.end() ? nullptr : in_unit->second;
   }
   const int kKind = VpiTypespecKind(type.kind);
   if (kKind == 0) return nullptr;
@@ -51,7 +53,7 @@ VpiObject* TypeParameterTypespec(const DataType& type, VpiObject* scope,
 // `scope`, related through vpiTypespec to the type it has. A type parameter
 // has no value and so no storage, and nothing else makes an object for it.
 void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
-                       const VpiObject* unit, const VpiAttachBuild& build) {
+                       const VpiObjectMap& unit, const VpiAttachBuild& build) {
   VpiObject* obj = build.alloc();
   obj->type = vpiTypeParameter;
   obj->name = build.keep(std::string(param.name));
@@ -66,9 +68,11 @@ void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
 }
 
 // The parameters of the instance at `prefix`, an instance of `mod`, each made
-// the kind of parameter object it is; `unit` is the compilation unit's scope.
+// the kind of parameter object it is; `unit` holds the compilation unit's
+// typespecs.
 void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
-                           const VpiObjectMap& objects, const VpiObject* unit,
+                           const VpiObjectMap& objects,
+                           const VpiObjectMap& unit,
                            const VpiAttachBuild& build) {
   VpiObject* scope = FindObjectForFlatName(
       objects, prefix.empty() ? std::string(mod->name) : prefix);
@@ -91,6 +95,7 @@ void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
+                      const VpiObjectMap& unit_typespecs,
                       const VpiAttachBuild& build) {
   // §37.28 details 1 and 2: a value parameter is a vpiParameter, which says
   // through vpiLocalParam whether it is a localparam, and a type parameter is
@@ -99,11 +104,9 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
   // and a type parameter had none, so the vpiParameter iteration found nothing
   // and no type parameter reached a typespec.
   if (design == nullptr) return;
-  auto unit = objects.find("$unit");
-  const VpiObject* unit_scope = unit == objects.end() ? nullptr : unit->second;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        AttachScopeParameters(mod, prefix, objects, unit_scope, build);
+        AttachScopeParameters(mod, prefix, objects, unit_typespecs, build);
       });
 }
 

@@ -77,15 +77,20 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.25, §37.26, §37.85 detail 5 and §37.17: give each scope a typespec per
-// typedef it declares, and link each variable declared with one to it.
-void AttachTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
-                     const VpiAttachBuild& build);
+// typedef it declares, and link each variable declared with one to it. Answers
+// the compilation unit's typespecs by typedef name, since no scope object of
+// the model holds them.
+VpiObjectMap AttachTypespecs(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiAttachBuild& build);
 
 // §37.28 details 1 and 2: make each value parameter a vpiParameter and each
 // type parameter a vpiTypeParameter, each saying whether it is a localparam,
-// and relate a type parameter to the typespec of the type it has. Runs after
-// AttachTypespecs, whose typespecs a type parameter naming a typedef reaches.
+// and relate a type parameter to the typespec of the type it has, a typedef's
+// among those its scope declares or `unit_typespecs`, the compilation unit's,
+// which AttachTypespecs made and answered.
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
+                      const VpiObjectMap& unit_typespecs,
                       const VpiAttachBuild& build);
 
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range

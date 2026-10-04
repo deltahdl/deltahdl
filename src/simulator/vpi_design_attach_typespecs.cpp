@@ -129,14 +129,15 @@ VpiObject* DeclaredTypespec(const RtlirVariable& var,
 
 }  // namespace
 
-void AttachTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
-                     const VpiAttachBuild& build) {
+VpiObjectMap AttachTypespecs(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiAttachBuild& build) {
   // §37.25, §37.26 and §37.85 detail 5: each typedef a scope declares is a
   // typespec named after it, an enum's with its constants and a struct's or
   // union's with its members; and §37.17 relates a variable declared with one
   // to it. No typespec of any kind was made, so vpiTypedef reached none and a
   // variable's vpiTypespec was null.
-  if (design == nullptr || design->compilation_unit == nullptr) return;
+  if (design == nullptr || design->compilation_unit == nullptr) return {};
   const CompilationUnit& unit = *design->compilation_unit;
   auto unit_scope = objects.find("$unit");
   const TypespecsByName kUnit =
@@ -160,6 +161,7 @@ void AttachTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
           }
         }
       });
+  return kUnit;
 }
 
 }  // namespace delta
