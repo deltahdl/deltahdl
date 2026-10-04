@@ -48,6 +48,29 @@ void UsePackageSeparator(VpiObject* obj, std::string_view dotted,
   for (auto* child : obj->children) UsePackageSeparator(child, dotted, colons);
 }
 
+// §37.10: `obj`, the scope the walk made for the package or compilation unit
+// named `name`, given the package's type and names.
+void MakePackageScope(VpiObject* obj, std::string_view name) {
+  obj->type = vpiPackage;
+  const std::string kColons = std::string(name) + "::";
+  const std::string kDotted = std::string(name) + ".";
+  for (auto* member : obj->children) {
+    UsePackageSeparator(member, kDotted, kColons);
+  }
+  obj->full_name = kColons;
+}
+
+// §37.10 detail 6: the objects of the compilation unit, which
+// vpi_handle_by_name() does not reach.
+void MarkInCompilationUnit(VpiObject* obj) {
+  obj->in_compilation_unit = true;
+  for (auto* child : obj->children) MarkInCompilationUnit(child);
+}
+
+// The scope the lowerer's keys put a compilation unit's data items under
+// ("$unit.name", lowerer_package_data.cpp).
+constexpr std::string_view kUnitScope = "$unit";
+
 }  // namespace
 
 void VpiContext::AttachInstanceObjects(const RtlirDesign* design) {
@@ -69,15 +92,14 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   if (design == nullptr) return;
   for (const PackageDecl* pkg : design->packages) {
     if (pkg == nullptr) continue;
-    VpiHandle obj = DesignObjectForFlatName(pkg->name);
-    obj->type = vpiPackage;
-    const std::string kColons = std::string(pkg->name) + "::";
-    const std::string kDotted = std::string(pkg->name) + ".";
-    for (auto* member : obj->children) {
-      UsePackageSeparator(member, kDotted, kColons);
-    }
-    obj->full_name = kColons;
+    MakePackageScope(DesignObjectForFlatName(pkg->name), pkg->name);
   }
+  // The compilation unit's data is keyed the same way, under "$unit". It is
+  // part of no module either, and detail 5 names its objects "$unit::name".
+  auto unit = object_map_.find(kUnitScope);
+  if (unit == object_map_.end() || unit->second == nullptr) return;
+  MakePackageScope(unit->second, kUnitScope);
+  MarkInCompilationUnit(unit->second);
 }
 
 void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {

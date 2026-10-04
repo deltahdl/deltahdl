@@ -468,6 +468,33 @@ TEST_F(InstanceObjectsOfARun, AnImportedItemIsNotReachedThroughTheImporter) {
   EXPECT_EQ(vpi_handle_by_name(VpiText("top.P"), nullptr), nullptr);
 }
 
+constexpr const char* kUnitItemBesideTop =
+    "int g = 3;\n"
+    "module top; int x = $unit::g; endmodule\n";
+
+// Detail 6: an object of the compilation unit is not reached by name.
+TEST_F(InstanceObjectsOfARun, ACompilationUnitItemIsNotReachedByName) {
+  Run(kUnitItemBesideTop);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("$unit.g"), nullptr), nullptr);
+}
+
+// The compilation unit is no part of the top beside it.
+TEST_F(InstanceObjectsOfARun, ACompilationUnitIsNoChildOfTheTop) {
+  Run(kUnitItemBesideTop);
+  EXPECT_EQ(
+      FullNameOfChild(vpi_handle_by_name(VpiText("top"), nullptr), "$unit"),
+      "");
+}
+
+// Detail 5: the full name of an object of the compilation unit begins with
+// "$unit::". The unit is drawn as a package, reached from no scope.
+TEST_F(InstanceObjectsOfARun, ACompilationUnitItemsFullNameUsesColons) {
+  Run(kUnitItemBesideTop);
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(FullNameOfChild(vpi_scan(it), "g"), "$unit::g");
+}
+
 constexpr const char* kTwoTimescales =
     "module sub; timeunit 1us; timeprecision 1ps; endmodule\n"
     "module top; timeunit 10ns; timeprecision 1ns; sub s(); endmodule\n";
