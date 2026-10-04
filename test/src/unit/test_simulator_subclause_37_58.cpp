@@ -192,10 +192,10 @@ TEST_F(BitSelectsOfARun, ABitSelectsIndexIsTheWrittenIndex) {
 }
 
 // A select of one bit of a vector net is no bit select: it is that net's bit
-// (§37.16), the object the index reaches.
+// (§37.16), the object the index reaches. The net is declared without an
+// assignment, which would be the top's first continuous assignment.
 TEST_F(BitSelectsOfARun, ABitOfANetIsTheNetsBit) {
-  Run("module top; wire [7:0] a = 8'h08; wire y; assign y = a[3]; "
-      "endmodule\n");
+  Run("module top; wire [7:0] a; wire y; assign y = a[3]; endmodule\n");
   EXPECT_EQ(Rhs(), vpi_handle_by_index(
                        vpi_handle_by_name(VpiText("top.a"), nullptr), 3));
 }

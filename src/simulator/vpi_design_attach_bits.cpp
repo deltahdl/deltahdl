@@ -1,6 +1,11 @@
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
@@ -12,6 +17,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
@@ -58,40 +64,83 @@ bool HasVarBits(int type) {
   return type == kVpiReg || type == vpiBitVar || type == vpiPackedArrayVar;
 }
 
-}  // namespace
+// What making one object's bits needs: somewhere to allocate an object, a
+// string to keep a bit's name in, and the arena an index constant lives in.
+struct BitBuild {
+  std::function<VpiObject*()> alloc;
+  std::function<std::string_view(std::string)> keep;
+  Arena& arena;
+};
 
-void VpiContext::MakeVectorBits(VpiObject* parent, int bit_type,
-                                const PackedRange& range) {
-  // The bits stand in declaration order, the left index first.
-  const auto kWidth =
-      static_cast<int64_t>(range.HighIndex() - range.LowIndex() + 1);
-  Arena& arena = sim_ctx_->GetArena();
+// One object a vector's bits hang from, the kind of bit it has and the range
+// they are indexed by.
+struct BitTarget {
+  VpiObject* parent;
+  int bit_type;
+  PackedRange range;
+};
+
+// The objects of the instance at `prefix` that have bits: its vector nets and
+// its packed logic and bit variables. The ranges are the declarations', read in
+// the instance's own scope, where its parameters have their instance's values.
+std::vector<BitTarget> BitTargets(
+    const RtlirModule* mod, const std::string& prefix,
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    SimContext& ctx) {
+  InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
+                               prefix.empty() ? "" : prefix + ".");
+  std::vector<BitTarget> targets;
+  for (const RtlirNet& net : mod->nets) {
+    VpiHandle obj =
+        FindObjectForFlatName(objects, VpiFlatName(prefix, net.name));
+    if (obj == nullptr || obj->type != kVpiNet) continue;
+    auto range = DeclaredRange(net.dtype, net.width, ctx);
+    if (range) targets.push_back({obj, vpiNetBit, *range});
+  }
+  for (const RtlirVariable& var : mod->variables) {
+    VpiHandle obj =
+        FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+    if (obj == nullptr || !HasVarBits(obj->type)) continue;
+    auto range = DeclaredRange(var.dtype, var.width, ctx);
+    if (range) targets.push_back({obj, vpiRegBit, *range});
+  }
+  return targets;
+}
+
+// §37.16, §37.17: the bits of `target.parent`, in declaration order with the
+// left index first, each holding its offset into the parent's storage, size 1
+// and its index, which vpiIndex reaches as a constant (detail 13).
+void MakeVectorBits(const BitTarget& target, const BitBuild& build) {
+  const PackedRange& range = target.range;
+  const int64_t kWidth = range.HighIndex() - range.LowIndex() + 1;
+  VpiObject* parent = target.parent;
   for (int64_t offset = kWidth - 1; offset >= 0; --offset) {
     const int64_t kIndex = range.IndexAtOffset(offset);
-    VpiObject* bit = AllocObject();
-    bit->type = bit_type;
+    const std::string kSuffix = "[" + std::to_string(kIndex) + "]";
+    VpiObject* bit = build.alloc();
+    bit->type = target.bit_type;
     bit->parent = parent;
     bit->var = parent->var;
     bit->net = parent->net;
     bit->bit_offset = static_cast<int>(offset);
     bit->size = 1;
     bit->index = static_cast<int>(kIndex);
-    name_pool_.emplace_back(std::string(parent->name) + "[" +
-                            std::to_string(kIndex) + "]");
-    bit->name = name_pool_.back();
-    bit->full_name = parent->full_name + "[" + std::to_string(kIndex) + "]";
-    // §37.16 and §37.17 detail 13: vpiIndex reaches the bit's index.
-    VpiObject* index = AllocObject();
+    bit->name = build.keep(std::string(parent->name) + kSuffix);
+    bit->full_name = parent->full_name + kSuffix;
+    VpiObject* index = build.alloc();
     index->type = vpiConstant;
     index->const_type = vpiIntConst;
-    auto* storage = arena.Create<Variable>();
-    storage->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(kIndex));
+    auto* storage = build.arena.Create<Variable>();
+    storage->value =
+        MakeLogic4VecVal(build.arena, 32, static_cast<uint64_t>(kIndex));
     index->var = storage;
     index->size = 32;
     bit->index_expr = index;
     parent->children.push_back(bit);
   }
 }
+
+}  // namespace
 
 void VpiContext::AttachVectorBits(const RtlirDesign* design) {
   // §37.16 and §37.17: a vector net has a net bit per bit and a packed logic or
@@ -100,27 +149,18 @@ void VpiContext::AttachVectorBits(const RtlirDesign* design) {
   // vpiBit iteration nor an index reached a bit of any object.
   if (design == nullptr || sim_ctx_ == nullptr) return;
   SimContext& ctx = *sim_ctx_;
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        // The range is the declaration's, read in the instance's own scope,
-        // where its parameters have their instance's values.
-        InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
-                                     prefix.empty() ? "" : prefix + ".");
-        for (const RtlirNet& net : mod->nets) {
-          VpiHandle obj =
-              FindObjectForFlatName(object_map_, VpiFlatName(prefix, net.name));
-          if (obj == nullptr || obj->type != kVpiNet) continue;
-          auto range = DeclaredRange(net.dtype, net.width, ctx);
-          if (range) MakeVectorBits(obj, vpiNetBit, *range);
-        }
-        for (const RtlirVariable& var : mod->variables) {
-          VpiHandle obj =
-              FindObjectForFlatName(object_map_, VpiFlatName(prefix, var.name));
-          if (obj == nullptr || !HasVarBits(obj->type)) continue;
-          auto range = DeclaredRange(var.dtype, var.width, ctx);
-          if (range) MakeVectorBits(obj, vpiRegBit, *range);
-        }
-      });
+  const BitBuild kBuild{[this] { return AllocObject(); },
+                        [this](std::string name) {
+                          name_pool_.push_back(std::move(name));
+                          return std::string_view(name_pool_.back());
+                        },
+                        ctx.GetArena()};
+  WalkInstancePaths(design, [&](const RtlirModule* mod,
+                                const std::string& prefix) {
+    for (const BitTarget& target : BitTargets(mod, prefix, object_map_, ctx)) {
+      MakeVectorBits(target, kBuild);
+    }
+  });
 }
 
 }  // namespace delta

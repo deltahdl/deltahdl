@@ -10,16 +10,29 @@ bool VpiIsExprOperandType(int type) {
   return VpiIsExprType(type) || VpiIsNetsType(type) || VpiIsVariablesType(type);
 }
 
+namespace {
+
+// §37.58 for a bit select, §37.16 and §37.17 detail 13 for a net bit and a var
+// bit: the bit's index, and the object it is a bit of.
+bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type != vpiBitSelect && ref->type != vpiNetBit &&
+      ref->type != vpiRegBit) {
+    return false;
+  }
+  if (type == vpiIndex) {
+    out = ref->index_expr;
+    return true;
+  }
+  if (type != vpiParent) return false;
+  out = ref->parent;
+  return true;
+}
+
+}  // namespace
+
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.58 for a bit select, §37.16 and §37.17 detail 13 for a net bit and a
-  // var bit: the bit's index, and the object it is a bit of.
-  if (ref->type == vpiBitSelect || ref->type == vpiNetBit ||
-      ref->type == vpiRegBit) {
-    if (type == vpiIndex) {
-      out = ref->index_expr;
-      return true;
-    }
-  } else if (ref->type == vpiPartSelect) {
+  if (TryResolveBitRelation(type, ref, out)) return true;
+  if (ref->type == vpiPartSelect) {
     if (type == vpiLeftRange) {
       out = ref->left_range;
       return true;

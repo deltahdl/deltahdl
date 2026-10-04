@@ -102,6 +102,14 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   MarkInCompilationUnit(unit->second);
 }
 
+void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
+  AttachInstanceDefinitions(design);
+  // A continuous assignment's bit select is the bit made here, so the bits
+  // come first.
+  AttachVectorBits(design);
+  AttachContinuousAssignments(design);
+}
+
 void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
   if (design == nullptr || design->top_modules.empty() ||
       design->top_modules.front() == nullptr) {

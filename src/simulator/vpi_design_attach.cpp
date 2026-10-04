@@ -722,10 +722,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachPackages(design);
   AttachTopModules(design);
-  AttachInstanceDefinitions(design);
-  // A continuous assignment's bit select is the bit made here.
-  AttachVectorBits(design);
-  AttachContinuousAssignments(design);
+  AttachInstanceContents(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   // §37.62: the event statements hang in the scope the top has just adopted, so
   // they are made once those scopes are final and the named event each one
