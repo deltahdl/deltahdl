@@ -160,17 +160,18 @@ std::optional<std::string> FlattenBlockPath(const Expr* head,
   return std::format("{}_{}_{}", head->base->text, *index, member);
 }
 
-// The stored name of the instance `g[k].i` names in a loop block, whose stored
-// name `flat` is registered only once the loop is elaborated: found through
-// the block's `g[]_i` entry (BlockInterfaceWalk::AddLoop) and entered into
-// `table` for the interface checks to find. Empty where no loop block named
-// `g` declares an interface instance `i`.
-std::string_view LoopBlockInstance(const Expr* head, std::string_view member,
-                                   const std::string& flat,
+// The stored name of the instance the path `conn`, `g[k].i`, names in a loop
+// block, whose stored name `flat` is registered only once the loop is
+// elaborated: found through the block's `g[]_i` entry
+// (BlockInterfaceWalk::AddLoop) and entered into `table` for the interface
+// checks to find. Empty where no loop block named `g` declares an interface
+// instance `i`.
+std::string_view LoopBlockInstance(const Expr* conn, const std::string& flat,
                                    const GenBlockPrefixes& prefixes,
                                    InterfaceInstTypes& table, Arena& arena) {
-  if (head->kind != ExprKind::kSelect) return {};
-  std::string pattern = std::format("{}[]_{}", head->base->text, member);
+  if (conn->lhs->kind != ExprKind::kSelect) return {};
+  std::string pattern =
+      std::format("{}[]_{}", conn->lhs->base->text, conn->rhs->text);
   std::string_view found = FindBlockInterface(pattern, prefixes, table);
   if (found.empty()) return {};
   std::string key =
@@ -191,8 +192,7 @@ Expr* ResolvedPath(Expr* conn, const GenBlockPrefixes& prefixes,
   if (!flat) return nullptr;
   std::string_view key = FindBlockInterface(*flat, prefixes, table);
   if (key.empty()) {
-    key = LoopBlockInstance(conn->lhs, conn->rhs->text, *flat, prefixes, table,
-                            arena);
+    key = LoopBlockInstance(conn, *flat, prefixes, table, arena);
   }
   if (key.empty()) return nullptr;
   return MakeInstanceIdent(key, conn, arena);
