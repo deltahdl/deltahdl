@@ -517,6 +517,7 @@ TEST_F(CallStatementsOfARun, TheInvokingCallIsTheModelsCallStatement) {
   Run("module m; initial $probe; endmodule\n"
       "module top; m u1(); m u2(); endmodule\n");
   std::vector<VpiObject*> seen;
+  seen.reserve(g_probe_sightings.size());
   for (const ProbeSighting& sighting : g_probe_sightings) {
     seen.push_back(VpiObjectOf(sighting.call));
   }
