@@ -13,7 +13,7 @@ namespace delta {
 
 uint32_t SourceManager::AddFile(std::string path, std::string content) {
   uint32_t id = static_cast<uint32_t>(files_.size()) + 1;
-  FileEntry entry{std::move(path), std::move(content), {}, {}};
+  FileEntry entry{std::move(path), std::move(content), {}, {}, false};
   ComputeLineOffsets(entry);
   files_.push_back(std::move(entry));
   return id;
@@ -24,7 +24,7 @@ uint32_t SourceManager::AddPreprocessedFile(
     std::vector<OutputLineOrigin> line_origins) {
   uint32_t id = static_cast<uint32_t>(files_.size()) + 1;
   FileEntry entry{
-      std::move(path), std::move(content), {}, std::move(line_origins)};
+      std::move(path), std::move(content), {}, std::move(line_origins), false};
   ComputeLineOffsets(entry);
   files_.push_back(std::move(entry));
   return id;
@@ -82,6 +82,17 @@ std::string_view SourceManager::GetLineText(SourceLoc where) const {
     --end;
   }
   return std::string_view(entry.content).substr(start, end - start);
+}
+
+void SourceManager::MarkProtected(uint32_t file_id) {
+  if (file_id == 0 || file_id > files_.size()) return;
+  files_[file_id - 1].is_protected = true;
+}
+
+bool SourceManager::IsProtected(SourceLoc loc) const {
+  SourceLoc at = ResolveToOrigin(loc);
+  if (at.file_id == 0 || at.file_id > files_.size()) return false;
+  return files_[at.file_id - 1].is_protected;
 }
 
 void SourceManager::ComputeLineOffsets(FileEntry& entry) {

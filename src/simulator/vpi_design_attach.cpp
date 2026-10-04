@@ -50,6 +50,15 @@ void RecordSourceLocation(VpiHandle obj, SourceLoc loc,
   obj->file = std::string(sources->FilePath(loc.file_id));
 }
 
+// §37.3.6: mark `obj` protected where `loc` stands in code a decryption
+// envelope contained. A context attached to no run has no source description
+// to ask and marks nothing.
+void RecordProtection(VpiHandle obj, SourceLoc loc,
+                      const SourceManager* sources) {
+  if (obj == nullptr || sources == nullptr) return;
+  if (sources->IsProtected(loc)) obj->is_protected = true;
+}
+
 // The source description a context attached to a run reads its locations
 // against, and null for one attached to none.
 const SourceManager* SourcesOf(SimContext* sim_ctx) {
@@ -378,6 +387,35 @@ void RecordDeclarationSourceLocations(
       });
 }
 
+// §37.3.6: the objects that represent code a decryption envelope contained --
+// the instance of a module declared in one, and a net or variable declared in
+// one -- report vpiIsProtected TRUE, and the access §37.3.6 makes an error is
+// refused for them. Run once the tops have adopted their contents, so a top
+// module is found under its own name like any other instance.
+void RecordProtectedDeclarations(
+    const RtlirDesign* design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    const SourceManager* sources) {
+  if (design == nullptr) return;
+
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        std::string_view instance = prefix.empty() ? mod->name : prefix;
+        RecordProtection(FindObjectForFlatName(objects, instance), mod->loc,
+                         sources);
+        for (const RtlirNet& net : mod->nets) {
+          RecordProtection(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, net.name)),
+              net.loc, sources);
+        }
+        for (const RtlirVariable& var : mod->variables) {
+          RecordProtection(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name)),
+              var.loc, sources);
+        }
+      });
+}
+
 }  // namespace
 
 void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
@@ -405,6 +443,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
       // §37.3.3: a port is written in the source text, so its object stands
       // where the declaration does and reports it.
       RecordSourceLocation(obj, port.loc, sources);
+      RecordProtection(obj, port.loc, sources);
       if (port.is_interconnect) {
         FillInterconnectNetObject(AllocObject(), port, obj, module, name_pool_);
       }
@@ -674,6 +713,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachTopModules(design);
+  RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   // §37.62: the event statements hang in the scope the top has just adopted, so
   // they are made once those scopes are final and the named event each one
   // triggers has been told which kind of object it is.

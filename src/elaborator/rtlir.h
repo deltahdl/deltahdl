@@ -683,6 +683,8 @@ struct RtlirEnumMember {
 
 struct RtlirModule {
   std::string_view name;
+  // Where the module was declared, which §37.3.6 asks of its instances.
+  SourceLoc loc;
 
   std::string_view library;
   bool has_param_port_list = false;

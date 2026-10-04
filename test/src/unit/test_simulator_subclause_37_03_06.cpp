@@ -1,9 +1,20 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 
+#include "common/source_mgr.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
+#include "fixture_simulator.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_processing.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -176,5 +187,138 @@ TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
+// What a PLI application reads of the design below while it runs: whether the
+// instance of the sealed module, the instance of the cleartext one and a net
+// declared inside the sealed module are protected, whether the sealed
+// instance's type and nets can be read, and whether the cleartext one's nets
+// can.
+struct ProtectionSeen {
+  int sealed_protected = -1;
+  int sealed_type = -1;
+  bool sealed_nets_reached = true;
+  int inner_net_protected = -1;
+  int clear_protected = -1;
+  bool clear_nets_reached = false;
+};
+
+ProtectionSeen g_seen;
+
+// The net named `name` among the children of `scope`, read off the object
+// itself, which no VPI routine reaches inside a protected scope.
+VpiObject* NetNamedIn(vpiHandle scope, std::string_view name) {
+  if (scope == nullptr) return nullptr;
+  for (VpiObject* child : VpiObjectOf(scope)->children) {
+    if (child->name == name) return child;
+  }
+  return nullptr;
+}
+
+PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle sealed = vpi_handle_by_name(VpiText("u"), nullptr);
+  if (sealed != nullptr) {
+    g_seen.sealed_protected = vpi_get(vpiIsProtected, sealed);
+    g_seen.sealed_type = vpi_get(vpiType, sealed);
+    g_seen.sealed_nets_reached = vpi_iterate(vpiNet, sealed) != nullptr;
+    VpiObject* inner = NetNamedIn(sealed, "inner");
+    if (inner != nullptr) g_seen.inner_net_protected = inner->is_protected;
+  }
+  vpiHandle clear = vpi_handle_by_name(VpiText("c"), nullptr);
+  if (clear != nullptr) {
+    g_seen.clear_protected = vpi_get(vpiIsProtected, clear);
+    vpiHandle nets = vpi_iterate(vpiNet, clear);
+    g_seen.clear_nets_reached = nets != nullptr;
+    if (nets != nullptr) vpi_free_object(nets);
+  }
+  return 0;
+}
+
+// A design instantiating a module sealed in a decryption envelope and one
+// written in the clear, encrypted by this tool and read back as a compile
+// reads it: preprocessed under the exchange key, its text registered with
+// the origin of each line, elaborated from the top and run.
+void RunADesignWithASealedModule(SimFixture& f) {
+  constexpr std::string_view kKey = "protection-exchange-key";
+  std::string authored =
+      "`pragma protect begin\n"
+      "module secret(input a, output y);\n"
+      "  wire inner;\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "`pragma protect end\n"
+      "module clear(input a);\n"
+      "  wire seen;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire a, y;\n"
+      "  secret u(.a(a), .y(y));\n"
+      "  clear c(.a(a));\n"
+      "  initial $probe;\n"
+      "endmodule\n";
+  PreprocConfig config;
+  config.protect_key = std::string(kKey);
+  Preprocessor pp(f.mgr, f.diag, config);
+  std::string text =
+      pp.Preprocess(f.mgr.AddFile("<test>", EncryptEnvelopes(authored, kKey)));
+  uint32_t fid = f.mgr.AddPreprocessedFile("<test>", text, pp.LineOrigins());
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag,
+              TextOrigin::kPreprocessorOutput);
+  Parser parser(lexer, f.arena, f.diag);
+  Elaborator elab(f.arena, f.diag, parser.Parse());
+  RtlirDesign* design = elab.Elaborate("t");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+}
+
+class VpiProtectionInARun : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    g_seen = ProtectionSeen();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = &ReadProtectionCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    RunADesignWithASealedModule(f_);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext ctx_;
+  SimFixture f_;
+};
+
+// §37.3.6: the instance of a module declared in a decryption envelope
+// represents code contained in it, so it reports vpiIsProtected TRUE.
+TEST_F(VpiProtectionInARun, AnInstanceOfASealedModuleIsProtected) {
+  EXPECT_EQ(g_seen.sealed_protected, 1);
+}
+
+// Its vpiType stays readable, as it does for every object.
+TEST_F(VpiProtectionInARun, ItsTypeStaysReadable) {
+  EXPECT_EQ(g_seen.sealed_type, vpiModule);
+}
+
+// The nets it contains are not reached through it, that being a relationship
+// of a protected object.
+TEST_F(VpiProtectionInARun, ItsNetsAreNotReached) {
+  EXPECT_FALSE(g_seen.sealed_nets_reached);
+}
+
+// A net declared inside the sealed module is itself code the envelope
+// contained.
+TEST_F(VpiProtectionInARun, ANetDeclaredInsideItIsProtected) {
+  EXPECT_EQ(g_seen.inner_net_protected, 1);
+}
+
+// The instance of a module written in the clear is not protected.
+TEST_F(VpiProtectionInARun, AnInstanceOfACleartextModuleIsNot) {
+  EXPECT_EQ(g_seen.clear_protected, 0);
+}
+
+// And its nets are reached as ever.
+TEST_F(VpiProtectionInARun, ACleartextInstancesNetsAreReached) {
+  EXPECT_TRUE(g_seen.clear_nets_reached);
+}
 }  // namespace
 }  // namespace delta

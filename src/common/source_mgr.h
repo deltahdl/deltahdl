@@ -37,6 +37,13 @@ class SourceManager {
   // for a position that has an origin.
   std::string_view GetLineText(SourceLoc loc) const;
 
+  // §37.3.6: an object is protected when it represents code contained in a
+  // decryption envelope. The text a reading recovers from an envelope is
+  // registered as a source of its own and marked here, and a position is
+  // protected when it stands in, or comes from, a source so marked.
+  void MarkProtected(uint32_t file_id);
+  bool IsProtected(SourceLoc loc) const;
+
  private:
   struct FileEntry {
     std::string path;
@@ -45,6 +52,7 @@ class SourceManager {
     // Empty unless this entry is preprocessed text, in which case it holds one
     // entry per line of it.
     std::vector<OutputLineOrigin> line_origins;
+    bool is_protected = false;
   };
 
   // `loc` restated in the source it came from, or `loc` unchanged when it

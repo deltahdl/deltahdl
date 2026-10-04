@@ -520,6 +520,9 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
                            std::string(src_mgr_.FilePath(loc.file_id)) + ":" +
                            std::to_string(loc.line) + ">";
   uint32_t block_id = src_mgr_.AddFile(std::move(block_name), cleartext);
+  // §37.3.6: what is read out of this source is code the envelope contained,
+  // so every object declared in it is protected.
+  src_mgr_.MarkProtected(block_id);
   size_t origins = line_origins_.size();
   std::string recovered = ProcessSource(cleartext, block_id, depth);
   // §34.5.28.2: a decrypt_license the recovered text carried was refused, so

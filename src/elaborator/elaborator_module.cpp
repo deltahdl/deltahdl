@@ -141,6 +141,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
                                   const CompilationUnit* unit,
                                   DiagEngine& diag) {
   mod->name = decl->name;
+  mod->loc = decl->range.start;
   mod->library = decl->library;
   mod->has_param_port_list = decl->has_param_port_list;
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
