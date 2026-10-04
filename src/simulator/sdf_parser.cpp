@@ -307,14 +307,13 @@ static bool LooksLikeExtendedIopathDirection(std::string_view s) {
 // parenthesized form is not a RETAIN, the input is restored to its original
 // position.
 //
-// §32.3: a retain spec states how long an output holds its former value after
-// an input changes. That is propagation timing for the very path being read,
-// not information from outside the simulator's concern, and SystemVerilog has
-// no construct to hold it -- so it is data the annotator understands and still
-// cannot place, and it is reported. The surrounding IOPATH is unaffected: its
-// own delays are annotated as usual, and only the part that found no home is
-// warned about.
-static void SkipOptionalIopathRetain(std::string_view& s, SdfFile& file) {
+// §32.4.1 Table 32-1 maps `(IOPATH (RETAIN`, `(COND (IOPATH (RETAIN` and
+// `(CONDELSE (IOPATH (RETAIN` to the specify path delays and pulse limits the
+// forms without RETAIN reach, and adds that RETAIN may be ignored. Ignoring it
+// is therefore the mapping the standard defines for the construct, which
+// leaves nothing of it unannotated for §32.3 to warn about: the IOPATH's own
+// delays are annotated as usual and the RETAIN is dropped in silence.
+static void SkipOptionalIopathRetain(std::string_view& s) {
   SkipWhitespace(s);
   if (s.size() >= 7 && s[0] == '(') {
     auto save = s;
@@ -322,7 +321,6 @@ static void SkipOptionalIopathRetain(std::string_view& s, SdfFile& file) {
     auto peek = NextSdfToken(s);
     if (peek.text == "RETAIN") {
       SkipSdfParen(s);
-      file.unannotatable.emplace_back("RETAIN");
     } else {
       s = save;
     }
@@ -407,12 +405,12 @@ static std::string ParseIopathSource(std::string_view& s, SdfIopath& io) {
   return port;
 }
 
-static SdfIopath ParseIopath(std::string_view& s, SdfFile& file) {
+static SdfIopath ParseIopath(std::string_view& s) {
   SdfIopath io;
   io.src_port = ParseIopathSource(s, io);
   io.dst_port = ParseSdfPort(s);
 
-  SkipOptionalIopathRetain(s, file);
+  SkipOptionalIopathRetain(s);
 
   SkipWhitespace(s);
   io.extended_form = LooksLikeExtendedIopathDirection(s);
@@ -546,7 +544,7 @@ static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kLParen);
     auto inner = NextSdfToken(s);
     if (inner.text == "IOPATH") {
-      auto io = ParseIopath(s, file);
+      auto io = ParseIopath(s);
       io.is_increment = increment;
       io.condition = std::move(cond);
       AddIopathToCell(cell, file, io);
@@ -571,7 +569,7 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kLParen);
     auto inner = NextSdfToken(s);
     if (inner.text == "IOPATH") {
-      auto io = ParseIopath(s, file);
+      auto io = ParseIopath(s);
       io.is_increment = increment;
       io.is_ifnone = true;
       AddIopathToCell(cell, file, io);
@@ -617,7 +615,7 @@ static void ParseDeviceDelayEntry(std::string_view& s, SdfCell& cell,
 // Handles a (IOPATH ...) delay-section entry.
 static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
                                   SdfFile& file, bool increment) {
-  auto io = ParseIopath(s, file);
+  auto io = ParseIopath(s);
   io.is_increment = increment;
   AddIopathToCell(cell, file, io);
 }

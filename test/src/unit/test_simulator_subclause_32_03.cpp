@@ -308,13 +308,12 @@ TEST(SdfAnnotator, UnknownDelaySectionModeWarnsAndAnnotatesNothing) {
 }
 
 // C1, eighth input form: a sub-spec nested inside a construct the annotator
-// does handle. A retain spec says how long an output holds its old value after
-// an input changes -- propagation timing for the path being read, not
-// information from outside the simulator's concern -- but SystemVerilog has
-// nowhere to record it. So it warns, while the enclosing IOPATH's own delays
-// still land: partial data is applied as far as it goes, and only the part with
-// no home is reported.
-TEST(SdfAnnotator, IopathRetainSubSpecWarnsWhileItsDelaysStillAnnotate) {
+// does handle. §32.4.1 Table 32-1 maps an IOPATH carrying a RETAIN to the
+// specify path delays the form without it reaches and lets the RETAIN be
+// ignored, so ignoring it is the whole mapping: the IOPATH's own delays land
+// and §32.3 has nothing left unannotated to warn about. The test fails on an
+// annotator that reports the RETAIN it dropped.
+TEST(SdfAnnotator, IopathRetainSubSpecIsIgnoredWhileItsDelaysAnnotate) {
   SimFixture f;
   SpecifyManager mgr;
   auto result = AnnotateOntoDesign(R"(
@@ -328,8 +327,7 @@ TEST(SdfAnnotator, IopathRetainSubSpecWarnsWhileItsDelaysStillAnnotate) {
   )",
                                    f, mgr);
 
-  ASSERT_EQ(result.warnings.size(), 1u);
-  EXPECT_NE(result.warnings[0].find("RETAIN"), std::string::npos);
+  EXPECT_TRUE(result.warnings.empty());
   EXPECT_EQ(mgr.GetPathDelay("a", "y"), 7u);   // the IOPATH itself did land
   EXPECT_EQ(mgr.GetPathDelay("b", "z"), 31u);  // and nothing else moved
 }

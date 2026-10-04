@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -323,6 +324,11 @@ struct SdfAnnotateTaskArgs {
   // region the annotation runs at -- the level module_instance names, else the
   // instance of the module holding the call -- which cell paths are read from.
   std::string region_prefix;
+  // §32.9 with §27.5 and §23.6: the storage key, without its trailing `.`, of
+  // the instance a hierarchical path names where the two differ -- "gb_u" for
+  // "gb.u", an instance generate block gb holds -- and empty otherwise. Unset,
+  // every cell's path is taken as its instance's key.
+  std::function<std::string_view(std::string_view)> instance_key_of_path;
   std::string config_file;
   std::string log_file;
   std::string mtm_spec;

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <ios>
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -410,6 +411,26 @@ static SdfFile ScaleSdfFileForRun(const SdfFile& file,
   return scaled;
 }
 
+// §32.9 with §27.5 and §23.6: a cell's INSTANCE path names its instance
+// through the levels of the hierarchy, a generate block among them, while the
+// instance's module paths carry the prefix it is stored under, `gb_u.` for the
+// path `gb/u`. Each path is rewritten from the design root to that key where
+// the two differ, which SdfCellPrefixInRegion then reads as any other path.
+static void TranslateSdfCellPaths(SdfFile& file,
+                                  const SdfAnnotateTaskArgs& args) {
+  if (!args.instance_key_of_path) return;
+  for (SdfCell& cell : file.cells) {
+    std::optional<std::string> prefix = SdfCellPrefixInRegion(
+        cell.instance, args.region_prefix, args.design_root);
+    if (!prefix || prefix->empty()) continue;
+    std::string_view path(*prefix);
+    path.remove_suffix(1);
+    std::string_view key = args.instance_key_of_path(path);
+    if (key.empty()) continue;
+    cell.instance = args.design_root + "." + std::string(key);
+  }
+}
+
 SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
                                        SpecifyManager& mgr,
                                        SdfMtm tool_default) {
@@ -421,6 +442,7 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
                               args.sdf_file);
     return result;
   }
+  TranslateSdfCellPaths(file, args);
 
   // §32.9: the configuration file is read first, then whichever of mtm_spec,
   // scale_factors and scale_type the call wrote overrides the matching keyword
@@ -590,6 +612,9 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
     args.region_prefix = ctx.ActiveInstancePrefix();
   }
 
+  args.instance_key_of_path = [&ctx](std::string_view path) {
+    return ctx.FindInstanceKeyOfPath(path);
+  };
   args.config_file = SdfAnnotateStringArg(call, 2, ctx, arena);
   args.log_file = SdfAnnotateStringArg(call, 3, ctx, arena);
   args.mtm_spec = SdfAnnotateStringArg(call, 4, ctx, arena);

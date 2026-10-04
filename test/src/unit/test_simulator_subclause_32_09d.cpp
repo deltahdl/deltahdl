@@ -277,4 +277,35 @@ TEST(SdfPerInstanceIopath, TwoInstancesOfOneCellTakeTheirOwnDeviceDelays) {
   EXPECT_EQ(right->delays[0], 59u);
 }
 
+// §32.9 names a cell through the levels of the design hierarchy, and §27.5
+// with §23.6 makes a named generate block one of them, so harness/gb/u names
+// the leaf in block gb. The test fails on an annotator that reads the path as
+// the instance prefix gb.u., which no module path carries: the instance is
+// keyed on its flat name gb_u and keeps the declared delay 3.
+TEST(SdfPerInstanceIopath, CellPathThroughAGenerateBlockReachesItsInstance) {
+  const std::string kSdf = SdfFileNamed(
+      "generate", "(DELAYFILE" + LeafCell("harness/gb/u", "19") + ")");
+
+  RunOfDesign run;
+  ASSERT_TRUE(
+      run.Start("module delay_leaf(input pin_i, output pin_o);\n"
+                "  specify\n"
+                "    (pin_i => pin_o) = 3;\n"
+                "  endspecify\n"
+                "endmodule\n"
+                "module harness;\n"
+                "  logic gen_o;\n"
+                "  if (1) begin : gb\n"
+                "    delay_leaf u(1'b0, gen_o);\n"
+                "  end\n"
+                "  initial $sdf_annotate(\"" +
+                kSdf +
+                "\");\n"
+                "endmodule\n"));
+
+  const PathDelay* path = run.PathUnder("gb_u.");
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->delays[0], 19u);
+}
+
 }  // namespace
