@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "elaborator/rtlir.h"
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -353,6 +357,155 @@ TEST(InstanceModel, NullHandleNonTimePropertyReturnsZero) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
+}
+
+PLI_INT32 DoNothingCalltf(PLI_BYTE8* /*user_data*/) { return 0; }
+
+// A design run with a PLI application registered, which is what has the run
+// build its VPI model, read back from the test once the run is over.
+class InstanceObjectsOfARun : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&vpi_);
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$noop");
+    data.calltf = &DoNothingCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  void Run(const std::string& src) {
+    RtlirDesign* design = ElaborateSrc(src, f_);
+    ASSERT_NE(design, nullptr);
+    ASSERT_FALSE(f_.has_errors);
+    LowerAndRun(design, f_);
+  }
+
+  // The names of the objects of `type` `ref` reaches, sorted.
+  static std::vector<std::string> NamesOf(int type, vpiHandle ref) {
+    std::vector<std::string> names;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return names;
+    while (vpiHandle obj = vpi_scan(it)) {
+      names.emplace_back(vpi_get_str(vpiName, obj));
+    }
+    std::ranges::sort(names);
+    return names;
+  }
+
+  // The full name of the child of `scope` named `name`, read off the object.
+  static std::string FullNameOfChild(vpiHandle scope, std::string_view name) {
+    for (VpiObject* child : VpiObjectOf(scope)->children) {
+      if (child->name == name) return child->full_name;
+    }
+    return "";
+  }
+
+  VpiContext vpi_;
+  SimFixture f_;
+};
+
+constexpr const char* kEmptyInstances =
+    "module leafm; endmodule\n"
+    "module sub; leafm leaf(); endmodule\n"
+    "module top; sub m1(); sub m2(); endmodule\n";
+
+// §37.10: every module instance is an object, whether or not it declares
+// anything, so the instances of top are its vpiModule children.
+TEST_F(InstanceObjectsOfARun, InstancesDeclaringNothingAreObjects) {
+  Run(kEmptyInstances);
+  EXPECT_EQ(NamesOf(vpiModule, vpi_handle_by_name(VpiText("top"), nullptr)),
+            (std::vector<std::string>{"m1", "m2"}));
+}
+
+// And an instance below one is reached by its full name, under its parent.
+TEST_F(InstanceObjectsOfARun, ADeepInstanceDeclaringNothingHasItsParent) {
+  Run(kEmptyInstances);
+  vpiHandle leaf = vpi_handle_by_name(VpiText("top.m2.leaf"), nullptr);
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_handle(vpiModule, leaf)), "top.m2");
+}
+
+constexpr const char* kPackageBesideTop =
+    "package pkg; int pv = 8; endpackage\n"
+    "module top; int x = pkg::pv; endmodule\n";
+
+// §37.10: a package is an instance of its own, reached from no scope.
+TEST_F(InstanceObjectsOfARun, APackageIsReachedFromNoScope) {
+  Run(kPackageBesideTop);
+  EXPECT_EQ(NamesOf(vpiPackage, nullptr), (std::vector<std::string>{"pkg"}));
+}
+
+// Detail 5: its full name is its name followed by "::".
+TEST_F(InstanceObjectsOfARun, APackagesFullNameEndsInColons) {
+  Run(kPackageBesideTop);
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_scan(it)), "pkg::");
+}
+
+// Detail 5: a member's full name joins the package's to its own with "::".
+TEST_F(InstanceObjectsOfARun, APackageMembersFullNameUsesColons) {
+  Run(kPackageBesideTop);
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(FullNameOfChild(vpi_scan(it), "pv"), "pkg::pv");
+}
+
+// The package is no part of the top that happens to be beside it.
+TEST_F(InstanceObjectsOfARun, APackageIsNoChildOfTheTop) {
+  Run(kPackageBesideTop);
+  EXPECT_EQ(FullNameOfChild(vpi_handle_by_name(VpiText("top"), nullptr), "pkg"),
+            "");
+}
+
+// Detail 6: an imported item is not reached by name through the scope that
+// imported it.
+TEST_F(InstanceObjectsOfARun, AnImportedItemIsNotReachedThroughTheImporter) {
+  Run("package pkg; parameter int P = 42; endpackage\n"
+      "module top; import pkg::P; int x = P; endmodule\n");
+  EXPECT_EQ(vpi_handle_by_name(VpiText("top.P"), nullptr), nullptr);
+}
+
+constexpr const char* kTwoTimescales =
+    "module sub; timeunit 1us; timeprecision 1ps; endmodule\n"
+    "module top; timeunit 10ns; timeprecision 1ns; sub s(); endmodule\n";
+
+// §37.10: an instance has the time unit of its definition, as a power of ten
+// of a second: 10 ns is -8.
+TEST_F(InstanceObjectsOfARun, AnInstanceHasItsTimeUnit) {
+  Run(kTwoTimescales);
+  EXPECT_EQ(vpi_get(vpiTimeUnit, vpi_handle_by_name(VpiText("top"), nullptr)),
+            -8);
+}
+
+TEST_F(InstanceObjectsOfARun, AnInstanceHasItsTimePrecision) {
+  Run(kTwoTimescales);
+  EXPECT_EQ(
+      vpi_get(vpiTimePrecision, vpi_handle_by_name(VpiText("top.s"), nullptr)),
+      -12);
+}
+
+// Detail 7: NULL asks for the smallest precision of all the design's modules.
+TEST_F(InstanceObjectsOfARun, NoObjectHasTheSmallestPrecision) {
+  Run(kTwoTimescales);
+  EXPECT_EQ(vpi_get(vpiTimePrecision, nullptr), -12);
+}
+
+// §37.10: an instance has the line and file of its definition: sub is
+// defined on line 1 and instantiated on line 2.
+TEST_F(InstanceObjectsOfARun, AnInstanceHasItsDefinitionsLine) {
+  Run(kTwoTimescales);
+  EXPECT_EQ(
+      vpi_get(vpiDefLineNo, vpi_handle_by_name(VpiText("top.s"), nullptr)), 1);
+}
+
+TEST_F(InstanceObjectsOfARun, AnInstanceHasItsDefinitionsFile) {
+  Run(kTwoTimescales);
+  EXPECT_STREQ(
+      vpi_get_str(vpiDefFile, vpi_handle_by_name(VpiText("top.s"), nullptr)),
+      "<test>");
 }
 
 }  // namespace

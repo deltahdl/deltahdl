@@ -268,10 +268,13 @@ static const char* VpiFileStr(VpiHandle obj) {
   return obj->file.empty() ? nullptr : obj->file.c_str();
 }
 
-// §37.83: vpiDefFile is drawn only on the attribute object; an attribute with
-// no recorded definition file - and any other object kind - yields null.
+// §37.83 and §37.10: vpiDefFile is drawn on the attribute object and on an
+// instance; one with no recorded definition file - and any other object kind -
+// yields null.
 static const char* VpiDefFileStr(VpiHandle obj) {
-  if (obj->type != vpiAttribute) return nullptr;
+  if (obj->type != vpiAttribute && !VpiIsInstanceType(obj->type)) {
+    return nullptr;
+  }
   return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
 }
 

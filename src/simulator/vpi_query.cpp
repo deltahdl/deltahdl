@@ -184,6 +184,20 @@ int VpiGetConstantSelect(VpiHandle obj) {
   return VpiBitSelectConstantSelectOf(obj) ? 1 : 0;
 }
 
+// §37.83 and §37.10: the line of an attribute's or an instance's definition.
+int VpiGetDefLineNo(VpiHandle obj) {
+  if (obj->type != vpiAttribute && !VpiIsInstanceType(obj->type)) {
+    return vpiUndefined;
+  }
+  return obj->def_line_no;
+}
+
+// §37.10: an instance's time unit or precision.
+int VpiGetInstanceTime(int property, VpiHandle obj) {
+  if (!VpiIsInstanceType(obj->type)) return vpiUndefined;
+  return property == vpiTimeUnit ? obj->time_unit : obj->time_precision;
+}
+
 // Handles the integer properties whose value depends on the object kind (each
 // drawn only on certain kinds, reporting vpiUndefined/0 otherwise). On a match
 // sets handled=true and returns the property value; otherwise leaves handled
@@ -229,10 +243,16 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
       return VpiGetBlocking(obj);
     case vpiDefAttribute:
       return VpiGetDefAttribute(obj);
-    // §37.83: vpiDefLineNo is drawn only on the attribute object; any other
-    // kind reports vpiUndefined.
+    // §37.83 and §37.10: vpiDefLineNo is drawn on the attribute object and on
+    // an instance, the line of its definition; any other kind reports
+    // vpiUndefined.
     case vpiDefLineNo:
-      return obj->type != vpiAttribute ? vpiUndefined : obj->def_line_no;
+      return VpiGetDefLineNo(obj);
+    // §37.10: an instance's time unit and precision, as powers of ten of a
+    // second; a NULL object is answered ahead of this (detail 7).
+    case vpiTimeUnit:
+    case vpiTimePrecision:
+      return VpiGetInstanceTime(property, obj);
     case vpiHasActual:
       return VpiGetHasActual(obj);
     case vpiIsDeferred:

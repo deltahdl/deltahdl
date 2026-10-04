@@ -689,12 +689,16 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // top-level name ever matched -- and the nets, which were not entered at all
   // though a wire is the clause's own example of an object VPI reaches.
   for (auto& [name, var] : sim_ctx.GetVariables()) {
+    // §37.10 detail 6: an imported item is not reached through the scope that
+    // imported it; the key the import enters is the run's, not the scope's.
+    if (sim_ctx.IsImportedName(name)) continue;
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || var == nullptr) continue;
     obj->type = kVpiReg;
     obj->var = var;
     obj->size = static_cast<int>(var->value.width);
   }
+  AttachInstanceObjects(design);
   AttachModuleDefNames(sim_ctx);
   AttachModulePathDelays(sim_ctx);
   // §37.40: the checks a specify block declares, made from the same run's
@@ -716,7 +720,9 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   AttachSourceDelayExpressions(sim_ctx, design);
   RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
+  AttachPackages(design);
   AttachTopModules(design);
+  AttachInstanceDefinitions(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   // §37.62: the event statements hang in the scope the top has just adopted, so
   // they are made once those scopes are final and the named event each one
@@ -841,12 +847,15 @@ static std::unordered_set<const RtlirModule*> MarkKeyedTops(
   return keyed_tops;
 }
 
-// The objects entered so far that no instance encloses and that are no top.
+// The objects entered so far that no instance encloses and that are no top
+// or package.
 static std::vector<VpiObject*> UnenclosedObjects(
     const std::unordered_map<std::string_view, VpiObject*>& objects) {
   std::vector<VpiObject*> contents;
   for (const auto& [name, object] : objects) {
-    if (object != nullptr && object->parent == nullptr && !object->top_module) {
+    // A package is enclosed by no module either, and stays so (§37.10).
+    if (object != nullptr && object->parent == nullptr && !object->top_module &&
+        object->type != vpiPackage) {
       contents.push_back(object);
     }
   }

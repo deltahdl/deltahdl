@@ -116,13 +116,14 @@ TEST_F(Attribute, DefinitionLineReportedThroughVpiGet) {
   EXPECT_EQ(vpi_get(vpiDefLineNo, VpiHandleOf(&attr)), 42);
 }
 
-// Figure property guard: the definition-location properties are drawn only on
-// the attribute object, so querying them on any other object kind is not a
-// valid request - vpiDefFile yields null and vpiDefLineNo yields vpiUndefined
-// through the production guards rather than handing back stored fields.
+// Figure property guard: the definition-location properties are drawn on the
+// attribute object and, by §37.10, on an instance, so querying them on a net
+// is not a valid request - vpiDefFile yields null and vpiDefLineNo yields
+// vpiUndefined through the production guards rather than handing back stored
+// fields.
 TEST_F(Attribute, DefinitionLocationPropertiesGuardedToAttribute) {
   VpiObject not_an_attribute;
-  not_an_attribute.type = vpiModule;
+  not_an_attribute.type = vpiNet;
   EXPECT_EQ(vpi_get_str(vpiDefFile, VpiHandleOf(&not_an_attribute)), nullptr);
   EXPECT_EQ(vpi_get(vpiDefLineNo, VpiHandleOf(&not_an_attribute)),
             vpiUndefined);

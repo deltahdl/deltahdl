@@ -612,8 +612,12 @@ bool VpiIsNullReferenceRelation(int type) {
   // with a NULL reference object. The relation was not among these, so an
   // iteration over them was a walk of the reference object's children and a
   // NULL reference reached nothing.
+  //
+  // §37.10 draws the instance from a circle as well, and a package is the
+  // instance no module encloses, so the design's packages are reached the same
+  // way.
   return type == kVpiModule || type == vpiCallback || type == vpiAssertion ||
-         type == vpiUdpDefn;
+         type == vpiUdpDefn || type == vpiPackage;
 }
 
 // §37.57 detail 1: whether the instantiation left this argument position empty.

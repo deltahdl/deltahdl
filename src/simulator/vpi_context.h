@@ -767,6 +767,11 @@ class VpiContext {
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachTimingChecks(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
+  // §37.10: every instance's object, each package's, and what an instance
+  // takes from its definition. In vpi_design_attach_instances.cpp.
+  void AttachInstanceObjects(const RtlirDesign* design);
+  void AttachPackages(const RtlirDesign* design);
+  void AttachInstanceDefinitions(const RtlirDesign* design);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.
