@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -82,6 +87,37 @@ TEST_F(Interface, IndexTransitionIsNullForArrayElementWithoutIndexExpr) {
   member.children.push_back(&child_expr);  // must not be reported via vpiIndex
 
   EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&member)), nullptr);
+}
+
+// A design run with a PLI application registered, its VPI model read back
+// once the run is over.
+class InterfacesOfARun : public VpiDesignRun {};
+
+constexpr const char* kInterfaceInstance =
+    "interface ifc; logic d; endinterface\n"
+    "module top; ifc i0(); endmodule\n";
+
+// §37.6: an interface instance is an interface, reached from the instance
+// that holds it through vpiInterface...
+TEST_F(InterfacesOfARun, AnInterfaceInstanceIsReachedAsAnInterface) {
+  Run(kInterfaceInstance);
+  EXPECT_EQ(NamesOf(vpiInterface, vpi_handle_by_name(VpiText("top"), nullptr)),
+            (std::vector<std::string>{"i0"}));
+}
+
+// ...of type vpiInterface...
+TEST_F(InterfacesOfARun, AnInterfaceInstanceIsOfTypeInterface) {
+  Run(kInterfaceInstance);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_name(VpiText("top.i0"), nullptr)),
+            vpiInterface);
+}
+
+// ...whose definition is the interface it instantiates.
+TEST_F(InterfacesOfARun, AnInterfaceInstancesDefinitionIsItsInterface) {
+  Run(kInterfaceInstance);
+  EXPECT_STREQ(
+      vpi_get_str(vpiDefName, vpi_handle_by_name(VpiText("top.i0"), nullptr)),
+      "ifc");
 }
 
 }  // namespace

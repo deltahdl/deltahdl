@@ -79,10 +79,14 @@ void VpiContext::AttachInstanceObjects(const RtlirDesign* design) {
   // instance objects the attach made otherwise, so an instance declaring
   // nothing, and every instance below it, was none.
   if (design == nullptr) return;
-  WalkInstancePaths(design,
-                    [this](const RtlirModule*, const std::string& prefix) {
-                      if (!prefix.empty()) DesignObjectForFlatName(prefix);
-                    });
+  WalkInstancePaths(
+      design, [this](const RtlirModule* mod, const std::string& prefix) {
+        // §37.6 and §37.9: the instance of an interface or a program is an
+        // object of that type, not a module.
+        if (!prefix.empty()) {
+          DesignObjectForFlatName(prefix)->type = VpiInstanceKind(mod);
+        }
+      });
 }
 
 void VpiContext::AttachPackages(const RtlirDesign* design) {

@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -150,6 +155,37 @@ TEST_F(Program, AProgramOfNoProceduresIteratesToNone) {
   program.children = {&assign};
 
   EXPECT_EQ(vpi_iterate(vpiProcess, VpiHandleOf(&program)), nullptr);
+}
+
+// A design run with a PLI application registered, its VPI model read back
+// once the run is over.
+class ProgramsOfARun : public VpiDesignRun {};
+
+constexpr const char* kProgramInstance =
+    "program prog; int v; endprogram\n"
+    "module top; prog p0(); endmodule\n";
+
+// §37.9: a program instance is a program, reached from the instance that
+// holds it through vpiProgram...
+TEST_F(ProgramsOfARun, AProgramInstanceIsReachedAsAProgram) {
+  Run(kProgramInstance);
+  EXPECT_EQ(NamesOf(vpiProgram, vpi_handle_by_name(VpiText("top"), nullptr)),
+            (std::vector<std::string>{"p0"}));
+}
+
+// ...of type vpiProgram...
+TEST_F(ProgramsOfARun, AProgramInstanceIsOfTypeProgram) {
+  Run(kProgramInstance);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_name(VpiText("top.p0"), nullptr)),
+            vpiProgram);
+}
+
+// ...whose definition is the program it instantiates.
+TEST_F(ProgramsOfARun, AProgramInstancesDefinitionIsItsProgram) {
+  Run(kProgramInstance);
+  EXPECT_STREQ(
+      vpi_get_str(vpiDefName, vpi_handle_by_name(VpiText("top.p0"), nullptr)),
+      "prog");
 }
 
 }  // namespace

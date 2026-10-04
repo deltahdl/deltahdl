@@ -29,6 +29,7 @@
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -612,7 +613,12 @@ void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   // type against the instance path, which is the same string the module object
   // carries as its vpiFullName.
   for (auto* obj : all_objects_) {
-    if (obj->type != kVpiModule || obj->full_name.empty()) continue;
+    // Every kind of instance names its definition (§37.10), a package aside,
+    // which is no instantiation of anything.
+    if (!VpiIsInstanceType(obj->type) || obj->type == vpiPackage ||
+        obj->full_name.empty()) {
+      continue;
+    }
     std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
     if (!type.empty()) obj->def_name = std::string(type);
   }
@@ -853,6 +859,7 @@ static std::unordered_set<const RtlirModule*> MarkKeyedTops(
     auto named = objects.find(top->name);
     if (named == objects.end() || named->second == nullptr) continue;
     named->second->top_module = true;
+    named->second->type = VpiInstanceKind(top);
     keyed_tops.insert(top);
   }
   return keyed_tops;
@@ -901,7 +908,7 @@ void VpiContext::AttachTopModules(const RtlirDesign* design) {
 
     name_pool_.emplace_back(top->name);
     auto* obj = AllocObject();
-    obj->type = kVpiModule;
+    obj->type = VpiInstanceKind(top);
     obj->name = name_pool_.back();
     obj->full_name = std::string(top->name);
     obj->top_module = true;

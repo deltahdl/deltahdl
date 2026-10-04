@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 
@@ -70,6 +72,14 @@ inline void PushChildInstances(
     child_prefix += std::string(child.inst_name);
     work.emplace_back(child.resolved, child_prefix);
   }
+}
+
+// §37.6, §37.9 and §37.10: the object type an instance of `mod` is -- an
+// interface, a program or a module, as its definition is.
+inline int VpiInstanceKind(const RtlirModule* mod) {
+  if (mod->is_interface) return vpiInterface;
+  if (mod->is_program) return vpiProgram;
+  return kVpiModule;
 }
 
 // The flat name the simulator keys one declaration of this scope under: the
