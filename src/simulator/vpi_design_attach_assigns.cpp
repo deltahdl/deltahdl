@@ -18,6 +18,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -434,6 +435,17 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
 }
 
 }  // namespace
+
+VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const std::string& prefix, SimContext& ctx,
+                                 const VpiAttachBuild& build) {
+  // An expression an instance writes outside every generate block, whose
+  // names resolve in the instance itself.
+  static const GenBlockPrefixes kNoGenBlocks;
+  return ExpressionObject(
+      expr, AssignBuild{build.alloc, &ctx,
+                        AssignNames{objects, prefix, kNoGenBlocks}});
+}
 
 void VpiContext::AttachContinuousAssignments(const RtlirDesign* design) {
   // §37.47: a module reaches the continuous assignments it holds. Nothing made

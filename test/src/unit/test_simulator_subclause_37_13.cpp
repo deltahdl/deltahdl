@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -206,6 +209,82 @@ TEST(IoDeclModel, ScalarIoDeclHasNoRanges) {
   EXPECT_EQ(VpiIoDeclRightRange(none), nullptr);
   EXPECT_EQ(VpiIoDeclLeftRange(none), VpiTypespecLeftRange(none));
   EXPECT_EQ(VpiIoDeclRightRange(none), VpiTypespecRightRange(none));
+}
+
+// A design whose interface, instantiated as top.i0, declares modports, run
+// with a PLI application registered.
+class ModportIoDeclsOfARun : public VpiDesignRun {
+ protected:
+  // The object top.i0.`name`.
+  static vpiHandle InInstance(const char* name) {
+    std::string full = std::string("top.i0.") + name;
+    return vpi_handle_by_name(full.data(), nullptr);
+  }
+
+  // The io decl `port` of the modport `modport` of top.i0.
+  static vpiHandle IoDecl(const char* modport, const char* port) {
+    vpiHandle iface = vpi_handle_by_name(VpiText("top.i0"), nullptr);
+    return Named(vpiIODecl, Named(vpiModport, iface, modport), port);
+  }
+
+  // The design whose interface declares `items`.
+  static std::string Design(const std::string& items) {
+    return "interface ifc; " + items +
+           " endinterface\nmodule top; ifc i0(); endmodule\n";
+  }
+};
+
+// §37.13 detail 2 with §37.7: the io decl of a modport port naming a variable
+// of its interface reaches that variable through vpiExpr.
+TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheVariableItNames) {
+  Run(Design("logic a, b; modport mp(input a, output b);"));
+  vpiHandle b = InInstance("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, IoDecl("mp", "b"))),
+            VpiObjectOf(b));
+}
+
+// ...and the io decl of one naming a net reaches that net.
+TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheNetItNames) {
+  Run(Design("wire w; modport mp(input w);"));
+  vpiHandle w = InInstance("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, IoDecl("mp", "w"))),
+            VpiObjectOf(w));
+}
+
+// §37.13 detail 2: the io decl of a ref port reaches a ref obj...
+TEST_F(ModportIoDeclsOfARun, ARefPortReachesARefObj) {
+  Run(Design("logic a; modport mr(ref a);"));
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, IoDecl("mr", "a"))),
+            vpiRefObj);
+}
+
+// ...whose vpiActual is the variable the port names.
+TEST_F(ModportIoDeclsOfARun, ARefPortsRefObjIsBoundToTheVariable) {
+  Run(Design("logic a; modport mr(ref a);"));
+  vpiHandle a = InInstance("a");
+  ASSERT_NE(a, nullptr);
+  vpiHandle ref_obj = vpi_handle(vpiExpr, IoDecl("mr", "a"));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, ref_obj)), VpiObjectOf(a));
+}
+
+// §37.13 with §25.5.4: the io decl of a .port_id(expr) port reaches the
+// expression it was written with...
+TEST_F(ModportIoDeclsOfARun, AnExpressionPortReachesItsExpression) {
+  Run(Design("logic [7:0] r; modport mp(output .lo(r[3:0]));"));
+  vpiHandle lo = vpi_handle(vpiExpr, IoDecl("mp", "lo"));
+  EXPECT_EQ(vpi_get(vpiType, lo), vpiPartSelect);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, lo)),
+            VpiObjectOf(InInstance("r")));
+}
+
+// ...and that of an empty .port_id() reaches none.
+TEST_F(ModportIoDeclsOfARun, AnEmptyExpressionPortReachesNone) {
+  Run(Design("logic [7:0] r; modport mp(output .lo());"));
+  vpiHandle lo = IoDecl("mp", "lo");
+  ASSERT_NE(lo, nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, lo), nullptr);
 }
 
 }  // namespace

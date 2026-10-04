@@ -175,16 +175,6 @@ class ModportsOfARun : public VpiDesignRun {
     return names;
   }
 
-  // The object of `type` named `name` that `ref` reaches.
-  static vpiHandle Named(int type, vpiHandle ref, const std::string& name) {
-    vpiHandle it = vpi_iterate(type, ref);
-    if (it == nullptr) return nullptr;
-    while (vpiHandle obj = vpi_scan(it)) {
-      if (name == vpi_get_str(vpiName, obj)) return obj;
-    }
-    return nullptr;
-  }
-
   static vpiHandle Instance() {
     return vpi_handle_by_name(VpiText("top.i0"), nullptr);
   }

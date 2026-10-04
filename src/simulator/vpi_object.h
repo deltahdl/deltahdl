@@ -291,6 +291,12 @@ struct VpiObject {
   // to an actual at the time of the query.
   VpiObject* actual = nullptr;
 
+  // §37.13 detail 2: what an io decl connects to, reported through vpiExpr,
+  // when that is an object the io decl does not own, such as the interface
+  // variable a modport port names. NULL leaves the relation to the io decl's
+  // own children.
+  VpiObject* io_expr = nullptr;
+
   // §37.61 detail 1: the dynamic prefix this object is reached through - the
   // class var, virtual interface var, or clocking block that prefixes the
   // expression, named event, or named event array in the source. Reported

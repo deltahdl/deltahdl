@@ -57,6 +57,16 @@ class VpiDesignRun : public ::testing::Test {
     return names;
   }
 
+  // The object of `type` named `name` that `ref` reaches; null for none.
+  static vpiHandle Named(int type, vpiHandle ref, std::string_view name) {
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return nullptr;
+    while (vpiHandle obj = vpi_scan(it)) {
+      if (name == vpi_get_str(vpiName, obj)) return obj;
+    }
+    return nullptr;
+  }
+
   // The full name of the child of `scope` named `name`, read off the object.
   static std::string FullNameOfChild(vpiHandle scope, std::string_view name) {
     for (VpiObject* child : VpiObjectOf(scope)->children) {

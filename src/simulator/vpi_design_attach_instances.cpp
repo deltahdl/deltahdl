@@ -84,26 +84,59 @@ int ModportPortDirection(Direction direction) {
                             /*expr_is_virtual_interface_var=*/false);
 }
 
-// §37.7: the modport `decl` declares, under the interface instance `iface`,
-// with an io decl per port it gives a direction. An imported or exported
-// task or function (§25.7) and a clocking block (§25.5.5) a modport names are
-// no io decls.
-void MakeModport(VpiObject* iface, const ModportDecl& decl,
-                 const VpiAttachBuild& build) {
-  VpiObject* modport = build.alloc();
+// Where the modports of one interface instance are made: the instance, the
+// objects keyed under its name `prefix`, among which the names its modports
+// write resolve, and what a run builds with.
+struct ModportScope {
+  VpiObject* iface;
+  const VpiObjectMap& objects;
+  const std::string& prefix;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
+};
+
+// §37.13 detail 2: what the io decl `io_decl` of the modport port `port`
+// reaches through vpiExpr. A port written .port_id(expr) (§25.5.4) reaches the
+// expression, and any other the net or variable of the interface it names,
+// through a ref obj bound to it when the port is a ref port.
+VpiObject* ModportPortExpr(const ModportScope& scope, VpiObject* io_decl,
+                           const ModportPort& port) {
+  if (port.is_named_port) {
+    return VpiInstanceExpression(port.expr, scope.objects, scope.prefix,
+                                 scope.ctx, scope.build);
+  }
+  VpiObject* item = FindObjectForFlatName(scope.objects,
+                                          VpiFlatName(scope.prefix, port.name));
+  if (port.direction != Direction::kRef || item == nullptr) return item;
+  VpiObject* ref_obj = scope.build.alloc();
+  ref_obj->type = vpiRefObj;
+  ref_obj->parent = io_decl;
+  ref_obj->name = io_decl->name;
+  ref_obj->full_name = io_decl->full_name;
+  ref_obj->actual = item;
+  return ref_obj;
+}
+
+// §37.7: the modport `decl` declares, under the interface instance, with an io
+// decl per port it gives a direction. An imported or exported task or
+// function (§25.7) and a clocking block (§25.5.5) a modport names are no io
+// decls.
+void MakeModport(const ModportScope& scope, const ModportDecl& decl) {
+  VpiObject* modport = scope.build.alloc();
   modport->type = vpiModport;
-  modport->parent = iface;
-  modport->name = build.keep(std::string(decl.name));
-  modport->full_name = iface->full_name + "." + std::string(decl.name);
-  iface->children.push_back(modport);
+  modport->parent = scope.iface;
+  modport->name = scope.build.keep(std::string(decl.name));
+  modport->full_name = scope.iface->full_name + "." + std::string(decl.name);
+  scope.iface->children.push_back(modport);
   for (const ModportPort& port : decl.ports) {
     if (port.is_import || port.is_export || port.is_clocking) continue;
-    VpiObject* io_decl = build.alloc();
+    VpiObject* io_decl = scope.build.alloc();
     io_decl->type = vpiIODecl;
     io_decl->parent = modport;
-    io_decl->name = build.keep(std::string(port.name));
+    io_decl->name = scope.build.keep(std::string(port.name));
     io_decl->full_name = modport->full_name + "." + std::string(port.name);
     io_decl->direction = ModportPortDirection(port.direction);
+    io_decl->io_expr = ModportPortExpr(scope, io_decl, port);
     modport->children.push_back(io_decl);
   }
 }
@@ -166,13 +199,13 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         AttachTypespecs(design, object_map_, kBuild);
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
-    AttachModports(design, object_map_, kBuild);
+    AttachModports(design, object_map_, *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design);
 }
 
 void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
-                    const VpiAttachBuild& build) {
+                    SimContext& ctx, const VpiAttachBuild& build) {
   // §37.7: an interface instance has a modport per modport its interface
   // declares, in the order they were written; none was made, so
   // vpi_iterate(vpiModport, interface) reached nothing.
@@ -188,8 +221,9 @@ void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
         VpiObject* iface =
             FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
         if (iface == nullptr) return;
+        const ModportScope kScope{iface, objects, prefix, ctx, build};
         for (const ModportDecl* decl : mod->modports) {
-          if (decl != nullptr) MakeModport(iface, *decl, build);
+          if (decl != nullptr) MakeModport(kScope, *decl);
         }
       });
 }

@@ -16,6 +16,7 @@ class Arena;
 class SimContext;
 struct DataType;
 enum class DataTypeKind : uint8_t;
+struct Expr;
 struct RtlirDesign;
 struct VpiObject;
 
@@ -99,9 +100,17 @@ void AttachVariableRanges(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
+// §37.58, §37.59: the expression object `expr` stands for, written in the
+// instance whose objects `objects` keys under `prefix`; null for a kind of
+// expression not modelled.
+VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const std::string& prefix, SimContext& ctx,
+                                 const VpiAttachBuild& build);
+
 // §37.7: give each interface instance a modport per modport its interface
-// declares, each with an io decl per port it gives a direction.
+// declares, each with an io decl per port it gives a direction, and §37.13:
+// each io decl the vpiExpr of what the port connects to.
 void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
-                    const VpiAttachBuild& build);
+                    SimContext& ctx, const VpiAttachBuild& build);
 
 }  // namespace delta

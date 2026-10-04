@@ -208,6 +208,7 @@ VpiHandle VpiIoDeclExpr(VpiHandle io_decl) {
   // connection whose own type is an expr-target kind rather than vpiExpr, so
   // the first such child is the relation's target.
   if (!io_decl || io_decl->type != vpiIODecl) return nullptr;
+  if (io_decl->io_expr != nullptr) return io_decl->io_expr;
   for (auto* child : io_decl->children) {
     if (VpiIsIoDeclExprType(child->type)) return child;
   }
