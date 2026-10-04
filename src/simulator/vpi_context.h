@@ -785,10 +785,6 @@ class VpiContext {
   void AttachNettypeDeclarations(const RtlirDesign* design);
   VpiObject* NettypeDeclarationIn(VpiHandle scope, const RtlirNet& net);
 
-  // §37.62: the event statement object each event trigger the design's
-  // processes wrote stands as. In vpi_helpers_instance.cpp.
-  void AttachEventStatements(const RtlirDesign* design);
-
   // §37.3.4: the source-written delay expression each delay-carrying object of
   // the design reaches through vpiDelay, and the one a net's declaration wrote.
   // Both are written in vpi_design_attach.cpp.

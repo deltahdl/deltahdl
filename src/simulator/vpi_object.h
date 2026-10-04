@@ -356,6 +356,13 @@ struct VpiObject {
   // has no always type to report. Zero (no always type) by default.
   int always_type = 0;
 
+  // §37.63: the statement a process runs, and for a statement of a run's
+  // procedure body the process it runs in; vpiStmt and vpiProcess read them
+  // where the run set them. A run hangs a body from the scope it stands in,
+  // where a name finds it, rather than from the process.
+  VpiObject* body = nullptr;
+  VpiObject* process = nullptr;
+
   // §37.62: whether an event statement is a blocking event trigger (->) rather
   // than a nonblocking one (->>), reported through vpi_get(vpiBlocking). The
   // property is drawn only on the event statement object. False by default.

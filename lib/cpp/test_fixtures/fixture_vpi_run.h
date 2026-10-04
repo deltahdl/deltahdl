@@ -67,6 +67,20 @@ class VpiDesignRun : public ::testing::Test {
     return nullptr;
   }
 
+  // The object `name` reaches from the top of the design, null for none.
+  static vpiHandle By(const std::string& name) {
+    return vpi_handle_by_name(VpiText(name.c_str()), nullptr);
+  }
+
+  // The kinds of the objects of `type` `ref` reaches, in the order reached.
+  static std::vector<int> KindsOf(int type, vpiHandle ref) {
+    std::vector<int> kinds;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return kinds;
+    while (vpiHandle obj = vpi_scan(it)) kinds.push_back(vpi_get(vpiType, obj));
+    return kinds;
+  }
+
   // The full name of the child of `scope` named `name`, read off the object.
   static std::string FullNameOfChild(vpiHandle scope, std::string_view name) {
     for (VpiObject* child : VpiObjectOf(scope)->children) {

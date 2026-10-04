@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -138,6 +142,144 @@ TEST_F(Process, AStatementOutsideAProcedureReachesNone) {
   mod.children = {&stmt};
 
   EXPECT_EQ(vpi_handle(vpiProcess, VpiHandleOf(&stmt)), nullptr);
+}
+
+// -----------------------------------------------------------------------------
+// The procedures of a run, built from the elaborated design rather than by
+// hand.
+// -----------------------------------------------------------------------------
+
+class ProcessesOfARun : public VpiDesignRun {
+ protected:
+  // The first procedure `scope` holds, null for none.
+  static vpiHandle FirstProcess(vpiHandle scope) {
+    vpiHandle it = vpi_iterate(vpiProcess, scope);
+    return it == nullptr ? nullptr : vpi_scan(it);
+  }
+};
+
+// §37.63 (figure, module -> process): a module reaches each procedure it
+// declares, in the order written, as an object of its own kind.
+TEST_F(ProcessesOfARun, AModuleIteratesItsProcedures) {
+  Run("module top; logic a, c;\n"
+      "  initial a = 0;\n"
+      "  always @(posedge c) a <= ~a;\n"
+      "  final a = 1;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(KindsOf(vpiProcess, top),
+            (std::vector<int>{vpiInitial, vpiAlways, vpiFinal}));
+}
+
+// §37.63 (figure, process -> module): a procedure reaches back its module.
+TEST_F(ProcessesOfARun, AProcedureReachesItsModule) {
+  Run("module top; logic a; initial a = 0; endmodule\n");
+  vpiHandle proc = FirstProcess(By("top"));
+  ASSERT_NE(proc, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, proc)), VpiObjectOf(By("top")));
+}
+
+// A submodule's procedures are its own, not the module instantiating it.
+TEST_F(ProcessesOfARun, ASubmodulesProceduresAreItsOwn) {
+  Run("module sub; logic a; initial a = 0; endmodule\n"
+      "module top; sub u(); endmodule\n");
+  EXPECT_EQ(KindsOf(vpiProcess, By("top")), std::vector<int>{});
+  EXPECT_EQ(KindsOf(vpiProcess, By("top.u")), std::vector<int>{vpiInitial});
+}
+
+// A concurrent assertion the elaborator runs as a process is no procedure the
+// source wrote.
+TEST_F(ProcessesOfARun, AnAssertionIsNoProcedure) {
+  Run("module top; logic a, c;\n"
+      "  assert property (@(posedge c) a);\n"
+      "  initial a = 0;\n"
+      "endmodule\n");
+  EXPECT_EQ(KindsOf(vpiProcess, By("top")), std::vector<int>{vpiInitial});
+}
+
+// D1: an always procedure reports the keyword that opened it, and an initial
+// reports no always type.
+TEST_F(ProcessesOfARun, AnAlwaysReportsTheKeywordThatOpenedIt) {
+  Run("module top; logic a, b, c, d, e;\n"
+      "  always @(posedge c) a <= 1;\n"
+      "  always_comb b = c;\n"
+      "  always_ff @(posedge c) d <= c;\n"
+      "  always_latch if (c) e = c;\n"
+      "  initial a = 0;\n"
+      "endmodule\n");
+  std::vector<int> always_types;
+  vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle proc = vpi_scan(it)) {
+    always_types.push_back(vpi_get(vpiAlwaysType, proc));
+  }
+  EXPECT_EQ(always_types,
+            (std::vector<int>{vpiAlways, vpiAlwaysComb, vpiAlwaysFF,
+                              vpiAlwaysLatch, vpiUndefined}));
+}
+
+// §37.63 (figure, process <-> stmt): a procedure whose body is a named block
+// reaches the block, which reaches back the procedure, and the block is still
+// named under the module and one of its scopes.
+TEST_F(ProcessesOfARun, AProcedureReachesItsNamedBlockBody) {
+  Run("module top; initial begin : blk end endmodule\n");
+  vpiHandle proc = FirstProcess(By("top"));
+  vpiHandle blk = By("top.blk");
+  ASSERT_NE(proc, nullptr);
+  ASSERT_NE(blk, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, proc)), VpiObjectOf(blk));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, blk)), VpiObjectOf(proc));
+  EXPECT_EQ(NamesOf(vpiInternalScope, By("top")),
+            std::vector<std::string>{"blk"});
+}
+
+// A block nested in the body runs in the same procedure.
+TEST_F(ProcessesOfARun, ANestedBlockReachesTheProcedureRunningIt) {
+  Run("module top; initial begin : outer begin : inner end end endmodule\n");
+  vpiHandle proc = FirstProcess(By("top"));
+  ASSERT_NE(proc, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, By("top.outer.inner"))),
+            VpiObjectOf(proc));
+}
+
+// A body the run builds no object for reaches nothing, while a named block
+// inside it still runs in the procedure.
+TEST_F(ProcessesOfARun, ABlockInsideAPlainBeginReachesItsProcedure) {
+  Run("module top; initial begin begin : BLK end end endmodule\n");
+  vpiHandle proc = FirstProcess(By("top"));
+  ASSERT_NE(proc, nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, proc), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, By("top.BLK"))),
+            VpiObjectOf(proc));
+}
+
+// A procedure whose body is an event statement reaches it, both ways.
+TEST_F(ProcessesOfARun, AProcedureReachesItsEventStatementBody) {
+  Run("module top; event e; initial -> e; endmodule\n");
+  vpiHandle proc = FirstProcess(By("top"));
+  ASSERT_NE(proc, nullptr);
+  vpiHandle body = vpi_handle(vpiStmt, proc);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiEventStmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, body)), VpiObjectOf(proc));
+}
+
+// §37.62 with §37.12: an event statement written inside a named block hangs
+// from the block, which is the scope it stands in.
+TEST_F(ProcessesOfARun, AnEventStatementInsideANamedBlockHangsFromIt) {
+  Run("module top; event e; initial begin : blk -> e; end endmodule\n");
+  vpiHandle blk = By("top.blk");
+  ASSERT_NE(blk, nullptr);
+  EXPECT_EQ(KindsOf(vpiEventStmt, By("top")), std::vector<int>{});
+  vpiHandle it = vpi_iterate(vpiEventStmt, blk);
+  ASSERT_NE(it, nullptr);
+  vpiHandle ev = vpi_scan(it);
+  ASSERT_NE(ev, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, ev)), VpiObjectOf(blk));
+  vpiHandle event = vpi_handle(vpiNamedEvent, ev);
+  ASSERT_NE(event, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, event), "e");
 }
 
 }  // namespace

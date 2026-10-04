@@ -111,10 +111,12 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
-// §37.12: give each instance an object per block its procedures write that is
-// a scope, nested as the blocks are, each with the variables it declares.
-void AttachBlockScopes(const RtlirDesign* design, const VpiObjectMap& objects,
-                       const VpiAttachBuild& build);
+// §37.63: give each instance a process per procedure it declares, reaching the
+// statement it runs; §37.12: an object per block its procedures write that is
+// a scope, nested as the blocks are, each with the variables it declares; and
+// §37.62: an event statement per trigger, hung from the scope it stands in.
+void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
+                      const VpiAttachBuild& build);
 
 // §37.7: give each interface instance a modport per modport its interface
 // declares, each with an io decl per port it gives a direction, and §37.13:

@@ -467,21 +467,9 @@ TEST(ScopePublic, VirtualInterfaceIterationUnsupportedInClassDefn) {
 
 class BlockScopesOfARun : public VpiDesignRun {
  protected:
-  // The object `name` reaches from the top of the design, null for none.
-  static vpiHandle By(const std::string& name) {
-    return vpi_handle_by_name(VpiText(name.c_str()), nullptr);
-  }
   static std::string FullName(vpiHandle obj) {
     const char* full_name = vpi_get_str(vpiFullName, obj);
     return full_name == nullptr ? "" : full_name;
-  }
-  // The kinds of the objects `type` reaches from `ref`, in the order reached.
-  static std::vector<int> KindsOf(int type, vpiHandle ref) {
-    std::vector<int> kinds;
-    vpiHandle it = vpi_iterate(type, ref);
-    if (it == nullptr) return kinds;
-    while (vpiHandle obj = vpi_scan(it)) kinds.push_back(vpi_get(vpiType, obj));
-    return kinds;
   }
 };
 

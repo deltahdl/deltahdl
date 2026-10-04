@@ -634,12 +634,12 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach.cpp
     simulator/vpi_design_attach_assigns.cpp
     simulator/vpi_design_attach_bits.cpp
-    simulator/vpi_design_attach_blocks.cpp
     simulator/vpi_design_attach_build.cpp
     simulator/vpi_design_attach_elements.cpp
     simulator/vpi_design_attach_instances.cpp
     simulator/vpi_design_attach_members.cpp
     simulator/vpi_design_attach_params.cpp
+    simulator/vpi_design_attach_procedures.cpp
     simulator/vpi_design_attach_ranges.cpp
     simulator/vpi_design_attach_typespecs.cpp
     simulator/vpi_design_attach_vars.cpp

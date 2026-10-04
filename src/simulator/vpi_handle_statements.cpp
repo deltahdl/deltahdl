@@ -34,6 +34,10 @@ bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     return true;
   }
   if (type != vpiStmt || !VpiIsBodyStmtOwnerType(ref->type)) return false;
+  if (ref->body != nullptr) {
+    out = ref->body;
+    return true;
+  }
   for (auto* child : ref->children) {
     if (!VpiIsScopeBodyStmtType(child->type)) continue;
     out = child;
@@ -44,6 +48,10 @@ bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
 
 bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiProcess) return false;
+  if (ref->process != nullptr) {
+    out = ref->process;
+    return true;
+  }
   for (VpiObject* scope = ref->parent; scope != nullptr;
        scope = scope->parent) {
     if (!VpiIsProcessType(scope->type)) continue;

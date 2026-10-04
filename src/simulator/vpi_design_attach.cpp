@@ -743,10 +743,6 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   AttachInstanceContents(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   RecordViewportGrants(design, object_map_, SourcesOf(sim_ctx_));
-  // §37.62: the event statements hang in the scope the top has just adopted, so
-  // they are made once those scopes are final and the named event each one
-  // triggers has been told which kind of object it is.
-  AttachEventStatements(design);
   // §37.23: the scope a nettype declaration hangs in is the one the top has
   // just adopted, so the declarations are made once those scopes are final.
   AttachNettypeDeclarations(design);
