@@ -391,9 +391,48 @@ void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
   }
 }
 
+// The sibling interface instance an actual of `child` names by its stored
+// name, `i` or the `i` of `i.mp`, where that sibling is not yet placed.
+static const RtlirModuleInst* UnplacedInterfaceActual(
+    const RtlirModuleInst& child, const std::vector<RtlirModuleInst>& siblings,
+    const std::vector<bool>& placed, size_t& index) {
+  for (const RtlirPortBinding& binding : child.port_bindings) {
+    const Expr* head = binding.connection;
+    if (head != nullptr && head->kind == ExprKind::kMemberAccess) {
+      head = head->lhs;
+    }
+    if (head == nullptr || head->kind != ExprKind::kIdentifier) continue;
+    for (index = 0; index < siblings.size(); ++index) {
+      const RtlirModuleInst& sibling = siblings[index];
+      if (!placed[index] && sibling.resolved != nullptr &&
+          sibling.resolved->is_interface && sibling.inst_name == head->text) {
+        return &sibling;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// §25.3: an interface port is joined to the storage of the interface instance
+// its actual names (Lowerer::TryAliasInterfacePort), which exists once that
+// instance is lowered, and the port is bound as soon as its own instance is.
+// An interface instance is therefore lowered ahead of a sibling written before
+// it that connects to it, as a module-level instance connecting `g.i` is
+// written before the instance a generate block declares (§27.5); every other
+// instance keeps its place.
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
-  for (const auto& child : mod->children) {
-    if (child.resolved) LowerChildInstance(child);
+  const std::vector<RtlirModuleInst>& children = mod->children;
+  std::vector<bool> placed(children.size(), false);
+  for (size_t i = 0; i < children.size(); ++i) {
+    if (placed[i] || children[i].resolved == nullptr) continue;
+    size_t index = 0;
+    while (const RtlirModuleInst* ifc =
+               UnplacedInterfaceActual(children[i], children, placed, index)) {
+      placed[index] = true;
+      LowerChildInstance(*ifc);
+    }
+    placed[i] = true;
+    LowerChildInstance(children[i]);
   }
 }
 

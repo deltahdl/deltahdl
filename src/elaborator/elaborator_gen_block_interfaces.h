@@ -27,6 +27,24 @@ std::string_view FindBlockInterface(std::string_view name,
                                     const GenBlockPrefixes& prefixes,
                                     const InterfaceInstTypes& table);
 
+// The path, loop constants and generate prefixes of the block instances a
+// declaration stands in (§27.4), outermost first.
+struct GenBlockContext {
+  const HierPath& path;
+  const GenBlockConsts& consts;
+  const GenBlockPrefixes& prefixes;
+};
+
+// §27.4 with §25.3 and §23.6: gives `inst` the context of the generate blocks
+// it stands in, its path among them, ahead of its ports being bound and as
+// ElaborateGenerateBlockItem stamps it again afterwards, since an interface
+// port's actual is resolved through those blocks; and registers in `table`,
+// under the name it is stored under, an interface instance a block declares,
+// which such an actual resolves to.
+void EnterGenBlockInstance(RtlirModuleInst& inst, const ModuleDecl* child_decl,
+                           const GenBlockContext& context,
+                           InterfaceInstTypes& table);
+
 // §25.3 with §23.6 and §27.5: registers in `table` each interface instance a
 // named block of a conditional generate construct among `items` declares,
 // under the name it will be stored under once the block is elaborated, so a

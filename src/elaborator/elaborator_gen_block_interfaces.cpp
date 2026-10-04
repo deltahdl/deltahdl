@@ -169,6 +169,18 @@ Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
 
 }  // namespace
 
+void EnterGenBlockInstance(RtlirModuleInst& inst, const ModuleDecl* child_decl,
+                           const GenBlockContext& context,
+                           InterfaceInstTypes& table) {
+  inst.gen_block_path = context.path;
+  inst.gen_block_consts = context.consts;
+  inst.gen_block_prefixes = context.prefixes;
+  if (child_decl->decl_kind == ModuleDeclKind::kInterface &&
+      !context.prefixes.empty()) {
+    table.emplace(inst.inst_name, child_decl->name);
+  }
+}
+
 void RegisterConditionalBlockInterfaces(
     const std::vector<ModuleItem*>& items,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
