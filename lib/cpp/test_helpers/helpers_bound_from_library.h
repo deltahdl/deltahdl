@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -15,19 +16,26 @@
 
 using namespace delta;
 
-// `source` written to a file in `tmp` and compiled by one invocation into
-// library "ip" there (§33.5.3), decrypting its envelopes under the exchange key
-// `key`, and the design rooted at `t` bound from that library by `binder`, as
-// another invocation binds it (§33.5.4), reading the compiled form and never
-// the source. Null where the compile or the bind fails.
+// `sources` written to files in `tmp`, in order, and compiled by one
+// invocation into library "ip" there (§33.5.3), one record per file, decrypting
+// their envelopes under the exchange key `key`; and the design rooted at `t`
+// bound from that library by `binder`, as another invocation binds it
+// (§33.5.4), reading the compiled form and never the sources. A cell a later
+// file declares again replaces the one an earlier file wrote (§33.3.1). Null
+// where the compile or the bind fails.
 inline RtlirDesign* BoundFromALibrary(const ScratchDir& tmp,
-                                      const std::string& source,
+                                      const std::vector<std::string>& sources,
                                       std::string_view key,
                                       SeparateCompilationBinder& binder) {
-  const std::string kPath = (tmp.dir / "sealed.sv").string();
-  std::ofstream(kPath) << source;
   CliOptions opts;
-  opts.source_files = {kPath};
+  for (const std::string& source : sources) {
+    const std::string kPath =
+        (tmp.dir /
+         ("source" + std::to_string(opts.source_files.size()) + ".sv"))
+            .string();
+    std::ofstream(kPath) << source;
+    opts.source_files.push_back(kPath);
+  }
   opts.precompile_library = "ip";
   opts.precompile_output = (tmp.dir / "ip.dpl").string();
   opts.protect.exchange_key = std::string(key);

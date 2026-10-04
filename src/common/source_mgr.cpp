@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -98,6 +99,11 @@ bool SourceManager::IsProtected(SourceLoc loc) const {
 
 void SourceManager::AddViewport(EnvelopeViewport viewport) {
   viewports_.push_back(std::move(viewport));
+}
+
+void SourceManager::DropViewports(
+    const std::function<bool(const EnvelopeViewport&)>& stale) {
+  std::erase_if(viewports_, stale);
 }
 
 bool SourceManager::StandsInEnvelope(SourceLoc loc,

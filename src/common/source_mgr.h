@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -58,6 +59,10 @@ class SourceManager {
   // name and grant the access they ask.
   void AddViewport(EnvelopeViewport viewport);
   const std::vector<EnvelopeViewport>& Viewports() const { return viewports_; }
+
+  // Drops the viewports `stale` answers true for, which describe envelopes of
+  // code that is no longer part of the design.
+  void DropViewports(const std::function<bool(const EnvelopeViewport&)>& stale);
 
   // Whether `loc` stands in, or comes from, the text of the envelope
   // `viewport` describes.

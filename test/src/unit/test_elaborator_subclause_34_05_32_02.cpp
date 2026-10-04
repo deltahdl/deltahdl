@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -74,18 +75,19 @@ struct CompiledDesign {
   }
 };
 
-// A text compiled into library "ip" under kKey by one invocation and bound from
-// `t` by another (§33.5.3, §33.5.4), which has the envelopes' viewports from
-// the library's record alone and checks them where it elaborates.
+// Texts compiled into library "ip" under kKey by one invocation, a record per
+// text, and bound from `t` by another (§33.5.3, §33.5.4), which has the
+// envelopes' viewports from the library's records alone and checks them where
+// it elaborates.
 struct BoundDesign {
   SourceManager mgr;
   DiagEngine diag{mgr};
   Arena arena;
 
-  explicit BoundDesign(const std::string& source) {
+  explicit BoundDesign(const std::vector<std::string>& sources) {
     ScratchDir tmp;
     SeparateCompilationBinder binder(mgr, arena, diag);
-    BoundFromALibrary(tmp, source, kKey, binder);
+    BoundFromALibrary(tmp, sources, kKey, binder);
   }
 };
 
@@ -247,7 +249,7 @@ TEST(ViewportContainment, ABareNameOfAnItemBeforeACleartextEnvelopeIsReported) {
 // An item of an element a cleartext envelope declares is contained within it.
 TEST(ViewportContainment,
      AnItemACleartextEnvelopeDeclaresIsContainedWhenBound) {
-  BoundDesign design(ModuleEnvelopeNaming("secret.inner"));
+  BoundDesign design({ModuleEnvelopeNaming("secret.inner")});
   EXPECT_FALSE(ContainsNothingReported(design.diag));
 }
 
@@ -255,7 +257,7 @@ TEST(ViewportContainment,
 // record's text.
 TEST(ViewportContainment,
      ANameACleartextEnvelopeDoesNotDeclareIsReportedWhenBound) {
-  BoundDesign design(ModuleEnvelopeNaming("secret.missing"));
+  BoundDesign design({ModuleEnvelopeNaming("secret.missing")});
   EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), kContainsNothing, 2,
                             "34.5.32.2"));
 }
@@ -264,8 +266,43 @@ TEST(ViewportContainment,
 // too, the record's sealed lines standing in the envelope though they come from
 // its protected copy.
 TEST(ViewportContainment, AnItemOfASealedElementIsContainedWhenBound) {
-  BoundDesign design(Sealed(ModuleEnvelopeNaming("secret.u.q")));
+  BoundDesign design({Sealed(ModuleEnvelopeNaming("secret.u.q"))});
   EXPECT_FALSE(ContainsNothingReported(design.diag));
+}
+
+// §33.3.1 has a cell a later compile writes replace the one an earlier compile
+// wrote. An envelope of the replaced cell's code is no longer in the design,
+// and nothing is reported for its viewports.
+
+// `secret` written again in the clear, with no envelope and none of its items.
+constexpr std::string_view kSecretRewritten =
+    "module secret(input a, output y);\n"
+    "  assign y = a;\n"
+    "endmodule\n";
+
+// The envelope declared the replaced element and names an item through it.
+TEST(ViewportContainment, AViewportOfAReplacedElementIsNotReportedWhenBound) {
+  BoundDesign design(
+      {ModuleEnvelopeNaming("secret.inner"), std::string(kSecretRewritten)});
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
+}
+
+// The envelope stood inside the replaced element.
+TEST(ViewportContainment,
+     AViewportInsideAReplacedElementIsNotReportedWhenBound) {
+  BoundDesign design(
+      {EnvelopeInsideModuleNaming("inner"), "module secret;\nendmodule\n"});
+  EXPECT_FALSE(ContainsNothingReported(design.diag));
+}
+
+// Replacing an element the envelope has nothing to do with leaves its viewport
+// held to its lines, and a name it does not declare is still reported.
+TEST(ViewportContainment,
+     AViewportNamingNothingIsReportedWhenAnotherElementIsReplaced) {
+  BoundDesign design({ModuleEnvelopeNaming("secret.missing"),
+                      "module other;\n  logic q;\nendmodule\n"});
+  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(), kContainsNothing, 2,
+                            "34.5.32.2"));
 }
 
 }  // namespace

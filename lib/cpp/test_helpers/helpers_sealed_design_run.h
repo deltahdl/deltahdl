@@ -53,7 +53,7 @@ inline void RunBoundFromALibrary(const std::string& source,
                                  std::string_view key, SimFixture& f) {
   ScratchDir tmp;
   SeparateCompilationBinder binder(f.mgr, f.arena, f.diag);
-  RtlirDesign* design = BoundFromALibrary(tmp, source, key, binder);
+  RtlirDesign* design = BoundFromALibrary(tmp, {source}, key, binder);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(f.diag.HasErrors());
   LowerAndRun(design, f);

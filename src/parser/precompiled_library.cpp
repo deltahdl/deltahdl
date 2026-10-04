@@ -23,6 +23,7 @@
 #include "common/types.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "preprocessor/protect_license.h"
 
@@ -334,6 +335,46 @@ struct LoadContext {
   DiagEngine& diag;
 };
 
+// Whether `viewport` describes an envelope of `cell`'s code, the two standing
+// in one record's text: one that declared the cell and names an item through
+// it, or one standing inside the cell, whose bare names name the cell's items.
+bool EnvelopeOfCell(const EnvelopeViewport& viewport, const ModuleDecl& cell) {
+  if (viewport.region_source == 0 ||
+      cell.range.start.file_id != viewport.region_source) {
+    return false;
+  }
+  const uint32_t kStart = cell.range.start.line;
+  if (kStart >= viewport.first_line && kStart <= viewport.last_line) {
+    const std::string_view kObject = viewport.object;
+    return kObject.substr(0, kObject.find('.')) == cell.name;
+  }
+  return kStart < viewport.first_line &&
+         viewport.last_line <= cell.range.end.line;
+}
+
+// Drops the viewports of envelopes of the cells of `library` a later record
+// declares again, `definitions`, while `target` still holds them.
+void DropReplacedViewports(
+    const CompilationUnit& target, std::string_view library,
+    const std::unordered_set<std::string_view>& definitions,
+    SourceManager& mgr) {
+  std::vector<const ModuleDecl*> replaced;
+  for (const auto* list :
+       {&target.modules, &target.interfaces, &target.programs}) {
+    for (const ModuleDecl* cell : *list) {
+      if (cell->library == library && definitions.contains(cell->name)) {
+        replaced.push_back(cell);
+      }
+    }
+  }
+  if (replaced.empty()) return;
+  mgr.DropViewports([&replaced](const EnvelopeViewport& viewport) {
+    return std::ranges::any_of(replaced, [&viewport](const ModuleDecl* cell) {
+      return EnvelopeOfCell(viewport, *cell);
+    });
+  });
+}
+
 template <typename Decl>
 void DropCells(std::vector<Decl*>& cells, std::string_view library,
                const std::unordered_set<std::string_view>& names) {
@@ -352,8 +393,11 @@ void DropCells(std::vector<Decl*>& cells, std::string_view library,
 // interfaces, programs, checkers, primitives and configurations share, and
 // among packages in theirs. Kept side by side, the two were one definition too
 // many for the bind.
+//
+// A viewport of an envelope of a replaced cell's code (§34.5.32) named code the
+// library no longer keeps, and goes with the cell.
 void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
-                            std::string_view library) {
+                            std::string_view library, SourceManager& mgr) {
   std::unordered_set<std::string_view> definitions;
   for (const auto* list :
        {&cu.modules, &cu.interfaces, &cu.programs, &cu.checkers}) {
@@ -361,6 +405,7 @@ void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
   }
   for (const auto* u : cu.udps) definitions.insert(u->name);
   for (const auto* c : cu.configs) definitions.insert(c->name);
+  DropReplacedViewports(target, library, definitions, mgr);
   DropCells(target.modules, library, definitions);
   DropCells(target.interfaces, library, definitions);
   DropCells(target.programs, library, definitions);
@@ -427,7 +472,7 @@ bool LoadRecord(const std::filesystem::path& path, Record& record,
   ApplyModuleDirectives(cu, record.directives.modules);
   const std::string& library = record.library;
   TagCells(*cu, library, ctx.arena);
-  ReplaceRecompiledCells(ctx.target, *cu, library);
+  ReplaceRecompiledCells(ctx.target, *cu, library, ctx.mgr);
   AppendCellDeclarations(ctx.target, *cu);
   return true;
 }
