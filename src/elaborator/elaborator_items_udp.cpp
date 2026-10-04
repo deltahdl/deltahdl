@@ -801,7 +801,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ClassifyAndCheckItems(
       decl, {kParentScope, BuildParamScope(mod), diag_}, inst_class_tables,
       [&](std::string_view name) { return FindModuleInScope(name); });
-  RegisterConditionalBlockInterfaces(
+  RegisterGenerateBlockInterfaces(
       decl->items,
       [&](std::string_view name) { return FindModuleInScope(name); },
       interface_inst_types_, arena_);

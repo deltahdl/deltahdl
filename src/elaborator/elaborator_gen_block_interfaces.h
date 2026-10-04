@@ -45,13 +45,15 @@ void EnterGenBlockInstance(RtlirModuleInst& inst, const ModuleDecl* child_decl,
                            const GenBlockContext& context,
                            InterfaceInstTypes& table);
 
-// §25.3 with §23.6 and §27.5: registers in `table` each interface instance a
-// named block of a conditional generate construct among `items` declares,
-// under the name it will be stored under once the block is elaborated, so a
-// module-level connection `g.i` may name it before the block is. Every
-// alternative is walked, since which one is selected is not yet folded.
-// `find_module` resolves an instance's module, interface or program name.
-void RegisterConditionalBlockInterfaces(
+// §25.3 with §23.6, §27.4 and §27.5: registers in `table` each interface
+// instance a named generate block among `items` declares, so a module-level
+// connection `g.i` or `g[k].i` may name it before the block is elaborated: a
+// conditional block's under the name it will be stored under, every
+// alternative walked since which one is selected is not yet folded, and a loop
+// block's under the block's name followed by `[]_`, its iterations' indices
+// not yet folded either. `find_module` resolves an instance's module,
+// interface or program name.
+void RegisterGenerateBlockInterfaces(
     const std::vector<ModuleItem*>& items,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
     InterfaceInstTypes& table, Arena& arena);
@@ -60,9 +62,11 @@ void RegisterConditionalBlockInterfaces(
 // an interface instance a generate block declares -- `i` or `i.mp` written in
 // the block, `g.i` or `g[k].i` written through it -- to that instance's stored
 // name, which the elaborator's interface checks and the simulator's connection
-// both look an instance up by. `scope` folds the index of a loop block's path.
+// both look an instance up by. `scope` folds the index of a loop block's path,
+// and the stored name such a path resolves to is entered into `table`, the
+// loop not yet having been elaborated where the path is written outside it.
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
-                                     const InterfaceInstTypes& table,
+                                     InterfaceInstTypes& table,
                                      const ScopeMap& scope, Arena& arena);
 
 }  // namespace delta

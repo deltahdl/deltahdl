@@ -522,4 +522,29 @@ TEST(LoopGenerateInstanceSim, PortConnectionsReadTheInstanceIndex) {
       "p 5 7 9\n");
 }
 
+// §27.4 makes a named loop block an array of block instances, each reached by
+// `g[k]` (§23.6), so `g[1].i` at module level names the interface instance the
+// second iteration declares and connects it (§25.3). The test fails on an
+// elaborator that knows a loop block's interface instances only once the loop
+// is elaborated, after the module-level connection is bound.
+TEST(LoopGenerateInstanceSim,
+     InterfaceInstanceOfALoopBlockIsConnectedByItsPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  int d;\n"
+                       "endinterface\n"
+                       "module cons(ifc p);\n"
+                       "  initial #1 $display(\"lp %0d\", p.d);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  for (genvar k = 0; k < 2; k++) begin : g\n"
+                       "    ifc i();\n"
+                       "    initial i.d = 40 + k;\n"
+                       "  end\n"
+                       "  cons c(g[1].i);\n"
+                       "endmodule\n",
+                       f),
+            "lp 41\n");
+}
+
 }  // namespace

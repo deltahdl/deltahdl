@@ -43,10 +43,29 @@ struct BlockInterfaceWalk {
 
   void AddConstruct(const ModuleItem* item, std::string_view prefix);
   void AddIf(const ModuleItem* item, std::string_view prefix);
+  void AddLoop(const ModuleItem* item, std::string_view prefix);
+  bool AddInterfaceInstance(const ModuleItem* item, std::string_view prefix);
   void AddBlock(std::string_view name, bool name_is_generated,
                 const std::vector<ModuleItem*>& body, bool has_begin_end,
                 std::string_view prefix);
 };
+
+// Registers `item` under `prefix` followed by its name where it is an instance
+// of an interface; false where it is no instance at all.
+bool BlockInterfaceWalk::AddInterfaceInstance(const ModuleItem* item,
+                                              std::string_view prefix) {
+  if (item->kind != ModuleItemKind::kModuleInst || item->inst_name.empty()) {
+    return false;
+  }
+  const ModuleDecl* child = find_module(item->inst_module);
+  if (child != nullptr && child->decl_kind == ModuleDeclKind::kInterface) {
+    std::string key = std::string(prefix) + std::string(item->inst_name);
+    table.emplace(std::string_view(arena.AllocString(key.c_str(), key.size()),
+                                   key.size()),
+                  item->inst_module);
+  }
+  return true;
+}
 
 // One block of a conditional construct. ElaborateConditionalGenerateBlock
 // stores what a block declares under the enclosing prefix followed by the
@@ -63,18 +82,24 @@ void BlockInterfaceWalk::AddBlock(std::string_view name, bool name_is_generated,
   if (name.empty() || name_is_generated) return;
   std::string block_prefix = std::format("{}{}_", prefix, name);
   for (const ModuleItem* sub : body) {
-    if (sub->kind == ModuleItemKind::kModuleInst && !sub->inst_name.empty()) {
-      const ModuleDecl* child = find_module(sub->inst_module);
-      if (child != nullptr && child->decl_kind == ModuleDeclKind::kInterface) {
-        std::string key = block_prefix + std::string(sub->inst_name);
-        table.emplace(
-            std::string_view(arena.AllocString(key.c_str(), key.size()),
-                             key.size()),
-            sub->inst_module);
-      }
-      continue;
-    }
-    AddConstruct(sub, block_prefix);
+    if (!AddInterfaceInstance(sub, block_prefix))
+      AddConstruct(sub, block_prefix);
+  }
+}
+
+// §27.4: a named loop block is an array of block instances, each stored under
+// the enclosing prefix, the block's name and the iteration's index, which is
+// folded only when the loop is elaborated. An interface instance the block
+// declares is therefore registered under the block's name followed by `[]_`,
+// which no stored name can spell, for `g[k].i` to be resolved through once its
+// index is folded (LoopBlockInstance). A construct nested in the loop block is
+// stored under the index as well, and is not walked.
+void BlockInterfaceWalk::AddLoop(const ModuleItem* item,
+                                 std::string_view prefix) {
+  if (item->name.empty() || item->name_is_generated) return;
+  std::string template_prefix = std::format("{}{}[]_", prefix, item->name);
+  for (const ModuleItem* sub : item->gen_body) {
+    AddInterfaceInstance(sub, template_prefix);
   }
 }
 
@@ -92,12 +117,14 @@ void BlockInterfaceWalk::AddIf(const ModuleItem* item,
            other->gen_body_has_begin_end, prefix);
 }
 
-// A loop block's instances are stored under each iteration's index, which is
-// not folded until the loop is elaborated, so a loop is not walked.
 void BlockInterfaceWalk::AddConstruct(const ModuleItem* item,
                                       std::string_view prefix) {
   if (item->kind == ModuleItemKind::kGenerateIf) {
     AddIf(item, prefix);
+    return;
+  }
+  if (item->kind == ModuleItemKind::kGenerateFor) {
+    AddLoop(item, prefix);
     return;
   }
   if (item->kind != ModuleItemKind::kGenerateCase) return;
@@ -133,10 +160,48 @@ std::optional<std::string> FlattenBlockPath(const Expr* head,
   return std::format("{}_{}_{}", head->base->text, *index, member);
 }
 
+// The stored name of the instance `g[k].i` names in a loop block, whose stored
+// name `flat` is registered only once the loop is elaborated: found through
+// the block's `g[]_i` entry (BlockInterfaceWalk::AddLoop) and entered into
+// `table` for the interface checks to find. Empty where no loop block named
+// `g` declares an interface instance `i`.
+std::string_view LoopBlockInstance(const Expr* head, std::string_view member,
+                                   const std::string& flat,
+                                   const GenBlockPrefixes& prefixes,
+                                   InterfaceInstTypes& table, Arena& arena) {
+  if (head->kind != ExprKind::kSelect) return {};
+  std::string pattern = std::format("{}[]_{}", head->base->text, member);
+  std::string_view found = FindBlockInterface(pattern, prefixes, table);
+  if (found.empty()) return {};
+  std::string key =
+      std::string(found.substr(0, found.size() - pattern.size())) + flat;
+  std::string_view stored(arena.AllocString(key.c_str(), key.size()),
+                          key.size());
+  table.emplace(stored, table.at(found));
+  return stored;
+}
+
+// The actual `g.i` or `g[k].i` is rewritten to, an interface instance a
+// generate block declares, or null where it names none.
+Expr* ResolvedPath(Expr* conn, const GenBlockPrefixes& prefixes,
+                   InterfaceInstTypes& table, const ScopeMap& scope,
+                   Arena& arena) {
+  std::optional<std::string> flat =
+      FlattenBlockPath(conn->lhs, conn->rhs->text, scope);
+  if (!flat) return nullptr;
+  std::string_view key = FindBlockInterface(*flat, prefixes, table);
+  if (key.empty()) {
+    key = LoopBlockInstance(conn->lhs, conn->rhs->text, *flat, prefixes, table,
+                            arena);
+  }
+  if (key.empty()) return nullptr;
+  return MakeInstanceIdent(key, conn, arena);
+}
+
 // The actual `conn` is rewritten to, or null where it names no interface
 // instance of a block or already names one by its stored name.
 Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
-                     const InterfaceInstTypes& table, const ScopeMap& scope,
+                     InterfaceInstTypes& table, const ScopeMap& scope,
                      Arena& arena) {
   if (conn->kind == ExprKind::kIdentifier) {
     std::string_view key = FindBlockInterface(conn->text, prefixes, table);
@@ -158,13 +223,7 @@ Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
       return copy;
     }
   }
-  // `g.i` or `g[k].i`, an interface instance a generate block declares.
-  std::optional<std::string> flat =
-      FlattenBlockPath(conn->lhs, conn->rhs->text, scope);
-  if (!flat) return nullptr;
-  std::string_view key = FindBlockInterface(*flat, prefixes, table);
-  if (key.empty()) return nullptr;
-  return MakeInstanceIdent(key, conn, arena);
+  return ResolvedPath(conn, prefixes, table, scope, arena);
 }
 
 }  // namespace
@@ -181,7 +240,7 @@ void EnterGenBlockInstance(RtlirModuleInst& inst, const ModuleDecl* child_decl,
   }
 }
 
-void RegisterConditionalBlockInterfaces(
+void RegisterGenerateBlockInterfaces(
     const std::vector<ModuleItem*>& items,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
     InterfaceInstTypes& table, Arena& arena) {
@@ -190,7 +249,7 @@ void RegisterConditionalBlockInterfaces(
 }
 
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
-                                     const InterfaceInstTypes& table,
+                                     InterfaceInstTypes& table,
                                      const ScopeMap& scope, Arena& arena) {
   // Every binding is asked rather than only those of a port marked an
   // interface port: an actual is rewritten only where it names an entry of
