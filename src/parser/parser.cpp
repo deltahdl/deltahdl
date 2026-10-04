@@ -546,16 +546,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
 
-  if (Check(TokenKind::kKwTypedef)) {
-    unit->cu_items.push_back(ParseTypedef());
-    return;
-  }
-  // §6.6.7 with §3.12.1: a nettype declaration is a net declaration, which a
-  // compilation unit holds as a package does (A.1.2, A.1.11, A.2.1.3).
-  if (Check(TokenKind::kKwNettype)) {
-    unit->cu_items.push_back(ParseNettypeDecl());
-    return;
-  }
+  if (TryParseCuTypeDeclaration(unit)) return;
   if (TryParseUnitBindDirective(unit)) return;
   if (TryParseSecondaryTopLevel(unit)) {
     if (!top_attrs.empty() && unit->udps.size() > udp_count) {
@@ -565,6 +556,21 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   }
   if (TryParseCuScopeItem(unit)) return;
   ReportUnexpectedTopLevelToken();
+}
+
+// A typedef, or a nettype declaration: §6.6.7 with §3.12.1 makes the second a
+// net declaration, which a compilation unit holds as a package does (A.1.2,
+// A.1.11, A.2.1.3).
+bool Parser::TryParseCuTypeDeclaration(CompilationUnit* unit) {
+  if (Check(TokenKind::kKwTypedef)) {
+    unit->cu_items.push_back(ParseTypedef());
+    return true;
+  }
+  if (Check(TokenKind::kKwNettype)) {
+    unit->cu_items.push_back(ParseNettypeDecl());
+    return true;
+  }
+  return false;
 }
 
 // The current token opens no top-level declaration. §14.7 names one such token

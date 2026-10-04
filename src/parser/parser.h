@@ -474,6 +474,7 @@ class Parser {
   std::string_view ArenaCopy(std::string_view text);
 
   BindDirective* ParseBindDirective();
+  bool TryParseCuTypeDeclaration(CompilationUnit* unit);
   bool TryParseUnitBindDirective(CompilationUnit* unit);
   BindTargetInstance ParseBindTargetInstance();
 
