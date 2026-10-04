@@ -7,11 +7,11 @@
 // published algorithm produces, reads it back, and refuses the characters
 // neither algorithm writes.
 //
-// The writing is driven through EncodeProtectBlock rather than through an
-// envelope, because the encrypting half writes an envelope under neither of
-// these two today: #4303 is the open question of how it honours a request for
-// them, the values §34.5.13.2 and its neighbours announce on the next line
-// being ones these two algorithms break across several.
+// Most of the writing is driven through EncodeProtectBlock, which holds it to
+// the published algorithm alone. The cases at the end drive it through an
+// envelope: the encrypting half writes its blocks under either of these two,
+// or raw, where a text asks for it, and keeps the values §34.5.13.2 and its
+// neighbours announce on the next line under a one-line scheme.
 //
 // A text written under either one runs to several lines by construction:
 // uuencode ends every line after a set number of bytes and closes its output
@@ -33,6 +33,7 @@
 
 #include "fixture_preprocessor.h"
 #include "fixture_protect_encoding.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
