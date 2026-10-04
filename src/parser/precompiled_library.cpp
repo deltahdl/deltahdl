@@ -194,35 +194,26 @@ void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   for (uint32_t line : d.protected_lines) WriteU32(os, line);
 }
 
-// Each entry is read before it is kept, so a damaged count ends the read at the
+// Reads a count and that many entries into `out`, each with `read_one`. Each
+// entry is read before it is kept, so a damaged count ends the read at the
 // stream's end rather than asking for room for entries that are not there.
-bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
+template <typename T, typename ReadOne>
+bool ReadList(std::ifstream& is, std::vector<T>& out, ReadOne read_one) {
   uint32_t count = 0;
   if (!ReadU32(is, count)) return false;
   for (uint32_t i = 0; i < count; ++i) {
-    ModuleDirectives m;
-    if (!ReadModuleDirectives(is, m)) return false;
-    d.modules.push_back(std::move(m));
-  }
-  if (!ReadU32(is, count)) return false;
-  for (uint32_t i = 0; i < count; ++i) {
-    std::string name;
-    if (!ReadString(is, name)) return false;
-    d.cell_modules.push_back(std::move(name));
-  }
-  if (!ReadU32(is, count)) return false;
-  for (uint32_t i = 0; i < count; ++i) {
-    ProtectLicense license;
-    if (!ReadRuntimeLicense(is, license)) return false;
-    d.runtime_licenses.push_back(std::move(license));
-  }
-  if (!ReadU32(is, count)) return false;
-  for (uint32_t i = 0; i < count; ++i) {
-    uint32_t line = 0;
-    if (!ReadU32(is, line)) return false;
-    d.protected_lines.push_back(line);
+    T entry{};
+    if (!read_one(is, entry)) return false;
+    out.push_back(std::move(entry));
   }
   return true;
+}
+
+bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
+  return ReadList(is, d.modules, ReadModuleDirectives) &&
+         ReadList(is, d.cell_modules, ReadString) &&
+         ReadList(is, d.runtime_licenses, ReadRuntimeLicense) &&
+         ReadList(is, d.protected_lines, ReadU32);
 }
 
 // Parses `source`, the preprocessor's output, with every report suppressed, and
