@@ -796,21 +796,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   if (!unit_hier_head_names_) {
     // §27.6 gives each unnamed generate block a genblk<n> name, which
     // Elaborator::ElaborateModule assigns as it reaches each module, so the
-    // modules not yet reached are named here, nested declarations among them,
-    // for the names to be collected. Naming a scope a second time leaves it as
-    // it was, since only a block with no name is given one.
-    std::function<void(const ModuleDecl*)> name_blocks =
-        [&](const ModuleDecl* scope) {
-          AssignGenerateBlockNames(scope);
-          for (const ModuleItem* item : scope->items) {
-            if (item->nested_module_decl != nullptr)
-              name_blocks(item->nested_module_decl);
-          }
-        };
-    for (const auto* scopes : {&unit_->modules, &unit_->interfaces,
-                               &unit_->programs, &unit_->checkers}) {
-      for (const ModuleDecl* scope : *scopes) name_blocks(scope);
-    }
+    // modules not yet reached are named here for the names to be collected.
+    AssignUnitGenerateBlockNames(unit_, arena_);
     unit_hier_head_names_ = std::make_shared<const UnitHierHeadNames>(unit_);
   }
   ReportUnresolvedHierHeads(

@@ -68,6 +68,9 @@ std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
                                                const CompilationUnit* unit,
                                                DiagEngine& diag);
 
+// Whether every type parameter `decl` declares has a default type (§6.20.3).
+bool AllTypeParamsHaveDefaults(const ModuleDecl* decl);
+
 // Puts back the typedef-map entries ApplyChildTypeParams replaced.
 void RestoreChildTypeParams(TypedefMap& typedefs,
                             const std::vector<SavedTypedef>& saved);

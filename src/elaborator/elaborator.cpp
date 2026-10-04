@@ -16,6 +16,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_type_facts.h"
@@ -485,7 +486,20 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     top_item.inst_module = mod_decl->name;
     ApplyConfigParamOverrides(&top_item, mod_decl, top_params, ScopeMap{},
                               config_locked);
+    // §6.20.3: no instantiation assigns a top-level module's type parameters,
+    // so each takes its default, or a configuration's assignment, and is
+    // published as ElaborateModuleInst publishes a child's, for `$bits(T)` and
+    // a declaration of type T to read. A type parameter with no default is
+    // reported among the top's parameters, and none is published then.
+    std::vector<SavedTypedef> saved_type_params;
+    if (AllTypeParamsHaveDefaults(mod_decl)) {
+      saved_type_params = ApplyChildTypeParams(
+          TypeParamSourcesFor(&top_item, instance_param_overrides_,
+                              config_inst_path_),
+          mod_decl, typedefs_, unit_, diag_);
+    }
     auto* top = ElaborateModule(mod_decl, top_params);
+    RestoreChildTypeParams(typedefs_, saved_type_params);
     current_inst_path_ = std::move(saved_path);
     config_inst_path_ = std::move(saved_config_path);
     if (!top) return false;

@@ -181,6 +181,13 @@ bool IsConditionalGenerateConstruct(ModuleItemKind k);
 // no separate scope. Defined in elaborator_generate.cpp and shared with the
 // generate-block naming translation unit, which has to skip the same blocks
 // when numbering.
+// §27.6: gives every unnamed generate block of every module, interface,
+// program and checker of `unit`, and of the declarations nested in them, its
+// genblk<n> name, as Elaborator::AssignGenerateBlockNames does for one module.
+// A block already named is left as it is, so naming a scope twice changes
+// nothing. Defined in elaborator_generate_naming.cpp.
+void AssignUnitGenerateBlockNames(const CompilationUnit* unit, Arena& arena);
+
 bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
                            bool has_begin_end);
 

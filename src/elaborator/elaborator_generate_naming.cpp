@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 
 namespace delta {
@@ -137,11 +138,33 @@ static void NameConstructBlocks(ModuleItem* it, std::string_view name,
                     it->gen_else->gen_body_has_begin_end, name, arena);
 }
 
-void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
+static void NameModuleGenerateBlocks(const ModuleDecl* decl, Arena& arena) {
   std::unordered_set<std::string_view> used;
   for (const auto& port : decl->ports) used.insert(port.name);
   for (const auto& p : decl->params) used.insert(p.first);
-  NameGenerateBlocksInScope(decl->items, std::move(used), arena_);
+  NameGenerateBlocksInScope(decl->items, std::move(used), arena);
+}
+
+void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
+  NameModuleGenerateBlocks(decl, arena_);
+}
+
+static void NameScopeTreeGenerateBlocks(const ModuleDecl* decl, Arena& arena) {
+  NameModuleGenerateBlocks(decl, arena);
+  for (const ModuleItem* item : decl->items) {
+    if (item->nested_module_decl != nullptr) {
+      NameScopeTreeGenerateBlocks(item->nested_module_decl, arena);
+    }
+  }
+}
+
+void AssignUnitGenerateBlockNames(const CompilationUnit* unit, Arena& arena) {
+  for (const auto* scopes :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const ModuleDecl* scope : *scopes) {
+      NameScopeTreeGenerateBlocks(scope, arena);
+    }
+  }
 }
 
 // §27.5: gather the block names introduced by the alternatives of a single

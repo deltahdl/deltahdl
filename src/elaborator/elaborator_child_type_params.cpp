@@ -163,6 +163,17 @@ std::vector<SavedTypedef> ApplyChildTypeParams(const TypeParamAssignments& from,
   return saved;
 }
 
+bool AllTypeParamsHaveDefaults(const ModuleDecl* decl) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->type_param_names.count(decl->params[i].first) == 0) continue;
+    if (i >= decl->param_types.size() ||
+        decl->param_types[i].kind == DataTypeKind::kImplicit) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void RestoreChildTypeParams(TypedefMap& typedefs,
                             const std::vector<SavedTypedef>& saved) {
   for (const auto& s : saved) {
