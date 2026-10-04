@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_license.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
@@ -86,13 +87,14 @@ std::string BlockBeneath(std::string_view envelope, std::string_view block) {
   return std::string(envelope.substr(from, envelope.find('\n', from) - from));
 }
 
-// The text the recipient's run, holding its own key, produces from
-// `envelope`.
+// The text the recipient's run, holding its own key and the licence the block
+// carries (§34.5.28.2), produces from `envelope`.
 std::string TheRecipientGets(const std::string& envelope) {
   SourceManager mgr;
   DiagEngine diag{mgr};
   PreprocConfig config;
   config.protect_keys = RecipientsKeys();
+  config.ask_license = GrantingEveryLicence();
   Preprocessor pp(mgr, diag, config);
   return pp.Preprocess(mgr.AddFile("<recipient>", envelope));
 }

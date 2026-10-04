@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_license.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
@@ -68,13 +69,14 @@ size_t Count(std::string_view written, std::string_view needle) {
 }
 
 // The text a decrypting run of `envelope` produced with the author's key in
-// its database, where the data the block recorded come back as the source
-// the compilation step reads.
+// its database and the licence the block carries (§34.5.28.2), where the data
+// the block recorded come back as the source the compilation step reads.
 std::string Recovered(const std::string& envelope) {
   SourceManager mgr;
   DiagEngine diag{mgr};
   PreprocConfig config;
   config.protect_keys = TheAuthorsKeyInTheDatabase();
+  config.ask_license = GrantingEveryLicence();
   Preprocessor pp(mgr, diag, config);
   return pp.Preprocess(mgr.AddFile("<envelope>", envelope));
 }

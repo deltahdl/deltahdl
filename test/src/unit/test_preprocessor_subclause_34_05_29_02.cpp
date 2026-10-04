@@ -166,7 +166,7 @@ TEST(ProtectRuntimeLicenseDescription, TheModelIsReadAllTheSame) {
 // A licence in cleartext the tool is about to encrypt is the ENCRYPTION INPUT
 // case, met in no encrypted model, so it is not recorded.
 TEST(ProtectRuntimeLicenseDescription, ALicenceInCleartextIsNotRecorded) {
-  ReadSource run(std::string(kLicense));
+  ReadSource run{std::string(kLicense)};
   EXPECT_TRUE(run.pp.RuntimeLicenses().empty());
 }
 
