@@ -1,5 +1,6 @@
 #include "simulator/modport_expression.h"
 
+#include <cstdint>
 #include <string>
 
 #include "common/arena.h"
@@ -55,6 +56,31 @@ bool TryModportExpressionAssign(const Stmt* stmt, SimContext& ctx,
     return false;
   return TryModportExpressionWrite(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena),
                                    ctx, arena);
+}
+
+// The statement `stmt` with the expression `port` stands for as its target in
+// place of the port, built once per statement and port.
+static const Stmt* NonblockingOfExpression(const Stmt* stmt,
+                                           const ModportExpressionPort* port,
+                                           SimContext& ctx, Arena& arena) {
+  if (const Stmt* built = ctx.FindModportExpressionNba(stmt, port))
+    return built;
+  auto* nba = arena.Create<Stmt>(*stmt);
+  nba->lhs = port->expr;
+  ctx.RecordModportExpressionNba(stmt, port, nba);
+  return nba;
+}
+
+bool TryModportExpressionNonblocking(const Stmt* stmt, const NbaSample& sample,
+                                     uint64_t delay_ticks, SimContext& ctx,
+                                     Arena& arena) {
+  const ModportExpressionPort* port = PortNamedBy(stmt->lhs, ctx);
+  if (port == nullptr) return false;
+  const Stmt* nba = NonblockingOfExpression(stmt, port, ctx, arena);
+  InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
+                                     port->instance_prefix);
+  ScheduleNonblockingAssign(nba, sample, delay_ticks, ctx, arena);
+  return true;
 }
 
 }  // namespace delta

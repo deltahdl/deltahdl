@@ -9,12 +9,15 @@
 // evaluates the expression in the interface instance, and a write assigns to
 // it there.
 
+#include <cstdint>
+
 namespace delta {
 
 class Arena;
 class SimContext;
 struct Expr;
 struct Logic4Vec;
+struct NbaSample;
 struct Stmt;
 
 // Answers true and puts in `out` the value of the expression `expr` names
@@ -33,5 +36,14 @@ bool TryModportExpressionWrite(const Expr* lhs, const Logic4Vec& value,
 // other statement.
 bool TryModportExpressionAssign(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena);
+
+// The nonblocking assignment statement `stmt` with such a port as its target,
+// whose right-hand side `sample` was taken where the statement stands: the
+// update of the expression, resolved in the interface instance, is scheduled
+// `delay_ticks` from now as any other nonblocking update is; false for any
+// other statement.
+bool TryModportExpressionNonblocking(const Stmt* stmt, const NbaSample& sample,
+                                     uint64_t delay_ticks, SimContext& ctx,
+                                     Arena& arena);
 
 }  // namespace delta

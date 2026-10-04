@@ -19,6 +19,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/modport_expression.h"
 #include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -761,6 +762,17 @@ static void ScheduleResolvedFieldNba(const FieldTarget& target,
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
+// The update of a target that stands for storage reached some other way: a
+// clockvar, whose drive is synchronous (§14.16), and a modport expression
+// port, whose update lands on the expression it stands for (§25.5.4).
+static bool TryScheduleElsewhere(const Stmt* stmt, const NbaSample& sample,
+                                 uint64_t delay_ticks, SimContext& ctx,
+                                 Arena& arena) {
+  return TryModportExpressionNonblocking(stmt, sample, delay_ticks, ctx,
+                                         arena) ||
+         TryScheduleSynchronousDrive(stmt, sample.value, ctx, arena);
+}
+
 void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
@@ -771,7 +783,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   LhsIndexPin pin(stmt->lhs, ctx, arena);
 
   const Logic4Vec& rhs_val = sample.value;
-  if (TryScheduleSynchronousDrive(stmt, rhs_val, ctx, arena)) return;
+  if (TryScheduleElsewhere(stmt, sample, delay_ticks, ctx, arena)) return;
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;

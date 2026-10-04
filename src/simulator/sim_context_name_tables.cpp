@@ -683,4 +683,15 @@ const ModportExpressionPort* DeclaredNameTables::FindModportExpression(
   return it != modport_expressions_.end() ? &it->second : nullptr;
 }
 
+const Stmt* DeclaredNameTables::FindModportExpressionNba(
+    const Stmt* stmt, const ModportExpressionPort* port) const {
+  auto it = modport_expression_nbas_.find({stmt, port});
+  return it != modport_expression_nbas_.end() ? it->second : nullptr;
+}
+
+void DeclaredNameTables::RecordModportExpressionNba(
+    const Stmt* stmt, const ModportExpressionPort* port, const Stmt* nba) {
+  modport_expression_nbas_[{stmt, port}] = nba;
+}
+
 }  // namespace delta

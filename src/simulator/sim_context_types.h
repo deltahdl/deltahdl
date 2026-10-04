@@ -51,7 +51,7 @@ struct EnumMemberInfo {
 // §25.5.4: what a modport expression port stands for; see
 // DeclaredNameTables::RegisterModportExpression.
 struct ModportExpressionPort {
-  const Expr* expr = nullptr;
+  Expr* expr = nullptr;
   std::string instance_prefix;
 };
 

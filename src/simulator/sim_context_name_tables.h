@@ -96,6 +96,14 @@ class DeclaredNameTables {
   const ModportExpressionPort* FindModportExpression(
       std::string_view key) const;
   bool HasModportExpressions() const { return !modport_expressions_.empty(); }
+  // The nonblocking assignment of the expression that the statement `stmt`,
+  // whose target is the port `port`, schedules, built once per statement and
+  // port.
+  const Stmt* FindModportExpressionNba(const Stmt* stmt,
+                                       const ModportExpressionPort* port) const;
+  void RecordModportExpressionNba(const Stmt* stmt,
+                                  const ModportExpressionPort* port,
+                                  const Stmt* nba);
 
   void RegisterLetDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindLetDecl(std::string_view name);
@@ -423,6 +431,8 @@ class DeclaredNameTables {
   std::unordered_map<const Expr*, const Stmt*> forkjoin_calls_;
   // §25.5.4: see RegisterModportExpression.
   std::unordered_map<std::string, ModportExpressionPort> modport_expressions_;
+  std::map<std::pair<const Stmt*, const ModportExpressionPort*>, const Stmt*>
+      modport_expression_nbas_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::unordered_map<std::string_view, ModuleItem*> property_decls_;
