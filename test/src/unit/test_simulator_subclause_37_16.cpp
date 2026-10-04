@@ -692,6 +692,13 @@ TEST_F(NetBitsOfARun, ANetBitAtAConstantIndexIsAConstantSelect) {
   EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Net(), 2)), 1);
 }
 
+// Detail 23: a net no other net holds has no parent, so it is a constant
+// select.
+TEST_F(NetBitsOfARun, ANetWithNoParentIsAConstantSelect) {
+  Run(kVectorNet);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Net()), 1);
+}
+
 // A design run with a PLI application registered, its nets read back once the
 // run is over.
 class NetTypesOfARun : public VpiDesignRun {

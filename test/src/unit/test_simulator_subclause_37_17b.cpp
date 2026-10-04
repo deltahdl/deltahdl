@@ -124,6 +124,13 @@ TEST_F(VariablesOfARun, ABitAtAConstantIndexIsAConstantSelect) {
             1);
 }
 
+// Detail 27: a variable of static lifetime that no other variable holds has no
+// parent, so it is a constant select.
+TEST_F(VariablesOfARun, AStaticVariableWithNoParentIsAConstantSelect) {
+  Run(kPackedVariables);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Var("top.v")), 1);
+}
+
 // A value put to a bit is put to that bit of the variable.
 TEST_F(VariablesOfARun, WritingABitWritesThatBitOfTheVariable) {
   Run(kPackedVariables);
@@ -464,6 +471,14 @@ TEST_F(VariablesOfARun, AnArrayElementIsReachedByName) {
   EXPECT_EQ(IntOf(Var("top.arr[2]")), 7);
 }
 
+// Detail 27: an element of an array whose bounds are static, at a constant
+// index, is a constant select.
+TEST_F(VariablesOfARun, AStaticArrayElementIsAConstantSelect) {
+  Run(kFixedArrays);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Var("top.arr"), 2)),
+            1);
+}
+
 // A multidimensional array's subarray is an array var of its own, reached by
 // the outer index, whose elements the inner index reaches (§38.19)...
 TEST_F(VariablesOfARun, AnElementOfASubarrayIsReachedByIndex) {
@@ -535,6 +550,14 @@ TEST_F(VariablesOfARun, AQueueElementIsAnArrayMember) {
   EXPECT_EQ(vpi_get(vpiArrayMember, vpi_handle_by_index(Var("top.q"), 1)), 1);
 }
 
+// Detail 27: a queue's bounds are not static, so none of its elements is a
+// constant select.
+TEST_F(VariablesOfARun, AQueueElementIsNoConstantSelect) {
+  Run(kVariableSizedArrays);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Var("top.q"), 1)),
+            0);
+}
+
 // A value put to the element is put into the array's store, where the next
 // selection of it reads it.
 TEST_F(VariablesOfARun, WritingAQueueElementWritesTheQueue) {
@@ -576,6 +599,12 @@ TEST_F(VariablesOfARun, AStructMembersParentIsTheStruct) {
   Run(kUnpackedStruct);
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiParent, Var("top.s.b"))),
                "s");
+}
+
+// ...which is a constant select (detail 27)...
+TEST_F(VariablesOfARun, AStructMemberIsAConstantSelect) {
+  Run(kUnpackedStruct);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Var("top.s.b")), 1);
 }
 
 // ...and its kind is the field's type (detail 17).

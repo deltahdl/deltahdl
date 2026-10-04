@@ -497,6 +497,55 @@ static void DispatchGetValueByFormat(
   DispatchIntegerFormat(v, value, str_pool, vec_pool, strength_pool);
 }
 
+// §37.16, §37.17: a net bit or var bit selected by an index that is not a
+// constant, which has no bit of its parent's storage of its own.
+static bool IsVaryingBit(const VpiObject& obj) {
+  return (obj.type == vpiNetBit || obj.type == vpiRegBit) &&
+         obj.bit_offset < 0 && obj.parent != nullptr &&
+         obj.index_expr != nullptr;
+}
+
+// The bit of its vector a varying bit stands for when a value is read or
+// written: the vector's bit at the index its index expression then holds. An
+// index with an x or z bit, or one naming no bit of the vector, selects none
+// (§11.5.1).
+static VpiHandle VaryingBitTarget(VpiHandle obj) {
+  VpiHandle index = obj->index_expr;
+  if (index->var == nullptr) return nullptr;
+  VpiRefreshElementCopy(*index);
+  const Logic4Vec& held = index->var->value;
+  if (held.width == 0 || held.is_real || !held.IsKnown()) return nullptr;
+  const int64_t kIndex = SelectBoundValue(held);
+  for (VpiHandle bit : obj->parent->children) {
+    if (bit != obj && bit->type == obj->type && bit->bit_offset >= 0 &&
+        bit->index == kIndex) {
+      return bit;
+    }
+  }
+  return nullptr;
+}
+
+// §38.15 for a varying bit: the value of the bit its index selects, or, when
+// it selects none, x of a 4-state vector and 0 of a 2-state one (§11.5.1).
+static void GetVaryingBitValue(
+    VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
+    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
+    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
+  VpiHandle target = VaryingBitTarget(obj);
+  if (target != nullptr && target->var != nullptr) {
+    DispatchGetValueByFormat(target, value, str_pool, vec_pool, strength_pool);
+    return;
+  }
+  const Variable* whole = obj->parent->var;
+  const bool kTwoState = whole != nullptr && !whole->is_4state;
+  Logic4Word bit = kTwoState ? Logic4Word{0, 0} : Logic4Word{1, 1};
+  Logic4Vec bit_view;
+  bit_view.width = 1;
+  bit_view.nwords = 1;
+  bit_view.words = &bit;
+  DispatchIntegerFormat(bit_view, value, str_pool, vec_pool, strength_pool);
+}
+
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
   // §37.3.6: an object a decryption envelope sealed gives up no value; the
@@ -517,6 +566,10 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     ++obj->side_effect_count;
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
+  if (IsVaryingBit(*obj)) {
+    GetVaryingBitValue(obj, value, str_pool_, vec_pool_, strength_pool_);
+    return;
+  }
   VpiRefreshElementCopy(*obj);
   if (!obj->var) return;
   DispatchGetValueByFormat(obj, value, str_pool_, vec_pool_, strength_pool_);
@@ -778,6 +831,13 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   if (mode == vpiCancelEvent) {
     if (obj->type == vpiSchedEvent) obj->scheduled = false;
     return nullptr;
+  }
+
+  // §37.16, §37.17: a value put to a varying bit is put to the bit its index
+  // selects, and with none selected nothing is written (§11.5.1).
+  if (IsVaryingBit(*obj)) {
+    obj = VaryingBitTarget(obj);
+    if (obj == nullptr) return nullptr;
   }
 
   bool has_delay = PutValueHasDelay(mode, time);

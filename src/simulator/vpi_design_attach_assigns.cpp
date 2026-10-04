@@ -194,7 +194,9 @@ std::vector<const Expr*> Operands(const Expr* first,
 // whose index is not a constant. It is a bit of the kind the vector's own bits
 // are, reaching the vector through vpiParent and the expression the source
 // wrote through vpiIndex; which of the vector's bits it stands for is not fixed
-// before the run, so it holds none of them. Null for a vector with no bits.
+// before the run, so it holds none of them, and its value is the one of the bit
+// its index selects when the value is read or written (vpi_value.cpp). Null
+// for a vector with no bits.
 VpiObject* VaryingBitObject(VpiObject* base, const Expr* index,
                             const AssignBuild& build) {
   int bit_type = 0;

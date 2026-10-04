@@ -161,6 +161,14 @@ class BitSelectsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
+  // Puts the integer `integer` to an object, with no delay.
+  static void PutInt(vpiHandle obj, int integer) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = integer;
+    vpi_put_value(obj, &value, nullptr, vpiNoDelay);
+  }
+
   // The right side of the top's continuous assignment.
   static vpiHandle Rhs() {
     vpiHandle it =
@@ -235,6 +243,52 @@ TEST_F(BitSelectsOfARun, AVaryingBitOfAVariableIsAVarBit) {
   Run("module top; logic [7:0] v; integer i = 2; wire y; assign y = v[i];\n"
       "endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiRegBit);
+}
+
+constexpr const char* kVaryingVarBit =
+    "module top; logic [7:0] v = 8'b0000_0100; integer i = 2; wire y;\n"
+    "assign y = v[i];\n"
+    "endmodule\n";
+
+// The value of a varying bit (§37.17, §38.15) is that of the variable's bit
+// its index selects when the value is read...
+TEST_F(BitSelectsOfARun, AVaryingBitHoldsTheBitItsIndexSelects) {
+  Run(kVaryingVarBit);
+  EXPECT_EQ(IntOf(Rhs()), 1);
+}
+
+// ...so it follows the index from one read to the next...
+TEST_F(BitSelectsOfARun, AVaryingBitFollowsItsIndex) {
+  Run(kVaryingVarBit);
+  PutInt(vpi_handle_by_name(VpiText("top.i"), nullptr), 4);
+  EXPECT_EQ(IntOf(Rhs()), 0);
+}
+
+// ...and an index naming no bit of a 4-state vector reads x (§11.5.1).
+TEST_F(BitSelectsOfARun, AVaryingBitPastTheRangeReadsX) {
+  Run(kVaryingVarBit);
+  PutInt(vpi_handle_by_name(VpiText("top.i"), nullptr), 9);
+  s_vpi_value value = {};
+  value.format = vpiScalarVal;
+  vpi_get_value(Rhs(), &value);
+  EXPECT_EQ(value.value.scalar, vpiX);
+}
+
+// A value put to a varying bit is put to the bit its index selects.
+TEST_F(BitSelectsOfARun, WritingAVaryingBitWritesTheBitItsIndexSelects) {
+  Run(kVaryingVarBit);
+  PutInt(vpi_handle_by_name(VpiText("top.i"), nullptr), 0);
+  PutInt(Rhs(), 1);
+  EXPECT_EQ(IntOf(vpi_handle_by_name(VpiText("top.v"), nullptr)), 5);
+}
+
+// A varying bit of a net holds the net's bit its index selects (§37.16). The
+// net's own assignment comes second, so the select is the top's first.
+TEST_F(BitSelectsOfARun, AVaryingBitOfANetHoldsTheBitItsIndexSelects) {
+  Run("module top; wire [7:0] a; integer i = 2; wire y; assign y = a[i];\n"
+      "assign a = 8'b0000_0100;\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf(Rhs()), 1);
 }
 
 }  // namespace
