@@ -665,17 +665,20 @@ std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
   for (std::size_t i = 0; i < exp.args.size(); ++i) {
     const DpiArg& formal = exp.args[i];
     const std::string kName = "a" + std::to_string(i);
-    const std::string kSeparator = i == 0 ? "" : ", ";
+    if (i != 0) {
+      parameters += ", ";
+      addresses += ", ";
+    }
     if (DpiFormalIsPassedByValue(formal, false)) {
-      parameters += kSeparator + DpiCTypeOfFormal(formal, false) + " " + kName;
-      addresses += kSeparator + "(void*)&" + kName;
+      parameters.append(DpiCTypeOfFormal(formal, false)).append(" ");
+      addresses += "(void*)&";
     } else {
       parameters +=
-          kSeparator +
-          (formal.direction == Direction::kInput ? "const void* " : "void* ") +
-          kName;
-      addresses += kSeparator + "(void*)" + kName;
+          formal.direction == Direction::kInput ? "const void* " : "void* ";
+      addresses += "(void*)";
     }
+    parameters += kName;
+    addresses += kName;
   }
   if (parameters.empty()) {
     parameters = "void";

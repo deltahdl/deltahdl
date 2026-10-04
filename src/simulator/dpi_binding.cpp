@@ -101,6 +101,7 @@ void DpiExportEntry(int index, void** args, void* result) {
   const DataTypeKind kResult =
       exp.is_task ? DataTypeKind::kInt : exp.return_type;
   std::vector<DpiArgValue> values;
+  values.reserve(exp.args.size());
   for (std::size_t i = 0; i < exp.args.size(); ++i) {
     values.push_back(exp.args[i].direction == Direction::kOutput
                          ? DpiArgValue{}

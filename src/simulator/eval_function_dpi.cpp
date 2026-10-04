@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_export.h"
 #include "simulator/dpi_runtime.h"
@@ -727,6 +728,47 @@ Expr* IdentifierNaming(const std::string& text, Arena& arena) {
   return id;
 }
 
+// §35.7: makes each formal's temporary, names it as the formal's actual in
+// `call`, and writes an input's or inout's value into it -- an array formal
+// is an array the body can index, and a call with outputs writes them back.
+void SendExportArguments(std::string_view key,
+                         const std::vector<DpiArg>& formals,
+                         const std::vector<DpiArgValue>& args, Expr* call,
+                         const ActualBindingCtx& b) {
+  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
+    const DpiArg& formal = formals[i];
+    const std::string kTemp = ExportTempName(key, i);
+    EnsureExportTemp(kTemp, formal, b.ctx);
+    Expr* actual = IdentifierNaming(kTemp, b.arena);
+    call->args.push_back(actual);
+    if (formal.direction == Direction::kOutput) continue;
+    if (!formal.unpacked_dims.empty()) {
+      WritebackDpiArray(formal, actual, args[i], b);
+      continue;
+    }
+    PerformBlockingAssign(actual,
+                          DpiValueOfType(b.arena, formal.type, formal.width,
+                                         args[i], !formal.is_unsigned),
+                          b.ctx, b.arena);
+  }
+}
+
+// §35.7: reads back what the call left in each output's and inout's
+// temporary into `args`.
+void ReceiveExportArguments(const std::vector<DpiArg>& formals,
+                            std::vector<DpiArgValue>& args,
+                            const ActualBindingCtx& b) {
+  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
+    const DpiArg& formal = formals[i];
+    if (formal.direction == Direction::kInput) continue;
+    const Expr* actual = b.call->args[i];
+    args[i] = formal.unpacked_dims.empty()
+                  ? DpiArgValueOfType(formal.type, formal.width,
+                                      EvalExpr(actual, b.ctx, b.arena))
+                  : DpiArrayActual(formal, actual, b);
+  }
+}
+
 }  // namespace
 
 // §35.5.4: the name the call reaches its import declaration by -- the
@@ -783,8 +825,9 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // declaration carries (§35.5.1.3). The frame's scope is the instance the
   // call is made in, by its fully qualified name (§H.9.3), which is the scope
   // an export that instance declares is reached in (§35.5.3).
-  dpi->EnterDeclaredImportCall(
-      callee, DpiScope{DpiInstanceScopeName(ctx.ActiveInstancePrefix(), ctx)});
+  DpiScope scope;
+  scope.name = DpiInstanceScopeName(ctx.ActiveInstancePrefix(), ctx);
+  dpi->EnterDeclaredImportCall(callee, std::move(scope));
 
   DpiArgValue result;
   if (import->is_pure) {
@@ -825,38 +868,12 @@ DpiArgValue CallDpiExportedFunction(std::string_view key,
   call->kind = ExprKind::kCall;
   call->callee = *arena.Create<std::string>(key);
   ActualBindingCtx binding{call, formals.size(), ctx, arena};
-  // Each formal's value goes to the function through a temporary named as its
-  // actual, an input's or inout's written there first, so an array formal is
-  // an array the body can index and a call with outputs writes them back.
-  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
-    const DpiArg& formal = formals[i];
-    const std::string kTemp = ExportTempName(key, i);
-    EnsureExportTemp(kTemp, formal, ctx);
-    Expr* actual = IdentifierNaming(kTemp, arena);
-    call->args.push_back(actual);
-    if (formal.direction == Direction::kOutput) continue;
-    if (!formal.unpacked_dims.empty()) {
-      WritebackDpiArray(formal, actual, args[i], binding);
-    } else {
-      PerformBlockingAssign(actual,
-                            DpiValueOfType(arena, formal.type, formal.width,
-                                           args[i], !formal.is_unsigned),
-                            ctx, arena);
-    }
-  }
+  SendExportArguments(key, formals, args, call, binding);
   // The key and the temporaries are names from the root of the design, so the
   // call is evaluated as from there whatever instance C was entered from.
   InstancePrefixOverride root(ctx.InstancePrefixOverride(), "");
   Logic4Vec value = EvalExpr(call, ctx, arena);
-  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
-    const DpiArg& formal = formals[i];
-    if (formal.direction == Direction::kInput) continue;
-    const Expr* actual = call->args[i];
-    args[i] = formal.unpacked_dims.empty()
-                  ? DpiArgValueOfType(formal.type, formal.width,
-                                      EvalExpr(actual, ctx, arena))
-                  : DpiArrayActual(formal, actual, binding);
-  }
+  ReceiveExportArguments(formals, args, binding);
   return DpiArgValueOfType(result, 0, value);
 }
 
