@@ -199,6 +199,8 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   signal_ranges_.clear();
   unpacked_arrays_.clear();
   unlowered_params_.clear();
+  block_params_.clear();
+  shadowed_signals_.clear();
   array_shapes_.clear();
   output_ports_.clear();
   reported_exprs_.clear();
@@ -580,7 +582,7 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
 
 void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   if (!assign.lhs || !assign.rhs) return;
-  SetGenScope(assign.gen_block_consts);
+  SetGenScope(assign.gen_block_consts, assign.gen_block_prefixes);
   if (assign.lhs->kind == ExprKind::kSelect) {
     LowerSelectTarget(assign.lhs, assign.rhs, aig);
     return;
@@ -871,7 +873,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   }
 
   for (const auto& proc : mod->processes) {
-    SetGenScope(proc.gen_block_consts);
+    SetGenScope(proc.gen_block_consts, proc.gen_block_prefixes);
     switch (proc.kind) {
       case RtlirProcessKind::kAlwaysComb:
         LowerAlwaysComb(proc, *aig);
@@ -895,6 +897,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
     }
   }
 
+  RestoreShadowedSignals();
   RegisterOutputs(*aig);
   // A graph built over a statement that was passed over describes something
   // other than the module, so answer with nothing rather than with that.

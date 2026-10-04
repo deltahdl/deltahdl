@@ -10,7 +10,6 @@
 #include "common/packed_range.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
@@ -460,13 +459,6 @@ void SynthLower::LowerSelectTarget(const Expr* lhs, const Expr* rhs,
   }
   propagated_width_ = 0;
   propagated_signed_ = false;
-}
-
-void SynthLower::SetGenScope(const GenBlockConsts& consts) {
-  scope_ = param_scope_;
-  for (const auto& [name, value] : consts) {
-    scope_[name] = value;
-  }
 }
 
 }  // namespace delta

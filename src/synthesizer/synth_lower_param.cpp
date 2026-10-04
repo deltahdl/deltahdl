@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -8,6 +10,7 @@
 #include "common/packed_range.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "synthesizer/aig.h"
@@ -118,6 +121,16 @@ bool SynthLower::MapParamArray(const RtlirParamDecl& param,
   return true;
 }
 
+// The constant bits of the value `param` resolved to, `width` of them.
+static std::vector<uint32_t> ParamBits(const RtlirParamDecl& param,
+                                       uint32_t width) {
+  std::vector<uint32_t> bits(width);
+  for (uint32_t b = 0; b < width; ++b) {
+    bits[b] = ConstBit(ParamValueBit(param, b));
+  }
+  return bits;
+}
+
 bool SynthLower::MapParam(const RtlirParamDecl& param) {
   // A real or a string parameter holds its value outside
   // RtlirParamDecl::resolved_value, and a parameter declared in a generate
@@ -130,11 +143,17 @@ bool SynthLower::MapParam(const RtlirParamDecl& param) {
   ParamStorageShape shape = ParamStorageShapeOf(param);
   if (param.unpacked_dims != nullptr) return MapParamArray(param, shape);
   if (!param.is_resolved) return false;
-  std::vector<uint32_t> bits(shape.width);
-  for (uint32_t b = 0; b < shape.width; ++b) {
-    bits[b] = ConstBit(ParamValueBit(param, b));
+  RecordParamSignal(param, shape, ParamBits(param, shape.width));
+  return true;
+}
+
+bool SynthLower::RecordBlockParam(const RtlirParamDecl& param) {
+  if (param.gen_block_prefix.empty() || !param.is_resolved ||
+      param.is_real_value || param.decl_is_real || param.is_string_value ||
+      param.unpacked_dims != nullptr) {
+    return false;
   }
-  RecordParamSignal(param, shape, std::move(bits));
+  block_params_.push_back(&param);
   return true;
 }
 
@@ -142,7 +161,10 @@ void SynthLower::MapParams(const RtlirModule* mod) {
   for (const auto& param : mod->params) {
     // A type parameter names a type rather than a value, so no operand reads
     // it.
-    if (param.is_type_param || signal_widths_.count(param.name) != 0) continue;
+    if (param.is_type_param || RecordBlockParam(param) ||
+        signal_widths_.count(param.name) != 0) {
+      continue;
+    }
     if (!MapParam(param)) unlowered_params_.insert(param.name);
   }
 }
@@ -157,6 +179,87 @@ bool SynthLower::ReportIfUnloweredParam(const Expr* expr, const Expr* name) {
                       "parameter's value has no lowering in the synthesizer",
                       Subclause("6.20"));
   return true;
+}
+
+void SynthLower::InstallScopeConstant(std::string_view name,
+                                      std::vector<uint32_t> bits,
+                                      bool is_signed, PackedRange range) {
+  bool kept = std::any_of(
+      shadowed_signals_.begin(), shadowed_signals_.end(),
+      [name](const ShadowedSignal& held) { return held.name == name; });
+  auto it = signal_bits_.find(name);
+  if (!kept && it == signal_bits_.end()) {
+    shadowed_signals_.push_back(ShadowedSignal{.name = name});
+  } else if (!kept) {
+    shadowed_signals_.push_back(
+        ShadowedSignal{.name = name,
+                       .recorded = true,
+                       .is_unpacked = unpacked_arrays_.count(name) != 0,
+                       .width = signal_widths_[name],
+                       .is_signed = signal_signed_[name],
+                       .range = signal_ranges_[name],
+                       .bits = it->second});
+  }
+  unpacked_arrays_.erase(name);
+  signal_widths_[name] = static_cast<uint32_t>(bits.size());
+  signal_signed_[name] = is_signed;
+  signal_ranges_[name] = range;
+  signal_bits_[name] = std::move(bits);
+}
+
+void SynthLower::RestoreShadowedSignals() {
+  for (ShadowedSignal& held : shadowed_signals_) {
+    if (!held.recorded) {
+      signal_bits_.erase(held.name);
+      signal_widths_.erase(held.name);
+      signal_signed_.erase(held.name);
+      signal_ranges_.erase(held.name);
+      continue;
+    }
+    if (held.is_unpacked) unpacked_arrays_.insert(held.name);
+    signal_widths_[held.name] = held.width;
+    signal_signed_[held.name] = held.is_signed;
+    signal_ranges_[held.name] = held.range;
+    signal_bits_[held.name] = std::move(held.bits);
+  }
+  shadowed_signals_.clear();
+}
+
+// §27.4 makes a loop generate block's implicit localparam an integer, which
+// §6.11 makes 32 bits and signed.
+static constexpr uint32_t kIntegerBits = 32;
+
+// The constant bits of the integer `value`, two's complement.
+static std::vector<uint32_t> IntegerBits(int64_t value) {
+  std::vector<uint32_t> bits(kIntegerBits);
+  for (uint32_t b = 0; b < kIntegerBits; ++b) {
+    bits[b] = ConstBit(((static_cast<uint64_t>(value) >> b) & 1u) != 0);
+  }
+  return bits;
+}
+
+// The prefixes come outermost first, so a parameter of an inner block is
+// recorded after, and so over, one of the same name in a block enclosing it,
+// as §23.9's upward search finds the inner one first.
+void SynthLower::SetGenScope(const GenBlockConsts& consts,
+                             const GenBlockPrefixes& prefixes) {
+  RestoreShadowedSignals();
+  scope_ = param_scope_;
+  for (const auto& [name, value] : consts) {
+    scope_[name] = value;
+    InstallScopeConstant(name, IntegerBits(value), true,
+                         PackedRange::Implicit(kIntegerBits));
+  }
+  for (std::string_view prefix : prefixes) {
+    for (const RtlirParamDecl* param : block_params_) {
+      if (param->gen_block_prefix != prefix) continue;
+      scope_[param->name] = param->resolved_value;
+      ParamStorageShape shape = ParamStorageShapeOf(*param);
+      InstallScopeConstant(param->name, ParamBits(*param, shape.width),
+                           shape.is_signed,
+                           ParamDeclaredRange(*param, shape.width));
+    }
+  }
 }
 
 }  // namespace delta

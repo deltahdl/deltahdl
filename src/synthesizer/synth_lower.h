@@ -409,9 +409,22 @@ class SynthLower {
   // defines, rather than an element of an unpacked array, which is §11.5.2.
   bool IsVectorSelect(const Expr* sel);
 
-  // Install the scope the indices of the item being lowered are folded in:
-  // the module's parameters, and the §27.4 loop index values `consts` carries.
-  void SetGenScope(const GenBlockConsts& consts);
+  // Install the scope of the item being lowered, which stands in the generate
+  // blocks `prefixes` names: the module's parameters, the §27.4 loop index
+  // values `consts` carries, and the parameters those blocks declare (§23.9).
+  // Each loop index and block parameter is recorded as a signal whose bits are
+  // the constants of its value, over whatever the name held at module scope,
+  // and is folded into the scope a select's index is folded in. Defined, with
+  // the three below, in synth_lower_param.cpp.
+  void SetGenScope(const GenBlockConsts& consts,
+                   const GenBlockPrefixes& prefixes);
+  void InstallScopeConstant(std::string_view name, std::vector<uint32_t> bits,
+                            bool is_signed, PackedRange range);
+  // Put back each name SetGenScope recorded over as it stood at module scope.
+  void RestoreShadowedSignals();
+  // Record the parameters `mod` declares in its generate blocks, and answer
+  // whether `param` was one SetGenScope can install.
+  bool RecordBlockParam(const RtlirParamDecl& param);
 
   // §11.5.1: lower one bit of a select whose index did not fold, which is the
   // form the subclause writes `dword[8*sel +: 8]` and `vect[addr]` in. Such a
@@ -535,9 +548,28 @@ class SynthLower {
   std::unordered_set<std::string_view> unpacked_arrays_;
 
   // The value parameters of the module MapParams could not record as signals:
-  // a real or a string parameter, one declared in a generate block, and a
-  // parameter array whose elements did not fold from a positional pattern.
+  // a real or a string parameter, and a parameter array whose elements did
+  // not fold from a positional pattern, whether declared in the module or in
+  // one of its generate blocks.
   std::unordered_set<std::string_view> unlowered_params_;
+
+  // §27.4 with §23.9: the value parameters the module declares in its generate
+  // blocks, each recorded by SetGenScope while an item of its block is lowered.
+  std::vector<const RtlirParamDecl*> block_params_;
+
+  // A name's module-scope state, kept while SetGenScope has recorded a loop
+  // index or a block parameter over it, and put back before the next item's
+  // scope goes in. `recorded` is false where the name held no signal.
+  struct ShadowedSignal {
+    std::string_view name;
+    bool recorded = false;
+    bool is_unpacked = false;
+    uint32_t width = 0;
+    bool is_signed = false;
+    PackedRange range;
+    std::vector<uint32_t> bits;
+  };
+  std::vector<ShadowedSignal> shadowed_signals_;
 
   // §11.5.2: the shape of each unpacked array this can address, which is the
   // one-dimensional arrays a variable declaration gives a low bound for.
