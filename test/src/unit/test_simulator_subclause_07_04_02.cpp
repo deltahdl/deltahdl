@@ -292,6 +292,31 @@ TEST(UnpackedArraySim, StructElementsInitializedWrittenAndRead) {
   EXPECT_EQ(RunAndGet(src, "sum"), 13u);
 }
 
+// §7.4.2 with §7.2: each element of a multidimensional unpacked array of
+// structures is a structure too, so a member write to `c[x][y]`, by indices
+// written out and by a foreach with a loop variable per dimension, is stored
+// in that element and read back through `c[x][y].member`.
+TEST(UnpackedArraySim, MultidimensionalStructElementsWrittenAndRead) {
+  const char* src =
+      "module t;\n"
+      "  typedef struct { int i; int j; } p_t;\n"
+      "  p_t c [11:12][6:8];\n"
+      "  int direct, sum;\n"
+      "  initial begin\n"
+      "    c[12][7].j = 5;\n"
+      "    direct = c[12][7].j;\n"
+      "    foreach (c[x, y]) begin\n"
+      "      c[x][y].i = x - 10;\n"
+      "      c[x][y].j = y - 5;\n"
+      "    end\n"
+      "    sum = 0;\n"
+      "    foreach (c[x, y]) sum += c[x][y].i * c[x][y].j;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "direct"), 5u);
+  EXPECT_EQ(RunAndGet(src, "sum"), 18u);
+}
+
 // §7.4.2 with §8.5: a class property may be a multidimensional unpacked
 // array, and each element `g[i][j]` is a variable of its own, written and
 // read in a method, through a handle, and by a foreach with a loop variable
