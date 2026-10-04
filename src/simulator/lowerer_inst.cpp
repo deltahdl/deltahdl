@@ -525,6 +525,18 @@ static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
 // assignment of an element's width, so the port read one value's bits. False
 // for a port that is no one-dimensional unpacked array, or a connection that
 // names no array of as many elements, which keep the scalar path.
+// §27.4: a port connection written in a loop generate block may read the
+// block's implicit localparam, and a name it reads may be one the block
+// declares, so the assignment a connection is lowered to carries the loop
+// constants and generate prefixes of the block instance holding the instance,
+// which Lowerer::LowerContAssign binds while evaluating it.
+static RtlirContAssign PortBindingAssign(const RtlirModuleInst& inst) {
+  RtlirContAssign ca;
+  ca.gen_block_consts = inst.gen_block_consts;
+  ca.gen_block_prefixes = inst.gen_block_prefixes;
+  return ca;
+}
+
 bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
                                     const RtlirPortBinding& binding,
                                     const std::string& inst_seg,
@@ -561,7 +573,7 @@ bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
                                          port_shape.AddressAt(p), arena_);
     Expr* conn_elem =
         MakeElementSelect(binding.connection, conn_shape.AddressAt(p), arena_);
-    RtlirContAssign ca;
+    RtlirContAssign ca = PortBindingAssign(inst);
     ca.lhs = input ? local_elem : conn_elem;
     ca.rhs = input ? conn_elem : local_elem;
     ca.width = port->width;
@@ -728,7 +740,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       std::string port_name =
           inst_prefix_ + inst_seg + std::string(binding.port_name);
       BindCheckerClockvarFormal(inst, binding, inst_prefix_, port_name, ctx_);
-      RtlirContAssign ca;
+      RtlirContAssign ca = PortBindingAssign(inst);
       ca.lhs = local_id;
       ca.rhs = binding.connection;
       ca.width = InputPortAssignWidth(binding, port_name, ctx_);
@@ -747,7 +759,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     // instance-array distribution, all of which the continuous-assignment
     // lvalue writer now handles.
     if (!IsDrivableOutputConnection(binding.connection->kind)) continue;
-    RtlirContAssign ca;
+    RtlirContAssign ca = PortBindingAssign(inst);
     ca.lhs = binding.connection;
     ca.rhs = local_id;
     ca.width = binding.width;

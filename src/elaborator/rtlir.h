@@ -631,6 +631,10 @@ struct RtlirModuleInst {
   // produce the same string. A hierarchical path is read against these two.
   std::string_view simple_inst_name;
   HierPath gen_block_path;
+  // §27.4: the loop constants and generate prefixes of the block instance
+  // holding this instance, which its port connections are evaluated with.
+  GenBlockConsts gen_block_consts;
+  GenBlockPrefixes gen_block_prefixes;
   struct RtlirModule* resolved = nullptr;
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;

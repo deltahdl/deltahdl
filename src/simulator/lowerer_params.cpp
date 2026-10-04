@@ -26,7 +26,14 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     // makes a child instance's parameters — including any defparam override —
     // visible to that instance's processes. The name is arena-persisted because
     // SimContext keys variables by string_view.
-    auto* full = arena_.Create<std::string>(inst_prefix_ + std::string(p.name));
+    //
+    // §27.4 and §27.5 make a generate block a scope of its own, so a parameter
+    // declared in one is keyed under the block's prefix as its variables are:
+    // a bare read in the block finds it there first (GenerateBlockKeys), and
+    // the module's parameter of the same name, or another block's, is a
+    // different variable.
+    auto* full = arena_.Create<std::string>(
+        inst_prefix_ + std::string(p.gen_block_prefix) + std::string(p.name));
     // §21.7.2.1: dumped, the parameter is declared with the parameter var_type.
     ctx_.Vcd().MarkVcdParameter(*full);
     LowerParam(p, *full);

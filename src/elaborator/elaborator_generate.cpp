@@ -194,7 +194,8 @@ static void StampGenBlockInstance(std::vector<Item>& items, size_t first,
 // assignment and a user-defined primitive instance each reach simulation as
 // their own thread, and the clause admits the parameter "anywhere within the
 // generate block that a normal parameter with an integer value can be used", so
-// all three carry it. Lowerer::LowerUdpInst in src/simulator/lowerer_udp.cpp
+// all three carry it, as does a module instance for its port connections.
+// Lowerer::LowerUdpInst in src/simulator/lowerer_udp.cpp
 // gives an RtlirUdpInst a Process of its own for the reason
 // Lowerer::LowerContAssign in src/simulator/lowerer_contassign.cpp gives one to
 // an RtlirContAssign, which is why RtlirUdpInst carries the same two members as
@@ -208,6 +209,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_proc = mod->processes.size();
   size_t first_assign = mod->assigns.size();
   size_t first_udp = mod->udp_insts.size();
+  size_t first_child = mod->children.size();
   ElaborateItem(item, mod);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
@@ -232,6 +234,10 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);
   StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_,
+                        gen_prefix_scopes_);
+  // A module instance's port connections are lowered as continuous
+  // assignments (Lowerer::LowerPortBindings), which read the same two.
+  StampGenBlockInstance(mod->children, first_child, gen_loop_consts_,
                         gen_prefix_scopes_);
 }
 

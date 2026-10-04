@@ -495,4 +495,31 @@ TEST(LoopGenerateInstanceSim,
             "ip 7\nip 9\n");
 }
 
+// §27.4 Example 3 indexes arrays by the implicit localparam in each instance's
+// port connections, so instance g[k] reads src[2 - k] and drives dst[k]. The
+// test fails on a simulator that evaluates the connections with no value for
+// the genvar, which connects every instance to the wrong elements.
+TEST(LoopGenerateInstanceSim, PortConnectionsReadTheInstanceIndex) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module add1(input logic [7:0] a, output logic [7:0] y);\n"
+                 "  assign y = a + 1;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  logic [7:0] src [0:2];\n"
+                 "  wire [7:0] dst [0:2];\n"
+                 "  genvar i;\n"
+                 "  for (i = 0; i < 3; i = i + 1) begin : g\n"
+                 "    add1 u(.a(src[2 - i]), .y(dst[i]));\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    src[0] = 8; src[1] = 6; src[2] = 4;\n"
+                 "    #1 $display(\"p %0d %0d %0d\", dst[0], dst[1], "
+                 "dst[2]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "p 5 7 9\n");
+}
+
 }  // namespace

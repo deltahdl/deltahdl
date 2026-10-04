@@ -464,4 +464,65 @@ TEST(GenerateSimulation, GenerateBlockOfABoundModuleRuns) {
             "bnd gen\n");
 }
 
+// §27.5 makes each generate block a scope of its own, and §23.9 resolves a
+// name read in a block in that block first, so each block reads the K it
+// declares. The test fails on a simulator that stores every block's K under
+// one name, where both blocks read the last one lowered.
+TEST(GenerateSimulation, EachBlockReadsTheLocalparamItDeclares) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  if (1) begin : a\n"
+                       "    localparam int K = 3;\n"
+                       "    initial #1 $write(\"two %0d\", K);\n"
+                       "  end\n"
+                       "  if (1) begin : b\n"
+                       "    localparam int K = 4;\n"
+                       "    initial #2 $display(\" %0d\", K);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "two 3 4\n");
+}
+
+// A block's K hides the module's K inside the block only, and the module's is
+// still reached through its path. The test fails on a simulator whose block K
+// replaces the module's.
+TEST(GenerateSimulation, BlockLocalparamHidesTheModuleParameterInTheBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  parameter int K = 1;\n"
+                       "  if (1) begin : g\n"
+                       "    localparam int K = 9;\n"
+                       "    initial $display(\"sh %0d %0d\", K, top.K);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "sh 9 1\n");
+}
+
+// §27.4 makes each loop iteration's block a scope, and the case-generate in it
+// selects a block c of its own, so the first iteration reads 7 and the second
+// 8. The test fails on a simulator that stores both selected blocks' K under
+// one name.
+TEST(GenerateSimulation, EachIterationReadsItsSelectedBlocksLocalparam) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  genvar i;\n"
+                       "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+                       "    case (i)\n"
+                       "      0: begin : c\n"
+                       "        localparam int K = 7;\n"
+                       "        initial #1 $display(\"cs5 %0d\", K);\n"
+                       "      end\n"
+                       "      default: begin : c\n"
+                       "        localparam int K = 8;\n"
+                       "        initial #2 $display(\"cs5 %0d\", K);\n"
+                       "      end\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "cs5 7\ncs5 8\n");
+}
+
 }  // namespace
