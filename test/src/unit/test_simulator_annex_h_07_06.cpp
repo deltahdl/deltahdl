@@ -330,4 +330,26 @@ TEST(DpiArrayNaturalOrder, AnArrayOfVectorsCrossesAsTheirChunks) {
   EXPECT_EQ(VariableValue(f, "v[1]"), 0U);
 }
 
+// The C function the design below calls, summing the two ints of its array.
+int SumOfTwo(const int* a) { return (a[0] * 10) + a[1]; }
+
+// §35.5.6.1 with §H.7.3: a formal's unpacked dimension may be sized by a
+// parameter, a constant expression like any other, and the array then crosses
+// in C layout as one sized by a literal does.
+TEST(DpiArrayNaturalOrder, AParameterSizedArrayCrossesInCLayout) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  parameter int N = 2;\n"
+      "  import \"DPI-C\" function int sum_sized(input int a [N]);\n"
+      "  int arr [2] = '{3, 4};\n"
+      "  int r;\n"
+      "  initial r = sum_sized(arr);\n"
+      "endmodule\n",
+      f, {{"sum_sized", reinterpret_cast<void*>(&SumOfTwo)}},
+      "annex_h_07_06_parameter_sized");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "r"), 34U);
+}
+
 }  // namespace

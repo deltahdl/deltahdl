@@ -170,14 +170,15 @@ TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
 }
 
 // §35.4 with §35.5.6.1: an import whose symbol is found but whose formal is
-// an array sized by a parameter, whose bound this simulator does not fold for
-// the C layout yet, is left unbound, and its call's report says why.
+// an array sized by a constant function call, whose bound this simulator does
+// not fold for the C layout yet, is left unbound, and its call's report says
+// why.
 TEST(DpiImportBinding, AFormalWithNoCLayoutHereIsNamedAtTheCall) {
   SimFixture f;
   RunWithImportsBound(
       "module t;\n"
-      "  parameter int N = 2;\n"
-      "  import \"DPI-C\" function int sum_sized(input int a [N]);\n"
+      "  function int two(); return 2; endfunction\n"
+      "  import \"DPI-C\" function int sum_sized(input int a [two()]);\n"
       "  int arr [2] = '{1, 2};\n"
       "  int r;\n"
       "  initial r = sum_sized(arr);\n"

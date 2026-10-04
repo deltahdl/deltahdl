@@ -577,7 +577,7 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
 // entry per SystemVerilog name, and a module instantiated twice registers its
 // declarations once: the second instance's are the same declarations.
 static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
-                                   SimContext& ctx) {
+                                   const ScopeMap& scope, SimContext& ctx) {
   DpiRuntime* dpi = nullptr;
   for (const auto* item : decls) {
     if (item->kind != ModuleItemKind::kDpiImport) continue;
@@ -607,14 +607,14 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
     func.packed_arg_passing =
         DpiPassingSemanticsOfSpecString(item->dpi_spec_string);
     for (const auto& arg : item->func_args) {
-      func.args.push_back(DpiFormalOfArg(arg));
+      func.args.push_back(DpiFormalOfArg(arg, scope));
     }
     dpi->RegisterImport(std::move(func));
   }
 }
 
 void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
-  RegisterDpiImportDecls(mod->dpi_import_decls, ctx);
+  RegisterDpiImportDecls(mod->dpi_import_decls, DpiParameterScope(*mod), ctx);
 }
 
 // §6.18 with §15.4.9 (printed page 377): each typedef item among `items`,
@@ -889,10 +889,10 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
 
 void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx) {
   for (const auto* pkg : design->packages) {
-    RegisterDpiImportDecls(pkg->items, ctx);
+    RegisterDpiImportDecls(pkg->items, ScopeMap{}, ctx);
   }
   if (design->compilation_unit != nullptr) {
-    RegisterDpiImportDecls(design->compilation_unit->cu_items, ctx);
+    RegisterDpiImportDecls(design->compilation_unit->cu_items, ScopeMap{}, ctx);
   }
 }
 

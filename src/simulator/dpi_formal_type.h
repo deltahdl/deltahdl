@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -43,13 +44,18 @@ DpiCrossingType DpiCrossingTypeOf(const DataType& declared,
 // §35.5.4 and §35.7: the formal an import's or an export's declaration
 // writes as `arg`, its type as written, which ResolveDpiFormalTypes later
 // resolves to the type it crosses as.
-DpiArg DpiFormalOfArg(const FunctionArg& arg);
+DpiArg DpiFormalOfArg(const FunctionArg& arg, const ScopeMap& scope);
+
+// The values of `mod`'s own parameters by name, which the bounds of a formal
+// its declarations write may name (§35.5.6.1, §6.20).
+ScopeMap DpiParameterScope(const RtlirModule& mod);
 
 // §H.7.3: the unpacked dimensions `dims` a formal's declaration wrote, each as
-// its lower and upper bound, outermost first. Empty where there are none, where
-// one is open (§35.5.6.1) or where a bound does not fold to a constant.
+// its lower and upper bound, outermost first, the bounds folded against
+// `scope`. Empty where there are none, where one is open (§35.5.6.1) or where
+// a bound does not fold to a constant.
 std::vector<SvActualDimension> DpiSizedUnpackedDimensions(
-    const std::vector<Expr*>& dims);
+    const std::vector<Expr*>& dims, const ScopeMap& scope);
 
 // Sets the type each formal of every import `dpi` holds crosses as, the
 // dimensions of each sized unpacked one and the members of each unpacked

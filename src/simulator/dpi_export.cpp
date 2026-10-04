@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -32,6 +33,7 @@ std::string DpiInstanceScopeName(std::string_view prefix,
 
 void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
                               SimContext& ctx) {
+  const ScopeMap kScope = DpiParameterScope(*mod);
   for (const ModuleItem* item : mod->dpi_export_decls) {
     const std::string kKey = std::string(prefix) + std::string(item->name);
     const ModuleItem* subroutine = ctx.FindFunction(kKey);
@@ -49,7 +51,7 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
       exp.return_type =
           exp.is_task ? DataTypeKind::kVoid : subroutine->return_type.kind;
       for (const FunctionArg& arg : subroutine->func_args) {
-        exp.args.push_back(DpiFormalOfArg(arg));
+        exp.args.push_back(DpiFormalOfArg(arg, kScope));
       }
     }
     if (subroutine != nullptr && !exp.is_task) {

@@ -131,16 +131,17 @@ DpiCrossingType Named(const DataType& type, const RtlirDesign& design) {
 // One unpacked dimension a declaration wrote, as its lower and upper bound;
 // none where it is open or a bound does not fold. §7.4.2 writes `[N]` for the
 // range [0:N-1].
-std::optional<SvActualDimension> SizedDimension(const Expr* dim) {
+std::optional<SvActualDimension> SizedDimension(const Expr* dim,
+                                                const ScopeMap& scope) {
   if (dim == nullptr) return std::nullopt;
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    std::optional<int64_t> left = ConstEvalInt(dim->lhs);
-    std::optional<int64_t> right = ConstEvalInt(dim->rhs);
+    std::optional<int64_t> left = ConstEvalInt(dim->lhs, scope);
+    std::optional<int64_t> right = ConstEvalInt(dim->rhs, scope);
     if (!left || !right) return std::nullopt;
     return SvActualDimension{static_cast<int32_t>(std::min(*left, *right)),
                              static_cast<int32_t>(std::max(*left, *right))};
   }
-  std::optional<int64_t> size = ConstEvalInt(dim);
+  std::optional<int64_t> size = ConstEvalInt(dim, scope);
   if (!size || *size <= 0) return std::nullopt;
   return SvActualDimension{0, static_cast<int32_t>(*size - 1)};
 }
@@ -165,7 +166,17 @@ DpiCrossingType DpiCrossingTypeOf(const DataType& declared,
   }
 }
 
-DpiArg DpiFormalOfArg(const FunctionArg& arg) {
+ScopeMap DpiParameterScope(const RtlirModule& mod) {
+  ScopeMap scope;
+  for (const RtlirParamDecl& param : mod.params) {
+    if (param.gen_block_prefix.empty()) {
+      scope[param.name] = param.resolved_value;
+    }
+  }
+  return scope;
+}
+
+DpiArg DpiFormalOfArg(const FunctionArg& arg, const ScopeMap& scope) {
   DpiArg formal;
   formal.name = arg.name;
   formal.type = arg.data_type.kind;
@@ -196,15 +207,18 @@ DpiArg DpiFormalOfArg(const FunctionArg& arg) {
   // §35.5.6.1: a formal with unpacked dimensions is an array of values of
   // its type rather than one of them.
   formal.has_unpacked_dimensions = !arg.unpacked_dims.empty();
+  // §35.5.6.1: a dimension's bounds are constant expressions, the declaring
+  // module's parameters among what they may name.
+  formal.unpacked_dims = DpiSizedUnpackedDimensions(arg.unpacked_dims, scope);
   formal.declaration = &arg;
   return formal;
 }
 
 std::vector<SvActualDimension> DpiSizedUnpackedDimensions(
-    const std::vector<Expr*>& dims) {
+    const std::vector<Expr*>& dims, const ScopeMap& scope) {
   std::vector<SvActualDimension> sized;
   for (const Expr* dim : dims) {
-    std::optional<SvActualDimension> folded = SizedDimension(dim);
+    std::optional<SvActualDimension> folded = SizedDimension(dim, scope);
     if (!folded) return {};
     sized.push_back(*folded);
   }
@@ -249,7 +263,11 @@ void ResolveFormal(DpiArg& formal, const DataType& type,
                    const std::vector<Expr*>& unpacked,
                    const RtlirDesign& design, const SimContext& ctx) {
   formal.has_unpacked_dimensions = !unpacked.empty();
-  formal.unpacked_dims = DpiSizedUnpackedDimensions(unpacked);
+  // Dimensions the registration already folded against the declaring scope
+  // stand; a member's are folded here.
+  if (formal.unpacked_dims.empty()) {
+    formal.unpacked_dims = DpiSizedUnpackedDimensions(unpacked, ScopeMap{});
+  }
   formal.is_open_array =
       std::find(unpacked.begin(), unpacked.end(), nullptr) != unpacked.end();
   DpiCrossingType crossing = DpiCrossingTypeOf(type, design);
