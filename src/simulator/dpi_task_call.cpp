@@ -1,6 +1,12 @@
 #include "simulator/dpi_task_call.h"
 
 #include <pthread.h>
+// glibc declares pthread_t and pthread_attr_t in <bits/pthreadtypes.h>, which
+// misc-include-cleaner asks for as the declaring header (as in src/main.cpp);
+// Apple's SDK declares them in <pthread.h>'s own tree and has no such file.
+#if __has_include(<bits/pthreadtypes.h>)
+#include <bits/pthreadtypes.h>
+#endif
 
 #include <condition_variable>
 #include <cstddef>

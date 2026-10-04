@@ -32,6 +32,30 @@ std::string DpiInstanceScopeName(std::string_view prefix,
   return std::string(kTop) + "." + std::string(path);
 }
 
+namespace {
+
+// What runs the export registered `index`th with `dpi`, whose subroutine is
+// keyed `key`. The formals are read at the call, ResolveDpiFormalTypes having
+// resolved them in place once the design is lowered, so the export is named by
+// its position rather than copied. §35.8: a task may consume time, so the
+// process that enabled the calling import runs it (RunExportedTaskFromC).
+DpiRtArgCallback ExportImplementation(DpiRuntime& dpi, SimContext& ctx,
+                                      size_t index, std::string_view key,
+                                      bool is_task) {
+  DpiRuntime* runtime = &dpi;
+  if (is_task) {
+    return [runtime, index, key](std::vector<DpiArgValue>& args) {
+      return RunExportedTaskFromC(runtime->Exports()[index], key, args);
+    };
+  }
+  SimContext* run = &ctx;
+  return [runtime, run, index, key](std::vector<DpiArgValue>& args) {
+    return CallDpiExportedFunction(key, runtime->Exports()[index], args, *run);
+  };
+}
+
+}  // namespace
+
 void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
                               SimContext& ctx) {
   const ScopeMap kScope = DpiParameterScope(*mod);
@@ -54,28 +78,9 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
       for (const FunctionArg& arg : subroutine->func_args) {
         exp.args.push_back(DpiFormalOfArg(arg, kScope));
       }
-    }
-    if (subroutine != nullptr) {
-      // The formals are read at the call, ResolveDpiFormalTypes having
-      // resolved them in place once the design is lowered, so the export is
-      // named by its position rather than copied.
-      const size_t kIndex = dpi.Exports().size();
-      std::string_view key = *ctx.GetArena().Create<std::string>(kKey);
-      DpiRuntime* runtime = &dpi;
-      SimContext* run = &ctx;
-      if (exp.is_task) {
-        // §35.8: a task may consume time, so the process that enabled the
-        // calling import runs it (RunExportedTaskFromC).
-        exp.arg_impl = [runtime, kIndex, key](std::vector<DpiArgValue>& args) {
-          return RunExportedTaskFromC(runtime->Exports()[kIndex], key, args);
-        };
-      } else {
-        exp.arg_impl = [runtime, run, kIndex,
-                        key](std::vector<DpiArgValue>& args) {
-          return CallDpiExportedFunction(key, runtime->Exports()[kIndex], args,
-                                         *run);
-        };
-      }
+      exp.arg_impl = ExportImplementation(
+          dpi, ctx, dpi.Exports().size(),
+          *ctx.GetArena().Create<std::string>(kKey), exp.is_task);
     }
     dpi.RegisterExport(std::move(exp));
   }

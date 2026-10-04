@@ -713,7 +713,9 @@ std::string DpiImportNotCallableInC(const DpiRtFunction& import) {
              std::string(formal.name) + "'";
     }
   }
-  if (!DpiTypeMayBeAResult(import.return_type)) {
+  // §35.9: an imported task returns the int that says whether it was
+  // disabled, whatever its declaration names as a result.
+  if (!import.is_task && !DpiTypeMayBeAResult(import.return_type)) {
     return "its result type is not one §H.8.9 lets a C function return";
   }
   return "";
