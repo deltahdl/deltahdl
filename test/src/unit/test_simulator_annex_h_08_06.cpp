@@ -77,8 +77,8 @@ TEST(DpiPassingByHandle, TheHandleIsAGenericPointerReadThroughTheLibrary) {
 // array through the handle §H.8.6 passes it by: the sum of an array of ints
 // with its first dimension's ranges, the high byte of each element of an array
 // of 40-bit vectors with the packed dimension's left bound, the sum of products
-// over a two-dimensional array of structs with its sizes, and outputs written
-// element by element.
+// over an array of structs, the sum over a two-dimensional array of ints with
+// its sizes, and outputs written element by element.
 int SumOpenInts(svOpenArrayHandle h) {
   int sum = 0;
   for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
@@ -103,12 +103,20 @@ struct Coordinates {
   int j;
 };
 
-int SumOfProducts(svOpenArrayHandle h) {
+int SumOfStructProducts(svOpenArrayHandle h) {
+  int sum = 0;
+  for (int a = svLow(h, 1); a <= svHigh(h, 1); ++a) {
+    auto* p = static_cast<Coordinates*>(svGetArrElemPtr1(h, a));
+    sum += p->i * p->j;
+  }
+  return (sum * 100) + (svSize(h, 1) * 10) + svLeft(h, 1);
+}
+
+int SumOverTwoDimensions(svOpenArrayHandle h) {
   int sum = 0;
   for (int a = svLow(h, 1); a <= svHigh(h, 1); ++a) {
     for (int b = svLow(h, 2); b <= svHigh(h, 2); ++b) {
-      auto* p = static_cast<Coordinates*>(svGetArrElemPtr2(h, a, b));
-      sum += p->i * p->j;
+      sum += *static_cast<int*>(svGetArrElemPtr2(h, a, b));
     }
   }
   return (sum * 100) + (svSize(h, 1) * 10) + svSize(h, 2);
@@ -135,32 +143,37 @@ void RunOpenArrayDesign(SimFixture& f) {
       "  typedef struct { int i; int j; } coords;\n"
       "  import \"DPI-C\" function int sum_open(input int a []);\n"
       "  import \"DPI-C\" function int hi_of_each(input logic [39:0] a []);\n"
-      "  import \"DPI-C\" function int sum2d(input coords a [][]);\n"
+      "  import \"DPI-C\" function int sum_coords(input coords a []);\n"
+      "  import \"DPI-C\" function int sum2d(input int a [][]);\n"
       "  import \"DPI-C\" function void fill_open(output bit b [],\n"
       "      output logic [7:0] v [], output int i []);\n"
       "  int ia [5:2] = '{10, 20, 30, 40};\n"
       "  logic [39:0] la [1:3];\n"
-      "  coords ca [11:12][6:8];\n"
+      "  coords ca [3:5];\n"
+      "  int m [11:12][6:8];\n"
       "  bit b [4:7];\n"
       "  logic [7:0] v [3:5];\n"
       "  int ii [7:8];\n"
-      "  int s1, s2, s3;\n"
+      "  int s1, s2, s3, s4;\n"
       "  initial begin\n"
       "    la[1] = {8'd1, 32'd0}; la[2] = {8'd2, 32'd0}; la[3] = {8'd3, "
       "32'd0};\n"
-      "    foreach (ca[x, y]) begin\n"
-      "      ca[x][y].i = x - 10; ca[x][y].j = y - 5;\n"
+      "    foreach (ca[k]) begin\n"
+      "      ca[k].i = k; ca[k].j = k + 1;\n"
       "    end\n"
+      "    foreach (m[x, y]) m[x][y] = (x - 10) * (y - 5);\n"
       "    s1 = sum_open(ia);\n"
       "    s2 = hi_of_each(la);\n"
-      "    s3 = sum2d(ca);\n"
+      "    s3 = sum_coords(ca);\n"
+      "    s4 = sum2d(m);\n"
       "    fill_open(b, v, ii);\n"
       "  end\n"
       "endmodule\n",
       f,
       {{"sum_open", reinterpret_cast<void*>(&SumOpenInts)},
        {"hi_of_each", reinterpret_cast<void*>(&HighBytesOf)},
-       {"sum2d", reinterpret_cast<void*>(&SumOfProducts)},
+       {"sum_coords", reinterpret_cast<void*>(&SumOfStructProducts)},
+       {"sum2d", reinterpret_cast<void*>(&SumOverTwoDimensions)},
        {"fill_open", reinterpret_cast<void*>(&FillOpen)}},
       "annex_h_08_06_open_arrays");
 }
@@ -191,11 +204,19 @@ TEST(DpiOpenArrayArguments, PackedElementsAreReachedCanonically) {
 }
 
 // §H.12.4: an element of an unpacked struct is reached by its address, in the
-// layout C gives the struct, over two unsized dimensions.
+// layout C gives the struct.
 TEST(DpiOpenArrayArguments, StructElementsAreReachedByAddress) {
   SimFixture f;
   RunOpenArrayDesign(f);
-  EXPECT_EQ(VariableValue(f, "s3"), 1823U);
+  EXPECT_EQ(VariableValue(f, "s3"), 6233U);
+}
+
+// §35.6.1.1: every unsized dimension takes the actual's range, and an element
+// is reached by one index per dimension, row-major.
+TEST(DpiOpenArrayArguments, TwoUnsizedDimensionsTakeTheActualsRanges) {
+  SimFixture f;
+  RunOpenArrayDesign(f);
+  EXPECT_EQ(VariableValue(f, "s4"), 1823U);
 }
 
 // An open output array is copied back element by element at the indices C

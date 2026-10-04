@@ -170,24 +170,25 @@ TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
 }
 
 // §35.4 with §35.5.6.1: an import whose symbol is found but whose formal is
-// an open array, which this simulator lays out in no C object yet, is left
-// unbound, and its call's report says why.
+// an array sized by a parameter, whose bound this simulator does not fold for
+// the C layout yet, is left unbound, and its call's report says why.
 TEST(DpiImportBinding, AFormalWithNoCLayoutHereIsNamedAtTheCall) {
   SimFixture f;
   RunWithImportsBound(
       "module t;\n"
-      "  import \"DPI-C\" function int sum_open(input int a []);\n"
+      "  parameter int N = 2;\n"
+      "  import \"DPI-C\" function int sum_sized(input int a [N]);\n"
       "  int arr [2] = '{1, 2};\n"
       "  int r;\n"
-      "  initial r = sum_open(arr);\n"
+      "  initial r = sum_sized(arr);\n"
       "endmodule\n",
-      f, {{"sum_open", reinterpret_cast<void*>(&AddSeven)}},
+      f, {{"sum_sized", reinterpret_cast<void*>(&AddSeven)}},
       "subclause_35_04_no_layout");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "imported subroutine 'sum_open' is bound to no "
+                            "imported subroutine 'sum_sized' is bound to no "
                             "foreign implementation: deltahdl does not yet "
                             "lay out in C the type of its formal 'a'",
-                            5, "35.5.4"));
+                            6, "35.5.4"));
 }
 
 // A binding whose calls the C compiler cannot build is reported with what the

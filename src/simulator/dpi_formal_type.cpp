@@ -91,6 +91,24 @@ const Value* Find(const std::unordered_map<std::string_view, Value>& map,
   return it == map.end() ? nullptr : &it->second;
 }
 
+// A typedef name standing for a type of kind `kind` that is no enumeration
+// and no packed aggregate, recorded under `key`: its width and signedness the
+// design's tables give.
+DpiCrossingType NamedOfKind(DataTypeKind kind, const DataType& type,
+                            const std::string& key, const RtlirDesign& design) {
+  const auto* width = Find(design.type_widths, key);
+  const auto* is_signed = Find(design.type_signed, key);
+  DpiCrossingType out;
+  out.kind = kind;
+  out.is_unsigned = is_signed == nullptr || !*is_signed;
+  out.type_name = type.type_name;
+  if (IsVectorKind(kind)) {
+    out.width = width == nullptr ? 0 : *width;
+    out.is_packed_array = design.type_ranges.contains(key) || out.width > 1;
+  }
+  return out;
+}
+
 // §6.18: a typedef name crosses as the type it stands for.
 DpiCrossingType Named(const DataType& type, const RtlirDesign& design) {
   const std::string kKey = TypeKey(type);
@@ -100,23 +118,31 @@ DpiCrossingType Named(const DataType& type, const RtlirDesign& design) {
     const auto* decl = Find(design.type_enums, kKey);
     if (decl != nullptr && *decl != nullptr) return EnumBase(**decl, design);
   }
-  const auto* width = Find(design.type_widths, kKey);
-  const auto* is_signed = Find(design.type_signed, kKey);
   if (*kind == DataTypeKind::kStruct || *kind == DataTypeKind::kUnion) {
     const auto* layout = Find(design.type_layouts, kKey);
+    const auto* width = Find(design.type_widths, kKey);
     if (layout != nullptr && *layout != nullptr && (*layout)->is_packed) {
       return PackedAggregate(**layout, width == nullptr ? 0 : *width);
     }
   }
-  DpiCrossingType out;
-  out.kind = *kind;
-  out.is_unsigned = is_signed == nullptr || !*is_signed;
-  out.type_name = type.type_name;
-  if (IsVectorKind(*kind)) {
-    out.width = width == nullptr ? 0 : *width;
-    out.is_packed_array = design.type_ranges.contains(kKey) || out.width > 1;
+  return NamedOfKind(*kind, type, kKey, design);
+}
+
+// One unpacked dimension a declaration wrote, as its lower and upper bound;
+// none where it is open or a bound does not fold. §7.4.2 writes `[N]` for the
+// range [0:N-1].
+std::optional<SvActualDimension> SizedDimension(const Expr* dim) {
+  if (dim == nullptr) return std::nullopt;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    std::optional<int64_t> left = ConstEvalInt(dim->lhs);
+    std::optional<int64_t> right = ConstEvalInt(dim->rhs);
+    if (!left || !right) return std::nullopt;
+    return SvActualDimension{static_cast<int32_t>(std::min(*left, *right)),
+                             static_cast<int32_t>(std::max(*left, *right))};
   }
-  return out;
+  std::optional<int64_t> size = ConstEvalInt(dim);
+  if (!size || *size <= 0) return std::nullopt;
+  return SvActualDimension{0, static_cast<int32_t>(*size - 1)};
 }
 
 }  // namespace
@@ -143,22 +169,9 @@ std::vector<SvActualDimension> DpiSizedUnpackedDimensions(
     const std::vector<Expr*>& dims) {
   std::vector<SvActualDimension> sized;
   for (const Expr* dim : dims) {
-    // An open dimension, `[]`, is written with no expression (§35.5.6.1).
-    if (dim == nullptr) return {};
-    const bool kRange =
-        dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon;
-    std::optional<int64_t> left = ConstEvalInt(kRange ? dim->lhs : dim);
-    std::optional<int64_t> right =
-        kRange ? ConstEvalInt(dim->rhs) : std::optional<int64_t>(0);
-    if (!left || !right) return {};
-    // §7.4.2: `[N]` is the range [0:N-1].
-    if (!kRange) {
-      if (*left <= 0) return {};
-      right = *left - 1;
-      left = 0;
-    }
-    sized.push_back({static_cast<int32_t>(std::min(*left, *right)),
-                     static_cast<int32_t>(std::max(*left, *right))});
+    std::optional<SvActualDimension> folded = SizedDimension(dim);
+    if (!folded) return {};
+    sized.push_back(*folded);
   }
   return sized;
 }

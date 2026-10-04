@@ -14,6 +14,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -303,6 +304,7 @@ Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
 // unpacked dimensions as declared, outermost first.
 struct UnpackedActual {
   std::vector<Variable*> elements;
+  std::vector<std::string> names;
   std::vector<DpiArrayRange> ranges;
 };
 
@@ -353,6 +355,7 @@ UnpackedActual UnpackedActualOf(std::string_view name, bool from_left,
   for (const std::string& element : names) {
     actual.elements.push_back(ctx.FindVariable(element));
   }
+  actual.names = std::move(names);
   return actual;
 }
 
@@ -458,17 +461,9 @@ DpiArgValue DpiAggregateActual(const DpiArg& formal, const Expr* actual,
   whole.type = formal.type;
   if (actual->kind != ExprKind::kIdentifier) return whole;
   const Variable* var = b.ctx.FindVariable(actual->text);
-  const StructTypeInfo* info = b.ctx.GetVariableStructType(actual->text);
+  const StructTypeInfo* info = StructLayoutOfName(actual->text, b.ctx);
   if (var == nullptr || info == nullptr) return whole;
   return AggregateValue(formal, *info, var->value, b.arena);
-}
-
-// The layout of the structs an array of them, `name`, holds: the array's
-// own where the run records one, and the formal's type's otherwise.
-const StructTypeInfo* ElementStructOf(std::string_view name,
-                                      const DpiArg& formal, SimContext& ctx) {
-  const StructTypeInfo* info = ctx.GetVariableStructType(name);
-  return info != nullptr ? info : ctx.FindStructType(formal.type_name);
 }
 
 // The actual of an unpacked formal, sized or open: its elements each a value
@@ -482,10 +477,13 @@ DpiArgValue DpiArrayActual(const DpiArg& formal, const Expr* actual,
   UnpackedActual found =
       UnpackedActualOf(actual->text, formal.is_open_array, b.ctx);
   array.ranges = std::move(found.ranges);
-  const StructTypeInfo* info =
-      formal.members.empty() ? nullptr
-                             : ElementStructOf(actual->text, formal, b.ctx);
-  for (Variable* element : found.elements) {
+  for (size_t k = 0; k < found.elements.size(); ++k) {
+    Variable* element = found.elements[k];
+    // An element of an array of structures has the layout a member select of
+    // it reads through (§7.4.2 with §7.2).
+    const StructTypeInfo* info =
+        formal.members.empty() ? nullptr
+                               : StructLayoutOfName(found.names[k], b.ctx);
     if (element == nullptr) {
       array.elements.emplace_back();
     } else if (info != nullptr) {
@@ -613,14 +611,15 @@ bool AssignmentWouldChangeActual(const Expr* lhs, const Logic4Vec& next,
 void WritebackDpiArray(const DpiArg& formal, const Expr* lhs,
                        const DpiArgValue& array, const ActualBindingCtx& b) {
   if (lhs->kind != ExprKind::kIdentifier) return;
-  std::vector<Variable*> elements =
-      UnpackedActualOf(lhs->text, formal.is_open_array, b.ctx).elements;
-  const StructTypeInfo* info = formal.members.empty()
-                                   ? nullptr
-                                   : ElementStructOf(lhs->text, formal, b.ctx);
-  for (size_t k = 0; k < elements.size() && k < array.elements.size(); ++k) {
-    Variable* element = elements[k];
+  UnpackedActual found =
+      UnpackedActualOf(lhs->text, formal.is_open_array, b.ctx);
+  for (size_t k = 0; k < found.elements.size() && k < array.elements.size();
+       ++k) {
+    Variable* element = found.elements[k];
     if (element == nullptr) continue;
+    const StructTypeInfo* info =
+        formal.members.empty() ? nullptr
+                               : StructLayoutOfName(found.names[k], b.ctx);
     Logic4Vec next = OwnRhsWords(element->value, b.arena);
     if (info != nullptr) {
       DepositAggregate(next, formal, *info, array.elements[k], b.arena);
@@ -643,7 +642,7 @@ void WritebackDpiAggregate(const DpiArg& formal, const Expr* lhs,
                            const ActualBindingCtx& b) {
   if (lhs->kind != ExprKind::kIdentifier) return;
   Variable* var = b.ctx.FindVariable(lhs->text);
-  const StructTypeInfo* info = b.ctx.GetVariableStructType(lhs->text);
+  const StructTypeInfo* info = StructLayoutOfName(lhs->text, b.ctx);
   if (var == nullptr || info == nullptr) return;
   Logic4Vec next = OwnRhsWords(var->value, b.arena);
   DepositAggregate(next, formal, *info, value, b.arena);
