@@ -558,7 +558,7 @@ TEST_F(BlockScopesOfARun, AForkReportsTheJoinKeywordThatClosedIt) {
 // type gives (§37.17), and a block parameter is none of them.
 TEST_F(BlockScopesOfARun, ANamedBlocksVariablesHangBeneathIt) {
   Run("module top; initial begin : blk\n"
-      "  parameter int P = 1; int v = 3; logic [3:0] w; int a [2];\n"
+      "  parameter int P = 1; int v; logic [3:0] w; int a [2];\n"
       "end endmodule\n");
   vpiHandle blk = By("top.blk");
   ASSERT_NE(blk, nullptr);
