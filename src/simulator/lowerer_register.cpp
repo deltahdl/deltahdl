@@ -26,6 +26,7 @@
 #include "simulator/class_specialization.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
@@ -607,38 +608,7 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
     func.packed_arg_passing =
         DpiPassingSemanticsOfSpecString(item->dpi_spec_string);
     for (const auto& arg : item->func_args) {
-      DpiArg formal;
-      formal.name = arg.name;
-      formal.type = arg.data_type.kind;
-      // §35.5.1.2 reads the direction to decide which way each formal's value
-      // crosses, so it travels with the declaration rather than being inferred
-      // at the call.
-      formal.direction = arg.direction;
-      // §35.6: the default the declaration gave a formal, which a call site
-      // that omits the argument takes.
-      formal.default_value = arg.default_value;
-      // §35.5.6 admits "Packed arrays, structs, and unions composed of types
-      // bit and logic" as formal types and names no width limit, and
-      // DataTypeKind says only kBit or kLogic for one of those. So the width
-      // the declaration wrote travels beside the kind for exactly those types;
-      // every other formal's type states its own width, and recording one for
-      // it would put a second answer beside the kind's.
-      if (DataTypeKind kind = arg.data_type.kind;
-          kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
-          kind == DataTypeKind::kReg) {
-        formal.width = EvalTypeWidth(arg.data_type);
-      }
-      // §H.7.4: an integer type the declaration qualified unsigned crosses
-      // as the unsigned C type; the parser has already settled the default
-      // signedness of a type that named neither qualifier.
-      formal.is_unsigned = !arg.data_type.is_signed;
-      // §H.7.5: a struct or union crosses under the name of its type.
-      formal.type_name = arg.data_type.type_name;
-      // §35.5.6.1: a formal with unpacked dimensions is an array of values of
-      // its type rather than one of them.
-      formal.has_unpacked_dimensions = !arg.unpacked_dims.empty();
-      formal.declaration = &arg;
-      func.args.push_back(formal);
+      func.args.push_back(DpiFormalOfArg(arg));
     }
     dpi->RegisterImport(std::move(func));
   }

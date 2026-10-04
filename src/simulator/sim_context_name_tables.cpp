@@ -589,6 +589,7 @@ std::string_view DeclaredNameTables::FindInstancePath(
 }
 
 void DeclaredNameTables::RegisterTopModule(std::string_view name) {
+  if (top_module_names_.empty()) first_top_module_ = std::string(name);
   top_module_names_.insert(std::string(name));
 }
 

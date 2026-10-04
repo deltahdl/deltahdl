@@ -370,6 +370,9 @@ class DeclaredNameTables {
   // one of these names at the head of a path drops it and reads the rest.
   void RegisterTopModule(std::string_view name);
   bool IsTopModule(std::string_view name) const;
+  // The top registered first, the root a §35.5.3 instance scope name such as
+  // "top.u1" starts from; empty before any is registered.
+  std::string_view FirstTopModule() const { return first_top_module_; }
   // §23.3.1: a top-level module after the first, keyed under its own name as
   // an instance is (Lowerer::LowerParallelTop), so a path that starts with its
   // name starts at the root rather than below the first top.
@@ -495,6 +498,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string, std::string> instance_keys_by_path_;
   std::unordered_map<std::string, std::string> interface_port_instances_;
   std::unordered_set<std::string> top_module_names_;
+  std::string first_top_module_;
   std::unordered_set<std::string> parallel_top_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>
       var_class_type_params_;

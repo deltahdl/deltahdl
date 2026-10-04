@@ -13,10 +13,12 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_export.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -680,6 +682,51 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
   }
 }
 
+// §35.7: the temporary variable that carries formal `index` of the export
+// whose function is keyed `key` across one call from C, its name starting with
+// a `$` so that no name a design declares can stand for it.
+std::string ExportTempName(std::string_view key, size_t index) {
+  return "$dpi_export." + std::string(key) + "." + std::to_string(index);
+}
+
+// Makes the temporary `name` for `formal` the first time it is needed: a
+// variable of the formal's width, or for an unpacked formal an array of such
+// variables over the formal's dimensions.
+void EnsureExportTemp(const std::string& name, const DpiArg& formal,
+                      SimContext& ctx) {
+  const uint32_t kWidth = DpiValueWidth(formal.type, formal.width);
+  if (formal.unpacked_dims.empty()) {
+    if (ctx.FindVariable(name) == nullptr) ctx.CreateVariable(name, kWidth);
+    return;
+  }
+  if (ctx.FindArrayInfo(name) != nullptr) return;
+  ArrayInfo info;
+  info.lo = static_cast<uint32_t>(formal.unpacked_dims.front().low);
+  info.size = static_cast<uint32_t>(formal.unpacked_dims.front().high -
+                                    formal.unpacked_dims.front().low + 1);
+  info.elem_width = kWidth;
+  info.elem_type_kind = formal.type;
+  if (formal.unpacked_dims.size() > 1) {
+    for (const SvActualDimension& dim : formal.unpacked_dims) {
+      info.dim_los.push_back(static_cast<uint32_t>(dim.low));
+      info.dim_sizes.push_back(static_cast<uint32_t>(dim.high - dim.low + 1));
+      info.dim_descending.push_back(false);
+    }
+  }
+  ctx.RegisterArray(name, info);
+  for (const std::string& element : UnpackedActualOf(name, false, ctx).names) {
+    ctx.CreateVariable(element, kWidth);
+  }
+}
+
+// An identifier naming `text`, which the arena keeps for the run.
+Expr* IdentifierNaming(const std::string& text, Arena& arena) {
+  auto* id = arena.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = *arena.Create<std::string>(text);
+  return id;
+}
+
 }  // namespace
 
 // §35.5.4: the name the call reaches its import declaration by -- the
@@ -733,11 +780,11 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §35.5.3: "A DPI call chain is a call chain ... that begins when
   // SystemVerilog code calls an imported subroutine." This call site is that
   // beginning, and the frame's context property is the one the import's own
-  // declaration carries (§35.5.1.3). The instantiated scope the declaration
-  // stands in is not carried here: a design's declarations reach the registry
-  // by name, and which instance of a module declared one is a question
-  // §35.5.3's scope chain asks that this does not yet answer.
-  dpi->EnterDeclaredImportCall(callee, DpiScope{});
+  // declaration carries (§35.5.1.3). The frame's scope is the instance the
+  // call is made in, by its fully qualified name (§H.9.3), which is the scope
+  // an export that instance declares is reached in (§35.5.3).
+  dpi->EnterDeclaredImportCall(
+      callee, DpiScope{DpiInstanceScopeName(ctx.ActiveInstancePrefix(), ctx)});
 
   DpiArgValue result;
   if (import->is_pure) {
@@ -767,6 +814,50 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return DpiValueOfType(arena, import->return_type, 0,
                         CoerceArgValue(result, import->return_type),
                         !import->return_is_unsigned);
+}
+
+DpiArgValue CallDpiExportedFunction(std::string_view key,
+                                    const std::vector<DpiArg>& formals,
+                                    DataTypeKind result,
+                                    std::vector<DpiArgValue>& args,
+                                    SimContext& ctx, Arena& arena) {
+  auto* call = arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = *arena.Create<std::string>(key);
+  ActualBindingCtx binding{call, formals.size(), ctx, arena};
+  // Each formal's value goes to the function through a temporary named as its
+  // actual, an input's or inout's written there first, so an array formal is
+  // an array the body can index and a call with outputs writes them back.
+  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
+    const DpiArg& formal = formals[i];
+    const std::string kTemp = ExportTempName(key, i);
+    EnsureExportTemp(kTemp, formal, ctx);
+    Expr* actual = IdentifierNaming(kTemp, arena);
+    call->args.push_back(actual);
+    if (formal.direction == Direction::kOutput) continue;
+    if (!formal.unpacked_dims.empty()) {
+      WritebackDpiArray(formal, actual, args[i], binding);
+    } else {
+      PerformBlockingAssign(actual,
+                            DpiValueOfType(arena, formal.type, formal.width,
+                                           args[i], !formal.is_unsigned),
+                            ctx, arena);
+    }
+  }
+  // The key and the temporaries are names from the root of the design, so the
+  // call is evaluated as from there whatever instance C was entered from.
+  InstancePrefixOverride root(ctx.InstancePrefixOverride(), "");
+  Logic4Vec value = EvalExpr(call, ctx, arena);
+  for (size_t i = 0; i < formals.size() && i < args.size(); ++i) {
+    const DpiArg& formal = formals[i];
+    if (formal.direction == Direction::kInput) continue;
+    const Expr* actual = call->args[i];
+    args[i] = formal.unpacked_dims.empty()
+                  ? DpiArgValueOfType(formal.type, formal.width,
+                                      EvalExpr(actual, ctx, arena))
+                  : DpiArrayActual(formal, actual, binding);
+  }
+  return DpiArgValueOfType(result, 0, value);
 }
 
 }  // namespace delta

@@ -23,6 +23,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/dpi_export.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
@@ -264,6 +265,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // called like a native one, so the declarations of the module being lowered
   // go into the registry EvalDpiCall reaches an import through.
   RegisterModuleDpiImports(mod, ctx_);
+  // §35.7: the top's exports, in the top's own scope.
+  RegisterModuleDpiExports(mod, inst_prefix_, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
   LowerFreeVariableSolver(mod);

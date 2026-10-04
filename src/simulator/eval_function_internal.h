@@ -9,6 +9,8 @@
 
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 
 namespace delta {
 
@@ -176,6 +178,17 @@ struct ActualBindingCtx {
 // found; the body is in eval_function_dpi.cpp, where the conversion between the
 // evaluator's Logic4Vec and the DpiArgValue the registry speaks lives.
 Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena);
+
+// §35.7 with §H.8.2: calls the exported function keyed `key` from the root of
+// the design, whose formals are `formals` and result `result`, with `args` in
+// the types those formals declare, as foreign code calling the export does.
+// The values the function leaves in its output and inout formals replace
+// those positions of `args`; the result is returned.
+DpiArgValue CallDpiExportedFunction(std::string_view key,
+                                    const std::vector<DpiArg>& formals,
+                                    DataTypeKind result,
+                                    std::vector<DpiArgValue>& args,
+                                    SimContext& ctx, Arena& arena);
 
 struct ClassTypeInfo;
 struct MethodCallParts;

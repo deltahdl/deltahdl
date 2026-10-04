@@ -40,6 +40,11 @@ struct DpiCrossingType {
 DpiCrossingType DpiCrossingTypeOf(const DataType& declared,
                                   const RtlirDesign& design);
 
+// §35.5.4 and §35.7: the formal an import's or an export's declaration
+// writes as `arg`, its type as written, which ResolveDpiFormalTypes later
+// resolves to the type it crosses as.
+DpiArg DpiFormalOfArg(const FunctionArg& arg);
+
 // §H.7.3: the unpacked dimensions `dims` a formal's declaration wrote, each as
 // its lower and upper bound, outermost first. Empty where there are none, where
 // one is open (§35.5.6.1) or where a bound does not fold to a constant.

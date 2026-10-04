@@ -16,6 +16,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/dpi_export.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -370,6 +371,9 @@ static void RegisterChildInstanceDecls(const RtlirModule* mod,
   // that writes it, an instantiated module, interface or program as much as
   // the top; the top's are registered by LowerModule.
   RegisterModuleDpiImports(mod, ctx);
+  // §35.7: and an export declaration makes the instance's subroutine one C
+  // code can call, in the instance's own scope (§35.5.3).
+  RegisterModuleDpiExports(mod, prefix, ctx);
   // §16.12.1: an assertion of the instance that instantiates a property or
   // sequence the instance's module declares expands it at the run, so the
   // declarations are registered as the top's are.

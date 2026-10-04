@@ -132,6 +132,10 @@ struct DpiRtExport {
   // conservative default for code that doesn't yet record scopes).
   std::string scope_name;
   DpiRtCallback impl;
+  // §35.7 with §H.8.2: an implementation that also writes the export's output
+  // and inout formals into the vector it is given, which CallExportFromImport
+  // hands back to the foreign caller. Preferred over `impl` where both are set.
+  DpiRtArgCallback arg_impl;
   // §35.7: every exported SystemVerilog function is a context function. The
   // flag is documentary at the type level and is normalized to true by
   // DpiRuntime::RegisterExport so callers that leave it unset still get the
@@ -234,6 +238,7 @@ class DpiRuntime {
   // Every import registered, in the order registered, open to the binding of
   // each to the foreign implementation its linkage name names (§35.4).
   std::vector<DpiRtFunction>& Imports() { return imports_; }
+  std::vector<DpiRtExport>& Exports() { return exports_; }
   const DpiRtFunction* FindImport(std::string_view sv_name) const;
   bool HasImport(std::string_view sv_name) const;
   uint32_t ImportCount() const;
@@ -408,9 +413,18 @@ class DpiRuntime {
   // §35.5.3: only context import calls (i.e., chains whose root is a context
   // import) can safely invoke a SystemVerilog export subroutine. Returns the
   // outcome and, on kOk, runs the export's registered implementation.
-  DpiExportCallStatus CallExportFromImport(std::string_view sv_name,
-                                           const std::vector<DpiArgValue>& args,
-                                           DpiArgValue* out_result);
+  // Where `written` is given, it receives the arguments as the export left
+  // them, its outputs and inouts among them.
+  DpiExportCallStatus CallExportFromImport(
+      std::string_view sv_name, const std::vector<DpiArgValue>& args,
+      DpiArgValue* out_result, std::vector<DpiArgValue>* written = nullptr);
+
+  // The SystemVerilog name of the innermost import call open, the one a
+  // foreign caller of an export is running in; empty where none is open.
+  std::string_view CurrentImportName() const {
+    return call_chain_.empty() ? std::string_view()
+                               : call_chain_.back().sv_name;
+  }
 
   // §35.5.3: reports whether a call to the named import would act as a
   // barrier for SystemVerilog compiler optimizations — true exactly when the

@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "parser/ast_type.h"
@@ -40,9 +41,18 @@ DpiArgValue ResultAsDeclaredType(const DpiRtExport& exp,
 }
 
 // The body of one export, entered with its actuals already the SystemVerilog
-// types it declares and leaving its result the type it declares.
+// types it declares and leaving its result the type it declares. An
+// implementation writing its outputs leaves the arguments in `written` where
+// one is given.
 DpiArgValue CallExportBody(const DpiRtExport& exp,
-                           const std::vector<DpiArgValue>& args) {
+                           const std::vector<DpiArgValue>& args,
+                           std::vector<DpiArgValue>* written = nullptr) {
+  if (exp.arg_impl) {
+    std::vector<DpiArgValue> actuals = ActualsAsDeclaredTypes(exp, args);
+    DpiArgValue result = ResultAsDeclaredType(exp, exp.arg_impl(actuals));
+    if (written != nullptr) *written = std::move(actuals);
+    return result;
+  }
   if (!exp.impl) return DpiArgValue::FromInt(0);
   return ResultAsDeclaredType(exp, exp.impl(ActualsAsDeclaredTypes(exp, args)));
 }
@@ -104,7 +114,7 @@ DpiExportCallStatus DpiRuntime::CheckExportCallPermitted(
 
 DpiExportCallStatus DpiRuntime::CallExportFromImport(
     std::string_view sv_name, const std::vector<DpiArgValue>& args,
-    DpiArgValue* out_result) {
+    DpiArgValue* out_result, std::vector<DpiArgValue>* written) {
   // §35.5.3: the instance of the export this call reaches is the one the
   // chain's current scope declares -- the import declaration's instantiated
   // scope until svSetScope names another. Where the current scope declares no
@@ -128,8 +138,8 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // The instance selected above is entered directly rather than through
   // CallExport, which looks the export up by name and so would enter whichever
   // instance holds the name index rather than the one this scope declares.
-  DpiArgValue result =
-      exp != nullptr ? CallExportBody(*exp, args) : DpiArgValue::FromInt(0);
+  DpiArgValue result = exp != nullptr ? CallExportBody(*exp, args, written)
+                                      : DpiArgValue::FromInt(0);
   chain_starts_.pop_back();
   current_scope_ = saved_scope;
   if (exp != nullptr && exp->is_task) {

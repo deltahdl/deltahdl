@@ -617,6 +617,86 @@ std::string TrampolineOf(const DpiRtFunction& import, std::size_t index) {
          kStatement + ";\n}\n";
 }
 
+// The bytes the C object `object` takes where it holds a value outright.
+std::size_t ScalarBytes(DpiCObject object) {
+  switch (object) {
+    case DpiCObject::kChar:
+    case DpiCObject::kScalar:
+      return 1;
+    case DpiCObject::kShort:
+      return sizeof(short);
+    case DpiCObject::kLongLong:
+      return sizeof(long long);
+    case DpiCObject::kFloat:
+      return sizeof(float);
+    case DpiCObject::kDouble:
+      return sizeof(double);
+    case DpiCObject::kPointer:
+    case DpiCObject::kString:
+    case DpiCObject::kOpenArray:
+      return sizeof(void*);
+    default:
+      return sizeof(int);
+  }
+}
+
+// The bytes the C objects of `storage` take, laid out as C reads them.
+std::size_t ObjectBytes(const DpiCStorage& storage) {
+  switch (storage.object) {
+    case DpiCObject::kBitVector:
+      return storage.bits.size() * sizeof(uint32_t);
+    case DpiCObject::kLogicVector:
+      return storage.logic.size() * sizeof(SvLogicVecVal);
+    case DpiCObject::kArray:
+    case DpiCObject::kAggregate:
+      return storage.bytes.size();
+    default:
+      return ScalarBytes(storage.object);
+  }
+}
+
+// The forwarder of one export: under the export's linkage name, each formal
+// passed by value as its own C type and every other as a pointer, which is
+// one in the calling convention whatever it points at, handing the address of
+// each to the entry point.
+std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
+  std::string parameters;
+  std::string addresses;
+  for (std::size_t i = 0; i < exp.args.size(); ++i) {
+    const DpiArg& formal = exp.args[i];
+    const std::string kName = "a" + std::to_string(i);
+    const std::string kSeparator = i == 0 ? "" : ", ";
+    if (DpiFormalIsPassedByValue(formal, false)) {
+      parameters += kSeparator + DpiCTypeOfFormal(formal, false) + " " + kName;
+      addresses += kSeparator + "(void*)&" + kName;
+    } else {
+      parameters +=
+          kSeparator +
+          (formal.direction == Direction::kInput ? "const void* " : "void* ") +
+          kName;
+      addresses += kSeparator + "(void*)" + kName;
+    }
+  }
+  if (parameters.empty()) {
+    parameters = "void";
+    addresses = "0";
+  }
+  // §35.8: an exported task returns the int that says whether a disable is
+  // active.
+  const std::string kResult =
+      exp.is_task ? "int" : DpiCTypeOfResult(exp.return_type);
+  const std::string kIndex = std::to_string(index);
+  std::string body = "  void* args[] = {" + addresses + "};\n";
+  if (kResult == "void") {
+    body += "  deltahdl_dpi_export_entry(" + kIndex + ", args, 0);\n";
+  } else {
+    body += "  " + kResult + " result;\n  deltahdl_dpi_export_entry(" + kIndex +
+            ", args, &result);\n  return result;\n";
+  }
+  return kResult + " " + std::string(DpiGlobalName(exp)) + "(" + parameters +
+         ") {\n" + body + "}\n";
+}
+
 }  // namespace
 
 std::string DpiCTrampolineName(std::size_t index) {
@@ -679,4 +759,63 @@ DpiArgValue CallDpiCFunction(const DpiCFunction& function,
   return LoadValue(result, kResultKind);
 }
 
+std::string DpiExportNotCallableFromC(const DpiRtExport& exp) {
+  for (const DpiArg& formal : exp.args) {
+    if (formal.is_open_array || !formal.members.empty() ||
+        !ObjectOfFormal(formal).has_value()) {
+      return "deltahdl does not yet pass to an exported subroutine the type "
+             "of its formal '" +
+             std::string(formal.name) + "'";
+    }
+  }
+  if (!exp.is_task && !DpiTypeMayBeAResult(exp.return_type)) {
+    return "its result type is not one §H.8.9 lets a C function return";
+  }
+  return "";
+}
+
+std::string DpiCExportEntrySetterName() {
+  return "deltahdl_dpi_set_export_entry";
+}
+
+std::string DpiCForwarderSource(
+    const std::vector<const DpiRtExport*>& exports) {
+  if (exports.empty()) return "";
+  std::string source =
+      "static void (*deltahdl_dpi_export_entry)(int, void**, void*);\n"
+      "void " +
+      DpiCExportEntrySetterName() +
+      "(void (*entry)(int, void**, void*)) {\n"
+      "  deltahdl_dpi_export_entry = entry;\n}\n";
+  for (std::size_t i = 0; i < exports.size(); ++i) {
+    source += ForwarderOf(*exports[i], i);
+  }
+  return source;
+}
+
+DpiArgValue DpiValueOfCObject(const DpiArg& formal, const void* object) {
+  DpiCStorage storage;
+  Prepare(storage, formal);
+  // Laying a value out first sizes the objects C's are read into.
+  StoreValue(storage, formal.type, DpiArgValue{});
+  std::memcpy(storage.Address(), object, ObjectBytes(storage));
+  return LoadValue(storage, formal.type);
+}
+
+void DpiStoreInCObject(const DpiArg& formal, const DpiArgValue& value,
+                       void* object) {
+  DpiCStorage storage;
+  Prepare(storage, formal);
+  StoreValue(storage, formal.type, value);
+  std::memcpy(object, storage.Address(), ObjectBytes(storage));
+}
+
+void DpiStoreResultInCObject(DataTypeKind kind, const DpiArgValue& value,
+                             void* result) {
+  if (kind == DataTypeKind::kVoid || result == nullptr) return;
+  DpiCStorage storage;
+  storage.object = ObjectOfSmallKind(kind);
+  StoreValue(storage, kind, value);
+  std::memcpy(result, storage.Address(), ScalarBytes(storage.object));
+}
 }  // namespace delta

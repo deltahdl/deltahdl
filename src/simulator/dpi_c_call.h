@@ -52,6 +52,41 @@ struct DpiCFunction {
   DpiCTrampoline trampoline = nullptr;
 };
 
+// §35.7 with §H.8.2: why foreign code cannot call the export `exp` through a
+// function this simulator generates, or empty where it can. An open array, a
+// struct or union, or a type whose C object is not built here is not passed
+// to an exported function yet.
+std::string DpiExportNotCallableFromC(const DpiRtExport& exp);
+
+// The function generated beside the forwarders that is handed the one entry
+// point every forwarder calls, as `void name(DpiCExportEntry)`.
+std::string DpiCExportEntrySetterName();
+
+// The entry point a forwarder calls: the export's position in the source,
+// one address per formal -- of the parameter itself where it is passed by
+// value, the pointer C passed where it is passed by reference -- and the
+// address of the C object the result is left in, null for none.
+using DpiCExportEntry = void (*)(int index, void** args, void* result);
+
+// The C source of one forwarder per export of `exports`, the `i`th under its
+// linkage name with the prototype §H.8.2 gives it, calling the entry point
+// with index i, and of the function that installs that entry point. Every
+// export is one DpiExportNotCallableFromC accepts. Empty for none.
+std::string DpiCForwarderSource(const std::vector<const DpiRtExport*>& exports);
+
+// §H.8: the value of `formal` held in the C object at `object`, laid out as
+// the formal is passed to C.
+DpiArgValue DpiValueOfCObject(const DpiArg& formal, const void* object);
+
+// Lays `value` out in the C object at `object` as `formal` is passed to C,
+// which is how an export's output reaches its foreign caller.
+void DpiStoreInCObject(const DpiArg& formal, const DpiArgValue& value,
+                       void* object);
+
+// Lays `value` out in the C object of a result of type `kind` at `result`.
+void DpiStoreResultInCObject(DataTypeKind kind, const DpiArgValue& value,
+                             void* result);
+
 // §H.8: calls `function` with `args`, one value per formal, each already of
 // its formal's type. Every argument is laid out in the C object its passing
 // mode names; after the call, the value the C function left in each output and
