@@ -220,10 +220,18 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
   // type is one, so the generic child walk this fell through to reached no
   // operand of any operation, and the clause's own traverseExpr() descended
   // into nothing.
+  //
+  // §37.58 draws the nets and variables classes inside `simple expr`, so a net
+  // or variable an operation reads is one of its operands. VpiIsExprType leaves
+  // the two out for the protection rule it serves, and taken here alone it left
+  // every operation over the design's nets with no operand at all.
   std::vector<VpiHandle> operands;
   if (!operation || operation->type != vpiOperation) return operands;
   for (auto* child : operation->children) {
-    if (VpiIsExprType(child->type)) operands.push_back(child);
+    if (VpiIsExprType(child->type) || VpiIsNetsType(child->type) ||
+        VpiIsVariablesType(child->type)) {
+      operands.push_back(child);
+    }
   }
   return operands;
 }

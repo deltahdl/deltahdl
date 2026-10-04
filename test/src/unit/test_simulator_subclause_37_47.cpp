@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "fixture_vpi_run.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
