@@ -550,6 +550,12 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->cu_items.push_back(ParseTypedef());
     return;
   }
+  // §6.6.7 with §3.12.1: a nettype declaration is a net declaration, which a
+  // compilation unit holds as a package does (A.1.2, A.1.11, A.2.1.3).
+  if (Check(TokenKind::kKwNettype)) {
+    unit->cu_items.push_back(ParseNettypeDecl());
+    return;
+  }
   if (TryParseUnitBindDirective(unit)) return;
   if (TryParseSecondaryTopLevel(unit)) {
     if (!top_attrs.empty() && unit->udps.size() > udp_count) {

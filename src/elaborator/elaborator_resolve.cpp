@@ -457,6 +457,13 @@ void Elaborator::RegisterCuScopeItems() {
     // bit whose `x[5]` was reported as a select of a scalar.
     if (item->kind == ModuleItemKind::kTypedef && !item->unpacked_dims.empty())
       td_array_dims_[item->name] = item->unpacked_dims;
+    // §6.6.7 with §3.12.1: a compilation-unit nettype is a type the modules
+    // after it declare nets of, as a module's own nettype is to that module.
+    if (item->kind == ModuleItemKind::kNettypeDecl) {
+      typedefs_[item->name] = item->typedef_type;
+      nettype_names_.insert(item->name);
+      RegisterNettypeResolutionAndCanonical(item);
+    }
   }
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);

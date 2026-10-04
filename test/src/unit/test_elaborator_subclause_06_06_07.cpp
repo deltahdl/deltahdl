@@ -574,4 +574,30 @@ TEST(NettypeElaboration, ResolutionFunctionMissingFromATypedefsClassReported) {
                             6, "6.6.7"));
 }
 
+// §6.6.7 with §3.12.1: a nettype declaration is a net declaration, which a
+// compilation unit may hold as a package may (A.1.2, A.1.11, A.2.1.3), and
+// the modules after it declare nets of its type.
+constexpr const char* kCompilationUnitNettype =
+    "nettype logic mynet;\n"
+    "module top; mynet n; endmodule\n";
+
+TEST(NettypeElaboration, ACompilationUnitNettypeIsDeclared) {
+  ElabFixture f;
+  auto* design = Elaborate(kCompilationUnitNettype, f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NettypeElaboration, ANetOfACompilationUnitNettypeCarriesIt) {
+  ElabFixture f;
+  auto* design = Elaborate(kCompilationUnitNettype, f);
+  ASSERT_NE(design, nullptr);
+  const RtlirNet* net = nullptr;
+  for (const auto& n : design->top_modules[0]->nets) {
+    if (n.name == "n") net = &n;
+  }
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->nettype_name, "mynet");
+}
+
 }  // namespace
