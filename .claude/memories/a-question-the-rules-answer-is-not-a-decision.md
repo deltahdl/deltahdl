@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-04T14:12:04.418Z
+  modified: 2026-10-04T22:25:00.315Z
 ---
 
 # A question the rules answer is not a decision
@@ -46,5 +46,11 @@ term it uses before calling anything beside it open. §34.5.32.2 makes only a
 viewport's access value implementation-specific; its shall that the object be
 contained within the envelope, with §34.4's definition of an envelope as a
 lexical region, settles that the object name resolves against the envelope's
-own declarations, not as an elaborated hierarchical path. Once the answer stands,
+own declarations, not as an elaborated hierarchical path. For a Clause 37
+question of which object a construct is, the diagram and its headline details
+are not the whole clause: read every numbered detail through to the end,
+examples included. The vpiParent and prefix details often name the object
+outright. §37.17 detail 26 and §37.16 detail 31 make a partly indexed packed
+select a vpiLogicVar or vpiLogicNet vector, which the object list alone
+seemed to leave unnamed. Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
