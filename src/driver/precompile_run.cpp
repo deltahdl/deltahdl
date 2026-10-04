@@ -73,7 +73,8 @@ std::vector<T> Since(const std::vector<T>& all, size_t before) {
 
 // Preprocesses the file at `path` with `preproc`, which carries macros and
 // directive state from the files before it as an ordinary compile's does, and
-// keeps the parts of the preprocessor's records this file added.
+// keeps the parts of the preprocessor's records this file added, its runtime
+// licences among them.
 std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
                                                 Preprocessor& preproc,
                                                 SourceManager& src_mgr) {
@@ -83,12 +84,19 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
   size_t origins = preproc.LineOrigins().size();
   size_t modules = preproc.ModuleDirectivesList().size();
   size_t cells = preproc.CellModuleNames().size();
+  size_t licenses = preproc.RuntimeLicenses().size();
   PreprocessedSource out;
   out.path = path;
   out.text = preproc.Preprocess(file_id);
   out.line_origins = Since(preproc.LineOrigins(), origins);
   out.directives.modules = Since(preproc.ModuleDirectivesList(), modules);
   out.directives.cell_modules = Since(preproc.CellModuleNames(), cells);
+  // §34.5.29.2 asks each runtime licence before the model is executed, which
+  // the bind that reads this record does, so the licences go with the text.
+  for (const ProtectRuntimeLicense& met :
+       Since(preproc.RuntimeLicenses(), licenses)) {
+    out.directives.runtime_licenses.push_back(met.license);
+  }
   return out;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -54,5 +55,15 @@ class ProtectLicenseLibraries {
 bool RuntimeLicensesGranted(const std::vector<ProtectRuntimeLicense>& licenses,
                             ProtectLicenseLibraries& libraries,
                             DiagEngine& diag);
+
+// §34.5.29.2 for a separate compilation bind (§33.5.4), which executes models
+// another invocation precompiled: asks the runtime licences the libraries at
+// `library_paths` keep (PrecompiledLibrary::RuntimeLicenses) as
+// RuntimeLicensesGranted asks them. The bind reads no source text, so each
+// refusal is reported at no place. Answers whether all of them license the
+// tool, which is whether the bound design may be simulated.
+bool PrecompiledRuntimeLicensesGranted(
+    const std::vector<std::string>& library_paths,
+    ProtectLicenseLibraries& libraries, DiagEngine& diag);
 
 }  // namespace delta

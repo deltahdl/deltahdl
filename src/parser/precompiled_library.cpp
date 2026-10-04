@@ -21,14 +21,16 @@
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
+#include "preprocessor/protect_license.h"
 
 namespace delta {
 
 namespace {
 
-// DPLIB002 records carry the directive state beside the text; a DPLIB001 file,
-// which held the text alone, is not read.
-constexpr char kMagic[] = "DPLIB002";
+// DPLIB003 records carry the directive state and the runtime licences beside
+// the text; a DPLIB002 file, which held no licences, and a DPLIB001 file, which
+// held the text alone, are not read.
+constexpr char kMagic[] = "DPLIB003";
 constexpr std::streamsize kMagicLen = 8;
 
 void WriteU32(std::ofstream& os, uint32_t v) {
@@ -148,11 +150,43 @@ bool ReadModuleDirectives(std::ifstream& is, ModuleDirectives& d) {
   return true;
 }
 
+// One runtime licence, part by part. Only licences the reading found stated
+// are recorded (Preprocessor::ApplyLicense), so `stated` is not written and is
+// restored by ReadRuntimeLicense.
+void WriteRuntimeLicense(std::ofstream& os, const ProtectLicense& license) {
+  WriteString(os, license.library);
+  WriteString(os, license.entry);
+  WriteString(os, license.feature);
+  WriteString(os, license.exit);
+  WriteU8(os, license.has_exit ? 1 : 0);
+  WriteU64(os, license.match);
+  WriteU8(os, license.has_match ? 1 : 0);
+}
+
+bool ReadRuntimeLicense(std::ifstream& is, ProtectLicense& license) {
+  uint8_t has_exit = 0;
+  uint8_t has_match = 0;
+  bool read = ReadString(is, license.library) &&
+              ReadString(is, license.entry) &&
+              ReadString(is, license.feature) && ReadString(is, license.exit) &&
+              ReadU8(is, has_exit) && ReadU64(is, license.match) &&
+              ReadU8(is, has_match);
+  if (!read) return false;
+  license.has_exit = has_exit != 0;
+  license.has_match = has_match != 0;
+  license.stated = true;
+  return true;
+}
+
 void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   WriteU32(os, static_cast<uint32_t>(d.modules.size()));
   for (const ModuleDirectives& m : d.modules) WriteModuleDirectives(os, m);
   WriteU32(os, static_cast<uint32_t>(d.cell_modules.size()));
   for (const std::string& name : d.cell_modules) WriteString(os, name);
+  WriteU32(os, static_cast<uint32_t>(d.runtime_licenses.size()));
+  for (const ProtectLicense& license : d.runtime_licenses) {
+    WriteRuntimeLicense(os, license);
+  }
 }
 
 // Each entry is read before it is kept, so a damaged count ends the read at the
@@ -170,6 +204,12 @@ bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
     std::string name;
     if (!ReadString(is, name)) return false;
     d.cell_modules.push_back(std::move(name));
+  }
+  if (!ReadU32(is, count)) return false;
+  for (uint32_t i = 0; i < count; ++i) {
+    ProtectLicense license;
+    if (!ReadRuntimeLicense(is, license)) return false;
+    d.runtime_licenses.push_back(std::move(license));
   }
   return true;
 }
@@ -330,6 +370,16 @@ bool LoadRecord(const std::filesystem::path& path, Record& record,
   return true;
 }
 
+// Opens the file at `path` for reading its records, past the format marker;
+// false where it is not a file this tool wrote.
+bool OpenRecords(const std::filesystem::path& path, std::ifstream& is) {
+  is.open(path, std::ios::binary);
+  if (!is.good()) return false;
+  char magic[kMagicLen];
+  if (!is.read(magic, kMagicLen)) return false;
+  return std::memcmp(magic, kMagic, kMagicLen) == 0;
+}
+
 }  // namespace
 
 bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
@@ -374,12 +424,8 @@ std::vector<std::string> PrecompiledLibrary::CellNames(
 bool PrecompiledLibrary::Load(const std::filesystem::path& path,
                               CompilationUnit& target, SourceManager& mgr,
                               Arena& arena, DiagEngine& diag) {
-  std::ifstream is(path, std::ios::binary);
-  if (!is.good()) return false;
-
-  char magic[kMagicLen];
-  if (!is.read(magic, kMagicLen)) return false;
-  if (std::memcmp(magic, kMagic, kMagicLen) != 0) return false;
+  std::ifstream is;
+  if (!OpenRecords(path, is)) return false;
 
   LoadContext ctx{target, mgr, arena, diag};
   while (true) {
@@ -389,6 +435,21 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
     if (!LoadRecord(path, record, ctx)) return false;
   }
   return true;
+}
+
+std::vector<ProtectLicense> PrecompiledLibrary::RuntimeLicenses(
+    const std::filesystem::path& path) {
+  std::vector<ProtectLicense> licenses;
+  std::ifstream is;
+  if (!OpenRecords(path, is)) return licenses;
+  while (is.peek() != EOF) {
+    Record record;
+    if (!ReadRecord(is, record)) return {};
+    for (ProtectLicense& license : record.directives.runtime_licenses) {
+      licenses.push_back(std::move(license));
+    }
+  }
+  return licenses;
 }
 
 }  // namespace delta

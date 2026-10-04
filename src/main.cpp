@@ -663,6 +663,14 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   // elaborated from source descriptions is: --lint-only and --parse-only stop
   // short of the run, and anything else simulates it.
   if (opts.lint_only || opts.parse_only) return 0;
+  // §34.5.29.2: the runtime licences the precompiled models state are asked
+  // before they are executed, which here is now, and the exit functions they
+  // name are called as `licenses` goes, once the simulation is over.
+  delta::ProtectLicenseLibraries licenses;
+  if (!delta::PrecompiledRuntimeLicensesGranted(opts.precompiled_libs, licenses,
+                                                diag)) {
+    return 1;
+  }
   return RunOnDeepStack(
       [&] { return SimulateDesign(opts, design, diag, arena); });
 }

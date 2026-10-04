@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "preprocessor/protect_license.h"
 
 namespace delta {
 
@@ -20,9 +21,15 @@ struct CompilationUnit;
 // modules `celldefine marked (§22.10). A binding run reads no source
 // description and runs no preprocessor, so it applies these to the cells as
 // the compile that preprocessed the text applied them.
+//
+// Beside them go the runtime licences the preprocessor met in the text's
+// encrypted models. §34.5.29.2 has each asked before the model is executed,
+// and a precompiled model is executed by the binding run, not by the compile
+// that decrypted it.
 struct PrecompiledDirectives {
   std::vector<ModuleDirectives> modules;
   std::vector<std::string> cell_modules;
+  std::vector<ProtectLicense> runtime_licenses;
 };
 
 // A file holding compiled cells, in a format and at a location this tool
@@ -67,6 +74,12 @@ class PrecompiledLibrary {
   // it is damaged, or when a source description in it no longer parses.
   static bool Load(const std::filesystem::path& path, CompilationUnit& target,
                    SourceManager& mgr, Arena& arena, DiagEngine& diag);
+
+  // The runtime licences every record held at `path` states, in the order the
+  // records were written; none where `path` is not a file this tool wrote or a
+  // record in it is damaged, which Load reports as no cells read.
+  static std::vector<ProtectLicense> RuntimeLicenses(
+      const std::filesystem::path& path);
 };
 
 }  // namespace delta

@@ -1,9 +1,13 @@
 #include "driver/protect_license_libraries.h"
 
 #include <cstdint>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "parser/precompiled_library.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_license.h"
 #include "simulator/shared_library.h"
@@ -61,6 +65,18 @@ bool RuntimeLicensesGranted(const std::vector<ProtectRuntimeLicense>& licenses,
     granted = false;
   }
   return granted;
+}
+
+bool PrecompiledRuntimeLicensesGranted(
+    const std::vector<std::string>& library_paths,
+    ProtectLicenseLibraries& libraries, DiagEngine& diag) {
+  std::vector<ProtectRuntimeLicense> licenses;
+  for (const std::string& path : library_paths) {
+    for (ProtectLicense& license : PrecompiledLibrary::RuntimeLicenses(path)) {
+      licenses.push_back({std::move(license), SourceLoc::None()});
+    }
+  }
+  return RuntimeLicensesGranted(licenses, libraries, diag);
 }
 
 }  // namespace delta
