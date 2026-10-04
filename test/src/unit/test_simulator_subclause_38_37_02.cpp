@@ -1,7 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
 #include <type_traits>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "fixture_scratch_dir.h"
+#include "simulator/foreign_code.h"
+#include "simulator/shared_library.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -125,6 +132,56 @@ TEST_F(VlogStartupArrayInitialization, SuppliedArrayHoldsOnlyItsTerminator) {
 
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
   EXPECT_TRUE(vpi_ctx_.RegisteredCallbacks().empty());
+}
+
+// A VPI application whose vlog_startup_routines[] names one routine, which
+// counts its calls, read back through deltahdl_startup_count().
+constexpr std::string_view kStartupLibrary =
+    "static int started = 0;\n"
+    "static void count_start(void) { ++started; }\n"
+    "void (*vlog_startup_routines[])(void) = {count_start, 0};\n"
+    "int deltahdl_startup_count(void) { return started; }\n";
+
+// A library defining no vlog_startup_routines[] at all.
+constexpr std::string_view kPlainLibrary =
+    "int deltahdl_plain_marker(void) { return 1; }\n";
+
+// Builds `source` into a library named `name` in `scratch`, answering the
+// location -sv_lib names it by.
+std::string BuiltLibrary(const ScratchDir& scratch, std::string_view name,
+                         std::string_view source) {
+  const std::string kBase = (scratch.dir / std::string(name)).string();
+  const std::string kError = BuildCSharedLibrary(source, kBase, "cc");
+  EXPECT_TRUE(kError.empty()) << kError;
+  return kBase;
+}
+
+// §36.9.1 with §38.37.2: the routines a loaded VPI application names in its
+// own vlog_startup_routines[] are called as it is loaded, just after the
+// simulator is invoked and ahead of the design, each once.
+TEST(LoadedApplicationStartupRoutines, AreCalledWhenTheLibraryLoads) {
+  ScratchDir scratch;
+  const std::string kLibrary =
+      BuiltLibrary(scratch, "deltahdl_startup_app", kStartupLibrary);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  ASSERT_TRUE(ForeignCodeLoadLibraries({}, {kLibrary}, diag));
+  auto* count =
+      reinterpret_cast<int (*)()>(GlobalSymbol("deltahdl_startup_count"));
+  ASSERT_NE(count, nullptr);
+  EXPECT_EQ(count(), 1);
+}
+
+// A library that names no startup routines is loaded as before, with nothing
+// reported.
+TEST(LoadedApplicationStartupRoutines, ALibraryWithoutTheArrayLoadsAsBefore) {
+  ScratchDir scratch;
+  const std::string kLibrary =
+      BuiltLibrary(scratch, "deltahdl_plain_app", kPlainLibrary);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EXPECT_TRUE(ForeignCodeLoadLibraries({}, {kLibrary}, diag));
+  EXPECT_TRUE(diag.Diagnostics().empty());
 }
 
 }  // namespace

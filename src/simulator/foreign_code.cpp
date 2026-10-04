@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "simulator/shared_library.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -302,6 +303,16 @@ bool LoadForeignLibrary(const ForeignCodeLibrary& library, DiagEngine& diag) {
                kLocation + ", could not be loaded: " + load.error,
                Subclause("J.4"));
     return false;
+  }
+  // §36.9.1 with §38.37.2: a VPI application names in its own
+  // vlog_startup_routines[] the routines the simulator calls just after it is
+  // invoked, which for a library loaded here is now, ahead of reading the
+  // design. The array is looked up through this library's handle, apart from
+  // the tool's array of the same name, which main walks itself.
+  auto* routines = static_cast<VlogStartupRoutine*>(
+      SharedLibrarySymbol(load.handle, "vlog_startup_routines"));
+  if (routines != nullptr && routines != vlog_startup_routines) {
+    InvokeVlogStartupRoutines(routines);
   }
   return true;
 }
