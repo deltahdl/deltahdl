@@ -192,34 +192,40 @@ TEST_F(TaskFuncCall, EmptyAndNullArgumentsHaveDistinctRepresentations) {
   EXPECT_EQ(vpi_get(vpiConstType, VpiHandleOf(&null_arg)), vpiNullConst);
 
   // The vpiArgument relation reaches exprs, an interface expr, a scope, a
-  // primitive, and named events; a statement or a module is not an argument.
+  // primitive, and named events; `scope` is a class whose kinds a module and a
+  // named begin are (§37.4.1), and a statement is not an argument.
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiOperation));  // an expr kind
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiInterface));  // an interface expr kind
-  EXPECT_TRUE(VpiIsTfCallArgumentType(vpiScope));
+  EXPECT_TRUE(VpiIsTfCallArgumentType(vpiModule));     // a scope kind
+  EXPECT_TRUE(VpiIsTfCallArgumentType(vpiNamedBegin));
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiGate));  // a primitive
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiNamedEvent));
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiNamedEventArray));
-  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiIf));  // a statement
-  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiModule));
+  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiIf));     // a statement
+  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiScope));  // a class, not a kind
 }
 
 // Detail 10: iterating a protected object's relationships is normally an error,
 // but a protected system task or function call still allows iteration over its
 // vpiArgument relation. The argument iteration collects only the call's
-// argument objects (excluding a non-argument child), while any other relation
-// on the same protected call is still refused.
+// argument objects (excluding one of a kind no argument is, and the call's
+// children), while any other relation on the same protected call is still
+// refused.
 TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
   VpiObject arg0;
   arg0.type = vpiOperation;  // an argument expression
   VpiObject arg1;
   arg1.type = vpiNamedEvent;  // a named-event argument
   VpiObject not_arg;
-  not_arg.type = vpiTypespec;  // a child that is not a call argument
+  not_arg.type = vpiTypespec;  // a kind that is not a call argument
+  VpiObject child;
+  child.type = vpiConstant;  // a child, which is no argument
 
   VpiObject call;
   call.type = vpiSysTaskCall;
   call.is_protected = true;
-  call.children = {&arg0, &not_arg, &arg1};
+  call.arguments = {&arg0, &not_arg, &arg1};
+  call.children = {&child};
 
   vpiHandle it = vpi_iterate(vpiArgument, VpiHandleOf(&call));
   ASSERT_NE(it, nullptr);
@@ -551,6 +557,67 @@ TEST_F(CallStatementsOfARun, ASystemTaskCallReachesItsUserSystf) {
   EXPECT_EQ(
       vpi_handle(vpiUserSystf, Named(vpiSysTaskCall, By("top"), "$display")),
       nullptr);
+}
+
+// A built-in system function written as a statement is no system task call:
+// $random is a function of §20.14 and $urandom one of §18.13, while $cast,
+// which §8.16 lets be called as a task, is a task where a statement calls it
+// (#5027).
+TEST_F(CallStatementsOfARun, ABuiltInSystemFunctionStatementIsNoSysTaskCall) {
+  Run("module top; int a; real r = 2.0;\n"
+      "  initial begin $random; $urandom; $cast(a, r); end endmodule\n");
+  EXPECT_EQ(Named(vpiSysTaskCall, By("top"), "$random"), nullptr);
+  EXPECT_EQ(Named(vpiSysTaskCall, By("top"), "$urandom"), nullptr);
+  EXPECT_NE(Named(vpiSysTaskCall, By("top"), "$cast"), nullptr);
+}
+
+// An argument naming a scope that stands around the call is reached through
+// vpiArgument like any other (#5028).
+TEST_F(CallStatementsOfARun, AnArgumentNamingTheScopeAroundTheCallIsReached) {
+  Run("module top; initial $printtimescale(top); endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  vpiHandle it = vpi_iterate(vpiArgument, call);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top")));
+}
+
+// A method task call on a class var a block declares is an object of the run,
+// whose vpiPrefix is the block's variable rather than the module's variable
+// of that name it shadows (#5029).
+TEST_F(CallStatementsOfARun, AMethodTaskCallOnABlockVariableIsAnObject) {
+  Run("module top;\n"
+      "  class C; task run(); endtask endclass\n"
+      "  int obj;\n"
+      "  initial begin : b C obj = new; obj.run(); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "run");
+  ASSERT_NE(call, nullptr);
+  ASSERT_NE(By("top.b.obj"), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, call)),
+            VpiObjectOf(By("top.b.obj")));
+}
+
+constexpr const char* kPackageTask = "package p; task t; endtask endpackage\n";
+
+// A call of a task a package declares is a task call, whether the name was
+// imported (#5030)...
+TEST_F(CallStatementsOfARun, ACallOfAnImportedPackageTaskIsATaskCall) {
+  Run(std::string(kPackageTask) +
+      "module top; import p::*; initial t; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+}
+
+// ...or written behind the package's name.
+TEST_F(CallStatementsOfARun, AScopedCallOfAPackageTaskIsATaskCall) {
+  Run(std::string(kPackageTask) + "module top; initial p::t; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
 }
 
 }  // namespace

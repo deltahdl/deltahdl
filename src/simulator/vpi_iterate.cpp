@@ -207,8 +207,8 @@ struct VpiIterateStores {
 };
 
 // §37.42 / §37.27: classify the tf-call argument and named-event special
-// modes. A tf call's arguments are reached through vpiArgument (argument-kind
-// children, not vpiArgument-typed children); a named event's
+// modes. A tf call's arguments are reached through vpiArgument (the call's
+// argument list, not vpiArgument-typed children); a named event's
 // vpiWaitingProcesses reaches the waiting threads and its vpiIndex reaches the
 // locating index expressions.
 void ComputeTfAndEventModes(int type, VpiHandle ref, VpiIterateModes& m) {
@@ -451,10 +451,6 @@ bool VpiIterateMatchesEdgeMode(int obj_type, int type, VpiHandle ref,
   }
   if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
     *matched = VpiIsCaseItemConditionType(obj_type);
-    return true;
-  }
-  if (modes.tf_argument) {
-    *matched = VpiIsTfCallArgumentType(obj_type);
     return true;
   }
   // §37.16, §37.17 detail 12: vpiBit reaches a net's net bits and a
@@ -813,6 +809,10 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   }
   if (modes.for_header_stmts) {
     VpiCollectForHeaderStmts(type, ref, iter);
+    return true;
+  }
+  if (modes.tf_argument) {
+    VpiCollectTfCallArguments(ref, iter);
     return true;
   }
   return false;

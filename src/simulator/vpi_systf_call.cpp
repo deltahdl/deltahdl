@@ -194,8 +194,8 @@ struct SystfArgumentBuild {
   std::function<VpiObject*()> alloc;
 };
 
-// §36.4: the arguments the call site wrote, hung on the call so §37.42's
-// vpiArgument iteration reaches them.
+// §36.4: the arguments the call site wrote, held as the call's arguments so
+// §37.42's vpiArgument iteration reaches them.
 void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
                               const SystfArgumentBuild& build) {
   for (const Expr* actual : call_site.args) {
@@ -213,7 +213,7 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
     } else {
       SystfCallArgument(arg, actual, build.ctx, build.arena, build.evaluate);
     }
-    call->children.push_back(arg);
+    call->arguments.push_back(arg);
   }
 }
 
@@ -285,7 +285,7 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   call->user_defined = true;
   call->user_systf =
       VpiSystfObjectAt(all_objects_, RegistrationIndex(systfs_, data));
-  call->children.clear();
+  call->arguments.clear();
 
   // It is also where a system function's return value is put: vpi_put_value
   // writes through the object's own storage, so the call carries a variable

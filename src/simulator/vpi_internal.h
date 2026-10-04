@@ -52,6 +52,11 @@ VpiHandle VpiForHeaderStmt(int type, VpiHandle for_stmt);
 // vpi_helpers_loops.cpp, used by vpi_iterate.cpp.
 void VpiCollectForHeaderStmts(int type, VpiHandle for_stmt, VpiHandle iter);
 
+// §37.42: the arguments a tf call was written with, which the vpiArgument
+// iteration walks. Defined in vpi_helpers_statements.cpp, used by
+// vpi_iterate.cpp.
+void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter);
+
 // §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74/§37.75: the body statement
 // the object model draws an untagged arrow to `stmt` for, §37.74's two single
 // arrows to a for statement's header, and the process a statement runs in;

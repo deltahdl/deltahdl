@@ -83,10 +83,15 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
 
 // Where the objects a statement holds hang: the scope object around it, and
 // the path a named one among them is named under, which an unnamed scope
-// between them leaves as it was.
+// between them leaves as it was. A scope a block stands as also carries the
+// block, whose declarations a name the statement writes resolves to first
+// (§9.3, §23.9), and every scope carries the one around it, null at a
+// procedure's own scope.
 struct BlockParent {
   VpiObject* scope;
   const std::string& path;
+  const Stmt* block = nullptr;
+  const BlockParent* outer = nullptr;
 };
 
 // What a walk of one procedure body builds with: the design and the instance's
@@ -183,20 +188,37 @@ bool DeclaresTask(const std::vector<ModuleItem*>& decls,
   });
 }
 
+// §26.2: whether the package the design declares under `package` declares a
+// task named `name`.
+bool PackageDeclaresTask(const RtlirDesign& design, std::string_view package,
+                         std::string_view name) {
+  return std::ranges::any_of(design.packages, [&](const PackageDecl* decl) {
+    return decl != nullptr && decl->name == package &&
+           DeclaresTask(decl->items, name);
+  });
+}
+
 // §13.3: whether `name` is a task the instance's module, one of its generate
-// blocks or the compilation unit declares.
+// blocks or the compilation unit declares, or, by §26.3, one the module
+// imports from a package by its name or with a wildcard.
 bool NamesTask(const BodyWalk& walk, std::string_view name) {
   if (DeclaresTask(walk.mod.function_decls, name) ||
       DeclaresTask(walk.design.cu_function_decls, name)) {
     return true;
   }
-  return std::ranges::any_of(walk.mod.gen_block_subroutines,
-                             [name](const RtlirGenBlockSubroutine& sub) {
-                               return sub.decl != nullptr &&
-                                      sub.decl->kind ==
-                                          ModuleItemKind::kTaskDecl &&
-                                      sub.decl->name == name;
-                             });
+  if (std::ranges::any_of(walk.mod.gen_block_subroutines,
+                          [name](const RtlirGenBlockSubroutine& sub) {
+                            return sub.decl != nullptr &&
+                                   sub.decl->kind ==
+                                       ModuleItemKind::kTaskDecl &&
+                                   sub.decl->name == name;
+                          })) {
+    return true;
+  }
+  return std::ranges::any_of(walk.mod.imports, [&](const RtlirImport& entry) {
+    return (entry.is_wildcard || entry.item_name == name) &&
+           PackageDeclaresTask(walk.design, entry.package_name, name);
+  });
 }
 
 // The class among `decls` named `name`, null for none.
@@ -275,42 +297,132 @@ std::string_view ClassOfVariable(const RtlirModule& mod,
   return {};
 }
 
+// Whether `name` is a built-in system function, every one the standard defines
+// listed by the clause defining it: §14.14, §16.14.7, §18.13, §19.9, and the
+// functions of §20.3 to §20.15, §21.3 and §21.6. $cast (§8.16), $system
+// (§20.17.1) and $stacktrace (§20.17.2) may each be called as a task or a
+// function, and a statement calling one calls the task.
+bool IsBuiltInSystemFunction(std::string_view name) {
+  static constexpr std::string_view kFunctions[] = {
+      // §14.14, §16.14.7, §18.13 and §19.9.
+      "$global_clock", "$inferred_clock", "$inferred_disable", "$urandom",
+      "$urandom_range", "$get_coverage",
+      // §20.3 and §20.4.
+      "$realtime", "$stime", "$time", "$timeunit", "$timeprecision",
+      // §20.5 and §20.6.
+      "$bitstoreal", "$realtobits", "$bitstoshortreal", "$shortrealtobits",
+      "$itor", "$rtoi", "$signed", "$unsigned", "$bits", "$isunbounded",
+      "$typename",
+      // §20.7.
+      "$unpacked_dimensions", "$dimensions", "$left", "$right", "$low", "$high",
+      "$increment", "$size",
+      // §20.8.
+      "$clog2", "$ln", "$log10", "$exp", "$sqrt", "$pow", "$floor", "$ceil",
+      "$sin", "$cos", "$tan", "$asin", "$acos", "$atan", "$atan2", "$hypot",
+      "$sinh", "$cosh", "$tanh", "$asinh", "$acosh", "$atanh",
+      // §20.9.
+      "$countbits", "$countones", "$onehot", "$onehot0", "$isunknown",
+      // §20.12.
+      "$sampled", "$rose", "$fell", "$stable", "$changed", "$past",
+      "$past_gclk", "$rose_gclk", "$fell_gclk", "$stable_gclk", "$changed_gclk",
+      "$future_gclk", "$rising_gclk", "$falling_gclk", "$steady_gclk",
+      "$changing_gclk",
+      // §20.13, §20.14 and §20.15.
+      "$coverage_control", "$coverage_get_max", "$coverage_get",
+      "$coverage_merge", "$coverage_save", "$random", "$dist_chi_square",
+      "$dist_erlang", "$dist_exponential", "$dist_normal", "$dist_poisson",
+      "$dist_t", "$dist_uniform", "$q_full",
+      // §21.3 and §21.6.
+      "$fopen", "$fgetc", "$ungetc", "$fgets", "$fscanf", "$sscanf", "$fread",
+      "$ftell", "$fseek", "$rewind", "$feof", "$ferror", "$sformatf",
+      "$test$plusargs", "$value$plusargs"};
+  return std::ranges::any_of(kFunctions, [name](std::string_view function) {
+    return function == name;
+  });
+}
+
 // §37.42: a system task call, named after the system task it calls. A system
-// function an application registered stays a function where a statement calls
-// it, and the evaluator runs it as one (§36.5), so it is no system task call.
+// function stays a function where a statement calls it, and the evaluator runs
+// it as one (§36.5), so it is no system task call. A name an application
+// registered is what the registration made it, which the run calls it as.
 CallShape SystemTaskCallShape(const Expr& call, const BodyWalk& walk) {
   const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
   if (kSystf.type == vpiSysFunc) return {};
+  if (kSystf.type == 0 && IsBuiltInSystemFunction(call.callee)) return {};
   CallShape shape{vpiSysTaskCall, call.callee};
   shape.user_defined = kSystf.type == vpiSysTask;
   shape.systf = kSystf.object;
   return shape;
 }
 
-// §37.42: a method task call, applied through `access` to a class var of the
+// §8.4: the variable a call's prefix names, as the class it holds a handle of
+// (empty for a variable of no class type and for no variable) and the object
+// standing for it.
+struct ClassVar {
+  std::string_view cls;
+  VpiObject* object = nullptr;
+};
+
+// §23.9: the variable `name` names in the scope `parent` stands for: one a
+// block declares, the innermost around the statement first, or else one of the
 // instance's module.
-CallShape MethodTaskCallShape(const Expr& access, const BodyWalk& walk) {
-  if (access.is_scope_resolution || access.lhs == nullptr ||
-      access.rhs == nullptr || access.lhs->kind != ExprKind::kIdentifier ||
-      access.rhs->kind != ExprKind::kIdentifier) {
-    return {};
+ClassVar FindClassVar(const BlockParent& parent, std::string_view name,
+                      const BodyWalk& walk) {
+  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
+    if (at->block == nullptr) continue;
+    for (const Stmt* item : BlockItems(*at->block)) {
+      if (item == nullptr || item->kind != StmtKind::kVarDecl ||
+          item->var_name != name) {
+        continue;
+      }
+      const DataType& type = item->var_decl_type;
+      return {type.kind == DataTypeKind::kNamed ? type.type_name
+                                                : std::string_view(),
+              ChildNamed(at->scope, name)};
+    }
   }
-  const MethodTask kTask = ClassMethodTask(
-      walk, ClassOfVariable(walk.mod, access.lhs->text), access.rhs->text);
+  return {ClassOfVariable(walk.mod, name),
+          FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, name))};
+}
+
+// §37.42: a method task call, applied through `access`, which joins two
+// names, to a class var of the scope the call stands in.
+CallShape MethodTaskCallShape(const Expr& access, const BlockParent& parent,
+                              const BodyWalk& walk) {
+  const ClassVar kVar = FindClassVar(parent, access.lhs->text, walk);
+  const MethodTask kTask = ClassMethodTask(walk, kVar.cls, access.rhs->text);
   if (kTask == MethodTask::kNone) return {};
   CallShape shape{vpiMethodTaskCall, access.rhs->text};
-  shape.prefix = FindObjectForFlatName(
-      walk.objects, VpiFlatName(walk.prefix, access.lhs->text));
+  shape.prefix = kVar.object;
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
   shape.user_defined = kTask == MethodTask::kDeclared;
   return shape;
 }
 
-// §37.42 with §37.60: what the expression statement `expr` calls. A task is
-// enabled with or without an argument list (§13.3), so the callee is the
-// expression itself where no list follows it.
-CallShape CallShapeOf(const Expr& expr, const BodyWalk& walk) {
+// Whether the member access or scope resolution `access` joins two plain
+// names, `obj.run` or `p::t`, the one form of either this walk resolves.
+bool JoinsTwoNames(const Expr& access) {
+  return access.lhs != nullptr && access.rhs != nullptr &&
+         access.lhs->kind == ExprKind::kIdentifier &&
+         access.rhs->kind == ExprKind::kIdentifier;
+}
+
+// §37.42 with §26.3: a task call naming a package's task behind the package's
+// name, `p::t`.
+CallShape PackageTaskCallShape(const Expr& access, const BodyWalk& walk) {
+  if (!PackageDeclaresTask(walk.design, access.lhs->text, access.rhs->text)) {
+    return {};
+  }
+  return CallShape{vpiTaskCall, access.rhs->text};
+}
+
+// §37.42 with §37.60: what the expression statement `expr`, standing in the
+// scope `parent` stands for, calls. A task is enabled with or without an
+// argument list (§13.3), so the callee is the expression itself where no list
+// follows it.
+CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
+                      const BodyWalk& walk) {
   if (expr.kind == ExprKind::kSystemCall) {
     return SystemTaskCallShape(expr, walk);
   }
@@ -320,25 +432,17 @@ CallShape CallShapeOf(const Expr& expr, const BodyWalk& walk) {
     if (!NamesTask(walk, callee->text)) return {};
     return CallShape{vpiTaskCall, callee->text};
   }
-  if (callee->kind == ExprKind::kMemberAccess) {
-    return MethodTaskCallShape(*callee, walk);
+  if (callee->kind != ExprKind::kMemberAccess || !JoinsTwoNames(*callee)) {
+    return {};
   }
-  return {};
-}
-
-// Whether `obj` is `call` or stands around it.
-bool StandsAround(const VpiObject* obj, const VpiObject* call) {
-  for (const VpiObject* at = call; at != nullptr; at = at->parent) {
-    if (at == obj) return true;
-  }
-  return false;
+  if (callee->is_scope_resolution) return PackageTaskCallShape(*callee, walk);
+  return MethodTaskCallShape(*callee, parent, walk);
 }
 
 // §37.42: the arguments `expr` was written with, in order, each the
 // expression object the instance's names resolve it to (§37.58, §37.59), an
 // empty position being detail 8's empty argument. An expression of a kind the
-// model builds no object for is passed over, and so is a scope standing around
-// the call, which hung below it would make the model a loop.
+// model builds no object for is passed over.
 void MakeCallArguments(VpiObject* call, const Expr& expr,
                        const BodyWalk& walk) {
   if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
@@ -353,9 +457,7 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
       arg = VpiInstanceExpression(actual, walk.objects, walk.prefix,
                                   walk.calls.ctx, walk.build);
     }
-    if (arg != nullptr && !StandsAround(arg, call)) {
-      call->children.push_back(arg);
-    }
+    if (arg != nullptr) call->arguments.push_back(arg);
   }
 }
 
@@ -367,7 +469,7 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
-  const CallShape kShape = CallShapeOf(*stmt.expr, walk);
+  const CallShape kShape = CallShapeOf(*stmt.expr, parent, walk);
   if (kShape.type == 0) return nullptr;
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
   call->name = walk.build.keep(std::string(kShape.name));
@@ -433,7 +535,7 @@ VpiObject* MakeBlockScope(const Stmt& stmt, int kind, const BlockParent& parent,
     block->join_type = JoinTypeOf(stmt.join_kind);
   }
   MakeBlockVariables(block, stmt, path, walk.build);
-  WalkSubStmts(stmt, BlockParent{block, path}, walk);
+  WalkSubStmts(stmt, BlockParent{block, path, &stmt, &parent}, walk);
   return block;
 }
 
@@ -467,7 +569,7 @@ VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
   std::string path;
   VpiObject* begin =
       MakeScopeObject(vpiNamedBegin, stmt->label, parent, walk, path);
-  WalkStmtItself(*stmt, BlockParent{begin, path}, walk);
+  WalkStmtItself(*stmt, BlockParent{begin, path, nullptr, &parent}, walk);
   return begin;
 }
 

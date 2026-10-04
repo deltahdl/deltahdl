@@ -284,7 +284,7 @@ VpiObject* CallObject(const Expr* expr, const AssignBuild& build) {
       expr->kind == ExprKind::kSystemCall ? vpiSysFuncCall : vpiFuncCall;
   for (const Expr* arg : expr->args) {
     VpiObject* obj = ExpressionObject(arg, build);
-    if (obj != nullptr) call->children.push_back(obj);
+    if (obj != nullptr) call->arguments.push_back(obj);
   }
   return call;
 }

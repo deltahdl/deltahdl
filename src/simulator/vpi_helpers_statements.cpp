@@ -736,15 +736,19 @@ bool VpiIsMethodCallType(int type) {
 
 bool VpiIsTfCallArgumentType(int type) {
   // §37.42: the vpiArgument relation of a tf call reaches an expr, an interface
-  // expr, a scope, a primitive, a named event, or a named event array. An expr
-  // and an interface expr are themselves groupings, so defer to their
-  // classifiers; the rest are concrete kinds.
+  // expr, a scope, a primitive, a named event, or a named event array. An expr,
+  // an interface expr and a scope are themselves groupings (§37.4.1), so defer
+  // to their classifiers; the rest are concrete kinds. The scope class was
+  // taken for a kind of its own, which no object is, so a module passed as an
+  // argument was none.
   //
   // §37.58 holds nets and variables in simple expr, so a net or variable passed
   // as an argument is one too.
-  if (VpiIsExprOperandType(type) || VpiIsInterfaceExprType(type)) return true;
+  if (VpiIsExprOperandType(type) || VpiIsInterfaceExprType(type) ||
+      VpiIsInternalScopeType(type)) {
+    return true;
+  }
   switch (type) {
-    case vpiScope:
     case vpiNamedEvent:
     case vpiNamedEventArray:
       return true;
@@ -767,6 +771,16 @@ void VpiMakeNullArgument(VpiHandle arg) {
   if (!arg) return;
   arg->type = vpiConstant;
   arg->const_type = vpiNullConst;
+}
+
+void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter) {
+  // §37.42: the arguments the call was written with, in order, each of a kind
+  // the vpiArgument arrow reaches.
+  for (VpiObject* arg : call->arguments) {
+    if (arg != nullptr && VpiIsTfCallArgumentType(arg->type)) {
+      iter->children.push_back(arg);
+    }
+  }
 }
 
 // ===========================================================================

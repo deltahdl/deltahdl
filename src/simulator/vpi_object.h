@@ -492,6 +492,13 @@ struct VpiObject {
   // reaches through vpiUserSystf; null for a call of a built-in one.
   VpiObject* user_systf = nullptr;
 
+  // §37.42 (figure): the arguments a tf call was written with, in order, which
+  // the vpiArgument iteration walks. They are held here rather than among the
+  // call's children because an argument may name a scope standing around the
+  // call, and hung below the call that scope would make the walks down the
+  // model's children a loop. Empty for every object that is no tf call.
+  std::vector<VpiObject*> arguments;
+
   // §37.47 detail 3: the bit offset a cont assign bit reports through
   // vpi_get(vpiOffset). The offset is measured from the least significant bit,
   // so the LSB carries offset zero and the bit n positions above it carries
