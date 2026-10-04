@@ -74,6 +74,13 @@ struct SvActualDimension {
   int32_t high = 0;
 };
 
+// §35.6.1.1: one unpacked dimension of an actual as its declaration wrote it,
+// left bound first, which an open formal's dimension takes on.
+struct DpiArrayRange {
+  int32_t left = 0;
+  int32_t right = 0;
+};
+
 struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
@@ -103,6 +110,11 @@ struct DpiArg {
   // is. This is the width the declaration gave it; 0 leaves the width to the
   // kind, which is what every formal whose type carries its own width has.
   uint32_t width = 0;
+  // §H.7.3 and §H.8.4: whether the declaration wrote a packed dimension on a
+  // bit, logic or reg formal. A one-bit packed array, `bit [0:0]`, has the
+  // scalar's width and is still a packed array, crossing by reference to its
+  // canonical chunk where the scalar crosses by value.
+  bool is_packed_array = false;
   // §H.7.4: whether the type is unsigned -- a byte, shortint, int or
   // longint the declaration qualified unsigned crosses as the unsigned C
   // type corresponding to Table H.1's row for the signed type. For any other
@@ -119,6 +131,25 @@ struct DpiArg {
   // elements are what the kind and width describe, and crosses as a C array
   // or an open-array handle rather than as one value of that type.
   bool has_unpacked_dimensions = false;
+  // §H.7.3 with §H.7.6: the unpacked dimensions, outermost first, of a formal
+  // whose declaration sized every one of them with constant bounds, each as
+  // its lower and upper bound whichever way round it was written. Empty for a
+  // formal with none, with an open one (§35.5.6.1) or with a bound that does
+  // not fold.
+  std::vector<SvActualDimension> unpacked_dims = {};
+  // §H.7.8: the members of an unpacked struct or union formal, in
+  // declaration order, each as a formal of its own type. Empty for every other
+  // formal, and for one whose declaration was not found.
+  std::vector<DpiArg> members = {};
+  // §35.5.6.1 and §H.8.6: whether a dimension the declaration wrote after the
+  // formal's name is unsized, `[]`, which makes the formal an open array
+  // passed by handle, its dimensions those of the actual.
+  bool is_open_array = false;
+  // The formal as the declaration wrote it, which ResolveDpiFormalTypes
+  // (src/simulator/dpi_formal_type.h) resolves to the type the formal crosses
+  // as once the design's typedef names are known (§H.7.3, §H.7.4). Null for a
+  // formal registered without a declaration.
+  const FunctionArg* declaration = nullptr;
 };
 
 struct DpiArgValue {
@@ -148,6 +179,14 @@ struct DpiArgValue {
   // The declared width the words carry, which the word count rounds up to a
   // multiple of 32 and so cannot state.
   uint32_t vec_width = 0;
+  // §H.7.3: the elements of an unpacked array, each a value of the formal's
+  // element type, in the order C lays them out -- row-major, each dimension
+  // from its lower index. Empty for every value that is not an array.
+  std::vector<DpiArgValue> elements;
+  // §35.6.1.1: the actual's unpacked dimensions, outermost first, as an open
+  // formal takes them on; an open array's elements are in the order those
+  // ranges run, each from its left bound (§H.12.4).
+  std::vector<DpiArrayRange> ranges;
 
   static DpiArgValue FromInt(int32_t v);
   static DpiArgValue FromLongint(int64_t v);
@@ -179,6 +218,8 @@ struct DpiArgValue {
     return vec_words;
   }
   uint32_t VecWidth() const { return vec_width; }
+  // Whether this value is an unpacked array's elements.
+  bool IsArray() const { return !elements.empty(); }
 };
 
 // §35.6.2: a value-change event the SystemVerilog simulator raises for an

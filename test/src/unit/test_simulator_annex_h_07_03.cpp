@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "helpers_open_array_natural_order.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
@@ -443,6 +446,71 @@ TEST(DpiDataRepresentation, AnEnumIsItsBaseTypeAndSmallWhenItIs) {
             "const svLogicVecVal*");
   EXPECT_EQ(delta::DpiCTypeOfFormal(FormalOf(DataTypeKind::kBit, 4), false),
             "const svBitVecVal*");
+}
+
+// The C functions the design below calls, each reading its formal as the type
+// it crosses as: a typedef of a packed array, a packed struct and a packed
+// union as one svBitVecVal chunk, an enum of int as an int by value and an
+// enum of logic [3:0] as one svLogicVecVal chunk.
+int LowBitsOf(const uint32_t* v) { return static_cast<int>(*v & 7U); }
+
+int EnumPlusOne(int e) { return e + 1; }
+
+int EnumBits(const SvLogicVecVal* e) {
+  return static_cast<int>((e->aval * 10) + e->bval);
+}
+
+// The value the design's variable `name` holds once the run is over, all ones
+// where the run holds no such variable.
+uint64_t VariableValue(SimFixture& f, std::string_view name) {
+  auto* var = f.ctx.FindVariable(name);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+// §H.7.3 with §6.18: a formal written with a typedef name crosses as the type
+// the name stands for -- `typedef bit [2:0] A` a three-bit packed array, an
+// enumeration its base type, a packed struct or union the packed array of its
+// width -- so each import is called rather than left bound to nothing.
+TEST(DpiTypesOfFormals, ATypeNameCrossesAsTheTypeItStandsFor) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  typedef bit [2:0] A;\n"
+      "  typedef struct packed { bit a; bit b; bit c; } S;\n"
+      "  typedef union packed { A a; S s; } U;\n"
+      "  typedef enum int { P = 20, Q = 30 } E;\n"
+      "  typedef enum logic [3:0] { X = 4'd5, Y = 4'b1z10 } F;\n"
+      "  import \"DPI-C\" function int as_a(input A v);\n"
+      "  import \"DPI-C\" function int as_s(input S v);\n"
+      "  import \"DPI-C\" function int as_u(input U v);\n"
+      "  import \"DPI-C\" function int as_e(input E e);\n"
+      "  import \"DPI-C\" function int as_f(input F f);\n"
+      "  int a, s, u, e, l;\n"
+      "  S sv; U uv; F fv;\n"
+      "  initial begin\n"
+      "    sv.a = 1'b1; sv.b = 1'b0; sv.c = 1'b1;\n"
+      "    uv.a = 3'b110;\n"
+      "    fv = Y;\n"
+      "    a = as_a(3'b011);\n"
+      "    s = as_s(sv);\n"
+      "    u = as_u(uv);\n"
+      "    e = as_e(Q);\n"
+      "    l = as_f(fv);\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"as_a", reinterpret_cast<void*>(&LowBitsOf)},
+       {"as_s", reinterpret_cast<void*>(&LowBitsOf)},
+       {"as_u", reinterpret_cast<void*>(&LowBitsOf)},
+       {"as_e", reinterpret_cast<void*>(&EnumPlusOne)},
+       {"as_f", reinterpret_cast<void*>(&EnumBits)}},
+      "annex_h_07_03_type_names");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "a"), 3U);
+  EXPECT_EQ(VariableValue(f, "s"), 5U);
+  EXPECT_EQ(VariableValue(f, "u"), 6U);
+  EXPECT_EQ(VariableValue(f, "e"), 31U);
+  EXPECT_EQ(VariableValue(f, "l"), 104U);
 }
 
 }  // namespace

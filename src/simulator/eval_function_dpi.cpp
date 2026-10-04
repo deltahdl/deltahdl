@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -15,8 +17,10 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/svdpi.h"
 #include "simulator/variable.h"
 
@@ -212,6 +216,11 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
     case DataTypeKind::kInteger:
       return DpiArgValue::FromLogicVec(SvLogicVecVal{
           static_cast<uint32_t>(word.aval), static_cast<uint32_t>(word.bval)});
+    case DataTypeKind::kTime:
+      // §H.7.3: time is a packed 4-state type, so it crosses as its two
+      // aval/bval pairs (§H.7.7) and its unknown bits stay unknown.
+      return DpiArgValue::FromLogicVecWords(CanonicalWordsOfVec(v, 64), 64,
+                                            kind);
     case DataTypeKind::kString:
       // §35.5.6 admits a string formal, and §H.8.10 has its characters laid
       // out for C as a C string. A design's string is held a byte per
@@ -290,6 +299,206 @@ Logic4Vec DpiValueOfType(Arena& arena, DataTypeKind kind,
   return v;
 }
 
+// The elements of the fixed-size unpacked array an actual names, and its
+// unpacked dimensions as declared, outermost first.
+struct UnpackedActual {
+  std::vector<Variable*> elements;
+  std::vector<DpiArrayRange> ranges;
+};
+
+// The declared dimensions of the array `info` describes, outermost first.
+std::vector<DpiArrayRange> DeclaredRanges(const ArrayInfo& info) {
+  std::vector<DpiArrayRange> ranges;
+  const bool kSingle = info.dim_sizes.empty();
+  const size_t kCount = kSingle ? 1 : info.dim_sizes.size();
+  for (size_t d = 0; d < kCount; ++d) {
+    const auto kLow = static_cast<int32_t>(kSingle ? info.lo : info.dim_los[d]);
+    const auto kSize =
+        static_cast<int32_t>(kSingle ? info.size : info.dim_sizes[d]);
+    const bool kDescending =
+        kSingle ? info.is_descending
+                : d < info.dim_descending.size() && info.dim_descending[d];
+    const int32_t kHigh = kLow + kSize - 1;
+    ranges.push_back(kDescending ? DpiArrayRange{kHigh, kLow}
+                                 : DpiArrayRange{kLow, kHigh});
+  }
+  return ranges;
+}
+
+// §H.7.3: the elements of the array `name` names, row-major. A sized formal
+// lays each dimension out from its lower index (§H.7.6 c)) and an open one
+// from its left bound (§H.12.4), which `from_left` selects. Empty where `name`
+// names no fixed-size array.
+UnpackedActual UnpackedActualOf(std::string_view name, bool from_left,
+                                SimContext& ctx) {
+  UnpackedActual actual;
+  const ArrayInfo* info = ctx.FindArrayInfo(name);
+  if (info == nullptr || info->is_dynamic || info->is_queue) return actual;
+  actual.ranges = DeclaredRanges(*info);
+  std::vector<std::string> names = {std::string(name)};
+  for (const DpiArrayRange& range : actual.ranges) {
+    const int32_t kFirst =
+        from_left ? range.left : std::min(range.left, range.right);
+    const int32_t kStep = from_left && range.left > range.right ? -1 : 1;
+    const int32_t kCount = std::abs(range.left - range.right) + 1;
+    std::vector<std::string> next;
+    for (const std::string& prefix : names) {
+      for (int32_t j = 0; j < kCount; ++j) {
+        next.push_back(prefix + "[" + std::to_string(kFirst + (j * kStep)) +
+                       "]");
+      }
+    }
+    names = std::move(next);
+  }
+  for (const std::string& element : names) {
+    actual.elements.push_back(ctx.FindVariable(element));
+  }
+  return actual;
+}
+
+// §7.2 with §7.4.2: which slot of a member array's packed bits, counted from
+// the least significant, holds the element at C index `k` -- the leftmost
+// element stands in the most significant bits, and C index 0 is the lower
+// index (§H.7.6 c)).
+uint32_t MemberElementSlot(const StructFieldInfo& field, uint32_t k) {
+  const int64_t kLower = std::min(field.elem_left, field.elem_right);
+  const int64_t kFromLeft = std::abs(kLower + k - field.elem_left);
+  return field.elem_count - 1 - static_cast<uint32_t>(kFromLeft);
+}
+
+// The bits one element of a member array takes.
+uint32_t MemberElementWidth(const StructFieldInfo& field) {
+  return field.elem_count == 0 ? field.width : field.width / field.elem_count;
+}
+
+// §H.7.8: the members of the unpacked struct or union `bits` holds under the
+// layout `info`, each a value of `formal`'s member at the same position.
+DpiArgValue AggregateValue(const DpiArg& formal, const StructTypeInfo& info,
+                           const Logic4Vec& bits, Arena& arena) {
+  DpiArgValue whole;
+  whole.type = formal.type;
+  for (size_t m = 0; m < formal.members.size() && m < info.fields.size(); ++m) {
+    const DpiArg& member = formal.members[m];
+    const StructFieldInfo& field = info.fields[m];
+    Logic4Vec held =
+        ExtractBitField(arena, bits, field.bit_offset, field.width);
+    if (!member.members.empty() && field.nested != nullptr) {
+      whole.elements.push_back(
+          AggregateValue(member, *field.nested, held, arena));
+      continue;
+    }
+    if (member.unpacked_dims.empty() || field.elem_count == 0) {
+      whole.elements.push_back(
+          DpiArgValueOfType(member.type, member.width,
+                            MemberValueOf(held, field.type_kind, arena)));
+      continue;
+    }
+    DpiArgValue array;
+    array.type = member.type;
+    const uint32_t kWidth = MemberElementWidth(field);
+    for (uint32_t k = 0; k < field.elem_count; ++k) {
+      array.elements.push_back(DpiArgValueOfType(
+          member.type, member.width,
+          ExtractBitField(arena, held, MemberElementSlot(field, k) * kWidth,
+                          kWidth)));
+    }
+    whole.elements.push_back(std::move(array));
+  }
+  return whole;
+}
+
+// `value` of `formal`'s type, at `width` bits, as the bits a member holds.
+Logic4Vec MemberBits(const DpiArg& formal, const DpiArgValue& value,
+                     DataTypeKind held_kind, uint32_t width, Arena& arena) {
+  Logic4Vec next = DpiValueOfType(arena, formal.type, formal.width, value,
+                                  !formal.is_unsigned);
+  return ResizeToWidth(MemberBitsOf(next, held_kind, arena), width, arena);
+}
+
+// §35.5.1.2 for an unpacked struct or union: the members C left in `value`
+// are deposited into `bits`, which holds the actual under the layout `info`.
+void DepositAggregate(Logic4Vec& bits, const DpiArg& formal,
+                      const StructTypeInfo& info, const DpiArgValue& value,
+                      Arena& arena) {
+  for (size_t m = 0; m < formal.members.size() && m < info.fields.size() &&
+                     m < value.elements.size();
+       ++m) {
+    const DpiArg& member = formal.members[m];
+    const StructFieldInfo& field = info.fields[m];
+    const DpiArgValue& part = value.elements[m];
+    if (!member.members.empty() && field.nested != nullptr) {
+      Logic4Vec held = OwnRhsWords(
+          ExtractBitField(arena, bits, field.bit_offset, field.width), arena);
+      DepositAggregate(held, member, *field.nested, part, arena);
+      DepositBitField(bits, field.bit_offset, held, field.width);
+    } else if (member.unpacked_dims.empty() || field.elem_count == 0) {
+      DepositBitField(
+          bits, field.bit_offset,
+          MemberBits(member, part, field.type_kind, field.width, arena),
+          field.width);
+    } else {
+      const uint32_t kWidth = MemberElementWidth(field);
+      for (uint32_t k = 0; k < field.elem_count && k < part.elements.size();
+           ++k) {
+        DepositBitField(
+            bits, field.bit_offset + (MemberElementSlot(field, k) * kWidth),
+            MemberBits(member, part.elements[k], field.type_kind, kWidth,
+                       arena),
+            kWidth);
+      }
+    }
+  }
+}
+
+// The actual of an unpacked struct or union formal, its members in order; an
+// actual that is not a struct variable's name has none to give.
+DpiArgValue DpiAggregateActual(const DpiArg& formal, const Expr* actual,
+                               const ActualBindingCtx& b) {
+  DpiArgValue whole;
+  whole.type = formal.type;
+  if (actual->kind != ExprKind::kIdentifier) return whole;
+  const Variable* var = b.ctx.FindVariable(actual->text);
+  const StructTypeInfo* info = b.ctx.GetVariableStructType(actual->text);
+  if (var == nullptr || info == nullptr) return whole;
+  return AggregateValue(formal, *info, var->value, b.arena);
+}
+
+// The layout of the structs an array of them, `name`, holds: the array's
+// own where the run records one, and the formal's type's otherwise.
+const StructTypeInfo* ElementStructOf(std::string_view name,
+                                      const DpiArg& formal, SimContext& ctx) {
+  const StructTypeInfo* info = ctx.GetVariableStructType(name);
+  return info != nullptr ? info : ctx.FindStructType(formal.type_name);
+}
+
+// The actual of an unpacked formal, sized or open: its elements each a value
+// of the formal's element type in C order, and its declared dimensions. An
+// actual that is not an array name has no elements to give.
+DpiArgValue DpiArrayActual(const DpiArg& formal, const Expr* actual,
+                           const ActualBindingCtx& b) {
+  DpiArgValue array;
+  array.type = formal.type;
+  if (actual->kind != ExprKind::kIdentifier) return array;
+  UnpackedActual found =
+      UnpackedActualOf(actual->text, formal.is_open_array, b.ctx);
+  array.ranges = std::move(found.ranges);
+  const StructTypeInfo* info =
+      formal.members.empty() ? nullptr
+                             : ElementStructOf(actual->text, formal, b.ctx);
+  for (Variable* element : found.elements) {
+    if (element == nullptr) {
+      array.elements.emplace_back();
+    } else if (info != nullptr) {
+      array.elements.push_back(
+          AggregateValue(formal, *info, element->value, b.arena));
+    } else {
+      array.elements.push_back(
+          DpiArgValueOfType(formal.type, formal.width, element->value));
+    }
+  }
+  return array;
+}
+
 DpiArgValue EvalDpiActualForFormal(const DpiRtFunction* import, size_t i,
                                    const ActualBindingCtx& b) {
   DataTypeKind type = import->args[i].type;
@@ -300,6 +509,17 @@ DpiArgValue EvalDpiActualForFormal(const DpiRtFunction* import, size_t i,
   // call to say afterwards whether the call changed it.
   uint32_t width = import->args[i].width;
   int ai = ResolveDpiActualIndex(import, b.call, i, b.positional_count);
+  if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr &&
+      (!import->args[i].unpacked_dims.empty() ||
+       import->args[i].is_open_array)) {
+    return DpiArrayActual(import->args[i],
+                          b.call->args[static_cast<size_t>(ai)], b);
+  }
+  if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr &&
+      !import->args[i].members.empty()) {
+    return DpiAggregateActual(import->args[i],
+                              b.call->args[static_cast<size_t>(ai)], b);
+  }
   if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr) {
     return DpiArgValueOfType(
         type, width,
@@ -387,6 +607,50 @@ bool AssignmentWouldChangeActual(const Expr* lhs, const Logic4Vec& next,
 // for a native subroutine, reading the values out of the callee's local
 // variables; a foreign callee has none, so the values are read out of the
 // vector it was called with.
+// §35.5.1.2 for an unpacked formal, sized or open: each element C left is
+// copied back into the actual's element at the same position, at that
+// element's width, a struct element member by member.
+void WritebackDpiArray(const DpiArg& formal, const Expr* lhs,
+                       const DpiArgValue& array, const ActualBindingCtx& b) {
+  if (lhs->kind != ExprKind::kIdentifier) return;
+  std::vector<Variable*> elements =
+      UnpackedActualOf(lhs->text, formal.is_open_array, b.ctx).elements;
+  const StructTypeInfo* info = formal.members.empty()
+                                   ? nullptr
+                                   : ElementStructOf(lhs->text, formal, b.ctx);
+  for (size_t k = 0; k < elements.size() && k < array.elements.size(); ++k) {
+    Variable* element = elements[k];
+    if (element == nullptr) continue;
+    Logic4Vec next = OwnRhsWords(element->value, b.arena);
+    if (info != nullptr) {
+      DepositAggregate(next, formal, *info, array.elements[k], b.arena);
+    } else {
+      next = OwnRhsWords(
+          ResizeToWidth(DpiValueOfType(b.arena, formal.type, formal.width,
+                                       array.elements[k], !formal.is_unsigned),
+                        element->value.width, b.arena),
+          b.arena);
+    }
+    element->value = next;
+    element->NotifyWatchers();
+  }
+}
+
+// §35.5.1.2 for an unpacked struct or union formal: the members C left are
+// deposited into the struct variable the actual names.
+void WritebackDpiAggregate(const DpiArg& formal, const Expr* lhs,
+                           const DpiArgValue& value,
+                           const ActualBindingCtx& b) {
+  if (lhs->kind != ExprKind::kIdentifier) return;
+  Variable* var = b.ctx.FindVariable(lhs->text);
+  const StructTypeInfo* info = b.ctx.GetVariableStructType(lhs->text);
+  if (var == nullptr || info == nullptr) return;
+  Logic4Vec next = OwnRhsWords(var->value, b.arena);
+  DepositAggregate(next, formal, *info, value, b.arena);
+  var->value = next;
+  var->NotifyWatchers();
+}
+
 void WritebackDpiChangedArgs(const DpiRtFunction* import,
                              const ActualBindingCtx& b,
                              const std::vector<DpiArgValue>& actuals,
@@ -400,6 +664,15 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
     // all, and the assignment narrows it to whatever the actual holds, as an
     // assignment to that actual would anywhere else.
     const Expr* lhs = b.call->args[static_cast<size_t>(ai)];
+    if (!import->args[i].unpacked_dims.empty() ||
+        import->args[i].is_open_array) {
+      WritebackDpiArray(import->args[i], lhs, actuals[i], b);
+      continue;
+    }
+    if (!import->args[i].members.empty()) {
+      WritebackDpiAggregate(import->args[i], lhs, actuals[i], b);
+      continue;
+    }
     Logic4Vec next =
         DpiValueOfType(b.arena, import->args[i].type, import->args[i].width,
                        actuals[i], !import->args[i].is_unsigned);

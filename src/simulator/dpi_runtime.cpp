@@ -81,80 +81,6 @@ bool DpiSvdpiSrcIsNeededForExportCall(
   return !allocates_representation_dynamically;
 }
 
-DpiArgValue DpiArgValue::FromInt(int32_t v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kInt;
-  a.data.int_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromLongint(int64_t v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kLongint;
-  a.data.longint_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromReal(double v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kReal;
-  a.data.real_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromString(std::string v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kString;
-  a.string_val = std::move(v);
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromChandle(SvChandle v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kChandle;
-  a.data.chandle_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromBit(SvBit v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kBit;
-  a.data.bit_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromLogic(SvLogic v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kLogic;
-  a.data.logic_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromLogicVec(SvLogicVecVal v) {
-  DpiArgValue a;
-  a.type = DataTypeKind::kInteger;
-  a.data.logic_vec_val = v;
-  return a;
-}
-
-DpiArgValue DpiArgValue::FromLogicVecWords(std::vector<SvLogicVecVal> words,
-                                           uint32_t width, DataTypeKind type) {
-  DpiArgValue a;
-  a.type = type;
-  a.vec_words = std::move(words);
-  a.vec_width = width;
-  return a;
-}
-
-int32_t DpiArgValue::AsInt() const { return data.int_val; }
-int64_t DpiArgValue::AsLongint() const { return data.longint_val; }
-double DpiArgValue::AsReal() const { return data.real_val; }
-const std::string& DpiArgValue::AsString() const { return string_val; }
-SvChandle DpiArgValue::AsChandle() const { return data.chandle_val; }
-SvBit DpiArgValue::AsBit() const { return data.bit_val; }
-SvLogic DpiArgValue::AsLogic() const { return data.logic_val; }
-SvLogicVecVal DpiArgValue::AsLogicVec() const { return data.logic_vec_val; }
-
 namespace {
 
 // Read any numeric DPI argument value as an integer. Real values round to the
@@ -217,6 +143,11 @@ double NumericToReal(const DpiArgValue& v) {
 // value-change semantics where an assignment of an unchanged value is inert.
 bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
   if (a.type != b.type) return false;
+  // §H.7.3: an unpacked array is the same value when every element is.
+  if (a.IsArray() || b.IsArray()) {
+    return std::equal(a.elements.begin(), a.elements.end(), b.elements.begin(),
+                      b.elements.end(), SameArgValue);
+  }
   // Annex H.10.1.2: a value carried in the canonical array is compared word by
   // word over the whole of it. Falling through to the union below would read a
   // member nothing wrote and call two different wide values the same, so an
@@ -421,52 +352,71 @@ DpiArgValue DpiRuntime::CallImport(std::string_view sv_name,
 
 namespace {
 
-// The values one call presents for its input arguments, written so that two
-// calls read the same here exactly when every argument agrees in both type and
-// value. §35.5.2 replaces a pure function's call with the value previously
-// computed for the same values of the input arguments, and this is what decides
+// The value `arg` presents, written so that two values read the same here
+// exactly when they agree in both type and value. Each branch reads the union
+// member the argument's type wrote, so a value never stands in for a
+// differently typed one that happens to share a representation; an array's
+// elements and a wide value's words (§H.7.3, §H.10.1.2) are read whole.
+void AppendArgKey(std::string& key, const DpiArgValue& arg) {
+  key += std::to_string(static_cast<int>(arg.type));
+  key += ':';
+  if (arg.IsArray()) {
+    key += '[';
+    for (const DpiArgValue& element : arg.elements) {
+      AppendArgKey(key, element);
+      key += ',';
+    }
+    key += ']';
+    return;
+  }
+  if (arg.IsWideVec()) {
+    for (const SvLogicVecVal& word : arg.AsLogicVecWords()) {
+      key += std::to_string(word.aval) + '/' + std::to_string(word.bval) + ',';
+    }
+    return;
+  }
+  switch (arg.type) {
+    case DataTypeKind::kString:
+      key += arg.AsString();
+      break;
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+      key += std::to_string(arg.AsReal());
+      break;
+    case DataTypeKind::kChandle:
+      key += std::to_string(reinterpret_cast<uintptr_t>(arg.AsChandle()));
+      break;
+    case DataTypeKind::kBit:
+      key += std::to_string(static_cast<int>(arg.AsBit()));
+      break;
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      key += std::to_string(static_cast<int>(arg.AsLogic()));
+      break;
+    case DataTypeKind::kInteger:
+      key += std::to_string(arg.AsLogicVec().aval);
+      key += '/';
+      key += std::to_string(arg.AsLogicVec().bval);
+      break;
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      key += std::to_string(arg.AsLongint());
+      break;
+    default:
+      key += std::to_string(arg.AsInt());
+      break;
+  }
+}
+
+// §35.5.2 replaces a pure function's call with the value previously computed
+// for the same values of the input arguments, and this key is what decides
 // which values are the same ones.
 std::string PureCallArgKey(std::string_view sv_name,
                            const std::vector<DpiArgValue>& args) {
   std::string key(sv_name);
   for (const auto& arg : args) {
     key += '|';
-    key += std::to_string(static_cast<int>(arg.type));
-    key += ':';
-    // Each branch reads the union member the argument's type wrote, so a value
-    // never stands in for a differently typed one that happens to share a
-    // representation.
-    switch (arg.type) {
-      case DataTypeKind::kString:
-        key += arg.AsString();
-        break;
-      case DataTypeKind::kReal:
-      case DataTypeKind::kShortreal:
-        key += std::to_string(arg.AsReal());
-        break;
-      case DataTypeKind::kChandle:
-        key += std::to_string(reinterpret_cast<uintptr_t>(arg.AsChandle()));
-        break;
-      case DataTypeKind::kBit:
-        key += std::to_string(static_cast<int>(arg.AsBit()));
-        break;
-      case DataTypeKind::kLogic:
-      case DataTypeKind::kReg:
-        key += std::to_string(static_cast<int>(arg.AsLogic()));
-        break;
-      case DataTypeKind::kInteger:
-        key += std::to_string(arg.AsLogicVec().aval);
-        key += '/';
-        key += std::to_string(arg.AsLogicVec().bval);
-        break;
-      case DataTypeKind::kLongint:
-      case DataTypeKind::kTime:
-        key += std::to_string(arg.AsLongint());
-        break;
-      default:
-        key += std::to_string(arg.AsInt());
-        break;
-    }
+    AppendArgKey(key, arg);
   }
   return key;
 }
@@ -545,8 +495,11 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
   std::vector<DpiArgValue> callee = actuals;
   for (size_t i = 0; i < func->args.size() && i < callee.size(); ++i) {
     if (func->args[i].direction == Direction::kOutput) {
-      callee[i] =
+      // An open array's shape is the actual's (§35.6.1.1), whatever it holds.
+      DpiArgValue seeded =
           UndeterminedOutputValue(func->args[i].type, func->args[i].width);
+      seeded.ranges = callee[i].ranges;
+      callee[i] = std::move(seeded);
     } else {
       // §35.6.1: input and inout formals are passed copy-in through a temporary
       // initialized with the actual coerced to the formal's type. When the

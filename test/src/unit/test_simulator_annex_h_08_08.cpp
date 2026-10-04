@@ -213,7 +213,9 @@ TEST(DpiInoutAndOutputArguments, PackedFormalsAreWrittenAsCanonicalArrays) {
   EXPECT_EQ(args[1].AsLogicVecWords()[1].bval, 0x80000000U);
   EXPECT_EQ(args[2].AsLogicVec().aval, 5U);
   EXPECT_EQ(args[2].AsLogicVec().bval, 1U);
-  EXPECT_EQ(args[3].AsLongint(), (2LL << 32) | 5);
+  ASSERT_EQ(args[3].AsLogicVecWords().size(), 2U);
+  EXPECT_EQ(args[3].AsLogicVecWords()[0].aval, 5U);
+  EXPECT_EQ(args[3].AsLogicVecWords()[1].aval, 2U);
 }
 
 }  // namespace

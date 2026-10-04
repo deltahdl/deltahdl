@@ -387,10 +387,12 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/covergroup_instance_coverage.cpp
     simulator/covergroup_instance_handles.cpp
     simulator/covergroup_instance_options.cpp
+    simulator/dpi_arg_value.cpp
     simulator/dpi_binding.cpp
     simulator/dpi_c_call.cpp
     simulator/dpi_c_type.cpp
     simulator/dpi_context.cpp
+    simulator/dpi_formal_type.cpp
     simulator/dpi_include_file.cpp
     simulator/foreign_code.cpp
     simulator/shared_library.cpp

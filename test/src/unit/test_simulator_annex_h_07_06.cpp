@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <cstdlib>
+#include <string_view>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "helpers_open_array_natural_order.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
@@ -237,6 +242,92 @@ TEST(MappingSvRangesToCRanges, SingleElementUnpackedDimensionMapsToZero) {
   EXPECT_EQ(svHigh(h, 1), -4);
   EXPECT_EQ(svSize(h, 1), 1);
   EXPECT_EQ(svHigh(h, 1) - svLow(h, 1), 0);  // sole element -> C index 0.
+}
+
+// The C functions the designs below call: one weighting the four elements of
+// an array of bytes by C index, one filling an array of three ints, and one
+// writing two elements of an array of 64-bit 4-state vectors.
+int WeightedByCIndex(const uint32_t* a) {
+  return static_cast<int>(a[0] + (a[1] * 10) + (a[2] * 100) + (a[3] * 1000));
+}
+
+void FillThreeInts(int* o) {
+  o[0] = 9;
+  o[1] = 8;
+  o[2] = 7;
+}
+
+void FillVectors(SvLogicVecVal* arr) {
+  for (int i = 0; i < 64 * 2; ++i) arr[i] = {0, 0};
+  arr[0].aval = 7;
+  arr[(63 * 2) + 1].aval = 1U << 31U;
+}
+
+// A design passing a sized unpacked array to a C function, and filling one
+// through an output, run to its end.
+void RunSizedArrayDesign(SimFixture& f) {
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function int weighted(input bit [7:0] a [0:3]);\n"
+      "  import \"DPI-C\" function void fill_arr(output int o [3:1]);\n"
+      "  import \"DPI-C\" function void fill_vecs(\n"
+      "      output logic [64:1] arr [0:63]);\n"
+      "  bit [7:0] a [0:3] = '{1, 2, 3, 4};\n"
+      "  bit [7:0] r [3:0] = '{4, 3, 2, 1};\n"
+      "  int o [3:1];\n"
+      "  logic [64:1] v [0:63];\n"
+      "  int w, w2;\n"
+      "  initial begin\n"
+      "    w = weighted(a);\n"
+      "    w2 = weighted(r);\n"
+      "    fill_arr(o);\n"
+      "    fill_vecs(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"weighted", reinterpret_cast<void*>(&WeightedByCIndex)},
+       {"fill_arr", reinterpret_cast<void*>(&FillThreeInts)},
+       {"fill_vecs", reinterpret_cast<void*>(&FillVectors)}},
+      "annex_h_07_06_sized_arrays");
+}
+
+// The value the design's variable `name` holds once the run is over, all ones
+// where the run holds no such variable.
+uint64_t VariableValue(SimFixture& f, std::string_view name) {
+  auto* var = f.ctx.FindVariable(name);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+// §H.7.3 with §H.7.6 c): a stand-alone array passed to a sized formal has the C
+// layout, its lower index at C index 0 whichever way round its range was
+// written -- `[0:3]` and `[3:0]` holding the same elements at the same
+// addresses cross alike.
+TEST(DpiArrayNaturalOrder, ASizedArrayCrossesInCLayoutLowerIndexFirst) {
+  SimFixture f;
+  RunSizedArrayDesign(f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "w"), 4321U);
+  EXPECT_EQ(VariableValue(f, "w2"), 4321U);
+}
+
+// An output array is copied back element by element, C index 0 into the
+// lower index: o[1] gets what C wrote first.
+TEST(DpiArrayNaturalOrder, ASizedOutputArrayIsCopiedBackLowerIndexFirst) {
+  SimFixture f;
+  RunSizedArrayDesign(f);
+  EXPECT_EQ(VariableValue(f, "o[1]"), 9U);
+  EXPECT_EQ(VariableValue(f, "o[2]"), 8U);
+  EXPECT_EQ(VariableValue(f, "o[3]"), 7U);
+}
+
+// An array of packed elements lays each element out as its canonical chunks
+// (§H.7.6), two svLogicVecVal per 64-bit element here.
+TEST(DpiArrayNaturalOrder, AnArrayOfVectorsCrossesAsTheirChunks) {
+  SimFixture f;
+  RunSizedArrayDesign(f);
+  EXPECT_EQ(VariableValue(f, "v[0]"), 7U);
+  EXPECT_EQ(VariableValue(f, "v[63]"), uint64_t{1} << 63U);
+  EXPECT_EQ(VariableValue(f, "v[1]"), 0U);
 }
 
 }  // namespace

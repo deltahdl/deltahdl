@@ -23,6 +23,8 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/dpi_formal_type.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer_always_comb.h"
@@ -821,6 +823,13 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
+  }
+
+  // §H.7.3 and §H.7.4: every import is declared by now, and the typedef names
+  // its formals were written with are resolved to the types they cross as
+  // before any of them is bound to C.
+  if (DpiRuntime* dpi = ctx_.GetDpiRuntime(); dpi != nullptr) {
+    ResolveDpiFormalTypes(*dpi, *design, ctx_);
   }
 
   // §36.6: the design is put within reach of the PLI applications here, ahead

@@ -637,6 +637,7 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
       // §35.5.6.1: a formal with unpacked dimensions is an array of values of
       // its type rather than one of them.
       formal.has_unpacked_dimensions = !arg.unpacked_dims.empty();
+      formal.declaration = &arg;
       func.args.push_back(formal);
     }
     dpi->RegisterImport(std::move(func));

@@ -33,14 +33,14 @@ std::string SmallCType(DataTypeKind kind, bool is_unsigned) {
   }
 }
 
-// A formal of bit, logic or reg whose declaration gave it a width is a packed
-// array; one without is the scalar.
+// A formal of bit, logic or reg whose declaration gave it a packed dimension,
+// or a width only one can give, is a packed array; one without is the scalar.
 bool IsPackedArray(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
-      return formal.width > 1;
+      return formal.is_packed_array || formal.width > 1;
     case DataTypeKind::kInteger:
     case DataTypeKind::kTime:
       return true;
@@ -466,8 +466,10 @@ bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate) {
 
 DpiPassingMode DpiPassingModeOfFormal(const DpiArg& formal, bool open_array) {
   if (open_array) return DpiPassingMode::kByHandle;
+  // §H.8.4 and §H.8.8: an unpacked array is passed by reference whatever its
+  // element type, an input of small elements included.
   if (formal.direction == Direction::kInput && !IsPackedArray(formal) &&
-      DpiTypeIsSmall(formal.type)) {
+      !formal.has_unpacked_dimensions && DpiTypeIsSmall(formal.type)) {
     return DpiPassingMode::kByValue;
   }
   return DpiPassingMode::kByReference;
