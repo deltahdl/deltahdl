@@ -25,6 +25,29 @@ void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
   scope->children.push_back(obj);
 }
 
+// The parameters of the instance at `prefix`, an instance of `mod`, each made
+// the kind of parameter object it is.
+void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
+                           const VpiObjectMap& objects,
+                           const VpiAttachBuild& build) {
+  VpiObject* scope = FindObjectForFlatName(
+      objects, prefix.empty() ? std::string(mod->name) : prefix);
+  for (const RtlirParamDecl& param : mod->params) {
+    if (param.is_type_param) {
+      if (scope != nullptr && param.gen_block_prefix.empty()) {
+        MakeTypeParameter(scope, param, build);
+      }
+      continue;
+    }
+    VpiObject* obj = FindObjectForFlatName(
+        objects, VpiFlatName(prefix, std::string(param.gen_block_prefix) +
+                                         std::string(param.name)));
+    if (obj == nullptr) continue;
+    obj->type = vpiParameter;
+    obj->local_param = param.is_localparam;
+  }
+}
+
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -35,25 +58,10 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
   // vpiReg like any variable, and a type parameter had none, so the
   // vpiParameter iteration found nothing.
   if (design == nullptr) return;
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* scope = FindObjectForFlatName(
-            objects, prefix.empty() ? std::string(mod->name) : prefix);
-        for (const RtlirParamDecl& param : mod->params) {
-          if (param.is_type_param) {
-            if (scope != nullptr && param.gen_block_prefix.empty()) {
-              MakeTypeParameter(scope, param, build);
-            }
-            continue;
-          }
-          VpiObject* obj = FindObjectForFlatName(
-              objects, VpiFlatName(prefix, std::string(param.gen_block_prefix) +
-                                               std::string(param.name)));
-          if (obj == nullptr) continue;
-          obj->type = vpiParameter;
-          obj->local_param = param.is_localparam;
-        }
-      });
+  WalkInstancePaths(design,
+                    [&](const RtlirModule* mod, const std::string& prefix) {
+                      AttachScopeParameters(mod, prefix, objects, build);
+                    });
 }
 
 }  // namespace delta
