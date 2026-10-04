@@ -287,7 +287,7 @@ std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
 std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       std::string_view content,
                                       std::string_view key,
-                                      const ProtectEncoding& encoding,
+                                      const ProtectEnvelopeEncodings& encodings,
                                       std::string_view method);
 
 // The region a set of key blocks is made for: its cleartext, and the key a
@@ -320,7 +320,7 @@ struct ProtectKeyBlockRegion {
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      const ProtectKeyBlockRegion& region,
                                      const ProtectKeyList& keys,
-                                     const ProtectEncoding& encoding,
+                                     const ProtectEnvelopeEncodings& encodings,
                                      const ProtectDigestBlockPolicy& digest);
 
 }  // namespace delta

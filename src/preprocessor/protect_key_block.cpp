@@ -183,7 +183,7 @@ bool SameProtectDataDecryption(const ProtectDataDecryption& a,
 std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
                                       std::string_view content,
                                       std::string_view key,
-                                      const ProtectEncoding& encoding,
+                                      const ProtectEnvelopeEncodings& encodings,
                                       std::string_view method) {
   std::string text;
   // §34.5.23 has the entity unchanged wherever the tool writes it out, and
@@ -195,15 +195,17 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
   if (!request.keyname.empty()) {
     AppendDirective(text, kKeyKeynameKeyword, request.keyname);
   } else {
-    text.append(
-        ProtectEncodedValueDirective(encoding, request.public_key.size()));
+    // §34.5.26 writes the public key on the one line beneath its keyword.
+    text.append(ProtectEncodedValueDirective(encodings.one_line,
+                                             request.public_key.size()));
     text.append(ProtectKeyPublicKeyDirective(
-        EncodeProtectBlock(request.public_key, encoding)));
+        EncodeProtectBlock(request.public_key, encodings.one_line)));
   }
   text.append(ProtectEncodedValueDirective(
-      encoding, ProtectedRegionBlockSize(content, method)));
+      encodings.blocks, ProtectedRegionBlockSize(content, method)));
   text.append("`pragma protect ").append(kKeyBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(content, key, encoding.enctype, method));
+  text.append(
+      EncryptProtectedRegion(content, key, encodings.blocks.enctype, method));
   text.push_back('\n');
   return text;
 }
@@ -231,7 +233,7 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      const ProtectKeyBlockRegion& region,
                                      const ProtectKeyList& keys,
-                                     const ProtectEncoding& encoding,
+                                     const ProtectEnvelopeEncodings& encodings,
                                      const ProtectDigestBlockPolicy& digest) {
   ProtectKeyBlocks blocks;
   const ProtectDataDecryption* first = nullptr;
@@ -250,9 +252,11 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                blocks.data_changed_line == 0) {
       blocks.data_changed_line = request.line;
     }
-    std::string content = KeyBlockContentFor(request, blocks, digest, encoding);
+    // The block's cleartext holds §34.5.14's and §34.5.20's one-line values.
+    std::string content =
+        KeyBlockContentFor(request, blocks, digest, encodings.one_line);
     blocks.directives.append(ProtectKeyBlockDirectives(
-        request, content, key, encoding, requests.KeyMethod()));
+        request, content, key, encodings, requests.KeyMethod()));
     // §34.5.22 owes a digest block to each key block generated, immediately
     // following the block it refers to. The buffer the block was formed from is
     // what the digest is computed over, because that is what a reader holds
@@ -261,7 +265,7 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
     ProtectDigestBlockPolicy block_digest = digest;
     block_digest.key = blocks.digest_key;
     blocks.directives.append(
-        ProtectDigestBlockDirectives(content, block_digest, encoding));
+        ProtectDigestBlockDirectives(content, block_digest, encodings.blocks));
   }
   return blocks;
 }

@@ -5,6 +5,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace delta {
 
@@ -113,6 +114,25 @@ struct ProtectEncoding {
 // scheme is this implementation's own, and neither a line length nor a byte
 // count is assumed on a text's behalf.
 ProtectEncoding DefaultProtectEncoding();
+
+// The two writings one envelope is written in (§34.5.9.2): `blocks`, the
+// scheme the input asked for, for the content of a data_block, digest_block or
+// key_block, which runs to the next pragma directive; and `one_line`, a scheme
+// keeping a value on one line, for the values §34.5.13, §34.5.14, §34.5.19,
+// §34.5.20 and §34.5.26 write on the line beneath their keyword. §34.2 reads
+// pragma expressions in sequence, so each value is written beneath an
+// expression stating the scheme it is in. One scheme stands for both where it
+// writes one line, which is what the conversion from a single one says.
+struct ProtectEnvelopeEncodings {
+  ProtectEnvelopeEncodings(const ProtectEncoding& both)
+      : blocks(both), one_line(both) {}
+  ProtectEnvelopeEncodings(ProtectEncoding block_scheme,
+                           ProtectEncoding one_line_scheme)
+      : blocks(std::move(block_scheme)), one_line(std::move(one_line_scheme)) {}
+
+  ProtectEncoding blocks;
+  ProtectEncoding one_line;
+};
 
 // Reads the pragma_value of an encoding expression: the parenthesized list of
 // subkeyword expressions, with or without the parentheses around it. An

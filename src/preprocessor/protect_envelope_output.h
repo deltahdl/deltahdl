@@ -226,27 +226,25 @@ struct RegionEncryption {
 std::string_view RegionDigestKey(const RegionKeyNames& names,
                                  const ProtectKeyList& keys);
 
-// The scheme the blocks of one envelope are written under: the one the
-// enclosed text asked for, where a block of that scheme stands on one line, and
-// this implementation's own otherwise.
-//
-// A line length the text stated is carried across; a scheme that breaks its own
-// output is not written under. §34.5.9.2 separates the two. The length is "the
-// maximum number of characters (after any encoding) in a single line of the
-// data_block", which names one block, and §34.5.15.2 has that block begin on
-// the line beneath its keyword and says nothing about where it ends: breaking
-// it is what the subkeyword is for, "so that the generated text files [are]
-// usable by commonly available text tools". The scheme is the other half: the
-// same clause has the encoding specify "how the data_block, digest_block, and
-// key_block content shall be encoded", and §34.5.13.2 and its siblings put each
-// key value on "the next line" under it too, so a scheme whose own output runs
-// to several lines would break values the clause gives one line each.
-//
-// Preprocessor::ReadProtectDataBlock (preprocessor/preprocessor.h) is handed
-// the run of a block's lines joined, as Preprocessor::ReadProtectKeyBlock and
-// Preprocessor::ReadProtectDigestBlock are for the blocks §34.5.27 and §34.5.22
-// announce, so a block another tool broke reads back whichever scheme it chose.
+// The scheme an envelope writes its one-line values in: the one the enclosed
+// text asked for, where that scheme keeps a value on one line, and this
+// implementation's own otherwise. §34.5.13.2 and the subclauses beside it put a
+// key value on the line beneath its keyword, which a scheme breaking its output
+// over several lines would split. A line length the text stated is carried
+// across, §34.5.9.2 giving it to the data block alone.
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested);
+
+// The scheme an envelope writes its data_block, digest_block and key_block in:
+// the one the enclosed text asked for wherever this implementation provides it,
+// one breaking its output over several lines included, since §34.5.9.2 has the
+// encoding expression decide how those blocks are written and each runs to the
+// next pragma directive (§34.5.15.2). Preprocessor::ReadProtectDataBlock,
+// ReadProtectKeyBlock and ReadProtectDigestBlock are handed a block's lines
+// joined, so a broken block reads back whichever scheme it was written in.
+ProtectEncoding RequestedBlockEncoding(const ProtectEncoding& requested);
+
+// Both, for the envelope a text asking for `requested` is written as.
+ProtectEnvelopeEncodings EnvelopeEncodings(const ProtectEncoding& requested);
 
 // The decryption envelope one encryption envelope is transformed into: the
 // pair of expressions that delimits a protected region, with the encrypted

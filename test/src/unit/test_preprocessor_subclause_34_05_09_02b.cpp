@@ -31,8 +31,12 @@
 #include <string>
 #include <string_view>
 
+#include "fixture_preprocessor.h"
 #include "fixture_protect_encoding.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 
@@ -215,6 +219,74 @@ TEST(ProtectQuotedPrintableReading, AnEscapeTheAlgorithmNeverWritesIsRefused) {
   EXPECT_FALSE(DecodeProtectBlock("acme=2", kQuotedPrintableEnctype, &bytes));
   EXPECT_FALSE(DecodeProtectBlock("acme=G0", kQuotedPrintableEnctype, &bytes));
   EXPECT_FALSE(DecodeProtectBlock("acme=0G", kQuotedPrintableEnctype, &bytes));
+}
+
+// §34.5.9.2 ENCRYPTION INPUT: the encoding expression a text states decides how
+// the data_block, digest_block and key_block of the output are written, and
+// Table 34-2 sets four identifiers aside for it. A scheme that breaks its
+// output over several lines is honoured for the blocks, whose content runs to
+// the next pragma directive, so the data block is written in the scheme asked
+// for and reads back by that scheme's algorithm to the block the cipher
+// produced. Each case fails on an encrypting tool that writes its own one-line
+// scheme in place of the one requested.
+void ExpectTheDataBlockWrittenIn(std::string_view enctype) {
+  std::string envelope = EnvelopeAround(NamesScheme(enctype));
+  std::string stated = "`pragma protect encoding=(enctype=\"";
+  stated.append(enctype).append("\"");
+  EXPECT_TRUE(Holds(ProtectedPartOf(envelope), stated)) << envelope;
+  std::string block;
+  ASSERT_TRUE(
+      DecodeProtectBlock(EncodingDataBlockLinesOf(envelope), enctype, &block));
+  std::string recovered;
+  EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
+  EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
+}
+
+TEST(ProtectBlockWriting, AUuencodeRequestWritesTheDataBlockInUuencode) {
+  ExpectTheDataBlockWrittenIn(kUuencodeEnctype);
+}
+
+TEST(ProtectBlockWriting,
+     AQuotedPrintableRequestWritesTheDataBlockInQuotedPrintable) {
+  ExpectTheDataBlockWrittenIn(kQuotedPrintableEnctype);
+}
+
+TEST(ProtectBlockWriting, ARawRequestWritesTheDataBlockRaw) {
+  ExpectTheDataBlockWrittenIn(kRawEnctype);
+}
+
+// §34.5.9.2 DECRYPTION INPUT: a reader takes the scheme each block was written
+// in from the expression standing ahead of it, so the envelope written in the
+// scheme requested is read back to the design it sealed.
+TEST(ProtectBlockWriting, AnEnvelopeWrittenInUuencodeIsReadBack) {
+  std::string envelope = EnvelopeAround(NamesScheme(kUuencodeEnctype));
+  PreprocFixture f;
+  std::string read = Preprocess(envelope, f, HoldingTheKey());
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
+}
+
+// A region whose keys travel in key blocks, its data_decrypt_key written inside
+// a block's cleartext on the line beneath its keyword (§34.5.14). That value
+// stays on its one line, under a one-line scheme §34.2's sequential reading
+// puts in effect ahead of it, while the key block around it is written in the
+// scheme requested; a reader holding the provider's key reads the block, then
+// the key, then the data. The test fails on a writer that leaves the one-line
+// value in a scheme that breaks it over several lines, or a key block in a
+// scheme other than the one asked for.
+TEST(ProtectBlockWriting, AKeyBlockWrittenInUuencodeIsReadBack) {
+  std::string sealed = SealedByDesignation(
+      kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);
+  ASSERT_TRUE(Holds(sealed, kKeyBlockLine));
+  ProtectKeyList keys;
+  keys.Add({std::string(kKeyProvider), std::string(kDesignatedKey),
+            std::string(kProviderKey)});
+  PreprocConfig config;
+  config.protect_keys = keys;
+  PreprocFixture f;
+  std::string read = Preprocess(sealed, f, config);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
 }
 
 }  // namespace

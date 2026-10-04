@@ -77,7 +77,7 @@ void AppendDigestPublicKey(std::string_view key,
 // The designations §34.5.10 through §34.5.13 write for the key a region's data
 // are under.
 void AppendClearDataNames(const EncryptionEnvelope& envelope,
-                          const ProtectEncoding& block_encoding,
+                          const ProtectEncoding& one_line_encoding,
                           bool signed_envelope, std::string* text) {
   // §34.5.10.2 has the entity whose keys the data are under unchanged in the
   // output file, except where a digital signature is used, in which case it is
@@ -103,7 +103,8 @@ void AppendClearDataNames(const EncryptionEnvelope& envelope,
   // an envelope that kept it inside the block would be one nothing could pick
   // the key for.
   if (!envelope.names.data_public_key.empty()) {
-    AppendDataPublicKey(envelope.names.data_public_key, block_encoding, text);
+    AppendDataPublicKey(envelope.names.data_public_key, one_line_encoding,
+                        text);
   }
 }
 
@@ -111,7 +112,7 @@ void AppendClearDataNames(const EncryptionEnvelope& envelope,
 // digest is under, with the identifier §34.5.17 names the cipher for that key
 // by and the identifier §34.5.21 names the algorithm computing the digest by.
 void AppendClearDigestNames(const EncryptionEnvelope& envelope,
-                            const ProtectEncoding& block_encoding,
+                            const ProtectEncoding& one_line_encoding,
                             bool signed_envelope, std::string* text) {
   // §34.5.16.2 has the entity whose key a region's digest is under unchanged in
   // the output file, except where a digital signature is used, in which case it
@@ -172,7 +173,7 @@ void AppendClearDigestNames(const EncryptionEnvelope& envelope,
   // the designation behind the very block the digest vouches for -- and one
   // that wrote no name for its digest's key has nothing to fall back on.
   if (!envelope.names.digest_public_key.empty()) {
-    AppendDigestPublicKey(envelope.names.digest_public_key, block_encoding,
+    AppendDigestPublicKey(envelope.names.digest_public_key, one_line_encoding,
                           text);
   }
   // §34.5.21.2 has the identifier naming the algorithm the region's digests are
@@ -194,7 +195,7 @@ void AppendClearDigestNames(const EncryptionEnvelope& envelope,
 // by. None of them is lifted into a key block: this is the entity whose key
 // opens that block, and what a reader combines with it to reach that key.
 void AppendClearKeyNames(const EncryptionEnvelope& envelope,
-                         const ProtectEncoding& block_encoding,
+                         const ProtectEncoding& one_line_encoding,
                          bool signed_envelope, std::string* text) {
   // §34.5.23 has the entity whose keys a region's own keys are under unchanged
   // in what the tool writes out, and makes no exception at all: §34.5.10.2
@@ -249,16 +250,16 @@ void AppendClearKeyNames(const EncryptionEnvelope& envelope,
   // an envelope that kept it inside the block would be one nothing could pick
   // the key for -- and the region designated no key by name to fall back on.
   if (!envelope.names.key_public_key.empty()) {
-    AppendKeyPublicKey(envelope.names.key_public_key, block_encoding, text);
+    AppendKeyPublicKey(envelope.names.key_public_key, one_line_encoding, text);
   }
 }
 
 void AppendClearNames(const EncryptionEnvelope& envelope,
-                      const ProtectEncoding& block_encoding,
+                      const ProtectEncoding& one_line_encoding,
                       bool signed_envelope, std::string* text) {
-  AppendClearDataNames(envelope, block_encoding, signed_envelope, text);
-  AppendClearDigestNames(envelope, block_encoding, signed_envelope, text);
-  AppendClearKeyNames(envelope, block_encoding, signed_envelope, text);
+  AppendClearDataNames(envelope, one_line_encoding, signed_envelope, text);
+  AppendClearDigestNames(envelope, one_line_encoding, signed_envelope, text);
+  AppendClearKeyNames(envelope, one_line_encoding, signed_envelope, text);
 }
 
 }  // namespace
@@ -306,6 +307,19 @@ ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
   return encoding;
 }
 
+ProtectEncoding RequestedBlockEncoding(const ProtectEncoding& requested) {
+  ProtectEncoding encoding = DefaultProtectEncoding();
+  if (ProtectEncodingIsAvailable(requested.enctype)) {
+    encoding.enctype = requested.enctype;
+  }
+  encoding.line_length = requested.line_length;
+  return encoding;
+}
+
+ProtectEnvelopeEncodings EnvelopeEncodings(const ProtectEncoding& requested) {
+  return {RequestedBlockEncoding(requested), EnvelopeBlockEncoding(requested)};
+}
+
 std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
                                    const RegionEncryption& how) {
   std::string text;
@@ -325,12 +339,12 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   if (!envelope.author_info.empty()) {
     text.append(ProtectAuthorInfoDirective(envelope.author_info));
   }
-  // The scheme the envelope's blocks are written under is stated for the
-  // envelope as a whole, ahead of everything depending on it, and each block
-  // restates it with the count of what that block holds.
-  ProtectEncoding block_encoding =
-      EnvelopeBlockEncoding(envelope.requested_encoding);
-  std::string envelope_encoding = ProtectEncodingValue(block_encoding);
+  // The one-line scheme is stated for the envelope as a whole, ahead of the
+  // values written in it, and each block states the scheme it is written in
+  // with the count of what that block holds (§34.5.9.2, §34.2).
+  ProtectEnvelopeEncodings encodings =
+      EnvelopeEncodings(envelope.requested_encoding);
+  std::string envelope_encoding = ProtectEncodingValue(encodings.one_line);
   const bool kSignedEnvelope = !how.key_blocks.directives.empty();
   // §34.5.11.2 sends the cipher the region's data are under into the key_block
   // where a digital signature is used, which is what an envelope carrying key
@@ -352,7 +366,7 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
       {kEncryptAgent, kEncryptAgentInfo,
        kSignedEnvelope ? std::string_view{} : block_method,
        envelope_encoding}));
-  AppendClearNames(envelope, block_encoding, kSignedEnvelope, &text);
+  AppendClearNames(envelope, encodings.one_line, kSignedEnvelope, &text);
   // §34.5.27 has the blocks carrying the key the region's data are under
   // written into the envelope ahead of the block those keys open. A reader has
   // to hold the key before it reaches what the key is for, and there is nothing
@@ -372,7 +386,7 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // block before any of the encoding was applied to it, so it is taken from
   // what goes into the writing rather than from the characters that come out.
   text.append(ProtectEncodedValueDirective(
-      block_encoding, ProtectedRegionBlockSize(envelope.body, block_method)));
+      encodings.blocks, ProtectedRegionBlockSize(envelope.body, block_method)));
   // §34.5.15.1 spells the expression as the keyword standing alone, and
   // §34.5.15.2 has it indicate "that a data block begins on the next line in
   // the file". The block is therefore written beneath the keyword rather than
@@ -382,15 +396,15 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // (preprocessor/protect_key_block.cpp) are the same three lines.
   text.append("`pragma protect ").append(kDataBlockKeyword).append("\n");
   text.append(EncryptProtectedRegion(envelope.body, how.key,
-                                     block_encoding.enctype, block_method,
-                                     block_encoding.line_length));
+                                     encodings.blocks.enctype, block_method,
+                                     encodings.blocks.line_length));
   text.push_back('\n');
   // §34.5.22 owes a digest block to the data block as well as each key block,
   // immediately following the block it refers to. The digest is computed over
   // the region's own text, that being what a reader holds once it has opened
   // the block and so what a reader recomputes the digest from.
-  text.append(
-      ProtectDigestBlockDirectives(envelope.body, how.digest, block_encoding));
+  text.append(ProtectDigestBlockDirectives(envelope.body, how.digest,
+                                           encodings.blocks));
   text.append(envelope.end_directive);
   text.append(ProtectKeywordResetDirective());
   return text;
