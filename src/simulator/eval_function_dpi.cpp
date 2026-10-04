@@ -695,12 +695,19 @@ std::string ExportTempName(std::string_view key, size_t index) {
 
 // Makes the temporary `name` for `formal` the first time it is needed: a
 // variable of the formal's width, or for an unpacked formal an array of such
-// variables over the formal's dimensions.
+// variables over the formal's dimensions. The run's tables keep the names they
+// are given as views, so each one is held by the arena for the run.
 void EnsureExportTemp(const std::string& name, const DpiArg& formal,
                       SimContext& ctx) {
+  Arena& arena = ctx.GetArena();
+  auto kept = [&arena](const std::string& text) -> std::string_view {
+    return *arena.Create<std::string>(text);
+  };
   const uint32_t kWidth = DpiValueWidth(formal.type, formal.width);
   if (formal.unpacked_dims.empty()) {
-    if (ctx.FindVariable(name) == nullptr) ctx.CreateVariable(name, kWidth);
+    if (ctx.FindVariable(name) == nullptr) {
+      ctx.CreateVariable(kept(name), kWidth);
+    }
     return;
   }
   if (ctx.FindArrayInfo(name) != nullptr) return;
@@ -717,9 +724,9 @@ void EnsureExportTemp(const std::string& name, const DpiArg& formal,
       info.dim_descending.push_back(false);
     }
   }
-  ctx.RegisterArray(name, info);
+  ctx.RegisterArray(kept(name), info);
   for (const std::string& element : UnpackedActualOf(name, false, ctx).names) {
-    ctx.CreateVariable(element, kWidth);
+    ctx.CreateVariable(kept(element), kWidth);
   }
 }
 
