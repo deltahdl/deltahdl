@@ -800,5 +800,28 @@ TEST_F(VariablesOfARun, AnAssociativeArrayIsAnAssocArray) {
   EXPECT_EQ(vpi_get(vpiArrayType, Var("top.aa")), vpiAssocArray);
 }
 
+constexpr const char* kAggregateTypedefs =
+    "typedef struct { int a; int b; } s_t;\n"
+    "typedef union { int a; shortint b; } u_t;\n"
+    "module top; s_t s; u_t u; endmodule\n";
+
+// §37.17: a variable declared with a struct typedef is a struct var...
+TEST_F(VariablesOfARun, AStructTypedefVariableIsAStructVar) {
+  Run(kAggregateTypedefs);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.s")), vpiStructVar);
+}
+
+// ...one declared with a union typedef a union var...
+TEST_F(VariablesOfARun, AUnionTypedefVariableIsAUnionVar) {
+  Run(kAggregateTypedefs);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.u")), vpiUnionVar);
+}
+
+// ...and the unpacked struct's size is its number of fields (detail 9).
+TEST_F(VariablesOfARun, AStructTypedefVariablesSizeIsItsFieldCount) {
+  Run(kAggregateTypedefs);
+  EXPECT_EQ(vpi_get(vpiSize, Var("top.s")), 2);
+}
+
 }  // namespace
 }  // namespace delta

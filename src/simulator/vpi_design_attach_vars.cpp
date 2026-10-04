@@ -3,7 +3,9 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -78,19 +80,34 @@ void RecordArrayFacts(VpiObject* obj, const RtlirVariable& var,
   }
 }
 
+// §37.17 and §37.26: a variable whose type is a struct or union named through
+// a typedef reports kNamed and was stamped a reg; the run's layout of it says
+// which of the two it is, and an unpacked one's size is its number of fields
+// (detail 9).
+void RecordAggregateFacts(VpiObject* obj, const RtlirVariable& var,
+                          const std::string& key, SimContext& ctx) {
+  const StructTypeInfo* info = ctx.GetVariableStructType(key);
+  if (info != nullptr && obj->type == kVpiReg) {
+    obj->type = info->is_union ? vpiUnionVar : vpiStructVar;
+  }
+  if (obj->type != vpiStructVar && obj->type != vpiUnionVar) return;
+  if (info != nullptr) {
+    if (!info->is_packed) obj->size = static_cast<int>(info->fields.size());
+  } else if (var.dtype != nullptr && !var.dtype->is_packed) {
+    // A struct the run kept no layout of is sized from its declaration.
+    obj->size = static_cast<int>(var.dtype->struct_members.size());
+  }
+}
+
 // §37.17: the facts a variable's object answers from its declaration.
 void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
                          const std::string& key, SimContext& ctx) {
+  RecordAggregateFacts(obj, var, key, ctx);
   obj->decl_signed = var.is_signed;
   const VpiScalarVectorQuery kQuery = ScalarVectorQueryOf(obj->type, var);
   obj->decl_scalar = VpiVariableScalar(kQuery);
   obj->decl_vector = VpiVariableVector(kQuery);
   RecordArrayFacts(obj, var, key, ctx);
-  // Detail 9: an unpacked struct or union's size is its number of fields.
-  if ((obj->type == vpiStructVar || obj->type == vpiUnionVar) &&
-      var.dtype != nullptr && !var.dtype->is_packed) {
-    obj->size = static_cast<int>(var.dtype->struct_members.size());
-  }
 }
 
 }  // namespace
