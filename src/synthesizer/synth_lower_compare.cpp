@@ -119,15 +119,33 @@ uint32_t SynthLower::LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
   // §11.8.2 rules that an operand the propagated size extends "shall be
   // sign-extended only if the propagated type is signed", so `sign_extend` is
   // what decides the positions above the operand's own width. They carry zero
-  // otherwise, which is what SynthLower::GetSignalBit already answers above a
-  // signal's own width.
+  // otherwise.
   //
   // §11.4.4 and §11.4.5 set `sign_extend` from both operands of a comparison
   // being signed, since either one unsigned makes it a comparison between
   // unsigned values. §11.4.10 sets it from the left operand of a shift alone.
-  uint32_t width = SignalWidth(expr->text);
-  if (sign_extend && bit >= width) return GetSignalBit(expr->text, width - 1);
-  return LowerExprBit(expr, aig, bit);
+  uint32_t width = ExtendedOperandWidth(expr);
+  if (width == 0 || bit < width) return LowerExprBit(expr, aig, bit);
+  if (sign_extend) return LowerExprBit(expr, aig, width - 1);
+  return AigGraph::kConstFalse;
+}
+
+uint32_t SynthLower::ExtendedOperandWidth(const Expr* expr) {
+  // A name holds the width it was declared with, and a literal written with a
+  // size or a base the width §5.7.1 gives it. A decimal literal written with
+  // neither is read out of the 64 bits of Expr::int_val, as kLiteralBits says,
+  // so it is left as it reads.
+  if (expr->kind == ExprKind::kIdentifier) return SignalWidth(expr->text);
+  if (expr->kind == ExprKind::kIntegerLiteral) {
+    if (expr->text.find('\'') == std::string_view::npos) return 0;
+    return ExprWidth(expr).value_or(0);
+  }
+  // §11.8.2 carries every other operand out at the size propagated down to it,
+  // which is where its top bit is: `a - b` stops at that size rather than
+  // running its borrow on above it. An operand ExprWidth cannot answer for may
+  // be wider than that size, which was taken from the other operand alone.
+  if (!ExprWidth(expr)) return 0;
+  return propagated_width_;
 }
 
 uint32_t SynthLower::CompareEqual(const Expr* lhs, const Expr* rhs,
@@ -212,14 +230,18 @@ uint32_t SynthLower::LowerInsideRangeMatch(const Expr* sel_expr,
   // equals one of the values the range holds, which for `[lo:hi]` is where it
   // is at least lo and at most hi. Both halves are the §11.4.4 comparison
   // CompareAtLeast answers, the upper one with the operands exchanged, which is
-  // how LowerCompareMatch builds `a <= b` out of `b >= a`.
-  bool is_signed = IsSignedSignal(sel_expr->text) &&
-                   IsSignedSignal(range->index->text) &&
-                   IsSignedSignal(range->index_end->text);
+  // how LowerCompareMatch builds `a <= b` out of `b >= a`. Those are signed
+  // where the expression and both bounds are, and §11.8.2 carries that type
+  // down into the three operands while they are compared.
+  bool is_signed = IsSignedExpr(sel_expr) && IsSignedExpr(range->index) &&
+                   IsSignedExpr(range->index_end);
+  bool saved_signed = propagated_signed_;
+  propagated_signed_ = is_signed;
   uint32_t at_least =
       CompareAtLeast(sel_expr, range->index, aig, width, is_signed);
   uint32_t at_most =
       CompareAtLeast(range->index_end, sel_expr, aig, width, is_signed);
+  propagated_signed_ = saved_signed;
   return aig.AddAnd(at_least, at_most);
 }
 
@@ -272,9 +294,10 @@ uint32_t SynthLower::LowerCompareMatch(const Expr* expr, AigGraph& aig) {
   uint32_t width = CompareWidth(lhs, rhs);
   // §11.4.4 and §11.4.5 both rule that one unsigned operand makes the whole
   // comparison unsigned, so a signed comparison is one both operands are signed
-  // for. SynthLower::IsSignedSignal answers false for a name it holds no
-  // signedness for, which is every operand that is not a signal.
-  bool is_signed = IsSignedSignal(lhs->text) && IsSignedSignal(rhs->text);
+  // for. §11.8.1 answers an operand that is an expression from its own
+  // operands, and §5.7.1 makes an unsized decimal literal signed, so `s - 1`
+  // and `-1` are signed operands beside a signed `s`.
+  bool is_signed = IsSignedExpr(lhs) && IsSignedExpr(rhs);
   if (ComparesForEquality(expr->op)) {
     return CompareEqual(lhs, rhs, aig, width, is_signed);
   }

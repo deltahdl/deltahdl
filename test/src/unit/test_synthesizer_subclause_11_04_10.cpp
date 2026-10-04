@@ -126,4 +126,20 @@ TEST(ShiftSynthesis, AnUnsignedRightOperandLeavesTheShiftResultSigned) {
       });
 }
 
+// §11.6.1 Table 11-21 leaves a shift's left operand context-determined, so
+// `(a + b) >>> 1` with a four-bit target carries the sum out at four bits and
+// then shifts it right, filling from its own top bit, because §11.8.1 makes the
+// result signed where `a` and `b` both are. The test fails on a lowering that
+// reads a left operand that is not a name only at bit 0 and as zero above it,
+// which shifts out the one bit it kept and drives `y` to 0 everywhere.
+TEST(ShiftSynthesis, AnExpressionLeftOperandIsShiftedWhole) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input signed [3:0] b",
+                      "(a + b) >>> 1"),
+      16, [](uint64_t a, uint64_t b) {
+        uint64_t sum = (a + b) & 0xFu;
+        return ((sum >> 1) | (sum & 0x8u)) & 0xFu;
+      });
+}
+
 }  // namespace

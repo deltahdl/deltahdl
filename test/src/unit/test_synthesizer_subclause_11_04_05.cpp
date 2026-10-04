@@ -182,4 +182,19 @@ TEST(EqualitySynthesis,
       [](uint64_t, uint64_t) { return uint64_t{0}; });
 }
 
+// §11.6.1 Table 11-21 sizes both operands of `==` to the longer of the two,
+// four bits here, and §11.8.2 carries the subtraction out at that size, so
+// `a - b` wraps modulo 16. `a - b == 4'd15` therefore holds exactly where `b`
+// is one more than `a` modulo 16. The test fails on a lowering that carries the
+// borrow of `a - b` on above the four bits: at `a` below `b` that sets every
+// higher bit of the difference, where the zero-extended literal has none, so
+// the equality fails at the fifteen pairs with `a` below `b`.
+TEST(EqualitySynthesis, ExpressionOperandIsCarriedOutAtTheOperandSize) {
+  ExpectAssignSweep(
+      ModuleAssigning("input [3:0] a, input [3:0] b", "a - b == 4'd15"), 16,
+      [](uint64_t a, uint64_t b) {
+        return ((a - b) & 0xFu) == 0xFu ? uint64_t{1} : uint64_t{0};
+      });
+}
+
 }  // namespace

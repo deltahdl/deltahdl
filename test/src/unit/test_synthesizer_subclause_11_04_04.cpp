@@ -127,4 +127,45 @@ TEST(RelationalSynthesis,
       [](uint64_t, uint64_t) { return uint64_t{0}; });
 }
 
+// §11.8.1 makes a binary arithmetic expression signed where every operand is
+// signed, and §5.7.1 makes an unsized decimal literal signed, so `a - b < 0`
+// over two signed operands is a §11.4.4 comparison between signed values. It
+// holds exactly where `a` stands below `b`. The test fails on a lowering that
+// counts only a name declared signed as a signed operand: that compares the
+// difference as unsigned, never finds it below zero, and drives `y` to 0
+// everywhere.
+TEST(RelationalSynthesis, SignedExpressionOperandComparesAsSigned) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input signed [3:0] b",
+                      "a - b < 0"),
+      16, [](uint64_t a, uint64_t b) {
+        return SignedFourBit(a) < SignedFourBit(b) ? uint64_t{1} : uint64_t{0};
+      });
+}
+
+// §5.7.1 makes the unsized decimal literal `1` signed, and §11.8.1 carries
+// that through unary minus, so `a < -1` over a signed `a` is a comparison
+// between signed values. It holds for `a` from -8 to -2. The test fails on a
+// lowering that reads the literal operand as unsigned: there -1 is the largest
+// value, every `a` stands below it, and `y` is driven to 1 everywhere.
+TEST(RelationalSynthesis, SignedLiteralOperandComparesAsSigned) {
+  ExpectAssignSweep(ModuleAssigning("input signed [3:0] a", "a < -1"), 1,
+                    [](uint64_t a, uint64_t) {
+                      return SignedFourBit(a) < -1 ? uint64_t{1} : uint64_t{0};
+                    });
+}
+
+// §5.7.1 makes `2'sb10` a signed two-bit literal, -2, and §11.8.2 sign-extends
+// it to the four bits of `a` in a comparison between signed values, so
+// `a < 2'sb10` holds for `a` from -8 to -3. The test fails on a lowering that
+// reads the literal as unsigned, where it is 2, and on one that compares as
+// signed but fills the literal's upper positions with zeros, which also makes
+// it 2.
+TEST(RelationalSynthesis, SizedSignedLiteralIsSignExtended) {
+  ExpectAssignSweep(ModuleAssigning("input signed [3:0] a", "a < 2'sb10"), 1,
+                    [](uint64_t a, uint64_t) {
+                      return SignedFourBit(a) < -2 ? uint64_t{1} : uint64_t{0};
+                    });
+}
+
 }  // namespace

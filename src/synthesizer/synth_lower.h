@@ -226,14 +226,20 @@ class SynthLower {
   uint32_t CompareWidth(const Expr* lhs, const Expr* rhs);
 
   // §11.8.2: lower one bit of an operand the expression around it has
-  // propagated a wider size to. The positions above the operand's own declared
-  // width are extension positions, and the standard rules that an operand
+  // propagated a wider size to. The positions above the width
+  // SynthLower::ExtendedOperandWidth answers for the operand are extension
+  // positions, and the standard rules that an operand
   // "shall be sign-extended only if the propagated type is signed", which is
   // what `sign_extend` carries. §11.4.4 and §11.4.5 extend both operands of a
   // comparison to the width it is carried out over, and §11.4.10 extends a
   // shift's left operand to the width the shift moves it within.
   uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit, bool sign_extend);
+
+  // The number of positions an operand's own value occupies, above which
+  // SynthLower::LowerExtendedOperandBit extends it, or 0 where that is not
+  // known and the operand is read as SynthLower::LowerExprBit answers it.
+  uint32_t ExtendedOperandWidth(const Expr* expr);
 
   // §11.4.12: lower one bit of a concatenation. The bit of the result at `bit`
   // is a bit of whichever operand's own width spans that position, so this
