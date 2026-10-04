@@ -772,6 +772,9 @@ class VpiContext {
   void AttachInstanceObjects(const RtlirDesign* design);
   void AttachPackages(const RtlirDesign* design);
   void AttachInstanceDefinitions(const RtlirDesign* design);
+  // §37.47: each instance's continuous assignments, hung on their nets as
+  // drivers and loads (§37.46). In vpi_design_attach_assigns.cpp.
+  void AttachContinuousAssignments(const RtlirDesign* design);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.

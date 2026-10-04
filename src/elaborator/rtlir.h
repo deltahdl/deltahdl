@@ -360,6 +360,8 @@ struct RtlirVariable {
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
+  // §37.47: the assign or net declaration it came from; null for a gate's.
+  const ModuleItem* source_item = nullptr;
   uint32_t width = 0;
   uint8_t drive_strength0 = 0;
   uint8_t drive_strength1 = 0;

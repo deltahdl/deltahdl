@@ -436,6 +436,7 @@ static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
   RtlirContAssign ca;
   ca.lhs = lhs;
   ca.rhs = item->init_expr;
+  ca.source_item = item;
   ca.width = net.width;
   ca.drive_strength0 = item->data_type.drive_strength0;
   ca.drive_strength1 = item->data_type.drive_strength1;

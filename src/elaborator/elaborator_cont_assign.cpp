@@ -122,6 +122,7 @@ RtlirContAssign BuildContAssignFor(ModuleItem* item, Expr* lhs, Expr* rhs,
   RtlirContAssign ca;
   ca.lhs = lhs;
   ca.rhs = rhs;
+  ca.source_item = item;
   ca.width = width;
   ca.drive_strength0 = item->drive_strength0;
   ca.drive_strength1 = item->drive_strength1;

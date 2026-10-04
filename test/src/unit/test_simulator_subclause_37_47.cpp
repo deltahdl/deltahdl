@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -185,6 +191,127 @@ TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&assign))), &target);
   EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&assign)), nullptr);
   EXPECT_EQ(vpi_handle(vpiDelay, VpiHandleOf(&assign)), nullptr);
+}
+
+// A design run with a PLI application registered, its continuous assignments
+// read back once the run is over.
+class ContinuousAssignmentsOfARun : public VpiDesignRun {
+ protected:
+  // How many objects of `type` `ref` reaches.
+  static int CountOf(int type, vpiHandle ref) {
+    int count = 0;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return 0;
+    while (vpi_scan(it) != nullptr) ++count;
+    return count;
+  }
+
+  // The continuous assignment of the top that is not a net declaration's.
+  static vpiHandle AssignStatementOfTop() {
+    vpiHandle it =
+        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+    if (it == nullptr) return nullptr;
+    vpiHandle found = nullptr;
+    while (vpiHandle ca = vpi_scan(it)) {
+      if (vpi_get(vpiNetDeclAssign, ca) == 0) found = ca;
+    }
+    return found;
+  }
+};
+
+constexpr const char* kTwoAssignments =
+    "module top;\n"
+    "  wire a, b, y;\n"
+    "  wire w = a;\n"
+    "  assign y = a & b;\n"
+    "endmodule\n";
+
+// §37.47: a module reaches its continuous assignments, the one a net
+// declaration makes among them.
+TEST_F(ContinuousAssignmentsOfARun, AModuleReachesItsContinuousAssignments) {
+  Run(kTwoAssignments);
+  EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
+            2);
+}
+
+// vpiLhs is the net the assignment drives.
+TEST_F(ContinuousAssignmentsOfARun, ItsLeftHandSideIsTheNetItDrives) {
+  Run(kTwoAssignments);
+  vpiHandle ca = AssignStatementOfTop();
+  ASSERT_NE(ca, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, ca)), "y");
+}
+
+// vpiRhs is the expression it assigns, here an operation...
+TEST_F(ContinuousAssignmentsOfARun, ItsRightHandSideIsAnOperation) {
+  Run(kTwoAssignments);
+  vpiHandle ca = AssignStatementOfTop();
+  ASSERT_NE(ca, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiRhs, ca)), vpiOperation);
+}
+
+// ...whose operator is the one the source wrote...
+TEST_F(ContinuousAssignmentsOfARun, TheOperationHasTheSourcesOperator) {
+  Run(kTwoAssignments);
+  vpiHandle ca = AssignStatementOfTop();
+  ASSERT_NE(ca, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiRhs, ca)), vpiBitAndOp);
+}
+
+// ...and whose operands are the two nets it reads.
+TEST_F(ContinuousAssignmentsOfARun, TheOperationsOperandsAreTheNetsItReads) {
+  Run(kTwoAssignments);
+  vpiHandle ca = AssignStatementOfTop();
+  ASSERT_NE(ca, nullptr);
+  EXPECT_EQ(NamesOf(vpiOperand, vpi_handle(vpiRhs, ca)),
+            (std::vector<std::string>{"a", "b"}));
+}
+
+// The assignment a net declaration makes says so.
+TEST_F(ContinuousAssignmentsOfARun, ANetDeclarationsAssignmentIsMarked) {
+  Run(kTwoAssignments);
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+  ASSERT_NE(it, nullptr);
+  int marked = 0;
+  while (vpiHandle ca = vpi_scan(it)) marked += vpi_get(vpiNetDeclAssign, ca);
+  EXPECT_EQ(marked, 1);
+}
+
+// §37.46: the assignment is a driver of the net it drives...
+TEST_F(ContinuousAssignmentsOfARun, ItDrivesTheNetOnItsLeft) {
+  Run(kTwoAssignments);
+  EXPECT_EQ(CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.y"), nullptr)),
+            1);
+}
+
+// ...and a load of every net it reads: a is read by both assignments.
+TEST_F(ContinuousAssignmentsOfARun, ItLoadsEachNetItReads) {
+  Run(kTwoAssignments);
+  EXPECT_EQ(CountOf(vpiLoad, vpi_handle_by_name(VpiText("top.a"), nullptr)), 2);
+}
+
+// One assignment to a concatenation is one object, though the elaborator
+// splits it into one assignment per element.
+TEST_F(ContinuousAssignmentsOfARun, AnAssignmentToAConcatenationIsOneObject) {
+  Run("module top; wire [1:0] r; wire p, q; assign {p, q} = r; endmodule\n");
+  EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
+            1);
+}
+
+// It drives every net of the concatenation.
+TEST_F(ContinuousAssignmentsOfARun, AnAssignmentToAConcatenationDrivesEach) {
+  Run("module top; wire [1:0] r; wire p, q; assign {p, q} = r; endmodule\n");
+  EXPECT_EQ(CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.q"), nullptr)),
+            1);
+}
+
+// An instance reaches the assignments its own definition wrote.
+TEST_F(ContinuousAssignmentsOfARun, AnInstanceReachesItsOwnAssignments) {
+  Run("module sub(input c, output d); assign d = ~c; endmodule\n"
+      "module top; wire x, z; sub u(.c(x), .d(z)); endmodule\n");
+  EXPECT_EQ(
+      CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top.u"), nullptr)), 1);
 }
 
 }  // namespace
