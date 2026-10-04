@@ -135,7 +135,7 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope) {
   // it is the first child of either kind. Null where the scope wrote none.
   if (!scope) return nullptr;
   for (auto* child : scope->children) {
-    if (VpiIsExprType(child->type) || child->type == vpiDistribution) {
+    if (VpiIsExprObject(child) || child->type == vpiDistribution) {
       return child;
     }
   }

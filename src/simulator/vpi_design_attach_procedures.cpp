@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -167,7 +166,8 @@ int BareAtomicKind(StmtKind kind) {
 }
 
 // §37.42: what a call statement stands as. `type` is the kind of tf call, zero
-// for a statement that calls no task; `name` is the subroutine it calls;
+// for a statement that calls nothing the walk resolves; `name` is the
+// subroutine it calls;
 // `prefix` is the object a method is applied to (detail 2); `user_defined`
 // is the figure's vpiUserDefn; `systf` is the systf object a call of a
 // registered system task reaches.
@@ -179,46 +179,54 @@ struct CallShape {
   VpiObject* systf = nullptr;
 };
 
-// §13.3: whether `decls` declares a task named `name`.
-bool DeclaresTask(const std::vector<ModuleItem*>& decls,
-                  std::string_view name) {
-  return std::ranges::any_of(decls, [name](const ModuleItem* decl) {
-    return decl != nullptr && decl->kind == ModuleItemKind::kTaskDecl &&
-           decl->name == name;
-  });
+// §13.3 and §13.4: the kind of tf call a call of `decl` is, `task` for a task
+// and `function` for a function, zero for an item that is neither.
+int CallKindOf(const ModuleItem& decl, int task, int function) {
+  if (decl.kind == ModuleItemKind::kTaskDecl) return task;
+  return decl.kind == ModuleItemKind::kFunctionDecl ? function : 0;
 }
 
-// §26.2: whether the package the design declares under `package` declares a
-// task named `name`.
-bool PackageDeclaresTask(const RtlirDesign& design, std::string_view package,
-                         std::string_view name) {
-  return std::ranges::any_of(design.packages, [&](const PackageDecl* decl) {
-    return decl != nullptr && decl->name == package &&
-           DeclaresTask(decl->items, name);
-  });
+// The kind of tf call a call of the subroutine `decls` declares under `name`
+// is, zero where they declare none.
+int DeclaredCallKind(const std::vector<ModuleItem*>& decls,
+                     std::string_view name) {
+  for (const ModuleItem* decl : decls) {
+    if (decl == nullptr || decl->name != name) continue;
+    const int kKind = CallKindOf(*decl, vpiTaskCall, vpiFuncCall);
+    if (kKind != 0) return kKind;
+  }
+  return 0;
 }
 
-// §13.3: whether `name` is a task the instance's module, one of its generate
-// blocks or the compilation unit declares, or, by §26.3, one the module
-// imports from a package by its name or with a wildcard.
-bool NamesTask(const BodyWalk& walk, std::string_view name) {
-  if (DeclaresTask(walk.mod.function_decls, name) ||
-      DeclaresTask(walk.design.cu_function_decls, name)) {
-    return true;
+// §26.2: the same, of the package the design declares under `package`.
+int PackageCallKind(const RtlirDesign& design, std::string_view package,
+                    std::string_view name) {
+  for (const PackageDecl* decl : design.packages) {
+    if (decl == nullptr || decl->name != package) continue;
+    const int kKind = DeclaredCallKind(decl->items, name);
+    if (kKind != 0) return kKind;
   }
-  if (std::ranges::any_of(walk.mod.gen_block_subroutines,
-                          [name](const RtlirGenBlockSubroutine& sub) {
-                            return sub.decl != nullptr &&
-                                   sub.decl->kind ==
-                                       ModuleItemKind::kTaskDecl &&
-                                   sub.decl->name == name;
-                          })) {
-    return true;
+  return 0;
+}
+
+// The kind of tf call a call of `name` is, of a task or function the
+// instance's module, one of its generate blocks or the compilation unit
+// declares, or, by §26.3, one the module imports from a package by its name or
+// with a wildcard; zero for none.
+int NamedCallKind(const BodyWalk& walk, std::string_view name) {
+  int kind = DeclaredCallKind(walk.mod.function_decls, name);
+  if (kind == 0) kind = DeclaredCallKind(walk.design.cu_function_decls, name);
+  for (const RtlirGenBlockSubroutine& sub : walk.mod.gen_block_subroutines) {
+    if (kind == 0 && sub.decl != nullptr && sub.decl->name == name) {
+      kind = CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall);
+    }
   }
-  return std::ranges::any_of(walk.mod.imports, [&](const RtlirImport& entry) {
-    return (entry.is_wildcard || entry.item_name == name) &&
-           PackageDeclaresTask(walk.design, entry.package_name, name);
-  });
+  for (const RtlirImport& entry : walk.mod.imports) {
+    if (kind == 0 && (entry.is_wildcard || entry.item_name == name)) {
+      kind = PackageCallKind(walk.design, entry.package_name, name);
+    }
+  }
+  return kind;
 }
 
 // The class among `decls` named `name`, null for none.
@@ -248,43 +256,55 @@ const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
   return nullptr;
 }
 
-// §9.7, §15.3.3, §15.4.3, §15.4.5 and §15.4.7: the methods the built-in
-// classes declare as tasks, every other method of theirs being a function.
-bool IsBuiltInClassTask(std::string_view cls, std::string_view method) {
-  static constexpr std::pair<std::string_view, std::string_view> kTasks[] = {
+// §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
+// the built-in class `cls` is, zero for none. Every method the three classes
+// declare is listed but new, which no statement calls through a variable.
+int BuiltInClassCallKind(std::string_view cls, std::string_view method) {
+  using Method = std::pair<std::string_view, std::string_view>;
+  static constexpr Method kTasks[] = {
       {"process", "await"}, {"semaphore", "get"}, {"mailbox", "put"},
       {"mailbox", "get"},   {"mailbox", "peek"},
   };
-  return std::ranges::any_of(kTasks, [&](const auto& task) {
-    return task.first == cls && task.second == method;
-  });
+  static constexpr Method kFunctions[] = {
+      {"process", "self"},          {"process", "status"},
+      {"process", "kill"},          {"process", "suspend"},
+      {"process", "resume"},        {"process", "srandom"},
+      {"process", "get_randstate"}, {"process", "set_randstate"},
+      {"semaphore", "put"},         {"semaphore", "try_get"},
+      {"mailbox", "num"},           {"mailbox", "try_put"},
+      {"mailbox", "try_get"},       {"mailbox", "try_peek"},
+  };
+  const auto kIsCalled = [&](const Method& entry) {
+    return entry.first == cls && entry.second == method;
+  };
+  if (std::ranges::any_of(kTasks, kIsCalled)) return vpiMethodTaskCall;
+  return std::ranges::any_of(kFunctions, kIsCalled) ? vpiMethodFuncCall : 0;
 }
 
-// What the method a call names is: no task, a task of a class the design
-// declares, or a task of a built-in class.
-enum class MethodTask : uint8_t { kNone, kDeclared, kBuiltIn };
+// §37.42: what a method call calls - the kind of tf call it is, zero for a
+// method the walk resolves to nothing, and whether the design declares it.
+struct MethodCall {
+  int type = 0;
+  bool declared = false;
+};
 
-// The kind of task `method` of the class `cls` is, found in the class or, by
-// §8.13, in the classes it extends. A class the design declares answers ahead
-// of a built-in one of its name, which §15.2 lets user code redefine. The
-// bound stops a chain of extensions that loops.
-MethodTask ClassMethodTask(const BodyWalk& walk, std::string_view cls,
+// The method `method` of the class `cls`, found in the class or, by §8.13, in
+// the classes it extends. A class the design declares answers ahead of a
+// built-in one of its name, which §15.2 lets user code redefine. The bound
+// stops a chain of extensions that loops.
+MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
                            std::string_view method) {
   constexpr int kMaxDepth = 64;
   for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
     const ClassDecl* decl = FindClassDecl(walk, cls);
-    if (decl == nullptr) {
-      return IsBuiltInClassTask(cls, method) ? MethodTask::kBuiltIn
-                                             : MethodTask::kNone;
-    }
+    if (decl == nullptr) return {BuiltInClassCallKind(cls, method), false};
     const ModuleItem* found = MethodNamed(*decl, method);
     if (found != nullptr) {
-      return found->kind == ModuleItemKind::kTaskDecl ? MethodTask::kDeclared
-                                                      : MethodTask::kNone;
+      return {CallKindOf(*found, vpiMethodTaskCall, vpiMethodFuncCall), true};
     }
     cls = decl->base_class;
   }
-  return MethodTask::kNone;
+  return {};
 }
 
 // §8.4: the class a variable of the instance's module named `name` holds a
@@ -341,16 +361,18 @@ bool IsBuiltInSystemFunction(std::string_view name) {
   });
 }
 
-// §37.42: a system task call, named after the system task it calls. A system
-// function stays a function where a statement calls it, and the evaluator runs
-// it as one (§36.5), so it is no system task call. A name an application
-// registered is what the registration made it, which the run calls it as.
-CallShape SystemTaskCallShape(const Expr& call, const BodyWalk& walk) {
+// §37.42: a system task or system function call, named after what it calls. A
+// system function stays a function where a statement calls it, and the
+// evaluator runs it as one (§36.5). A name an application registered is what
+// the registration made it, which the run calls it as; every other name is a
+// system task.
+CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
-  if (kSystf.type == vpiSysFunc) return {};
-  if (kSystf.type == 0 && IsBuiltInSystemFunction(call.callee)) return {};
-  CallShape shape{vpiSysTaskCall, call.callee};
-  shape.user_defined = kSystf.type == vpiSysTask;
+  const bool kFunction =
+      kSystf.type == vpiSysFunc ||
+      (kSystf.type == 0 && IsBuiltInSystemFunction(call.callee));
+  CallShape shape{kFunction ? vpiSysFuncCall : vpiSysTaskCall, call.callee};
+  shape.user_defined = kSystf.type == vpiSysTask || kSystf.type == vpiSysFunc;
   shape.systf = kSystf.object;
   return shape;
 }
@@ -385,18 +407,18 @@ ClassVar FindClassVar(const BlockParent& parent, std::string_view name,
           FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, name))};
 }
 
-// §37.42: a method task call, applied through `access`, which joins two
-// names, to a class var of the scope the call stands in.
-CallShape MethodTaskCallShape(const Expr& access, const BlockParent& parent,
-                              const BodyWalk& walk) {
+// §37.42: a method task or method function call, applied through `access`,
+// which joins two names, to a class var of the scope the call stands in.
+CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
+                          const BodyWalk& walk) {
   const ClassVar kVar = FindClassVar(parent, access.lhs->text, walk);
-  const MethodTask kTask = ClassMethodTask(walk, kVar.cls, access.rhs->text);
-  if (kTask == MethodTask::kNone) return {};
-  CallShape shape{vpiMethodTaskCall, access.rhs->text};
+  const MethodCall kCall = ClassMethodCall(walk, kVar.cls, access.rhs->text);
+  if (kCall.type == 0) return {};
+  CallShape shape{kCall.type, access.rhs->text};
   shape.prefix = kVar.object;
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
-  shape.user_defined = kTask == MethodTask::kDeclared;
+  shape.user_defined = kCall.declared;
   return shape;
 }
 
@@ -408,13 +430,12 @@ bool JoinsTwoNames(const Expr& access) {
          access.rhs->kind == ExprKind::kIdentifier;
 }
 
-// §37.42 with §26.3: a task call naming a package's task behind the package's
-// name, `p::t`.
-CallShape PackageTaskCallShape(const Expr& access, const BodyWalk& walk) {
-  if (!PackageDeclaresTask(walk.design, access.lhs->text, access.rhs->text)) {
-    return {};
-  }
-  return CallShape{vpiTaskCall, access.rhs->text};
+// §37.42 with §26.3: a task or function call naming a package's subroutine
+// behind the package's name, `p::t`.
+CallShape PackageCallShape(const Expr& access, const BodyWalk& walk) {
+  return CallShape{
+      PackageCallKind(walk.design, access.lhs->text, access.rhs->text),
+      access.rhs->text};
 }
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
@@ -424,19 +445,18 @@ CallShape PackageTaskCallShape(const Expr& access, const BodyWalk& walk) {
 CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
                       const BodyWalk& walk) {
   if (expr.kind == ExprKind::kSystemCall) {
-    return SystemTaskCallShape(expr, walk);
+    return SystemCallShape(expr, walk);
   }
   const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
   if (callee == nullptr) return {};
   if (callee->kind == ExprKind::kIdentifier) {
-    if (!NamesTask(walk, callee->text)) return {};
-    return CallShape{vpiTaskCall, callee->text};
+    return CallShape{NamedCallKind(walk, callee->text), callee->text};
   }
   if (callee->kind != ExprKind::kMemberAccess || !JoinsTwoNames(*callee)) {
     return {};
   }
-  if (callee->is_scope_resolution) return PackageTaskCallShape(*callee, walk);
-  return MethodTaskCallShape(*callee, parent, walk);
+  if (callee->is_scope_resolution) return PackageCallShape(*callee, walk);
+  return MethodCallShape(*callee, parent, walk);
 }
 
 // §37.42: the arguments `expr` was written with, in order, each the
@@ -462,10 +482,12 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
 }
 
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a
-// statement that calls no task. A call is named after what it calls; a label
-// written on it names the begin §9.3.5 makes around it instead. A system task
-// call is recorded as the call statement it is, which a run's invocation of a
-// registered system task stands as (detail 3).
+// statement that calls nothing the walk resolves. A call is named after what
+// it calls; a label written on it names the begin §9.3.5 makes around it
+// instead. It is marked as written as a statement, which tells a function call
+// standing as one from a function call standing as an expression. A system
+// task or function call is recorded as the call statement it is, which a run's
+// invocation of a registered system task or function stands as (detail 3).
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
@@ -476,8 +498,9 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   call->tf_prefix = kShape.prefix;
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;
+  call->written_as_stmt = true;
   MakeCallArguments(call, *stmt.expr, walk);
-  if (kShape.type == vpiSysTaskCall) {
+  if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
     walk.calls.sites[{stmt.expr, walk.prefix}] = call;
   }
   return call;

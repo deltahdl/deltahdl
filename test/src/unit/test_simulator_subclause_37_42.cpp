@@ -458,10 +458,45 @@ TEST_F(CallStatementsOfARun, ATaskCallIsAnObjectOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
 }
 
-// ...and a call of a void function written as a statement is none.
-TEST_F(CallStatementsOfARun, AFunctionCallStatementIsNoTaskCall) {
+// ...and a call of a void function written as a statement is a func call
+// statement named after the function, the tf call class §37.60 draws in atomic
+// stmt holding the function calls too (#5034).
+TEST_F(CallStatementsOfARun, AFunctionCallStatementIsAFuncCall) {
   Run("module top; function void f(); endfunction initial f(); endmodule\n");
-  EXPECT_EQ(BodyOf("top"), nullptr);
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "f");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
+  EXPECT_NE(vpi_handle(vpiProcess, call), nullptr);
+}
+
+// A built-in system function written as a statement is a sys func call that is
+// not user-defined and reaches no user systf.
+TEST_F(CallStatementsOfARun, ABuiltInSystemFunctionStatementIsASysFuncCall) {
+  Run("module top; initial $random; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiSysFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "$random");
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
+  EXPECT_EQ(vpi_handle(vpiUserSystf, call), nullptr);
+}
+
+// A call of a class's function method written as a statement is a method func
+// call whose vpiPrefix is the class var it is applied to.
+TEST_F(CallStatementsOfARun, AMethodFunctionCallStatementIsAMethodFuncCall) {
+  Run("module top;\n"
+      "  class C; function void go(); endfunction endclass\n"
+      "  C obj = new;\n"
+      "  initial obj.go();\n"
+      "endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "go");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "obj");
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
 }
 
 constexpr const char* kMethodTaskCall =
@@ -495,10 +530,15 @@ TEST_F(CallStatementsOfARun, ABuiltInClassTaskCallIsNotUserDefined) {
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
 }
 
-// ...while its put is a function (§15.3.2), and a call of it no task call.
-TEST_F(CallStatementsOfARun, ABuiltInClassFunctionCallIsNoMethodTaskCall) {
+// ...while its put is a function (§15.3.2), and a call of it a method func
+// call that is not user-defined either (#5034).
+TEST_F(CallStatementsOfARun, ABuiltInClassFunctionCallIsAMethodFuncCall) {
   Run("module top; semaphore s = new(1); initial s.put(1); endmodule\n");
-  EXPECT_EQ(BodyOf("top"), nullptr);
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "s");
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
 }
 
 // A call statement reaches the arguments it was written with, in order
@@ -557,6 +597,35 @@ TEST_F(CallStatementsOfARun, ASystemTaskCallReachesItsUserSystf) {
   EXPECT_EQ(
       vpi_handle(vpiUserSystf, Named(vpiSysTaskCall, By("top"), "$display")),
       nullptr);
+}
+
+// The call the calltf of $peek last reached through vpiSysTfCall.
+vpiHandle g_peek_call = nullptr;
+
+PLI_INT32 PeekCalltf(PLI_BYTE8* /*user_data*/) {
+  g_peek_call = vpi_handle(vpiSysTfCall, nullptr);
+  return 0;
+}
+
+// A registered system function written as a statement is a sys func call that
+// is user-defined, reaches the systf its registration returned, and is the very
+// object its calltf reaches (#5034).
+TEST_F(CallStatementsOfARun, ARegisteredSystemFunctionStatementIsASysFuncCall) {
+  g_peek_call = nullptr;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
+  data.tfname = VpiText("$peek");
+  data.calltf = &PeekCalltf;
+  vpiHandle peek = vpi_register_systf(&data);
+  ASSERT_NE(peek, nullptr);
+  Run("module top; initial $peek; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiSysFuncCall);
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUserSystf, call)), VpiObjectOf(peek));
+  EXPECT_EQ(VpiObjectOf(g_peek_call), VpiObjectOf(call));
 }
 
 // A built-in system function written as a statement is no system task call:

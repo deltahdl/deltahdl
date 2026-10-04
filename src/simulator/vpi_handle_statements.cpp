@@ -39,7 +39,7 @@ bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     return true;
   }
   for (auto* child : ref->children) {
-    if (!VpiIsScopeBodyStmtType(child->type)) continue;
+    if (!VpiIsScopeBodyStmtObject(child)) continue;
     out = child;
     return true;
   }

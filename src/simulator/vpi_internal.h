@@ -25,6 +25,16 @@ inline PLI_BYTE8* VpiText(const char* text) {
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
+// §37.60 with §37.42 and §37.59: whether `obj` stands as an atomic statement,
+// as a statement a scope body or a statement's body holds, or as an
+// expression. A function call is drawn both in the tf call class of atomic
+// stmt and in expr, and is the one where it was written as a statement and
+// the other everywhere else. Defined in vpi_helpers_statements.cpp, used by
+// the scans that tell a statement's body from its condition.
+bool VpiIsAtomicStmtObject(VpiHandle obj);
+bool VpiIsScopeBodyStmtObject(VpiHandle obj);
+bool VpiIsExprObject(VpiHandle obj);
+
 // §37.12: the kinds the scope class groups, which vpiInternalScope reaches.
 // Defined in vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
 bool VpiIsInternalScopeType(int type);

@@ -6,6 +6,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -131,6 +132,77 @@ TEST_F(AtomicStatement, TheMembersOfTheClassHaveConstantsOfTheirOwn) {
   EXPECT_NE(vpiImmediateAssume, vpiReturn);
   EXPECT_NE(vpiImmediateCover, vpiAnyPattern);
   EXPECT_NE(vpiImmediateAssume, vpiReturnStmt);
+}
+
+// The tf call class drawn inside atomic stmt holds the three function call
+// kinds as well as the task calls (§37.42), and §37.59 draws the same three in
+// expr: a function call is an atomic statement where it was written as one and
+// an expression everywhere else (#5034).
+TEST_F(AtomicStatement, AFunctionCallWrittenAsAStatementIsOne) {
+  for (int type : {vpiFuncCall, vpiMethodFuncCall, vpiSysFuncCall}) {
+    VpiObject call;
+    call.type = type;
+    EXPECT_FALSE(VpiIsAtomicStmtObject(&call)) << type;
+    EXPECT_TRUE(VpiIsExprObject(&call)) << type;
+    call.written_as_stmt = true;
+    EXPECT_TRUE(VpiIsAtomicStmtObject(&call)) << type;
+    EXPECT_FALSE(VpiIsExprObject(&call)) << type;
+  }
+}
+
+// So a loop whose body is a call statement and whose condition is a call
+// reaches each through its own relation, the body standing first here as a
+// do-while writes it.
+TEST_F(AtomicStatement, ALoopTellsItsConditionCallFromItsBodyCall) {
+  VpiObject condition;
+  condition.type = vpiFuncCall;
+  VpiObject body;
+  body.type = vpiFuncCall;
+  body.written_as_stmt = true;
+  VpiObject loop;
+  loop.type = vpiDoWhile;
+  loop.children = {&body, &condition};
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&loop))),
+            &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&loop))), &body);
+}
+
+// An if-else whose condition and both branches are calls reaches its else
+// branch as the second of the two call statements.
+TEST_F(AtomicStatement, AnIfElseReachesAnElseCallStatement) {
+  VpiObject condition;
+  condition.type = vpiSysFuncCall;
+  VpiObject then_call;
+  then_call.type = vpiFuncCall;
+  then_call.written_as_stmt = true;
+  VpiObject else_call;
+  else_call.type = vpiMethodFuncCall;
+  else_call.written_as_stmt = true;
+  VpiObject branch;
+  branch.type = vpiIfElse;
+  branch.children = {&condition, &then_call, &else_call};
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&branch))),
+            &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&branch))), &then_call);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&branch))),
+            &else_call);
+}
+
+// A case item's match expressions are its calls that are expressions, the
+// call statement it branches to being none of them.
+TEST_F(AtomicStatement, ACaseItemsCallStatementIsNoMatchExpression) {
+  VpiObject match;
+  match.type = vpiFuncCall;
+  VpiObject action;
+  action.type = vpiFuncCall;
+  action.written_as_stmt = true;
+  VpiObject item;
+  item.type = vpiCaseItem;
+  item.children = {&match, &action};
+  vpiHandle it = vpi_iterate(vpiExpr, VpiHandleOf(&item));
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &match);
+  EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
 // -----------------------------------------------------------------------------

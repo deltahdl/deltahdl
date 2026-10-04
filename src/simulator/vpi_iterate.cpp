@@ -438,75 +438,75 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
 // call's arguments, and a constraint's constraint items. Returns true if one of
 // these applied and writes its verdict into *matched. These are checked after
 // the kind-mode group so the original precedence is preserved.
-bool VpiIterateMatchesEdgeMode(int obj_type, int type, VpiHandle ref,
+bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
                                const VpiIterateModes& modes, bool* matched) {
   if (modes.interconnect_array_element || modes.interconnect_net_element ||
       modes.interconnect_net_member) {
-    *matched = VpiIsInterconnectSubelementType(obj_type);
+    *matched = VpiIsInterconnectSubelementType(obj->type);
     return true;
   }
   if (modes.tchk_expr) {
-    *matched = obj_type == vpiTchkTerm || VpiIsExprType(obj_type);
+    *matched = obj->type == vpiTchkTerm || VpiIsExprType(obj->type);
     return true;
   }
   if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
-    *matched = VpiIsCaseItemConditionType(obj_type);
+    *matched = VpiIsCaseItemConditionType(obj->type) && !obj->written_as_stmt;
     return true;
   }
   // §37.16, §37.17 detail 12: vpiBit reaches a net's net bits and a
   // variable's var bits; no object's own type is the relation's.
   if (type == vpiBit) {
-    *matched = obj_type == vpiNetBit || obj_type == vpiRegBit;
+    *matched = obj->type == vpiNetBit || obj->type == vpiRegBit;
     return true;
   }
   if (type == vpiConstraintItem) {
-    *matched = VpiIsConstraintItemType(obj_type);
+    *matched = VpiIsConstraintItemType(obj->type);
     return true;
   }
   return false;
 }
 
-bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
+bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
                        const VpiIterateModes& modes) {
   bool matched = false;
   // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects reg word
   // objects, etc. - the fixed-kind special modes resolved first to preserve
   // precedence.
-  if (VpiIterateMatchesKindMode(obj_type, modes, &matched)) return matched;
+  if (VpiIterateMatchesKindMode(obj->type, modes, &matched)) return matched;
   // §37.x: the vpiAssertion relation reaches every assertion kind, checked
   // between the two grouped mode blocks exactly as in the original order.
-  if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+  if (type == vpiAssertion) return VpiIsAssertionType(obj->type);
   // §37.35/§37.5: the module-to-primitive edge is drawn to the `primitive`
   // class, so it reaches the gates, switches and UDPs the class groups.
   // Matching the class constant against an object's own type reached none of
   // them: §37.4.1 makes the enclosure a grouping and no object is one.
-  if (type == vpiPrimitive) return VpiIsPrimitiveType(obj_type);
+  if (type == vpiPrimitive) return VpiIsPrimitiveType(obj->type);
   // §37.9/§37.5/§37.63: the edge from a program or a module to its procedures
   // is drawn to the `process` class, so it reaches the initial, final and
   // always procedures the class groups rather than an object whose own type is
   // the class name, which is a kind no procedure has.
-  if (type == vpiProcess) return VpiIsProcessType(obj_type);
+  if (type == vpiProcess) return VpiIsProcessType(obj->type);
   // §37.12: vpiInternalScope is drawn to the `scope` class likewise.
-  if (type == vpiInternalScope) return VpiIsInternalScopeType(obj_type);
+  if (type == vpiInternalScope) return VpiIsInternalScopeType(obj->type);
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
-  if (type == vpiMemory) return obj_type == VpiMemoryIterationItemType();
+  if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();
   // §37.10: the vpiNetTypedef iteration reaches the instance's nettype
   // declarations, whose own type is the vpiNettypeDecl of Annex M; the tag the
   // diagram writes on the iteration is not the type of what it reaches.
-  if (type == vpiNetTypedef) return obj_type == vpiNettypeDecl;
+  if (type == vpiNetTypedef) return obj->type == vpiNettypeDecl;
   // §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs.
   if (type == vpiTypedef)
-    return VpiIsTypespecType(obj_type) && obj_type != vpiTypeParameter;
+    return VpiIsTypespecType(obj->type) && obj->type != vpiTypeParameter;
   // §37.11/§37.5: the module's edges to `instance array` and to the `primitive
   // array` nested inside it are drawn to those class enclosures, so they reach
   // the module, interface, program, gate, switch and udp arrays the two group.
-  if (type == vpiInstanceArray) return VpiIsInstanceArrayType(obj_type);
-  if (type == vpiPrimitiveArray) return VpiIsPrimitiveArrayType(obj_type);
+  if (type == vpiInstanceArray) return VpiIsInstanceArrayType(obj->type);
+  if (type == vpiPrimitiveArray) return VpiIsPrimitiveArrayType(obj->type);
   // §37.24/§37.40/§37.72/§37.42/§37.34: the edge-specific special modes.
-  if (VpiIterateMatchesEdgeMode(obj_type, type, ref, modes, &matched)) {
+  if (VpiIterateMatchesEdgeMode(obj, type, ref, modes, &matched)) {
     return matched;
   }
-  return obj_type == type;
+  return obj->type == type;
 }
 
 // §37.12 detail 4: collect the objects actually imported into the scope - those
@@ -599,7 +599,7 @@ void CollectForeachLoopVars(VpiObject* ref,
 void CollectMatchingChildren(int type, VpiHandle ref,
                              const VpiIterateModes& modes, VpiObject* iter) {
   for (auto* child : ref->children) {
-    if (!VpiIterateMatches(child->type, type, ref, modes)) continue;
+    if (!VpiIterateMatches(child, type, ref, modes)) continue;
     if (modes.class_methods && child->implicit_builtin_method) continue;
     if (modes.class_constraint && child->inline_constraint) continue;
     iter->children.push_back(child);
@@ -683,7 +683,7 @@ void CollectMatchingObjects(int type, VpiHandle ref,
                             const std::vector<VpiObject*>& all_objects,
                             VpiObject* iter) {
   for (auto* obj : all_objects) {
-    if (!VpiIterateMatches(obj->type, type, ref, modes)) continue;
+    if (!VpiIterateMatches(obj, type, ref, modes)) continue;
     if (modes.top_module && !obj->top_module) continue;
     iter->children.push_back(obj);
   }

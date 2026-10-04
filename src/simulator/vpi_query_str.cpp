@@ -430,7 +430,7 @@ static const char* VpiNameStr(VpiHandle obj) {
   // §37.60 detail 1: an atomic statement's vpiName is its label when one
   // was written, and NULL otherwise - never an empty string for an
   // unlabeled statement.
-  if (VpiIsAtomicStmtType(obj->type)) {
+  if (VpiIsAtomicStmtObject(obj)) {
     return obj->name.empty() ? nullptr : obj->name.data();
   }
   return obj->name.data();

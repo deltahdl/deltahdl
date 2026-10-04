@@ -38,7 +38,7 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control) {
     return nullptr;
   }
   for (auto* child : event_control->children) {
-    if (VpiIsScopeBodyStmtType(child->type)) return child;
+    if (VpiIsScopeBodyStmtObject(child)) return child;
   }
   return nullptr;
 }
@@ -54,7 +54,7 @@ VpiHandle VpiEventControlConditionExpr(VpiHandle event_control) {
   // this scan. Null when no condition operand is attached.
   if (!event_control) return nullptr;
   for (auto* child : event_control->children) {
-    if (VpiIsExprType(child->type) || child->type == vpiSequenceInst ||
+    if (VpiIsExprObject(child) || child->type == vpiSequenceInst ||
         child->type == vpiNamedEvent) {
       return child;
     }
@@ -74,7 +74,7 @@ VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
   // own type is vpiEventControl and is left to the generic traversal.
   if (!repeat_control) return nullptr;
   for (auto* child : repeat_control->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }
@@ -93,7 +93,7 @@ VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
     return nullptr;
   }
   for (auto* child : delay_control->children) {
-    if (VpiIsScopeBodyStmtType(child->type)) return child;
+    if (VpiIsScopeBodyStmtObject(child)) return child;
   }
   return nullptr;
 }
@@ -112,7 +112,7 @@ VpiHandle VpiDelayControlDelayExpr(VpiHandle delay_control) {
   // cannot serve it. Null when no delay operand is attached.
   if (!delay_control) return nullptr;
   for (auto* child : delay_control->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }

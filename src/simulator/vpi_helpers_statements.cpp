@@ -73,16 +73,11 @@ bool VpiIsAtomicStmtType(int type) {
   // enclosure reaches the kinds that class groups, and those three were outside
   // it. Both groupings are named here in full.
   //
-  // `tf call` is held here as its three kinds that call a task: the task call,
-  // the method task call and the system-task call. §37.42 draws three more
-  // kinds in it, and every one of them is a call that returns a value, which
-  // §37.59 also draws inside `expr`. A kind in both classes is reached by the
-  // condition scans and the body scans alike, and the objects that carry a
-  // condition and a body carry them as children in one list, so admitting the
-  // three here would have a loop's condition answer for its body. Telling the
-  // two apart is §37.60's reading to settle, not a line in this switch. A
-  // method task call returns no value and §37.59 draws it nowhere in `expr`,
-  // so it is a statement and nothing else, as the other two task calls are.
+  // `tf call` is held here as its three kinds that call a task, each a
+  // statement wherever it stands. §37.42 draws the three function calls in it
+  // too, and §37.59 draws them in `expr` as well, so a function call is a
+  // statement only where it was written as one. Its kind cannot say which, and
+  // VpiIsAtomicStmtObject below admits it by the object instead.
   if (VpiIsWaitType(type) || VpiIsDisableType(type)) return true;
   switch (type) {
     case vpiIf:
@@ -117,6 +112,18 @@ bool VpiIsAtomicStmtType(int type) {
     default:
       return false;
   }
+}
+
+bool VpiIsAtomicStmtObject(VpiHandle obj) {
+  if (VpiIsAtomicStmtType(obj->type)) return true;
+  const bool kFunctionCall = obj->type == vpiFuncCall ||
+                             obj->type == vpiMethodFuncCall ||
+                             obj->type == vpiSysFuncCall;
+  return kFunctionCall && obj->written_as_stmt;
+}
+
+bool VpiIsScopeBodyStmtObject(VpiHandle obj) {
+  return VpiIsAtomicStmtObject(obj) || VpiIsScopeBodyStmtType(obj->type);
 }
 
 bool VpiIsPatternType(int type) {
@@ -187,7 +194,9 @@ std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item) {
   std::vector<VpiHandle> conditions;
   if (!case_item || case_item->default_case_item) return conditions;
   for (auto* child : case_item->children) {
-    if (VpiIsCaseItemConditionType(child->type)) conditions.push_back(child);
+    if (VpiIsCaseItemConditionType(child->type) && !child->written_as_stmt) {
+      conditions.push_back(child);
+    }
   }
   return conditions;
 }
@@ -306,7 +315,7 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
   // edge.
   if (!wait) return nullptr;
   for (auto* child : wait->children) {
-    if (VpiIsExprType(child->type) || child->type == vpiSequenceInst) {
+    if (VpiIsExprObject(child) || child->type == vpiSequenceInst) {
       return child;
     }
   }
@@ -333,7 +342,7 @@ namespace {
 VpiHandle SecondBodyStmt(VpiHandle stmt) {
   int seen = 0;
   for (auto* child : stmt->children) {
-    if (!VpiIsScopeBodyStmtType(child->type)) continue;
+    if (!VpiIsScopeBodyStmtObject(child)) continue;
     if (++seen == 2) return child;
   }
   return nullptr;
@@ -428,7 +437,7 @@ VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
   // when none is attached.
   if (!if_stmt) return nullptr;
   for (auto* child : if_stmt->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }
@@ -587,7 +596,7 @@ VpiHandle VpiTaskFuncStmt(VpiHandle task_func) {
   // the body holds no statement.
   if (!task_func) return nullptr;
   for (auto* child : task_func->children) {
-    if (VpiIsScopeBodyStmtType(child->type)) return child;
+    if (VpiIsScopeBodyStmtObject(child)) return child;
   }
   return nullptr;
 }

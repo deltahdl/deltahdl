@@ -59,7 +59,7 @@ bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
   // §37.12 and §37.63 (figures): a statement reaches the scope it stands in
   // through the untagged arrow to `scope`, the nearest object around it that
   // is one; a block that is no scope is passed over.
-  if (type != vpiScope || !VpiIsScopeBodyStmtType(ref->type)) return false;
+  if (type != vpiScope || !VpiIsScopeBodyStmtObject(ref)) return false;
   out = nullptr;
   for (VpiObject* scope = ref->parent; scope != nullptr;
        scope = scope->parent) {

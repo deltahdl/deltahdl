@@ -31,7 +31,7 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   // first expression child. Null when none is attached.
   if (!loop || !VpiIsWhileOrRepeatType(loop->type)) return nullptr;
   for (auto* child : loop->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }
@@ -47,7 +47,7 @@ VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {
   // rather than among its children. Null when no condition is attached.
   if (!for_stmt) return nullptr;
   for (auto* child : for_stmt->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }
@@ -63,7 +63,7 @@ VpiHandle VpiDoWhileConditionExpr(VpiHandle do_while) {
   // attached.
   if (!do_while) return nullptr;
   for (auto* child : do_while->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }

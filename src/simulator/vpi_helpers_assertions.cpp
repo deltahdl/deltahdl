@@ -247,7 +247,7 @@ VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
   // assertion's first expression child. Null when none is attached.
   if (!assertion) return nullptr;
   for (auto* child : assertion->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprObject(child)) return child;
   }
   return nullptr;
 }
@@ -262,7 +262,7 @@ static std::vector<VpiHandle> ImmediateAssertionStmts(VpiHandle assertion) {
   std::vector<VpiHandle> stmts;
   if (!assertion) return stmts;
   for (auto* child : assertion->children) {
-    if (VpiIsScopeBodyStmtType(child->type)) stmts.push_back(child);
+    if (VpiIsScopeBodyStmtObject(child)) stmts.push_back(child);
   }
   return stmts;
 }

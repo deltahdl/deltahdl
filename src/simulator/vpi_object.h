@@ -499,6 +499,12 @@ struct VpiObject {
   // model's children a loop. Empty for every object that is no tf call.
   std::vector<VpiObject*> arguments;
 
+  // §37.60 with §37.59: whether a tf call was written as a statement. Both
+  // classes draw the three function call kinds, so for a function call the
+  // kind alone cannot say whether it is a statement's body or its condition;
+  // this does.
+  bool written_as_stmt = false;
+
   // §37.47 detail 3: the bit offset a cont assign bit reports through
   // vpi_get(vpiOffset). The offset is measured from the least significant bit,
   // so the LSB carries offset zero and the bit n positions above it carries

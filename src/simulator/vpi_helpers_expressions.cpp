@@ -1,3 +1,4 @@
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -8,6 +9,10 @@ namespace delta {
 
 bool VpiIsExprOperandType(int type) {
   return VpiIsExprType(type) || VpiIsNetsType(type) || VpiIsVariablesType(type);
+}
+
+bool VpiIsExprObject(VpiHandle obj) {
+  return VpiIsExprType(obj->type) && !obj->written_as_stmt;
 }
 
 namespace {
