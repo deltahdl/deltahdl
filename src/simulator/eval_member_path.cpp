@@ -315,6 +315,18 @@ static bool FindStructRoot(std::string_view name, std::string& path,
 const StructTypeInfo* ContainerElementLayout(const Expr* base,
                                              SimContext& ctx) {
   if (base == nullptr) return nullptr;
+  // §7.4.2 with §7.2: an element of a multidimensional unpacked array of
+  // structures, `c[x][y]`, has the layout the array registers under its own
+  // name, whatever the indices before the last one are.
+  if (base->kind == ExprKind::kSelect) {
+    const Expr* root = base;
+    while (root != nullptr && root->kind == ExprKind::kSelect &&
+           root->index_end == nullptr) {
+      root = root->base;
+    }
+    if (root == nullptr || root->kind != ExprKind::kIdentifier) return nullptr;
+    return StructLayoutOfName(root->text, ctx);
+  }
   if (base->kind == ExprKind::kIdentifier) {
     // §8.11 with §23.9: in a method a property of the object is found ahead
     // of a variable of the module the class is declared in; a local of the
