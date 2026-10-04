@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -489,6 +490,40 @@ TEST(InterfaceModport, NestedInterfaceModportNamingOuterSignalIsError) {
                             "modport 'initiator' references 'x', which "
                             "interface 'illegal_i' does not declare",
                             5, "25.5"));
+}
+
+// §25.5 with §37.7: the elaborated interface carries the modports its
+// declaration wrote, in source order with their ports, so the VPI model a run
+// builds from the elaborated design can give each interface instance its
+// modport objects.
+TEST(InterfaceModportNames, AnElaboratedInterfaceCarriesItsModports) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface ifc;\n"
+      "  logic a, b;\n"
+      "  modport mp(input a, output b);\n"
+      "  modport mq(input b);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc i0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  const delta::RtlirModule* ifc = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(ifc, nullptr);
+  ASSERT_EQ(ifc->modports.size(), 2u);
+  EXPECT_EQ(ifc->modports[0]->name, "mp");
+  EXPECT_EQ(ifc->modports[0]->ports.size(), 2u);
+  EXPECT_EQ(ifc->modports[1]->name, "mq");
+}
+
+// A module declares no modports, and carries none.
+TEST(InterfaceModportNames, AnElaboratedModuleCarriesNoModports) {
+  ElabFixture f;
+  auto* design = Elaborate("module top;\nendmodule\n", f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->top_modules[0]->modports.empty());
 }
 
 }  // namespace

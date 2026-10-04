@@ -732,6 +732,9 @@ struct RtlirModule {
   // wants all three; elaboration validates them (Elaborator::
   // ValidateClockingBlock) and this is what lets the run have them at all.
   std::vector<ModuleItem*> clocking_blocks;
+  // §25.5 with §37.7: an interface's modport declarations, in source order;
+  // empty for every other kind of definition.
+  std::vector<const ModportDecl*> modports;
   // §16.15: the condition of the module's default disable iff declaration,
   // which §16.14.7's $inferred_disable returns within its scope; nullptr
   // where the module declares none.

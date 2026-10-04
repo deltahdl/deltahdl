@@ -147,6 +147,9 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   mod->is_interface = (decl->decl_kind == ModuleDeclKind::kInterface);
   mod->is_checker = (decl->decl_kind == ModuleDeclKind::kChecker);
+  if (mod->is_interface) {
+    mod->modports.assign(decl->modports.begin(), decl->modports.end());
+  }
   // Annex E: each of its directives applies to the modules that follow it,
   // so the values recorded at this module's header stand ahead of the unit's
   // last.
