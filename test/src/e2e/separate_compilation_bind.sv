@@ -35,10 +35,10 @@
 // continuous assignment and no process, and its one instantiation is the one
 // child.
 //
-// PrecompiledLibrary::Load in src/parser/precompiled_library.cpp reads a
-// compiled form back with the lexer and the parser alone, so this file carries
-// no compiler directive: nothing here needs the preprocessor a bind never
-// runs.
+// The precompile preprocesses this file and records the directive state
+// beside the preprocessed text, which PrecompiledLibrary::Load in
+// src/parser/precompiled_library.cpp applies as it reads the text back, so a
+// bind runs no preprocessor; this file needs none of that state.
 module separate_compilation_top;
   separate_compilation_leaf u();
 endmodule

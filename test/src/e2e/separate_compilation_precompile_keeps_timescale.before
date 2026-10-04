@@ -1,0 +1,4 @@
+--precompile-into
+ts_lib
+--precompile-out
+ts.lib

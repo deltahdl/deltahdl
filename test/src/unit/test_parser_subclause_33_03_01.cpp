@@ -377,4 +377,29 @@ TEST(LibraryMapIncludeStatement, IncludeWithoutPathIsRejected) {
   EXPECT_FALSE(errors.empty());
 }
 
+// §33.3.1 resolves a map's relative specification against the directory of
+// the map file, and one directory reached through a symbolic link is the same
+// directory reached directly. The map is loaded through a link to the scratch
+// directory and the source named through the directory itself, and the other
+// way about, so the two spellings meet on both sides. The test fails on a map
+// that resolves its own directory through the link but compares the source
+// path as written, which answers work.
+TEST(LibraryMapFileReading, SourceNamedThroughASymbolicLinkMatches) {
+  ScratchMapDir tmp;
+  tmp.Write("real/lib.map", "library rtlLib *.v;\n");
+  fs::path real = tmp.dir / "real";
+  fs::path link = tmp.dir / "link";
+  std::error_code ec;
+  fs::create_directory_symlink(real, link, ec);
+  ASSERT_FALSE(ec) << ec.message();
+
+  LibraryMap through_link;
+  ASSERT_TRUE(through_link.LoadMapFile(link / "lib.map"));
+  EXPECT_EQ(through_link.LibraryForFile((real / "top.v").string()), "rtlLib");
+
+  LibraryMap direct;
+  ASSERT_TRUE(direct.LoadMapFile(real / "lib.map"));
+  EXPECT_EQ(direct.LibraryForFile((link / "top.v").string()), "rtlLib");
+}
+
 }  // namespace

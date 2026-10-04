@@ -1,0 +1,4 @@
+test/src/e2e/separate_compilation_precompile_parse_error.sv:7:5: error: expected top-level declaration (§3.12.1)
+      %
+      ^
+could not precompile test/src/e2e/separate_compilation_precompile_parse_error.sv into sc_parse_error.lib

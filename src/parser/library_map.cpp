@@ -272,13 +272,28 @@ void LibraryMap::AddDeclaration(const LibraryDecl& decl,
   }
 }
 
+// §33.3.1 resolves a map's relative specification against the directory of
+// the map file, which LoadMapFileImpl takes through fs::weakly_canonical, so an
+// absolute source path is taken the same way before the two are compared: a
+// file named through a symbolic link to that directory is the file the
+// specification names. A relative path is compared as written.
+static std::string ComparedSourcePath(std::string_view path) {
+  namespace fs = std::filesystem;
+  fs::path written{std::string(path)};
+  if (!written.is_absolute()) return std::string(path);
+  std::error_code ec;
+  fs::path canon = fs::weakly_canonical(written, ec);
+  return ec ? std::string(path) : canon.string();
+}
+
 std::vector<const LibraryMap::Entry*> LibraryMap::EntriesClaiming(
     std::string_view path) const {
   SpecKind best = SpecKind::kDirectory;
   std::vector<const Entry*> claimants;
+  const std::string kCompared = ComparedSourcePath(path);
 
   for (const auto& e : entries_) {
-    if (!PathMatches(e.spec, e.base_dir, path)) continue;
+    if (!PathMatches(e.spec, e.base_dir, kCompared)) continue;
     SpecKind kind = ClassifySpec(e.spec);
     // A more specific specification settles the claim on its own, so the
     // specifications claiming the file less specifically drop out.

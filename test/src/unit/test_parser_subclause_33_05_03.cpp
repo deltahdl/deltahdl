@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "fixture_scratch_dir.h"
 #include "parser/ast_design.h"
 #include "parser/precompiled_library.h"
@@ -160,7 +161,7 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   ScratchDir tmp;
   auto path = tmp.dir / "truncated.dpl";
   std::ofstream os(path, std::ios::binary);
-  os.write("DPLIB001", 8);
+  os.write("DPLIB002", 8);
 
   unsigned char bad[4] = {0x10, 0x00, 0x00, 0x00};
   os.write(reinterpret_cast<const char*>(bad), 4);
@@ -223,6 +224,44 @@ TEST(SeparateCompilationTool, CellNamesListsTheDefinitions) {
   EXPECT_EQ(names[0], "adder");
   EXPECT_EQ(names[1], "top");
   EXPECT_EQ(names[2], "bus");
+}
+
+// §33.5.4 has the binding run read no source description, and §3.14.2.3 and
+// §22 give a design element the `timescale and `default_nettype in force at its
+// header, so a record carries the directive state the compile recorded and a
+// load applies it, with the modules `celldefine marked (§22.10). The test fails
+// on a record holding the text alone, which loads the module with none of it.
+TEST(SeparateCompilationTool, LoadAppliesTheRecordedDirectiveState) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  ModuleDirectives leaf;
+  leaf.module = "leaf";
+  leaf.has_timescale = true;
+  leaf.timescale.unit = TimeUnit::kUs;
+  leaf.timescale.magnitude = 10;
+  leaf.timescale.precision = TimeUnit::kNs;
+  leaf.timescale.prec_magnitude = 100;
+  leaf.default_nettype = NetType::kTri;
+  PrecompiledDirectives directives;
+  directives.modules.push_back(leaf);
+  directives.cell_modules.emplace_back("leaf");
+  ASSERT_TRUE(PrecompiledLibrary::Save("module leaf;\nendmodule\n", "rtlLib",
+                                       path, directives));
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  CompilationUnit target;
+  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
+  ASSERT_EQ(target.modules.size(), 1u);
+  const ModuleDecl* mod = target.modules[0];
+  EXPECT_TRUE(mod->has_directive_timescale);
+  EXPECT_EQ(mod->directive_timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(mod->directive_timescale.magnitude, 10);
+  EXPECT_EQ(mod->directive_timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(mod->directive_timescale.prec_magnitude, 100);
+  EXPECT_EQ(mod->default_nettype, NetType::kTri);
+  EXPECT_TRUE(mod->is_cell);
 }
 
 }  // namespace

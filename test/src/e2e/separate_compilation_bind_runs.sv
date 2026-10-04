@@ -9,9 +9,9 @@
 // and stopped, so the leaf's $display never ran and the invocation printed
 // nothing. Both invocations run in a temporary directory the runner makes.
 //
-// PrecompiledLibrary::Load in src/parser/precompiled_library.cpp reads a
-// compiled form back with the lexer and the parser alone, so this file carries
-// no compiler directive.
+// PrecompiledLibrary::Load in src/parser/precompiled_library.cpp reads the
+// compiled form back with the directive state the precompile recorded; this
+// file carries no compiler directive.
 module separate_compilation_runs_top;
   separate_compilation_runs_leaf #(.W(4)) u();
 endmodule

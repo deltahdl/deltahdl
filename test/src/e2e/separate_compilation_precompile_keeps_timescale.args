@@ -1,0 +1,4 @@
+--load-lib
+ts.lib
+--top
+sc_ts_top

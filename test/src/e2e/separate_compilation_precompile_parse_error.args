@@ -1,0 +1,4 @@
+--precompile-into
+sc_lib
+--precompile-out
+sc_parse_error.lib

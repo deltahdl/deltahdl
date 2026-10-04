@@ -21,7 +21,6 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -31,6 +30,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "driver/cli_options.h"
+#include "driver/precompile_run.h"
 #include "elaborator/command_line_bind.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -40,7 +40,6 @@
 #include "parser/ast_design.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
-#include "parser/precompiled_library.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
@@ -181,16 +180,7 @@ struct PreprocResult {
 PreprocResult PreprocessSources(const delta::CliOptions& opts,
                                 delta::SourceManager& src_mgr,
                                 delta::DiagEngine& diag) {
-  delta::PreprocConfig pp_config;
-  pp_config.include_dirs = opts.include_dirs;
-  pp_config.defines = opts.defines;
-  // §34.3 (printed page 949): a tool processing source text decrypts the
-  // decryption envelopes it meets with the key the user supplies, so the keys
-  // given on the command line are the ones a reading run opens them with, as
-  // an --encrypt run seals them under the same two.
-  pp_config.protect_key = opts.protect.exchange_key;
-  pp_config.protect_keys = opts.protect.keys;
-  delta::Preprocessor preproc(src_mgr, diag, std::move(pp_config));
+  delta::Preprocessor preproc(src_mgr, diag, delta::PreprocConfigFor(opts));
 
   PreprocResult result;
   for (const auto& path : opts.source_files) {
@@ -623,50 +613,6 @@ int RunEnvelopeEncryption(const delta::CliOptions& opts,
   return diag.HasErrors() ? 1 : 0;
 }
 
-// §33.5.3's separate compilation tool: the invocation that compiles source
-// descriptions into a library rather than binding a design. "It is essential
-// that library cells persist, and the compiled forms shall, therefore, exist
-// somewhere in the filesystem", which is what --precompile-out names and what a
-// later --load-lib reads.
-//
-// Both options are required together. A library name with nowhere to write it
-// leaves nothing that persists, and a file with no library name holds cells
-// belonging to no library, which §33.5.3 has a bind select from.
-int RunPrecompile(const delta::CliOptions& opts, delta::DiagEngine& diag) {
-  if (opts.precompile_library.empty() || opts.precompile_output.empty()) {
-    std::cerr << "--precompile-into and --precompile-out are used together\n";
-    return 1;
-  }
-  // §33.3.1 (printed page 937): "In the case where multiple modules with the
-  // same name are mapped to the same library in a single invocation of the
-  // compiler, then a warning shall be issued." The last is the one the library
-  // keeps (PrecompiledLibrary::Load); a cell written by an earlier invocation
-  // is recompiled rather than duplicated, and draws none.
-  std::unordered_set<std::string> written;
-  for (const auto& path : opts.source_files) {
-    auto content = ReadFile(path);
-    if (content.empty()) return 1;
-    for (const auto& name : delta::PrecompiledLibrary::CellNames(content)) {
-      if (written.insert(name).second) continue;
-      // Joined rather than std::format'ed: main shall throw nothing, and
-      // std::format is declared to throw format_error.
-      diag.Warning(delta::SourceLoc::None(),
-                   "'" + name + "' is compiled into library '" +
-                       opts.precompile_library +
-                       "' more than once in this invocation; the last one is "
-                       "kept",
-                   delta::Subclause("33.3.1"));
-    }
-    if (!delta::PrecompiledLibrary::Save(content, opts.precompile_library,
-                                         opts.precompile_output)) {
-      std::cerr << "could not precompile " << path << " into "
-                << opts.precompile_output << "\n";
-      return 1;
-    }
-  }
-  return diag.HasErrors() ? 1 : 0;
-}
-
 // §33.5.4's binding invocation: "the tool that actually does the binding only
 // needs to be given the lib.cell specification for the top-level cell(s) and/or
 // the config to be used. In this strategy, the config itself shall also be
@@ -730,7 +676,7 @@ bool RanStandaloneMode(const delta::CliOptions& opts,
     return true;
   }
   if (!opts.precompile_library.empty() || !opts.precompile_output.empty()) {
-    status = RunPrecompile(opts, diag);
+    status = delta::RunPrecompile(opts, src_mgr, diag);
     return true;
   }
   if (!opts.precompiled_libs.empty()) {

@@ -5,12 +5,25 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 class Arena;
 class DiagEngine;
 class SourceManager;
 struct CompilationUnit;
+
+// What a compile records beside the text of a source description: the
+// directive state the preprocessor carried to each design element's header --
+// its `timescale (§3.14.2.3), default net type and the rest (§22) -- and the
+// modules `celldefine marked (§22.10). A binding run reads no source
+// description and runs no preprocessor, so it applies these to the cells as
+// the compile that preprocessed the text applied them.
+struct PrecompiledDirectives {
+  std::vector<ModuleDirectives> modules;
+  std::vector<std::string> cell_modules;
+};
 
 // A file holding compiled cells, in a format and at a location this tool
 // chooses for itself. Compiling a source description writes the cells it
@@ -23,8 +36,11 @@ struct CompilationUnit;
 // one file or several, under one library name or several.
 class PrecompiledLibrary {
  public:
-  // Compiles `source` into library `library`, adding its cells to the file at
-  // `path` and creating that file if it is not there yet.
+  // Compiles `source`, the text the preprocessor produced for a source
+  // description, into library `library` with the directive state `directives`
+  // recorded beside it, adding its cells to the file at `path` and creating
+  // that file if it is not there yet. Nothing is reported: a caller that wants
+  // the parse errors of the source parses it itself first.
   //
   // Returns false, having written nothing that outlasts the call, when the
   // library name is empty (cells must go into some library), when the source
@@ -34,11 +50,13 @@ class PrecompiledLibrary {
   // A true return means the record is in the filesystem, not merely handed to
   // the stream.
   static bool Save(std::string_view source, std::string_view library,
-                   const std::filesystem::path& path);
+                   const std::filesystem::path& path,
+                   const PrecompiledDirectives& directives = {});
 
   // The names of the cells `source` declares in the definitions name space --
   // modules, interfaces, programs, checkers, primitives and configurations --
-  // in the order it declares them; none where it does not parse.
+  // in the order it declares them; none where it does not parse. Nothing is
+  // reported.
   static std::vector<std::string> CellNames(std::string_view source);
 
   // Reads every cell held at `path` into `target`, tagging each with the
