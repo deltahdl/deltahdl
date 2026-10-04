@@ -104,6 +104,7 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
 
 void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   AttachInstanceDefinitions(design);
+  AttachVariableFacts(design);
   // A continuous assignment's bit select is the bit made here, so the bits
   // come first.
   AttachVectorBits(design);

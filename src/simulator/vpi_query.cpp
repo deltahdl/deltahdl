@@ -7,7 +7,9 @@
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
+#include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
@@ -36,6 +38,14 @@ bool VpiGetProtectedRefused(int property, VpiHandle obj) {
 // falls back to the object's stored size for everything else.
 int VpiGetSize(VpiHandle obj) {
   if (obj->type == vpiGenScopeArray) return VpiGenScopeArraySize(obj);
+  // §37.17 detail 9: a queue's, dynamic array's or associative array's current
+  // number of elements, and a string var's current number of characters.
+  if (obj->queue != nullptr)
+    return static_cast<int>(obj->queue->elements.size());
+  if (obj->assoc != nullptr) return static_cast<int>(obj->assoc->Size());
+  if (obj->type == vpiStringVar && obj->var != nullptr) {
+    return static_cast<int>(obj->var->value.width / 8);
+  }
   if (obj->type == vpiContAssignBit) return 1;
   if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
   return obj->size;
@@ -184,6 +194,20 @@ int VpiGetConstantSelect(VpiHandle obj) {
   return VpiBitSelectConstantSelectOf(obj) ? 1 : 0;
 }
 
+// §37.17 detail 20: a variable's vpiScalar or vpiVector, as its declaration
+// made it when the run built its object; a var bit is a scalar. A port or net
+// answers by its width, and any other object FALSE.
+int VpiGetScalarOrVector(int property, VpiHandle obj) {
+  const bool kScalar = property == vpiScalar;
+  if (obj->type == vpiRegBit) return kScalar ? 1 : 0;
+  if (VpiIsVariablesType(obj->type)) {
+    return (kScalar ? obj->decl_scalar : obj->decl_vector) ? 1 : 0;
+  }
+  if (!VpiScalarVectorAppliesTo(obj->type)) return 0;
+  return (kScalar ? VpiPortScalar(obj->size) : VpiPortVector(obj->size)) ? 1
+                                                                         : 0;
+}
+
 // §37.83 and §37.10: the line of an attribute's or an instance's definition.
 int VpiGetDefLineNo(VpiHandle obj) {
   if (obj->type != vpiAttribute && !VpiIsInstanceType(obj->type)) {
@@ -222,13 +246,11 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     //
     // Any other object reports 0.
     case vpiScalar:
-      return VpiScalarVectorAppliesTo(obj->type) && VpiPortScalar(obj->size)
-                 ? 1
-                 : 0;
     case vpiVector:
-      return VpiScalarVectorAppliesTo(obj->type) && VpiPortVector(obj->size)
-                 ? 1
-                 : 0;
+      return VpiGetScalarOrVector(property, obj);
+    // §37.17 detail 21: an array var's kind of array; zero for any other.
+    case vpiArrayType:
+      return obj->array_type;
     case vpiConstantSelect:
       return VpiGetConstantSelect(obj);
     // §37.14 details 7 and 9: the port index gives port order; it does not
@@ -542,8 +564,10 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // figure draws and no application can read.
     case vpiMethod:
       return VpiBool(VpiTaskFuncIsMethod(obj));
+    // §37.17 and §37.28: a variable's or parameter's sign is its
+    // declaration's, recorded when the run built it.
     case vpiSigned:
-      return VpiBool(VpiFunctionIsSigned(obj));
+      return VpiBool(VpiFunctionIsSigned(obj) || obj->decl_signed);
     // §37.34: whether a constraint is virtual, as a Boolean property.
     case vpiVirtual:
       return VpiBool(obj->is_virtual);

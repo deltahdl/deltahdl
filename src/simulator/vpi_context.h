@@ -769,7 +769,8 @@ class VpiContext {
   void AttachModuleDefNames(SimContext& sim_ctx);
   // §37.10: every instance's object, each package's, and once the tops are
   // made what each instance holds (vpi_design_attach_instances.cpp): what it
-  // takes from its definition, its vectors' bits (§37.16, §37.17,
+  // takes from its definition, its variables' declared facts (§37.17,
+  // vpi_design_attach_vars.cpp), its vectors' bits (§37.16, §37.17,
   // vpi_design_attach_bits.cpp) and its continuous assignments (§37.47,
   // vpi_design_attach_assigns.cpp).
   void AttachInstanceObjects(const RtlirDesign* design);
@@ -778,6 +779,7 @@ class VpiContext {
   void AttachInstanceDefinitions(const RtlirDesign* design);
   void AttachVectorBits(const RtlirDesign* design);
   void AttachContinuousAssignments(const RtlirDesign* design);
+  void AttachVariableFacts(const RtlirDesign* design);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.

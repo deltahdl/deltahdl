@@ -11,6 +11,9 @@
 
 namespace delta {
 
+struct AssocArrayObject;
+struct QueueObject;
+
 struct VpiObject {
   int type = 0;
   // §38.11 hands this back as a C string: VpiNameStr in vpi_query_str.cpp
@@ -377,6 +380,18 @@ struct VpiObject {
   // array, so it reads this to confirm the target is a vpiStaticArray before
   // touching any element. Zero when the object is not an array.
   int array_type = 0;
+
+  // §37.17: what a variable's declaration says of it, recorded when a run
+  // builds its object: whether it is signed (§6.11), and its vpiScalar and
+  // vpiVector (detail 20).
+  bool decl_signed = false;
+  bool decl_scalar = false;
+  bool decl_vector = false;
+
+  // §37.17 detail 9: the run's store of a queue or dynamic array, and of an
+  // associative array, whose current element count is the variable's vpiSize.
+  QueueObject* queue = nullptr;
+  AssocArrayObject* assoc = nullptr;
 
   // §38.35: for a static unpacked array, the declared index values of each
   // unpacked dimension in left-to-right (declaration) order - so a[2:0][3:5]

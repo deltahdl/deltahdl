@@ -307,7 +307,13 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   if (var.is_event) {
     return var.num_unpacked_dims > 0 ? vpiNamedEventArray : vpiNamedEvent;
   }
-  if (var.num_unpacked_dims > 0) return vpiRegArray;
+  // §37.17 detail 1 with Table 36-10: an array of variables is one array var,
+  // whether its unpacked dimension is fixed or a queue's, a dynamic array's or
+  // an associative array's.
+  if (var.num_unpacked_dims > 0 || var.is_queue || var.is_dynamic ||
+      var.is_assoc) {
+    return vpiRegArray;
+  }
   // A name declared through a typedef reports kNamed, so the flags the
   // elaborator resolved through the typedef answer first for the kinds that
   // have one.
@@ -322,6 +328,9 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   if (var.is_real) return vpiRealVar;
   if (var.is_string) return vpiStringVar;
   if (var.is_chandle) return vpiChandleVar;
+  // A variable declared with an enum typedef reports kNamed; the enum it names
+  // makes it an enum var all the same.
+  if (!var.enum_type_name.empty()) return vpiEnumVar;
   switch (var.decl_kind) {
     case DataTypeKind::kInteger:
       return vpiIntegerVar;
@@ -343,6 +352,8 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
       return vpiStructVar;
     case DataTypeKind::kUnion:
       return vpiUnionVar;
+    case DataTypeKind::kVirtualInterface:
+      return vpiVirtualInterfaceVar;
     default:
       // §37.17 detail 19: a logic var and a reg are the same object kind, and
       // it is what a variable the clause draws no separate box for carries.
