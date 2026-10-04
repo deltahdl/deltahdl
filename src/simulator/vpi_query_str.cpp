@@ -596,7 +596,8 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   // vpiIsProtected properties are the exception - permitted for all objects -
   // so they fall through; any other property records the error and yields no
   // string.
-  if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
+  if (VpiReadSealed(*obj) && property != kVpiType &&
+      property != vpiIsProtected) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =

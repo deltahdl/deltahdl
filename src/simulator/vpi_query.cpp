@@ -27,7 +27,7 @@ namespace {
 // protected *expression* still permits vpiSize. Reports whether the (property,
 // obj) pair must be refused as a protected-access error.
 bool VpiGetProtectedRefused(int property, VpiHandle obj) {
-  return obj->is_protected && property != kVpiType &&
+  return VpiReadSealed(*obj) && property != kVpiType &&
          property != vpiIsProtected &&
          (property != kVpiSize || !VpiIsExprType(obj->type));
 }
@@ -761,7 +761,8 @@ PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
   // vpiUndefined. The vpiType and vpiIsProtected properties stay accessible for
   // every object, and a protected expression still permits vpiSize, mirroring
   // the carve-outs vpi_get() applies (§37.3.6, §37.59).
-  if (obj->is_protected && property != kVpiType && property != vpiIsProtected &&
+  if (VpiReadSealed(*obj) && property != kVpiType &&
+      property != vpiIsProtected &&
       (property != kVpiSize || !VpiIsExprType(obj->type))) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;

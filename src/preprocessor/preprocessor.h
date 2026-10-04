@@ -371,11 +371,15 @@ class Preprocessor {
   // envelope is open to hold it, and the two rules the subclause states about
   // where one may stand are reported here.
   //
-  // A viewport that states both and stands where it may is reported as well.
   // §34.5.32.2 leaves the access value an implementation-specific relaxation
-  // of protection, and this tool applies no protection for it to relax, so
-  // the expression is answered with a warning rather than acted on.
+  // of protection, so a value this tool does not define is reported as
+  // granting nothing. The viewports of a decryption envelope are kept, where
+  // it closes, in the SourceManager for the stages that know the objects they
+  // name.
   void ApplyViewport(const PragmaKeywordExpression& expr, SourceLoc loc);
+  // §34.5.32.2: the viewports of a decryption envelope closing here, recorded
+  // in the SourceManager with the sources its text was read into.
+  void RecordEnvelopeViewports();
   // What §34.5.28 and §34.5.29 have one protect pragma expression say about
   // the tool reading it. Each states a licence the tool is to obtain before it
   // decrypts a model or before it executes one, and the value naming that
@@ -598,11 +602,9 @@ class Preprocessor {
   // envelope, so what one describes goes away with the envelope it was written
   // in and is not offered to the next.
   //
-  // What they were described for is not done for them. Permitting access to
-  // one object rather than another needs the objects a decryption envelope
-  // seals to be sealed from a reader in the first place, and nothing here
-  // seals them, so this reads back what a text described and not what any
-  // reader of the design is then allowed. ApplyViewport reports that.
+  // What a decryption envelope's viewports are granted is decided later, where
+  // the objects they name are known; SourceManager::Viewports() carries them
+  // there once the envelope has closed.
   const std::vector<ProtectViewport>& ProtectViewports() const {
     return protect_viewports_;
   }
@@ -747,7 +749,14 @@ class Preprocessor {
   // "the current protected envelope", so the enclosing envelopes' viewports are
   // held here while an inner one is open and taken back when it closes.
   // protect_viewports_ above is the current envelope's alone.
-  std::vector<std::vector<ProtectViewport>> protect_viewport_stack_;
+  struct EnclosingViewports {
+    std::vector<ProtectViewport> viewports;
+    uint32_t envelope_source = 0;
+  };
+  std::vector<EnclosingViewports> protect_viewport_stack_;
+  // The source the data block of the decryption envelope in force recovered
+  // to, and 0 until that block is read.
+  uint32_t protect_envelope_source_ = 0;
   // What RuntimeLicenses() answers with.
   std::vector<ProtectRuntimeLicense> runtime_licenses_;
   // The decryption envelope depth at which a decrypt_license expression was

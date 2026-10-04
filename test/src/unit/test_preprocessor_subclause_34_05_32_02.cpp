@@ -33,37 +33,27 @@ using namespace delta;
 //
 // The second sentence is decided here only where no envelope is open at all,
 // which is the one case a reading can settle without knowing what the envelope
-// holds. Beyond that it is out of reach at this stage and is left so
-// deliberately: the preprocessor has no symbol table and never parses the
-// cleartext a data block recovers -- Preprocessor::TakeDataBlockValue in
-// src/preprocessor/preprocessor_protect_values.cpp appends that text to the
-// output and keeps no name out of it -- so nothing here can say whether
-// top.dut.mem is one of the objects the envelope contains. The phase that
-// resolves such a name is the elaborator, where HierPath in
-// src/elaborator/rtlir.h and Elaborator::CheckHierRefUndeclaredMember in
-// src/elaborator/elaborator_scope_rules_hier.cpp already do it.
+// holds. Beyond that it is out of reach at this stage: the preprocessor has no
+// symbol table, so nothing here can say whether a name is one of the objects
+// the envelope contains. A decryption envelope's viewports are kept in the
+// SourceManager where it closes, and the elaborator resolves and reports them
+// (ReportViewportsContainingNothing in src/elaborator/viewport_resolution.cpp).
 //
-// The third sentence is performed by nothing, and the last section here is
-// about the tool saying so. No access is permitted to anything, because
-// nothing downstream of the preprocessor is told a design element came out of
-// a protected envelope, so there is no protection of an object for a
-// relaxation to relax and every object is reachable already. This file holds
-// the value to two things: that it is carried as written, no spelling of it
-// being judged, which is what "implementation-specific" leaves open; and that
-// a text asking for a grant this tool does not make is told so rather than
-// left to assume it was made. #3284 records the grant itself.
+// The third sentence is this tool's to define, and the last section here is
+// about the reading's part of it: an access value this tool does not define is
+// reported as granting nothing, and the two it does define are not reported.
 
 namespace {
 
 // The object a source names and the access it asks for it. The object is
-// written as a hierarchical name because that is what an author names an
-// object of a sealed design by, and the access holds characters no keyword is
-// spelled with, so a value read back is the one the directive wrote.
-constexpr std::string_view kObject = "top.dut.mem";
+// written with more than one component, as a name of an item of a design
+// element the envelope declares is, and the access holds characters no keyword
+// is spelled with, so a value read back is the one the directive wrote.
+constexpr std::string_view kObject = "dut.mem";
 constexpr std::string_view kAccess = "read-only";
 
 // A second object of the same envelope, for the case describing two.
-constexpr std::string_view kOtherObject = "top.dut.ctrl";
+constexpr std::string_view kOtherObject = "dut.ctrl";
 
 // An access no part of the standard mentions. §34.5.32.2 leaves the value to
 // the implementation, so a reading that admitted a fixed list of spellings
@@ -87,10 +77,10 @@ constexpr std::string_view kClosesDecryption =
 constexpr std::string_view kNoEnvelope =
     "viewport expression stands in no protected envelope";
 
-// The message Preprocessor::ApplyViewport answers a viewport it does nothing
-// for with. The fragment is the sentence's opening rather than the whole of
-// it, the rest naming what a reader reaches instead.
-constexpr std::string_view kNotActedOn = "viewport expression is not acted on";
+// The message Preprocessor::ApplyViewport answers a viewport asking for an
+// access this tool does not define with. The fragment is the part naming the
+// rule rather than the whole of it, which also quotes the value asked for.
+constexpr std::string_view kGrantsNothing = "is not one this tool defines";
 
 // ---------------------------------------------------------------------------
 // The expression describes objects within the current protected envelope.
@@ -98,9 +88,9 @@ constexpr std::string_view kNotActedOn = "viewport expression is not acted on";
 
 // A viewport inside an open decryption envelope describes an object of it, and
 // the name comes back whole: §34.5.32.2 has the name specify an object
-// contained within the envelope, and an object of a sealed design is named by
-// the path that reaches it, so a reading keeping the last component alone
-// would describe a different object from the one asked for.
+// contained within the envelope, and an item of a design element the envelope
+// declares is named through that element, so a reading keeping the last
+// component alone would describe a different object from the one asked for.
 TEST(ProtectViewportDescription, ADecryptionEnvelopeIsDescribedByOneInside) {
   ReadingViewports reading(std::string(kOpensDecryption) +
                            ViewportOf(kObject, kAccess));
@@ -241,38 +231,44 @@ TEST(ProtectViewportDescription, AnAccessTheStandardNeverNamesIsCarriedToo) {
 }
 
 // ---------------------------------------------------------------------------
-// The relaxation this implementation does not perform.
+// The access values this implementation defines.
 // ---------------------------------------------------------------------------
 
-// A relaxation of protection needs a protection to relax, and this tool has
-// none. §34.2 says code contained within a decryption envelope is said to be
-// protected, and the property that withholds such an object from a reader is
-// VpiObject::is_protected in src/simulator/vpi_object.h, which no path from a
-// decryption envelope sets. So an object of a region this preprocessor
-// decrypted is reachable whether a viewport named it or not, and a text that
-// asked for one object to be reachable got every object instead.
-//
-// That is what Preprocessor::ApplyViewport in
-// src/preprocessor/preprocessor_protect_viewport.cpp answers a viewport with,
-// and the case names the report rather than counting one. It is a warning
-// because the expression breaks no rule of §34.5.32: it is the spelling
-// §34.5.32.1 defines, standing in an envelope as §34.5.32.2 requires, and
-// what goes unanswered is the grant rather than the writing.
-TEST(ProtectViewportDescription, AViewportIsAnsweredWithWhatWasNotDoneForIt) {
+// This tool defines two access values, "r" and "rw" (ViewportAccessOf in
+// src/common/envelope_viewport.h, listed in README.md), and a viewport asking
+// for either is granted it where the design's objects are attached, so the
+// reading has nothing to say about it.
+TEST(ProtectViewportDescription, AReadAccessDrawsNoReport) {
   ReadingViewports reading(std::string(kOpensDecryption) +
-                           ViewportOf(kObject, kAccess));
-  EXPECT_TRUE(
-      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 2, "34.5.32"));
+                           ViewportOf(kObject, "r"));
+  EXPECT_TRUE(reading.diag.Diagnostics().empty()) << reading.text;
+}
+
+// The second of the two.
+TEST(ProtectViewportDescription, AReadWriteAccessDrawsNoReport) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ViewportOf(kObject, "rw"));
+  EXPECT_TRUE(reading.diag.Diagnostics().empty()) << reading.text;
+}
+
+// Any other value relaxes nothing, and a text that asked for it is told so at
+// the viewport rather than left to assume it was granted. It is a warning
+// because the expression breaks no rule of §34.5.32: the value is left to the
+// implementation, and what goes unanswered is the grant rather than the
+// writing.
+TEST(ProtectViewportDescription, AnUndefinedAccessIsReportedAsGrantingNothing) {
+  ReadingViewports reading(std::string(kOpensDecryption) +
+                           ViewportOf(kObject, kOwnAccess));
+  EXPECT_TRUE(ReportedWarning(reading.diag.Diagnostics(), kGrantsNothing, 2,
+                              "34.5.32.2"));
 }
 
 // The other half of the report's severity: the expression is accepted. The
-// viewport is gathered as the cases above read it back and no error stands
-// against the text, so a producer's model still compiles. Without this the
-// case above would hold of a tool that turned the expression away, which
-// would refuse a source §34.5.32 permits.
-TEST(ProtectViewportDescription, TheAnswerLeavesTheViewportGathered) {
+// viewport is gathered and no error stands against the text, so a producer's
+// model still compiles.
+TEST(ProtectViewportDescription, TheReportLeavesTheViewportGathered) {
   ReadingViewports reading(std::string(kOpensDecryption) +
-                           ViewportOf(kObject, kAccess));
+                           ViewportOf(kObject, kOwnAccess));
   ASSERT_EQ(reading.Count(), 1U) << reading.text;
   EXPECT_FALSE(reading.diag.HasErrors());
 }
@@ -280,37 +276,33 @@ TEST(ProtectViewportDescription, TheAnswerLeavesTheViewportGathered) {
 // A protected envelope that asked for nothing is told nothing. The envelope
 // here carries a content keyword of its own, so the case says the report
 // follows the viewport rather than the protect pragma directive standing
-// inside an envelope: without the keyword it would be an empty envelope, and
-// an empty envelope is quiet whatever provokes the report.
+// inside an envelope.
 TEST(ProtectViewportDescription, AnEnvelopeAskingForNoAccessIsToldNothing) {
   ReadingViewports reading(std::string(kOpensDecryption) +
                            ProtectDirective("author = \"acme\""));
   EXPECT_TRUE(reading.diag.Diagnostics().empty()) << reading.text;
 }
 
-// §34.5.32.2 has each expression describe its own object, and each object is
-// one the reader reaches anyway, so each expression is answered. A report made
-// once for the envelope would satisfy the case above and leave the second
-// object's author believing that one was granted, which is why the two lines
-// are named separately here.
-TEST(ProtectViewportDescription, EachViewportIsAnsweredAtItsOwnLine) {
+// §34.5.32.2 has each expression describe its own object, so each one asking
+// for an access this tool does not define is answered at its own line.
+TEST(ProtectViewportDescription, EachUndefinedAccessIsReportedAtItsOwnLine) {
   ReadingViewports reading(std::string(kOpensDecryption) +
                            ViewportOf(kObject, kAccess) +
-                           ViewportOf(kOtherObject, kAccess));
-  EXPECT_TRUE(
-      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 2, "34.5.32"));
-  EXPECT_TRUE(
-      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 3, "34.5.32"));
+                           ViewportOf(kOtherObject, kOwnAccess));
+  EXPECT_TRUE(ReportedWarning(reading.diag.Diagnostics(), kGrantsNothing, 2,
+                              "34.5.32.2"));
+  EXPECT_TRUE(ReportedWarning(reading.diag.Diagnostics(), kGrantsNothing, 3,
+                              "34.5.32.2"));
 }
 
 // An expression standing in no envelope is reported under §34.5.32.2 and stops
 // there, the object it named being contained in nothing. So the two reports
 // are alternatives rather than a pair: a text told its viewport describes no
-// envelope is not also told what would have been granted had it described one.
+// envelope is not also told what its access would have granted.
 TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeIsNotAnsweredTwice) {
-  ReadingViewports reading(ViewportOf(kObject, kAccess));
-  EXPECT_FALSE(
-      ReportedWarning(reading.diag.Diagnostics(), kNotActedOn, 1, "34.5.32"));
+  ReadingViewports reading(ViewportOf(kObject, kOwnAccess));
+  EXPECT_FALSE(ReportedWarning(reading.diag.Diagnostics(), kGrantsNothing, 1,
+                               "34.5.32.2"));
 }
 
 // §34.2 permits the nesting -- "Decryption envelopes may contain other

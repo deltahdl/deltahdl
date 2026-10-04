@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/envelope_viewport.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_user.h"
 
@@ -89,6 +90,11 @@ struct VpiObject {
   // otherwise specified, accessing a protected object's properties is an error;
   // vpiType and vpiIsProtected are the permitted exceptions.
   bool is_protected = false;
+  // §34.5.32.2: what a viewport of the envelope sealing this object relaxes of
+  // that protection. kRead lets its properties, relationships and value be
+  // read, and kReadWrite its value be written as well; vpiIsProtected still
+  // reports TRUE.
+  ViewportAccess viewport_access = ViewportAccess::kNone;
 
   // §38.12: whether this callback object stands in for a user-defined system
   // task or system function. When true, `index` selects the registration
@@ -767,6 +773,17 @@ struct VpiObject {
   // null and vpiWith reports NULL.
   VpiObject* nettype_with = nullptr;
 };
+
+// §37.3.6, relaxed by §34.5.32.2: whether reading the properties,
+// relationships or value of `obj` is refused.
+inline bool VpiReadSealed(const VpiObject& obj) {
+  return obj.is_protected && obj.viewport_access == ViewportAccess::kNone;
+}
+
+// And whether writing its value is.
+inline bool VpiWriteSealed(const VpiObject& obj) {
+  return obj.is_protected && obj.viewport_access != ViewportAccess::kReadWrite;
+}
 
 // The simulator's handle is a pointer to the object it models. Annex K's
 // vpiHandle is a PLI_UINT32*, an opaque pointer a PLI application cannot look

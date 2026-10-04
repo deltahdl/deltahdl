@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -430,6 +431,8 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateModports();
 
   ValidateSpecifyBlocks();
+
+  ReportViewportsContainingNothing(*unit_, diag_);
 
   RegisterCuScopeItems();
 

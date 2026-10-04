@@ -500,7 +500,7 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
   // §37.3.6: an object a decryption envelope sealed gives up no value; the
   // caller's buffer is left as it was.
-  if (obj->is_protected) {
+  if (VpiReadSealed(*obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
@@ -753,7 +753,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
                                s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
   // §37.3.6: nor is a value written to one; nothing is scheduled.
-  if (obj->is_protected) {
+  if (VpiWriteSealed(*obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =

@@ -3,6 +3,8 @@
 #include <string>
 #include <string_view>
 
+#include "common/source_loc.h"
+
 namespace delta {
 
 // §34.5.32 answers what a protected envelope lets a tool look at.
@@ -42,6 +44,8 @@ struct ProtectViewport {
   // against empty strings, and the first of those is not a viewport at all
   // while the second is one describing an object with no name.
   bool stated = false;
+  // Where the expression was written.
+  SourceLoc loc;
 };
 
 // The viewport a pragma_value states, and an unstated one where the value is

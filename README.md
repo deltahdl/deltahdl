@@ -52,6 +52,17 @@ deltahdl [options] <source-files...>
 | `--retime` | Enable register retiming |
 | `--dump-aig` | Print AIG to stdout |
 
+### Viewport Access Values
+
+A decryption envelope's `viewport` pragma expression (IEEE 1800-2023 §34.5.32) names an object of the envelope and an access value that relaxes the object's protection. The standard leaves the access values to the implementation; DeltaHDL defines two:
+
+| Access | Effect on the named object |
+| --- | --- |
+| `"r"` | A VPI application reads its properties, relationships and value as for an unprotected object, and reaches it by name through the protected scopes holding it. `vpiIsProtected` still reports TRUE. |
+| `"rw"` | Everything `"r"` allows, and its value can be written. |
+
+Any other access value draws a warning and grants nothing. The object name is resolved against the envelope's own declarations from the scope the envelope stands in. Use `"q"` for an item the envelope declares directly. Use `"secret.q"` for an item of a design element `secret` that the envelope declares; this names `q` in every instance of `secret`. A name that resolves to no declaration in the envelope is an error.
+
 ### Examples
 
 Simulate a design with VCD output:

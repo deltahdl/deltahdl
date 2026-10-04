@@ -119,7 +119,7 @@ bool ValidatePutValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                                   int* index_p, long long* out_start_ordinal,
                                   s_vpi_error_info* err) {
   // §37.3.6: nor is a value written to an object a decryption envelope sealed.
-  if (obj->is_protected) {
+  if (VpiWriteSealed(*obj)) {
     return RecordArrayError(
         err, "vpi_put_value_array() on a protected object is an error");
   }
@@ -345,7 +345,7 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                                   int* index_p, long long* out_start_ordinal,
                                   const char** out_err_msg) {
   // §37.3.6: an object a decryption envelope sealed gives up no value.
-  if (obj->is_protected) {
+  if (VpiReadSealed(*obj)) {
     *out_err_msg = "vpi_get_value_array() on a protected object is an error";
     return false;
   }

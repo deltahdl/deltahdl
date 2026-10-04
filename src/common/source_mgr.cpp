@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/envelope_viewport.h"
 #include "common/source_loc.h"
 
 namespace delta {
@@ -93,6 +94,18 @@ bool SourceManager::IsProtected(SourceLoc loc) const {
   SourceLoc at = ResolveToOrigin(loc);
   if (at.file_id == 0 || at.file_id > files_.size()) return false;
   return files_[at.file_id - 1].is_protected;
+}
+
+void SourceManager::AddViewport(EnvelopeViewport viewport) {
+  viewports_.push_back(std::move(viewport));
+}
+
+bool SourceManager::StandsInEnvelope(SourceLoc loc,
+                                     const EnvelopeViewport& viewport) const {
+  if (!loc.IsValid()) return false;
+  const uint32_t kFile = ResolveToOrigin(loc).file_id;
+  return kFile != 0 && kFile >= viewport.first_source &&
+         kFile <= viewport.last_source;
 }
 
 void SourceManager::ComputeLineOffsets(FileEntry& entry) {

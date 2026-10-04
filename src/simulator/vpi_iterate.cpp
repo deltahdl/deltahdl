@@ -855,7 +855,7 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // carves out one exception: a protected system task or function call shall
   // still allow iteration over its vpiArgument relation. Every other protected
   // iteration is still refused.
-  if (ref && ref->is_protected && !kModes.tf_argument) return nullptr;
+  if (ref && VpiReadSealed(*ref) && !kModes.tf_argument) return nullptr;
 
   // §37.72 detail 2: a default case item has no condition expression, so
   // iterating its match expressions (vpi_iterate(vpiExpr, item)) returns NULL.

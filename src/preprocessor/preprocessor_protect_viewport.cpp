@@ -1,7 +1,9 @@
+#include <string>
 #include <string_view>
 #include <utility>
 
 #include "common/diagnostic.h"
+#include "common/envelope_viewport.h"
 #include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
@@ -27,9 +29,14 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
   // takes the enclosing one back.
   if (OpensEncryptionEnvelope(expr.keyword, expr.has_value) ||
       OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
-    protect_viewport_stack_.push_back(std::move(protect_viewports_));
+    protect_viewport_stack_.push_back(
+        {std::move(protect_viewports_), protect_envelope_source_});
     protect_viewports_.clear();
+    protect_envelope_source_ = 0;
     return;
+  }
+  if (ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
+    RecordEnvelopeViewports();
   }
   if (ClosesEncryptionEnvelope(expr.keyword, expr.has_value) ||
       ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
@@ -38,9 +45,11 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
     // envelope, which describes nothing.
     if (protect_viewport_stack_.empty()) {
       protect_viewports_.clear();
+      protect_envelope_source_ = 0;
       return;
     }
-    protect_viewports_ = std::move(protect_viewport_stack_.back());
+    protect_viewports_ = std::move(protect_viewport_stack_.back().viewports);
+    protect_envelope_source_ = protect_viewport_stack_.back().envelope_source;
     protect_viewport_stack_.pop_back();
     return;
   }
@@ -68,23 +77,34 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                 Subclause("34.5.32.2"));
     return;
   }
-  // §34.5.32.2 asks for an access it does not define: the access value is an
-  // implementation-specific relaxation of protection, and what it relaxes is
-  // the protection §37.3.6 gives an object sealed in a decryption envelope,
-  // whose properties a VPI application may read none of. This tool seals each
-  // such object (VpiObject::is_protected in src/simulator/vpi_object.h, set
-  // where the design's objects are attached) and defines no access value that
-  // relaxes the seal, so the object a viewport names stays as sealed as the
-  // rest. The expression is reported for that reason: a text that named one
-  // object to be reachable is entitled to hear that it is not. #3284 carries
-  // what would replace the report: access values written down and acted on.
-  diag_.Warning(loc,
-                "protect pragma viewport expression is not acted on: this "
-                "tool defines no access value that relaxes the protection of "
-                "a decryption envelope's objects, so the object the viewport "
-                "names stays protected",
-                Subclause("34.5.32"));
+  // §34.5.32.2: the access value is an implementation-specific relaxation of
+  // protection, and this tool defines two (see ViewportAccessOf in
+  // src/common/envelope_viewport.h). A text asking for any other is told that
+  // it is granted nothing rather than left to assume it was.
+  if (ViewportAccessOf(viewport.access) == ViewportAccess::kNone) {
+    diag_.Warning(loc,
+                  "protect pragma viewport access \"" + viewport.access +
+                      "\" is not one this tool defines (\"r\" or \"rw\"), "
+                      "so the object the viewport names stays protected",
+                  Subclause("34.5.32.2"));
+  }
+  viewport.loc = loc;
   protect_viewports_.push_back(std::move(viewport));
+}
+
+void Preprocessor::RecordEnvelopeViewports() {
+  // §34.5.32.2 requires a viewport's object to be contained within its
+  // envelope, and §34.4 makes the envelope a lexical region: the text its data
+  // block recovered to and the text of every envelope and file read inside
+  // that. They were registered from the data block on, so they are the sources
+  // from it to the last one registered. An envelope whose block was never read
+  // -- refused a licence, or never written -- recovered to no text, so its
+  // viewports describe nothing a later stage could find.
+  if (protect_envelope_source_ == 0) return;
+  for (const ProtectViewport& viewport : protect_viewports_) {
+    src_mgr_.AddViewport({viewport.object, viewport.access, viewport.loc,
+                          protect_envelope_source_, src_mgr_.LastFileId()});
+  }
 }
 
 }  // namespace delta

@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/envelope_viewport.h"
 #include "common/source_loc.h"
 
 namespace delta {
@@ -49,6 +50,19 @@ class SourceManager {
   void MarkProtected(uint32_t file_id);
   bool IsProtected(SourceLoc loc) const;
 
+  // The id the most recently registered source was given, and 0 before any.
+  uint32_t LastFileId() const { return static_cast<uint32_t>(files_.size()); }
+
+  // §34.5.32.2: the viewports of the decryption envelopes a reading closed,
+  // in the order it closed them, for the stages that resolve the objects they
+  // name and grant the access they ask.
+  void AddViewport(EnvelopeViewport viewport);
+  const std::vector<EnvelopeViewport>& Viewports() const { return viewports_; }
+
+  // Whether `loc` stands in, or comes from, the text of the envelope
+  // `viewport` describes.
+  bool StandsInEnvelope(SourceLoc loc, const EnvelopeViewport& viewport) const;
+
  private:
   struct FileEntry {
     std::string path;
@@ -68,6 +82,7 @@ class SourceManager {
   // std::string small-string optimization would move and dangle those views on
   // the next AddFile. A deque never relocates existing elements on push_back.
   std::deque<FileEntry> files_;
+  std::vector<EnvelopeViewport> viewports_;
 };
 
 }  // namespace delta

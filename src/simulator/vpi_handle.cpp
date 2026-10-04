@@ -6,7 +6,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/envelope_viewport.h"
 #include "simulator/vpi_user.h"
+
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -80,29 +82,22 @@ VpiHandle ResolveNamePathComponent(
   return nullptr;
 }
 
-// §38.21: resolve one path component during a hierarchical name lookup and
-// enforce the protected-scope rule on it. Returns the resolved handle for the
-// component, or null when the component names nothing or when descending into
-// an intermediate protected object would be required (the latter records an
-// error via the supplied error slot). The handle is null on every failure path,
-// so the caller stops the walk whenever this returns null.
-VpiHandle ResolveNamePathStep(
-    const NamePathStep& step,
-    const std::unordered_map<std::string_view, VpiObject*>& object_map,
-    s_vpi_error_info& err) {
-  VpiHandle next = ResolveNamePathComponent(step, object_map);
-  if (next == nullptr) return nullptr;
-
-  // §38.21: a hierarchical name that passes through a protected scope is an
-  // error - an intermediate component naming a protected object cannot be
-  // descended into to reach a deeper object.
-  if (!step.is_last && next->is_protected) {
-    SetVpiHandleError(err,
-                      "vpi_handle_by_name() through a protected scope is an "
-                      "error");
-    return nullptr;
+// §38.21: a hierarchical name that passes through a protected scope is an
+// error - an intermediate component naming a protected object cannot be
+// descended into to reach a deeper object - unless what the name reaches is an
+// object a viewport opened (§34.5.32.2), which is reached through the scopes
+// sealing it.
+bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
+  if (path.empty()) return false;
+  const VpiHandle kReached = path.back();
+  if (kReached != nullptr &&
+      kReached->viewport_access != ViewportAccess::kNone) {
+    return false;
   }
-  return next;
+  for (size_t i = 0; i + 1 < path.size(); ++i) {
+    if (VpiReadSealed(*path[i])) return true;
+  }
+  return false;
 }
 
 }  // namespace
@@ -113,7 +108,7 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   // §38.21: a protected object cannot serve as the search scope. Unless
   // otherwise specified, asking for a handle relative to a protected scope is
   // an error; record it and return no handle.
-  if (scope != nullptr && scope->is_protected) {
+  if (scope != nullptr && VpiReadSealed(*scope)) {
     SetVpiHandleError(
         last_error_, "vpi_handle_by_name() with a protected scope is an error");
     return nullptr;
@@ -123,13 +118,21 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   // component at a time from the leftmost (outermost) scope to the rightmost.
   std::vector<std::string_view> parts = VpiNamePathComponents(name);
 
+  std::vector<VpiHandle> path;
   VpiHandle current = nullptr;
   for (size_t i = 0; i < parts.size(); ++i) {
     bool is_last = (i + 1 == parts.size());
     NamePathStep step{current, scope, parts[i], is_last};
-    VpiHandle next = ResolveNamePathStep(step, object_map_, last_error_);
-    if (next == nullptr) return nullptr;
-    current = next;
+    current = ResolveNamePathComponent(step, object_map_);
+    if (current == nullptr) break;
+    path.push_back(current);
+  }
+  if (current == nullptr) path.push_back(nullptr);
+  if (PassesThroughSealedScope(path)) {
+    SetVpiHandleError(last_error_,
+                      "vpi_handle_by_name() through a protected scope is an "
+                      "error");
+    return nullptr;
   }
 
   if (current == nullptr) return nullptr;
@@ -175,7 +178,7 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   // §38.19: unless otherwise specified, calling vpi_handle_by_index() for a
   // protected reference object is an error. Record it (§38.2) and hand back a
   // null handle.
-  if (parent->is_protected) {
+  if (VpiReadSealed(*parent)) {
     SetVpiHandleError(
         last_error_, "vpi_handle_by_index() on a protected object is an error");
     return nullptr;
@@ -202,7 +205,7 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
   // §38.20: as with vpi_handle_by_index(), calling vpi_handle_by_multi_index()
   // for a protected reference object is an error unless otherwise specified.
   // Record it (§38.2) and hand back a null handle.
-  if (parent->is_protected) {
+  if (VpiReadSealed(*parent)) {
     SetVpiHandleError(
         last_error_,
         "vpi_handle_by_multi_index() on a protected object is an error");
@@ -893,7 +896,7 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // §38.18: unless otherwise specified, asking vpi_handle() for an object
   // related to a protected reference object is an error. Record it and hand
   // back a null handle.
-  if (ref->is_protected) {
+  if (VpiReadSealed(*ref)) {
     SetVpiHandleError(last_error_,
                       "vpi_handle() on a protected object is an error");
     return nullptr;

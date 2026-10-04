@@ -523,6 +523,8 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   // §37.3.6: what is read out of this source is code the envelope contained,
   // so every object declared in it is protected.
   src_mgr_.MarkProtected(block_id);
+  // §34.5.32.2: the envelope a viewport of it describes is this text.
+  protect_envelope_source_ = block_id;
   size_t origins = line_origins_.size();
   std::string recovered = ProcessSource(cleartext, block_id, depth);
   // §34.5.28.2: a decrypt_license the recovered text carried was refused, so
