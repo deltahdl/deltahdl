@@ -804,17 +804,25 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
   return false;
 }
 
+// §37.3.6: nor is a value written to an object a decryption envelope sealed;
+// the error is recorded and nothing is scheduled.
+static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
+  if (!VpiWriteSealed(obj)) return false;
+  RecordVpiError(error, "vpi_put_value() on a protected object is an error");
+  return true;
+}
+
+// The object a value put to `obj` is written to: `obj` itself, or for a
+// varying bit (§37.16, §37.17) the bit its index selects, null when it selects
+// none and nothing is written (§11.5.1).
+static VpiHandle PutValueTargetOf(VpiHandle obj) {
+  return IsVaryingBit(*obj) ? VaryingBitTarget(obj) : obj;
+}
+
 VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
                                s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
-  // §37.3.6: nor is a value written to one; nothing is scheduled.
-  if (VpiWriteSealed(*obj)) {
-    last_error_.state = kVpiPLI;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        VpiText("vpi_put_value() on a protected object is an error");
-    return nullptr;
-  }
+  if (PutValueIsSealed(*obj, last_error_)) return nullptr;
 
   if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;
 
@@ -833,12 +841,8 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
-  // §37.16, §37.17: a value put to a varying bit is put to the bit its index
-  // selects, and with none selected nothing is written (§11.5.1).
-  if (IsVaryingBit(*obj)) {
-    obj = VaryingBitTarget(obj);
-    if (obj == nullptr) return nullptr;
-  }
+  obj = PutValueTargetOf(obj);
+  if (obj == nullptr) return nullptr;
 
   bool has_delay = PutValueHasDelay(mode, time);
 

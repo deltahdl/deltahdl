@@ -127,10 +127,12 @@ TEST_F(VariableSelectObject, ASelectOfASelectIsNotAConstantSelect) {
   EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
-// The property belongs to the var select. An object of another kind reports 0
-// here, its own clause owning what a constant selection means for it.
-TEST_F(VariableSelectObject, TheRuleAnswersForAVarSelectAlone) {
-  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&array_)), 0);
+// The rule is the var select's. The array it selects into is answered by its
+// own clause instead: §37.17 detail 27 makes a variable of static lifetime with
+// no parent a constant select, which the var select's rule, wanting a parent
+// that is an unpacked array, would never make it.
+TEST_F(VariableSelectObject, TheArrayIsAnsweredByTheVariablesRule) {
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&array_)), 1);
 }
 
 // The figure's vpiIndex relation, which §37.4.3 walks with vpi_iterate() and
