@@ -497,9 +497,9 @@ def test_running_the_package_as_a_module_calls_main(
     assert calls_made_by_running_as_a_module(rst) == ["main"]
 
 
-def test_copies_the_case_files_into_the_working_directory(
+def _run_with_case_files(
     rst: ModuleType, tmp_path: Path,
-) -> None:
+) -> tuple[tuple[bool, str], dict[str, str]]:
     supplied = tmp_path / "supplied.files"
     (supplied / "nested").mkdir(parents=True)
     (supplied / "lib.map").write_text("library rtlLib *.v;\n")
@@ -523,9 +523,27 @@ def test_copies_the_case_files_into_the_working_directory(
     expected_path.write_text("ran\n")
     with patch.object(rst.subprocess, "run", side_effect=fake_run):
         outcome: tuple[bool, str] = rst.run_test(sv, expected_path)
+    return outcome, seen
 
-    assert outcome == (True, "")
-    assert seen["map"] == "library rtlLib *.v;\n"
+
+def test_a_case_with_case_files_passes(rst: ModuleType, tmp_path: Path) -> None:
+    assert _run_with_case_files(rst, tmp_path)[0] == (True, "")
+
+
+def test_copies_a_case_file_into_the_working_directory(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    assert _run_with_case_files(rst, tmp_path)[1]["map"] == "library rtlLib *.v;\n"
+
+
+def test_copies_a_nested_case_file_into_the_working_directory(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    seen = _run_with_case_files(rst, tmp_path)[1]
     assert seen["leaf"] == "module leaf; endmodule\n"
-    assert Path(seen["cwd"]) != supplied
-    assert not Path(seen["cwd"]).exists()
+
+
+def test_the_working_directory_holding_case_files_is_removed(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    assert not Path(_run_with_case_files(rst, tmp_path)[1]["cwd"]).exists()
