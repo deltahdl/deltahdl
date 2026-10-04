@@ -645,5 +645,42 @@ TEST(ScopePublic, AStatementInNoScopeReachesNone) {
   SetGlobalVpiContext(nullptr);
 }
 
+// §9.3.5: a label on a statement other than a block creates a named begin
+// around it, which D1 makes a scope, and the procedure runs that begin.
+TEST_F(BlockScopesOfARun, ALabelOnAStatementCreatesANamedBegin) {
+  Run("module top; event e; initial trig: -> e; endmodule\n");
+  vpiHandle trig = By("top.trig");
+  ASSERT_NE(trig, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, trig), vpiNamedBegin);
+  EXPECT_EQ(FullName(trig), "top.trig");
+  EXPECT_EQ(KindsOf(vpiEventStmt, trig), std::vector<int>{vpiEventStmt});
+  vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, vpi_scan(it))), VpiObjectOf(trig));
+}
+
+// §9.3.5: a label on a for loop that declares no variable creates a named
+// begin around it like any other statement's.
+TEST_F(BlockScopesOfARun, ALabelOnAPlainForLoopCreatesANamedBegin) {
+  Run("module top; int j; initial ln: for (j = 0; j < 1; j++) ; endmodule\n");
+  vpiHandle ln = By("top.ln");
+  ASSERT_NE(ln, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, ln), vpiNamedBegin);
+}
+
+// §9.3.5: a label on a foreach loop, or on a for loop declaring its variables,
+// names the block the loop itself creates, so no named begin stands around it.
+TEST_F(BlockScopesOfARun, ALabelOnAScopedLoopCreatesNoNamedBegin) {
+  Run("module top; int a [2];\n"
+      "  initial lf: foreach (a[i]) a[i] = i;\n"
+      "  initial ld: for (int i = 0; i < 1; i++) ;\n"
+      "endmodule\n");
+  for (const std::string& name : std::vector<std::string>{"top.lf", "top.ld"}) {
+    vpiHandle loop = By(name);
+    EXPECT_TRUE(loop == nullptr || vpi_get(vpiType, loop) != vpiNamedBegin)
+        << name;
+  }
+}
+
 }  // namespace
 }  // namespace delta

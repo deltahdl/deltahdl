@@ -103,19 +103,28 @@ std::string_view EventTriggerTargetName(const Stmt& stmt) {
   return target->text;
 }
 
-// §37.62: the event statement a trigger stands as, hung from the scope it is
-// written in (§37.12 with §37.63), which is what its vpiScope reads and what
-// §38.36.1.3 reads a module's statements off.
+// §37.60: the object an atomic statement of `type` stands as, hung from the
+// scope it is written in (§37.12 with §37.63), which is what its vpiScope reads
+// and what §38.36.1.3 reads a module's statements off, its label its vpiName.
+VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
+                               const BlockParent& parent,
+                               const BodyWalk& walk) {
+  VpiObject* obj = walk.build.alloc();
+  obj->type = type;
+  obj->parent = parent.scope;
+  obj->process = walk.process;
+  if (!stmt.label.empty()) obj->name = walk.build.keep(std::string(stmt.label));
+  parent.scope->children.push_back(obj);
+  return obj;
+}
+
+// §37.62: the event statement a trigger stands as.
 VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
                               const BodyWalk& walk) {
-  VpiObject* obj = walk.build.alloc();
-  obj->type = vpiEventStmt;
+  VpiObject* obj = MakeAtomicStatement(stmt, vpiEventStmt, parent, walk);
   // §9.7.2: "->" is the blocking event trigger and "->>" the nonblocking one,
   // which is the whole of what the property distinguishes.
   obj->blocking = stmt.kind == StmtKind::kEventTrigger;
-  obj->parent = parent.scope;
-  obj->process = walk.process;
-  parent.scope->children.push_back(obj);
   // The figure's single arrow, which the generic one-to-one traversal walks by
   // the kind of the child: the named event object the design already carries
   // for the declaration, not a second one standing for the same event.
@@ -125,6 +134,53 @@ VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
       FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, kTarget));
   if (event != nullptr) obj->children.push_back(event);
   return obj;
+}
+
+// §37.60: the kind of an atomic statement that carries nothing but its label,
+// 0 for a statement of another kind.
+int BareAtomicKind(StmtKind kind) {
+  switch (kind) {
+    case StmtKind::kBreak:
+      return vpiBreak;
+    case StmtKind::kContinue:
+      return vpiContinue;
+    case StmtKind::kNull:
+      return vpiNullStmt;
+    default:
+      return 0;
+  }
+}
+
+// §9.3.5: whether the label on `stmt` creates a named begin around it. A label
+// on a begin or fork is the block's name, and one on a foreach loop, or on a
+// for loop declaring its variables, names the block the loop creates; on any
+// other statement it creates a named begin-end block of its own.
+bool LabelCreatesNamedBegin(const Stmt& stmt) {
+  if (stmt.label.empty() || stmt.kind == StmtKind::kBlock ||
+      stmt.kind == StmtKind::kFork || stmt.kind == StmtKind::kForeach) {
+    return false;
+  }
+  return stmt.kind != StmtKind::kFor || stmt.for_init_types.empty() ||
+         stmt.for_init_types.front().kind == DataTypeKind::kImplicit;
+}
+
+// A scope object of `kind` hung from the scope around it, named `label` under
+// the path the scope extends, which `path` is set to.
+VpiObject* MakeScopeObject(int kind, std::string_view label,
+                           const BlockParent& parent, const BodyWalk& walk,
+                           std::string& path) {
+  VpiObject* scope = walk.build.alloc();
+  scope->type = kind;
+  scope->parent = parent.scope;
+  scope->process = walk.process;
+  path = parent.path;
+  if (!label.empty()) {
+    scope->name = walk.build.keep(std::string(label));
+    path += "." + std::string(label);
+    scope->full_name = path;
+  }
+  parent.scope->children.push_back(scope);
+  return scope;
 }
 
 VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
@@ -141,39 +197,46 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
 // the scope around it, with the variables it declares.
 VpiObject* MakeBlockScope(const Stmt& stmt, int kind, const BlockParent& parent,
                           const BodyWalk& walk) {
-  VpiObject* block = walk.build.alloc();
-  block->type = kind;
-  block->parent = parent.scope;
-  block->process = walk.process;
-  std::string path = parent.path;
-  if (!stmt.label.empty()) {
-    block->name = walk.build.keep(std::string(stmt.label));
-    path += "." + std::string(stmt.label);
-    block->full_name = path;
-  }
+  std::string path;
+  VpiObject* block = MakeScopeObject(kind, stmt.label, parent, walk, path);
   if (stmt.kind == StmtKind::kFork) {
     block->join_type = JoinTypeOf(stmt.join_kind);
   }
-  parent.scope->children.push_back(block);
   MakeBlockVariables(block, stmt, path, walk.build);
   WalkSubStmts(stmt, BlockParent{block, path}, walk);
   return block;
 }
 
-// The object `stmt` stands as, made with the objects it holds; null for a
-// statement of a kind the run builds no object for, whose contents are walked
-// all the same.
+// The object `stmt` itself stands as, made with the objects it holds; null for
+// a statement of a kind the run builds no object for, whose contents are
+// walked all the same.
+VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
+                          const BodyWalk& walk) {
+  if (stmt.kind == StmtKind::kEventTrigger ||
+      stmt.kind == StmtKind::kNbEventTrigger) {
+    return MakeEventStatement(stmt, parent, walk);
+  }
+  const int kAtomic = BareAtomicKind(stmt.kind);
+  if (kAtomic != 0) return MakeAtomicStatement(stmt, kAtomic, parent, walk);
+  const int kScope = BlockScopeKind(stmt);
+  if (kScope != 0) return MakeBlockScope(stmt, kScope, parent, walk);
+  WalkSubStmts(stmt, parent, walk);
+  return nullptr;
+}
+
+// The object `stmt` stands as: the named begin its label creates around it
+// (§9.3.5), holding what the statement itself stands as, or that object alone.
 VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
                     const BodyWalk& walk) {
   if (stmt == nullptr) return nullptr;
-  if (stmt->kind == StmtKind::kEventTrigger ||
-      stmt->kind == StmtKind::kNbEventTrigger) {
-    return MakeEventStatement(*stmt, parent, walk);
+  if (!LabelCreatesNamedBegin(*stmt)) {
+    return WalkStmtItself(*stmt, parent, walk);
   }
-  const int kKind = BlockScopeKind(*stmt);
-  if (kKind != 0) return MakeBlockScope(*stmt, kKind, parent, walk);
-  WalkSubStmts(*stmt, parent, walk);
-  return nullptr;
+  std::string path;
+  VpiObject* begin =
+      MakeScopeObject(vpiNamedBegin, stmt->label, parent, walk, path);
+  WalkStmtItself(*stmt, BlockParent{begin, path}, walk);
+  return begin;
 }
 
 // The scope a process of `instance` stands in: the generate block instance
@@ -236,9 +299,14 @@ void AttachInstanceProcedures(const RtlirModule& mod, VpiObject* instance,
     VpiObject* process =
         kIsAssertion ? nullptr : MakeProcess(proc, scope, build);
     const BodyWalk kWalk{objects, prefix, process, build};
-    VpiObject* body =
-        WalkStmt(proc.body, BlockParent{scope, scope->full_name}, kWalk);
-    if (process != nullptr) process->body = body;
+    const BlockParent kParent{scope, scope->full_name};
+    if (process != nullptr) {
+      process->body = WalkStmt(proc.body, kParent, kWalk);
+    } else if (proc.body != nullptr) {
+      // The body of such a process is the assertion itself, whose label names
+      // the assertion (§16.5) rather than a block around it.
+      WalkSubStmts(*proc.body, kParent, kWalk);
+    }
   }
 }
 

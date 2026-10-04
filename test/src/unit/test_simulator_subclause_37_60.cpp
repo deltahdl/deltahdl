@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -127,6 +130,63 @@ TEST_F(AtomicStatement, TheMembersOfTheClassHaveConstantsOfTheirOwn) {
   EXPECT_NE(vpiImmediateAssume, vpiReturn);
   EXPECT_NE(vpiImmediateCover, vpiAnyPattern);
   EXPECT_NE(vpiImmediateAssume, vpiReturnStmt);
+}
+
+// -----------------------------------------------------------------------------
+// The atomic statements of a run, built from the elaborated design rather than
+// by hand.
+// -----------------------------------------------------------------------------
+
+class AtomicStatementsOfARun : public VpiDesignRun {
+ protected:
+  // The first object of `type` `ref` reaches, null for none.
+  static vpiHandle First(int type, vpiHandle ref) {
+    vpiHandle it = vpi_iterate(type, ref);
+    return it == nullptr ? nullptr : vpi_scan(it);
+  }
+};
+
+// The label property: a labeled statement reports its label through vpiName.
+TEST_F(AtomicStatementsOfARun, ALabeledStatementReportsItsLabel) {
+  Run("module top; event e; initial trig: -> e; endmodule\n");
+  vpiHandle stmt = First(vpiEventStmt, By("top.trig"));
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, stmt), "trig");
+}
+
+// An unlabeled statement has no label to report.
+TEST_F(AtomicStatementsOfARun, AnUnlabeledStatementReportsNoLabel) {
+  Run("module top; event e; initial -> e; endmodule\n");
+  vpiHandle stmt = First(vpiEventStmt, By("top"));
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, stmt), nullptr);
+}
+
+// A null statement is an object of the run, the body of the procedure that
+// writes it.
+TEST_F(AtomicStatementsOfARun, ANullStatementIsAnObjectOfTheRun) {
+  Run("module top; initial ; endmodule\n");
+  vpiHandle proc = First(vpiProcess, By("top"));
+  ASSERT_NE(proc, nullptr);
+  vpiHandle body = vpi_handle(vpiStmt, proc);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiNullStmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, body)), VpiObjectOf(proc));
+}
+
+// A break and a continue are objects of the run, standing in the block that
+// holds them and running in its procedure.
+TEST_F(AtomicStatementsOfARun, ABreakAndAContinueAreObjectsOfTheRun) {
+  Run("module top; initial for (int i = 0; i < 2; i++) begin : lp\n"
+      "  if (i == 0) continue;\n"
+      "  break;\n"
+      "end endmodule\n");
+  vpiHandle lp = By("top.lp");
+  ASSERT_NE(lp, nullptr);
+  EXPECT_EQ(KindsOf(vpiContinue, lp), std::vector<int>{vpiContinue});
+  EXPECT_EQ(KindsOf(vpiBreak, lp), std::vector<int>{vpiBreak});
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, First(vpiBreak, lp))),
+            VpiObjectOf(First(vpiProcess, By("top"))));
 }
 
 }  // namespace
