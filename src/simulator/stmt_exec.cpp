@@ -17,6 +17,7 @@
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_event_property.h"
 #include "simulator/covergroup_instance.h"
+#include "simulator/dpi_task_call.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -619,6 +620,11 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   }
   auto* func = ctx.EnterSubroutinePackage(SetupTaskCall(expr, ctx, arena));
   if (!func) {
+    // §35.8: an imported task's C code may call an exported task that
+    // consumes time, so its enable runs as one that can suspend this process.
+    if (EnablesDpiImportTask(expr, ctx)) {
+      co_return co_await ExecDpiImportTask(expr, ctx, arena);
+    }
     ExecCallStmtExpr(expr, ctx, arena);
     co_return StmtResult::kDone;
   }

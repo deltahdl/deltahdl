@@ -797,12 +797,14 @@ static std::string_view DpiCalleeName(const Expr* expr) {
   return scoped->rhs->text;
 }
 
-Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto* dpi = ctx.GetDpiRuntime();
-  std::string_view callee = DpiCalleeName(expr);
-  const DpiRtFunction* import =
-      dpi == nullptr ? nullptr : dpi->FindImport(callee);
-  if (import == nullptr) return MakeLogic4VecVal(arena, 1, 0);
+bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                        DpiImportCall& call) {
+  call.dpi = ctx.GetDpiRuntime();
+  call.expr = expr;
+  call.callee = DpiCalleeName(expr);
+  call.import =
+      call.dpi == nullptr ? nullptr : call.dpi->FindImport(call.callee);
+  if (call.import == nullptr) return false;
   // §35.4 makes an imported subroutine's declaration a reference to a global
   // symbol the foreign side defines, and §35.5.4 leaves the binding of that
   // symbol to the tool, which BindDpiImports makes before the run. A call
@@ -811,15 +813,15 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // then given -- is reported rather than answered: the zero it would
   // otherwise yield is a value the design reads as data and cannot tell from a
   // foreign function that returned zero.
-  if (!import->impl && !import->arg_impl) {
-    std::string message = "imported subroutine '" + std::string(callee) +
+  if (!call.import->impl && !call.import->arg_impl) {
+    std::string message = "imported subroutine '" + std::string(call.callee) +
                           "' is bound to no foreign implementation";
-    if (!import->unbound_reason.empty()) {
-      message += ": " + import->unbound_reason;
+    if (!call.import->unbound_reason.empty()) {
+      message += ": " + call.import->unbound_reason;
     }
     ctx.GetDiag().Error(expr->range.start, std::move(message),
                         Subclause("35.5.4"));
-    return MakeLogic4VecVal(arena, 1, 0);
+    return false;
   }
   // §35.6: calling an imported function uses the same usage and syntax as a
   // native function call. When the import's formals are known, resolve the
@@ -827,7 +829,7 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // arguments backed by defaults behave exactly as for native subroutine calls.
   ActualBindingCtx binding{expr, expr->args.size() - expr->arg_names.size(),
                            ctx, arena};
-  std::vector<DpiArgValue> args = BindDpiCallActuals(import, binding);
+  call.args = BindDpiCallActuals(call.import, binding);
 
   // §35.5.3: "A DPI call chain is a call chain ... that begins when
   // SystemVerilog code calls an imported subroutine." This call site is that
@@ -837,26 +839,37 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // an export that instance declares is reached in (§35.5.3).
   DpiScope scope;
   scope.name = DpiInstanceScopeName(ctx.ActiveInstancePrefix(), ctx);
-  dpi->EnterDeclaredImportCall(callee, std::move(scope));
+  call.dpi->EnterDeclaredImportCall(call.callee, std::move(scope));
+  return true;
+}
 
-  DpiArgValue result;
-  if (import->is_pure) {
+void CallDpiImport(DpiImportCall& call) {
+  if (call.import->is_pure) {
     // §35.5.2: a pure function's call "can be ... replaced with the value
     // previously computed for the same values of the input arguments", and a
     // pure function has no output or inout formals for a copy-back to carry.
-    result = dpi->CallImportReusingPureResult(callee, args);
+    call.result = call.dpi->CallImportReusingPureResult(call.callee, call.args);
   } else {
     // §35.5.1.2 and §35.6.1 copy the written formals back into the actuals;
     // §35.6.2 says which of those actuals the call actually changed.
-    std::vector<DpiArgValueChange> changes;
-    result = dpi->CallImportDetectingChanges(callee, args, changes);
-    WritebackDpiChangedArgs(import, binding, args, changes);
+    call.result = call.dpi->CallImportDetectingChanges(call.callee, call.args,
+                                                       call.changes);
+  }
+}
+
+Logic4Vec FinishDpiImportCall(DpiImportCall& call, SimContext& ctx,
+                              Arena& arena) {
+  if (!call.import->is_pure) {
+    ActualBindingCtx binding{
+        call.expr, call.expr->args.size() - call.expr->arg_names.size(), ctx,
+        arena};
+    WritebackDpiChangedArgs(call.import, binding, call.args, call.changes);
   }
 
   // §35.9 item c): an imported function returning while a disable is in effect
   // shall have acknowledged it first, and a simulator checks that on the
   // return. Leaving the frame is that return.
-  dpi->LeaveImportCall();
+  call.dpi->LeaveImportCall();
 
   // §35.6.1: the result crosses back through a temporary of the declared result
   // type, so a body that computed it in another type is coerced to the type
@@ -864,26 +877,47 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §35.5.5 restricts a function result to the small values it lists, every
   // one of which the kind's own width states, so no declared width travels
   // with it the way §35.5.6's packed formals carry one.
-  return DpiValueOfType(arena, import->return_type, 0,
-                        CoerceArgValue(result, import->return_type),
-                        !import->return_is_unsigned);
+  return DpiValueOfType(arena, call.import->return_type, 0,
+                        CoerceArgValue(call.result, call.import->return_type),
+                        !call.import->return_is_unsigned);
 }
 
-DpiArgValue CallDpiExportedFunction(std::string_view key,
-                                    const DpiRtExport& exp,
-                                    std::vector<DpiArgValue>& args,
-                                    SimContext& ctx) {
+Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
+  DpiImportCall call;
+  if (!BeginDpiImportCall(expr, ctx, arena, call)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  CallDpiImport(call);
+  return FinishDpiImportCall(call, ctx, arena);
+}
+
+Expr* DpiExportCall(std::string_view key, const DpiRtExport& exp,
+                    const std::vector<DpiArgValue>& args, SimContext& ctx) {
   Arena& arena = ctx.GetArena();
   auto* call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = *arena.Create<std::string>(key);
   ActualBindingCtx binding{call, exp.args.size(), ctx, arena};
   SendExportArguments(key, exp.args, args, call, binding);
+  return call;
+}
+
+void ReadDpiExportOutputs(const Expr* call, const DpiRtExport& exp,
+                          std::vector<DpiArgValue>& args, SimContext& ctx) {
+  ActualBindingCtx binding{call, exp.args.size(), ctx, ctx.GetArena()};
+  ReceiveExportArguments(exp.args, args, binding);
+}
+
+DpiArgValue CallDpiExportedFunction(std::string_view key,
+                                    const DpiRtExport& exp,
+                                    std::vector<DpiArgValue>& args,
+                                    SimContext& ctx) {
+  Expr* call = DpiExportCall(key, exp, args, ctx);
   // The key and the temporaries are names from the root of the design, so the
   // call is evaluated as from there whatever instance C was entered from.
   InstancePrefixOverride root(ctx.InstancePrefixOverride(), "");
-  Logic4Vec value = EvalExpr(call, ctx, arena);
-  ReceiveExportArguments(exp.args, args, binding);
+  Logic4Vec value = EvalExpr(call, ctx, ctx.GetArena());
+  ReadDpiExportOutputs(call, exp, args, ctx);
   return DpiArgValueOfType(exp.return_type, 0, value);
 }
 

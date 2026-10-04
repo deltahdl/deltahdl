@@ -398,6 +398,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/foreign_code.cpp
     simulator/shared_library.cpp
     simulator/dpi_side.cpp
+    simulator/dpi_task_call.cpp
     simulator/dpi_time.cpp
     simulator/dpi_runtime.cpp
     simulator/compiled_sim.cpp

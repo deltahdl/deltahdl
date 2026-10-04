@@ -14,6 +14,7 @@
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/dpi_task_call.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/sim_context.h"
 
@@ -54,7 +55,7 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
         exp.args.push_back(DpiFormalOfArg(arg, kScope));
       }
     }
-    if (subroutine != nullptr && !exp.is_task) {
+    if (subroutine != nullptr) {
       // The formals are read at the call, ResolveDpiFormalTypes having
       // resolved them in place once the design is lowered, so the export is
       // named by its position rather than copied.
@@ -62,11 +63,19 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
       std::string_view key = *ctx.GetArena().Create<std::string>(kKey);
       DpiRuntime* runtime = &dpi;
       SimContext* run = &ctx;
-      exp.arg_impl = [runtime, run, kIndex,
-                      key](std::vector<DpiArgValue>& args) {
-        return CallDpiExportedFunction(key, runtime->Exports()[kIndex], args,
-                                       *run);
-      };
+      if (exp.is_task) {
+        // §35.8: a task may consume time, so the process that enabled the
+        // calling import runs it (RunExportedTaskFromC).
+        exp.arg_impl = [runtime, kIndex, key](std::vector<DpiArgValue>& args) {
+          return RunExportedTaskFromC(runtime->Exports()[kIndex], key, args);
+        };
+      } else {
+        exp.arg_impl = [runtime, run, kIndex,
+                        key](std::vector<DpiArgValue>& args) {
+          return CallDpiExportedFunction(key, runtime->Exports()[kIndex], args,
+                                         *run);
+        };
+      }
     }
     dpi.RegisterExport(std::move(exp));
   }

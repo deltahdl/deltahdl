@@ -116,15 +116,6 @@ void DpiExportEntry(int index, void** args, void* result) {
     DpiStoreResultInCObject(kResult, DpiArgValue::FromInt(0), result);
     return;
   }
-  if (exp.is_task) {
-    // #4926: an exported task may consume time, which the import's C call
-    // cannot be suspended for, so its body is not entered.
-    binding.diag->Error(SourceLoc::None(),
-                        "exported task '" + std::string(exp.sv_name) +
-                            "' called from C is not run: deltahdl does not "
-                            "yet suspend an imported task's C code",
-                        Subclause("35.8"));
-  }
   for (std::size_t i = 0; i < exp.args.size() && i < written.size(); ++i) {
     if (exp.args[i].direction != Direction::kInput) {
       DpiStoreInCObject(exp.args[i], written[i], args[i]);

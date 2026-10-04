@@ -179,11 +179,51 @@ struct ActualBindingCtx {
 // evaluator's Logic4Vec and the DpiArgValue the registry speaks lives.
 Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §35.5.3 to §35.6: one call of an imported subroutine, from its actuals being
+// bound and its call-chain frame entered to the write-back of its outputs.
+// EvalDpiCall runs the three steps below in turn; an imported task's enable
+// runs the foreign function itself elsewhere (ExecDpiImportTask).
+struct DpiImportCall {
+  DpiRuntime* dpi = nullptr;
+  const DpiRtFunction* import = nullptr;
+  std::string_view callee;
+  const Expr* expr = nullptr;
+  std::vector<DpiArgValue> args;
+  std::vector<DpiArgValueChange> changes;
+  DpiArgValue result;
+};
+
+// Binds the actuals of the call `expr` and enters its frame. False where the
+// call reaches no import or one bound to no implementation, the second
+// reported.
+bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                        DpiImportCall& call);
+
+// Calls the foreign function, which the call's outputs and result come back
+// from.
+void CallDpiImport(DpiImportCall& call);
+
+// Writes the outputs the call changed back into its actuals, leaves its frame
+// and answers its result.
+Logic4Vec FinishDpiImportCall(DpiImportCall& call, SimContext& ctx,
+                              Arena& arena);
+
 // §35.7 with §H.8.2: calls the exported function keyed `key` from the root of
 // the design, the subroutine the export `exp` names, with `args` in the types
 // its formals declare, as foreign code calling the export does. The values the
 // function leaves in its output and inout formals replace those positions of
 // `args`; the result is returned.
+// §35.7: the call of the subroutine keyed `key` that the export `exp` names,
+// each formal's value carried by a temporary named as its actual, an input's
+// and an inout's written there from `args`.
+Expr* DpiExportCall(std::string_view key, const DpiRtExport& exp,
+                    const std::vector<DpiArgValue>& args, SimContext& ctx);
+
+// The values the call DpiExportCall made left in its outputs' and inouts'
+// temporaries, into those positions of `args`.
+void ReadDpiExportOutputs(const Expr* call, const DpiRtExport& exp,
+                          std::vector<DpiArgValue>& args, SimContext& ctx);
+
 DpiArgValue CallDpiExportedFunction(std::string_view key,
                                     const DpiRtExport& exp,
                                     std::vector<DpiArgValue>& args,

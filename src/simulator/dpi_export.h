@@ -20,9 +20,9 @@ std::string DpiInstanceScopeName(std::string_view prefix,
 // `prefix`, with the DPI runtime: under its SystemVerilog name and its linkage
 // name, in the instance's scope, with the formals and result of the
 // subroutine it exports. An exported function is run by calling it from the
-// root of the design (CallDpiExportedFunction); an exported task is
-// registered with nothing to run, a call from C that may enable one being
-// one that has to suspend the import's C code (§35.8).
+// root of the design (CallDpiExportedFunction); an exported task by the
+// process that enabled the calling import, which can consume its time
+// (RunExportedTaskFromC, §35.8).
 void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
                               SimContext& ctx);
 
