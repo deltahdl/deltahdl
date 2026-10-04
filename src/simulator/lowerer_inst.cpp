@@ -332,8 +332,8 @@ void Lowerer::RegisterExportedSubroutines(const RtlirModuleInst& inst,
   for (ModuleItem* def : inst.resolved->function_decls) {
     if (def->method_class != port_name) continue;
     std::string tail = "." + std::string(def->name);
-    auto* own = arena_.Create<std::string>(child_prefix +
-                                           std::string(port_name) + tail);
+    auto* own = arena_.Create<std::string>(child_prefix);
+    own->append(port_name).append(tail);
     RegisterRunningIn(*own, def, child_prefix, ctx_);
     if (DeclaresForkjoin(ifc, def->name)) {
       ctx_.AddForkjoinDefinition(instance_key + tail, *own);
