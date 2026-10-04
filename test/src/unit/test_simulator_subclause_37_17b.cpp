@@ -116,6 +116,14 @@ TEST_F(VariablesOfARun, ABitsParentIsItsVariable) {
       "v");
 }
 
+// Detail 27: a var bit is an element of a packed array, whose bounds are
+// static, so one whose index is a constant is a constant select.
+TEST_F(VariablesOfARun, ABitAtAConstantIndexIsAConstantSelect) {
+  Run(kPackedVariables);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Var("top.v"), 3)),
+            1);
+}
+
 // A value put to a bit is put to that bit of the variable.
 TEST_F(VariablesOfARun, WritingABitWritesThatBitOfTheVariable) {
   Run(kPackedVariables);

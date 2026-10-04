@@ -190,11 +190,37 @@ std::vector<const Expr*> Operands(const Expr* first,
   return operands;
 }
 
+// §37.16, §37.17 details 12 and 13: a bit of a vector net or packed variable
+// whose index is not a constant. It is a bit of the kind the vector's own bits
+// are, reaching the vector through vpiParent and the expression the source
+// wrote through vpiIndex; which of the vector's bits it stands for is not fixed
+// before the run, so it holds none of them. Null for a vector with no bits.
+VpiObject* VaryingBitObject(VpiObject* base, const Expr* index,
+                            const AssignBuild& build) {
+  int bit_type = 0;
+  for (const VpiObject* child : base->children) {
+    if (child->type == vpiNetBit || child->type == vpiRegBit) {
+      bit_type = child->type;
+      break;
+    }
+  }
+  if (bit_type == 0) return nullptr;
+  VpiObject* bit = build.alloc();
+  bit->type = bit_type;
+  bit->parent = base;
+  bit->size = 1;
+  bit->index_expr = ExpressionObject(index, build);
+  if (bit_type == vpiRegBit && bit->index_expr != nullptr) {
+    bit->children.push_back(bit->index_expr);
+  }
+  return bit;
+}
+
 // §37.58: a select of one bit. Of an integer var, a time var or a parameter it
 // is a bit select reaching the object through vpiParent and its index through
 // vpiIndex; of a vector net or a logic or bit variable it is that object's own
-// bit (§37.16, §37.17), which a constant index names. A bit a varying index
-// selects is not modelled and gives null.
+// bit (§37.16, §37.17), the one a constant index names, or one standing for
+// whichever bit a varying index selects.
 VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* base = ExpressionObject(expr->base, build);
   if (base == nullptr) return nullptr;
@@ -210,9 +236,9 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     }
     return select;
   }
-  if (expr->index == nullptr ||
-      expr->index->kind != ExprKind::kIntegerLiteral) {
-    return nullptr;
+  if (expr->index == nullptr) return nullptr;
+  if (expr->index->kind != ExprKind::kIntegerLiteral) {
+    return VaryingBitObject(base, expr->index, build);
   }
   const auto kIndex = static_cast<int>(expr->index->int_val);
   for (VpiObject* child : base->children) {

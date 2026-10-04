@@ -200,5 +200,42 @@ TEST_F(BitSelectsOfARun, ABitOfANetIsTheNetsBit) {
                        vpi_handle_by_name(VpiText("top.a"), nullptr), 3));
 }
 
+constexpr const char* kVaryingNetBit =
+    "module top; wire [7:0] a; integer i = 2; wire y; assign y = a[i];\n"
+    "endmodule\n";
+
+// A bit of a vector net selected by an index that is not a constant is still
+// one of the net's bits (§37.16), though which one is not fixed before the
+// run...
+TEST_F(BitSelectsOfARun, AVaryingBitOfANetIsANetBit) {
+  Run(kVaryingNetBit);
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiNetBit);
+}
+
+// ...whose parent is the net...
+TEST_F(BitSelectsOfARun, AVaryingBitsParentIsTheNet) {
+  Run(kVaryingNetBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiParent, Rhs())), "a");
+}
+
+// ...whose index is the expression the source wrote...
+TEST_F(BitSelectsOfARun, AVaryingBitsIndexIsTheWrittenIndex) {
+  Run(kVaryingNetBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiIndex, Rhs())), "i");
+}
+
+// ...and which is no constant select (§37.16 detail 23).
+TEST_F(BitSelectsOfARun, AVaryingBitIsNoConstantSelect) {
+  Run(kVaryingNetBit);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Rhs()), 0);
+}
+
+// Of a packed variable it is one of the variable's bits (§37.17).
+TEST_F(BitSelectsOfARun, AVaryingBitOfAVariableIsAVarBit) {
+  Run("module top; logic [7:0] v; integer i = 2; wire y; assign y = v[i];\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiRegBit);
+}
+
 }  // namespace
 }  // namespace delta

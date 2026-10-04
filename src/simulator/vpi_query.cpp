@@ -181,15 +181,43 @@ int VpiGetIsFinal(VpiHandle obj) {
   return obj->is_final ? 1 : 0;
 }
 
+// §37.16 detail 23 for a net bit, §37.17 detail 27 for a var bit: a bit of a
+// vector is an element of a packed array, whose bounds are static, so it is a
+// constant select when its index and the outer indices it carries are all
+// constants.
+bool VpiVectorBitConstantSelect(VpiHandle bit) {
+  bool all_indices_constant =
+      bit->index_expr != nullptr && bit->index_expr->type == vpiConstant;
+  for (const VpiObject* child : bit->children) {
+    if (VpiIsExprType(child->type) && child->type != vpiConstant) {
+      all_indices_constant = false;
+    }
+  }
+  if (bit->type == vpiNetBit) {
+    return VpiNetConstantSelect(bit->parent != nullptr, all_indices_constant,
+                                true);
+  }
+  VpiConstantSelectQuery query;
+  query.has_static_lifetime = !bit->automatic;
+  query.has_parent = bit->parent != nullptr;
+  query.all_indices_constant = all_indices_constant;
+  query.all_elements_static_members = true;
+  return VpiConstantSelect(query);
+}
+
 // §37.19: the figure draws "-> constant selection / bool: vpiConstantSelect" on
 // a var select, and §37.4.2's key reads a Boolean property with vpi_get().
 // Nothing answered the property at all, so the one normative detail §37.19 owns
 // was computed by a helper no caller reached and the figure's property was
-// unreadable. §37.58 detail 3 owns the property for a bit select and §37.19
-// detail 1 for a var select, so each clause's rule answers for its own object;
+// unreadable. §37.58 detail 3 owns the property for a bit select, §37.19
+// detail 1 for a var select, and §37.16 and §37.17 for a net bit and a var
+// bit, so each clause's rule answers for its own object;
 // any other kind reports 0, its own clause owning what the property means for
 // it.
 int VpiGetConstantSelect(VpiHandle obj) {
+  if (obj->type == vpiNetBit || obj->type == vpiRegBit) {
+    return VpiVectorBitConstantSelect(obj) ? 1 : 0;
+  }
   if (VpiVarSelectConstantSelectOf(obj)) return 1;
   return VpiBitSelectConstantSelectOf(obj) ? 1 : 0;
 }

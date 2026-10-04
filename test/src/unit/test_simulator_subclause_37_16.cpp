@@ -685,6 +685,13 @@ TEST_F(NetBitsOfARun, ANetBitHoldsItsBit) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(Net(), 2)), 1);
 }
 
+// Detail 23: a net bit is an element of a packed array, whose bounds are
+// static, so one whose index is a constant is a constant select.
+TEST_F(NetBitsOfARun, ANetBitAtAConstantIndexIsAConstantSelect) {
+  Run(kVectorNet);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Net(), 2)), 1);
+}
+
 // A design run with a PLI application registered, its nets read back once the
 // run is over.
 class NetTypesOfARun : public VpiDesignRun {
