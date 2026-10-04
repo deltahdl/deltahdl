@@ -124,10 +124,13 @@ uint32_t SynthLower::LowerNegateBit(const Expr* expr, AigGraph& aig,
   // makes the negation the complement of the operand plus one. Bit `bit` of
   // that sum depends on every bit of the operand below it, so the chain is
   // rippled from bit 0 up rather than the operand read at `bit` alone.
+  // §11.6.1 Table 11-21 makes the operand context-determined, so it is read
+  // extended to the propagated size before it is negated.
   uint32_t carry = AigGraph::kConstTrue;
   uint32_t sum = AigGraph::kConstFalse;
   for (uint32_t b = 0; b <= bit; ++b) {
-    uint32_t complemented = aig.AddNot(LowerExprBit(expr->lhs, aig, b));
+    uint32_t complemented =
+        aig.AddNot(LowerContextOperandBit(expr->lhs, aig, b));
     sum = FullAdderBit(aig, AigGraph::kConstFalse, complemented, carry);
   }
   return sum;
@@ -136,8 +139,10 @@ uint32_t SynthLower::LowerNegateBit(const Expr* expr, AigGraph& aig,
 uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit) {
   if (expr->op == TokenKind::kTilde) {
-    // Table 11-15 of §11.4.8 gives the bitwise negation one result per bit.
-    return aig.AddNot(LowerExprBit(expr->lhs, aig, bit));
+    // Table 11-15 of §11.4.8 gives the bitwise negation one result per bit,
+    // and §11.6.1 Table 11-21 makes its operand context-determined, so the
+    // complement is of the operand extended to the propagated size.
+    return aig.AddNot(LowerContextOperandBit(expr->lhs, aig, bit));
   }
   if (expr->op == TokenKind::kBang) {
     // §11.4.7 states the result of the logical negation as `1'b0` or `1'b1`,
@@ -146,8 +151,9 @@ uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
     return aig.AddNot(LowerTruthValue(expr->lhs, aig, Subclause("11.4.7")));
   }
   if (expr->op == TokenKind::kPlus) {
-    // Table 11-6 of §11.4.3: "Unary plus m (same as m)".
-    return LowerExprBit(expr->lhs, aig, bit);
+    // Table 11-6 of §11.4.3: "Unary plus m (same as m)", the operand extended
+    // as §11.6.1 Table 11-21 makes it context-determined.
+    return LowerContextOperandBit(expr->lhs, aig, bit);
   }
   if (expr->op == TokenKind::kMinus) return LowerNegateBit(expr, aig, bit);
   if (ReductionRuleFor(expr->op).folded != TokenKind::kEof) {

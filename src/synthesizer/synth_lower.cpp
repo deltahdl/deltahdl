@@ -366,11 +366,12 @@ uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
 }
 
-// §11.8.2: an operand of a binary arithmetic or bitwise operator is extended
-// to the size of the expression it stands in, by its sign where the type
-// propagated down to it is signed (§11.8.1 making the expression signed only
-// where every operand is), and §11.6.1 Table 11-21 makes both operands of
-// those operators context-determined. An identifier is extended here through
+// §11.8.2: a context-determined operand is extended to the size of the
+// expression it stands in, by its sign where the type propagated down to it is
+// signed (§11.8.1 making the expression signed only where every operand is).
+// §11.6.1 Table 11-21 makes context-determined both operands of a binary
+// arithmetic or bitwise operator, the operand of unary `+`, `-` and `~`, and
+// both arms of `i ? j : k`. An identifier is extended here through
 // LowerExtendedOperandBit, so `a ^ s` with `s` a four-bit signed 4'b1000 in an
 // eight-bit signed context reads 8'hF8 where zeros read 8'h08. Every other
 // operand lowers to the context itself.
@@ -546,11 +547,12 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
       return LowerReplicateBit(expr, aig, bit);
     case ExprKind::kTernary: {
       // §11.4.11 returns the first expression where the condition is true,
-      // which is where it is nonzero.
+      // which is where it is nonzero. §11.6.1 Table 11-21 makes both arms
+      // context-determined, so each is read extended to the propagated size.
       uint32_t sel =
           LowerTruthValue(expr->condition, aig, Subclause("11.4.11"));
-      uint32_t t = LowerExprBit(expr->true_expr, aig, bit);
-      uint32_t f = LowerExprBit(expr->false_expr, aig, bit);
+      uint32_t t = LowerContextOperandBit(expr->true_expr, aig, bit);
+      uint32_t f = LowerContextOperandBit(expr->false_expr, aig, bit);
       return aig.AddMux(sel, t, f);
     }
     case ExprKind::kRealLiteral:

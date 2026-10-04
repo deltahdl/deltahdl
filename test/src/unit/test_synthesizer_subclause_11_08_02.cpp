@@ -113,4 +113,83 @@ TEST(OperandExtensionSynthesis, AnUnsignedOperandBesideASignedOneIsZeroFilled) {
       [](uint64_t a, uint64_t b) -> uint64_t { return (a ^ b) & 0xFu; });
 }
 
+// The value a four-bit signed `v` stands for in an eight-bit context: its four
+// bits with the top one copied into bits 7 to 4.
+uint64_t SignExtendedFromFourBits(uint64_t v) {
+  return (v & 0x8u) != 0 ? (v | 0xF0u) : v;
+}
+
+// §11.6.1 Table 11-21 makes the operand of unary `-` context-determined, and
+// §11.8.2 sign-extends it to the eight bits of the signed context before it is
+// negated, so `-a` at `a` of -1 is 1. The test fails on a lowering that negates
+// the four-bit pattern zero-extended, which answers -15.
+TEST(OperandExtensionSynthesis, ASignedUnaryMinusOperandIsSignExtended) {
+  ExpectAssignSweep(ModuleAssigningTo("output logic signed [7:0] y",
+                                      "input signed [3:0] a", "-a"),
+                    1, [](uint64_t a, uint64_t) -> uint64_t {
+                      return (0 - SignExtendedFromFourBits(a)) & 0xFFu;
+                    });
+}
+
+// The operand of unary `+` is context-determined as that of unary `-` is, so
+// `+a` is `a` sign-extended to eight bits. The test fails on a lowering that
+// reads the operand zero above its own four bits.
+TEST(OperandExtensionSynthesis, ASignedUnaryPlusOperandIsSignExtended) {
+  ExpectAssignSweep(ModuleAssigningTo("output logic signed [7:0] y",
+                                      "input signed [3:0] a", "+a"),
+                    1, [](uint64_t a, uint64_t) -> uint64_t {
+                      return SignExtendedFromFourBits(a);
+                    });
+}
+
+// §11.6.1 Table 11-21 makes the operand of `~` context-determined, so `~a` in
+// an eight-bit signed context complements `a` sign-extended, which is zero in
+// bits 7 to 4 wherever `a` is negative. The test fails on a lowering that
+// complements the zero-extended pattern, which sets those bits at every `a`.
+TEST(OperandExtensionSynthesis, ASignedBitwiseNegationOperandIsSignExtended) {
+  ExpectAssignSweep(ModuleAssigningTo("output logic signed [7:0] y",
+                                      "input signed [3:0] a", "~a"),
+                    1, [](uint64_t a, uint64_t) -> uint64_t {
+                      return ~SignExtendedFromFourBits(a) & 0xFFu;
+                    });
+}
+
+// The case above with `a` unsigned, which §11.8.2 zero-extends, so `~a` sets
+// bits 7 to 4 at every `a`. The test fails on a fix that sign-extends the
+// operand of `~` whatever its type.
+TEST(OperandExtensionSynthesis, AnUnsignedBitwiseNegationOperandIsZeroFilled) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [7:0] y", "input [3:0] a", "~a"), 1,
+      [](uint64_t a, uint64_t) -> uint64_t { return ~a & 0xFFu; });
+}
+
+// §11.6.1 Table 11-21 makes both arms of `i ? j : k` context-determined, and
+// §11.8.1 makes the conditional signed where both arms are, so §11.8.2
+// sign-extends the arm it chooses to the eight bits of the target. `b` carries
+// the second arm in its low four bits and the condition in bit 4. The test
+// fails on a lowering that reads either arm zero above its own four bits.
+TEST(OperandExtensionSynthesis, SignedConditionalArmsAreSignExtended) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic signed [7:0] y",
+                        "input signed [3:0] a, input signed [3:0] b, input c",
+                        "c ? a : b"),
+      32, [](uint64_t a, uint64_t bc) -> uint64_t {
+        return SignExtendedFromFourBits((bc & 0x10u) != 0 ? a : bc & 0xFu);
+      });
+}
+
+// The case above with `b` unsigned, which §11.8.1 makes the conditional
+// unsigned for, so §11.8.2 zero-extends both arms. The test fails on a fix
+// that sign-extends a signed arm whatever the type of the conditional.
+TEST(OperandExtensionSynthesis,
+     AnUnsignedArmMakesBothConditionalArmsZeroFilled) {
+  ExpectAssignSweep(
+      ModuleAssigningTo("output logic [7:0] y",
+                        "input signed [3:0] a, input [3:0] b, input c",
+                        "c ? a : b"),
+      32, [](uint64_t a, uint64_t bc) -> uint64_t {
+        return (bc & 0x10u) != 0 ? a : bc & 0xFu;
+      });
+}
+
 }  // namespace
