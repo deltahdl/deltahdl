@@ -62,9 +62,8 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
       SimContext* run = &ctx;
       exp.arg_impl = [runtime, run, kIndex,
                       key](std::vector<DpiArgValue>& args) {
-        const DpiRtExport& self = runtime->Exports()[kIndex];
-        return CallDpiExportedFunction(key, self.args, self.return_type, args,
-                                       *run, run->GetArena());
+        return CallDpiExportedFunction(key, runtime->Exports()[kIndex], args,
+                                       *run);
       };
     }
     dpi.RegisterExport(std::move(exp));

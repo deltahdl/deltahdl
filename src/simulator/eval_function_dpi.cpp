@@ -685,9 +685,12 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
 
 // §35.7: the temporary variable that carries formal `index` of the export
 // whose function is keyed `key` across one call from C, its name starting with
-// a `$` so that no name a design declares can stand for it.
+// a `$` so that no name a design declares can stand for it. A dot would read
+// as a hierarchical or member path, so the instance path's dots are `$` too.
 std::string ExportTempName(std::string_view key, size_t index) {
-  return "$dpi_export." + std::string(key) + "." + std::to_string(index);
+  std::string name = "$dpi_export$" + std::string(key);
+  std::replace(name.begin(), name.end(), '.', '$');
+  return name + "$" + std::to_string(index);
 }
 
 // Makes the temporary `name` for `formal` the first time it is needed: a
@@ -860,21 +863,21 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 DpiArgValue CallDpiExportedFunction(std::string_view key,
-                                    const std::vector<DpiArg>& formals,
-                                    DataTypeKind result,
+                                    const DpiRtExport& exp,
                                     std::vector<DpiArgValue>& args,
-                                    SimContext& ctx, Arena& arena) {
+                                    SimContext& ctx) {
+  Arena& arena = ctx.GetArena();
   auto* call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = *arena.Create<std::string>(key);
-  ActualBindingCtx binding{call, formals.size(), ctx, arena};
-  SendExportArguments(key, formals, args, call, binding);
+  ActualBindingCtx binding{call, exp.args.size(), ctx, arena};
+  SendExportArguments(key, exp.args, args, call, binding);
   // The key and the temporaries are names from the root of the design, so the
   // call is evaluated as from there whatever instance C was entered from.
   InstancePrefixOverride root(ctx.InstancePrefixOverride(), "");
   Logic4Vec value = EvalExpr(call, ctx, arena);
-  ReceiveExportArguments(formals, args, binding);
-  return DpiArgValueOfType(result, 0, value);
+  ReceiveExportArguments(exp.args, args, binding);
+  return DpiArgValueOfType(exp.return_type, 0, value);
 }
 
 }  // namespace delta
