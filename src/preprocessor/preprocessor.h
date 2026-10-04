@@ -380,6 +380,7 @@ class Preprocessor {
   // §34.5.32.2: the viewports of a decryption envelope closing here, recorded
   // in the SourceManager with the sources its text was read into.
   void RecordEnvelopeViewports();
+  void RecordRegionViewports(SourceLoc closed_at);
   // What §34.5.28 and §34.5.29 have one protect pragma expression say about
   // the tool reading it. Each states a licence the tool is to obtain before it
   // decrypts a model or before it executes one, and the value naming that
@@ -752,11 +753,18 @@ class Preprocessor {
   struct EnclosingViewports {
     std::vector<ProtectViewport> viewports;
     uint32_t envelope_source = 0;
+    SourceLoc opened_at;
+    uint32_t first_source = 0;
   };
   std::vector<EnclosingViewports> protect_viewport_stack_;
   // The source the data block of the decryption envelope in force recovered
   // to, and 0 until that block is read.
   uint32_t protect_envelope_source_ = 0;
+  // Where the envelope in force opened, and the id the first source registered
+  // after that was given: an encryption envelope compiled where it is written
+  // is the text from there to its end.
+  SourceLoc protect_envelope_opened_at_;
+  uint32_t protect_envelope_first_source_ = 0;
   // What RuntimeLicenses() answers with.
   std::vector<ProtectRuntimeLicense> runtime_licenses_;
   // The decryption envelope depth at which a decrypt_license expression was

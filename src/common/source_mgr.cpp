@@ -103,9 +103,14 @@ void SourceManager::AddViewport(EnvelopeViewport viewport) {
 bool SourceManager::StandsInEnvelope(SourceLoc loc,
                                      const EnvelopeViewport& viewport) const {
   if (!loc.IsValid()) return false;
-  const uint32_t kFile = ResolveToOrigin(loc).file_id;
-  return kFile != 0 && kFile >= viewport.first_source &&
-         kFile <= viewport.last_source;
+  const SourceLoc kAt = ResolveToOrigin(loc);
+  if (kAt.file_id == 0) return false;
+  if (kAt.file_id == viewport.region_source &&
+      kAt.line >= viewport.first_line && kAt.line <= viewport.last_line) {
+    return true;
+  }
+  return kAt.file_id >= viewport.first_source &&
+         kAt.file_id <= viewport.last_source;
 }
 
 void SourceManager::ComputeLineOffsets(FileEntry& entry) {

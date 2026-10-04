@@ -30,13 +30,19 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
   if (OpensEncryptionEnvelope(expr.keyword, expr.has_value) ||
       OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
     protect_viewport_stack_.push_back(
-        {std::move(protect_viewports_), protect_envelope_source_});
+        {std::move(protect_viewports_), protect_envelope_source_,
+         protect_envelope_opened_at_, protect_envelope_first_source_});
     protect_viewports_.clear();
     protect_envelope_source_ = 0;
+    protect_envelope_opened_at_ = loc;
+    protect_envelope_first_source_ = src_mgr_.LastFileId() + 1;
     return;
   }
   if (ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
     RecordEnvelopeViewports();
+  }
+  if (ClosesEncryptionEnvelope(expr.keyword, expr.has_value)) {
+    RecordRegionViewports(loc);
   }
   if (ClosesEncryptionEnvelope(expr.keyword, expr.has_value) ||
       ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
@@ -48,8 +54,11 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
       protect_envelope_source_ = 0;
       return;
     }
-    protect_viewports_ = std::move(protect_viewport_stack_.back().viewports);
-    protect_envelope_source_ = protect_viewport_stack_.back().envelope_source;
+    EnclosingViewports& enclosing = protect_viewport_stack_.back();
+    protect_viewports_ = std::move(enclosing.viewports);
+    protect_envelope_source_ = enclosing.envelope_source;
+    protect_envelope_opened_at_ = enclosing.opened_at;
+    protect_envelope_first_source_ = enclosing.first_source;
     protect_viewport_stack_.pop_back();
     return;
   }
@@ -92,6 +101,21 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
   protect_viewports_.push_back(std::move(viewport));
 }
 
+namespace {
+
+// What a later stage keeps of a viewport: the object it names, the access it
+// asks for and where it was written. The text of its envelope is the caller's
+// to fill in.
+EnvelopeViewport KeptViewport(const ProtectViewport& viewport) {
+  EnvelopeViewport kept;
+  kept.object = viewport.object;
+  kept.access = viewport.access;
+  kept.loc = viewport.loc;
+  return kept;
+}
+
+}  // namespace
+
 void Preprocessor::RecordEnvelopeViewports() {
   // §34.5.32.2 requires a viewport's object to be contained within its
   // envelope, and §34.4 makes the envelope a lexical region: the text its data
@@ -102,8 +126,27 @@ void Preprocessor::RecordEnvelopeViewports() {
   // viewports describe nothing a later stage could find.
   if (protect_envelope_source_ == 0) return;
   for (const ProtectViewport& viewport : protect_viewports_) {
-    src_mgr_.AddViewport({viewport.object, viewport.access, viewport.loc,
-                          protect_envelope_source_, src_mgr_.LastFileId()});
+    EnvelopeViewport kept = KeptViewport(viewport);
+    kept.first_source = protect_envelope_source_;
+    kept.last_source = src_mgr_.LastFileId();
+    src_mgr_.AddViewport(std::move(kept));
+  }
+}
+
+void Preprocessor::RecordRegionViewports(SourceLoc closed_at) {
+  // An encryption envelope this tool compiles where it is written is the lines
+  // from its begin to its end, and the sources registered between them. A
+  // begin and an end in different sources bound no lines of one source, so
+  // their viewports describe no region a later stage could find.
+  if (closed_at.file_id != protect_envelope_opened_at_.file_id) return;
+  for (const ProtectViewport& viewport : protect_viewports_) {
+    EnvelopeViewport kept = KeptViewport(viewport);
+    kept.first_source = protect_envelope_first_source_;
+    kept.last_source = src_mgr_.LastFileId();
+    kept.region_source = closed_at.file_id;
+    kept.first_line = protect_envelope_opened_at_.line;
+    kept.last_line = closed_at.line;
+    src_mgr_.AddViewport(std::move(kept));
   }
 }
 

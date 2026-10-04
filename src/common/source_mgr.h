@@ -53,8 +53,8 @@ class SourceManager {
   // The id the most recently registered source was given, and 0 before any.
   uint32_t LastFileId() const { return static_cast<uint32_t>(files_.size()); }
 
-  // §34.5.32.2: the viewports of the decryption envelopes a reading closed,
-  // in the order it closed them, for the stages that resolve the objects they
+  // §34.5.32.2: the viewports of the envelopes a reading closed, in the order
+  // it closed them, for the stages that resolve the objects they
   // name and grant the access they ask.
   void AddViewport(EnvelopeViewport viewport);
   const std::vector<EnvelopeViewport>& Viewports() const { return viewports_; }

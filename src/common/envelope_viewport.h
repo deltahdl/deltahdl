@@ -26,14 +26,22 @@ inline ViewportAccess ViewportAccessOf(std::string_view access) {
   return ViewportAccess::kNone;
 }
 
-// One viewport of a decryption envelope a reading opened, kept for the stages
-// after the preprocessor. §34.5.32.2 requires the object it names to be
-// contained within its envelope, and §34.4 makes an envelope a lexical region,
-// so the envelope is kept as the sources its text was read into: the source
-// its data block recovered to, and every source registered while that text was
-// read, which are the ones its nested envelopes and included files recovered
-// to. Sources are numbered in the order they are registered, so those are the
-// ids from `first_source` to `last_source`.
+// One viewport of an envelope a reading met, kept for the stages after the
+// preprocessor. §34.5.32.2 requires the object it names to be contained within
+// its envelope, and §34.4 makes an envelope a lexical region, so the envelope
+// is kept as the text it spans.
+//
+// A decryption envelope's text is the source its data block recovered to, and
+// every source registered while that text was read, which are the ones its
+// nested envelopes and included files recovered to. Sources are numbered in
+// the order they are registered, so those are the ids from `first_source` to
+// `last_source`.
+//
+// An encryption envelope this tool compiles where it is written, never
+// encrypting it, is the lines from its begin to its end in the source holding
+// them, `region_source` from `first_line` to `last_line`, and the sources
+// registered between the two, which its included files and nested decryption
+// envelopes recovered to. `region_source` is 0 for a decryption envelope.
 struct EnvelopeViewport {
   std::string object;
   std::string access;
@@ -41,6 +49,9 @@ struct EnvelopeViewport {
   SourceLoc loc;
   uint32_t first_source = 0;
   uint32_t last_source = 0;
+  uint32_t region_source = 0;
+  uint32_t first_line = 0;
+  uint32_t last_line = 0;
 };
 
 }  // namespace delta
