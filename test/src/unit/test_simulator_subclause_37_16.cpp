@@ -685,5 +685,65 @@ TEST_F(NetBitsOfARun, ANetBitHoldsItsBit) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(Net(), 2)), 1);
 }
 
+// A design run with a PLI application registered, its nets read back once the
+// run is over.
+class NetTypesOfARun : public VpiDesignRun {
+ protected:
+  static int NetTypeOf(const char* name) {
+    return vpi_get(vpiNetType, vpi_handle_by_name(VpiText(name), nullptr));
+  }
+};
+
+constexpr const char* kNetKinds =
+    "nettype logic mynet;\n"
+    "module top;\n"
+    "  wire w; tri t; wand wa; supply0 s0; trireg tr; uwire u; mynet n;\n"
+    "endmodule\n";
+
+// §37.16: a net's vpiNetType is the kind of net it was declared.
+TEST_F(NetTypesOfARun, AWireIsAWire) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.w"), vpiWire);
+}
+
+TEST_F(NetTypesOfARun, ATriIsATri) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.t"), vpiTri);
+}
+
+TEST_F(NetTypesOfARun, AWandIsAWand) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.wa"), vpiWand);
+}
+
+TEST_F(NetTypesOfARun, ASupply0IsASupply0) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.s0"), vpiSupply0);
+}
+
+TEST_F(NetTypesOfARun, ATriregIsATriReg) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.tr"), vpiTriReg);
+}
+
+TEST_F(NetTypesOfARun, AUwireIsAUwire) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.u"), vpiUwire);
+}
+
+// A net of a user-defined nettype is a nettype net.
+TEST_F(NetTypesOfARun, AUserNettypeNetIsANettypeNet) {
+  Run(kNetKinds);
+  EXPECT_EQ(NetTypeOf("top.n"), vpiNettypeNet);
+}
+
+// §37.3.2: the string form names the constant the integer form reports.
+TEST_F(NetTypesOfARun, TheNetTypesNameIsItsConstant) {
+  Run(kNetKinds);
+  EXPECT_STREQ(
+      vpi_get_str(vpiNetType, vpi_handle_by_name(VpiText("top.wa"), nullptr)),
+      "vpiWand");
+}
+
 }  // namespace
 }  // namespace delta

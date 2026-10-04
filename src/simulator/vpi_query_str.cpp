@@ -380,6 +380,8 @@ static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
   switch (property) {
     case vpiOpType:
       return VpiOpTypeConstantName(obj->op_type);
+    case vpiNetType:
+      return VpiNetTypeConstantName(VpiNetTypeOf(obj));
     default:
       return nullptr;
   }

@@ -251,6 +251,9 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     // §37.17 detail 21: an array var's kind of array; zero for any other.
     case vpiArrayType:
       return obj->array_type;
+    // §37.16: the kind of net a net was declared.
+    case vpiNetType:
+      return VpiNetTypeOf(obj);
     case vpiConstantSelect:
       return VpiGetConstantSelect(obj);
     // §37.14 details 7 and 9: the port index gives port order; it does not

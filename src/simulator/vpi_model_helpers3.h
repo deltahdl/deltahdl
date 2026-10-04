@@ -379,6 +379,13 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 // an object, so these are the kinds an object drawn as a net carries.
 bool VpiIsNetsType(int type);
 
+// §37.16: a net's vpiNetType -- the Annex K constant of the kind it was
+// declared, vpiNettypeNet for a user-defined nettype's -- and 0 for an object
+// carrying no net; and the spelling of such a constant, null for any other
+// value (§37.3.2).
+int VpiNetTypeOf(VpiHandle obj);
+const char* VpiNetTypeConstantName(int net_type);
+
 // §37.39 (figure): the path terms one of a module path's three term relations
 // reaches - vpiModPathOut the output terms, and of the input terms
 // vpiModDataPathIn the data source of an edge-sensitive path and vpiModPathIn
