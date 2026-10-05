@@ -242,7 +242,7 @@ void FillOrderedWait(VpiObject* obj, const Stmt& stmt,
     AddChild(obj, with.expression(event));
   }
   with.statement(stmt.then_branch, obj);
-  with.statement(stmt.else_branch, obj);
+  obj->else_stmt = with.statement(stmt.else_branch, obj);
 }
 
 // The objects a statement holding a condition and the statements it runs
@@ -315,7 +315,7 @@ int AssertionStmtKind(const Stmt& stmt) {
 // its pass and fail actions, the fail action recorded as such since §16.3 lets
 // the pass action go unwritten - and whether it is deferred and whether final
 // (§16.4). §37.50: a concurrent one reports whether it covers a sequence, and
-// holds its actions likewise.
+// holds its actions likewise, as §37.73's expect statement does.
 void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->cover_sequence = stmt.cover_sequence;
   if (!stmt.is_procedural_concurrent) {
@@ -381,6 +381,8 @@ int VpiBuiltStmtKind(const Stmt& stmt) {
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
       return AssertionStmtKind(stmt);
+    case StmtKind::kExpect:
+      return vpiExpectStmt;
     default:
       return 0;
   }
@@ -435,6 +437,7 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
+    case StmtKind::kExpect:
       FillAssertion(obj, stmt, with);
       return;
     default:

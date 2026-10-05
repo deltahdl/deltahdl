@@ -240,5 +240,20 @@ TEST_F(WaitsOfARun, AnOrderedWaitReachesBothActions) {
   EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
 }
 
+// An ordered wait written with an else action alone reaches it through
+// vpiElseStmt and no statement through vpiStmt (#5084).
+TEST_F(WaitsOfARun, AnElseActionAloneIsTheElseStatement) {
+  Run("module top; event a, b; int r;\n"
+      "  initial begin wait_order (a, b) else r = 2; end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kStmts = BlockStatements();
+  ASSERT_EQ(kStmts.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kStmts[0]), vpiOrderedWait);
+  EXPECT_EQ(vpi_handle(vpiStmt, kStmts[0]), nullptr);
+  vpiHandle otherwise = vpi_handle(vpiElseStmt, kStmts[0]);
+  ASSERT_NE(otherwise, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
+}
+
 }  // namespace
 }  // namespace delta

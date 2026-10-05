@@ -339,8 +339,10 @@ namespace {
 // statement each draw two arrows to the dotted `stmt` enclosure - a body or
 // pass action and an else action - and §37.4.1 makes that enclosure a class
 // grouping other objects and classes rather than a kind, so neither statement
-// carries the name of either arrow and position is what tells them apart.
+// carries the name of either arrow and position is what tells them apart,
+// unless a run recorded which is the else action, which §16.3 lets stand alone.
 VpiHandle SecondBodyStmt(VpiHandle stmt) {
+  if (stmt->else_stmt != nullptr) return stmt->else_stmt;
   int seen = 0;
   for (auto* child : stmt->children) {
     if (!VpiIsScopeBodyStmtObject(child)) continue;

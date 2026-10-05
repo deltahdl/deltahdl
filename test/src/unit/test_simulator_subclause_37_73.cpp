@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -146,6 +149,55 @@ TEST_F(Expect, ExpectStatementWithoutBodyReportsNullThroughEachRelation) {
 
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&spec_only)), nullptr);
   EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&spec_only)), nullptr);
+}
+
+// The expect statements of a run: those a design's procedures write, built
+// from the elaborated design rather than by hand (#5006).
+class ExpectsOfARun : public VpiDesignRun {
+ protected:
+  // The first statement the begin block `top`'s first procedure runs holds.
+  static vpiHandle FirstHeldStatement() {
+    vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+    if (procs == nullptr) return nullptr;
+    vpiHandle block = vpi_handle(vpiStmt, vpi_scan(procs));
+    vpiHandle held = block ? vpi_iterate(vpiStmt, block) : nullptr;
+    return held ? vpi_scan(held) : nullptr;
+  }
+
+  // The name of the call `expect` reaches through `relation`, empty for none.
+  static std::string CallReached(int relation, vpiHandle expect) {
+    vpiHandle call = vpi_handle(relation, expect);
+    return call == nullptr ? "" : vpi_get_str(vpiName, call);
+  }
+};
+
+// An expect statement a procedure writes is an object of the run, reaching its
+// pass action through vpiStmt and its fail action through vpiElseStmt.
+TEST_F(ExpectsOfARun, AnExpectStatementReachesBothActions) {
+  Run("module top; logic clk, a;\n"
+      "  initial begin\n"
+      "    expect (@(posedge clk) a) $display(\"p\"); else $write(\"f\");\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle expect = FirstHeldStatement();
+  ASSERT_NE(expect, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt);
+  EXPECT_EQ(CallReached(vpiStmt, expect), "$display");
+  EXPECT_EQ(CallReached(vpiElseStmt, expect), "$write");
+}
+
+// An expect statement written with a fail action alone reaches it through
+// vpiElseStmt and no statement through vpiStmt.
+TEST_F(ExpectsOfARun, AFailActionAloneIsTheElseStatement) {
+  Run("module top; logic clk, a;\n"
+      "  initial begin\n"
+      "    expect (@(posedge clk) a) else $write(\"f\");\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle expect = FirstHeldStatement();
+  ASSERT_NE(expect, nullptr);
+  EXPECT_EQ(CallReached(vpiStmt, expect), "");
+  EXPECT_EQ(CallReached(vpiElseStmt, expect), "$write");
 }
 
 }  // namespace

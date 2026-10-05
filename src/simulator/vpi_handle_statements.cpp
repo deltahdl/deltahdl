@@ -38,8 +38,9 @@ bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->body;
     return true;
   }
+  // An else action a run recorded is no body, though written alone (§16.3).
   for (auto* child : ref->children) {
-    if (!VpiIsScopeBodyStmtObject(child)) continue;
+    if (!VpiIsScopeBodyStmtObject(child) || child == ref->else_stmt) continue;
     out = child;
     return true;
   }

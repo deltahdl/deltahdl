@@ -282,8 +282,8 @@ struct VpiStmtBuild {
 // assign, deassign, force or release, an if or if-else, a case, a forever,
 // while, repeat, do-while, for or foreach loop, a wait, wait fork or ordered
 // wait, a disable or disable fork (§37.77), or an assertion: an immediate
-// one, or a concurrent one embedded in procedural code (§37.50); 0 for a
-// statement of another kind.
+// one, or a concurrent one embedded in procedural code (§37.50), or an expect
+// statement (§37.73); 0 for a statement of another kind.
 int VpiBuiltStmtKind(const Stmt& stmt);
 
 // §37.65 with §9.4.2: the condition an event control written over `events` is
