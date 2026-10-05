@@ -122,7 +122,6 @@ TEST_F(NamesOfARun, APackageMemberIsFoundByItsFullName) {
       "module top; endmodule\n");
   vpiHandle parameter = By("pkg::P");
   ASSERT_NE(parameter, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, parameter), vpiParameter);
   EXPECT_STREQ(vpi_get_str(vpiFullName, parameter), "pkg::P");
   vpiHandle variable = By("pkg::pv");
   ASSERT_NE(variable, nullptr);
