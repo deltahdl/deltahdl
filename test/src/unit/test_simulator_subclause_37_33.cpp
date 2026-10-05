@@ -552,5 +552,32 @@ TEST_F(ClassObjectsOfARun, AClassObjsTypespecReachesTheClassDefn) {
             VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
 }
 
+// A class a module declares has a defn under each instance of the module
+// (§37.31), and an object's typespec reaches the one under the instance the
+// object was created in, by a declaration's initializer or by a process.
+TEST_F(ClassObjectsOfARun, AClassObjReachesTheDefnOfItsOwnInstance) {
+  Run("module m;\n"
+      "  class A; int n; endclass\n"
+      "  A a = new;\n"
+      "  A b;\n"
+      "  initial b = new;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  m u1();\n"
+      "  m u2();\n"
+      "endmodule\n");
+  for (const std::string& inst : {"top.u1", "top.u2"}) {
+    vpiHandle own = Named(vpiClassDefn, By(inst), "A");
+    ASSERT_NE(own, nullptr);
+    for (const std::string& var : {"a", "b"}) {
+      vpiHandle obj = vpi_handle(vpiClassObj, By(inst + "." + var));
+      ASSERT_NE(obj, nullptr);
+      vpiHandle typespec = vpi_handle(vpiClassTypespec, obj);
+      EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+                VpiObjectOf(own));
+    }
+  }
+}
+
 }  // namespace
 }  // namespace delta

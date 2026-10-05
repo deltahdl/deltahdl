@@ -677,6 +677,12 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   }
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
+  // §37.31: a `new` in a method or constructor is written in the running
+  // object's class, and so stands in the instance that object was created
+  // in; any other stands in the instance its process or initializer runs in.
+  const ClassObject* running = ctx.CurrentThis();
+  obj->instance =
+      running != nullptr ? running->instance : ctx.ActiveInstancePrefix();
   // §8.25: the type parameters the specialization `info` is binds are bound
   // here, ahead of the bindings the levels are built from, because a property
   // whose declared type names one is sized as its level is built

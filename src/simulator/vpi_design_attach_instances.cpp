@@ -202,9 +202,10 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     const VpiClassDefnObjects kClasses =
         AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
-    // §37.32: the class defn a run's class obj reaches through its typespec.
-    // The run holds one class type per declaration, so a class a module
-    // declares stands as the defn of its first instance.
+    // §37.32: the class defn a run's class obj reaches through its typespec,
+    // kept per declaration. A class a module declares has one per instance,
+    // and ClassDefnOf in vpi_class_objects.cpp takes the one under the
+    // instance the object was created in, this one standing for a first top's.
     for (const auto& [key, defn] : kClasses) {
       run_objects_.try_emplace(key.first, defn);
     }

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -76,6 +78,32 @@ std::vector<const ClassTypeInfo*> ClassChain(const ClassTypeInfo* type) {
   return chain;
 }
 
+// §37.32 with §37.31: the class defn of the class `obj` was created with. A
+// class a module declares has one under each instance of the module, and the
+// object's is the one under the instance it was created in, found among the
+// `objects` by that instance's path; any other class has the one `by_decl`
+// holds for its declaration, as has a class of the first top.
+VpiObject* ClassDefnOf(
+    const ClassObject& obj, const VpiObjectMap& objects,
+    const std::unordered_map<const void*, VpiObject*>& by_decl) {
+  const ClassTypeInfo* type = obj.type;
+  if (type == nullptr || type->decl == nullptr) return nullptr;
+  std::string_view path = obj.instance;
+  if (!path.empty() && path.back() == '.') path.remove_suffix(1);
+  VpiObject* scope = type->package.empty() && !path.empty()
+                         ? FindObjectForFlatName(objects, path)
+                         : nullptr;
+  if (scope != nullptr) {
+    for (VpiObject* child : scope->children) {
+      if (child->type == vpiClassDefn && child->name == type->decl->name) {
+        return child;
+      }
+    }
+  }
+  auto found = by_decl.find(type->decl);
+  return found == by_decl.end() ? nullptr : found->second;
+}
+
 }  // namespace
 
 Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
@@ -128,10 +156,8 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   // reclaimed, so an object made for one that has since gone is made afresh.
   VpiObject*& made = run_objects_[obj];
   if (made == nullptr || made->obj_id != static_cast<int64_t>(obj->handle)) {
-    const void* decl = obj->type != nullptr ? obj->type->decl : nullptr;
-    auto defn = decl != nullptr ? run_objects_.find(decl) : run_objects_.end();
     made = VpiMakeClassObject(
-        *obj, defn != run_objects_.end() ? defn->second : nullptr, *sim_ctx_,
+        *obj, ClassDefnOf(*obj, object_map_, run_objects_), *sim_ctx_,
         {[this] { return AllocObject(); },
          [this](std::string name) {
            name_pool_.push_back(std::move(name));

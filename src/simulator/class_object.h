@@ -345,6 +345,13 @@ inline constexpr uint64_t kNullClassHandle = 0;
 
 struct ClassObject {
   const ClassTypeInfo* type = nullptr;
+  // §37.31 with §23.3: the instance the object was created in, as
+  // SimContext::ActiveInstancePrefix spells it ("u2." under the first top,
+  // empty for that top itself). The run registers one class type per class a
+  // module declares, shared by every instance of the module, while each
+  // instance has a class defn of its own, so this is what says whose defn the
+  // object's class typespec reaches (§37.32).
+  std::string instance;
   std::unordered_map<std::string, Logic4Vec> properties;
   // §7.8/§8.5: the entries of each property declared with an associative
   // dimension, keyed by the property's bare name. Such a property holds

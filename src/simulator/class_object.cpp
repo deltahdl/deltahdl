@@ -266,6 +266,7 @@ static QueueObject* CopyQueue(const QueueObject* src, Arena& arena) {
 ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
+  copy->instance = instance;
   // §8.12 (shallow copy, step 2): "All class properties ... are copied to
   // the new object." A class property is a variable, and §6.8 has a variable
   // "store a value from one assignment to the next", so the copy's properties
