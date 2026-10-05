@@ -103,6 +103,7 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   // formal's default standing for an actual the instance leaves out; with no
   // declaration built, the actuals as written.
   std::vector<VpiHandle> provided;
+  provided.reserve(instance.args.size());
   for (const Expr* actual : instance.args) {
     provided.push_back(with.expression(actual));
   }

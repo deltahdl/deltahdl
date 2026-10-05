@@ -432,6 +432,40 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
   }
 }
 
+// §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`; false
+// where it is not identifiers joined by dots alone.
+bool DottedName(const Expr* expr, std::string& out) {
+  if (expr == nullptr) return false;
+  if (expr->kind == ExprKind::kIdentifier) {
+    out += expr->text;
+    return expr->scope_prefix.empty();
+  }
+  if (expr->kind != ExprKind::kMemberAccess || expr->is_scope_resolution ||
+      expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier ||
+      !DottedName(expr->lhs, out)) {
+    return false;
+  }
+  out += ".";
+  out += expr->rhs->text;
+  return true;
+}
+
+// §23.6: the net or variable a hierarchical name reaches, whose first name
+// is no declaration the scope sees, an instance's: below the instance writing
+// it first, and then from the top of the design. Null where it is no such
+// name, a member of a structure among them.
+VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
+  std::string dotted;
+  if (!DottedName(expr, dotted)) return nullptr;
+  const std::string_view kFirst =
+      std::string_view(dotted).substr(0, dotted.find('.'));
+  if (Resolve(build.names, kFirst) != nullptr) return nullptr;
+  VpiObject* below = FindObjectForFlatName(
+      build.names.objects, VpiFlatName(build.names.prefix, dotted));
+  return below != nullptr ? below
+                          : FindObjectForFlatName(build.names.objects, dotted);
+}
+
 // The object standing for one side of an assignment: the net or variable a
 // name stands for, a constant, a select, a call, or an operation over these.
 // The kinds of expression the switch does not name are not modelled and give
@@ -473,6 +507,8 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kCall:
     case ExprKind::kSystemCall:
       return CallObject(expr, build);
+    case ExprKind::kMemberAccess:
+      return HierarchicalObject(expr, build);
     default:
       return nullptr;
   }
@@ -485,7 +521,7 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   // decompiles to it. A name stands for the net or variable it resolves to,
   // which is no object of this expression's own.
   if (obj != nullptr && expr->kind != ExprKind::kIdentifier &&
-      VpiIsExprType(obj->type)) {
+      expr->kind != ExprKind::kMemberAccess && VpiIsExprType(obj->type)) {
     obj->decompile = VpiExprDecompile(expr);
   }
   return obj;
