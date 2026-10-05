@@ -632,7 +632,8 @@ struct ModuleItem {
   // a named property written without arguments, the property's name. The
   // parser cannot tell such a name from a variable's, so it records the name
   // and the elaborator substitutes the property's body in place of the
-  // instance, or reports why it cannot. Empty for every other property_spec.
+  // instance, or reports why it cannot, emptying it where the name declares
+  // no property. Empty for every other property_spec.
   std::string_view prop_instance_name;
   // §16.12.1: for a named property whose body is the clocked boolean form
   // `@(event) boolean_expression`, the leading clocking event and the boolean,

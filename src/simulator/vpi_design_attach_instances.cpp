@@ -197,7 +197,6 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachGenScopes(design, object_map_, kBuild);
     AttachInstanceArrays(design, object_map_, kBuild);
     AttachClockingBlocks(design, object_map_, *sim_ctx_, kBuild);
-    AttachAssertions(design, object_map_, *sim_ctx_, kBuild);
     // A continuous assignment's bit select is the bit made here, so the bits
     // come first.
     AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);

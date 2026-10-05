@@ -288,6 +288,21 @@ TEST(PropertySpecModel, ClockingEventRelationIsSharedBySpecAndClockedProperty) {
   EXPECT_EQ(VpiClockingEvent(nullptr), nullptr);
 }
 
+// Diagram (property spec -- vpiClockingEvent --> expr): the clock a run records
+// on a property spec is the expression it reaches, ahead of any event control
+// among its children.
+TEST(PropertySpecModel, ARecordedClockIsTheClockingEvent) {
+  VpiObject spec;
+  spec.type = vpiPropertySpec;
+  VpiObject clock;
+  clock.type = vpiOperation;
+  VpiObject control;
+  control.type = vpiEventControl;
+  spec.children = {&control};
+  spec.clocking_event = &clock;
+  EXPECT_EQ(VpiClockingEvent(&spec), &clock);
+}
+
 // Diagram (property spec / clocked property -> property expr): the "-> property
 // expr" edge reaches the object's property-expr-kind child.
 TEST(PropertySpecModel, PropertySpecReachesItsPropertyExpr) {

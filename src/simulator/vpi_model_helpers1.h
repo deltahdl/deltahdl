@@ -138,10 +138,11 @@ bool VpiIsConcurrentAssertionPropertyType(int type);
 VpiHandle VpiConcurrentAssertionProperty(VpiHandle assertion);
 
 // §37.50 (detail 1): the clocking event a concurrent assertion is evaluated on,
-// reached through vpiClockingEvent and modeled as its event-control child. This
-// is always the actual event the assertion runs on, whether it was written
-// explicitly or inferred from context; vpiIsClockInferred (a separate Boolean)
-// records which form produced it. Null when no clocking event is attached.
+// reached through vpiClockingEvent: the expression of the clock the run
+// recorded on it. This is always the actual event the assertion runs on,
+// whether it was written explicitly or inferred from context;
+// vpiIsClockInferred (a separate Boolean) records which form produced it. Null
+// when no clocking event is attached.
 VpiHandle VpiConcurrentAssertionClockingEvent(VpiHandle assertion);
 
 // §37.50 (-> stmt / detail 2): whether a concurrent assertion kind carries a
@@ -155,13 +156,14 @@ bool VpiConcurrentAssertionHasPassStmt(int type);
 bool VpiConcurrentAssertionHasElseStmt(int type);
 
 // §37.50: the pass action statement a concurrent assertion traverses to through
-// vpiStmt - its first statement child; null when none is attached (for example
-// a restrict, which has no pass action statement).
+// vpiStmt - its first statement child other than the else action the run
+// recorded; null when none is attached (for example a restrict, which has no
+// pass action statement).
 VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion);
 
 // §37.50: the else (fail) action statement a concurrent assertion traverses to
-// through vpiElseStmt - its first else-statement child; null when none is
-// attached (a cover or restrict has none).
+// through vpiElseStmt - the else action the run recorded, or else its second
+// statement child; null when none is attached (a cover or restrict has none).
 VpiHandle VpiConcurrentAssertionElseStmt(VpiHandle assertion);
 
 // §37.50 (detail 2): whether a concurrent assertion kind is simulated and so
@@ -343,8 +345,9 @@ std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item);
 bool VpiIsDisableConditionType(int type);
 
 // §37.52: the clocking event a property spec or clocked property traverses to
-// through vpiClockingEvent (the diagram's -> expr edge), modeled as the
-// object's event-control child; null when none is present. §37.56's clocked seq
+// through vpiClockingEvent (the diagram's -> expr edge): the expression of the
+// clock a run recorded, or else the object's event-control child; null when
+// none is present. §37.56's clocked seq
 // shares this relation (its own vpiClockingEvent -> expr edge has the same
 // shape).
 VpiHandle VpiClockingEvent(VpiHandle obj);

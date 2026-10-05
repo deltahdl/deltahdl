@@ -164,10 +164,10 @@ class ExpectsOfARun : public VpiDesignRun {
     return held ? vpi_scan(held) : nullptr;
   }
 
-  // The name of the call `expect` reaches through `relation`, empty for none.
-  static std::string CallReached(int relation, vpiHandle expect) {
-    vpiHandle call = vpi_handle(relation, expect);
-    return call == nullptr ? "" : vpi_get_str(vpiName, call);
+  // The name of what `ref` reaches through `relation`, empty for nothing.
+  static std::string NameReached(int relation, vpiHandle ref) {
+    vpiHandle reached = vpi_handle(relation, ref);
+    return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 };
 
@@ -182,8 +182,8 @@ TEST_F(ExpectsOfARun, AnExpectStatementReachesBothActions) {
   vpiHandle expect = FirstHeldStatement();
   ASSERT_NE(expect, nullptr);
   EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt);
-  EXPECT_EQ(CallReached(vpiStmt, expect), "$display");
-  EXPECT_EQ(CallReached(vpiElseStmt, expect), "$write");
+  EXPECT_EQ(NameReached(vpiStmt, expect), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, expect), "$write");
 }
 
 // An expect statement written with a fail action alone reaches it through
@@ -196,8 +196,26 @@ TEST_F(ExpectsOfARun, AFailActionAloneIsTheElseStatement) {
       "endmodule\n");
   vpiHandle expect = FirstHeldStatement();
   ASSERT_NE(expect, nullptr);
-  EXPECT_EQ(CallReached(vpiStmt, expect), "");
-  EXPECT_EQ(CallReached(vpiElseStmt, expect), "$write");
+  EXPECT_EQ(NameReached(vpiStmt, expect), "");
+  EXPECT_EQ(NameReached(vpiElseStmt, expect), "$write");
+}
+
+// An expect statement reaches the property spec it watches, and the spec its
+// disable condition and its property expression (#5085).
+TEST_F(ExpectsOfARun, AnExpectStatementReachesItsPropertySpec) {
+  Run("module top; logic clk, rst, a;\n"
+      "  initial begin\n"
+      "    expect (@(posedge clk) disable iff (rst) a);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle expect = FirstHeldStatement();
+  ASSERT_NE(expect, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, expect);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, spec), vpiPropertySpec);
+  EXPECT_EQ(NameReached(vpiDisableCondition, spec), "rst");
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+  EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
 }
 
 }  // namespace

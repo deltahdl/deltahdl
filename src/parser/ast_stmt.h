@@ -286,6 +286,10 @@ struct Stmt {
   // clocks the sequences name, so that the evaluation tells the ticks of
   // that clock from the others'.
   std::vector<EventExpr> assert_clock;
+  // §16.16 (a) and §16.14.6: whether that clock was inferred, from the
+  // default clocking or the procedure, rather than written, which §37.50
+  // reports as vpiIsClockInferred.
+  bool assert_clock_inferred = false;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

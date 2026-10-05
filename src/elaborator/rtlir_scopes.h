@@ -167,6 +167,9 @@ struct RtlirAssertion {
   // The generate block instances between the module and the assertion,
   // outermost first; empty for an assertion of the module itself.
   HierPath gen_block_path;
+  // §27.4: the prefixes of those instances, innermost last, whose
+  // declarations a name the assertion writes finds first.
+  GenBlockPrefixes gen_block_prefixes;
 };
 
 // Appends `member` to `members` as a declaration of the generate block instance

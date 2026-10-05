@@ -160,13 +160,9 @@ VpiHandle VpiConcurrentAssertionProperty(VpiHandle assertion) {
 
 VpiHandle VpiConcurrentAssertionClockingEvent(VpiHandle assertion) {
   // §37.50 (detail 1): the clocking event is the actual event the assertion is
-  // evaluated on regardless of whether it was explicit or inferred, so the same
-  // event-control child is reported in both cases. Null when none is attached.
-  if (!assertion) return nullptr;
-  for (auto* child : assertion->children) {
-    if (child->type == vpiEventControl) return child;
-  }
-  return nullptr;
+  // evaluated on regardless of whether it was explicit or inferred, the
+  // expression of the clock the run recorded either way. Null when none was.
+  return assertion != nullptr ? assertion->clocking_event : nullptr;
 }
 
 bool VpiConcurrentAssertionHasPassStmt(int type) {
@@ -189,25 +185,53 @@ bool VpiConcurrentAssertionHasElseStmt(int type) {
   return type == vpiAssert || type == vpiAssume;
 }
 
-VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion) {
-  // §37.50: the pass action statement, modeled as the assertion's first
-  // statement child reached through vpiStmt. Null when none is attached.
-  if (!assertion) return nullptr;
+// §37.50 and §37.55: an assertion's action statements in the order they were
+// written - the pass action first and, for an assert or an assume, the else
+// action after it. A statement's own type is a statement kind (an assignment,
+// a begin, a task call) rather than the vpiStmt or vpiElseStmt relation tag,
+// which is a name for the edge and a type no object has, so the two are told
+// apart by the else action the run recorded and by position.
+static std::vector<VpiHandle> ActionStmts(VpiHandle assertion) {
+  std::vector<VpiHandle> stmts;
   for (auto* child : assertion->children) {
-    if (child->type == vpiStmt) return child;
+    if (VpiIsScopeBodyStmtObject(child)) stmts.push_back(child);
   }
-  return nullptr;
+  return stmts;
+}
+
+// The pass action among them, null where the assertion was written without
+// one, the fail action recorded as such being no pass action however it
+// stands (§16.3).
+static VpiHandle PassAction(VpiHandle assertion) {
+  std::vector<VpiHandle> stmts = ActionStmts(assertion);
+  std::erase(stmts, assertion->else_stmt);
+  return stmts.empty() ? nullptr : stmts.front();
+}
+
+// The fail action among them, null where the assertion was written without
+// one.
+static VpiHandle ElseAction(VpiHandle assertion) {
+  if (assertion->else_stmt != nullptr) return assertion->else_stmt;
+  std::vector<VpiHandle> stmts = ActionStmts(assertion);
+  return stmts.size() < 2 ? nullptr : stmts[1];
+}
+
+VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion) {
+  // §37.50: the pass action statement, reached through vpiStmt; detail 2 gives
+  // a restrict none.
+  if (!assertion || !VpiConcurrentAssertionHasPassStmt(assertion->type)) {
+    return nullptr;
+  }
+  return PassAction(assertion);
 }
 
 VpiHandle VpiConcurrentAssertionElseStmt(VpiHandle assertion) {
-  // §37.50: the else (fail) action statement, modeled as the assertion's first
-  // else-statement child reached through vpiElseStmt. Null when none is
-  // attached.
-  if (!assertion) return nullptr;
-  for (auto* child : assertion->children) {
-    if (child->type == vpiElseStmt) return child;
+  // §37.50: the else (fail) action statement, reached through vpiElseStmt,
+  // which is drawn from an assert and an assume alone.
+  if (!assertion || !VpiConcurrentAssertionHasElseStmt(assertion->type)) {
+    return nullptr;
   }
-  return nullptr;
+  return ElseAction(assertion);
 }
 
 bool VpiConcurrentAssertionIsSimulated(int type) {
@@ -253,40 +277,18 @@ VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
   return nullptr;
 }
 
-// §37.55: the assertion's action statements in the order they were written -
-// the pass action first and, for an assert or an assume, the else action after
-// it. A statement's own type is a statement kind (an assignment, a begin, a
-// task call) rather than the vpiStmt or vpiElseStmt relation tag, which is a
-// name for the edge and a type no object has, so the two are told apart by
-// position rather than by a type match.
-static std::vector<VpiHandle> ImmediateAssertionStmts(VpiHandle assertion) {
-  std::vector<VpiHandle> stmts;
-  if (!assertion) return stmts;
-  for (auto* child : assertion->children) {
-    if (VpiIsScopeBodyStmtObject(child)) stmts.push_back(child);
-  }
-  return stmts;
-}
-
 VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion) {
-  // §37.55: the pass action statement, reached through vpiStmt. Null when the
-  // assertion was written without one, the fail action recorded as such being
-  // no pass action however it stands.
-  std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
-  if (assertion != nullptr) std::erase(stmts, assertion->else_stmt);
-  return stmts.empty() ? nullptr : stmts.front();
+  // §37.55: the pass action statement, reached through vpiStmt.
+  return assertion != nullptr ? PassAction(assertion) : nullptr;
 }
 
 VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion) {
   // §37.55: the else (fail) action statement, reached through vpiElseStmt. The
   // edge is drawn from the assert and assume boxes and not from cover, so an
-  // immediate cover has none however many statements it carries. Null when the
-  // assertion was written without an else action.
+  // immediate cover has none however many statements it carries.
   if (!assertion) return nullptr;
   if (!VpiImmediateAssertionHasElseStmt(assertion->type)) return nullptr;
-  if (assertion->else_stmt != nullptr) return assertion->else_stmt;
-  std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
-  return stmts.size() < 2 ? nullptr : stmts[1];
+  return ElseAction(assertion);
 }
 
 bool VpiIsSequenceExprType(int type) {
@@ -571,9 +573,11 @@ bool VpiIsDisableConditionType(int type) {
 
 VpiHandle VpiClockingEvent(VpiHandle obj) {
   // §37.52: the clocking event a property spec or clocked property traverses
-  // to, modeled as the object's event-control child. Report the first one, or
-  // null when the handle is null or no clocking event is attached.
+  // to: the expression of the clock a run recorded, or else the object's
+  // event-control child. Null when the handle is null or no clocking event is
+  // attached.
   if (!obj) return nullptr;
+  if (obj->clocking_event != nullptr) return obj->clocking_event;
   for (auto* child : obj->children) {
     if (child->type == vpiEventControl) return child;
   }

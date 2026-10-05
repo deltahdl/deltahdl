@@ -190,7 +190,10 @@ bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
 void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
                             const PropertyRegistry& registry,
                             DiagEngine& diag) {
-  if (stmt->assert_clock.empty()) stmt->assert_clock = context;
+  if (stmt->assert_clock.empty()) {
+    stmt->assert_clock = context;
+    stmt->assert_clock_inferred = !context.empty();
+  }
   if (!stmt->assert_clock.empty()) {
     // §16.16 (e) and §16.16.1: a multiclocked property needs a unique
     // semantic leading clock under the clock flowing in.

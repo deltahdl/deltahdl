@@ -1,11 +1,9 @@
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "common/string_methods.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
@@ -295,66 +293,6 @@ CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   return shape;
 }
 
-// The kind of value a built-in method is called on: a string (§6.16), an enum
-// (§6.19.5), a fixed-size, dynamic or associative array or a queue (§7.4,
-// §7.5, §7.8, §7.10), or none of them.
-enum class BuiltInHolder : uint8_t {
-  kNone,
-  kString,
-  kEnum,
-  kFixedArray,
-  kDynamicArray,
-  kAssocArray,
-  kQueue,
-};
-
-// Whether `method` is one of the built-in methods of a value of `holder`'s
-// kind, every one listed by name: §6.16's of a string, §6.19.5's of an enum,
-// §7.5's of a dynamic array, §7.9's of an associative array, §7.10.2's of a
-// queue, and §7.12's of any unpacked array but the ordering methods of
-// §7.12.2, which an associative array has none of. Each is a function.
-bool IsBuiltInMethod(BuiltInHolder holder, std::string_view method) {
-  static constexpr std::string_view kEnum[] = {"first", "last", "next",
-                                               "prev",  "num",  "name"};
-  static constexpr std::string_view kDynamic[] = {"size", "delete"};
-  static constexpr std::string_view kAssoc[] = {
-      "num", "size", "delete", "exists", "first", "last", "next", "prev"};
-  static constexpr std::string_view kQueue[] = {
-      "size",     "insert",     "delete",   "pop_front",
-      "pop_back", "push_front", "push_back"};
-  static constexpr std::string_view kManipulation[] = {
-      "find",       "find_index",
-      "find_first", "find_first_index",
-      "find_last",  "find_last_index",
-      "min",        "max",
-      "unique",     "unique_index",
-      "sum",        "product",
-      "and",        "or",
-      "xor",        "map"};
-  static constexpr std::string_view kOrdering[] = {"reverse", "sort", "rsort",
-                                                   "shuffle"};
-  const auto kLists = [method](const auto& names) {
-    return std::ranges::any_of(
-        names, [method](std::string_view name) { return name == method; });
-  };
-  switch (holder) {
-    case BuiltInHolder::kString:
-      return StringMethodWritesItsObject(method) ||
-             StringMethodAnswersAValue(method);
-    case BuiltInHolder::kEnum:
-      return kLists(kEnum);
-    case BuiltInHolder::kNone:
-      return false;
-    default:
-      break;
-  }
-  if (kLists(kManipulation)) return true;
-  if (holder == BuiltInHolder::kAssocArray) return kLists(kAssoc);
-  if (kLists(kOrdering)) return true;
-  if (holder == BuiltInHolder::kDynamicArray) return kLists(kDynamic);
-  return holder == BuiltInHolder::kQueue && kLists(kQueue);
-}
-
 // §7.8: whether the unpacked dimension `dim` gives an associative array its
 // index type: a data type keyword, the wildcard, or a name standing for a type
 // or a class.
@@ -373,29 +311,30 @@ bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
 // its first unpacked dimension makes, a dynamic array's `[]` being recorded as
 // no dimension and a queue's as `[$]`; else a string or an enum, written as
 // one or through a typedef.
-BuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
+VpiBuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
   if (!decl.var_unpacked_dims.empty()) {
     const Expr* dim = decl.var_unpacked_dims.front();
-    if (dim == nullptr) return BuiltInHolder::kDynamicArray;
-    if (IsQueueDim(dim)) return BuiltInHolder::kQueue;
-    return IsAssocDim(*dim, walk) ? BuiltInHolder::kAssocArray
-                                  : BuiltInHolder::kFixedArray;
+    if (dim == nullptr) return VpiBuiltInHolder::kDynamicArray;
+    if (IsQueueDim(dim)) return VpiBuiltInHolder::kQueue;
+    return IsAssocDim(*dim, walk) ? VpiBuiltInHolder::kAssocArray
+                                  : VpiBuiltInHolder::kFixedArray;
   }
   const int kKind = TypeVariableKind(decl.var_decl_type, walk);
-  if (kKind == vpiStringVar) return BuiltInHolder::kString;
-  return kKind == vpiEnumVar ? BuiltInHolder::kEnum : BuiltInHolder::kNone;
+  if (kKind == vpiStringVar) return VpiBuiltInHolder::kString;
+  return kKind == vpiEnumVar ? VpiBuiltInHolder::kEnum
+                             : VpiBuiltInHolder::kNone;
 }
 
 // The same, of a variable of the instance's module.
-BuiltInHolder ModuleHolder(const RtlirVariable& var) {
-  if (var.is_queue) return BuiltInHolder::kQueue;
-  if (var.is_dynamic) return BuiltInHolder::kDynamicArray;
-  if (var.is_assoc) return BuiltInHolder::kAssocArray;
-  if (var.num_unpacked_dims > 0) return BuiltInHolder::kFixedArray;
-  if (var.is_string) return BuiltInHolder::kString;
+VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
+  if (var.is_queue) return VpiBuiltInHolder::kQueue;
+  if (var.is_dynamic) return VpiBuiltInHolder::kDynamicArray;
+  if (var.is_assoc) return VpiBuiltInHolder::kAssocArray;
+  if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
+  if (var.is_string) return VpiBuiltInHolder::kString;
   const bool kEnum =
       !var.enum_type_name.empty() || var.decl_kind == DataTypeKind::kEnum;
-  return kEnum ? BuiltInHolder::kEnum : BuiltInHolder::kNone;
+  return kEnum ? VpiBuiltInHolder::kEnum : VpiBuiltInHolder::kNone;
 }
 
 // §8.4: the variable a call's prefix names, as the class it holds a handle of
@@ -403,7 +342,7 @@ BuiltInHolder ModuleHolder(const RtlirVariable& var) {
 // built-in value it is, and the object standing for it.
 struct PrefixVar {
   std::string_view cls;
-  BuiltInHolder holder = BuiltInHolder::kNone;
+  VpiBuiltInHolder holder = VpiBuiltInHolder::kNone;
   VpiObject* object = nullptr;
 };
 
@@ -545,9 +484,9 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
                           const BodyWalk& walk) {
   const PrefixVar kVar = FindPrefixVar(parent, access.lhs->text, walk);
   MethodCall call;
-  if (kVar.holder == BuiltInHolder::kNone) {
+  if (kVar.holder == VpiBuiltInHolder::kNone) {
     call = ClassMethodCall(walk, kVar.cls, access.rhs->text);
-  } else if (IsBuiltInMethod(kVar.holder, access.rhs->text)) {
+  } else if (VpiIsBuiltInMethod(kVar.holder, access.rhs->text)) {
     call.type = vpiMethodFuncCall;
   }
   return MethodShape(call, access.rhs->text, kVar.object, walk);
@@ -602,7 +541,7 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
     return {};
   }
   const PrefixVar kVar = FindPrefixVar(parent, names.front(), walk);
-  if (kVar.holder != BuiltInHolder::kNone) return {};
+  if (kVar.holder != VpiBuiltInHolder::kNone) return {};
   std::string_view cls = kVar.cls;
   for (std::size_t i = 1; i < names.size(); ++i) {
     cls = PropertyClass(walk, cls, names[i]);
@@ -751,6 +690,23 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
                    [&](const Stmt* sub) { WalkStmt(sub, parent, walk); });
 }
 
+// What a statement written at `parent` builds the objects it reaches with,
+// used while `parent` and `walk` live.
+VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
+  return {walk.build,
+          [kSite = CallSiteOf(parent, walk), &walk](const Expr* expr) {
+            return VpiCallSiteExpression(expr, walk.objects, kSite,
+                                         walk.calls.ctx, walk.build);
+          },
+          [&parent, &walk](const Stmt* held, VpiObject* holder) {
+            return WalkStmt(
+                held, BlockParent{holder, parent.path, nullptr, &parent}, walk);
+          },
+          [&parent, &walk](const Expr* array) {
+            return ForeachIndexKind(array, parent, walk);
+          }};
+}
+
 // The object a statement the builder of vpi_design_attach_statements.cpp
 // knows stands as, with the expressions it writes and the statements it holds,
 // each hung from it; null for a statement of another kind.
@@ -763,21 +719,7 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   if (VpiIsAssertionType(kKind)) {
     VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
   }
-  const VpiCallSite kSite = CallSiteOf(parent, walk);
-  VpiFillStmt(obj, stmt,
-              {walk.build,
-               [&](const Expr* expr) {
-                 return VpiCallSiteExpression(expr, walk.objects, kSite,
-                                              walk.calls.ctx, walk.build);
-               },
-               [&](const Stmt* held, VpiObject* holder) {
-                 return WalkStmt(
-                     held, BlockParent{holder, parent.path, nullptr, &parent},
-                     walk);
-               },
-               [&](const Expr* array) {
-                 return ForeachIndexKind(array, parent, walk);
-               }});
+  VpiFillStmt(obj, stmt, StmtBuildAt(parent, walk));
   return obj;
 }
 
@@ -883,33 +825,35 @@ VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
   return process;
 }
 
-// The procedures one instance declares, each with the objects its body holds,
-// walked with `instance_walk`, whose process each procedure's own replaces. An
-// assertion the elaborator carries as a process is no procedure the source
-// wrote, so it stands as none, though the statements of its action blocks are
-// statements of the design all the same.
+// The assertions one instance writes as items, each in the generate block
+// instance writing it, and the procedures it declares with the objects their
+// bodies hold, walked with `instance_walk`, whose process each procedure's
+// own replaces. An assertion the elaborator carries as a process is no
+// procedure the source wrote, a concurrent one being the item's (§37.50).
 void AttachInstanceProcedures(VpiObject* instance,
                               const BodyWalk& instance_walk) {
+  for (const RtlirAssertion& assertion : instance_walk.mod.assertions) {
+    VpiObject* scope = VpiGenScopeOf(instance, assertion.gen_block_path);
+    if (scope == nullptr || assertion.item == nullptr) continue;
+    BodyWalk walk = instance_walk;
+    walk.gen_prefixes = &assertion.gen_block_prefixes;
+    VpiMakeItemAssertion(
+        *assertion.item, scope, walk.calls.ctx,
+        StmtBuildAt(BlockParent{scope, scope->full_name}, walk));
+  }
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
     // A process stands in the generate block instance its path names.
     VpiObject* scope = VpiGenScopeOf(instance, proc.gen_block_path);
     if (scope == nullptr) continue;
-    const bool kIsAssertion =
-        proc.is_static_assertion || proc.is_concurrent_clocked;
     BodyWalk walk = instance_walk;
     walk.gen_prefixes = &proc.gen_block_prefixes;
-    walk.process =
-        kIsAssertion ? nullptr : MakeProcess(proc, scope, instance_walk.build);
     const BlockParent kParent{scope, scope->full_name};
-    if (walk.process != nullptr) {
+    if (!proc.is_static_assertion && !proc.is_concurrent_clocked) {
+      walk.process = MakeProcess(proc, scope, instance_walk.build);
       walk.process->body = WalkProcessBody(proc, kParent, walk);
     } else if (proc.body != nullptr && proc.body->is_deferred) {
       // §16.4.3: a deferred assertion item is the statement it runs (§37.55).
       MakeBuiltStmt(*proc.body, kParent, walk);
-    } else if (proc.body != nullptr) {
-      // The body of such a process is the assertion itself, whose label names
-      // the assertion (§16.5) rather than a block around it.
-      WalkSubStmts(*proc.body, kParent, walk);
     }
   }
 }

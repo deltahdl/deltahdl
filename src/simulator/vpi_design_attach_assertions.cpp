@@ -3,14 +3,11 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
-#include "elaborator/rtlir.h"
-#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
-#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -36,8 +33,9 @@ int ConcurrentKindOf(const ModuleItem& item) {
 // §37.50: the object the concurrent assertion `item` stands as in `scope`,
 // named by its label, reporting where it stands and, for a cover, whether it
 // covers a sequence.
-void MakeConcurrentAssertion(const ModuleItem& item, VpiObject* scope,
-                             SimContext& ctx, const VpiAttachBuild& build) {
+VpiObject* MakeConcurrentAssertion(const ModuleItem& item, VpiObject* scope,
+                                   SimContext& ctx,
+                                   const VpiAttachBuild& build) {
   VpiObject* obj = build.alloc();
   obj->type = ConcurrentKindOf(item);
   obj->parent = scope;
@@ -48,6 +46,7 @@ void MakeConcurrentAssertion(const ModuleItem& item, VpiObject* scope,
   obj->cover_sequence = item.kind == ModuleItemKind::kCoverSequence;
   VpiRecordAssertionLocation(obj, SourceRange{item.loc, item.end}, ctx);
   scope->children.push_back(obj);
+  return obj;
 }
 
 }  // namespace
@@ -71,28 +70,27 @@ void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
   }
 }
 
-void AttachAssertions(const RtlirDesign* design, const VpiObjectMap& objects,
-                      SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.49 with §39.3.1 step b: an instance reaches the assertions written as
-  // its items, each hung from the generate block instance that writes it
-  // (§37.12), or from the instance itself. A deferred immediate one runs as a
-  // process the elaborator makes of it, whose walk (AttachProcedures) builds
-  // it as the statement it is, with its parts (§37.55).
-  WalkInstanceObjects(
-      design, objects,
-      [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
-        for (const RtlirAssertion& assertion : mod->assertions) {
-          const ModuleItem* item = assertion.item;
-          if (item == nullptr ||
-              (item->body != nullptr && item->body->is_deferred)) {
-            continue;
-          }
-          VpiObject* scope = VpiGenScopeOf(instance, assertion.gen_block_path);
-          if (scope != nullptr) {
-            MakeConcurrentAssertion(*item, scope, ctx, build);
-          }
-        }
-      });
+void VpiMakeItemAssertion(const ModuleItem& item, VpiObject* scope,
+                          SimContext& ctx, const VpiStmtBuild& with) {
+  // §37.49 with §39.3.1 step b: an assertion written as an item is an
+  // assertion of the scope writing it. A deferred immediate one runs as a
+  // process the elaborator makes of it, whose walk builds it as the statement
+  // it is, with its parts (§37.55).
+  if (item.body != nullptr && item.body->is_deferred) return;
+  VpiObject* obj = MakeConcurrentAssertion(item, scope, ctx, with.build);
+  // §37.50: the clock and the property the elaborator resolved onto the
+  // statement it carries, where it carries one. A spec instantiating a
+  // declared property stands as a property inst, which is not modelled.
+  if (item.body != nullptr) {
+    VpiFillAssertionClock(obj, *item.body, with);
+    if (item.prop_instance_name.empty()) {
+      VpiMakePropertySpec(obj, *item.body, with);
+    }
+  }
+  // §37.50 detail 2: a restrict writes no action; §16.14.3 gives a cover a
+  // pass action alone.
+  with.statement(item.assert_pass_stmt, obj);
+  obj->else_stmt = with.statement(item.assert_fail_stmt, obj);
 }
 
 }  // namespace delta

@@ -389,6 +389,11 @@ struct VpiObject {
   // §37.55: an assertion's fail action, reached through vpiElseStmt, where a
   // run recorded it; §16.3 lets the pass action before it go unwritten.
   VpiObject* else_stmt = nullptr;
+  // §37.50 and §37.52: the expression of the clock a concurrent assertion or
+  // a property spec is evaluated on, and a property spec's disable condition,
+  // reached through vpiClockingEvent and vpiDisableCondition.
+  VpiObject* clocking_event = nullptr;
+  VpiObject* disable_condition = nullptr;
 
   // §37.62: whether an event statement is a blocking event trigger (->) rather
   // than a nonblocking one (->>), reported through vpi_get(vpiBlocking). The

@@ -241,6 +241,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   // §37.49: an assertion the block writes is an object of this instance.
   for (size_t i = first_assertion; i < mod->assertions.size(); ++i) {
     mod->assertions[i].gen_block_path = gen_block_path_;
+    mod->assertions[i].gen_block_prefixes = gen_prefix_scopes_;
   }
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);

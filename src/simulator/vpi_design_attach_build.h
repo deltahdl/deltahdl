@@ -260,6 +260,25 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
 // for none.
 int VpiBuiltInClassCallKind(std::string_view cls, std::string_view method);
 
+// The kind of value a built-in method is called on: a string (§6.16), an enum
+// (§6.19.5), a fixed-size, dynamic or associative array or a queue (§7.4,
+// §7.5, §7.8, §7.10), or none of them.
+enum class VpiBuiltInHolder : uint8_t {
+  kNone,
+  kString,
+  kEnum,
+  kFixedArray,
+  kDynamicArray,
+  kAssocArray,
+  kQueue,
+};
+
+// Whether `method` is one of the built-in methods of a value of `holder`'s
+// kind: §6.16's of a string, §6.19.5's of an enum, §7.5's of a dynamic array,
+// §7.9's of an associative array, §7.10.2's of a queue, and §7.12's of any
+// unpacked array but §7.12.2's ordering methods for an associative one.
+bool VpiIsBuiltInMethod(VpiBuiltInHolder holder, std::string_view method);
+
 // Whether `name` is a system function the standard defines, which a statement
 // calling it calls as a function.
 bool VpiIsBuiltInSystemFunction(std::string_view name);
@@ -291,6 +310,18 @@ int VpiBuiltStmtKind(const Stmt& stmt);
 // is not modelled.
 VpiObject* VpiEventCondition(const std::vector<EventExpr>& events,
                              const VpiStmtBuild& with);
+
+// §37.50: give the concurrent assertion `obj` the clock it is evaluated on,
+// the one the statement carrying its property, `property`, resolved, and
+// whether that clock was inferred.
+void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
+                           const VpiStmtBuild& with);
+
+// §37.52: the property spec `property` carries, hung from `holder` with its
+// clock, its disable condition and the property expression of a Boolean
+// property; null where the spec was not read.
+VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
+                               const VpiStmtBuild& with);
 
 // The objects `obj`, made for `stmt` with the kind above, reaches: the
 // expressions its figure draws and the statements it holds, each built
@@ -351,11 +382,13 @@ void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
-// §37.49: give each instance an assertion object per concurrent assertion
-// written as one of its items, hung from the generate block instance that
-// writes it or the instance itself.
-void AttachAssertions(const RtlirDesign* design, const VpiObjectMap& objects,
-                      SimContext& ctx, const VpiAttachBuild& build);
+// §37.49 and §37.50: the assertion object of the concurrent assertion `item`
+// writes as an item, hung from `scope`, the generate block instance writing it
+// or the instance itself, with its clock, its property spec and its actions,
+// each built through `with`; none for a deferred immediate assertion, which
+// stands as the statement its process runs.
+void VpiMakeItemAssertion(const ModuleItem& item, VpiObject* scope,
+                          SimContext& ctx, const VpiStmtBuild& with);
 
 // §37.49: give the assertion `obj` the location of its text, `range`: its
 // file and the line and column it starts and ends at.
@@ -393,7 +426,8 @@ void AttachPortConnections(const RtlirDesign* design,
 // as the blocks are, each with the variables it declares; §37.62: an event
 // statement per trigger, §37.42: a call statement per task, method task and
 // system task call, and an object per statement VpiBuiltStmtKind names, each
-// hung from the block or statement it stands in.
+// hung from the block or statement it stands in; and §37.50: an assertion
+// object per concurrent assertion written as an item (VpiMakeItemAssertion).
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build);
 

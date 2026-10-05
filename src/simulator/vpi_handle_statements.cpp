@@ -1,8 +1,10 @@
 #include "simulator/vpi_user.h"
 // The statement-class predicates and the for-header helper these resolvers ask
 // are declared here.
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -10,9 +12,10 @@ namespace delta {
 // ===========================================================================
 // The vpi_handle() relations of the statement model: the untagged arrow every
 // statement that holds a body draws to §37.4.1's `stmt` class, §37.74's two
-// single arrows to a for statement's header, and §37.63's edge from a statement
-// back to the process it runs in. They sit in a file of their own because the
-// resolvers they were written beside had grown past the length
+// single arrows to a for statement's header, §37.63's edge from a statement
+// back to the process it runs in, and the edges §37.50 draws from a concurrent
+// assertion to its actions among the others. They sit in a file of their own
+// because the resolvers they were written beside had grown past the length
 // .github/workflows/deltahdl.yml admits a source file.
 // ===========================================================================
 
@@ -74,8 +77,58 @@ bool TryResolveUserSystfRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.52: the property expression a property spec reaches by its untagged
+// edge, the one child a run hangs from it. The property expr class groups
+// §37.54's sequence expr, which groups the bare expressions, a net or a
+// variable a name stands for among them (§37.58).
+static VpiHandle PropertySpecExpr(VpiHandle spec) {
+  for (auto* child : spec->children) {
+    if (VpiIsPropertyExprType(child->type) ||
+        VpiIsSequenceExprType(child->type) || VpiIsOperandObject(child)) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+// §37.50: the edges a concurrent assertion draws to its clock, its property
+// and its actions; §37.52: those a property spec draws to its disable
+// condition and its property expression. Each is a relation tag no object
+// carries for its own type, so the traversal they fell through to reached
+// none of them.
+static bool TryResolveAssertionRelation(int type, VpiHandle ref,
+                                        VpiHandle& out) {
+  if (VpiIsConcurrentAssertionType(ref->type)) {
+    switch (type) {
+      case vpiClockingEvent:
+        out = VpiConcurrentAssertionClockingEvent(ref);
+        return true;
+      case vpiProperty:
+        out = VpiConcurrentAssertionProperty(ref);
+        return true;
+      case vpiStmt:
+        out = VpiConcurrentAssertionStmt(ref);
+        return true;
+      case vpiElseStmt:
+        out = VpiConcurrentAssertionElseStmt(ref);
+        return true;
+      default:
+        return false;
+    }
+  }
+  if (ref->type != vpiPropertySpec) return false;
+  if (type == vpiDisableCondition) {
+    out = ref->disable_condition;
+    return true;
+  }
+  if (type != vpiPropertyExpr) return false;
+  out = PropertySpecExpr(ref);
+  return true;
+}
+
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  return TryResolveForAndBodyStmtRelation(type, ref, out) ||
+  return TryResolveAssertionRelation(type, ref, out) ||
+         TryResolveForAndBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out) ||
          TryResolveUserSystfRelation(type, ref, out);
 }

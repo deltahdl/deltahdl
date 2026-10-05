@@ -86,8 +86,10 @@ void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter);
 // §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74/§37.75: the body statement
 // the object model draws an untagged arrow to `stmt` for, §37.74's two single
 // arrows to a for statement's header, and the process a statement runs in;
-// §37.42: the user systf a system task or function call is a call of. Defined
-// in vpi_handle_statements.cpp, used by vpi_handle.cpp.
+// §37.42: the user systf a system task or function call is a call of; §37.50
+// and §37.52: a concurrent assertion's clock, property and actions and a
+// property spec's disable condition and property expression. Defined in
+// vpi_handle_statements.cpp, used by vpi_handle.cpp.
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out);
 
 // §37.80 (figure): whether an object is one of the kinds the callback diagram

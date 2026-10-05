@@ -2,6 +2,7 @@
 #include <string_view>
 #include <utility>
 
+#include "common/string_methods.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 
@@ -79,6 +80,53 @@ bool VpiIsBuiltInSystemFunction(std::string_view name) {
   return std::ranges::any_of(kFunctions, [name](std::string_view function) {
     return function == name;
   });
+}
+
+// Whether `method` is one of the built-in methods of a value of `holder`'s
+// kind, every one listed by name: §6.16's of a string, §6.19.5's of an enum,
+// §7.5's of a dynamic array, §7.9's of an associative array, §7.10.2's of a
+// queue, and §7.12's of any unpacked array but the ordering methods of
+// §7.12.2, which an associative array has none of. Each is a function.
+bool VpiIsBuiltInMethod(VpiBuiltInHolder holder, std::string_view method) {
+  static constexpr std::string_view kEnum[] = {"first", "last", "next",
+                                               "prev",  "num",  "name"};
+  static constexpr std::string_view kDynamic[] = {"size", "delete"};
+  static constexpr std::string_view kAssoc[] = {
+      "num", "size", "delete", "exists", "first", "last", "next", "prev"};
+  static constexpr std::string_view kQueue[] = {
+      "size",     "insert",     "delete",   "pop_front",
+      "pop_back", "push_front", "push_back"};
+  static constexpr std::string_view kManipulation[] = {
+      "find",       "find_index",
+      "find_first", "find_first_index",
+      "find_last",  "find_last_index",
+      "min",        "max",
+      "unique",     "unique_index",
+      "sum",        "product",
+      "and",        "or",
+      "xor",        "map"};
+  static constexpr std::string_view kOrdering[] = {"reverse", "sort", "rsort",
+                                                   "shuffle"};
+  const auto kLists = [method](const auto& names) {
+    return std::ranges::any_of(
+        names, [method](std::string_view name) { return name == method; });
+  };
+  switch (holder) {
+    case VpiBuiltInHolder::kString:
+      return StringMethodWritesItsObject(method) ||
+             StringMethodAnswersAValue(method);
+    case VpiBuiltInHolder::kEnum:
+      return kLists(kEnum);
+    case VpiBuiltInHolder::kNone:
+      return false;
+    default:
+      break;
+  }
+  if (kLists(kManipulation)) return true;
+  if (holder == VpiBuiltInHolder::kAssocArray) return kLists(kAssoc);
+  if (kLists(kOrdering)) return true;
+  if (holder == VpiBuiltInHolder::kDynamicArray) return kLists(kDynamic);
+  return holder == VpiBuiltInHolder::kQueue && kLists(kQueue);
 }
 
 }  // namespace delta

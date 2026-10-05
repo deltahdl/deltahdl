@@ -315,19 +315,55 @@ int AssertionStmtKind(const Stmt& stmt) {
 // its pass and fail actions, the fail action recorded as such since §16.3 lets
 // the pass action go unwritten - and whether it is deferred and whether final
 // (§16.4). §37.50: a concurrent one reports whether it covers a sequence, and
-// holds its actions likewise, as §37.73's expect statement does.
+// holds its clock, its property spec and its actions likewise, as §37.73's
+// expect statement holds its property spec and its actions.
 void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->cover_sequence = stmt.cover_sequence;
   if (!stmt.is_procedural_concurrent) {
     obj->is_deferred = stmt.is_deferred;
     obj->is_final = stmt.is_final_deferred;
     AddChild(obj, with.expression(stmt.assert_expr));
+  } else {
+    if (stmt.kind != StmtKind::kExpect) VpiFillAssertionClock(obj, stmt, with);
+    VpiMakePropertySpec(obj, stmt, with);
   }
   with.statement(stmt.assert_pass_stmt, obj);
   obj->else_stmt = with.statement(stmt.assert_fail_stmt, obj);
 }
 
 }  // namespace
+
+void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
+                           const VpiStmtBuild& with) {
+  // §37.50 detail 1: the clock the assertion is evaluated on, the one its spec
+  // writes or the one inferred for it, which vpiIsClockInferred tells apart.
+  obj->clocking_event = EventCondition(property.assert_clock, with);
+  obj->clock_inferred = property.assert_clock_inferred;
+}
+
+VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
+                               const VpiStmtBuild& with) {
+  // A spec the parser skipped left no property to stand for.
+  if (property.assert_expr == nullptr && property.assert_sequence == nullptr &&
+      property.assert_property == nullptr) {
+    return nullptr;
+  }
+  // §37.52: the clock, which §16.16 (a) has an inferred one stand as though
+  // written, the disable condition, which §16.15 lets a default disable iff
+  // give, and the property expression. A sequence (§37.54) or a property of
+  // operators, under a `not` included, stands for operations not modelled.
+  VpiObject* spec = with.build.alloc();
+  spec->type = vpiPropertySpec;
+  spec->parent = holder;
+  spec->clocking_event = EventCondition(property.assert_clock, with);
+  spec->disable_condition = with.expression(property.assert_disable_iff);
+  if (property.assert_sequence == nullptr &&
+      property.assert_property == nullptr && !property.assert_negated) {
+    AddChild(spec, with.expression(property.assert_expr));
+  }
+  holder->children.push_back(spec);
+  return spec;
+}
 
 VpiObject* VpiEventCondition(const std::vector<EventExpr>& events,
                              const VpiStmtBuild& with) {

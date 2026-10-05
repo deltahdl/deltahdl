@@ -387,6 +387,11 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   // replaced by what is inferred at the statement, the default clocking and
   // the default disable iff in scope.
   FillInferredDefaults(item->assert_expr, decl, inferred, arena);
+  // A name declaring no property leaves the spec no instance of one, which
+  // §37.50 reaches as a property spec rather than a property inst.
+  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
+    item->prop_instance_name = {};
+  }
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
     SubstituteSequenceInstance(item, decl, arena);
     return;
@@ -634,7 +639,10 @@ void Elaborator::ResolveStaticAssertionClock(
   // §16.4.3: a deferred immediate assertion outside procedural code stands
   // for an always_comb procedure and has no clock to resolve.
   if (item->body == nullptr || item->body->is_deferred) return;
-  if (item->sensitivity.empty()) item->sensitivity = default_clock;
+  if (item->sensitivity.empty()) {
+    item->sensitivity = default_clock;
+    item->body->assert_clock_inferred = !default_clock.empty();
+  }
   if (item->sensitivity.empty()) {
     diag_.Error(item->loc,
                 "concurrent assertion has no leading clocking event: none is "

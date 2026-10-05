@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -74,15 +75,16 @@ TEST(ConcurrentAssertionModel, AssertionReachesItsProperty) {
 
 // Claim 2 + Detail 1: the same clocking event is reported whether it was
 // written explicitly or inferred; the vpiIsClockInferred Boolean is what
-// distinguishes the two, not the clocking-event traversal.
+// distinguishes the two, not the clocking-event traversal. The event is the
+// expression the assertion records as its clock.
 TEST(ConcurrentAssertionModel, ClockingEventIsTheActualEventForBothForms) {
   VpiContext ctx;
 
   VpiObject explicit_clk;
   explicit_clk.type = vpiAssert;
   VpiObject ev0;
-  ev0.type = vpiEventControl;
-  explicit_clk.children = {&ev0};
+  ev0.type = vpiOperation;
+  explicit_clk.clocking_event = &ev0;
   EXPECT_EQ(VpiConcurrentAssertionClockingEvent(&explicit_clk), &ev0);
   EXPECT_EQ(ctx.Get(vpiIsClockInferred, &explicit_clk), 0);
 
@@ -90,8 +92,8 @@ TEST(ConcurrentAssertionModel, ClockingEventIsTheActualEventForBothForms) {
   inferred_clk.type = vpiAssert;
   inferred_clk.clock_inferred = true;
   VpiObject ev1;
-  ev1.type = vpiEventControl;
-  inferred_clk.children = {&ev1};
+  ev1.type = vpiOperation;
+  inferred_clk.clocking_event = &ev1;
   EXPECT_EQ(VpiConcurrentAssertionClockingEvent(&inferred_clk), &ev1);
   EXPECT_EQ(ctx.Get(vpiIsClockInferred, &inferred_clk), 1);
 }
@@ -152,26 +154,41 @@ TEST(ConcurrentAssertionModel, ElseStatementPresenceByKind) {
 }
 
 // Claims 3 and 5: an assert traverses to its pass statement through vpiStmt and
-// to its else statement through vpiElseStmt; each is null when absent.
+// to its else statement through vpiElseStmt; each is null when absent. A
+// statement's own type is a statement kind, so the two are told apart by the
+// else action the assertion records and by position.
 TEST(ConcurrentAssertionModel, AssertReachesPassAndElseStatements) {
   VpiObject assertion;
   assertion.type = vpiAssert;
   VpiObject pass;
-  pass.type = vpiStmt;
+  pass.type = vpiAssignment;
   VpiObject els;
-  els.type = vpiElseStmt;
+  els.type = vpiAssignment;
   assertion.children = {&pass, &els};
-
+  assertion.else_stmt = &els;
   EXPECT_EQ(VpiConcurrentAssertionStmt(&assertion), &pass);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(&assertion), &els);
 
+  // A cover draws no else edge, however many statements it holds.
   VpiObject pass_only;
   pass_only.type = vpiCover;
   VpiObject p2;
-  p2.type = vpiStmt;
-  pass_only.children = {&p2};
+  p2.type = vpiAssignment;
+  VpiObject p3;
+  p3.type = vpiAssignment;
+  pass_only.children = {&p2, &p3};
   EXPECT_EQ(VpiConcurrentAssertionStmt(&pass_only), &p2);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(&pass_only), nullptr);
+
+  // A fail action written alone is no pass action.
+  VpiObject fail_only;
+  fail_only.type = vpiAssume;
+  VpiObject f;
+  f.type = vpiAssignment;
+  fail_only.children = {&f};
+  fail_only.else_stmt = &f;
+  EXPECT_EQ(VpiConcurrentAssertionStmt(&fail_only), nullptr);
+  EXPECT_EQ(VpiConcurrentAssertionElseStmt(&fail_only), &f);
 
   EXPECT_EQ(VpiConcurrentAssertionStmt(nullptr), nullptr);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(nullptr), nullptr);
@@ -215,14 +232,14 @@ TEST(ConcurrentAssertionModel, PropertyTraversalSkipsNonPropertyChildren) {
   EXPECT_EQ(VpiConcurrentAssertionProperty(&assertion), nullptr);
 }
 
-// Claim 2 edge: the clocking-event traversal matches the event-control child,
-// so an assertion carrying only unrelated children reports no clocking event.
-TEST(ConcurrentAssertionModel, ClockingEventTraversalSkipsNonEventChildren) {
+// Claim 2 edge: the clocking event is the expression the assertion records,
+// so an assertion carrying an event control among its children reports none.
+TEST(ConcurrentAssertionModel, ClockingEventIsNoChildOfTheAssertion) {
   VpiObject assertion;
   assertion.type = vpiAssume;
-  VpiObject prop_child;
-  prop_child.type = vpiPropertySpec;
-  assertion.children = {&prop_child};
+  VpiObject control;
+  control.type = vpiEventControl;
+  assertion.children = {&control};
   EXPECT_EQ(VpiConcurrentAssertionClockingEvent(&assertion), nullptr);
 }
 
@@ -237,6 +254,133 @@ TEST(ConcurrentAssertionModel, StatementTraversalsSkipNonStatementChildren) {
   assertion.children = {&net_child};
   EXPECT_EQ(VpiConcurrentAssertionStmt(&assertion), nullptr);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(&assertion), nullptr);
+}
+
+class ConcurrentAssertionsOfARun : public VpiDesignRun {
+ protected:
+  // The name of what `relation` reaches from `ref`, empty for nothing.
+  static std::string NameReached(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
+  }
+
+  // The edge operation `event` stands for and the name of what it is taken
+  // of, as "posedge clk"; empty where it is no edge operation.
+  static std::string EdgeOf(vpiHandle event) {
+    if (event == nullptr || vpi_get(vpiType, event) != vpiOperation) return "";
+    const int kOp = vpi_get(vpiOpType, event);
+    vpiHandle operands = vpi_iterate(vpiOperand, event);
+    vpiHandle operand = operands == nullptr ? nullptr : vpi_scan(operands);
+    if (operand == nullptr) return "";
+    const std::string kName = vpi_get_str(vpiName, operand);
+    if (kOp == vpiPosedgeOp) return "posedge " + kName;
+    return kOp == vpiNegedgeOp ? "negedge " + kName : "";
+  }
+};
+
+// An assertion written as an item reaches its pass action through vpiStmt and
+// its fail action through vpiElseStmt (#5079).
+TEST_F(ConcurrentAssertionsOfARun, AnItemReachesBothActions) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk) a) $display(\"p\");\n"
+      "      else $write(\"f\");\n"
+      "  c1: cover property (@(posedge clk) a) $display(\"c\");\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  vpiHandle c1 = Named(vpiAssertion, By("top"), "c1");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(c1, nullptr);
+  EXPECT_EQ(NameReached(vpiStmt, a1), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(NameReached(vpiStmt, c1), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, c1), "");
+}
+
+// A fail action written alone is reached through vpiElseStmt and is no pass
+// action (#5079).
+TEST_F(ConcurrentAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk) a) else $write(\"f\");\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_EQ(NameReached(vpiStmt, a1), "");
+  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+}
+
+// An assertion embedded in a procedure reaches its actions the same way
+// (#5079).
+TEST_F(ConcurrentAssertionsOfARun, AProceduralAssertionReachesBothActions) {
+  Run("module top; logic clk, a;\n"
+      "  always @(posedge clk)\n"
+      "    p1: assert property (a) $display(\"p\"); else $write(\"f\");\n"
+      "endmodule\n");
+  vpiHandle p1 = Named(vpiAssertion, By("top"), "p1");
+  ASSERT_NE(p1, nullptr);
+  EXPECT_EQ(NameReached(vpiStmt, p1), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, p1), "$write");
+}
+
+// An assertion reaches the clock it writes through vpiClockingEvent, which was
+// not inferred (#5080).
+TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesTheClockItWrites) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, a1)), "posedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, a1), 0);
+}
+
+// An assertion writing no clock reaches the default clocking's event, inferred
+// (§16.16), and one embedded in a procedure the procedure's (§16.14.6) (#5080).
+TEST_F(ConcurrentAssertionsOfARun, AnInferredClockIsReachedAndReported) {
+  Run("module top; logic clk, a;\n"
+      "  default clocking cb @(negedge clk); endclocking\n"
+      "  a1: assert property (a);\n"
+      "  always @(posedge clk) p1: assert property (a);\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  vpiHandle p1 = Named(vpiAssertion, By("top"), "p1");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(p1, nullptr);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, a1)), "negedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, a1), 1);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, p1)), "posedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, p1), 1);
+}
+
+// An assertion reaches its property spec through vpiProperty, and the spec its
+// clock, its disable condition and its property expression (#5081).
+TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesItsPropertySpec) {
+  Run("module top; logic clk, rst, a;\n"
+      "  a1: assert property (@(posedge clk) disable iff (rst) a);\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle spec = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, spec), vpiPropertySpec);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, spec)), "posedge clk");
+  EXPECT_EQ(NameReached(vpiDisableCondition, spec), "rst");
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+}
+
+// A spec that is a name declaring no property is a Boolean property spec, on
+// the default clocking's event as though written (§16.16) (#5081).
+TEST_F(ConcurrentAssertionsOfARun, ABareNameIsABooleanPropertySpec) {
+  Run("module top; logic clk, a;\n"
+      "  default clocking cb @(negedge clk); endclocking\n"
+      "  a1: assert property (a);\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle spec = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, spec), vpiPropertySpec);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, spec)), "negedge clk");
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
 }  // namespace
