@@ -23,6 +23,7 @@ struct EventExpr;
 enum class DataTypeKind : uint8_t;
 struct Expr;
 struct ModuleItem;
+struct PropertyExprNode;
 struct RtlirAssertion;
 struct RtlirPropertyDecl;
 struct RtlirDesign;
@@ -326,13 +327,19 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
                                const VpiStmtBuild& with);
 
 // §37.52: what a property spec is made of: the clock written or inferred for
-// it, its disable condition, and the expression of a Boolean property, null
-// for a property of any other form.
+// it, its disable condition, and the tree of its property, null where the
+// parser read none.
 struct VpiPropertySpecParts {
   const std::vector<EventExpr>& clock;
   const Expr* disable = nullptr;
-  const Expr* boolean = nullptr;
+  const PropertyExprNode* property = nullptr;
 };
+
+// §37.52: the property expr the property tree `node` stands for: the
+// expression of a Boolean, or the operation of a property operator (detail
+// 2) over its operands, each built through `with`; null for a form not built.
+VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
+                                 const VpiStmtBuild& with);
 
 // §37.52: the property spec of `parts`, hung from `holder`.
 VpiObject* VpiMakePropertySpecOf(VpiObject* holder,

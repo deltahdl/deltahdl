@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -371,6 +373,154 @@ TEST(PropertySpecModel, DisableConditionReachesExpressionOrDistribution) {
 
   EXPECT_FALSE(VpiIsDisableConditionType(vpiModule));
   EXPECT_FALSE(VpiIsDisableConditionType(vpiNet));
+}
+
+// One assertion per operator form of §16.12, each named for what it shows.
+constexpr const char* kPropertyOperators =
+    "module top; logic clk, a, b, c;\n"
+    "  i1: assert property (@(posedge clk) a |-> b);\n"
+    "  i2: assert property (@(posedge clk) a |=> b);\n"
+    "  f1: assert property (@(posedge clk) a #-# b);\n"
+    "  f2: assert property (@(posedge clk) a #=# b);\n"
+    "  n1: assert property (@(posedge clk) not (a s_until_with b));\n"
+    "  u1: assert property (@(posedge clk) a until b);\n"
+    "  x1: assert property (@(posedge clk) nexttime [2] a);\n"
+    "  x2: assert property (@(posedge clk) nexttime a);\n"
+    "  w1: assert property (@(posedge clk) always [1:3] a);\n"
+    "  e1: assert property (@(posedge clk) s_eventually [1:2] a);\n"
+    "  r1: assert property (@(posedge clk) accept_on (b) a);\n"
+    "  r2: assert property (@(posedge clk) sync_reject_on (b) a);\n"
+    "  c1: assert property (@(posedge clk) if (a) b else c);\n"
+    "  c2: assert property (@(posedge clk) if (a) b);\n"
+    "  j1: assert property (@(posedge clk) (a |-> b) and (a |-> c));\n"
+    "  j2: assert property (@(posedge clk) (a |-> b) or (a |-> c));\n"
+    "  j3: assert property (@(posedge clk) (a |-> b) implies (a |-> c));\n"
+    "  j4: assert property (@(posedge clk) (a |-> b) iff (a |-> c));\n"
+    "endmodule\n";
+
+class PropertyOperationsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override { Run(kPropertyOperators); }
+
+  // The property expr the property spec of the assertion `name` reaches.
+  static vpiHandle PropertyOf(const char* name) {
+    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
+    vpiHandle spec =
+        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion);
+    return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
+  }
+
+  // The operator of the operation `op`, 0 where it is no operation.
+  static int OpOf(vpiHandle op) {
+    if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
+    return vpi_get(vpiOpType, op);
+  }
+
+  // The operands of `op` in the order vpiOperand reaches them.
+  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
+    std::vector<vpiHandle> operands;
+    vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
+    if (it == nullptr) return operands;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      operands.push_back(h);
+    }
+    return operands;
+  }
+
+  // The names of the operands of `op`, an operand without one as "".
+  static std::vector<std::string> OperandNames(vpiHandle op) {
+    std::vector<std::string> names;
+    for (vpiHandle operand : OperandsOf(op)) {
+      const char* name = vpi_get_str(vpiName, operand);
+      names.emplace_back(name == nullptr ? "" : name);
+    }
+    return names;
+  }
+};
+
+// An implication is an operation of its overlap, antecedent first, and a
+// followed-by the operation of the one written (detail 2, §16.12.7, §16.12.9)
+// (#5087).
+TEST_F(PropertyOperationsOfARun, ImplicationsAndFollowedBysAreTheirOperators) {
+  EXPECT_EQ(OpOf(PropertyOf("i1")), vpiOverlapImplyOp);
+  EXPECT_EQ(OpOf(PropertyOf("i2")), vpiNonOverlapImplyOp);
+  EXPECT_EQ(OpOf(PropertyOf("f1")), vpiOverlapFollowedByOp);
+  EXPECT_EQ(OpOf(PropertyOf("f2")), vpiNonOverlapFollowedByOp);
+  const std::vector<std::string> kAThenB{"a", "b"};
+  for (const char* name : {"i1", "i2", "f1", "f2"}) {
+    EXPECT_EQ(OperandNames(PropertyOf(name)), kAThenB) << name;
+  }
+}
+
+// A not reaches the operation it negates, and an until reports through
+// vpiOpStrong whether it was written strong (detail 3) (#5087).
+TEST_F(PropertyOperationsOfARun, UntilsReportTheirStrength) {
+  vpiHandle negation = PropertyOf("n1");
+  EXPECT_EQ(OpOf(negation), vpiNotOp);
+  const std::vector<vpiHandle> kNegated = OperandsOf(negation);
+  ASSERT_EQ(kNegated.size(), 1u);
+  EXPECT_EQ(OpOf(kNegated[0]), vpiUntilWithOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, kNegated[0]), 1);
+  EXPECT_EQ(OperandNames(kNegated[0]), (std::vector<std::string>{"a", "b"}));
+  vpiHandle weak = PropertyOf("u1");
+  EXPECT_EQ(OpOf(weak), vpiUntilOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, weak), 0);
+}
+
+// A nexttime takes its property and its constant, the constant only where it
+// differs from 1; an always and an eventually their property and the two
+// bounds of their range (detail 2) (#5087).
+TEST_F(PropertyOperationsOfARun, CountedOperatorsTakeTheirBounds) {
+  vpiHandle counted = PropertyOf("x1");
+  EXPECT_EQ(OpOf(counted), vpiNexttimeOp);
+  const std::vector<vpiHandle> kCounted = OperandsOf(counted);
+  ASSERT_EQ(kCounted.size(), 2u);
+  EXPECT_STREQ(vpi_get_str(vpiName, kCounted[0]), "a");
+  EXPECT_EQ(vpi_get(vpiType, kCounted[1]), vpiConstant);
+  EXPECT_EQ(OperandsOf(PropertyOf("x2")).size(), 1u);
+  vpiHandle always = PropertyOf("w1");
+  EXPECT_EQ(OpOf(always), vpiAlwaysOp);
+  EXPECT_EQ(OperandsOf(always).size(), 3u);
+  EXPECT_EQ(vpi_get(vpiOpStrong, always), 0);
+  vpiHandle eventually = PropertyOf("e1");
+  EXPECT_EQ(OpOf(eventually), vpiEventuallyOp);
+  EXPECT_EQ(OperandsOf(eventually).size(), 3u);
+  EXPECT_EQ(vpi_get(vpiOpStrong, eventually), 1);
+}
+
+// An abort takes its condition before its property, and the conditional
+// operators their condition first (detail 2, §16.12.14, §16.12.10) (#5087).
+TEST_F(PropertyOperationsOfARun, ConditionsComeFirst) {
+  EXPECT_EQ(OpOf(PropertyOf("r1")), vpiAcceptOnOp);
+  EXPECT_EQ(OpOf(PropertyOf("r2")), vpiSyncRejectOnOp);
+  EXPECT_EQ(OperandNames(PropertyOf("r1")),
+            (std::vector<std::string>{"b", "a"}));
+  EXPECT_EQ(OpOf(PropertyOf("c1")), vpiIfElseOp);
+  EXPECT_EQ(OperandNames(PropertyOf("c1")),
+            (std::vector<std::string>{"a", "b", "c"}));
+  EXPECT_EQ(OpOf(PropertyOf("c2")), vpiIfOp);
+  EXPECT_EQ(OperandNames(PropertyOf("c2")),
+            (std::vector<std::string>{"a", "b"}));
+}
+
+// The binary property operators join two properties, each an operation of
+// its own (detail 2, §16.12.3 to §16.12.8) (#5087).
+TEST_F(PropertyOperationsOfARun, BinaryOperatorsJoinTwoProperties) {
+  const struct {
+    const char* name;
+    int op;
+  } kJoins[] = {{"j1", vpiCompAndOp},
+                {"j2", vpiCompOrOp},
+                {"j3", vpiImpliesOp},
+                {"j4", vpiIffOp}};
+  for (const auto& join : kJoins) {
+    vpiHandle property = PropertyOf(join.name);
+    EXPECT_EQ(OpOf(property), join.op) << join.name;
+    const std::vector<vpiHandle> kSides = OperandsOf(property);
+    ASSERT_EQ(kSides.size(), 2u) << join.name;
+    EXPECT_EQ(OpOf(kSides[0]), vpiOverlapImplyOp) << join.name;
+    EXPECT_EQ(OpOf(kSides[1]), vpiOverlapImplyOp) << join.name;
+  }
 }
 
 }  // namespace

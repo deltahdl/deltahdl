@@ -353,16 +353,22 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
     return nullptr;
   }
   // §16.16 (a) has an inferred clock stand as though written, and §16.15 lets
-  // a default disable iff give the condition. A sequence (§37.54) or a
-  // property of operators, under a `not` included, stands for operations not
-  // modelled.
-  const bool kBoolean = property.assert_sequence == nullptr &&
-                        property.assert_property == nullptr &&
-                        !property.assert_negated;
+  // a default disable iff give the condition. A property of operators is the
+  // tree the parser read, and a negated Boolean the not over it (§16.12.3);
+  // a sequence (§37.54) stands for operations not modelled.
+  const bool kSequence = property.assert_sequence != nullptr;
+  PropertyExprNode boolean;
+  boolean.boolean = property.assert_expr;
+  PropertyExprNode negated;
+  negated.kind = PropertyExprNode::Kind::kNot;
+  negated.operands.push_back(&boolean);
+  const PropertyExprNode* tree = property.assert_property;
+  if (tree == nullptr && property.assert_negated) tree = &negated;
+  if (tree == nullptr && !kSequence) tree = &boolean;
   return VpiMakePropertySpecOf(
       holder,
       VpiPropertySpecParts{property.assert_clock, property.assert_disable_iff,
-                           kBoolean ? property.assert_expr : nullptr},
+                           kSequence ? nullptr : tree},
       with);
 }
 
@@ -375,7 +381,7 @@ VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
   spec->parent = holder;
   spec->clocking_event = EventCondition(parts.clock, with);
   spec->disable_condition = with.expression(parts.disable);
-  AddChild(spec, with.expression(parts.boolean));
+  AddChild(spec, VpiPropertyExprObject(parts.property, with));
   holder->children.push_back(spec);
   return spec;
 }

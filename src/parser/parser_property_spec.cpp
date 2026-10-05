@@ -703,6 +703,7 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
   negated->operands.push_back(consequent);
   node->operands.push_back(negated);
   auto* whole = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
+  whole->followed_by = true;
   whole->operands.push_back(node);
   return whole;
 }

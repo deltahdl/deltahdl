@@ -228,7 +228,203 @@ VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   return nullptr;
 }
 
+// §37.52 detail 2: the operation of `op_type` over `operands`, in the order
+// given, strong where `strong` is (detail 3); null where an operand is.
+VpiObject* PropertyOperation(int op_type,
+                             const std::vector<VpiObject*>& operands,
+                             bool strong, const VpiAttachBuild& build) {
+  for (const VpiObject* operand : operands) {
+    if (operand == nullptr) return nullptr;
+  }
+  VpiObject* op = build.alloc();
+  op->type = vpiOperation;
+  op->op_type = op_type;
+  op->op_strong = strong;
+  op->children = operands;
+  return op;
+}
+
+// §16.9: whether `body` is one Boolean expression and nothing beside it.
+bool IsSingleBoolean(const SeqLinearBody& body) {
+  return body.operands.size() == 1 && body.delays.size() == 1 &&
+         body.delays[0].min == 0 && body.delays[0].max == 0 &&
+         body.repetitions.size() == 1 &&
+         body.repetitions[0].kind == SeqRepetition::Kind::kNone &&
+         (body.match_items.empty() || body.match_items[0].empty()) &&
+         body.throughouts.empty() && body.intersects.empty() &&
+         body.conjuncts.empty() && body.alternatives.empty() &&
+         !body.first_match;
+}
+
+// §37.52 with §37.54: the sequence `sequence` as an operand of a property
+// operator, the Boolean expression it is where it is one; null for one of
+// any other form.
+VpiObject* SequenceOperand(const ModuleItem* sequence,
+                           const VpiStmtBuild& with) {
+  if (sequence == nullptr || !IsSingleBoolean(sequence->seq_linear)) {
+    return nullptr;
+  }
+  return with.expression(sequence->seq_linear.operands.front());
+}
+
+// The property expr of the operand `index` of `node`; null where it has none.
+VpiObject* OperandOf(const PropertyExprNode& node, size_t index,
+                     const VpiStmtBuild& with) {
+  return index < node.operands.size()
+             ? VpiPropertyExprObject(node.operands[index], with)
+             : nullptr;
+}
+
+// §16.12.5: an and or an or over every operand of `node`, joined left to
+// right as the grammar's binary operator joins them.
+VpiObject* JoinedOperation(int op_type, const PropertyExprNode& node,
+                           const VpiStmtBuild& with) {
+  VpiObject* joined = OperandOf(node, 0, with);
+  for (size_t i = 1; i < node.operands.size(); ++i) {
+    joined = PropertyOperation(op_type, {joined, OperandOf(node, i, with)},
+                               false, with.build);
+  }
+  return joined;
+}
+
+// §16.12.9: the followed-by `node`, the not standing for it, as the operator
+// written: the implication's antecedent, then the property its negated
+// consequent negates.
+VpiObject* FollowedByOperation(const PropertyExprNode& node,
+                               const VpiStmtBuild& with) {
+  const PropertyExprNode* implication =
+      node.operands.empty() ? nullptr : node.operands.front();
+  if (implication == nullptr || implication->operands.empty() ||
+      implication->operands.front()->operands.empty()) {
+    return nullptr;
+  }
+  const int kOp =
+      implication->strong ? vpiNonOverlapFollowedByOp : vpiOverlapFollowedByOp;
+  return PropertyOperation(kOp,
+                           {SequenceOperand(implication->sequence, with),
+                            OperandOf(*implication->operands.front(), 0, with)},
+                           false, with.build);
+}
+
+// §16.12.10: an if, or an if-else where an else is written, its condition
+// first.
+VpiObject* ConditionalOperation(const PropertyExprNode& node,
+                                const VpiStmtBuild& with) {
+  std::vector<VpiObject*> operands{with.expression(node.boolean),
+                                   OperandOf(node, 0, with)};
+  if (node.operands.size() > 1) operands.push_back(OperandOf(node, 1, with));
+  return PropertyOperation(node.operands.size() > 1 ? vpiIfElseOp : vpiIfOp,
+                           operands, false, with.build);
+}
+
+// §16.12.11 and §16.12.13 with detail 2: a nexttime takes its property and
+// its constant, the constant only where it is other than 1; an always and an
+// eventually their property and the bounds of their range.
+VpiObject* CountedOperation(int op_type, const PropertyExprNode& node,
+                            const VpiStmtBuild& with) {
+  VpiObject* property = OperandOf(node, 0, with);
+  if (op_type == vpiNexttimeOp) {
+    const Expr* count = node.boolean;
+    const bool kOne = count != nullptr &&
+                      count->kind == ExprKind::kIntegerLiteral &&
+                      count->int_val == 1;
+    return PropertyOperation(
+        op_type, VpiNexttimeOperands(property, with.expression(count), !kOne),
+        node.strong, with.build);
+  }
+  return PropertyOperation(
+      op_type,
+      VpiAlwaysEventuallyOperands(property, with.expression(node.range_min),
+                                  with.expression(node.range_max)),
+      node.strong, with.build);
+}
+
+// §16.12.3 and §16.12.9: a not over its operand, or the followed-by it
+// stands for.
+VpiObject* NotOperation(const PropertyExprNode& node,
+                        const VpiStmtBuild& with) {
+  if (node.followed_by) return FollowedByOperation(node, with);
+  return PropertyOperation(vpiNotOp, {OperandOf(node, 0, with)}, false,
+                           with.build);
+}
+
+// §16.12.7: an implication, overlapping or not, its antecedent first.
+VpiObject* ImplicationOperation(const PropertyExprNode& node,
+                                const VpiStmtBuild& with) {
+  const int kOp = node.strong ? vpiNonOverlapImplyOp : vpiOverlapImplyOp;
+  return PropertyOperation(
+      kOp, {SequenceOperand(node.sequence, with), OperandOf(node, 0, with)},
+      false, with.build);
+}
+
+// §16.12.8 and §16.12.12: the operator of an implies, an iff or an until,
+// the untils told apart by whether they overlap.
+int BinaryOp(const PropertyExprNode& node) {
+  switch (node.kind) {
+    case PropertyExprNode::Kind::kImplies:
+      return vpiImpliesOp;
+    case PropertyExprNode::Kind::kIff:
+      return vpiIffOp;
+    default:
+      return node.range_unbounded ? vpiUntilWithOp : vpiUntilOp;
+  }
+}
+
+// §16.12.8 and §16.12.12: an implies, an iff or an until over its two
+// operands, an until strong where it was written so.
+VpiObject* BinaryOperation(const PropertyExprNode& node,
+                           const VpiStmtBuild& with) {
+  return PropertyOperation(BinaryOp(node),
+                           {OperandOf(node, 0, with), OperandOf(node, 1, with)},
+                           node.strong, with.build);
+}
+
+// §16.12.14: the abort operator `node` was written with.
+int AbortOp(const PropertyExprNode& node) {
+  if (node.accept) return node.synchronous ? vpiSyncAcceptOnOp : vpiAcceptOnOp;
+  return node.synchronous ? vpiSyncRejectOnOp : vpiRejectOnOp;
+}
+
 }  // namespace
+
+VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
+                                 const VpiStmtBuild& with) {
+  if (node == nullptr) return nullptr;
+  using Kind = PropertyExprNode::Kind;
+  switch (node->kind) {
+    case Kind::kBoolean:
+      return with.expression(node->boolean);
+    case Kind::kSequence:
+      return SequenceOperand(node->sequence, with);
+    case Kind::kNot:
+      return NotOperation(*node, with);
+    case Kind::kOr:
+      return JoinedOperation(vpiCompOrOp, *node, with);
+    case Kind::kAnd:
+      return JoinedOperation(vpiCompAndOp, *node, with);
+    case Kind::kIfElse:
+      return ConditionalOperation(*node, with);
+    case Kind::kImplication:
+      return ImplicationOperation(*node, with);
+    case Kind::kImplies:
+    case Kind::kIff:
+    case Kind::kUntil:
+      return BinaryOperation(*node, with);
+    case Kind::kNexttime:
+      return CountedOperation(vpiNexttimeOp, *node, with);
+    case Kind::kAlways:
+      return CountedOperation(vpiAlwaysOp, *node, with);
+    case Kind::kEventually:
+      return CountedOperation(vpiEventuallyOp, *node, with);
+    case Kind::kAbort:
+      return PropertyOperation(
+          AbortOp(*node),
+          {with.expression(node->boolean), OperandOf(*node, 0, with)}, false,
+          with.build);
+    default:
+      return nullptr;
+  }
+}
 
 VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
                                const VpiStmtBuild& with) {
@@ -292,11 +488,8 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
   // read and stands for no spec.
   const PropertyExprNode* tree = decl.prop_body_tree;
   if (tree == nullptr) return obj;
-  const bool kBoolean = tree->kind == PropertyExprNode::Kind::kBoolean;
   VpiMakePropertySpecOf(
-      obj,
-      VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff,
-                           kBoolean ? tree->boolean : nullptr},
+      obj, VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff, tree},
       with);
   return obj;
 }

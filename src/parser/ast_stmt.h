@@ -127,6 +127,10 @@ struct PropertyExprNode {
   // it is one of the sync_ forms, checked at the clock ticks alone.
   bool accept = false;
   bool synchronous = false;
+  // §16.12.9: a not standing for the followed-by `s #-# p`, `not (s |-> not
+  // p)`, or `s #=# p`, the implication beneath it strong; the operator the
+  // source wrote, which §37.52 reports.
+  bool followed_by = false;
   // §16.12.16: a case over the case expression in `boolean`, each operand
   // the property of one property_case_item and the item's expressions at
   // the same index here, the default's none.
