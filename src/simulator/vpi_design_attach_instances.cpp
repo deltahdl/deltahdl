@@ -199,6 +199,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     const VpiObjectMap kUnitTypespecs =
         AttachTypespecs(design, object_map_, kBuild);
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
+    AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // §37.42: a system call finds the registration its name resolves to, and

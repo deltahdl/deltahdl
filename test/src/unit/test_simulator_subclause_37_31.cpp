@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -277,6 +280,89 @@ TEST_F(ClassDefinition, ExtendsArgumentIterationReturnsChainingExpressions) {
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &arg_a);
   EXPECT_EQ(VpiObjectOf(seen[1]), &arg_b);
+}
+
+// A design run with a PLI application registered, whose class definitions are
+// read back from the model the run built.
+class ClassDefinitionsOfARun : public VpiDesignRun {
+ protected:
+  // The class defn of `scope` named `name`, null for none.
+  static vpiHandle DefnIn(vpiHandle scope, std::string_view name) {
+    return Named(vpiClassDefn, scope, name);
+  }
+};
+
+// §37.31: a class a module declares is a class defn of each of its instances,
+// full-named under the instance...
+TEST_F(ClassDefinitionsOfARun, AModuleClassIsAClassDefnOfItsInstance) {
+  Run("module top; class Packet; endclass endmodule\n");
+  EXPECT_EQ(NamesOf(vpiClassDefn, By("top")),
+            std::vector<std::string>{"Packet"});
+  vpiHandle defn = By("top.Packet");
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, defn), vpiClassDefn);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, defn), "top.Packet");
+}
+
+// ...reporting whether it is virtual...
+TEST_F(ClassDefinitionsOfARun, AVirtualClassReportsVpiVirtual) {
+  Run("module top; virtual class Shape; endclass\n"
+      "  class Square extends Shape; endclass endmodule\n");
+  EXPECT_EQ(vpi_get(vpiVirtual, DefnIn(By("top"), "Shape")), 1);
+  EXPECT_EQ(vpi_get(vpiVirtual, DefnIn(By("top"), "Square")), 0);
+}
+
+// ...a package's class is a class defn of the package...
+TEST_F(ClassDefinitionsOfARun, APackageClassIsAClassDefnOfThePackage) {
+  Run("package pkg; class Item; endclass endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle defn = DefnIn(By("pkg"), "Item");
+  ASSERT_NE(defn, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, defn), "pkg::Item");
+}
+
+// ...and the compilation unit's are reached with a NULL reference, which
+// reaches no class an instance declares.
+TEST_F(ClassDefinitionsOfARun, AUnitClassIsReachedWithANullReference) {
+  Run("class Unit; endclass\n"
+      "module top; class Packet; endclass endmodule\n");
+  EXPECT_EQ(NamesOf(vpiClassDefn, nullptr), std::vector<std::string>{"Unit"});
+  vpiHandle it = vpi_iterate(vpiClassDefn, nullptr);
+  ASSERT_NE(it, nullptr);
+  vpiHandle defn = vpi_scan(it);
+  vpi_release_handle(it);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, defn), "$unit::Unit");
+}
+
+// Detail 6: a derived class reaches its base through its extends object, and
+// the arguments its constructor chaining passes...
+TEST_F(ClassDefinitionsOfARun, ADerivedClassReachesItsBaseThroughExtends) {
+  Run("module top; class Base; function new(int n); endfunction endclass\n"
+      "  class Derived extends Base(5); endclass endmodule\n");
+  vpiHandle base = DefnIn(By("top"), "Base");
+  vpiHandle extends = vpi_handle(vpiExtends, DefnIn(By("top"), "Derived"));
+  ASSERT_NE(extends, nullptr);
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, extends);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "Base");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)), VpiObjectOf(base));
+  vpiHandle args = vpi_iterate(vpiArgument, extends);
+  ASSERT_NE(args, nullptr);
+  vpiHandle arg = vpi_scan(args);
+  vpi_release_handle(args);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(arg, &value);
+  EXPECT_EQ(value.value.integer, 5);
+  EXPECT_EQ(vpi_handle(vpiExtends, base), nullptr);
+}
+
+// ...and detail 5: a base class iterates the classes derived from it.
+TEST_F(ClassDefinitionsOfARun, ABaseClassIteratesItsDerivedClasses) {
+  Run("module top; class Base; endclass class A extends Base; endclass\n"
+      "  class B extends Base; endclass class C; endclass endmodule\n");
+  EXPECT_EQ(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "Base")),
+            (std::vector<std::string>{"A", "B"}));
 }
 
 }  // namespace

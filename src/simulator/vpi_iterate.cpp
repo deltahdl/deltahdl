@@ -620,15 +620,12 @@ void CollectMatchingChildren(int type, VpiHandle ref,
 bool VpiIsNullReferenceRelation(int type) {
   // §37.36 (figure) draws the udp defn from a circle too: a UDP definition
   // belongs to no scope, so the application reaches the design's definitions
-  // with a NULL reference object. The relation was not among these, so an
-  // iteration over them was a walk of the reference object's children and a
-  // NULL reference reached nothing.
-  //
-  // §37.10 draws the instance from a circle as well, and a package is the
-  // instance no module encloses, so the design's packages are reached the same
-  // way.
+  // with a NULL reference object. §37.10 draws the instance from a circle as
+  // well, and a package is the instance no module encloses, so the design's
+  // packages are reached the same way; and §37.31 draws the class defn so, the
+  // compilation unit's classes being those no instance or package declares.
   return type == kVpiModule || type == vpiCallback || type == vpiAssertion ||
-         type == vpiUdpDefn || type == vpiPackage;
+         type == vpiUdpDefn || type == vpiPackage || type == vpiClassDefn;
 }
 
 // §37.57 detail 1: whether the instantiation left this argument position empty.
@@ -685,6 +682,7 @@ void CollectMatchingObjects(int type, VpiHandle ref,
   for (auto* obj : all_objects) {
     if (!VpiIterateMatches(obj, type, ref, modes)) continue;
     if (modes.top_module && !obj->top_module) continue;
+    if (type == vpiClassDefn && !obj->in_compilation_unit) continue;
     iter->children.push_back(obj);
   }
 }

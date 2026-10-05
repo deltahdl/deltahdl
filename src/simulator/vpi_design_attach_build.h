@@ -111,6 +111,14 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiObjectMap& unit_typespecs,
                       const VpiAttachBuild& build);
 
+// §37.31: give each module instance and each package a class defn per class it
+// declares, and make one per class of the compilation unit, reached with a
+// NULL reference; and details 5 and 6: give each derived class its extends
+// object and hang it from its base's derived classes.
+void AttachClassDefinitions(const RtlirDesign* design,
+                            const VpiObjectMap& objects, SimContext& ctx,
+                            const VpiAttachBuild& build);
+
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
 void AttachVariableRanges(const RtlirDesign* design,
