@@ -463,6 +463,21 @@ int IndexTypeKind(std::string_view name, const BodyWalk& walk) {
 }
 
 // §12.7.3: the kind of the first index variable of a foreach loop over the
+// variable `name` of the instance's module: its index type's where the array
+// is associative, an int var otherwise.
+int ModuleIndexKind(std::string_view name, const BodyWalk& walk) {
+  for (const RtlirVariable& var : walk.mod.variables) {
+    if (var.name != name || !var.is_assoc) continue;
+    if (var.is_class_index) return vpiClassVar;
+    return IndexTypeKind(var.assoc_index_keyword.empty()
+                             ? var.assoc_index_type_name
+                             : var.assoc_index_keyword,
+                         walk);
+  }
+  return vpiIntVar;
+}
+
+// §12.7.3: the kind of the first index variable of a foreach loop over the
 // array `array` names, the index type's where the array's first dimension is
 // associative and an int var otherwise; an array a block around the
 // statement declares is found first (§23.9).
@@ -479,15 +494,7 @@ int ForeachIndexKind(const Expr* array, const BlockParent& parent,
     const bool kAssoc = dim != nullptr && IsAssocDim(*dim, walk);
     return kAssoc ? IndexTypeKind(dim->text, walk) : vpiIntVar;
   }
-  for (const RtlirVariable& var : walk.mod.variables) {
-    if (var.name != array->text || !var.is_assoc) continue;
-    if (var.is_class_index) return vpiClassVar;
-    return IndexTypeKind(var.assoc_index_keyword.empty()
-                             ? var.assoc_index_type_name
-                             : var.assoc_index_keyword,
-                         walk);
-  }
-  return vpiIntVar;
+  return ModuleIndexKind(array->text, walk);
 }
 
 // §37.42 with §37.31: the task or function the class defn made for `owner`
