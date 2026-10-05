@@ -142,6 +142,22 @@ struct AssignNames {
   const VpiObject* scope = nullptr;
 };
 
+// §23.9 and §12.7.3: the variable or named event `scope` itself declares
+// under `name`, or the index variable of the foreach loop `scope` is; null
+// where neither is.
+VpiHandle DeclaredIn(const VpiObject* scope, std::string_view name) {
+  for (VpiObject* var : scope->loop_vars) {
+    if (var != nullptr && var->name == name) return var;
+  }
+  for (VpiObject* child : scope->children) {
+    const bool kDeclares = VpiIsVariablesType(child->type) ||
+                           child->type == vpiNamedEvent ||
+                           child->type == vpiNamedEventArray;
+    if (kDeclares && child->name == name) return child;
+  }
+  return nullptr;
+}
+
 // §23.9: the variable or named event a block around `scope`, or `scope`
 // itself, declares under `name`, the innermost first, or the index variable
 // a foreach loop around it declares (§12.7.3); null where none does, the
@@ -153,15 +169,8 @@ VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name,
   for (; scope != nullptr && !VpiIsInstanceType(scope->type);
        scope = scope->parent) {
     if ((scope->type == vpiGenScope) != gen) continue;
-    for (VpiObject* var : scope->loop_vars) {
-      if (var != nullptr && var->name == name) return var;
-    }
-    for (VpiObject* child : scope->children) {
-      const bool kDeclares = VpiIsVariablesType(child->type) ||
-                             child->type == vpiNamedEvent ||
-                             child->type == vpiNamedEventArray;
-      if (kDeclares && child->name == name) return child;
-    }
+    VpiHandle declared = DeclaredIn(scope, name);
+    if (declared != nullptr) return declared;
   }
   return nullptr;
 }
