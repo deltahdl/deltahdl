@@ -298,6 +298,14 @@ struct VpiCallBuild {
   const VpiSubroutineObjects& subroutines;
 };
 
+// §37.14 details 3, 4 and 10: link each port of each instance to its higher
+// connection, the expression the instantiation wrote for it, and its lower
+// one, the instance's own net or variable of the port. The ports are those
+// VpiContext::AttachDesignPorts made.
+void AttachPortConnections(const RtlirDesign* design,
+                           const VpiObjectMap& objects, SimContext& ctx,
+                           const VpiAttachBuild& build);
+
 // §37.63: give each instance a process per procedure it declares, reaching the
 // statement it runs; §37.12: an object per block its procedures write, nested
 // as the blocks are, each with the variables it declares; §37.62: an event

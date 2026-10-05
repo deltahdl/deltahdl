@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -352,6 +353,50 @@ TEST_F(PortModelInARun, ThePortsWidthDecidesScalarAndVector) {
   EXPECT_EQ(g_wide_port_size, 8);
   EXPECT_EQ(g_wide_port_vector, 1);
   EXPECT_EQ(g_narrow_port_scalar, 1);
+}
+
+// The ports of a run: those an instantiation in a design connects, built from
+// the elaborated design rather than by hand (#4951).
+class PortsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle PortOfU(const char* name) {
+    return Named(vpiPort, By("top.u"), name);
+  }
+};
+
+constexpr const char* kConnectedPorts =
+    "module sub(input logic a, output logic o, input logic n);\n"
+    "  assign o = a;\n"
+    "endmodule\n"
+    "module top; logic w, x; wire y; sub u(.a(w & x), .o(y), .n()); "
+    "endmodule\n";
+
+// Details 3 and 4: a port's higher connection is the expression the
+// instantiation wrote for it, and its lower one the instance's own variable
+// or net of the port.
+TEST_F(PortsOfARun, APortReachesBothOfItsConnections) {
+  Run(kConnectedPorts);
+  vpiHandle a = PortOfU("a");
+  vpiHandle o = PortOfU("o");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(o, nullptr);
+  vpiHandle high = vpi_handle(vpiHighConn, a);
+  ASSERT_NE(high, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, high), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, high), vpiBitAndOp);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, a)), VpiObjectOf(By("top.u.a")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, o)), VpiObjectOf(By("top.y")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, o)), VpiObjectOf(By("top.u.o")));
+}
+
+// Detail 10: a port the instantiation leaves unconnected has no higher
+// connection, though its lower one is there.
+TEST_F(PortsOfARun, AnUnconnectedPortHasNoHigherConnection) {
+  Run(kConnectedPorts);
+  vpiHandle n = PortOfU("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(vpi_handle(vpiHighConn, n), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, n)), VpiObjectOf(By("top.u.n")));
 }
 
 }  // namespace

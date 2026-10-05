@@ -6,6 +6,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -442,6 +443,14 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
       }
     }
   });
+  if (sim_ctx_ == nullptr) return;
+  AttachPortConnections(design, object_map_, *sim_ctx_,
+                        {[this] { return AllocObject(); },
+                         [this](std::string name) {
+                           name_pool_.push_back(std::move(name));
+                           return std::string_view(name_pool_.back());
+                         },
+                         sim_ctx_->GetArena()});
 }
 
 namespace {
