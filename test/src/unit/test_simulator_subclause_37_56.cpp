@@ -281,8 +281,9 @@ class MulticlockSequencesOfARun : public VpiDesignRun {};
 // clock, the first on the clock flowing into it, each reaching its clock and
 // its sequence expr (§16.13.1) (#5098).
 TEST_F(MulticlockSequencesOfARun, AChainOnTwoClocksIsAMulticlockSequence) {
-  Run("module top; logic clk1, clk2, a, b;\n"
-      "  m1: assert property (@(posedge clk1) a ##1 @(posedge clk2) b);\n"
+  Run("module top; logic clk1, clk2, a, b, c, d;\n"
+      "  m1: assert property (@(posedge clk1) a ##1 b ##1 @(posedge clk2) c "
+      "##2 d);\n"
       "endmodule\n");
   vpiHandle sequence = PropertyOf("m1");
   ASSERT_NE(sequence, nullptr);
@@ -294,24 +295,28 @@ TEST_F(MulticlockSequencesOfARun, AChainOnTwoClocksIsAMulticlockSequence) {
     clocked.push_back(h);
   }
   ASSERT_EQ(clocked.size(), 2u);
-  const char* const kNames[] = {"a", "b"};
-  const int kEdges[] = {vpiPosedgeOp, vpiPosedgeOp};
+  const char* const kNames[][2] = {{"a", "b"}, {"c", "d"}};
+  const char* const kClocks[] = {"clk1", "clk2"};
+  const int kDelays[] = {1, 2};
   for (size_t i = 0; i < clocked.size(); ++i) {
     vpiHandle event = vpi_handle(vpiClockingEvent, clocked[i]);
     ASSERT_NE(event, nullptr) << i;
-    EXPECT_EQ(vpi_get(vpiOpType, event), kEdges[i]) << i;
-    vpiHandle held = vpi_handle(vpiSequenceExpr, clocked[i]);
+    EXPECT_EQ(vpi_get(vpiOpType, event), vpiPosedgeOp) << i;
+    const std::vector<vpiHandle> kEdge = OperandsOf(event);
+    ASSERT_EQ(kEdge.size(), 1u) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, kEdge[0]), kClocks[i]) << i;
+    vpiHandle held = vpi_handle(vpiOperation, clocked[i]);
     ASSERT_NE(held, nullptr) << i;
-    EXPECT_STREQ(vpi_get_str(vpiName, held), kNames[i]) << i;
+    EXPECT_EQ(vpi_get(vpiOpType, held), vpiCycleDelayOp) << i;
+    const std::vector<vpiHandle> kHeld = OperandsOf(held);
+    ASSERT_EQ(kHeld.size(), 3u) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, kHeld[0]), kNames[i][0]) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, kHeld[1]), kNames[i][1]) << i;
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(kHeld[2], &value);
+    EXPECT_EQ(value.value.integer, kDelays[i]) << i;
   }
-  const std::vector<vpiHandle> kFirst =
-      OperandsOf(vpi_handle(vpiClockingEvent, clocked[0]));
-  const std::vector<vpiHandle> kSecond =
-      OperandsOf(vpi_handle(vpiClockingEvent, clocked[1]));
-  ASSERT_EQ(kFirst.size(), 1u);
-  ASSERT_EQ(kSecond.size(), 1u);
-  EXPECT_STREQ(vpi_get_str(vpiName, kFirst[0]), "clk1");
-  EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "clk2");
 }
 
 }  // namespace

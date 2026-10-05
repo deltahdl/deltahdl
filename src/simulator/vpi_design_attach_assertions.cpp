@@ -520,11 +520,32 @@ bool IsLoneChain(const SeqLinearBody& body) {
          body.alternatives.empty() && !body.first_match;
 }
 
+// §37.56: the clocked seq of the operands of `body` from `start` to before
+// `end`, on `clock`, reaching it and the sequence expr they are, a run after
+// the first joined to the one before by the clock change rather than a delay.
+VpiObject* ClockedRun(const SeqLinearBody& body, size_t start, size_t end,
+                      const std::vector<EventExpr>* clock,
+                      const VpiStmtBuild& with) {
+  std::vector<ChainElement> run =
+      ChainElements(body, start, end, nullptr, with);
+  if (start > 0 && !run.empty()) {
+    run[0].before.min = 0;
+    run[0].before.max = 0;
+  }
+  VpiObject* clocked = with.build.alloc();
+  clocked->type = vpiClockedSeq;
+  if (clock != nullptr) {
+    clocked->clocking_event = VpiEventCondition(*clock, with);
+  }
+  VpiObject* sequence = JoinChain(run, with);
+  if (sequence != nullptr) clocked->children.push_back(sequence);
+  return clocked;
+}
+
 // §37.56 with §16.13.1: the chain `body`, whose operands name clocks of their
 // own, as a multiclock sequence expr reaching a clocked seq per run of
 // operands on one clock, the first run's the clock `flowing` into the chain
-// where it names none; each clocked seq reaches its clock and the sequence
-// expr its run is.
+// where it names none.
 VpiObject* MulticlockExpr(const SeqLinearBody& body,
                           const std::vector<EventExpr>* flowing,
                           const VpiStmtBuild& with) {
@@ -538,19 +559,10 @@ VpiObject* MulticlockExpr(const SeqLinearBody& body,
   for (size_t start = 0; start < kCount;) {
     size_t end = start + 1;
     while (end < kCount && kClockAt(end) == nullptr) ++end;
-    std::vector<ChainElement> run =
-        ChainElements(body, start, end, nullptr, with);
-    if (start > 0 && !run.empty()) run[0].before = SeqCycleDelay{0, 0};
     const std::vector<EventExpr>* clock =
         kClockAt(start) != nullptr ? kClockAt(start) : flowing;
-    VpiObject* clocked = with.build.alloc();
-    clocked->type = vpiClockedSeq;
+    VpiObject* clocked = ClockedRun(body, start, end, clock, with);
     clocked->parent = multiclock;
-    if (clock != nullptr) {
-      clocked->clocking_event = VpiEventCondition(*clock, with);
-    }
-    VpiObject* sequence = JoinChain(run, with);
-    if (sequence != nullptr) clocked->children.push_back(sequence);
     multiclock->children.push_back(clocked);
     start = end;
   }
