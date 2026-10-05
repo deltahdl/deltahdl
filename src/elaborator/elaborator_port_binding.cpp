@@ -739,6 +739,7 @@ void Elaborator::SynthesizeExplicitDefault(const PortBindScope& scope,
   RtlirPortBinding& binding = bind.binding;
   const RtlirPort* port = bind.child_port;
   if (binding.direction != Direction::kInput) return;
+  binding.unconnected = binding.connection == nullptr;
 
   if (scope.is_ordered && !binding.connection && port && port->default_value) {
     binding.connection = port->default_value;
@@ -864,9 +865,11 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
     BindWildcardDeclaredPort(scope, port, binding);
   } else if (port.default_value) {
     binding.connection = port.default_value;
+    binding.unconnected = true;
   } else if (port.direction == Direction::kInput) {
     binding.connection = DefaultInputConnection(
         arena_, port, scope.has_pull, scope.inst.resolved->unconnected_drive);
+    binding.unconnected = true;
   }
 
   if (binding.connection) {
@@ -902,6 +905,7 @@ void Elaborator::BindTrailingInputPorts(const PortBindScope& scope) {
     binding.direction = port.direction;
     binding.width = port.width;
     binding.port_expr = port.port_expr;
+    binding.unconnected = true;
 
     if (port.default_value) {
       binding.connection = port.default_value;

@@ -333,6 +333,7 @@ static void BuildBoundWildcardBindings(const ModuleItem* item,
       binding.connection = expr;
     } else {
       binding.connection = port.default_value;
+      binding.unconnected = true;
     }
     if (binding.connection) inst.port_bindings.push_back(binding);
   }

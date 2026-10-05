@@ -24,7 +24,8 @@ VpiObject* PortNamed(VpiHandle module, std::string_view name) {
 // instantiation wrote for it, its names resolved in the instance holding the
 // instantiation, and its lower connection the instance's own net or variable
 // of the port's name. A port the instantiation leaves unconnected reaches no
-// higher connection.
+// higher connection, though the elaborator supplies its default, a pull or 'z
+// in its place.
 void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
                   const VpiObjectMap& objects, SimContext& ctx,
                   const VpiAttachBuild& build) {
@@ -34,8 +35,10 @@ void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
   for (const RtlirPortBinding& binding : inst.port_bindings) {
     VpiObject* port = PortNamed(module, binding.port_name);
     if (port == nullptr) continue;
-    port->high_conn =
-        VpiInstanceExpression(binding.connection, objects, prefix, ctx, build);
+    port->high_conn = binding.unconnected
+                          ? nullptr
+                          : VpiInstanceExpression(binding.connection, objects,
+                                                  prefix, ctx, build);
   }
   for (VpiObject* port : module->children) {
     if (port->type != kVpiPort || port->low_conn != nullptr ||

@@ -616,18 +616,18 @@ struct RtlirPortBinding {
   // The bound port's RtlirPort::port_expr, what the connection is joined to
   // inside the instance. Null for a port without one.
   Expr* port_expr = nullptr;
+  // §23.3.3: no connection was written; `connection` is a default in its place.
+  bool unconnected = false;
 };
 
 struct RtlirModuleInst {
   std::string_view module_name;
   std::string_view inst_name;
   // §23.6: the instance's name as the source wrote it, and the generate block
-  // instances between it and the module holding it. RtlirModuleInst::inst_name
-  // concatenates the two into one identifier, because the simulator keys an
-  // instance's storage on a single flat string (Lowerer::LowerChildModules in
-  // src/simulator/lowerer_child.cpp), and the steps cannot be recovered from it
-  // -- a block named `g` holding `u` and a module-level instance named `g_u`
-  // produce the same string. A hierarchical path is read against these two.
+  // instances between it and its module, which inst_name joins into the one
+  // flat string the simulator keys the instance under (lowerer_child.cpp) and
+  // from which they cannot be recovered: a block `g` holding `u` and an
+  // instance `g_u` give the same string. A hierarchical path reads these two.
   std::string_view simple_inst_name;
   HierPath gen_block_path;
   // §27.4: the loop constants and generate prefixes of the block instance
