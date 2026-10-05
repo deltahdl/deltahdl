@@ -596,6 +596,44 @@ TEST_F(ExpressionsOfARun, AWithClauseDecompilesAfterItsCall) {
   EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "arr.sum() with (item * 2)");
 }
 
+// ...a randomize() call with its inline constraint block (§18.7, #5039)...
+TEST_F(ExpressionsOfARun, AnInlineConstraintBlockDecompilesAfterItsCall) {
+  Run("module top; int a; wire [31:0] y;\n"
+      "  assign y = std::randomize(a) with {a>0; soft a<9;}; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()),
+               "std::randomize(a) with {a > 0; soft a < 9;}");
+}
+
+// ...with the identifier list that restricts it...
+TEST_F(ExpressionsOfARun, ARestrictedBlockDecompilesWithItsIdentifierList) {
+  Run("module top; class C; rand int x; endclass C c = new;\n"
+      "  wire [31:0] y; assign y = c.randomize() with (x) {x>0;};\n"
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()),
+               "c.randomize() with (x) {x > 0;}");
+}
+
+// ...each constraint set an item governs in braces...
+TEST_F(ExpressionsOfARun, AGoverningItemDecompilesWithItsSets) {
+  Run("module top; int a, b; wire [31:0] y;\n"
+      "  assign y = std::randomize(a, b) with {solve b before a;\n"
+      "    b -> a!=0; if (b>1) a<4; else a>8;}; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()),
+               "std::randomize(a, b) with {solve b before a; b -> {a != 0;} "
+               "if (b > 1) {a < 4;} else {a > 8;}}");
+}
+
+// ...and each distribution, uniqueness, iteration and disabling as written...
+TEST_F(ExpressionsOfARun, AConstraintItemDecompilesAsWritten) {
+  Run("module top; int a, b; int q[4]; wire [31:0] y;\n"
+      "  assign y = std::randomize(a, b) with {a dist {0:=1, [1:3]:/2};\n"
+      "    unique {a, b}; foreach (q[i]) q[i]<a; disable soft a;};\n"
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()),
+               "std::randomize(a, b) with {a dist {0 := 1, [1:3] :/ 2}; "
+               "unique {a, b}; foreach (q[i]) {q[i] < a;} disable soft a;}");
+}
+
 // ...a cast with the type it casts to...
 TEST_F(ExpressionsOfARun, ACastDecompilesWithItsType) {
   Run("module top; wire [7:0] a; wire [31:0] y; assign y = int'(a+1); "

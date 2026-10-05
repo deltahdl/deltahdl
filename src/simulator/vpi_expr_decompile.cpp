@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/operator_binding_power.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -124,12 +125,152 @@ std::optional<std::string> RenderList(
   return out;
 }
 
+std::optional<std::string> RenderConstraintSet(
+    const std::vector<ConstraintItem*>& items);
+
+// §18.5.3: one dist_item, a value, a bracketed range or `default`, with the
+// weight it is written with.
+std::optional<std::string> RenderDistItem(const ConstraintDistItem& item) {
+  std::string text = "default";
+  if (item.is_range) {
+    const Expr* end = item.tolerance != nullptr ? item.tolerance : item.hi;
+    const std::optional<Piece> kLo = Render(item.lo);
+    const std::optional<Piece> kEnd = Render(end);
+    if (!kLo || !kEnd) return std::nullopt;
+    std::string_view separator = ":";
+    if (item.tolerance != nullptr) {
+      separator = item.tolerance_relative ? "+%-" : "+/-";
+    }
+    text = "[" + kLo->text + std::string(separator) + kEnd->text + "]";
+  } else if (!item.is_default) {
+    const std::optional<Piece> kValue = Render(item.value);
+    if (!kValue) return std::nullopt;
+    text = kValue->text;
+  }
+  if (item.weight == nullptr) return text;
+  const std::optional<Piece> kWeight = Render(item.weight);
+  if (!kWeight) return std::nullopt;
+  return VpiDecompileJoin(
+      {text, item.per_element ? ":=" : ":/", kWeight->text});
+}
+
+// §18.5.3: an expression_or_dist, the dist_list braced after `dist`.
+std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
+  const std::optional<Piece> kExpr = Render(item.expr);
+  if (!kExpr) return std::nullopt;
+  if (!item.has_dist) return kExpr->text;
+  std::string list;
+  for (const ConstraintDistItem& dist_item : item.dist) {
+    const std::optional<std::string> kItem = RenderDistItem(dist_item);
+    if (!kItem) return std::nullopt;
+    if (!list.empty()) list += ", ";
+    list += *kItem;
+  }
+  return VpiDecompileJoin({kExpr->text, "dist", "{" + list + "}"});
+}
+
+// §18.5.7.1: a foreach's array and its loop variables, a variable left out
+// standing as nothing between its commas.
+std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
+  const std::optional<Piece> kArray = Render(item.expr);
+  if (!kArray) return std::nullopt;
+  std::string text = kArray->text + "[";
+  for (std::size_t i = 0; i < item.loop_vars.size(); ++i) {
+    if (i > 0) text += ", ";
+    text += item.loop_vars[i];
+  }
+  return VpiDecompileJoin({"foreach", VpiDecompileParenthesize(text + "]")});
+}
+
+// §18.5 (A.1.10): one constraint block item, terminated as the source
+// terminates it. An implication's antecedent keeps the parentheses that stop
+// the implication taking part of it away.
+std::optional<std::string> RenderConstraintItem(const ConstraintItem& item) {
+  std::optional<std::string> head;
+  switch (item.kind) {
+    case ConstraintItemKind::kExpression:
+      head = RenderExpressionOrDist(item);
+      if (!head) return std::nullopt;
+      return VpiDecompileJoin({item.soft ? "soft" : "", *head}) + ";";
+    case ConstraintItemKind::kUnique:
+      head = RenderList(item.exprs, {});
+      if (!head) return std::nullopt;
+      return "unique {" + *head + "};";
+    case ConstraintItemKind::kDisableSoft: {
+      const std::optional<Piece> kPrimary = Render(item.expr);
+      if (!kPrimary) return std::nullopt;
+      return VpiDecompileJoin({"disable", "soft", kPrimary->text}) + ";";
+    }
+    case ConstraintItemKind::kSolveBefore: {
+      const std::optional<std::string> kBefore = RenderList(item.exprs, {});
+      const std::optional<std::string> kAfter = RenderList(item.after, {});
+      if (!kBefore || !kAfter) return std::nullopt;
+      return VpiDecompileJoin({"solve", *kBefore, "before", *kAfter}) + ";";
+    }
+    case ConstraintItemKind::kImplication: {
+      const std::optional<Piece> kAntecedent = Render(item.expr);
+      if (!kAntecedent) return std::nullopt;
+      head = AsLeftOperand(*kAntecedent,
+                           InfixBindingPower(TokenKind::kArrow).first)
+                 .text +
+             " ->";
+      break;
+    }
+    case ConstraintItemKind::kIfElse: {
+      const std::optional<Piece> kCondition = Render(item.expr);
+      if (!kCondition) return std::nullopt;
+      head =
+          VpiDecompileJoin({"if", VpiDecompileParenthesize(kCondition->text)});
+      break;
+    }
+    case ConstraintItemKind::kForeach:
+      head = RenderForeachHead(item);
+      break;
+  }
+  const std::optional<std::string> kBody = RenderConstraintSet(item.body);
+  if (!head || !kBody) return std::nullopt;
+  if (!item.has_else) return VpiDecompileJoin({*head, *kBody});
+  const std::optional<std::string> kElse = RenderConstraintSet(item.else_body);
+  if (!kElse) return std::nullopt;
+  return VpiDecompileJoin({*head, *kBody, "else", *kElse});
+}
+
+// §18.5: a constraint set or block, its items one space apart in braces.
+std::optional<std::string> RenderConstraintSet(
+    const std::vector<ConstraintItem*>& items) {
+  std::vector<std::string> rendered;
+  for (const ConstraintItem* item : items) {
+    if (item == nullptr) return std::nullopt;
+    std::optional<std::string> text = RenderConstraintItem(*item);
+    if (!text) return std::nullopt;
+    rendered.push_back(std::move(*text));
+  }
+  return "{" + VpiDecompileJoin(rendered) + "}";
+}
+
+// §18.7: a randomize() call's inline constraint block after `with`, the
+// identifier list restricting it in the parentheses it is written in.
+std::optional<std::string> RenderInlineConstraint(const Expr& expr) {
+  const ClassMember* block = expr.inline_constraint;
+  if (!block->constraint_items_parsed) return std::nullopt;
+  const std::optional<std::string> kBlock =
+      RenderConstraintSet(block->constraint_items);
+  if (!kBlock) return std::nullopt;
+  std::string ids;
+  for (std::string_view id : expr.with_restrict_ids) {
+    if (!ids.empty()) ids += ", ";
+    ids += id;
+  }
+  return VpiDecompileJoin(
+      {"with", expr.with_has_parens ? VpiDecompileParenthesize(ids) : "",
+       *kBlock});
+}
+
 // §13.5 and §20: a call, its arguments in parentheses after the name; a system
 // call written with none is its name alone.
 std::optional<Piece> RenderCall(const Expr& expr) {
   std::string callee(expr.callee);
   if (expr.kind == ExprKind::kCall) {
-    if (expr.inline_constraint != nullptr) return std::nullopt;
     const std::optional<Piece> kCallee = Render(expr.lhs);
     if (!kCallee) return std::nullopt;
     callee = kCallee->text;
@@ -140,6 +281,11 @@ std::optional<Piece> RenderCall(const Expr& expr) {
       RenderList(expr.args, expr.arg_names);
   if (!kArgs) return std::nullopt;
   std::string text = callee + "(" + *kArgs + ")";
+  if (expr.inline_constraint != nullptr) {
+    const std::optional<std::string> kWith = RenderInlineConstraint(expr);
+    if (!kWith) return std::nullopt;
+    return Piece{VpiDecompileJoin({text, *kWith})};
+  }
   // §7.12: an array manipulation method's with clause, its expression in the
   // parentheses it is written in, or its array range in brackets (§7.12.1).
   if (expr.with_expr != nullptr) {
