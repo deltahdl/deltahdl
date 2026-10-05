@@ -639,6 +639,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach.cpp
     simulator/vpi_design_attach_arrays.cpp
     simulator/vpi_design_attach_assigns.cpp
+    simulator/vpi_design_attach_clocking.cpp
     simulator/vpi_design_attach_bits.cpp
     simulator/vpi_design_attach_build.cpp
     simulator/vpi_design_attach_builtins.cpp

@@ -298,6 +298,11 @@ VpiObject* DisableTarget(VpiObject* from, const Expr* name) {
 
 }  // namespace
 
+VpiObject* VpiEventCondition(const std::vector<EventExpr>& events,
+                             const VpiStmtBuild& with) {
+  return EventCondition(events, with);
+}
+
 int VpiBuiltStmtKind(const Stmt& stmt) {
   switch (stmt.kind) {
     case StmtKind::kBlockingAssign:

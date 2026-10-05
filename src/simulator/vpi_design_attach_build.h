@@ -18,6 +18,7 @@ class Arena;
 class SimContext;
 struct ClassDecl;
 struct DataType;
+struct EventExpr;
 enum class DataTypeKind : uint8_t;
 struct Expr;
 struct ModuleItem;
@@ -283,6 +284,12 @@ struct VpiStmtBuild {
 // kind.
 int VpiBuiltStmtKind(const Stmt& stmt);
 
+// §37.65 with §9.4.2: the condition an event control written over `events` is
+// written over, the events joined by event or operations; null where an event
+// is not modelled.
+VpiObject* VpiEventCondition(const std::vector<EventExpr>& events,
+                             const VpiStmtBuild& with);
+
 // The objects `obj`, made for `stmt` with the kind above, reaches: the
 // expressions its figure draws and the statements it holds, each built
 // through `with`.
@@ -333,6 +340,14 @@ VpiObject* VpiMakeInstanceArray(VpiObject* holder, int kind,
 // which the array reaches it by (§38.19); it keeps its place in its scope.
 void VpiAddArrayElement(VpiObject* array, VpiObject* element, int64_t index,
                         const VpiAttachBuild& build);
+
+// §37.48 with §37.5, §37.6 and §37.9: give each instance a clocking block per
+// clocking block it declares, with its clocking event and an io decl per
+// clocking signal, marking the one it named default and the one it named
+// global.
+void AttachClockingBlocks(const RtlirDesign* design,
+                          const VpiObjectMap& objects, SimContext& ctx,
+                          const VpiAttachBuild& build);
 
 // §37.11: make each instance array of modules, interfaces or programs an
 // array object over its elements.

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -266,6 +267,49 @@ TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
   EXPECT_EQ(VpiClockingIODeclExpr(nullptr), nullptr);
   EXPECT_EQ(VpiClockingBlockClockingEvent(&other), nullptr);
   EXPECT_EQ(VpiClockingBlockClockingEvent(nullptr), nullptr);
+}
+
+// The clocking blocks of a run: those a design declares, built from the
+// elaborated design rather than by hand (#4956).
+class ClockingBlocksOfARun : public VpiDesignRun {};
+
+// A module's default clocking block is reached from it as a clocking block and
+// as its default clocking, named as declared and reaching its clocking event.
+TEST_F(ClockingBlocksOfARun, ADefaultClockingBlockIsReachedFromItsModule) {
+  Run("module top; logic clk, a, b;\n"
+      "  default clocking cb @(posedge clk); input a; output b; endclocking\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle cb = Named(vpiClockingBlock, top, "cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, cb), "top.cb");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDefaultClocking, top)), VpiObjectOf(cb));
+  vpiHandle event = vpi_handle(vpiClockingEvent, cb);
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, event), vpiEventControl);
+}
+
+// A clocking block reaches an io decl per clocking signal, in the order
+// declared, each reporting its direction and reaching through vpiExpr the
+// signal it is named after (detail 4).
+TEST_F(ClockingBlocksOfARun, AClockingBlockReachesItsIoDecls) {
+  Run("module top; logic clk, a, b;\n"
+      "  clocking cb @(posedge clk); input a; output b; endclocking\n"
+      "endmodule\n");
+  vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(vpi_handle(vpiDefaultClocking, By("top")), nullptr);
+  vpiHandle it = vpi_iterate(vpiClockingIODecl, cb);
+  ASSERT_NE(it, nullptr);
+  vpiHandle a = vpi_scan(it);
+  vpiHandle b = vpi_scan(it);
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, a), "a");
+  EXPECT_EQ(vpi_get(vpiDirection, a), vpiInput);
+  EXPECT_EQ(vpi_get(vpiDirection, b), vpiOutput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, b)), VpiObjectOf(By("top.b")));
 }
 
 }  // namespace
