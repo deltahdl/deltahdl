@@ -108,16 +108,18 @@ std::optional<std::string> RenderList(
   std::string out;
   for (std::size_t i = 0; i < exprs.size(); ++i) {
     if (i > 0) out += ", ";
-    std::string item;
+    const bool kNamed = i < names.size() && !names[i].empty();
+    if (kNamed) {
+      out += '.';
+      out += names[i];
+      out += '(';
+    }
     if (exprs[i] != nullptr) {
       const std::optional<Piece> kItem = Render(exprs[i]);
       if (!kItem) return std::nullopt;
-      item = kItem->text;
+      out += kItem->text;
     }
-    if (i < names.size() && !names[i].empty()) {
-      item = "." + std::string(names[i]) + "(" + item + ")";
-    }
-    out += item;
+    if (kNamed) out += ')';
   }
   return out;
 }
