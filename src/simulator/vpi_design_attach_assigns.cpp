@@ -458,14 +458,26 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
 
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build,
-                                 const VpiCalleeResolver& callees) {
+                                 const VpiAttachBuild& build) {
   // An expression an instance writes outside every generate block, whose
   // names resolve in the instance itself.
   static const GenBlockPrefixes kNoGenBlocks;
   return ExpressionObject(
+      expr,
+      AssignBuild{
+          build.alloc, &ctx, AssignNames{objects, prefix, kNoGenBlocks}, {}});
+}
+
+VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const VpiCallSite& site, SimContext& ctx,
+                                 const VpiAttachBuild& build) {
+  // Its names resolve in the instance, as VpiInstanceExpression's do; its
+  // callees resolve at the site.
+  static const GenBlockPrefixes kNoGenBlocks;
+  return ExpressionObject(
       expr, AssignBuild{build.alloc, &ctx,
-                        AssignNames{objects, prefix, kNoGenBlocks}, callees});
+                        AssignNames{objects, site.prefix, kNoGenBlocks},
+                        VpiCalleesAt(site)});
 }
 
 void VpiContext::AttachContinuousAssignments(

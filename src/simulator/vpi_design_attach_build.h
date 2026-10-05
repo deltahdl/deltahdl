@@ -204,13 +204,19 @@ void AttachVariableRanges(const RtlirDesign* design,
                           const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written in the
-// instance whose objects `objects` keys under `prefix`, a func call in it
-// reaching the function `callees` resolves its callee to (§37.42); null for a
-// kind of expression not modelled.
+// instance whose objects `objects` keys under `prefix`; null for a kind of
+// expression not modelled.
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build,
-                                 const VpiCalleeResolver& callees = {});
+                                 const VpiAttachBuild& build);
+
+// §37.58, §37.59: the expression object `expr` stands for, written at `site`
+// in the instance whose objects `objects` keys, a func call in it reaching the
+// function its callee resolves to there (§37.42); null for a kind of
+// expression not modelled.
+VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const VpiCallSite& site, SimContext& ctx,
+                                 const VpiAttachBuild& build);
 
 // §37.42: a system task or function an application registered, as a call
 // that names it finds it: the systf object vpi_register_systf returned for it

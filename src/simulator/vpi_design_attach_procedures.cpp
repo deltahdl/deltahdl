@@ -586,15 +586,15 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
   if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
     return;
   }
-  const VpiCalleeResolver kCallees = VpiCalleesAt(CallSiteOf(parent, walk));
+  const VpiCallSite kSite = CallSiteOf(parent, walk);
   for (const Expr* actual : expr.args) {
     VpiObject* arg = nullptr;
     if (actual == nullptr) {
       arg = walk.build.alloc();
       VpiMakeEmptyArgument(arg);
     } else {
-      arg = VpiInstanceExpression(actual, walk.objects, walk.prefix,
-                                  walk.calls.ctx, walk.build, kCallees);
+      arg = VpiCallSiteExpression(actual, walk.objects, kSite, walk.calls.ctx,
+                                  walk.build);
     }
     if (arg != nullptr) call->arguments.push_back(arg);
   }
