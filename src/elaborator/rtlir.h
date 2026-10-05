@@ -638,10 +638,10 @@ struct RtlirModuleInst {
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;
   bool is_bound = false;
+  InstArrayElement array;  // the instance array it belongs to, if any
   // §23.4: this instance's module, program or interface was declared inside
-  // the module instantiating it, so "the outer name space is visible to the
-  // inner module". A module declared elsewhere and merely instantiated here
-  // gets no such visibility, which is the §23.9 module boundary.
+  // the instantiating module, so "the outer name space is visible to the inner
+  // module"; one merely instantiated here meets the §23.9 module boundary.
   bool is_nested_decl = false;
   // §17.3: a procedural checker instance, instantiated by a statement of a
   // procedure rather than by a module item.

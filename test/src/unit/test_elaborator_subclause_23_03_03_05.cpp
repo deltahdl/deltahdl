@@ -1,6 +1,9 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -257,6 +260,32 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "  logic y;\n"
              "  child c[0:0](.i(x), .o(y));\n"
              "endmodule\n"));
+}
+
+// Each element of an instance array records the array it belongs to - its
+// name as written and its declared bounds - and its own index, which its
+// expanded name alone does not say; an instance outside any array records no
+// array (§37.11, #5071).
+TEST(InstanceArrayElaboration, AnElementRecordsItsArrayAndIndex) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module sub; endmodule\n"
+      "module top; sub arr[2:4] (); sub one (); endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto& children = design->top_modules[0]->children;
+  ASSERT_EQ(children.size(), 4U);
+  for (const auto& child : children) {
+    if (child.inst_name == "one") {
+      EXPECT_TRUE(child.array.name.empty());
+      continue;
+    }
+    EXPECT_EQ(child.array.name, "arr") << child.inst_name;
+    EXPECT_EQ(child.array.left, 2);
+    EXPECT_EQ(child.array.right, 4);
+    EXPECT_EQ(child.inst_name,
+              "arr[" + std::to_string(child.array.index) + "]");
+  }
 }
 
 }  // namespace

@@ -173,4 +173,15 @@ inline void RecordGenBlockMember(std::vector<RtlirGenBlockMember>& members,
   members.push_back(std::move(member));
 }
 
+// §23.3.3.5 with §37.11: the instance array an instance is an element of -
+// the array's name as the source wrote it, its declared left and right
+// bounds, and the element's own index. An instance outside any array has an
+// empty name.
+struct InstArrayElement {
+  std::string_view name;
+  int64_t left = 0;
+  int64_t right = 0;
+  int64_t index = 0;
+};
+
 }  // namespace delta

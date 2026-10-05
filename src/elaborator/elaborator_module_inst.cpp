@@ -676,6 +676,9 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
   for (uint32_t p = 0; p < total; ++p) {
     int64_t idx = right + step * static_cast<int64_t>(p);
     RtlirModuleInst copy = base;
+    // §37.11: the element records the array it belongs to and its index,
+    // which its expanded name alone does not say.
+    copy.array = {base.simple_inst_name, left, right, idx};
     std::string name = std::format("{}[{}]", base.inst_name, idx);
     auto* buf = ctx.arena.AllocString(name.c_str(), name.size());
     copy.inst_name = std::string_view(buf, name.size());
