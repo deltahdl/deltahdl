@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "common/diagnostic.h"
-#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "elaborator/rtlir_scopes.h"
@@ -15,12 +14,10 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
-#include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_model_helpers1.h"
-#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -61,175 +58,6 @@ VpiObject* MakeConcurrentAssertion(const ModuleItem& item, VpiObject* scope,
   VpiRecordAssertionLocation(obj, SourceRange{item.loc, item.end}, ctx);
   scope->children.push_back(obj);
   return obj;
-}
-
-// §6.11, §6.12 and §6.17: the data type a type keyword names alone.
-struct KeywordType {
-  TokenKind keyword;
-  DataTypeKind type;
-};
-constexpr KeywordType kKeywordTypes[] = {
-    {TokenKind::kKwLogic, DataTypeKind::kLogic},
-    {TokenKind::kKwReg, DataTypeKind::kReg},
-    {TokenKind::kKwBit, DataTypeKind::kBit},
-    {TokenKind::kKwByte, DataTypeKind::kByte},
-    {TokenKind::kKwShortint, DataTypeKind::kShortint},
-    {TokenKind::kKwInt, DataTypeKind::kInt},
-    {TokenKind::kKwLongint, DataTypeKind::kLongint},
-    {TokenKind::kKwInteger, DataTypeKind::kInteger},
-    {TokenKind::kKwTime, DataTypeKind::kTime},
-    {TokenKind::kKwReal, DataTypeKind::kReal},
-    {TokenKind::kKwShortreal, DataTypeKind::kShortreal},
-    {TokenKind::kKwRealtime, DataTypeKind::kRealtime},
-    {TokenKind::kKwString, DataTypeKind::kString},
-    {TokenKind::kKwEvent, DataTypeKind::kEvent},
-};
-
-// The data type `keyword` names alone; kImplicit where it names none.
-DataTypeKind KeywordDataType(TokenKind keyword) {
-  for (const KeywordType& entry : kKeywordTypes) {
-    if (entry.keyword == keyword) return entry.type;
-  }
-  return DataTypeKind::kImplicit;
-}
-
-// §37.51 detail 3 with §37.25: the kind of typespec a property formal declared
-// with the type keyword `keyword` reaches, 0 for an untyped formal, which
-// reaches none. §16.12 adds sequence and property to the data types a formal
-// may be declared with; §6.12 makes realtime a synonym for real.
-int FormalTypespecKind(TokenKind keyword) {
-  switch (keyword) {
-    case TokenKind::kKwSequence:
-      return vpiSequenceTypespec;
-    case TokenKind::kKwProperty:
-      return vpiPropertyTypespec;
-    case TokenKind::kKwEvent:
-      return vpiEventTypespec;
-    case TokenKind::kKwRealtime:
-      return vpiRealTypespec;
-    default: {
-      const DataTypeKind kType = KeywordDataType(keyword);
-      return kType == DataTypeKind::kImplicit ? 0 : VpiTypespecKind(kType);
-    }
-  }
-}
-
-// §37.25: the typespec the typedef `name` declares in the scopes from
-// `holder` out to the instance, or else among the compilation unit's,
-// `unit`; null where none of them declares one.
-VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
-                           const VpiObjectMap& unit) {
-  for (const VpiObject* scope = holder; scope != nullptr;
-       scope = scope->parent) {
-    for (VpiObject* child : scope->children) {
-      if (VpiIsTypespecType(child->type) && child->name == name) return child;
-    }
-    if (VpiIsInstanceType(scope->type)) break;
-  }
-  auto it = unit.find(name);
-  return it == unit.end() ? nullptr : it->second;
-}
-
-// §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
-// declared with, hung from `formal`: the one the typedef it names declares,
-// which other objects of that type share (§37.17), or one of the type's own,
-// reaching a range per packed dimension it was written with (§37.22); none
-// for an untyped formal.
-void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
-                        const VpiPropertyDeclSite& at,
-                        const VpiAttachBuild& build) {
-  const DataType* type = index < decl.prop_formal_types.size()
-                             ? decl.prop_formal_types[index]
-                             : nullptr;
-  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    VpiObject* named =
-        TypedefTypespec(formal->parent, type->type_name, at.unit_typespecs);
-    if (named != nullptr) formal->children.push_back(named);
-    return;
-  }
-  const TokenKind kKeyword = index < decl.prop_formal_type_kw.size()
-                                 ? decl.prop_formal_type_kw[index]
-                                 : TokenKind::kEof;
-  int kind = 0;
-  if (kKeyword != TokenKind::kEof) {
-    kind = FormalTypespecKind(kKeyword);
-  } else if (type != nullptr) {
-    kind = VpiTypespecKind(type->kind);
-  }
-  if (kind == 0) return;
-  VpiObject* typespec = build.alloc();
-  typespec->type = kind;
-  typespec->parent = formal;
-  formal->children.push_back(typespec);
-  for (const PackedRange& dim : WrittenPackedDims(type, at.ctx)) {
-    typespec->children.push_back(VpiRangeObject(typespec, dim, build));
-  }
-}
-
-// §37.51: the prop formal decl the formal `index` of `decl` stands as, hung
-// from `property`: named, of no direction unless it is a local variable
-// argument (detail 5), reaching the typespec of the type it is declared with
-// (detail 3) and the default value it declares, where it declares one,
-// through vpiExpr (detail 4).
-void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
-                    const VpiPropertyDeclSite& at, const VpiStmtBuild& with) {
-  VpiObject* formal = with.build.alloc();
-  formal->type = vpiPropFormalDecl;
-  formal->parent = property;
-  formal->name = with.build.keep(std::string(decl.prop_formals[index]));
-  formal->direction =
-      VpiPropFormalDirection(index < decl.prop_formal_is_local.size() &&
-                             decl.prop_formal_is_local[index]);
-  MakeFormalTypespec(decl, index, formal, at, with.build);
-  if (index < decl.prop_formal_defaults.size()) {
-    VpiObject* value = with.expression(decl.prop_formal_defaults[index]);
-    if (value != nullptr) formal->children.push_back(value);
-  }
-  property->children.push_back(formal);
-}
-
-// §37.51 with §16.10: the variable the local variable `local` a property
-// declares stands as, hung from the property decl `property` and named in
-// it, of the kind its type is (§37.17). §37.52 detail 1 gives its value no
-// access, so it holds none.
-void MakePropertyVariable(const SeqLocalDecl& local, VpiObject* property,
-                          const VpiAttachBuild& build) {
-  VpiObject* var = build.alloc();
-  var->type = VpiDataTypeVariableKind(KeywordDataType(local.type_kw));
-  var->parent = property;
-  var->name = build.keep(std::string(local.name));
-  var->full_name = VpiScopedFullName(property, local.name);
-  property->children.push_back(var);
-}
-
-// The child of `scope` of `type` named `name`; null where none is.
-VpiObject* ChildOfType(const VpiObject* scope, int type,
-                       std::string_view name) {
-  for (VpiObject* child : scope->children) {
-    if (child->type == type && child->name == name) return child;
-  }
-  return nullptr;
-}
-
-// §37.51: the property decl named `name` the scope standing around `holder`
-// declares, the nearest from a generate block instance out to the instance;
-// null where none was built. §16.16 (b): a name written through a clocking
-// block, `cb.p`, is the property that block declares.
-VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
-  const size_t kDot = name.find('.');
-  for (VpiObject* scope = holder->parent; scope != nullptr;
-       scope = scope->parent) {
-    VpiObject* found =
-        kDot == std::string_view::npos
-            ? ChildOfType(scope, vpiPropertyDecl, name)
-            : ChildOfType(scope, vpiClockingBlock, name.substr(0, kDot));
-    if (found != nullptr && kDot != std::string_view::npos) {
-      return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
-    }
-    if (found != nullptr) return found;
-    if (VpiIsInstanceType(scope->type)) break;
-  }
-  return nullptr;
 }
 
 // §37.52 detail 2: the operation of `op_type` over `operands`, in the order
@@ -506,11 +334,25 @@ bool IsModelledSequence(const SeqLinearBody& body) {
 }
 
 // §37.52 with §37.54: the sequence `sequence` as a property expr or as an
-// operand of a property operator; null for one holding a part not built.
-VpiObject* SequenceOperand(const ModuleItem* sequence,
-                           const VpiStmtBuild& with) {
+// operand of a property operator, the clock `flowing` into it (§16.13.3);
+// null for one holding a part not built.
+VpiObject* SequenceOperand(const ModuleItem* sequence, const VpiStmtBuild& with,
+                           const std::vector<EventExpr>* flowing) {
   if (sequence == nullptr) return nullptr;
-  return VpiSequenceExprObject(sequence->seq_linear, with, nullptr);
+  return VpiSequenceExprObject(sequence->seq_linear, with, flowing);
+}
+
+// §16.13.3: the clock flowing into the consequent of an implication whose
+// antecedent is `antecedent`, the clock `flowing` into the implication: the
+// one in force at the antecedent's end where the antecedent names clocks
+// outside parentheses and instances.
+const std::vector<EventExpr>* ConsequentClock(
+    const ModuleItem* antecedent, const std::vector<EventExpr>* flowing) {
+  if (antecedent == nullptr || antecedent->seq_linear.clocks.empty() ||
+      antecedent->seq_linear.clock_out.empty()) {
+    return flowing;
+  }
+  return &antecedent->seq_linear.clock_out;
 }
 
 // Whether `body` is one chain and nothing beside it, an operand of an
@@ -577,22 +419,26 @@ VpiObject* MulticlockExpr(const SeqLinearBody& body,
   return multiclock;
 }
 
-// The property expr of the operand `index` of `node`; null where it has none.
+// The property expr of the operand `index` of `node`, the clock `flowing`
+// into it; null where it has none.
 VpiObject* OperandOf(const PropertyExprNode& node, size_t index,
-                     const VpiStmtBuild& with) {
+                     const VpiStmtBuild& with,
+                     const std::vector<EventExpr>* flowing) {
   return index < node.operands.size()
-             ? VpiPropertyExprObject(node.operands[index], with)
+             ? VpiPropertyExprObject(node.operands[index], with, flowing)
              : nullptr;
 }
 
 // §16.12.5: an and or an or over every operand of `node`, joined left to
 // right as the grammar's binary operator joins them.
 VpiObject* JoinedOperation(int op_type, const PropertyExprNode& node,
-                           const VpiStmtBuild& with) {
-  VpiObject* joined = OperandOf(node, 0, with);
+                           const VpiStmtBuild& with,
+                           const std::vector<EventExpr>* flowing) {
+  VpiObject* joined = OperandOf(node, 0, with, flowing);
   for (size_t i = 1; i < node.operands.size(); ++i) {
-    joined = PropertyOperation(op_type, {joined, OperandOf(node, i, with)},
-                               false, with.build);
+    joined =
+        PropertyOperation(op_type, {joined, OperandOf(node, i, with, flowing)},
+                          false, with.build);
   }
   return joined;
 }
@@ -601,7 +447,8 @@ VpiObject* JoinedOperation(int op_type, const PropertyExprNode& node,
 // written: the implication's antecedent, then the property its negated
 // consequent negates.
 VpiObject* FollowedByOperation(const PropertyExprNode& node,
-                               const VpiStmtBuild& with) {
+                               const VpiStmtBuild& with,
+                               const std::vector<EventExpr>* flowing) {
   const PropertyExprNode* implication =
       node.operands.empty() ? nullptr : node.operands.front();
   if (implication == nullptr || implication->operands.empty() ||
@@ -610,19 +457,24 @@ VpiObject* FollowedByOperation(const PropertyExprNode& node,
   }
   const int kOp =
       implication->strong ? vpiNonOverlapFollowedByOp : vpiOverlapFollowedByOp;
-  return PropertyOperation(kOp,
-                           {SequenceOperand(implication->sequence, with),
-                            OperandOf(*implication->operands.front(), 0, with)},
-                           false, with.build);
+  return PropertyOperation(
+      kOp,
+      {SequenceOperand(implication->sequence, with, flowing),
+       OperandOf(*implication->operands.front(), 0, with,
+                 ConsequentClock(implication->sequence, flowing))},
+      false, with.build);
 }
 
 // §16.12.10: an if, or an if-else where an else is written, its condition
 // first.
 VpiObject* ConditionalOperation(const PropertyExprNode& node,
-                                const VpiStmtBuild& with) {
+                                const VpiStmtBuild& with,
+                                const std::vector<EventExpr>* flowing) {
   std::vector<VpiObject*> operands{with.expression(node.boolean),
-                                   OperandOf(node, 0, with)};
-  if (node.operands.size() > 1) operands.push_back(OperandOf(node, 1, with));
+                                   OperandOf(node, 0, with, flowing)};
+  if (node.operands.size() > 1) {
+    operands.push_back(OperandOf(node, 1, with, flowing));
+  }
   return PropertyOperation(node.operands.size() > 1 ? vpiIfElseOp : vpiIfOp,
                            operands, false, with.build);
 }
@@ -631,8 +483,9 @@ VpiObject* ConditionalOperation(const PropertyExprNode& node,
 // its constant, the constant only where it is other than 1; an always and an
 // eventually their property and the bounds of their range.
 VpiObject* CountedOperation(int op_type, const PropertyExprNode& node,
-                            const VpiStmtBuild& with) {
-  VpiObject* property = OperandOf(node, 0, with);
+                            const VpiStmtBuild& with,
+                            const std::vector<EventExpr>* flowing) {
+  VpiObject* property = OperandOf(node, 0, with, flowing);
   if (op_type == vpiNexttimeOp) {
     const Expr* count = node.boolean;
     const bool kOne = count != nullptr &&
@@ -651,19 +504,23 @@ VpiObject* CountedOperation(int op_type, const PropertyExprNode& node,
 
 // §16.12.3 and §16.12.9: a not over its operand, or the followed-by it
 // stands for.
-VpiObject* NotOperation(const PropertyExprNode& node,
-                        const VpiStmtBuild& with) {
-  if (node.followed_by) return FollowedByOperation(node, with);
-  return PropertyOperation(vpiNotOp, {OperandOf(node, 0, with)}, false,
+VpiObject* NotOperation(const PropertyExprNode& node, const VpiStmtBuild& with,
+                        const std::vector<EventExpr>* flowing) {
+  if (node.followed_by) return FollowedByOperation(node, with, flowing);
+  return PropertyOperation(vpiNotOp, {OperandOf(node, 0, with, flowing)}, false,
                            with.build);
 }
 
-// §16.12.7: an implication, overlapping or not, its antecedent first.
+// §16.12.7: an implication, overlapping or not, its antecedent first, the
+// clock `flowing` into it flowing on across it (§16.13.3).
 VpiObject* ImplicationOperation(const PropertyExprNode& node,
-                                const VpiStmtBuild& with) {
+                                const VpiStmtBuild& with,
+                                const std::vector<EventExpr>* flowing) {
   const int kOp = node.strong ? vpiNonOverlapImplyOp : vpiOverlapImplyOp;
   return PropertyOperation(
-      kOp, {SequenceOperand(node.sequence, with), OperandOf(node, 0, with)},
+      kOp,
+      {SequenceOperand(node.sequence, with, flowing),
+       OperandOf(node, 0, with, ConsequentClock(node.sequence, flowing))},
       false, with.build);
 }
 
@@ -683,10 +540,12 @@ int BinaryOp(const PropertyExprNode& node) {
 // §16.12.8 and §16.12.12: an implies, an iff or an until over its two
 // operands, an until strong where it was written so.
 VpiObject* BinaryOperation(const PropertyExprNode& node,
-                           const VpiStmtBuild& with) {
-  return PropertyOperation(BinaryOp(node),
-                           {OperandOf(node, 0, with), OperandOf(node, 1, with)},
-                           node.strong, with.build);
+                           const VpiStmtBuild& with,
+                           const std::vector<EventExpr>* flowing) {
+  return PropertyOperation(
+      BinaryOp(node),
+      {OperandOf(node, 0, with, flowing), OperandOf(node, 1, with, flowing)},
+      node.strong, with.build);
 }
 
 // §16.12.14: the abort operator `node` was written with.
@@ -699,8 +558,8 @@ int AbortOp(const PropertyExprNode& node) {
 // expression through vpiCondition and an item per property it branches to,
 // each grouping the expressions written before that property (detail 4),
 // the default's none (detail 5).
-VpiObject* CaseProperty(const PropertyExprNode& node,
-                        const VpiStmtBuild& with) {
+VpiObject* CaseProperty(const PropertyExprNode& node, const VpiStmtBuild& with,
+                        const std::vector<EventExpr>* flowing) {
   VpiObject* obj = with.build.alloc();
   obj->type = vpiCaseProperty;
   VpiObject* condition = with.expression(node.boolean);
@@ -715,48 +574,50 @@ VpiObject* CaseProperty(const PropertyExprNode& node,
         if (expression != nullptr) item->children.push_back(expression);
       }
     }
-    item->body = OperandOf(node, i, with);
+    item->body = OperandOf(node, i, with, flowing);
     obj->children.push_back(item);
   }
   return obj;
 }
 
-// §37.52: the property expr `node` stands for, its own clock aside.
+// §37.52: the property expr `node` stands for, its own clock aside, the
+// clock `flowing` into it flowing into its operands (§16.13.3).
 VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
-                                 const VpiStmtBuild& with) {
+                                 const VpiStmtBuild& with,
+                                 const std::vector<EventExpr>* flowing) {
   using Kind = PropertyExprNode::Kind;
   switch (node->kind) {
     case Kind::kBoolean:
       return with.expression(node->boolean);
     case Kind::kSequence:
-      return SequenceOperand(node->sequence, with);
+      return SequenceOperand(node->sequence, with, flowing);
     case Kind::kNot:
-      return NotOperation(*node, with);
+      return NotOperation(*node, with, flowing);
     case Kind::kOr:
-      return JoinedOperation(vpiCompOrOp, *node, with);
+      return JoinedOperation(vpiCompOrOp, *node, with, flowing);
     case Kind::kAnd:
-      return JoinedOperation(vpiCompAndOp, *node, with);
+      return JoinedOperation(vpiCompAndOp, *node, with, flowing);
     case Kind::kIfElse:
-      return ConditionalOperation(*node, with);
+      return ConditionalOperation(*node, with, flowing);
     case Kind::kImplication:
-      return ImplicationOperation(*node, with);
+      return ImplicationOperation(*node, with, flowing);
     case Kind::kImplies:
     case Kind::kIff:
     case Kind::kUntil:
-      return BinaryOperation(*node, with);
+      return BinaryOperation(*node, with, flowing);
     case Kind::kNexttime:
-      return CountedOperation(vpiNexttimeOp, *node, with);
+      return CountedOperation(vpiNexttimeOp, *node, with, flowing);
     case Kind::kAlways:
-      return CountedOperation(vpiAlwaysOp, *node, with);
+      return CountedOperation(vpiAlwaysOp, *node, with, flowing);
     case Kind::kEventually:
-      return CountedOperation(vpiEventuallyOp, *node, with);
+      return CountedOperation(vpiEventuallyOp, *node, with, flowing);
     case Kind::kAbort:
       return PropertyOperation(
           AbortOp(*node),
-          {with.expression(node->boolean), OperandOf(*node, 0, with)}, false,
-          with.build);
+          {with.expression(node->boolean), OperandOf(*node, 0, with, flowing)},
+          false, with.build);
     case Kind::kCase:
-      return CaseProperty(*node, with);
+      return CaseProperty(*node, with, flowing);
     default:
       return nullptr;
   }
@@ -788,9 +649,12 @@ VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
 }
 
 VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
-                                 const VpiStmtBuild& with) {
+                                 const VpiStmtBuild& with,
+                                 const std::vector<EventExpr>* flowing) {
   if (node == nullptr) return nullptr;
-  VpiObject* property = UnclockedPropertyExpr(node, with);
+  // §16.13.3: a clock of the property's own replaces the one flowing in.
+  VpiObject* property = UnclockedPropertyExpr(
+      node, with, node->clock.empty() ? flowing : &node->clock);
   if (property == nullptr || node->clock.empty()) return property;
   // §37.52 with §16.13.2: a property written under a clocking event of its
   // own is a clocked property, reaching that event and the property.
@@ -799,74 +663,6 @@ VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
   clocked->clocking_event = VpiEventCondition(node->clock, with);
   clocked->children.push_back(property);
   return clocked;
-}
-
-VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
-                               const VpiStmtBuild& with) {
-  VpiObject* inst = with.build.alloc();
-  inst->type = vpiPropertyInst;
-  inst->parent = holder;
-  const std::string_view kName =
-      instance.kind == ExprKind::kCall ? instance.callee : instance.text;
-  inst->property_decl = PropertyDeclAround(holder, kName);
-  // §37.51 detail 2: an argument per formal, in the order declared, the
-  // formal's default standing for an actual the instance leaves out; with no
-  // declaration built, the actuals as written.
-  std::vector<VpiHandle> provided;
-  provided.reserve(instance.args.size());
-  for (const Expr* actual : instance.args) {
-    provided.push_back(with.expression(actual));
-  }
-  std::vector<VpiPropertyFormal> formals;
-  for (VpiHandle formal : VpiPropFormals(inst->property_decl)) {
-    formals.push_back(VpiPropertyFormal{VpiPropFormalInitExpr(formal)});
-  }
-  for (VpiHandle argument : formals.empty()
-                                ? provided
-                                : VpiPropertyInstArguments(formals, provided)) {
-    if (argument != nullptr) inst->arguments.push_back(argument);
-  }
-  holder->children.push_back(inst);
-  return inst;
-}
-
-VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
-                               const VpiPropertyDeclSite& at,
-                               const VpiStmtBuild& with) {
-  VpiObject* scope = at.scope;
-  // §37.12 with §14.3: a property a clocking block declares is of that block.
-  if (declared.clocking_block != nullptr) {
-    scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
-    if (scope == nullptr) return nullptr;
-  }
-  const ModuleItem& decl = *declared.item;
-  VpiObject* obj = with.build.alloc();
-  obj->type = vpiPropertyDecl;
-  obj->parent = scope;
-  // §16.16 (b): the run keys a clocking block's property under the block's
-  // name and its own, `cb.p`, the block being its scope here.
-  const std::string_view kName =
-      declared.clocking_block == nullptr
-          ? decl.name
-          : decl.name.substr(decl.name.rfind('.') + 1);
-  obj->name = with.build.keep(std::string(kName));
-  obj->full_name = VpiScopedFullName(scope, kName);
-  scope->children.push_back(obj);
-  for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
-    MakePropFormal(decl, i, obj, at, with);
-  }
-  for (const SeqLocalDecl& local : decl.prop_locals) {
-    MakePropertyVariable(local, obj, with.build);
-  }
-  // §37.52: the body the parser read, its clock, its disable condition and,
-  // for a Boolean property, its expression; a body of another shape was not
-  // read and stands for no spec.
-  const PropertyExprNode* tree = decl.prop_body_tree;
-  if (tree == nullptr) return obj;
-  VpiMakePropertySpecOf(
-      obj, VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff, tree},
-      with);
-  return obj;
 }
 
 void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,

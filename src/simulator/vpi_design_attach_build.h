@@ -349,9 +349,12 @@ VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
 
 // §37.52: the property expr the property tree `node` stands for: the
 // expression of a Boolean, or the operation of a property operator (detail
-// 2) over its operands, each built through `with`; null for a form not built.
+// 2) over its operands, each built through `with`, the clock `flowing` into
+// it, where known, flowing on to the sequences among them (§16.13.3); null
+// for a form not built.
 VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
-                                 const VpiStmtBuild& with);
+                                 const VpiStmtBuild& with,
+                                 const std::vector<EventExpr>* flowing);
 
 // §37.52: the property spec of `parts`, hung from `holder`.
 VpiObject* VpiMakePropertySpecOf(VpiObject* holder,

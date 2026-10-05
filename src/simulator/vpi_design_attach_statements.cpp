@@ -386,17 +386,10 @@ VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
   spec->parent = holder;
   spec->clocking_event = EventCondition(parts.clock, with);
   spec->disable_condition = with.expression(parts.disable);
-  // §16.13.1: a sequence the spec is, on clocks of its own, takes the spec's
-  // clock as the one flowing into it.
-  const PropertyExprNode* property = parts.property;
-  const bool kSequence = property != nullptr &&
-                         property->kind == PropertyExprNode::Kind::kSequence &&
-                         property->clock.empty() &&
-                         property->sequence != nullptr;
-  AddChild(spec, kSequence
-                     ? VpiSequenceExprObject(property->sequence->seq_linear,
-                                             with, &parts.clock)
-                     : VpiPropertyExprObject(property, with));
+  // §16.13.3: the spec's clock flows into its property expr.
+  AddChild(spec,
+           VpiPropertyExprObject(parts.property, with,
+                                 parts.clock.empty() ? nullptr : &parts.clock));
   holder->children.push_back(spec);
   return spec;
 }

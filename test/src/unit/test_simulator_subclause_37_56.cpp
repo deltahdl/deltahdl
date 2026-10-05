@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -274,7 +275,25 @@ TEST(MulticlockSequenceExprModel, IterateClockedSeqsEmptyWhenNonePresent) {
   EXPECT_EQ(ctx.Iterate(vpiClockedSeq, &multiclock), nullptr);
 }
 
-class MulticlockSequencesOfARun : public VpiDesignRun {};
+class MulticlockSequencesOfARun : public VpiDesignRun {
+ protected:
+  // The signal of the clocking event each clocked seq of `multiclock`
+  // reaches, in order, empty for one reaching none.
+  static std::vector<std::string> ClocksOf(vpiHandle multiclock) {
+    std::vector<std::string> clocks;
+    if (multiclock == nullptr) return clocks;
+    vpiHandle it = vpi_iterate(vpiClockedSeq, multiclock);
+    if (it == nullptr) return clocks;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      const std::vector<vpiHandle> kEdge =
+          OperandsOf(vpi_handle(vpiClockingEvent, h));
+      const char* name =
+          kEdge.size() == 1 ? vpi_get_str(vpiName, kEdge[0]) : nullptr;
+      clocks.emplace_back(name == nullptr ? "" : name);
+    }
+    return clocks;
+  }
+};
 
 // A sequence whose operands are evaluated on clocks of their own is a
 // multiclock sequence expr, reaching a clocked seq per run of operands on one
@@ -317,6 +336,56 @@ TEST_F(MulticlockSequencesOfARun, AChainOnTwoClocksIsAMulticlockSequence) {
     vpi_get_value(kHeld[2], &value);
     EXPECT_EQ(value.value.integer, kDelays[i]) << i;
   }
+}
+
+// §16.13.3: the clock of a property spec flows into a sequence an
+// implication's antecedent is, so the first clocked seq of a multiclock
+// antecedent, naming no clock of its own, reaches the spec's clock (#5100).
+TEST_F(MulticlockSequencesOfARun, AnAntecedentTakesTheClockFlowingIntoIt) {
+  Run("module top; logic clk0, clk2, a, b, c;\n"
+      "  m1: assert property (@(posedge clk0) (a ##1 @(posedge clk2) b) "
+      "|-> c);\n"
+      "endmodule\n");
+  vpiHandle implication = PropertyOf("m1");
+  ASSERT_NE(implication, nullptr);
+  EXPECT_EQ(OpOf(implication), vpiOverlapImplyOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(implication);
+  ASSERT_EQ(kOperands.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, kOperands[0]), vpiMulticlockSequenceExpr);
+  EXPECT_EQ(ClocksOf(kOperands[0]), (std::vector<std::string>{"clk0", "clk2"}));
+}
+
+// §16.13.3: the clock of a property spec flows across a not into the
+// sequence it negates, the first clocked seq of a multiclock one reaching
+// it (#5100).
+TEST_F(MulticlockSequencesOfARun, ANegatedSequenceTakesTheClockFlowingIntoIt) {
+  Run("module top; logic clk0, clk1, a, b;\n"
+      "  m1: assert property (@(posedge clk0) not (a ##1 @(posedge clk1) "
+      "b));\n"
+      "endmodule\n");
+  vpiHandle negation = PropertyOf("m1");
+  ASSERT_NE(negation, nullptr);
+  EXPECT_EQ(OpOf(negation), vpiNotOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(negation);
+  ASSERT_EQ(kOperands.size(), 1u);
+  EXPECT_EQ(ClocksOf(kOperands[0]), (std::vector<std::string>{"clk0", "clk1"}));
+}
+
+// §16.13.3: the clock in force at the end of an antecedent flows into the
+// consequent, so the first clocked seq of a multiclock consequent reaches
+// the antecedent's last clock rather than the spec's (#5100).
+TEST_F(MulticlockSequencesOfARun, AConsequentTakesTheAntecedentsEndClock) {
+  Run("module top; logic clk0, clk1, clk2, a, b, c, d;\n"
+      "  m1: assert property (@(posedge clk0) a ##1 @(posedge clk1) b |=> "
+      "c ##1 @(posedge clk2) d);\n"
+      "endmodule\n");
+  vpiHandle implication = PropertyOf("m1");
+  ASSERT_NE(implication, nullptr);
+  EXPECT_EQ(OpOf(implication), vpiNonOverlapImplyOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(implication);
+  ASSERT_EQ(kOperands.size(), 2u);
+  EXPECT_EQ(ClocksOf(kOperands[0]), (std::vector<std::string>{"clk0", "clk1"}));
+  EXPECT_EQ(ClocksOf(kOperands[1]), (std::vector<std::string>{"clk1", "clk2"}));
 }
 
 }  // namespace
