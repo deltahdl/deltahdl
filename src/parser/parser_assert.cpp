@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -20,6 +21,24 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
                    std::string(tok.text),
                Subclause("16.4"));
   }
+}
+
+// §37.49: `item`, an assertion item read up to the last token `lexer` gave,
+// with the position its text ends at, which a deferred immediate assertion's
+// statement ends at too.
+static ModuleItem* EndedAtLastToken(ModuleItem* item, const Lexer& lexer) {
+  item->end = lexer.TakenEnd();
+  if (item->body != nullptr && item->body->is_deferred) {
+    item->body->range.end = item->end;
+  }
+  return item;
+}
+
+// §37.49: `stmt`, an assertion statement opened at `start` and read up to the
+// last token `lexer` gave, spanning that text.
+static Stmt* Spanning(Stmt* stmt, SourceLoc start, const Lexer& lexer) {
+  stmt->range = {start, lexer.TakenEnd()};
+  return stmt;
 }
 
 // CPD-dedup: the assertion forms below are written out of the same three
@@ -183,13 +202,14 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   Expect(keyword, Subclause("16.3"));
 
   if (Check(TokenKind::kKwProperty)) {
-    return ParseProceduralConcurrentAssertLike(kind);
+    return Spanning(ParseProceduralConcurrentAssertLike(kind),
+                    stmt->range.start, lexer_);
   }
 
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
-  return stmt;
+  return Spanning(stmt, stmt->range.start, lexer_);
 }
 
 Stmt* Parser::ParseImmediateAssert() {
@@ -209,14 +229,15 @@ Stmt* Parser::ParseImmediateCover() {
   Expect(TokenKind::kKwCover, Subclause("16.3"));
 
   if (Check(TokenKind::kKwProperty) || Check(TokenKind::kKwSequence)) {
-    return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
+    return Spanning(
+        ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate),
+        stmt->range.start, lexer_);
   }
 
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
   ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.3"));
-
-  return stmt;
+  return Spanning(stmt, stmt->range.start, lexer_);
 }
 
 static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
@@ -239,12 +260,13 @@ static bool IsDeferredImmediate(Lexer& lexer) {
   return false;
 }
 
-static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
+static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc,
+                                  const Lexer& lexer) {
   auto* item = arena.Create<ModuleItem>();
   item->kind = ModuleItemKind::kAssertProperty;
   item->loc = loc;
   item->body = stmt;
-  return item;
+  return EndedAtLastToken(item, lexer);
 }
 
 ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
@@ -256,7 +278,7 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
-  return WrapStmtAsItem(arena_, stmt, loc);
+  return WrapStmtAsItem(arena_, stmt, loc, lexer_);
 }
 
 // §16.14.5: a concurrent assertion used outside procedural code has `always`
@@ -536,7 +558,7 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
     item->body->assert_pass_stmt = item->assert_pass_stmt;
     item->body->assert_fail_stmt = item->assert_fail_stmt;
   }
-  return item;
+  return EndedAtLastToken(item, lexer_);
 }
 
 ModuleItem* Parser::ParseAssertProperty() {
@@ -574,7 +596,7 @@ ModuleItem* Parser::ParseCoverProperty() {
     stmt->assert_expr = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("16.4"));
     ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.4"));
-    return WrapStmtAsItem(arena_, stmt, item->loc);
+    return WrapStmtAsItem(arena_, stmt, item->loc, lexer_);
   }
 
   if (Check(TokenKind::kKwSequence)) {
@@ -617,7 +639,7 @@ ModuleItem* Parser::ParseCoverProperty() {
     item->body->assert_pass_stmt = item->assert_pass_stmt;
     item->body->cover_sequence = item->kind == ModuleItemKind::kCoverSequence;
   }
-  return item;
+  return EndedAtLastToken(item, lexer_);
 }
 
 // §16.14: the keywords a concurrent_assertion_statement opens with.
@@ -668,7 +690,7 @@ ModuleItem* Parser::ParseRestrictProperty() {
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   Expect(TokenKind::kRParen, Subclause("16.14.4"));
   Expect(TokenKind::kSemicolon, Subclause("16.14.4"));
-  return item;
+  return EndedAtLastToken(item, lexer_);
 }
 
 // §16.17: `expect ( property_spec ) action_block`, the spec the one an

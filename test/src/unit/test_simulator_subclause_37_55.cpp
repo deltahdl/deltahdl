@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -181,6 +182,81 @@ TEST(ImmediateAssertionModel, TraversalsSkipUnrelatedChildren) {
   EXPECT_EQ(VpiImmediateAssertionExpr(&assertion), nullptr);
   EXPECT_EQ(VpiImmediateAssertionStmt(&assertion), nullptr);
   EXPECT_EQ(VpiImmediateAssertionElseStmt(&assertion), nullptr);
+}
+
+// The immediate assertions of a run, built from the elaborated design rather
+// than by hand.
+class ImmediateAssertionsOfARun : public VpiDesignRun {
+ protected:
+  // The name of what `assertion` reaches through `relation`, empty for none.
+  static std::string NameReached(int relation, vpiHandle assertion) {
+    vpiHandle reached = vpi_handle(relation, assertion);
+    if (reached == nullptr) return "";
+    const char* name = vpi_get_str(vpiName, reached);
+    return name == nullptr ? "" : name;
+  }
+};
+
+// An assertion statement reaches the expression it asserts and its pass and
+// fail actions, and reports that it is not deferred; a cover has no fail
+// action (#5075).
+TEST_F(ImmediateAssertionsOfARun, AnAssertionStatementReachesItsParts) {
+  Run("module top; logic a, b;\n"
+      "  initial begin\n"
+      "    a1: assert (a) $display(\"p\"); else $write(\"f\");\n"
+      "    c1: cover (b) $display(\"c\");\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, top, "a1");
+  vpiHandle c1 = Named(vpiAssertion, top, "c1");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(c1, nullptr);
+  EXPECT_EQ(NameReached(vpiExpr, a1), "a");
+  EXPECT_EQ(NameReached(vpiStmt, a1), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(vpi_get(vpiIsDeferred, a1), 0);
+  EXPECT_EQ(NameReached(vpiExpr, c1), "b");
+  EXPECT_EQ(NameReached(vpiStmt, c1), "$display");
+  EXPECT_EQ(vpi_handle(vpiElseStmt, c1), nullptr);
+}
+
+// A deferred assertion written as a module item reaches its expression and
+// actions, and reports whether it is deferred and whether final (#5078).
+TEST_F(ImmediateAssertionsOfARun, ADeferredAssertionItemReachesItsParts) {
+  Run("module top; logic a, b;\n"
+      "  d1: assert final (a) $display(\"p\"); else $write(\"f\");\n"
+      "  d2: assert #0 (b);\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle d1 = Named(vpiAssertion, top, "d1");
+  vpiHandle d2 = Named(vpiAssertion, top, "d2");
+  ASSERT_NE(d1, nullptr);
+  ASSERT_NE(d2, nullptr);
+  EXPECT_EQ(NameReached(vpiExpr, d1), "a");
+  EXPECT_EQ(NameReached(vpiStmt, d1), "$display");
+  EXPECT_EQ(NameReached(vpiElseStmt, d1), "$write");
+  EXPECT_EQ(vpi_get(vpiIsDeferred, d1), 1);
+  EXPECT_EQ(vpi_get(vpiIsFinal, d1), 1);
+  EXPECT_EQ(NameReached(vpiExpr, d2), "b");
+  EXPECT_EQ(vpi_get(vpiIsDeferred, d2), 1);
+  EXPECT_EQ(vpi_get(vpiIsFinal, d2), 0);
+}
+
+// An assertion written with a fail action and no pass action reaches that
+// action through vpiElseStmt and no statement through vpiStmt (#5083).
+TEST_F(ImmediateAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
+  Run("module top; logic a;\n"
+      "  initial begin\n"
+      "    a1: assert (a) else $write(\"f\");\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, a1), nullptr);
+  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
 }
 
 }  // namespace

@@ -269,8 +269,10 @@ static std::vector<VpiHandle> ImmediateAssertionStmts(VpiHandle assertion) {
 
 VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion) {
   // §37.55: the pass action statement, reached through vpiStmt. Null when the
-  // assertion was written without one.
+  // assertion was written without one, the fail action recorded as such being
+  // no pass action however it stands.
   std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
+  if (assertion != nullptr) std::erase(stmts, assertion->else_stmt);
   return stmts.empty() ? nullptr : stmts.front();
 }
 
@@ -281,6 +283,7 @@ VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion) {
   // assertion was written without an else action.
   if (!assertion) return nullptr;
   if (!VpiImmediateAssertionHasElseStmt(assertion->type)) return nullptr;
+  if (assertion->else_stmt != nullptr) return assertion->else_stmt;
   std::vector<VpiHandle> stmts = ImmediateAssertionStmts(assertion);
   return stmts.size() < 2 ? nullptr : stmts[1];
 }

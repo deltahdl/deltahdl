@@ -759,6 +759,10 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   const int kKind = VpiBuiltStmtKind(stmt);
   if (kKind == 0) return nullptr;
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
+  // §37.49: an assertion reports where its text stands.
+  if (VpiIsAssertionType(kKind)) {
+    VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
+  }
   const VpiCallSite kSite = CallSiteOf(parent, walk);
   VpiFillStmt(obj, stmt,
               {walk.build,
@@ -899,6 +903,9 @@ void AttachInstanceProcedures(VpiObject* instance,
     const BlockParent kParent{scope, scope->full_name};
     if (walk.process != nullptr) {
       walk.process->body = WalkProcessBody(proc, kParent, walk);
+    } else if (proc.body != nullptr && proc.body->is_deferred) {
+      // §16.4.3: a deferred assertion item is the statement it runs (§37.55).
+      MakeBuiltStmt(*proc.body, kParent, walk);
     } else if (proc.body != nullptr) {
       // The body of such a process is the assertion itself, whose label names
       // the assertion (§16.5) rather than a block around it.

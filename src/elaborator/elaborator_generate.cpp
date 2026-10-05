@@ -216,6 +216,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_assign = mod->assigns.size();
   size_t first_udp = mod->udp_insts.size();
   size_t first_child = mod->children.size();
+  size_t first_assertion = mod->assertions.size();
   ElaborateItem(item, mod);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
@@ -236,6 +237,10 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   // reports, so the path is stamped on the processes alone.
   for (size_t i = first_proc; i < mod->processes.size(); ++i) {
     mod->processes[i].gen_block_path = gen_block_path_;
+  }
+  // §37.49: an assertion the block writes is an object of this instance.
+  for (size_t i = first_assertion; i < mod->assertions.size(); ++i) {
+    mod->assertions[i].gen_block_path = gen_block_path_;
   }
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);

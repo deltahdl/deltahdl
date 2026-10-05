@@ -824,7 +824,7 @@ static bool IsAssertionItem(ModuleItemKind kind) {
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
   // §37.49: the run makes each an object of its instance.
   if (mod != nullptr && IsAssertionItem(item->kind)) {
-    mod->assertions.push_back(item);
+    mod->assertions.push_back({item, {}});
   }
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:

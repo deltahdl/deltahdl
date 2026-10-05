@@ -30,6 +30,11 @@ class Lexer {
 
   Token Next();
   Token Peek();
+  // Where the token Next last returned ends, the position of its last
+  // character: the end of a construct read up to and including that token. A
+  // token is written on one line but for a string literal continued over a
+  // line break, whose end this places on the line it starts on.
+  SourceLoc TakenEnd() const;
 
   Token NextFilePathSpec();
 
@@ -98,6 +103,8 @@ class Lexer {
   void RestorePos(const SavedPos& saved);
 
  private:
+  // The next token of the text, read past what precedes it.
+  Token Scan();
   // The character at `p`, and '\0' at or past the end of the text. Every look
   // at the text goes through this, so a comparison with any other character
   // is false at the end without a separate test for it; a caller that has to
@@ -185,6 +192,8 @@ class Lexer {
   bool has_peeked_ = false;
   bool in_attribute_ = false;
   Token peeked_;
+  // The token Next last returned, whose end TakenEnd reports.
+  Token taken_;
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;

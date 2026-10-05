@@ -445,6 +445,9 @@ struct SeqLinearBody {
 struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
+  // §37.49: where an assertion item's text ends, the position of its last
+  // character, which the item's VPI object reports; unset for other items.
+  SourceLoc end;
   std::vector<Attribute> attrs;
 
   bool from_anonymous_program = false;

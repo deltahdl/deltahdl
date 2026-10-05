@@ -159,6 +159,16 @@ struct RtlirGenBlockClocking {
   GenBlockPrefixes gen_block_prefixes;
 };
 
+// §37.49 with §27.4: an assertion a module body writes as an item, with the
+// generate block instance it stands in. The instances of a loop generate block
+// share one body, so the item alone says not which instance wrote the entry.
+struct RtlirAssertion {
+  const ModuleItem* item = nullptr;
+  // The generate block instances between the module and the assertion,
+  // outermost first; empty for an assertion of the module itself.
+  HierPath gen_block_path;
+};
+
 // Appends `member` to `members` as a declaration of the generate block instance
 // `path`, the steps from the module to it; nothing for a declaration of the
 // module itself or of a block with an unnamed step (§27.6).

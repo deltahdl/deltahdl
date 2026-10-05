@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "common/source_loc.h"
 
 namespace delta {
 
@@ -280,8 +281,9 @@ struct VpiStmtBuild {
 // `stmt` stands as when it is an assignment, an event or delay control, an
 // assign, deassign, force or release, an if or if-else, a case, a forever,
 // while, repeat, do-while, for or foreach loop, a wait, wait fork or ordered
-// wait, or a disable or disable fork (§37.77); 0 for a statement of another
-// kind.
+// wait, a disable or disable fork (§37.77), or an assertion: an immediate
+// one, or a concurrent one embedded in procedural code (§37.50); 0 for a
+// statement of another kind.
 int VpiBuiltStmtKind(const Stmt& stmt);
 
 // §37.65 with §9.4.2: the condition an event control written over `events` is
@@ -349,10 +351,16 @@ void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
-// §37.49: give each instance an assertion object per assertion written as
-// one of its items.
+// §37.49: give each instance an assertion object per concurrent assertion
+// written as one of its items, hung from the generate block instance that
+// writes it or the instance itself.
 void AttachAssertions(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build);
+
+// §37.49: give the assertion `obj` the location of its text, `range`: its
+// file and the line and column it starts and ends at.
+void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
+                                SimContext& ctx);
 
 // §37.11: make each instance array of modules, interfaces or programs an
 // array object over its elements.

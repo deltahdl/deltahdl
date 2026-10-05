@@ -252,5 +252,85 @@ TEST_F(AssertionsOfARun, AnInstanceReachesTheAssertionsItsItemsWrite) {
   EXPECT_EQ(vpi_get(vpiStartLine, c1), 4);
 }
 
+// An assertion a generate block writes is each generate block instance's,
+// named under it (§37.12), and not its module's (#5076).
+TEST_F(AssertionsOfARun, AGenerateBlocksAssertionIsItsGenScopes) {
+  Run("module top; logic clk, a;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    a1: assert property (@(posedge clk) a);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle g1 = By("top.g[1]");
+  ASSERT_NE(g1, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, g1, "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, a1), "top.g[1].a1");
+  EXPECT_EQ(FullNameOfChild(By("top"), "a1"), "");
+}
+
+// An assertion reports the line and column its text ends at, the closing
+// semicolon of an item written over two lines (#5077).
+TEST_F(AssertionsOfARun, AnAssertionReportsWhereItsTextEnds) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk)\n"
+      "                       a);\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_EQ(vpi_get(vpiStartLine, a1), 2);
+  EXPECT_EQ(vpi_get(vpiEndLine, a1), 3);
+  EXPECT_EQ(vpi_get(vpiEndColumn, a1), 26);
+}
+
+// An instance reaches each immediate assertion its procedures write as a
+// statement, of the kind it is, named by its label and reporting where it
+// stands (#5075).
+TEST_F(AssertionsOfARun,
+       AnInstanceReachesTheImmediateAssertionsOfItsProcedures) {
+  Run("module top; logic a;\n"
+      "  initial begin\n"
+      "    a1: assert (a);\n"
+      "    m1: assume (a);\n"
+      "    c1: cover (a);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, top, "a1");
+  vpiHandle m1 = Named(vpiAssertion, top, "m1");
+  vpiHandle c1 = Named(vpiAssertion, top, "c1");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(m1, nullptr);
+  ASSERT_NE(c1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, a1), vpiImmediateAssert);
+  EXPECT_EQ(vpi_get(vpiType, m1), vpiImmediateAssume);
+  EXPECT_EQ(vpi_get(vpiType, c1), vpiImmediateCover);
+  EXPECT_EQ(vpi_get(vpiStartLine, c1), 5);
+  EXPECT_EQ(vpi_get(vpiEndLine, c1), 5);
+  EXPECT_EQ(vpi_get(vpiEndColumn, c1), 18);
+}
+
+// An instance reaches each concurrent assertion its procedures write, of the
+// kind it is and named by its label, though no statement of the procedure
+// stands for it (§37.60) (#5082).
+TEST_F(AssertionsOfARun,
+       AnInstanceReachesTheConcurrentAssertionsOfItsProcedures) {
+  Run("module top; logic clk, a;\n"
+      "  always @(posedge clk) begin\n"
+      "    p1: assert property (a);\n"
+      "    q1: assume property (a);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle p1 = Named(vpiAssertion, top, "p1");
+  vpiHandle q1 = Named(vpiAssertion, top, "q1");
+  ASSERT_NE(p1, nullptr);
+  ASSERT_NE(q1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, p1), vpiAssert);
+  EXPECT_EQ(vpi_get(vpiType, q1), vpiAssume);
+  EXPECT_EQ(vpi_get(vpiStartLine, q1), 4);
+}
+
 }  // namespace
 }  // namespace delta

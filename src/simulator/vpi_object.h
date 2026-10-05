@@ -386,6 +386,9 @@ struct VpiObject {
   // where a name finds it, rather than from the process.
   VpiObject* body = nullptr;
   VpiObject* process = nullptr;
+  // §37.55: an assertion's fail action, reached through vpiElseStmt, where a
+  // run recorded it; §16.3 lets the pass action before it go unwritten.
+  VpiObject* else_stmt = nullptr;
 
   // §37.62: whether an event statement is a blocking event trigger (->) rather
   // than a nonblocking one (->>), reported through vpi_get(vpiBlocking). The

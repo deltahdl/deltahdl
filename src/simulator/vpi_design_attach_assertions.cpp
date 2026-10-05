@@ -4,6 +4,7 @@
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/sim_context.h"
@@ -16,21 +17,9 @@ namespace delta {
 
 namespace {
 
-// §37.49 with §16.4: the immediate assertion kind of a deferred assertion
-// statement of `kind`.
-int ImmediateKindOf(StmtKind kind) {
-  if (kind == StmtKind::kAssumeImmediate) return vpiImmediateAssume;
-  return kind == StmtKind::kCoverImmediate ? vpiImmediateCover
-                                           : vpiImmediateAssert;
-}
-
-// §37.49 and §37.50: the object kind of the assertion `item` writes - a
-// deferred immediate one by the statement the parser wraps it around, and a
-// concurrent one by its keyword.
-int AssertionKindOf(const ModuleItem& item) {
-  if (item.body != nullptr && item.body->is_deferred) {
-    return ImmediateKindOf(item.body->kind);
-  }
+// §37.50: the object kind of the concurrent assertion `item` writes, by its
+// keyword.
+int ConcurrentKindOf(const ModuleItem& item) {
   switch (item.kind) {
     case ModuleItemKind::kAssumeProperty:
       return vpiAssume;
@@ -44,43 +33,64 @@ int AssertionKindOf(const ModuleItem& item) {
   }
 }
 
-// §37.49: where the assertion written at `loc` stands - its file, and the line
-// and column it starts at - read where the text was written (§22.12). A
-// position the parser did not record leaves all three as they were.
-void RecordAssertionLocation(VpiObject* obj, SourceLoc loc,
-                             const SourceManager& sources) {
-  if (!loc.IsValid()) return;
-  const SourceLoc kWritten = sources.ResolveToOrigin(loc);
-  obj->file = std::string(sources.FilePath(kWritten.file_id));
-  obj->start_line = static_cast<int>(kWritten.line);
-  obj->column = static_cast<int>(kWritten.column);
+// §37.50: the object the concurrent assertion `item` stands as in `scope`,
+// named by its label, reporting where it stands and, for a cover, whether it
+// covers a sequence.
+void MakeConcurrentAssertion(const ModuleItem& item, VpiObject* scope,
+                             SimContext& ctx, const VpiAttachBuild& build) {
+  VpiObject* obj = build.alloc();
+  obj->type = ConcurrentKindOf(item);
+  obj->parent = scope;
+  if (!item.name.empty()) {
+    obj->name = build.keep(std::string(item.name));
+    obj->full_name = VpiScopedFullName(scope, item.name);
+  }
+  obj->cover_sequence = item.kind == ModuleItemKind::kCoverSequence;
+  VpiRecordAssertionLocation(obj, SourceRange{item.loc, item.end}, ctx);
+  scope->children.push_back(obj);
 }
 
 }  // namespace
 
+void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
+                                SimContext& ctx) {
+  // §37.49: where the assertion stands - its file, the line and column it
+  // starts at and those it ends at - read where the text was written (§22.12).
+  // A position the parser did not record leaves its pair as it was.
+  const SourceManager& sources = ctx.GetDiag().Sources();
+  if (range.start.IsValid()) {
+    const SourceLoc kStart = sources.ResolveToOrigin(range.start);
+    obj->file = std::string(sources.FilePath(kStart.file_id));
+    obj->start_line = static_cast<int>(kStart.line);
+    obj->column = static_cast<int>(kStart.column);
+  }
+  if (range.end.IsValid()) {
+    const SourceLoc kEnd = sources.ResolveToOrigin(range.end);
+    obj->end_line = static_cast<int>(kEnd.line);
+    obj->end_column = static_cast<int>(kEnd.column);
+  }
+}
+
 void AttachAssertions(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build) {
   // §37.49 with §39.3.1 step b: an instance reaches the assertions written as
-  // its items, each of the kind it is, named by its label (§37.50), reporting
-  // where it stands, and a cover reporting whether it covers a sequence.
-  // RtlirModule::assertions kept each, and no pass made an object of one, so
-  // vpi_iterate(vpiAssertion) reached none in any design.
-  const SourceManager& sources = ctx.GetDiag().Sources();
+  // its items, each hung from the generate block instance that writes it
+  // (§37.12), or from the instance itself. A deferred immediate one runs as a
+  // process the elaborator makes of it, whose walk (AttachProcedures) builds
+  // it as the statement it is, with its parts (§37.55).
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
-        for (const ModuleItem* item : mod->assertions) {
-          if (item == nullptr) continue;
-          VpiObject* obj = build.alloc();
-          obj->type = AssertionKindOf(*item);
-          obj->parent = instance;
-          if (!item->name.empty()) {
-            obj->name = build.keep(std::string(item->name));
-            obj->full_name = VpiScopedFullName(instance, item->name);
+        for (const RtlirAssertion& assertion : mod->assertions) {
+          const ModuleItem* item = assertion.item;
+          if (item == nullptr ||
+              (item->body != nullptr && item->body->is_deferred)) {
+            continue;
           }
-          obj->cover_sequence = item->kind == ModuleItemKind::kCoverSequence;
-          RecordAssertionLocation(obj, item->loc, sources);
-          instance->children.push_back(obj);
+          VpiObject* scope = VpiGenScopeOf(instance, assertion.gen_block_path);
+          if (scope != nullptr) {
+            MakeConcurrentAssertion(*item, scope, ctx, build);
+          }
         }
       });
 }

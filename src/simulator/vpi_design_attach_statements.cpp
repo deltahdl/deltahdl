@@ -296,6 +296,37 @@ VpiObject* DisableTarget(VpiObject* from, const Expr* name) {
   return nullptr;
 }
 
+// §37.55 and §37.50: the kind of assertion `stmt` writes, an immediate one
+// (§37.60 counts it among the atomic statements) or, embedded in procedural
+// code (§16.14.6), a concurrent one, by its keyword.
+int AssertionStmtKind(const Stmt& stmt) {
+  const bool kConcurrent = stmt.is_procedural_concurrent;
+  switch (stmt.kind) {
+    case StmtKind::kAssumeImmediate:
+      return kConcurrent ? vpiAssume : vpiImmediateAssume;
+    case StmtKind::kCoverImmediate:
+      return kConcurrent ? vpiCover : vpiImmediateCover;
+    default:
+      return kConcurrent ? vpiAssert : vpiImmediateAssert;
+  }
+}
+
+// §37.55: what an immediate assertion reaches - the expression it asserts and
+// its pass and fail actions, the fail action recorded as such since §16.3 lets
+// the pass action go unwritten - and whether it is deferred and whether final
+// (§16.4). §37.50: a concurrent one reports whether it covers a sequence, and
+// holds its actions likewise.
+void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
+  obj->cover_sequence = stmt.cover_sequence;
+  if (!stmt.is_procedural_concurrent) {
+    obj->is_deferred = stmt.is_deferred;
+    obj->is_final = stmt.is_final_deferred;
+    AddChild(obj, with.expression(stmt.assert_expr));
+  }
+  with.statement(stmt.assert_pass_stmt, obj);
+  obj->else_stmt = with.statement(stmt.assert_fail_stmt, obj);
+}
+
 }  // namespace
 
 VpiObject* VpiEventCondition(const std::vector<EventExpr>& events,
@@ -346,6 +377,10 @@ int VpiBuiltStmtKind(const Stmt& stmt) {
       return vpiDisable;
     case StmtKind::kDisableFork:
       return vpiDisableFork;
+    case StmtKind::kAssertImmediate:
+    case StmtKind::kAssumeImmediate:
+    case StmtKind::kCoverImmediate:
+      return AssertionStmtKind(stmt);
     default:
       return 0;
   }
@@ -396,6 +431,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       return;
     case StmtKind::kWaitFork:
     case StmtKind::kDisableFork:
+      return;
+    case StmtKind::kAssertImmediate:
+    case StmtKind::kAssumeImmediate:
+    case StmtKind::kCoverImmediate:
+      FillAssertion(obj, stmt, with);
       return;
     default:
       FillConditional(obj, stmt, with);

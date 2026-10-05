@@ -506,8 +506,22 @@ Token Lexer::MakeOp(TokenKind kind, SourceLoc loc, uint32_t start) {
 Token Lexer::Next() {
   if (has_peeked_) {
     has_peeked_ = false;
-    return peeked_;
+    taken_ = peeked_;
+  } else {
+    taken_ = Scan();
   }
+  return taken_;
+}
+
+SourceLoc Lexer::TakenEnd() const {
+  SourceLoc end = taken_.loc;
+  if (!taken_.text.empty()) {
+    end.column += static_cast<uint32_t>(taken_.text.size()) - 1;
+  }
+  return end;
+}
+
+Token Lexer::Scan() {
   SkipWhitespaceAndComments();
   if (AtEnd()) {
     return MakeToken(TokenKind::kEof, MakeLoc());
@@ -544,7 +558,7 @@ Token Lexer::Next() {
 
 Token Lexer::Peek() {
   if (!has_peeked_) {
-    peeked_ = Next();
+    peeked_ = Scan();
     has_peeked_ = true;
   }
   return peeked_;
