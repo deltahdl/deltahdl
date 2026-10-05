@@ -154,7 +154,7 @@ struct CallShape {
   int type = 0;
   std::string_view name;
   VpiObject* prefix = nullptr;
-  std::vector<std::string_view> prefix_members;
+  std::vector<std::string_view> prefix_members = {};
   bool user_defined = false;
   VpiObject* systf = nullptr;
   VpiObject* called = nullptr;
