@@ -214,15 +214,18 @@ void FillFor(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
 }
 
 // §37.75: the array a foreach statement indexes (detail 1), its index
-// variables in order with none for one skipped (detail 2), which §12.7.3
-// declares as int variables of the statement, and its body.
+// variables in order with none for one skipped (detail 2), and its body.
+// §12.7.3 declares each index variable of the statement with the type of the
+// array's index: the index type for an associative first dimension, int for
+// every other.
 void FillForeach(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->foreach_array = with.expression(stmt.expr);
   for (std::string_view name : stmt.foreach_vars) {
     VpiObject* var = nullptr;
     if (!name.empty()) {
       var = with.build.alloc();
-      var->type = vpiIntVar;
+      var->type =
+          obj->loop_vars.empty() ? with.index_kind(stmt.expr) : vpiIntVar;
       var->name = with.build.keep(std::string(name));
       var->parent = obj;
     }

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/string_methods.h"
@@ -243,31 +242,6 @@ const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
   return nullptr;
 }
 
-// §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
-// the built-in class `cls` is, zero for none. Every method the three classes
-// declare is listed but new, which no statement calls through a variable.
-int BuiltInClassCallKind(std::string_view cls, std::string_view method) {
-  using Method = std::pair<std::string_view, std::string_view>;
-  static constexpr Method kTasks[] = {
-      {"process", "await"}, {"semaphore", "get"}, {"mailbox", "put"},
-      {"mailbox", "get"},   {"mailbox", "peek"},
-  };
-  static constexpr Method kFunctions[] = {
-      {"process", "self"},          {"process", "status"},
-      {"process", "kill"},          {"process", "suspend"},
-      {"process", "resume"},        {"process", "srandom"},
-      {"process", "get_randstate"}, {"process", "set_randstate"},
-      {"semaphore", "put"},         {"semaphore", "try_get"},
-      {"mailbox", "num"},           {"mailbox", "try_put"},
-      {"mailbox", "try_get"},       {"mailbox", "try_peek"},
-  };
-  const auto kIsCalled = [&](const Method& entry) {
-    return entry.first == cls && entry.second == method;
-  };
-  if (std::ranges::any_of(kTasks, kIsCalled)) return vpiMethodTaskCall;
-  return std::ranges::any_of(kFunctions, kIsCalled) ? vpiMethodFuncCall : 0;
-}
-
 // §37.42: what a method call calls - the kind of tf call it is, zero for a
 // method the walk resolves to nothing, whether the design declares it, and if
 // it does the class declaring it.
@@ -286,7 +260,7 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
   constexpr int kMaxDepth = 64;
   for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
     const ClassDecl* decl = FindClassDecl(walk, cls);
-    if (decl == nullptr) return {BuiltInClassCallKind(cls, method), false};
+    if (decl == nullptr) return {VpiBuiltInClassCallKind(cls, method), false};
     const ModuleItem* found = MethodNamed(*decl, method);
     if (found != nullptr) {
       return {CallKindOf(*found, vpiMethodTaskCall, vpiMethodFuncCall), true,
@@ -295,50 +269,6 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
     cls = decl->base_class;
   }
   return {};
-}
-
-// Whether `name` is a built-in system function, every one the standard defines
-// listed by the clause defining it: §14.14, §16.14.7, §18.13, §19.9, and the
-// functions of §20.3 to §20.15, §21.3 and §21.6. $cast (§8.16), $system
-// (§20.17.1) and $stacktrace (§20.17.2) may each be called as a task or a
-// function, and a statement calling one calls the task.
-bool IsBuiltInSystemFunction(std::string_view name) {
-  static constexpr std::string_view kFunctions[] = {
-      // §14.14, §16.14.7, §18.13 and §19.9.
-      "$global_clock", "$inferred_clock", "$inferred_disable", "$urandom",
-      "$urandom_range", "$get_coverage",
-      // §20.3 and §20.4.
-      "$realtime", "$stime", "$time", "$timeunit", "$timeprecision",
-      // §20.5 and §20.6.
-      "$bitstoreal", "$realtobits", "$bitstoshortreal", "$shortrealtobits",
-      "$itor", "$rtoi", "$signed", "$unsigned", "$bits", "$isunbounded",
-      "$typename",
-      // §20.7.
-      "$unpacked_dimensions", "$dimensions", "$left", "$right", "$low", "$high",
-      "$increment", "$size",
-      // §20.8.
-      "$clog2", "$ln", "$log10", "$exp", "$sqrt", "$pow", "$floor", "$ceil",
-      "$sin", "$cos", "$tan", "$asin", "$acos", "$atan", "$atan2", "$hypot",
-      "$sinh", "$cosh", "$tanh", "$asinh", "$acosh", "$atanh",
-      // §20.9.
-      "$countbits", "$countones", "$onehot", "$onehot0", "$isunknown",
-      // §20.12.
-      "$sampled", "$rose", "$fell", "$stable", "$changed", "$past",
-      "$past_gclk", "$rose_gclk", "$fell_gclk", "$stable_gclk", "$changed_gclk",
-      "$future_gclk", "$rising_gclk", "$falling_gclk", "$steady_gclk",
-      "$changing_gclk",
-      // §20.13, §20.14 and §20.15.
-      "$coverage_control", "$coverage_get_max", "$coverage_get",
-      "$coverage_merge", "$coverage_save", "$random", "$dist_chi_square",
-      "$dist_erlang", "$dist_exponential", "$dist_normal", "$dist_poisson",
-      "$dist_t", "$dist_uniform", "$q_full",
-      // §21.3 and §21.6.
-      "$fopen", "$fgetc", "$ungetc", "$fgets", "$fscanf", "$sscanf", "$fread",
-      "$ftell", "$fseek", "$rewind", "$feof", "$ferror", "$sformatf",
-      "$test$plusargs", "$value$plusargs"};
-  return std::ranges::any_of(kFunctions, [name](std::string_view function) {
-    return function == name;
-  });
 }
 
 // §37.42: a system task or system function call, named after what it calls. A
@@ -350,7 +280,7 @@ CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
   const bool kFunction =
       kSystf.type == vpiSysFunc ||
-      (kSystf.type == 0 && IsBuiltInSystemFunction(call.callee));
+      (kSystf.type == 0 && VpiIsBuiltInSystemFunction(call.callee));
   CallShape shape{kFunction ? vpiSysFuncCall : vpiSysTaskCall, call.callee};
   shape.user_defined = kSystf.type == vpiSysTask || kSystf.type == vpiSysFunc;
   shape.systf = kSystf.object;
@@ -469,23 +399,35 @@ struct PrefixVar {
   VpiObject* object = nullptr;
 };
 
+// §23.9: the declaration of the variable `name` a block around the statement
+// `parent` stands for declares, the innermost first, with `where` set to the
+// block's; null where no block declares one.
+const Stmt* BlockVarDecl(const BlockParent& parent, std::string_view name,
+                         const BlockParent*& where) {
+  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
+    if (at->block == nullptr) continue;
+    for (const Stmt* item : BlockItems(*at->block)) {
+      if (item != nullptr && item->kind == StmtKind::kVarDecl &&
+          item->var_name == name) {
+        where = at;
+        return item;
+      }
+    }
+  }
+  return nullptr;
+}
+
 // §23.9: the variable `name` names in the scope `parent` stands for: one a
 // block declares, the innermost around the statement first, or else one of the
 // instance's module.
 PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
                         const BodyWalk& walk) {
-  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
-    if (at->block == nullptr) continue;
-    for (const Stmt* item : BlockItems(*at->block)) {
-      if (item == nullptr || item->kind != StmtKind::kVarDecl ||
-          item->var_name != name) {
-        continue;
-      }
-      const DataType& type = item->var_decl_type;
-      return {type.kind == DataTypeKind::kNamed ? type.type_name
-                                                : std::string_view(),
-              BlockHolder(*item, walk), ChildNamed(at->scope, name)};
-    }
+  const BlockParent* where = nullptr;
+  if (const Stmt* item = BlockVarDecl(parent, name, where)) {
+    const DataType& type = item->var_decl_type;
+    return {
+        type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
+        BlockHolder(*item, walk), ChildNamed(where->scope, name)};
   }
   PrefixVar var;
   var.object =
@@ -497,6 +439,55 @@ PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
     break;
   }
   return var;
+}
+
+// §12.7.3 with §7.8: the kind of variable an associative array's index type
+// written as `name` declares, which a foreach loop variable over the array is
+// of: a built-in keyword's, or the kind a class or typedef name gives (§6.18).
+// §7.8.1 bars a foreach over a wildcard index.
+int IndexTypeKind(std::string_view name, const BodyWalk& walk) {
+  static constexpr struct {
+    std::string_view keyword;
+    int kind;
+  } kKeywords[] = {
+      {"string", vpiStringVar},     {"int", vpiIntVar},
+      {"integer", vpiIntegerVar},   {"byte", vpiByteVar},
+      {"shortint", vpiShortIntVar}, {"longint", vpiLongIntVar},
+      {"bit", vpiBitVar},           {"logic", vpiLogicVar},
+      {"reg", vpiLogicVar},         {"time", vpiTimeVar},
+  };
+  for (const auto& entry : kKeywords) {
+    if (entry.keyword == name) return entry.kind;
+  }
+  return VpiNamedTypeVariableKind(walk.design, walk.mod, name);
+}
+
+// §12.7.3: the kind of the first index variable of a foreach loop over the
+// array `array` names, the index type's where the array's first dimension is
+// associative and an int var otherwise; an array a block around the
+// statement declares is found first (§23.9).
+int ForeachIndexKind(const Expr* array, const BlockParent& parent,
+                     const BodyWalk& walk) {
+  if (array == nullptr || array->kind != ExprKind::kIdentifier) {
+    return vpiIntVar;
+  }
+  const BlockParent* where = nullptr;
+  if (const Stmt* item = BlockVarDecl(parent, array->text, where)) {
+    const Expr* dim = item->var_unpacked_dims.empty()
+                          ? nullptr
+                          : item->var_unpacked_dims.front();
+    const bool kAssoc = dim != nullptr && IsAssocDim(*dim, walk);
+    return kAssoc ? IndexTypeKind(dim->text, walk) : vpiIntVar;
+  }
+  for (const RtlirVariable& var : walk.mod.variables) {
+    if (var.name != array->text || !var.is_assoc) continue;
+    if (var.is_class_index) return vpiClassVar;
+    return IndexTypeKind(var.assoc_index_keyword.empty()
+                             ? var.assoc_index_type_name
+                             : var.assoc_index_keyword,
+                         walk);
+  }
+  return vpiIntVar;
 }
 
 // §37.42 with §37.31: the task or function the class defn made for `owner`
@@ -764,6 +755,9 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
                  return WalkStmt(
                      held, BlockParent{holder, parent.path, nullptr, &parent},
                      walk);
+               },
+               [&](const Expr* array) {
+                 return ForeachIndexKind(array, parent, walk);
                }});
   return obj;
 }

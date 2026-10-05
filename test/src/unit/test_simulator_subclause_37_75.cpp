@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -378,6 +380,36 @@ TEST_F(DoWhileAndForeachLoopsOfARun, TheBodyNamesTheLoopsIndexVariable) {
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, body)), VpiObjectOf(k));
   EXPECT_NE(VpiObjectOf(k), VpiObjectOf(By("top.k")));
+}
+
+// §12.7.3: an index variable over an associative array is of the array's
+// index type - a string, an integer, an enumeration a typedef names, or the
+// byte a block's array is indexed by - and an int over any other (#5064).
+TEST_F(DoWhileAndForeachLoopsOfARun, AnIndexVariableIsOfItsArraysIndexType) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  int s [string]; int g [integer]; int e [e_t]; int f [2];\n"
+      "  initial foreach (s[i]) begin end\n"
+      "  initial foreach (g[i]) begin end\n"
+      "  initial foreach (e[i]) begin end\n"
+      "  initial foreach (f[i]) begin end\n"
+      "  initial begin : b int q [byte]; foreach (q[k]) begin end end\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  while (vpiHandle proc = vpi_scan(procs)) {
+    vpiHandle loop = vpi_handle(vpiStmt, proc);
+    if (loop != nullptr && vpi_get(vpiType, loop) == vpiNamedBegin) {
+      vpiHandle held = vpi_iterate(vpiStmt, loop);
+      loop = held == nullptr ? nullptr : vpi_scan(held);
+    }
+    ASSERT_NE(loop, nullptr);
+    vpiHandle vars = vpi_iterate(vpiLoopVars, loop);
+    ASSERT_NE(vars, nullptr);
+    kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
+  }
+  EXPECT_EQ(kinds, (std::vector<int>{vpiStringVar, vpiIntegerVar, vpiEnumVar,
+                                     vpiIntVar, vpiByteVar}));
 }
 
 }  // namespace

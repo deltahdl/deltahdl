@@ -234,15 +234,26 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
+// §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
+// the built-in class `cls` is, vpiMethodTaskCall or vpiMethodFuncCall, zero
+// for none.
+int VpiBuiltInClassCallKind(std::string_view cls, std::string_view method);
+
+// Whether `name` is a system function the standard defines, which a statement
+// calling it calls as a function.
+bool VpiIsBuiltInSystemFunction(std::string_view name);
+
 // What the objects one statement reaches are built with: the build; the
 // expression object an expression the statement writes stands as, null for
 // one not modelled; and the object a statement it holds stands as, hung from
 // the object given and walked for the objects it holds in turn, null for one
-// the run builds no object for.
+// the run builds no object for; and the kind of the first index variable of a
+// foreach loop over the array an expression names (§12.7.3).
 struct VpiStmtBuild {
   const VpiAttachBuild& build;
   std::function<VpiObject*(const Expr*)> expression;
   std::function<VpiObject*(const Stmt*, VpiObject*)> statement;
+  std::function<int(const Expr*)> index_kind;
 };
 
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object
