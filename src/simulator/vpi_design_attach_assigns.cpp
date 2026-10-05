@@ -28,6 +28,7 @@
 #include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -321,13 +322,13 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
     }
     return select;
   }
-  if (!kDim.Contains(index->int_val)) return nullptr;
-  const int64_t kOffset =
-      kBaseOffset + (kDim.OffsetOf(index->int_val) * kWidth);
+  const auto kIndex = static_cast<int64_t>(index->int_val);
+  if (!kDim.Contains(kIndex)) return nullptr;
+  const int64_t kOffset = kBaseOffset + (kDim.OffsetOf(kIndex) * kWidth);
   if (rest.empty()) return BitAtOffset(*root, kOffset);
   VpiObject* slice = SliceObject(root, std::move(rest), kWidth, build);
   slice->bit_offset = static_cast<int>(kOffset);
-  const std::string kSuffix = "[" + std::to_string(index->int_val) + "]";
+  const std::string kSuffix = "[" + std::to_string(kIndex) + "]";
   slice->name = build.keep(std::string(base->name) + kSuffix);
   slice->full_name = base->full_name + kSuffix;
   return slice;

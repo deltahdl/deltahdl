@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -538,10 +539,11 @@ static std::optional<int64_t> VaryingIndex(VpiHandle obj) {
 // the bits a varying select that records the dimension it indexes now
 // stands for; none where its index names no element of the dimension.
 static std::optional<int64_t> VaryingOffset(VpiHandle obj) {
+  const std::optional<PackedRange>& dim = obj->select_dim;
   const std::optional<int64_t> kIndex = VaryingIndex(obj);
-  if (!kIndex || !obj->select_dim->Contains(*kIndex)) return std::nullopt;
+  if (!dim || !kIndex || !dim->Contains(*kIndex)) return std::nullopt;
   return obj->select_base_offset +
-         (obj->select_dim->OffsetOf(*kIndex) * std::max(obj->size, 1));
+         (dim->OffsetOf(*kIndex) * std::max(obj->size, 1));
 }
 
 // The bit of its vector a varying bit stands for when a value is read or
