@@ -694,8 +694,8 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
 // used while `parent` and `walk` live.
 VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
   return {walk.build,
-          [kSite = CallSiteOf(parent, walk), &walk](const Expr* expr) {
-            return VpiCallSiteExpression(expr, walk.objects, kSite,
+          [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
+            return VpiCallSiteExpression(expr, walk.objects, site,
                                          walk.calls.ctx, walk.build);
           },
           [&parent, &walk](const Stmt* held, VpiObject* holder) {
