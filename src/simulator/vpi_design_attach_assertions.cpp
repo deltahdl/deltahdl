@@ -510,7 +510,51 @@ bool IsModelledSequence(const SeqLinearBody& body) {
 VpiObject* SequenceOperand(const ModuleItem* sequence,
                            const VpiStmtBuild& with) {
   if (sequence == nullptr) return nullptr;
-  return VpiSequenceExprObject(sequence->seq_linear, with);
+  return VpiSequenceExprObject(sequence->seq_linear, with, nullptr);
+}
+
+// Whether `body` is one chain and nothing beside it, an operand of an
+// intersect, an and, an or or a first_match standing apart from its clocks.
+bool IsLoneChain(const SeqLinearBody& body) {
+  return body.intersects.empty() && body.conjuncts.empty() &&
+         body.alternatives.empty() && !body.first_match;
+}
+
+// §37.56 with §16.13.1: the chain `body`, whose operands name clocks of their
+// own, as a multiclock sequence expr reaching a clocked seq per run of
+// operands on one clock, the first run's the clock `flowing` into the chain
+// where it names none; each clocked seq reaches its clock and the sequence
+// expr its run is.
+VpiObject* MulticlockExpr(const SeqLinearBody& body,
+                          const std::vector<EventExpr>* flowing,
+                          const VpiStmtBuild& with) {
+  VpiObject* multiclock = with.build.alloc();
+  multiclock->type = vpiMulticlockSequenceExpr;
+  const size_t kCount = body.operands.size();
+  const auto kClockAt = [&body](size_t i) -> const std::vector<EventExpr>* {
+    return i < body.clocks.size() && !body.clocks[i].empty() ? &body.clocks[i]
+                                                             : nullptr;
+  };
+  for (size_t start = 0; start < kCount;) {
+    size_t end = start + 1;
+    while (end < kCount && kClockAt(end) == nullptr) ++end;
+    std::vector<ChainElement> run =
+        ChainElements(body, start, end, nullptr, with);
+    if (start > 0 && !run.empty()) run[0].before = SeqCycleDelay{0, 0};
+    const std::vector<EventExpr>* clock =
+        kClockAt(start) != nullptr ? kClockAt(start) : flowing;
+    VpiObject* clocked = with.build.alloc();
+    clocked->type = vpiClockedSeq;
+    clocked->parent = multiclock;
+    if (clock != nullptr) {
+      clocked->clocking_event = VpiEventCondition(*clock, with);
+    }
+    VpiObject* sequence = JoinChain(run, with);
+    if (sequence != nullptr) clocked->children.push_back(sequence);
+    multiclock->children.push_back(clocked);
+    start = end;
+  }
+  return multiclock;
 }
 
 // The property expr of the operand `index` of `node`; null where it has none.
@@ -701,7 +745,14 @@ VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
 }  // namespace
 
 VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
-                                 const VpiStmtBuild& with) {
+                                 const VpiStmtBuild& with,
+                                 const std::vector<EventExpr>* flowing) {
+  const auto kUnclocked = [](const std::vector<EventExpr>& clock) {
+    return clock.empty();
+  };
+  if (!std::ranges::all_of(body.clocks, kUnclocked)) {
+    return IsLoneChain(body) ? MulticlockExpr(body, flowing, with) : nullptr;
+  }
   if (!IsModelledSequence(body)) return nullptr;
   // §16.9.7 and §16.9.8: the alternatives of an or, left to right, and the
   // whole under the first_match it is the operand of.

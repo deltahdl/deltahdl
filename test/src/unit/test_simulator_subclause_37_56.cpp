@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -270,6 +272,46 @@ TEST(MulticlockSequenceExprModel, IterateClockedSeqsEmptyWhenNonePresent) {
   multiclock.children = {&lone};
 
   EXPECT_EQ(ctx.Iterate(vpiClockedSeq, &multiclock), nullptr);
+}
+
+class MulticlockSequencesOfARun : public VpiDesignRun {};
+
+// A sequence whose operands are evaluated on clocks of their own is a
+// multiclock sequence expr, reaching a clocked seq per run of operands on one
+// clock, the first on the clock flowing into it, each reaching its clock and
+// its sequence expr (§16.13.1) (#5098).
+TEST_F(MulticlockSequencesOfARun, AChainOnTwoClocksIsAMulticlockSequence) {
+  Run("module top; logic clk1, clk2, a, b;\n"
+      "  m1: assert property (@(posedge clk1) a ##1 @(posedge clk2) b);\n"
+      "endmodule\n");
+  vpiHandle sequence = PropertyOf("m1");
+  ASSERT_NE(sequence, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, sequence), vpiMulticlockSequenceExpr);
+  std::vector<vpiHandle> clocked;
+  vpiHandle it = vpi_iterate(vpiClockedSeq, sequence);
+  ASSERT_NE(it, nullptr);
+  for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+    clocked.push_back(h);
+  }
+  ASSERT_EQ(clocked.size(), 2u);
+  const char* const kNames[] = {"a", "b"};
+  const int kEdges[] = {vpiPosedgeOp, vpiPosedgeOp};
+  for (size_t i = 0; i < clocked.size(); ++i) {
+    vpiHandle event = vpi_handle(vpiClockingEvent, clocked[i]);
+    ASSERT_NE(event, nullptr) << i;
+    EXPECT_EQ(vpi_get(vpiOpType, event), kEdges[i]) << i;
+    vpiHandle held = vpi_handle(vpiSequenceExpr, clocked[i]);
+    ASSERT_NE(held, nullptr) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, held), kNames[i]) << i;
+  }
+  const std::vector<vpiHandle> kFirst =
+      OperandsOf(vpi_handle(vpiClockingEvent, clocked[0]));
+  const std::vector<vpiHandle> kSecond =
+      OperandsOf(vpi_handle(vpiClockingEvent, clocked[1]));
+  ASSERT_EQ(kFirst.size(), 1u);
+  ASSERT_EQ(kSecond.size(), 1u);
+  EXPECT_STREQ(vpi_get_str(vpiName, kFirst[0]), "clk1");
+  EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "clk2");
 }
 
 }  // namespace

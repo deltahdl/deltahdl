@@ -144,6 +144,11 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
     out = PropertySpecExpr(ref);
     return true;
   }
+  // §37.56: a clocked seq reaches the sequence expr its run of operands is.
+  if (type == vpiSequenceExpr && ref->type == vpiClockedSeq) {
+    out = PropertySpecExpr(ref);
+    return true;
+  }
   if (type == vpiPropertyExpr && ref->type == vpiCasePropertyItem) {
     out = ref->body;
     return true;

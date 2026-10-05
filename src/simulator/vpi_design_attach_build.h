@@ -339,10 +339,13 @@ struct VpiPropertySpecParts {
 // §37.54: the sequence expr the linear body `body` stands for: its operands
 // joined by cycle delays and repeated, its intersects, conjuncts and
 // alternatives, its throughouts and its within, its operands' match items,
-// under first_match where written, each built through `with`; null for a body
-// holding an operand clocked on its own or match items inside a first_match.
+// under first_match where written, each built through `with`; a chain whose
+// operands name clocks a multiclock sequence expr (§37.56), the clock
+// `flowing` into it, where known, its leading run's; null for a body holding
+// match items inside a first_match, or clocks beside an operator.
 VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
-                                 const VpiStmtBuild& with);
+                                 const VpiStmtBuild& with,
+                                 const std::vector<EventExpr>* flowing);
 
 // §37.52: the property expr the property tree `node` stands for: the
 // expression of a Boolean, or the operation of a property operator (detail
