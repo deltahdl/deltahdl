@@ -114,9 +114,9 @@ void StringBits(std::string_view text, uint32_t width,
 void VectorBits(const s_vpi_vecval* vector, uint32_t width,
                 std::vector<Logic4Word>& words) {
   for (uint32_t k = 0; k < width; ++k) {
-    const s_vpi_vecval& kElement = vector[k / 32];
-    SetBit(words, k, ((kElement.aval >> (k % 32)) & 1) != 0,
-           ((kElement.bval >> (k % 32)) & 1) != 0);
+    const s_vpi_vecval& element = vector[k / 32];
+    SetBit(words, k, ((element.aval >> (k % 32)) & 1) != 0,
+           ((element.bval >> (k % 32)) & 1) != 0);
   }
 }
 
