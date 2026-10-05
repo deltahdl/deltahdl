@@ -349,6 +349,11 @@ void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
+// §37.49: give each instance an assertion object per assertion written as
+// one of its items.
+void AttachAssertions(const RtlirDesign* design, const VpiObjectMap& objects,
+                      SimContext& ctx, const VpiAttachBuild& build);
+
 // §37.11: make each instance array of modules, interfaces or programs an
 // array object over its elements.
 void AttachInstanceArrays(const RtlirDesign* design,

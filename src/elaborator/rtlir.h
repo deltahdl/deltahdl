@@ -732,6 +732,9 @@ struct RtlirModule {
   // wants all three; elaboration validates them (Elaborator::
   // ValidateClockingBlock) and this is what lets the run have them at all.
   std::vector<ModuleItem*> clocking_blocks;
+  // §16.14 and §16.4: the assertions written as items of the module, the
+  // concurrent ones and the deferred immediate ones, in source order.
+  std::vector<ModuleItem*> assertions;
   // §25.5 with §37.7: an interface's modport declarations, in source order;
   // empty for every other kind of definition.
   std::vector<const ModportDecl*> modports;
@@ -770,15 +773,10 @@ struct RtlirModule {
   // src/simulator/lowerer_register.cpp registers let_decls and would otherwise
   // answer an import's name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_import_decls;
-  // §35.7's exported subroutines, declared in this module. §35.7 states that
-  // "Declaring a SystemVerilog function to be exported does not change its
-  // semantics or behavior from the SystemVerilog perspective; there is no
-  // effect on SystemVerilog usage other than making it possible for foreign
-  // language tasks and functions in a DPI call-chain to call the exported
-  // function", and an export declaration held in let_decls breaches that: it
-  // carries no expression to substitute, so RegisterModuleSubroutines in
-  // src/simulator/lowerer_register.cpp would answer the exported subroutine's
-  // own name with a let expansion of nothing, ahead of the function itself.
+  // §35.7's exported subroutines, declared in this module. §35.7 has an export
+  // leave the subroutine's SystemVerilog behavior unchanged, which one held in
+  // let_decls would breach: RegisterModuleSubroutines (lowerer_register.cpp)
+  // would answer its name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_export_decls;
   // §30.3's specify blocks, declared in this module: §30.3 states that a
   // specify block "shall appear inside a module declaration". What one declares

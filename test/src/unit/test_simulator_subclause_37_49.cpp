@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -216,6 +217,39 @@ TEST(AssertionModel, LocationAndNameApplyToAnyAssertionMemberKind) {
   EXPECT_EQ(ctx.Get(vpiColumn, p), 3);
   EXPECT_EQ(ctx.Get(vpiEndLine, p), 42);
   EXPECT_EQ(ctx.Get(vpiEndColumn, p), 7);
+}
+
+// The assertions of a run: those a design writes as module items, built from
+// the elaborated design rather than by hand (#4955).
+class AssertionsOfARun : public VpiDesignRun {};
+
+// An instance reaches each assertion written as its item, of the kind it is,
+// named by its label and reporting the line it starts on.
+TEST_F(AssertionsOfARun, AnInstanceReachesTheAssertionsItsItemsWrite) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "  m1: assume property (@(posedge clk) a);\n"
+      "  c1: cover sequence (@(posedge clk) a ##1 a);\n"
+      "  d1: assert #0 (a);\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, top, "a1");
+  vpiHandle m1 = Named(vpiAssertion, top, "m1");
+  vpiHandle c1 = Named(vpiAssertion, top, "c1");
+  vpiHandle d1 = Named(vpiAssertion, top, "d1");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(m1, nullptr);
+  ASSERT_NE(c1, nullptr);
+  ASSERT_NE(d1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, a1), vpiAssert);
+  EXPECT_EQ(vpi_get(vpiType, m1), vpiAssume);
+  EXPECT_EQ(vpi_get(vpiType, c1), vpiCover);
+  EXPECT_EQ(vpi_get(vpiType, d1), vpiImmediateAssert);
+  EXPECT_EQ(vpi_get(vpiIsCoverSequence, c1), 1);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, a1), "top.a1");
+  EXPECT_EQ(vpi_get(vpiStartLine, a1), 2);
+  EXPECT_EQ(vpi_get(vpiStartLine, c1), 4);
 }
 
 }  // namespace

@@ -805,7 +805,27 @@ static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
+// §16.14 and §16.4 with §37.49: whether `kind` is an assertion a module body
+// writes directly, a concurrent one or the deferred immediate one the parser
+// wraps as an item.
+static bool IsAssertionItem(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kAssertProperty:
+    case ModuleItemKind::kAssumeProperty:
+    case ModuleItemKind::kCoverProperty:
+    case ModuleItemKind::kCoverSequence:
+    case ModuleItemKind::kRestrictProperty:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
+  // §37.49: the run makes each an object of its instance.
+  if (mod != nullptr && IsAssertionItem(item->kind)) {
+    mod->assertions.push_back(item);
+  }
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
       ElaborateSequenceDeclItem(item, mod);
