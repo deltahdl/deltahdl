@@ -225,8 +225,14 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
   VpiObject* obj = with.build.alloc();
   obj->type = vpiPropertyDecl;
   obj->parent = scope;
-  obj->name = with.build.keep(std::string(decl.name));
-  obj->full_name = VpiScopedFullName(scope, decl.name);
+  // §16.16 (b): the run keys a clocking block's property under the block's
+  // name and its own, `cb.p`, the block being its scope here.
+  const std::string_view kName =
+      declared.clocking_block == nullptr
+          ? decl.name
+          : decl.name.substr(decl.name.rfind('.') + 1);
+  obj->name = with.build.keep(std::string(kName));
+  obj->full_name = VpiScopedFullName(scope, kName);
   scope->children.push_back(obj);
   for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
     MakePropFormal(decl, i, obj, with);
