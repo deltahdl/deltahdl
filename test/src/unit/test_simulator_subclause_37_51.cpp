@@ -323,5 +323,68 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
   EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a"}));
 }
 
+// A formal declared with a type reaches a typespec of that type, and an
+// untyped one none (detail 3) (#5091).
+TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
+  Run("module top; logic clk;\n"
+      "  property p(bit x, untyped y, event e, sequence s);\n"
+      "    @(posedge clk) x;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  const auto kTypespecOf = [decl](const char* formal) {
+    vpiHandle ts =
+        vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, formal));
+    return ts == nullptr ? 0 : vpi_get(vpiType, ts);
+  };
+  EXPECT_EQ(kTypespecOf("x"), vpiBitTypespec);
+  EXPECT_EQ(kTypespecOf("y"), 0);
+  EXPECT_EQ(kTypespecOf("e"), vpiEventTypespec);
+  EXPECT_EQ(kTypespecOf("s"), vpiSequenceTypespec);
+}
+
+// A property reaches the local variables it declares (§16.10), each of the
+// kind its type is (#5092).
+TEST_F(PropertyDeclsOfARun, APropertyReachesItsLocalVariables) {
+  Run("module top; logic clk, a;\n"
+      "  property p;\n"
+      "    int n; bit f;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_EQ(NamesOf(vpiVariables, decl), (std::vector<std::string>{"n", "f"}));
+  EXPECT_EQ(KindsOf(vpiVariables, decl),
+            (std::vector<int>{vpiIntVar, vpiBitVar}));
+  vpiHandle n = Named(vpiVariables, decl, "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, n), "top.p.n");
+}
+
+// A property a clocking block declares is a property decl of that block
+// (§37.12, §14.3), and an assertion naming it through the block, `cb.p`
+// (§16.16 (b)), reaches it from its property inst (#5090).
+TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
+  Run("module top; logic clk, a;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    property p; a; endproperty\n"
+      "  endclocking\n"
+      "  a1: assert property (cb.p);\n"
+      "endmodule\n");
+  vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  ASSERT_NE(cb, nullptr);
+  vpiHandle decl = Named(vpiPropertyDecl, cb, "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.cb.p");
+  EXPECT_EQ(Named(vpiPropertyDecl, By("top"), "p"), nullptr);
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
+}
+
 }  // namespace
 }  // namespace delta

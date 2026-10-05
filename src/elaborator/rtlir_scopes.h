@@ -169,6 +169,9 @@ struct RtlirPropertyDecl {
   HierPath gen_block_path;
   // §27.4: the prefixes of those instances, innermost last.
   GenBlockPrefixes gen_block_prefixes;
+  // §14.3: the clocking block declaring the property, whose scope it belongs
+  // to (§37.12); null for a property of the module or the generate block.
+  const ModuleItem* clocking_block = nullptr;
 };
 
 // §37.49 with §27.4: an assertion a module body writes as an item, with the

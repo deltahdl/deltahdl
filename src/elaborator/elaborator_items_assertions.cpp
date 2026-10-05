@@ -605,9 +605,7 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
-  RtlirPropertyDecl declared;
-  declared.item = item;
-  mod->declared_properties.push_back(declared);
+  mod->declared_properties.push_back(RtlirPropertyDecl{item, {}, {}, nullptr});
   // §16.12.22: the sequences the body uses as properties and as antecedents
   // are checked where the body is declared, once for every instance.
   ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
@@ -862,6 +860,7 @@ static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
   for (ModuleItem* decl : item->clocking_decls) {
     if (decl->kind == ModuleItemKind::kPropertyDecl) {
       mod->property_decls.push_back(decl);
+      mod->declared_properties.push_back(RtlirPropertyDecl{decl, {}, {}, item});
     } else {
       mod->sequence_decls.push_back(decl);
     }

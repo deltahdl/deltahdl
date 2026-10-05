@@ -855,7 +855,7 @@ void AttachInstanceProcedures(VpiObject* instance,
                     instance_walk.mod.declared_properties,
                     [](const RtlirPropertyDecl& declared, VpiObject* scope,
                        const VpiStmtBuild& with) {
-                      VpiMakePropertyDecl(*declared.item, scope, with);
+                      VpiMakePropertyDecl(declared, scope, with);
                     });
   AttachScopedItems(
       instance, instance_walk, instance_walk.mod.assertions,
