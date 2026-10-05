@@ -124,6 +124,11 @@ void VpiRefreshElementCopy(VpiObject& element) {
 
 void VpiStoreElementCopy(VpiObject& element) {
   if (element.var == nullptr) return;
+  if (element.property_of != nullptr) {
+    Logic4Vec* held = VpiHeldPropertyValue(*element.property_of, element.name);
+    if (held != nullptr) CopyWords(element.var->value, *held);
+    return;
+  }
   const VpiObject* holder = element.member_of;
   if (holder != nullptr && holder->var != nullptr) {
     CopyBits(element.var->value, 0, holder->var->value, element.member_offset,

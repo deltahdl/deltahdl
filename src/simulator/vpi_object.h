@@ -430,7 +430,7 @@ struct VpiObject {
   // §37.33 detail 6: of a property variable of a class obj, the run's class
   // object holding it under the variable's name. `var` holds a copy of the
   // value, refreshed as an element's is.
-  const ClassObject* property_of = nullptr;
+  ClassObject* property_of = nullptr;
 
   // §38.35: for a static unpacked array, the declared index values of each
   // unpacked dimension in left-to-right (declaration) order - so a[2:0][3:5]

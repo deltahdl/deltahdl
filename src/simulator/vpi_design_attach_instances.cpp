@@ -202,6 +202,12 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     const VpiClassDefnObjects kClasses =
         AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
+    // §37.32: the class defn a run's class obj reaches through its typespec.
+    // The run holds one class type per declaration, so a class a module
+    // declares stands as the defn of its first instance.
+    for (const auto& [key, defn] : kClasses) {
+      run_objects_.try_emplace(key.first, defn);
+    }
     subroutines = AttachSubroutines(design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);

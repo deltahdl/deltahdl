@@ -16,16 +16,17 @@ struct ClassObject;
 
 // §37.33 details 1, 5 and 6: the class obj standing for the run's class object
 // `obj`, made with `build`: its vpiObjId is the object's handle, it holds a
-// class typespec of the class the object was created with, and a variable per
-// property that class and the classes it extends declare, base first, each
-// holding a copy of the value the object holds.
-VpiObject* VpiMakeClassObject(const ClassObject& obj, SimContext& ctx,
-                              const VpiAttachBuild& build);
+// class typespec of the class the object was created with, reaching that
+// class's defn `defn` where there is one (§37.32), and a variable per property
+// that class and the classes it extends declare, base first, each holding a
+// copy of the value the object holds.
+VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
+                              SimContext& ctx, const VpiAttachBuild& build);
 
-// The value the property `name` of `obj` holds now: its own, or the class's
-// where the property is static (§8.9); null where neither holds one.
-const Logic4Vec* VpiHeldPropertyValue(const ClassObject& obj,
-                                      std::string_view name);
+// The storage of the value the property `name` of `obj` holds now: a ref
+// cell's where one stands (§13.5.2), the object's own, or the class's where
+// the property is static (§8.9); null where none holds one.
+Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name);
 
 // §37.42 detail 2: the member `members` name in turn, each in the class obj
 // the class var before it references as `object_of` reads it, from `var` on;

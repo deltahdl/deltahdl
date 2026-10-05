@@ -20,7 +20,8 @@ VpiObject* VpiCollectionElement(VpiObject& array, int index,
 // before its value is read; nothing for any other object.
 void VpiRefreshElementCopy(VpiObject& element);
 
-// Copies a value written to such an element or member back where it lives.
+// Copies a value written to such an element, member or property variable
+// back where it lives.
 void VpiStoreElementCopy(VpiObject& element);
 
 }  // namespace delta

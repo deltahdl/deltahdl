@@ -508,5 +508,49 @@ TEST_F(ClassObjectsOfARun, AClassVarReachesTheObjectItsValueNames) {
   EXPECT_EQ(vpi_get64(vpiObjId, z), 0);
 }
 
+// Detail 6: a class obj's variables are the object's properties, so a value
+// put to one is the property's value, and a static property's is every
+// object's of the class (§8.9).
+TEST_F(ClassObjectsOfARun, AValuePutToAPropertyVariableIsTheObjects) {
+  Run("module top;\n"
+      "  class A; int n = 5; static int s = 3; endclass\n"
+      "  A a = new;\n"
+      "  A e = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.a"));
+  ASSERT_NE(obj, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 9;
+  vpi_put_value(Named(vpiVariables, obj, "n"), &value, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, obj, "n")), 9);
+  value.value.integer = 8;
+  vpi_put_value(Named(vpiVariables, obj, "s"), &value, nullptr, vpiNoDelay);
+  vpiHandle other = vpi_handle(vpiClassObj, By("top.e"));
+  ASSERT_NE(other, nullptr);
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, other, "s")), 8);
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, other, "n")), 5);
+}
+
+// The class typespec of a class obj is of the class its object was created
+// with, and reaches that class's defn (§37.32), not the declared type's.
+TEST_F(ClassObjectsOfARun, AClassObjsTypespecReachesTheClassDefn) {
+  Run("module top;\n"
+      "  class A; int n; endclass\n"
+      "  class C extends A; int m; endclass\n"
+      "  C d = new;\n"
+      "  A c;\n"
+      "  initial c = d;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.c"));
+  ASSERT_NE(obj, nullptr);
+  vpiHandle defn = vpi_handle(vpiClassDefn, vpi_handle(vpiClassTypespec, obj));
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, defn), vpiClassDefn);
+  EXPECT_STREQ(vpi_get_str(vpiName, defn), "C");
+  EXPECT_EQ(VpiObjectOf(defn),
+            VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
+}
+
 }  // namespace
 }  // namespace delta

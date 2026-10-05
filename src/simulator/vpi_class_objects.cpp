@@ -38,7 +38,7 @@ int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
 // of the object `obj` stands as, under the class obj `holder`, automatic or
 // static as declared, with the visibility it was declared with and a copy of
 // the value the object holds.
-void MakePropertyVariable(VpiObject* holder, const ClassObject& obj,
+void MakePropertyVariable(VpiObject* holder, ClassObject& obj,
                           const ClassMember& member, SimContext& ctx,
                           const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
@@ -78,18 +78,23 @@ std::vector<const ClassTypeInfo*> ClassChain(const ClassTypeInfo* type) {
 
 }  // namespace
 
-const Logic4Vec* VpiHeldPropertyValue(const ClassObject& obj,
-                                      std::string_view name) {
-  if (const Logic4Vec* held = obj.FindPropertyValue(name)) return held;
+Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
+  std::string key(name);
+  if (auto cell = obj.ref_cells.find(key); cell != obj.ref_cells.end()) {
+    return &cell->second.var->value;
+  }
+  if (auto own = obj.properties.find(key); own != obj.properties.end()) {
+    return &own->second;
+  }
   const ClassTypeInfo* declarer =
       obj.type != nullptr ? obj.type->StaticPropertyDeclarer(name) : nullptr;
   if (declarer == nullptr) return nullptr;
-  auto found = declarer->static_properties.find(std::string(name));
+  auto found = declarer->static_properties.find(key);
   return found == declarer->static_properties.end() ? nullptr : &found->second;
 }
 
-VpiObject* VpiMakeClassObject(const ClassObject& obj, SimContext& ctx,
-                              const VpiAttachBuild& build) {
+VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
+                              SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* made = build.alloc();
   made->type = vpiClassObj;
   made->obj_id = static_cast<int64_t>(obj.handle);
@@ -98,6 +103,7 @@ VpiObject* VpiMakeClassObject(const ClassObject& obj, SimContext& ctx,
   typespec->type = vpiClassTypespec;
   typespec->name = build.keep(std::string(obj.type->name));
   typespec->parent = made;
+  if (defn != nullptr) typespec->children.push_back(defn);
   made->children.push_back(typespec);
   for (const ClassTypeInfo* cls : ClassChain(obj.type)) {
     if (cls->decl == nullptr) continue;
@@ -116,20 +122,22 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
     return class_var.referenced_object;
   }
   VpiRefreshElementCopy(class_var);
-  const ClassObject* obj =
-      sim_ctx_->GetClassObject(class_var.var->value.ToUint64());
+  ClassObject* obj = sim_ctx_->GetClassObject(class_var.var->value.ToUint64());
   if (obj == nullptr) return nullptr;
   // §37.33 detail 1: an identifier may be reused once its object is
   // reclaimed, so an object made for one that has since gone is made afresh.
   VpiObject*& made = run_objects_[obj];
   if (made == nullptr || made->obj_id != static_cast<int64_t>(obj->handle)) {
-    made = VpiMakeClassObject(*obj, *sim_ctx_,
-                              {[this] { return AllocObject(); },
-                               [this](std::string name) {
-                                 name_pool_.push_back(std::move(name));
-                                 return std::string_view(name_pool_.back());
-                               },
-                               sim_ctx_->GetArena()});
+    const void* decl = obj->type != nullptr ? obj->type->decl : nullptr;
+    auto defn = decl != nullptr ? run_objects_.find(decl) : run_objects_.end();
+    made = VpiMakeClassObject(
+        *obj, defn != run_objects_.end() ? defn->second : nullptr, *sim_ctx_,
+        {[this] { return AllocObject(); },
+         [this](std::string name) {
+           name_pool_.push_back(std::move(name));
+           return std::string_view(name_pool_.back());
+         },
+         sim_ctx_->GetArena()});
   }
   return made;
 }

@@ -915,9 +915,9 @@ class VpiContext {
   // callbacks with an error they have not returned from yet.
   bool dispatching_error_callbacks_ = false;
 
-  // §37.44 and §37.33: the run this context is attached to, and the object
-  // standing for each of its processes and class objects, which come and go
-  // while the design executes and so are made against the run as it stands.
+  // §37.44 and §37.33: the run attached to, the object standing for each of
+  // its processes and class objects, made against the run as it stands since
+  // they come and go, and the class defn of each class declaration (§37.31).
   SimContext* sim_ctx_ = nullptr;
   std::unordered_map<const void*, VpiObject*> run_objects_;
 
