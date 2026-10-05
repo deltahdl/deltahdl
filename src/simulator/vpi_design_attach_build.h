@@ -161,6 +161,10 @@ struct VpiCallSite {
   const std::string& prefix;
   const VpiObject* scope;
   const VpiSubroutineObjects& made;
+  // §27.4: the prefixes of the generate block instances the site stands in,
+  // innermost last, whose declarations a name finds ahead of the instance's;
+  // null where it stands in none.
+  const std::vector<std::string_view>* gen_prefixes = nullptr;
 };
 
 // §26.2: the task or function the package `package` declares under `name`.
@@ -219,11 +223,13 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
                           SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written in the
-// instance whose objects `objects` keys under `prefix`; null for a kind of
-// expression not modelled.
-VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
-                                 const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build);
+// instance whose objects `objects` keys under `prefix`, and in the generate
+// block instances `gen_prefixes` names, innermost last, whose declarations a
+// name finds first (§27.4); null for a kind of expression not modelled.
+VpiObject* VpiInstanceExpression(
+    const Expr* expr, const VpiObjectMap& objects, const std::string& prefix,
+    SimContext& ctx, const VpiAttachBuild& build,
+    const std::vector<std::string_view>* gen_prefixes = nullptr);
 
 // §37.58, §37.59: the expression object `expr` stands for, written at `site`
 // in the instance whose objects `objects` keys, a name in it resolving first

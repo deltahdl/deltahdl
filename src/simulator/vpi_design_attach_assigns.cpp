@@ -593,16 +593,19 @@ const VpiObject* CalleeScope(const RtlirModule& mod,
 
 }  // namespace
 
-VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
-                                 const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build) {
-  // An expression an instance writes outside every generate block, whose
-  // names resolve in the instance itself.
+VpiObject* VpiInstanceExpression(
+    const Expr* expr, const VpiObjectMap& objects, const std::string& prefix,
+    SimContext& ctx, const VpiAttachBuild& build,
+    const std::vector<std::string_view>* gen_prefixes) {
+  // An expression an instance writes outside every generate block resolves
+  // its names in the instance itself.
   static const GenBlockPrefixes kNoGenBlocks;
   return ExpressionObject(
       expr, AssignBuild{build.alloc,
                         &ctx,
-                        AssignNames{objects, prefix, kNoGenBlocks},
+                        AssignNames{objects, prefix,
+                                    gen_prefixes != nullptr ? *gen_prefixes
+                                                            : kNoGenBlocks},
                         {},
                         build.keep});
 }
@@ -610,14 +613,16 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
 VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build) {
-  // Its names resolve in the blocks around the site and then in the
-  // instance, as VpiInstanceExpression's do; its callees resolve at the site.
+  // Its names resolve in the blocks around the site, then in the generate
+  // blocks it stands in and in the instance, as VpiInstanceExpression's do;
+  // its callees resolve at the site.
   static const GenBlockPrefixes kNoGenBlocks;
+  const GenBlockPrefixes& gen =
+      site.gen_prefixes != nullptr ? *site.gen_prefixes : kNoGenBlocks;
   return ExpressionObject(
-      expr,
-      AssignBuild{build.alloc, &ctx,
-                  AssignNames{objects, site.prefix, kNoGenBlocks, site.scope},
-                  VpiCalleesAt(site), build.keep});
+      expr, AssignBuild{build.alloc, &ctx,
+                        AssignNames{objects, site.prefix, gen, site.scope},
+                        VpiCalleesAt(site), build.keep});
 }
 
 void VpiContext::AttachContinuousAssignments(

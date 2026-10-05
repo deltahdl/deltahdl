@@ -234,5 +234,19 @@ TEST_F(AssignmentsOfARun, AnAssignmentReachesTheVariableItsBlockDeclares) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, assign)), VpiObjectOf(By("top.w")));
 }
 
+// An assignment written in a generate block reaches the variable the block
+// declares, which shadows the module's of that name (§27.4, #5067).
+TEST_F(AssignmentsOfARun, AnAssignmentInAGenerateBlockReachesItsVariable) {
+  Run("module top; logic v;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g logic v; initial v = 1; end\n"
+      "endmodule\n");
+  vpiHandle assign = BodyOf("top.g[1]");
+  ASSERT_NE(assign, nullptr);
+  vpiHandle lhs = vpi_handle(vpiLhs, assign);
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, lhs), "v");
+  EXPECT_NE(VpiObjectOf(lhs), VpiObjectOf(By("top.v")));
+}
+
 }  // namespace
 }  // namespace delta

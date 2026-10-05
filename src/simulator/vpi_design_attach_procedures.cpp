@@ -9,6 +9,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -77,6 +78,9 @@ struct BodyWalk {
   const VpiCallBuild& calls;
   const VpiAttachBuild& build;
   VpiObject* process = nullptr;
+  // §27.4: the prefixes of the generate block instances the procedure stands
+  // in, innermost last, null for one of the instance itself.
+  const GenBlockPrefixes* gen_prefixes = nullptr;
 };
 
 // §9.7: the name the trigger names its event by, which is an identifier in the
@@ -174,8 +178,12 @@ CallShape SubroutineCallShape(const VpiCalledSubroutine& sub,
 // Where a statement standing in `parent` is written, as a call it holds
 // resolves the subroutine it calls.
 VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
-  return {walk.design, walk.mod, walk.prefix, parent.scope,
-          walk.calls.subroutines};
+  return {walk.design,
+          walk.mod,
+          walk.prefix,
+          parent.scope,
+          walk.calls.subroutines,
+          walk.gen_prefixes};
 }
 
 // The class among `decls` named `name`, null for none.
@@ -885,6 +893,7 @@ void AttachInstanceProcedures(VpiObject* instance,
     const bool kIsAssertion =
         proc.is_static_assertion || proc.is_concurrent_clocked;
     BodyWalk walk = instance_walk;
+    walk.gen_prefixes = &proc.gen_block_prefixes;
     walk.process =
         kIsAssertion ? nullptr : MakeProcess(proc, scope, instance_walk.build);
     const BlockParent kParent{scope, scope->full_name};

@@ -399,5 +399,34 @@ TEST_F(PortsOfARun, AnUnconnectedPortHasNoHigherConnection) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, n)), VpiObjectOf(By("top.u.n")));
 }
 
+// The instance of `sub` a scope holds, read off its definition name; null for
+// none.
+vpiHandle SubInstanceIn(vpiHandle scope) {
+  vpiHandle it = scope == nullptr ? nullptr : vpi_iterate(vpiModule, scope);
+  while (vpiHandle inst = it == nullptr ? nullptr : vpi_scan(it)) {
+    const char* def = vpi_get_str(vpiDefName, inst);
+    if (def != nullptr && std::string(def) == "sub") return inst;
+  }
+  return nullptr;
+}
+
+// A connection written in a generate block names the block's variable, which
+// shadows the module's of that name (§27.4, #5067).
+TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
+  Run("module sub(input logic a); endmodule\n"
+      "module top; logic v;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g logic v; sub u(.a(v)); end\n"
+      "endmodule\n");
+  vpiHandle inst = SubInstanceIn(By("top.g[0]"));
+  if (inst == nullptr) inst = SubInstanceIn(By("top"));
+  ASSERT_NE(inst, nullptr);
+  vpiHandle a = Named(vpiPort, inst, "a");
+  ASSERT_NE(a, nullptr);
+  vpiHandle high = vpi_handle(vpiHighConn, a);
+  ASSERT_NE(high, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, high), "v");
+  EXPECT_NE(VpiObjectOf(high), VpiObjectOf(By("top.v")));
+}
+
 }  // namespace
 }  // namespace delta
