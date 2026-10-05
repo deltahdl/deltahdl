@@ -1,8 +1,12 @@
+#include <algorithm>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_class.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -36,6 +40,23 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
       return vpiStructVar;
     case DataTypeKind::kUnion:
       return vpiUnionVar;
+    // §6.12 makes realtime a synonym for real.
+    case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
+      return vpiRealVar;
+    case DataTypeKind::kShortreal:
+      return vpiShortRealVar;
+    case DataTypeKind::kString:
+      return vpiStringVar;
+    case DataTypeKind::kChandle:
+      return vpiChandleVar;
+    case DataTypeKind::kEnum:
+      return vpiEnumVar;
+    // §37.27 and §37.29.
+    case DataTypeKind::kEvent:
+      return vpiNamedEvent;
+    case DataTypeKind::kVirtualInterface:
+      return vpiVirtualInterfaceVar;
     default:
       return kVpiReg;
   }
@@ -43,14 +64,49 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
 
 namespace {
 
+// §8.3, §9.7, §15.3 and §15.4: whether `name` names a class an instance of
+// `mod` sees: one the module or the compilation unit declares, or one of the
+// built-in classes.
+bool NamesClass(const RtlirDesign& design, const RtlirModule& mod,
+                std::string_view name) {
+  static constexpr std::string_view kBuiltIn[] = {"process", "semaphore",
+                                                  "mailbox"};
+  const auto kIsNamed = [name](std::string_view cls) { return cls == name; };
+  const auto kDeclares = [&](const std::vector<ClassDecl*>& decls) {
+    return std::ranges::any_of(decls, [&](const ClassDecl* decl) {
+      return decl != nullptr && kIsNamed(decl->name);
+    });
+  };
+  return kDeclares(mod.class_decls) || kDeclares(design.cu_class_decls) ||
+         std::ranges::any_of(kBuiltIn, kIsNamed);
+}
+
+}  // namespace
+
+int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
+                             std::string_view name) {
+  if (design.type_targets.contains(name) || NamesClass(design, mod, name)) {
+    return vpiClassVar;
+  }
+  const auto kFound = design.type_kinds.find(name);
+  if (kFound == design.type_kinds.end()) return kVpiReg;
+  return VpiDataTypeVariableKind(kFound->second);
+}
+
+namespace {
+
 // §37.26: the member variable of `holder` the field `field` lays out: its
-// vpiParent is the struct or union var, it is named after the field, and its
-// value is the field's bits of the holder's value, a copy that a read
-// refreshes and a write is copied back from.
+// vpiParent is the struct or union var, it is named after the field, its kind
+// is the one a variable of the field's type has (§37.17), and its value is the
+// field's bits of the holder's value, a copy that a read refreshes and a write
+// is copied back from, read as a real where the field is one.
 void MakeMember(VpiObject* holder, const StructFieldInfo& field,
+                const RtlirDesign& design, const RtlirModule& mod,
                 const VpiAttachBuild& build) {
   VpiObject* member = build.alloc();
-  member->type = VpiDataTypeVariableKind(field.type_kind);
+  member->type = field.type_kind == DataTypeKind::kNamed
+                     ? VpiNamedTypeVariableKind(design, mod, field.type_name)
+                     : VpiDataTypeVariableKind(field.type_kind);
   member->parent = holder;
   member->name = build.keep(std::string(field.name));
   member->full_name = holder->full_name + "." + std::string(field.name);
@@ -58,6 +114,8 @@ void MakeMember(VpiObject* holder, const StructFieldInfo& field,
   auto* storage = build.arena.Create<Variable>();
   storage->value = MakeLogic4Vec(build.arena, field.width);
   storage->value.is_signed = field.is_signed;
+  storage->value.is_real =
+      member->type == vpiRealVar || member->type == vpiShortRealVar;
   member->var = storage;
   member->size = static_cast<int>(field.width);
   member->member_of = holder;
@@ -86,7 +144,7 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
           const StructTypeInfo* info = ctx.GetVariableStructType(kKey);
           if (info == nullptr || info->is_packed) continue;
           for (const StructFieldInfo& field : info->fields) {
-            MakeMember(holder, field, build);
+            MakeMember(holder, field, *design, *mod, build);
           }
         }
       });

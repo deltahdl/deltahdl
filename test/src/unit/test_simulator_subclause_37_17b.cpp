@@ -613,6 +613,31 @@ TEST_F(VariablesOfARun, AStructMembersKindIsItsFieldsType) {
   EXPECT_EQ(vpi_get(vpiType, Var("top.s.b")), vpiIntVar);
 }
 
+// A member of a real, short real, string or enum type is the kind §37.17 draws
+// for that type, as a variable of it is, whether the field names the type or a
+// typedef standing for it (#5036)...
+TEST_F(VariablesOfARun, AStructMembersOfNonIntegralTypesHaveTheirKinds) {
+  Run("module top;\n"
+      "  typedef enum {X, Y} e_t;\n"
+      "  struct {real r; shortreal sr; string s; enum {A, B} en; e_t te;} m;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, Var("top.m.r")), vpiRealVar);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.m.sr")), vpiShortRealVar);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.m.s")), vpiStringVar);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.m.en")), vpiEnumVar);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.m.te")), vpiEnumVar);
+}
+
+// ...and a real member holds its field's value as a real.
+TEST_F(VariablesOfARun, ARealStructMemberHoldsARealValue) {
+  Run("module top; struct {int a; real r;} m = '{1, 2.5}; endmodule\n");
+  s_vpi_value value = {};
+  value.format = vpiObjTypeVal;
+  vpi_get_value(Var("top.m.r"), &value);
+  EXPECT_EQ(value.format, vpiRealVal);
+  EXPECT_DOUBLE_EQ(value.value.real, 2.5);
+}
+
 // A value put to a member is put into the struct's field, and leaves the other
 // field as it was.
 TEST_F(VariablesOfARun, WritingAStructMemberWritesItsField) {

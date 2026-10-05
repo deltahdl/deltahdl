@@ -20,6 +20,7 @@ struct DataType;
 enum class DataTypeKind : uint8_t;
 struct Expr;
 struct RtlirDesign;
+struct RtlirModule;
 struct VpiObject;
 
 // What an attach step that adds objects to the VPI model builds with:
@@ -44,9 +45,19 @@ VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build);
 // drawn for here, such as a name standing for another type.
 int VpiTypespecKind(DataTypeKind kind);
 
-// §37.17: the object kind of a variable declared with a type of `kind`, a
-// logic var for a type §37.17 draws no box of its own for.
+// §37.17, §37.27 and §37.29: the object kind of a variable declared with a
+// type of `kind`, a logic var for a type §37.17 draws no box of its own for.
+// A module's variables, a block's and a struct's members take their kinds
+// from it alike.
 int VpiDataTypeVariableKind(DataTypeKind kind);
+
+// §6.18 with §8.3: the object kind of a variable an instance of `mod` declares
+// with a type standing for `name`: a class var for a class the module or the
+// compilation unit declares, a built-in class or a typedef whose chain of
+// names ends in a class, and for any other typedef the kind of the type at the
+// end of its chain; a logic var for a name nothing resolves.
+int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
+                             std::string_view name);
 
 // The packed dimensions of a value, outermost first, each a declared range.
 using PackedDims = std::vector<PackedRange>;

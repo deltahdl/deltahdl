@@ -14,7 +14,6 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -220,64 +219,15 @@ const ClassDecl* FindClassDecl(const BodyWalk& walk, std::string_view name) {
   return decl != nullptr ? decl : ClassNamed(walk.design.cu_class_decls, name);
 }
 
-// §37.17, §37.27 and §37.29: the kind of variable a type of `kind` declares.
-// The real, short real, string, chandle and enum vars, the named event and the
-// virtual interface var each have a box of their own, realtime being real
-// (§6.12); VpiDataTypeVariableKind, which a struct's members share, maps the
-// rest.
-int DeclaredVariableKind(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kReal:
-    case DataTypeKind::kRealtime:
-      return vpiRealVar;
-    case DataTypeKind::kShortreal:
-      return vpiShortRealVar;
-    case DataTypeKind::kString:
-      return vpiStringVar;
-    case DataTypeKind::kChandle:
-      return vpiChandleVar;
-    case DataTypeKind::kEvent:
-      return vpiNamedEvent;
-    case DataTypeKind::kEnum:
-      return vpiEnumVar;
-    case DataTypeKind::kVirtualInterface:
-      return vpiVirtualInterfaceVar;
-    default:
-      return VpiDataTypeVariableKind(kind);
-  }
-}
-
-// §8.3, §9.7, §15.3 and §15.4: whether `name` names a class, one the design
-// declares or one of the built-in classes.
-bool NamesClass(const BodyWalk& walk, std::string_view name) {
-  static constexpr std::string_view kBuiltIn[] = {"process", "semaphore",
-                                                  "mailbox"};
-  return FindClassDecl(walk, name) != nullptr ||
-         std::ranges::any_of(
-             kBuiltIn, [name](std::string_view cls) { return cls == name; });
-}
-
-// §6.18 with §8.3: the kind of variable a type standing for `name` declares:
-// a class var for a class, or for a typedef whose chain of names ends in one,
-// and for any other typedef the kind at the end of its chain; a reg for a name
-// nothing resolves.
-int NamedVariableKind(const BodyWalk& walk, std::string_view name) {
-  if (walk.design.type_targets.contains(name) || NamesClass(walk, name)) {
-    return vpiClassVar;
-  }
-  const auto kFound = walk.design.type_kinds.find(name);
-  if (kFound == walk.design.type_kinds.end()) return kVpiReg;
-  return DeclaredVariableKind(kFound->second);
-}
-
 // §37.17: the object kind of a variable a block declares, as a module's of its
 // type is. An unpacked array of events is a named event array (§37.27), and
 // one of any other element one array var (§37.17 detail 1).
 int BlockVariableKind(const Stmt& decl, const BodyWalk& walk) {
   const DataType& type = decl.var_decl_type;
-  const int kKind = type.kind == DataTypeKind::kNamed
-                        ? NamedVariableKind(walk, type.type_name)
-                        : DeclaredVariableKind(type.kind);
+  const int kKind =
+      type.kind == DataTypeKind::kNamed
+          ? VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name)
+          : VpiDataTypeVariableKind(type.kind);
   if (decl.var_unpacked_dims.empty()) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }

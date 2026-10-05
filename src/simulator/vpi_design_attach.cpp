@@ -26,6 +26,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
@@ -333,34 +334,9 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   // A variable declared with an enum typedef reports kNamed; the enum it names
   // makes it an enum var all the same.
   if (!var.enum_type_name.empty()) return vpiEnumVar;
-  switch (var.decl_kind) {
-    case DataTypeKind::kInteger:
-      return vpiIntegerVar;
-    case DataTypeKind::kTime:
-      return vpiTimeVar;
-    case DataTypeKind::kByte:
-      return vpiByteVar;
-    case DataTypeKind::kShortint:
-      return vpiShortIntVar;
-    case DataTypeKind::kInt:
-      return vpiIntVar;
-    case DataTypeKind::kLongint:
-      return vpiLongIntVar;
-    case DataTypeKind::kBit:
-      return vpiBitVar;
-    case DataTypeKind::kEnum:
-      return vpiEnumVar;
-    case DataTypeKind::kStruct:
-      return vpiStructVar;
-    case DataTypeKind::kUnion:
-      return vpiUnionVar;
-    case DataTypeKind::kVirtualInterface:
-      return vpiVirtualInterfaceVar;
-    default:
-      // §37.17 detail 19: a logic var and a reg are the same object kind, and
-      // it is what a variable the clause draws no separate box for carries.
-      return kVpiReg;
-  }
+  // §37.17 detail 19: a logic var and a reg are the same object kind, and it
+  // is what a variable the clause draws no separate box for carries.
+  return VpiDataTypeVariableKind(var.decl_kind);
 }
 
 // §36.12.1 Table 36-10: tell each object the run built for a variable which
