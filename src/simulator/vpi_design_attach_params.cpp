@@ -2,6 +2,7 @@
 #include <string_view>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -57,7 +58,7 @@ void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
   VpiObject* obj = build.alloc();
   obj->type = vpiTypeParameter;
   obj->name = build.keep(std::string(param.name));
-  obj->full_name = scope->full_name + "." + std::string(param.name);
+  obj->full_name = VpiScopedFullName(scope, param.name);
   obj->parent = scope;
   obj->local_param = param.is_localparam;
   if (param.resolved_type != nullptr) {
@@ -92,6 +93,34 @@ void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
   }
 }
 
+// §37.10 with §37.28: the parameters the package `pkg` declares, in `scope`,
+// the package it stands as: a value parameter's object, which its storage
+// made, made a vpiParameter, and a type parameter given one of its own. Each
+// is a local parameter, since §6.20.4 makes a `parameter` written in a
+// package mean `localparam`.
+void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
+                             const VpiObjectMap& unit,
+                             const VpiAttachBuild& build) {
+  for (const ModuleItem* item : pkg.items) {
+    if (item == nullptr || item->kind != ModuleItemKind::kParamDecl) continue;
+    if (item->data_type.kind == DataTypeKind::kVoid) {
+      RtlirParamDecl param;
+      param.name = item->name;
+      param.is_localparam = true;
+      param.is_type_param = true;
+      param.resolved_type = &item->typedef_type;
+      MakeTypeParameter(&scope, param, unit, build);
+      continue;
+    }
+    for (VpiObject* child : scope.children) {
+      if (child->name == item->name && !VpiIsTypespecType(child->type)) {
+        child->type = vpiParameter;
+        child->local_param = true;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -108,6 +137,13 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         AttachScopeParameters(mod, prefix, objects, unit_typespecs, build);
       });
+  for (const PackageDecl* pkg : design->packages) {
+    if (pkg == nullptr) continue;
+    VpiObject* scope = FindObjectForFlatName(objects, pkg->name);
+    if (scope != nullptr) {
+      AttachPackageParameters(*pkg, *scope, unit_typespecs, build);
+    }
+  }
 }
 
 }  // namespace delta

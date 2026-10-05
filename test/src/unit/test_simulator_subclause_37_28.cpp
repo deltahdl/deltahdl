@@ -401,5 +401,43 @@ TEST_F(ParametersOfARun, AParameterPortsTypespecIsTheTypedefItsDefaultNames) {
   EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top.x", "T")), "ue_t");
 }
 
+constexpr const char* kPackageParameters =
+    "package pkg;\n"
+    "  parameter int P = 5;\n"
+    "  localparam int L = 7;\n"
+    "  parameter type T = logic [3:0];\n"
+    "endpackage\n"
+    "module top; endmodule\n";
+
+// Detail 1 with §37.10: a package's value parameters are what its
+// vpiParameter iteration reaches, as a module's are (#5102)...
+TEST_F(ParametersOfARun, APackagesValueParametersAreParameters) {
+  Run(kPackageParameters);
+  EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("pkg"), nullptr)),
+            (std::vector<std::string>{"L", "P"}));
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_name(VpiText("pkg::P"), nullptr)),
+            vpiParameter);
+}
+
+// ...each a local parameter, since §6.20.4 makes a `parameter` written in a
+// package mean `localparam` (#5102)...
+TEST_F(ParametersOfARun, APackagesParameterIsALocalParam) {
+  Run(kPackageParameters);
+  EXPECT_EQ(
+      vpi_get(vpiLocalParam, vpi_handle_by_name(VpiText("pkg::P"), nullptr)),
+      1);
+}
+
+// ...and its type parameters are vpiTypeParameters full-named through the
+// package, reaching the typespec of their type (Detail 2) (#5102).
+TEST_F(ParametersOfARun, APackagesTypeParameterIsATypeParameter) {
+  Run(kPackageParameters);
+  vpiHandle type = ChildOf(vpiTypeParameter,
+                           vpi_handle_by_name(VpiText("pkg"), nullptr), "T");
+  ASSERT_NE(type, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, type), "pkg::T");
+  EXPECT_EQ(vpi_get(vpiType, TypespecOf("pkg", "T")), vpiLogicTypespec);
+}
+
 }  // namespace
 }  // namespace delta
