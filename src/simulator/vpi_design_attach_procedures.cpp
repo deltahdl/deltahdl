@@ -851,12 +851,16 @@ void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
 // concurrent one being the item's (§37.50).
 void AttachInstanceProcedures(VpiObject* instance,
                               const BodyWalk& instance_walk) {
-  AttachScopedItems(instance, instance_walk,
-                    instance_walk.mod.declared_properties,
-                    [](const RtlirPropertyDecl& declared, VpiObject* scope,
-                       const VpiStmtBuild& with) {
-                      VpiMakePropertyDecl(declared, scope, with);
-                    });
+  const auto kUnit = instance_walk.objects.find("$unit");
+  const VpiObject* unit =
+      kUnit == instance_walk.objects.end() ? nullptr : kUnit->second;
+  AttachScopedItems(
+      instance, instance_walk, instance_walk.mod.declared_properties,
+      [&instance_walk, unit](const RtlirPropertyDecl& declared,
+                             VpiObject* scope, const VpiStmtBuild& with) {
+        VpiMakePropertyDecl(declared, {scope, unit, instance_walk.calls.ctx},
+                            with);
+      });
   AttachScopedItems(
       instance, instance_walk, instance_walk.mod.assertions,
       [&instance_walk](const RtlirAssertion& assertion, VpiObject* scope,

@@ -719,6 +719,11 @@ struct ModuleItem {
   // flattening casts an actual to a keyword type and reads an `event` formal
   // as the clock's event expression.
   std::vector<TokenKind> prop_formal_type_kw;
+  // §16.12: parallel to prop_formals for a property declaration; the data type
+  // a formal was declared with, packed dimensions and a user-defined type's
+  // name included, null where it is untyped or of the sequence, property or
+  // event type, which prop_formal_type_kw names.
+  std::vector<DataType*> prop_formal_types;
 
   // §16.10: identifiers introduced by assertion_variable_declaration items in
   // the body of a sequence or property declaration. Each entry is one local

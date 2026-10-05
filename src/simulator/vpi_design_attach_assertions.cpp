@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "elaborator/rtlir_scopes.h"
@@ -16,6 +17,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -108,13 +110,68 @@ int FormalTypespecKind(TokenKind keyword) {
   }
 }
 
+// §37.25: the typespec the typedef `name` declares in the scopes from
+// `holder` out to the instance, or else in the compilation unit `unit`; null
+// where none of them declares one.
+VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
+                           const VpiObject* unit) {
+  for (const VpiObject* scope = holder; scope != nullptr;
+       scope = scope->parent) {
+    for (VpiObject* child : scope->children) {
+      if (VpiIsTypespecType(child->type) && child->name == name) return child;
+    }
+    if (VpiIsInstanceType(scope->type)) break;
+  }
+  if (unit == nullptr) return nullptr;
+  for (VpiObject* child : unit->children) {
+    if (VpiIsTypespecType(child->type) && child->name == name) return child;
+  }
+  return nullptr;
+}
+
+// §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
+// declared with, hung from `formal`: the one the typedef it names declares,
+// which other objects of that type share (§37.17), or one of the type's own,
+// reaching a range per packed dimension it was written with (§37.22); none
+// for an untyped formal.
+void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
+                        const VpiPropertyDeclSite& at,
+                        const VpiAttachBuild& build) {
+  const DataType* type = index < decl.prop_formal_types.size()
+                             ? decl.prop_formal_types[index]
+                             : nullptr;
+  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
+    VpiObject* named =
+        TypedefTypespec(formal->parent, type->type_name, at.unit);
+    if (named != nullptr) formal->children.push_back(named);
+    return;
+  }
+  const TokenKind kKeyword = index < decl.prop_formal_type_kw.size()
+                                 ? decl.prop_formal_type_kw[index]
+                                 : TokenKind::kEof;
+  int kind = 0;
+  if (kKeyword != TokenKind::kEof) {
+    kind = FormalTypespecKind(kKeyword);
+  } else if (type != nullptr) {
+    kind = VpiTypespecKind(type->kind);
+  }
+  if (kind == 0) return;
+  VpiObject* typespec = build.alloc();
+  typespec->type = kind;
+  typespec->parent = formal;
+  formal->children.push_back(typespec);
+  for (const PackedRange& dim : WrittenPackedDims(type, at.ctx)) {
+    typespec->children.push_back(VpiRangeObject(typespec, dim, build));
+  }
+}
+
 // §37.51: the prop formal decl the formal `index` of `decl` stands as, hung
 // from `property`: named, of no direction unless it is a local variable
 // argument (detail 5), reaching the typespec of the type it is declared with
 // (detail 3) and the default value it declares, where it declares one,
 // through vpiExpr (detail 4).
 void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
-                    const VpiStmtBuild& with) {
+                    const VpiPropertyDeclSite& at, const VpiStmtBuild& with) {
   VpiObject* formal = with.build.alloc();
   formal->type = vpiPropFormalDecl;
   formal->parent = property;
@@ -122,16 +179,7 @@ void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
   formal->direction =
       VpiPropFormalDirection(index < decl.prop_formal_is_local.size() &&
                              decl.prop_formal_is_local[index]);
-  const int kTypespec =
-      index < decl.prop_formal_type_kw.size()
-          ? FormalTypespecKind(decl.prop_formal_type_kw[index])
-          : 0;
-  if (kTypespec != 0) {
-    VpiObject* typespec = with.build.alloc();
-    typespec->type = kTypespec;
-    typespec->parent = formal;
-    formal->children.push_back(typespec);
-  }
+  MakeFormalTypespec(decl, index, formal, at, with.build);
   if (index < decl.prop_formal_defaults.size()) {
     VpiObject* value = with.expression(decl.prop_formal_defaults[index]);
     if (value != nullptr) formal->children.push_back(value);
@@ -215,7 +263,9 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
 }
 
 VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
-                               VpiObject* scope, const VpiStmtBuild& with) {
+                               const VpiPropertyDeclSite& at,
+                               const VpiStmtBuild& with) {
+  VpiObject* scope = at.scope;
   // §37.12 with §14.3: a property a clocking block declares is of that block.
   if (declared.clocking_block != nullptr) {
     scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
@@ -235,7 +285,7 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
   obj->full_name = VpiScopedFullName(scope, kName);
   scope->children.push_back(obj);
   for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
-    MakePropFormal(decl, i, obj, with);
+    MakePropFormal(decl, i, obj, at, with);
   }
   for (const SeqLocalDecl& local : decl.prop_locals) {
     MakePropertyVariable(local, obj, with.build);

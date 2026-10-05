@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -9,6 +10,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -48,6 +50,8 @@ struct ParserPropertySpecHelpers {
   static Expr* ParsePropertyActualArg(Parser& p, bool& plain);
   static PropertyExprNode* ParseWholeSequenceActual(Parser& p);
   static Expr* ParseFormalDefault(Parser& p);
+  static DataType* ParseFormalType(Parser& p);
+  static DataType* NamedFormalType(Parser& p, std::string_view name);
   static bool ParseNamedActualPrefix(Parser& p, Expr* call, bool& named);
   static bool ParsePropertyActualList(Parser& p, Expr* call, bool& plain);
   static Expr* TryParsePropertyInstance(Parser& p);

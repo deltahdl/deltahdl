@@ -346,13 +346,30 @@ VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
 VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
                                const VpiStmtBuild& with);
 
+// §37.22: a range object under `parent` of the dimension `bounds`, an empty
+// range where it has none.
+VpiObject* VpiRangeObject(VpiObject* parent,
+                          const std::optional<PackedRange>& bounds,
+                          const VpiAttachBuild& build);
+
+// Where a property decl is built: `scope`, the instance or the generate block
+// instance declaring it; `unit`, the compilation unit's scope, whose typedefs
+// a formal's type may name, null where it has none; and the run its packed
+// dimensions are evaluated in.
+struct VpiPropertyDeclSite {
+  VpiObject* scope;
+  const VpiObject* unit;
+  SimContext& ctx;
+};
+
 // §37.12 and §37.51: the property decl of the property `declared` stands
-// for, hung from the scope declaring it, `scope` (the instance or the generate
-// block instance) or the clocking block `scope` holds that declares it, with
-// its formals, its variables and its property spec, each built through
-// `with`; null where that clocking block has no object.
+// for, hung from the scope declaring it, `at.scope` or the clocking block it
+// holds that declares it, with its formals, their typespecs, its variables
+// and its property spec, each built through `with`; null where that clocking
+// block has no object.
 VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
-                               VpiObject* scope, const VpiStmtBuild& with);
+                               const VpiPropertyDeclSite& at,
+                               const VpiStmtBuild& with);
 
 // The objects `obj`, made for `stmt` with the kind above, reaches: the
 // expressions its figure draws and the statements it holds, each built

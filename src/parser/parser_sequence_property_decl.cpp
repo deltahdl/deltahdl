@@ -233,6 +233,8 @@ struct PropertyPortScan {
   // keyword alone does not name, which a `[` or a type identifier after it
   // shows; `property`, `sequence` and `event` are kept as themselves.
   TokenKind carry_type_kw = TokenKind::kEof;
+  // §16.12: the data type in force for the formals that follow, null for none.
+  DataType* carry_type = nullptr;
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
@@ -241,12 +243,15 @@ struct PropertyPortScan {
         !LexerCheck(lexer, TokenKind::kRParen) &&
         !LexerCheck(lexer, TokenKind::kEq)) {
       if (LexerCheck(lexer, TokenKind::kIdentifier)) {
+        carry_type =
+            ParserPropertySpecHelpers::NamedFormalType(*parser, name_tok.text);
         name_tok = lexer.Next();
         carry_type_kw = TokenKind::kEof;
       }
     }
     item->prop_formals.push_back(name_tok.text);
     item->prop_formal_type_kw.push_back(carry_type_kw);
+    item->prop_formal_types.push_back(carry_type);
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
     item->prop_formal_has_default.push_back(false);
@@ -270,9 +275,10 @@ struct PropertyPortScan {
     // §16.14.7: a data-typed formal is neither untyped nor `event`, so it may
     // not be defaulted to $inferred_clock.
     clock_default_allowed = false;
-    TokenKind kind = lexer.Next().kind;
+    TokenKind kind = lexer.Peek().kind;
+    carry_type = ParserPropertySpecHelpers::ParseFormalType(*parser);
     carry_type_kw =
-        LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
+        carry_type->packed_dim_left != nullptr ? TokenKind::kEof : kind;
   }
 
   // §16.12.18: the `property` type keyword begins a run of one or more
@@ -286,6 +292,7 @@ struct PropertyPortScan {
     // may not be defaulted to $inferred_clock.
     clock_default_allowed = false;
     carry_type_kw = lexer.Next().kind;
+    carry_type = nullptr;
   }
 
   // §16.12.18: the `sequence`, `event`, and `untyped` type keywords begin a
@@ -301,6 +308,7 @@ struct PropertyPortScan {
     local_run = false;
     saw_local = false;
     carry_type_kw = kw == TokenKind::kKwUntyped ? TokenKind::kEof : kw;
+    carry_type = nullptr;
     lexer.Next();
   }
 

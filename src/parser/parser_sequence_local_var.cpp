@@ -668,4 +668,20 @@ void Parser::ScanSequenceBody(ModuleItem* item) {
   }
 }
 
+// §16.12 with §6.16: the data type a property formal is declared with,
+// read where the parse stands on the keyword opening it, its signing and
+// packed dimensions included, and kept for what reads the formal's type.
+DataType* ParserPropertySpecHelpers::ParseFormalType(Parser& p) {
+  return p.arena_.Create<DataType>(p.ParseDataType());
+}
+
+// §16.12 with §6.18: a formal declared with the user-defined type `name`.
+DataType* ParserPropertySpecHelpers::NamedFormalType(Parser& p,
+                                                     std::string_view name) {
+  auto* type = p.arena_.Create<DataType>();
+  type->kind = DataTypeKind::kNamed;
+  type->type_name = name;
+  return type;
+}
+
 }  // namespace delta

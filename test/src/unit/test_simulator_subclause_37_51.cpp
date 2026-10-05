@@ -386,5 +386,36 @@ TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
+// A formal of a packed type reaches a typespec of its keyword with the range
+// it was written with, and one of a user-defined type the typespec of the
+// typedef naming it, the module's or the compilation unit's (detail 3,
+// §37.25) (#5093).
+TEST_F(PropertyDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module top; logic clk;\n"
+      "  typedef struct packed { logic a, b; } pair_t;\n"
+      "  property p(bit [3:0] v, pair_t s, byte_t w);\n"
+      "    @(posedge clk) v[0];\n"
+      "  endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v), vpiBitTypespec);
+  vpiHandle ranges = vpi_iterate(vpiRange, v);
+  ASSERT_NE(ranges, nullptr);
+  vpiHandle range = vpi_scan(ranges);
+  ASSERT_NE(range, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, range), 4);
+  vpiHandle s = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "s"));
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, s), vpiStructTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, s), "pair_t");
+  vpiHandle w = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "w"));
+  ASSERT_NE(w, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, w), "byte_t");
+}
+
 }  // namespace
 }  // namespace delta

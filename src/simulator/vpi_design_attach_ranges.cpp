@@ -22,23 +22,6 @@ namespace {
 // dynamic, queue or associative one, which is an empty range.
 using DimBounds = std::optional<PackedRange>;
 
-// §37.22: a range object under `parent`, its bounds reached through
-// vpiLeftRange and vpiRightRange and its size the number of elements the
-// dimension holds. An empty range has neither bound and size 0.
-VpiObject* RangeObject(VpiObject* parent, const DimBounds& bounds,
-                       const VpiAttachBuild& build) {
-  VpiObject* range = build.alloc();
-  range->type = vpiRange;
-  range->parent = parent;
-  if (bounds) {
-    range->left_range = VpiIntConstant(bounds->left, build);
-    range->right_range = VpiIntConstant(bounds->right, build);
-    range->size =
-        static_cast<int>(bounds->HighIndex() - bounds->LowIndex() + 1);
-  }
-  return range;
-}
-
 // §37.17 detail 4: the unpacked dimensions of `var`, leftmost first. A queue,
 // dynamic or associative array's leftmost dimension is an empty range, and
 // so is every dimension whose bounds did not fold.
@@ -73,16 +56,34 @@ std::vector<DimBounds> RangeDims(const RtlirVariable& var, SimContext& ctx) {
 void AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
                   const VpiAttachBuild& build) {
   if (dims.empty()) return;
-  VpiObject* leftmost = RangeObject(obj, dims.front(), build);
+  VpiObject* leftmost = VpiRangeObject(obj, dims.front(), build);
   obj->children.push_back(leftmost);
   for (std::size_t i = 1; i < dims.size(); ++i) {
-    obj->children.push_back(RangeObject(obj, dims[i], build));
+    obj->children.push_back(VpiRangeObject(obj, dims[i], build));
   }
   obj->left_range = leftmost->left_range;
   obj->right_range = leftmost->right_range;
 }
 
 }  // namespace
+
+VpiObject* VpiRangeObject(VpiObject* parent,
+                          const std::optional<PackedRange>& bounds,
+                          const VpiAttachBuild& build) {
+  // §37.22: the bounds reached through vpiLeftRange and vpiRightRange and the
+  // size the number of elements the dimension holds; an empty range has
+  // neither bound and size 0.
+  VpiObject* range = build.alloc();
+  range->type = vpiRange;
+  range->parent = parent;
+  if (bounds) {
+    range->left_range = VpiIntConstant(bounds->left, build);
+    range->right_range = VpiIntConstant(bounds->right, build);
+    range->size =
+        static_cast<int>(bounds->HighIndex() - bounds->LowIndex() + 1);
+  }
+  return range;
+}
 
 void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
                           const std::vector<Expr*>& unpacked_dims,
