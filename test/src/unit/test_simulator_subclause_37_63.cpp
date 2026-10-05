@@ -243,13 +243,17 @@ TEST_F(ProcessesOfARun, ANestedBlockReachesTheProcedureRunningIt) {
             VpiObjectOf(proc));
 }
 
-// A body the run builds no object for reaches nothing, while a named block
-// inside it still runs in the procedure.
+// A body written as a plain begin is a begin of the run, though no scope
+// (§37.12 detail 1), which the procedure reaches and runs; a named block
+// inside it runs in the procedure too (#5060).
 TEST_F(ProcessesOfARun, ABlockInsideAPlainBeginReachesItsProcedure) {
   Run("module top; initial begin begin : BLK end end endmodule\n");
   vpiHandle proc = FirstProcess(By("top"));
   ASSERT_NE(proc, nullptr);
-  EXPECT_EQ(vpi_handle(vpiStmt, proc), nullptr);
+  vpiHandle body = vpi_handle(vpiStmt, proc);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiBegin);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, body)), VpiObjectOf(proc));
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, By("top.BLK"))),
             VpiObjectOf(proc));
 }

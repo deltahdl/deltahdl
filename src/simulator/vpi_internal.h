@@ -35,9 +35,24 @@ bool VpiIsAtomicStmtObject(VpiHandle obj);
 bool VpiIsScopeBodyStmtObject(VpiHandle obj);
 bool VpiIsExprObject(VpiHandle obj);
 
-// §37.12: the kinds the scope class groups, which vpiInternalScope reaches.
-// Defined in vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
+// §37.12: the kinds the scope class groups, which vpiInternalScope reaches,
+// and whether an object of one of them is a scope (details 1 and 2). Defined
+// in vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
 bool VpiIsInternalScopeType(int type);
+bool VpiIsScopeObject(VpiHandle obj);
+
+// §39.3.1 step b and §37.12: an iteration whose objects stand deeper than the
+// reference's children - an instance's assertions, the scopes a scope holds
+// (those inside a statement that is no scope among them), and the statements
+// a block holds - collected into `iter`; false for any other. Defined in
+// vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
+bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter);
+
+// §37.12 detail 1: the scope named `name` nested in `parent` through a
+// statement that is no scope, such as an unnamed begin declaring nothing,
+// which adds no level to the names of the scopes inside it; null for none.
+// Defined in vpi_helpers_scopes.cpp, used by vpi_design_walk.h.
+VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name);
 
 // §37.12/§37.63: a statement's vpiScope, the nearest scope around it. Defined
 // in vpi_helpers_scopes.cpp, used by vpi_handle.cpp.

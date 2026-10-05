@@ -49,7 +49,9 @@ inline VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
       return ChildNamed(child, name);
     }
   }
-  return nullptr;
+  // §37.12 detail 1: a block that is no scope, and any other statement, adds
+  // no level to the names of the scopes written inside it.
+  return VpiNestedScopeNamed(parent, name);
 }
 
 // §27.4 with §37.12: the generate block instance the block path `path` names

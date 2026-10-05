@@ -138,10 +138,12 @@ int VpiGetDpicStr(VpiHandle obj) {
   return obj->is_dpi_c ? vpiDPIC : vpiDPI;
 }
 
-// §37.62: vpiBlocking is drawn only on the event statement; any other kind
-// reports vpiUndefined.
+// §37.62 and §37.64: vpiBlocking is drawn only on the event statement and the
+// assignment; any other kind reports vpiUndefined.
 int VpiGetBlocking(VpiHandle obj) {
-  if (obj->type != vpiEventStmt) return vpiUndefined;
+  if (obj->type != vpiEventStmt && obj->type != vpiAssignment) {
+    return vpiUndefined;
+  }
   return obj->blocking ? 1 : 0;
 }
 

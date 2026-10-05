@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -181,6 +182,53 @@ TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
 
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&delay_control)), nullptr);
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
+}
+
+// The delay controls of a run: those a design's procedures write, built from
+// the elaborated design rather than by hand (#5002).
+class DelayControlsOfARun : public VpiDesignRun {
+ protected:
+  // The delay control the first procedure of `top` runs.
+  static vpiHandle Control() {
+    vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+    if (procs == nullptr) return nullptr;
+    vpiHandle control = vpi_handle(vpiStmt, vpi_scan(procs));
+    if (control != nullptr)
+      EXPECT_EQ(vpi_get(vpiType, control), vpiDelayControl);
+    return control;
+  }
+};
+
+// A delay control a procedure writes is an object of the run, reaching the
+// delay written through vpiDelay and the statement it delays through vpiStmt.
+TEST_F(DelayControlsOfARun, ADelayControlIsAnObjectOfTheRun) {
+  Run("module top; int a; initial #5 a = 1; endmodule\n");
+  vpiHandle control = Control();
+  ASSERT_NE(control, nullptr);
+  vpiHandle delay = vpi_handle(vpiDelay, control);
+  ASSERT_NE(delay, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, delay), vpiConstant);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(delay, &value);
+  EXPECT_EQ(value.value.integer, 5);
+  vpiHandle delayed = vpi_handle(vpiStmt, control);
+  ASSERT_NE(delayed, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, delayed), vpiAssignment);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, delayed)), VpiObjectOf(By("top.a")));
+}
+
+// A delay written as a name is the variable or parameter the name stands for,
+// which §37.58 draws among simple expressions.
+TEST_F(DelayControlsOfARun, ADelayWrittenAsANameIsWhatItNames) {
+  Run("module top; int d = 2; initial #d ; endmodule\n");
+  vpiHandle control = Control();
+  ASSERT_NE(control, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, control)),
+            VpiObjectOf(By("top.d")));
+  vpiHandle delayed = vpi_handle(vpiStmt, control);
+  ASSERT_NE(delayed, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, delayed), vpiNullStmt);
 }
 
 }  // namespace

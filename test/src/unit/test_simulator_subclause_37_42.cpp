@@ -557,8 +557,8 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
 TEST_F(CallStatementsOfARun, ACallStatementReachesItsDeclaration) {
   Run("module top; task t; endtask function void f(); endfunction\n"
       "  initial begin t; f(); end endmodule\n");
-  vpiHandle task = Named(vpiTaskCall, By("top"), "t");
-  vpiHandle func = Named(vpiFuncCall, By("top"), "f");
+  vpiHandle task = Named(vpiTaskCall, BodyOf("top"), "t");
+  vpiHandle func = Named(vpiFuncCall, BodyOf("top"), "f");
   ASSERT_NE(task, nullptr);
   ASSERT_NE(func, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, task)),
@@ -588,8 +588,8 @@ TEST_F(CallStatementsOfARun, AMethodCallReachesItsMethod) {
       "  initial begin obj.run(); obj.go(); end\n"
       "endmodule\n");
   vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
-  vpiHandle run = Named(vpiMethodTaskCall, By("top"), "run");
-  vpiHandle go = Named(vpiMethodFuncCall, By("top"), "go");
+  vpiHandle run = Named(vpiMethodTaskCall, BodyOf("top"), "run");
+  vpiHandle go = Named(vpiMethodFuncCall, BodyOf("top"), "go");
   ASSERT_NE(run, nullptr);
   ASSERT_NE(go, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, run)),
@@ -667,8 +667,8 @@ TEST_F(CallStatementsOfARun, ABuiltInClassFunctionCallIsAMethodFuncCall) {
 TEST_F(CallStatementsOfARun, ACallStatementReachesItsArguments) {
   Run("module top; int x; task t(input int a, input int b); endtask\n"
       "  initial begin $display(\"%d\", x); t(1, x); end endmodule\n");
-  vpiHandle display = Named(vpiSysTaskCall, By("top"), "$display");
-  vpiHandle task = Named(vpiTaskCall, By("top"), "t");
+  vpiHandle display = Named(vpiSysTaskCall, BodyOf("top"), "$display");
+  vpiHandle task = Named(vpiTaskCall, BodyOf("top"), "t");
   ASSERT_NE(display, nullptr);
   ASSERT_NE(task, nullptr);
   vpiHandle it = vpi_iterate(vpiArgument, display);
@@ -729,10 +729,11 @@ TEST_F(CallStatementsOfARun, ARegisteredSystemTaskCallIsUserDefined) {
   Run("module top; initial begin $probe; $display(\"hi\"); end endmodule\n");
   ASSERT_EQ(g_probe_sightings.size(), 1U);
   EXPECT_EQ(g_probe_sightings[0].user_defn, 1);
-  EXPECT_EQ(vpi_get(vpiUserDefn, Named(vpiSysTaskCall, By("top"), "$probe")),
-            1);
-  EXPECT_EQ(vpi_get(vpiUserDefn, Named(vpiSysTaskCall, By("top"), "$display")),
-            0);
+  EXPECT_EQ(
+      vpi_get(vpiUserDefn, Named(vpiSysTaskCall, BodyOf("top"), "$probe")), 1);
+  EXPECT_EQ(
+      vpi_get(vpiUserDefn, Named(vpiSysTaskCall, BodyOf("top"), "$display")),
+      0);
 }
 
 // A call of a registered system task reaches the systf its registration
@@ -742,9 +743,9 @@ TEST_F(CallStatementsOfARun, ASystemTaskCallReachesItsUserSystf) {
   ASSERT_EQ(g_probe_sightings.size(), 1U);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUserSystf, g_probe_sightings[0].call)),
             VpiObjectOf(probe_));
-  EXPECT_EQ(
-      vpi_handle(vpiUserSystf, Named(vpiSysTaskCall, By("top"), "$display")),
-      nullptr);
+  EXPECT_EQ(vpi_handle(vpiUserSystf,
+                       Named(vpiSysTaskCall, BodyOf("top"), "$display")),
+            nullptr);
 }
 
 // The call the calltf of $peek last reached through vpiSysTfCall.
@@ -783,9 +784,9 @@ TEST_F(CallStatementsOfARun, ARegisteredSystemFunctionStatementIsASysFuncCall) {
 TEST_F(CallStatementsOfARun, ABuiltInSystemFunctionStatementIsNoSysTaskCall) {
   Run("module top; int a; real r = 2.0;\n"
       "  initial begin $random; $urandom; $cast(a, r); end endmodule\n");
-  EXPECT_EQ(Named(vpiSysTaskCall, By("top"), "$random"), nullptr);
-  EXPECT_EQ(Named(vpiSysTaskCall, By("top"), "$urandom"), nullptr);
-  EXPECT_NE(Named(vpiSysTaskCall, By("top"), "$cast"), nullptr);
+  EXPECT_EQ(Named(vpiSysTaskCall, BodyOf("top"), "$random"), nullptr);
+  EXPECT_EQ(Named(vpiSysTaskCall, BodyOf("top"), "$urandom"), nullptr);
+  EXPECT_NE(Named(vpiSysTaskCall, BodyOf("top"), "$cast"), nullptr);
 }
 
 // An argument naming a scope that stands around the call is reached through
@@ -830,7 +831,7 @@ TEST_F(CallStatementsOfARun, ABuiltInMethodOfAModuleVariableIsAMethodFuncCall) {
                                                         {"delete", "aa"},
                                                         {"putc", "s"},
                                                         {"next", "e"}}) {
-    vpiHandle call = Named(vpiMethodFuncCall, By("top"), method);
+    vpiHandle call = Named(vpiMethodFuncCall, BodyOf("top"), method);
     ASSERT_NE(call, nullptr) << method;
     EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)),
                  holder.c_str());

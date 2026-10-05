@@ -587,27 +587,30 @@ bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
-// §37.79/§37.76: the lhs/rhs of the procedural continuous assignment family
-// (assign/force/deassign/release) and of alias statements.
+// §37.64/§37.79/§37.76: the lhs/rhs of an assignment, of the procedural
+// continuous assignment family (assign/force/deassign/release) and of alias
+// statements.
 bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   const int kRef = ref->type;
-  // §37.79/§37.76/§37.47: the assignment kinds that name a left-hand side - the
-  // procedural continuous assignment family, an alias statement, and a
-  // continuous assignment in either of the forms §37.47's enclosure groups.
-  // Neither of those two was named here, so the target of every continuous
-  // assignment in a design was reached by nothing: vpiLhs is a relation tag and
-  // the traversal this fell through to looks for a child whose own type is one.
-  const bool kNamesLhs = kRef == vpiAssignStmt || kRef == vpiForce ||
-                         kRef == vpiDeassign || kRef == vpiRelease ||
-                         kRef == vpiAliasStmt || VpiIsContAssignKind(kRef);
+  // §37.64/§37.79/§37.76/§37.47: the assignment kinds that name a left-hand
+  // side - a procedural assignment, the procedural continuous assignment
+  // family, an alias statement, and a continuous assignment in either of the
+  // forms §37.47's enclosure groups. vpiLhs is a relation tag, and the
+  // traversal a kind left out falls through to looks for a child whose own
+  // type is one, which reaches nothing.
+  const bool kNamesLhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
+                         kRef == vpiForce || kRef == vpiDeassign ||
+                         kRef == vpiRelease || kRef == vpiAliasStmt ||
+                         VpiIsContAssignKind(kRef);
   if (type == vpiLhs && kNamesLhs) {
     out = ref->lhs;
     return true;
   }
   // The right-hand side is drawn on the kinds that carry an expression to
   // assign; §37.79's deassign and release name a target and no source.
-  const bool kNamesRhs = kRef == vpiAssignStmt || kRef == vpiForce ||
-                         kRef == vpiAliasStmt || VpiIsContAssignKind(kRef);
+  const bool kNamesRhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
+                         kRef == vpiForce || kRef == vpiAliasStmt ||
+                         VpiIsContAssignKind(kRef);
   if (type == vpiRhs && kNamesRhs) {
     out = ref->rhs;
     return true;

@@ -49,14 +49,16 @@ TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
   EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&nonblocking_trigger)), 0);
 }
 
-// Applied through the public dispatch: vpiBlocking is drawn only on the event
-// statement object, so querying it on any other object kind is not a valid
-// request and the production guard returns vpiUndefined rather than handing
-// back a stored field. This distinguishes the clause's property edge, applied
-// by the guard, from an unconditional field read.
+// Applied through the public dispatch: vpiBlocking is drawn on the event
+// statement object and, by §37.64, the assignment, so querying it on an if
+// statement, which §37.71 draws no such property on, is not a valid request
+// and the production guard returns vpiUndefined rather than handing back a
+// stored field. This distinguishes the clause's property edge, applied by the
+// guard, from an unconditional field read.
 TEST_F(EventStatement, BlockingIsUndefinedForNonEventStatement) {
   VpiObject not_an_event_stmt;
-  not_an_event_stmt.type = vpiAssignment;
+  not_an_event_stmt.type = vpiIf;
+  not_an_event_stmt.blocking = true;
   EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&not_an_event_stmt)),
             vpiUndefined);
 }
@@ -74,12 +76,18 @@ std::vector<int> g_stmt_blocking;
 std::vector<std::string> g_triggered_event_names;
 std::vector<int> g_triggered_event_types;
 
+// The statements the begin block the module's procedure runs holds, which is
+// where §37.63 and §37.12 have an application find them: the procedure
+// reaches its body through vpiStmt, and the block the statements it holds.
 PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
   vpiHandle mod = vpi_handle_by_name(VpiText("top"), nullptr);
   if (mod == nullptr) return 0;
-  vpiHandle itr = vpi_iterate(vpiEventStmt, mod);
+  vpiHandle procs = vpi_iterate(vpiProcess, mod);
+  vpiHandle body = procs ? vpi_handle(vpiStmt, vpi_scan(procs)) : nullptr;
+  vpiHandle itr = body ? vpi_iterate(vpiStmt, body) : nullptr;
   if (itr == nullptr) return 0;
   while (vpiHandle stmt = vpi_scan(itr)) {
+    if (vpi_get(vpiType, stmt) != vpiEventStmt) continue;
     // §37.62: the one property the figure draws on the event statement.
     g_stmt_blocking.push_back(vpi_get(vpiBlocking, stmt));
     // §37.4.3: the figure's untagged single arrow, walked with vpi_handle()
@@ -144,9 +152,8 @@ TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
   EXPECT_EQ(g_triggered_event_names[1], "e");
 }
 
-// A trigger nested inside a block within the procedure is an event statement of
-// the design as much as one written at the top of it, so the walk descends
-// rather than reading the body's first level.
+// A trigger an if statement guards is an event statement of the design as much
+// as one written straight in the block.
 TEST_F(EventStatementOfADesign, ATriggerNestedInABlockIsFound) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;

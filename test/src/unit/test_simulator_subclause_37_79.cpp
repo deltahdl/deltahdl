@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -195,6 +198,40 @@ TEST_F(AssignDeassignForceRelease, EachKindReportsNoExpressionWhenNoneIsSet) {
     EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&stmt)), nullptr)
         << "kind " << stmt_kind;
   }
+}
+
+// The four of a run: those a design's procedures write, built from the
+// elaborated design rather than by hand (#5010). Each is a statement of the
+// block that holds it, reaching the variable or net it names and, for assign
+// and force, the expression driving it.
+class ProceduralContinuousAssignmentsOfARun : public VpiDesignRun {};
+
+TEST_F(ProceduralContinuousAssignmentsOfARun, EachIsAnObjectOfTheRun) {
+  Run("module top; logic r; wire w;\n"
+      "  initial begin assign r = 1; deassign r; force w = 1; release w; end\n"
+      "endmodule\n");
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle block = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(
+      KindsOf(vpiStmt, block),
+      (std::vector<int>{vpiAssignStmt, vpiDeassign, vpiForce, vpiRelease}));
+  vpiHandle it = vpi_iterate(vpiStmt, block);
+  ASSERT_NE(it, nullptr);
+  vpiHandle assign = vpi_scan(it);
+  vpiHandle deassign = vpi_scan(it);
+  vpiHandle force = vpi_scan(it);
+  vpiHandle release = vpi_scan(it);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, assign)), VpiObjectOf(By("top.r")));
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiRhs, assign)), vpiConstant);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, deassign)),
+            VpiObjectOf(By("top.r")));
+  EXPECT_EQ(vpi_handle(vpiRhs, deassign), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, force)), VpiObjectOf(By("top.w")));
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiRhs, force)), vpiConstant);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, release)), VpiObjectOf(By("top.w")));
+  EXPECT_EQ(vpi_handle(vpiRhs, release), nullptr);
 }
 
 }  // namespace

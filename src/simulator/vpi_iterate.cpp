@@ -482,8 +482,6 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
   // always procedures the class groups rather than an object whose own type is
   // the class name, which is a kind no procedure has.
   if (type == vpiProcess) return VpiIsProcessType(obj->type);
-  // §37.12: vpiInternalScope is drawn to the `scope` class likewise.
-  if (type == vpiInternalScope) return VpiIsInternalScopeType(obj->type);
   if (type == vpiTaskFunc) return VpiIsTaskFuncType(obj->type);
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();
@@ -828,14 +826,10 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
     return;
   }
   if (ref) {
-    // §39.3.1 step b: an instance handle passed as the reference walks "all
-    // assertions in an instance", which the children of the instance object are
-    // only the outermost of. Every other relation is the single-level walk the
-    // data model draws.
-    if (type == vpiAssertion && VpiIsInstanceType(ref->type)) {
-      VpiCollectInstanceAssertions(ref, iter);
-      return;
-    }
+    // §39.3.1 step b and §37.12: the relations that reach deeper than the
+    // reference's children; every other is the single-level walk the data
+    // model draws.
+    if (VpiCollectNestedObjects(type, ref, iter)) return;
     CollectMatchingChildren(type, ref, modes, iter);
   } else if (VpiIsNullReferenceRelation(type)) {
     // §37.4.3: the sweep answers only where a circle originates the

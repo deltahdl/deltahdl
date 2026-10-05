@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -137,6 +141,104 @@ TEST_F(EventControl, ConditionRelationIgnoresGuardedStatement) {
   event_control.children = {&body};
 
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&event_control)), nullptr);
+}
+
+// The event controls of a run: those a design's procedures write, built from
+// the elaborated design rather than by hand (#4999).
+class EventControlsOfARun : public VpiDesignRun {
+ protected:
+  // The statement the first procedure of `scope` runs.
+  static vpiHandle BodyOf(const std::string& scope) {
+    vpiHandle it = vpi_iterate(vpiProcess, By(scope));
+    return it == nullptr ? nullptr : vpi_handle(vpiStmt, vpi_scan(it));
+  }
+
+  // The operands of the operation `op`, in order.
+  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
+    std::vector<vpiHandle> operands;
+    vpiHandle it = vpi_iterate(vpiOperand, op);
+    if (it == nullptr) return operands;
+    while (vpiHandle operand = vpi_scan(it)) operands.push_back(operand);
+    return operands;
+  }
+};
+
+// An event control a procedure writes is an object of the run, written over
+// the posedge operation of the variable it names and guarding the statement
+// written after it, which stands in the instance and runs in the procedure.
+TEST_F(EventControlsOfARun, AnEventControlIsAnObjectOfTheRun) {
+  Run("module top; bit clk; int q, d; always @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, control), vpiEventControl);
+  vpiHandle condition = vpi_handle(vpiCondition, control);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, condition), vpiPosedgeOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(condition);
+  ASSERT_EQ(kOperands.size(), 1U);
+  EXPECT_EQ(VpiObjectOf(kOperands[0]), VpiObjectOf(By("top.clk")));
+  vpiHandle guarded = vpi_handle(vpiStmt, control);
+  ASSERT_NE(guarded, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, guarded), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiBlocking, guarded), 0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, guarded)), VpiObjectOf(By("top")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, guarded)),
+            VpiObjectOf(vpi_handle(vpiProcess, control)));
+}
+
+// A bare named event is the condition itself, the object its declaration
+// stands as.
+TEST_F(EventControlsOfARun, ANamedEventIsTheConditionItself) {
+  Run("module top; event e; initial @e ; endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  vpiHandle condition = vpi_handle(vpiCondition, control);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, condition), vpiNamedEvent);
+  EXPECT_EQ(VpiObjectOf(condition), VpiObjectOf(By("top.e")));
+  vpiHandle guarded = vpi_handle(vpiStmt, control);
+  ASSERT_NE(guarded, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, guarded), vpiNullStmt);
+}
+
+// §9.4.2.1 joins a list's events with `or`, a comma meaning the same, each
+// `or` nested around the events before it; an event an iff guards is the iff
+// operation of the event and its condition.
+TEST_F(EventControlsOfARun, AnEventListIsAnEventOrOperation) {
+  Run("module top; bit a, b, c, en;\n"
+      "  initial @(c, posedge a iff en or b) ;\n"
+      "endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  vpiHandle outer = vpi_handle(vpiCondition, control);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, outer), vpiEventOrOp);
+  const std::vector<vpiHandle> kOuter = OperandsOf(outer);
+  ASSERT_EQ(kOuter.size(), 2U);
+  EXPECT_EQ(VpiObjectOf(kOuter[1]), VpiObjectOf(By("top.b")));
+  EXPECT_EQ(vpi_get(vpiOpType, kOuter[0]), vpiEventOrOp);
+  const std::vector<vpiHandle> kInner = OperandsOf(kOuter[0]);
+  ASSERT_EQ(kInner.size(), 2U);
+  EXPECT_EQ(VpiObjectOf(kInner[0]), VpiObjectOf(By("top.c")));
+  EXPECT_EQ(vpi_get(vpiOpType, kInner[1]), vpiIffOp);
+  const std::vector<vpiHandle> kIff = OperandsOf(kInner[1]);
+  ASSERT_EQ(kIff.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kIff[0]), vpiPosedgeOp);
+  EXPECT_EQ(VpiObjectOf(kIff[1]), VpiObjectOf(By("top.en")));
+}
+
+// The implicit event list of §9.4.2.2 writes no condition, while the control
+// still guards its statement.
+TEST_F(EventControlsOfARun, AnImplicitEventListWritesNoCondition) {
+  Run("module top; int a, b; always @* a = b; endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, control), vpiEventControl);
+  EXPECT_EQ(vpi_handle(vpiCondition, control), nullptr);
+  vpiHandle guarded = vpi_handle(vpiStmt, control);
+  ASSERT_NE(guarded, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, guarded), vpiAssignment);
 }
 
 }  // namespace
