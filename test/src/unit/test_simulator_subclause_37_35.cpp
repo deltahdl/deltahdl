@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_constants.h"
@@ -235,6 +238,71 @@ TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
 
   EXPECT_EQ(vpi_handle(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
   EXPECT_EQ(vpi_iterate(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
+}
+
+// The primitives of a run: those a design instantiates, built from the
+// elaborated design rather than by hand (#4957).
+class PrimitivesOfARun : public VpiDesignRun {
+ protected:
+  // The terminals of `prim`, in the order written.
+  static std::vector<vpiHandle> TermsOf(vpiHandle prim) {
+    std::vector<vpiHandle> terms;
+    vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
+    while (vpiHandle term = it == nullptr ? nullptr : vpi_scan(it)) {
+      terms.push_back(term);
+    }
+    return terms;
+  }
+};
+
+constexpr const char* kPrimitives =
+    "module top; wire y, o, p; logic a, b, i, c;\n"
+    "  and g1(y, a, b);\n"
+    "  nmos m1(o, i, c);\n"
+    "  pullup pu(p);\n"
+    "endmodule\n";
+
+// An and gate is a gate of the instance, reporting its primitive type and its
+// number of inputs (detail 1), its terminals in order from index zero
+// (detail 3), the output first, each reaching the net or variable it connects
+// and the gate it belongs to.
+TEST_F(PrimitivesOfARun, AnAndGateIsAGateOfTheRun) {
+  Run(kPrimitives);
+  EXPECT_EQ(KindsOf(vpiPrimitive, By("top")),
+            (std::vector<int>{vpiGate, vpiSwitch, vpiGate}));
+  vpiHandle g1 = Named(vpiPrimitive, By("top"), "g1");
+  ASSERT_NE(g1, nullptr);
+  EXPECT_EQ(vpi_get(vpiPrimType, g1), vpiAndPrim);
+  EXPECT_EQ(vpi_get(vpiSize, g1), 2);
+  const std::vector<vpiHandle> kTerms = TermsOf(g1);
+  ASSERT_EQ(kTerms.size(), 3U);
+  EXPECT_EQ(vpi_get(vpiTermIndex, kTerms[0]), 0);
+  EXPECT_EQ(vpi_get(vpiDirection, kTerms[0]), vpiOutput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[0])),
+            VpiObjectOf(By("top.y")));
+  EXPECT_EQ(vpi_get(vpiTermIndex, kTerms[2]), 2);
+  EXPECT_EQ(vpi_get(vpiDirection, kTerms[2]), vpiInput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[2])),
+            VpiObjectOf(By("top.b")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, kTerms[1])), VpiObjectOf(g1));
+}
+
+// A MOS switch is a switch, its data input and control its two inputs; a
+// pullup is a gate with one output and no input.
+TEST_F(PrimitivesOfARun, ASwitchAndAPullupHaveTheirShapes) {
+  Run(kPrimitives);
+  vpiHandle m1 = Named(vpiPrimitive, By("top"), "m1");
+  vpiHandle pu = Named(vpiPrimitive, By("top"), "pu");
+  ASSERT_NE(m1, nullptr);
+  ASSERT_NE(pu, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, m1), vpiSwitch);
+  EXPECT_EQ(vpi_get(vpiPrimType, m1), vpiNmosPrim);
+  EXPECT_EQ(vpi_get(vpiSize, m1), 2);
+  EXPECT_EQ(vpi_get(vpiPrimType, pu), vpiPullupPrim);
+  EXPECT_EQ(vpi_get(vpiSize, pu), 0);
+  const std::vector<vpiHandle> kTerms = TermsOf(pu);
+  ASSERT_EQ(kTerms.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiDirection, kTerms[0]), vpiOutput);
 }
 
 }  // namespace

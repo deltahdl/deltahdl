@@ -50,11 +50,28 @@ bool TryResolveRangeBounds(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.35 (figure): a prim term reaches the expression its terminal connects,
+// through the diagram's untagged arrow to `expr`. The expression is the
+// term's child of a kind that class holds, a net or variable among them
+// (§37.58), never one whose own type is the relation's tag.
+bool TryResolvePrimTermExpr(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiExpr || ref->type != vpiPrimTerm) return false;
+  out = nullptr;
+  for (VpiObject* child : ref->children) {
+    if (VpiIsOperandObject(child)) {
+      out = child;
+      break;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (TryResolveBitRelation(type, ref, out) ||
-      TryResolveRangeBounds(type, ref, out)) {
+      TryResolveRangeBounds(type, ref, out) ||
+      TryResolvePrimTermExpr(type, ref, out)) {
     return true;
   }
   if (ref->type == vpiPartSelect) {

@@ -160,8 +160,8 @@ bool VpiIsOperandObject(VpiHandle obj);
 // §37.59: the relations of a part select (vpiLeftRange, vpiRightRange,
 // vpiParent) and an indexed part select (vpiBaseExpr, vpiWidthExpr,
 // vpiParent); §37.58, §37.16 and §37.17: of a bit select, net bit and var bit
-// (vpiIndex, vpiParent). Answers whether `ref` is one and `type` one of its
-// relations, with the target in `out`.
+// (vpiIndex, vpiParent); and §37.35: a prim term's vpiExpr. Answers whether
+// `ref` is one and `type` one of its relations, with the target in `out`.
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out);
 
 // §37.21 detail 1: a structure, union, or class variable owns the additional

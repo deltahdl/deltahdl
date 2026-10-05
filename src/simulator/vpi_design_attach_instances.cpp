@@ -231,6 +231,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                               },
                               call_site_objects_, kClasses, subroutines};
     AttachProcedures(design, object_map_, kCalls, kBuild);
+    AttachPrimitives(design, object_map_, *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design, subroutines);
 }

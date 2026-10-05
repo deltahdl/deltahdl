@@ -317,6 +317,12 @@ struct VpiCallBuild {
   const VpiSubroutineObjects& subroutines;
 };
 
+// §37.35: give each instance a gate or switch per primitive it instantiates,
+// each with a prim term per terminal. An instance array of primitives is left
+// for its primitive array.
+void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
+                      SimContext& ctx, const VpiAttachBuild& build);
+
 // §37.85: make each generate block instance of each instance the gen scope it
 // is, and each iteration of a loop generate an element, reached by its index,
 // of the gen scope array the instance holds for the loop's block.
