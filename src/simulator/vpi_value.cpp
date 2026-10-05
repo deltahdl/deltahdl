@@ -619,10 +619,10 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
 // unindexed (§37.16 detail 31, §37.17 detail 26) to the `size` bits it spans,
 // from the least significant up. They are taken from the bit pattern a
 // whole object's write stores of a scalar, integer or real value: the scalar
-// in the low bit and 0 above it, and the integer or real as 64 bits.
-static void PutValueWriteSlice(VpiHandle obj, const s_vpi_value* value) {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
+// in the low bit and 0 above it, and the integer or real as 64 bits, which
+// PutValuePattern gives, false for a format it has none of.
+static bool PutValuePattern(const s_vpi_value* value, uint64_t& aval,
+                            uint64_t& bval) {
   if (value->format == kVpiIntVal) {
     aval = static_cast<uint64_t>(value->value.integer);
   } else if (value->format == kVpiRealVal) {
@@ -632,8 +632,15 @@ static void PutValueWriteSlice(VpiHandle obj, const s_vpi_value* value) {
     aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
     bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
   } else {
-    return;
+    return false;
   }
+  return true;
+}
+
+static void PutValueWriteSlice(VpiHandle obj, const s_vpi_value* value) {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  if (!PutValuePattern(value, aval, bval)) return;
   Logic4Vec& whole = obj->var->value;
   for (int k = 0; k < std::max(obj->size, 1); ++k) {
     const auto kBit = static_cast<uint32_t>(obj->bit_offset + k);
@@ -783,6 +790,13 @@ static VpiHandle PutValueTargetOf(VpiHandle obj,
   return slice;
 }
 
+// §38.34: a vpiCancelEvent put, which leaves a scheduled event no longer
+// scheduled and hands back no handle.
+static VpiHandle CancelScheduledEvent(VpiHandle obj) {
+  if (obj->type == vpiSchedEvent) obj->scheduled = false;
+  return nullptr;
+}
+
 VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
                                s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
@@ -800,10 +814,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   // is not an error to cancel an event that has already occurred, so a handle
   // that is no longer scheduled is simply left alone. Cancelling removes the
   // event from the queue; the handle itself remains for the caller to free.
-  if (mode == vpiCancelEvent) {
-    if (obj->type == vpiSchedEvent) obj->scheduled = false;
-    return nullptr;
-  }
+  if (mode == vpiCancelEvent) return CancelScheduledEvent(obj);
 
   obj = PutValueTargetOf(obj, [this] { return AllocObject(); });
   if (obj == nullptr) return nullptr;
