@@ -559,6 +559,43 @@ TEST_F(BlockScopesOfARun, ANamedBlocksVariablesHangBeneathIt) {
   EXPECT_EQ(vpi_get(vpiType, By("top.blk.a")), vpiRegArray);
 }
 
+// A named block's variables of a real, string, chandle, event, enum or virtual
+// interface type are the kinds §37.17 and §37.27 draw for them, as a module's
+// of those types are, rather than regs (#5032).
+TEST_F(BlockScopesOfARun, ABlocksNonIntegralVariablesHaveTheirOwnKinds) {
+  Run("interface intf; endinterface\n"
+      "module top; initial begin : blk\n"
+      "  real r; realtime rt; shortreal sr; string s; chandle h;\n"
+      "  event e; event ea [2]; enum {A, B} en; virtual intf vi;\n"
+      "end endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.r")), vpiRealVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.rt")), vpiRealVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.sr")), vpiShortRealVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.s")), vpiStringVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.h")), vpiChandleVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.e")), vpiNamedEvent);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.ea")), vpiNamedEventArray);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.en")), vpiEnumVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.vi")), vpiVirtualInterfaceVar);
+}
+
+// A block's variable of a class type is a class var, whether the design
+// declares the class, the class is a built-in one, or a typedef names it; a
+// variable of any other typedef is the kind of the type the typedef names
+// (#5032).
+TEST_F(BlockScopesOfARun, ABlocksClassAndTypedefVariablesHaveTheirKinds) {
+  Run("module top;\n"
+      "  class C; endclass\n"
+      "  typedef C c_t; typedef real r_t; typedef enum {X, Y} e_t;\n"
+      "  initial begin : blk C obj; mailbox m; c_t t; r_t r; e_t en; end\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.obj")), vpiClassVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.m")), vpiClassVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.t")), vpiClassVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.r")), vpiRealVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.blk.en")), vpiEnumVar);
+}
+
 // D1: an unnamed begin or fork that directly declares a block item is a scope,
 // with the declared variable beneath it.
 TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresIsAScope) {
