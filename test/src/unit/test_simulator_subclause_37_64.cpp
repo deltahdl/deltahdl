@@ -245,6 +245,8 @@ TEST_F(AssignmentsOfARun, AnAssignmentInAGenerateBlockReachesItsVariable) {
   vpiHandle lhs = vpi_handle(vpiLhs, assign);
   ASSERT_NE(lhs, nullptr);
   EXPECT_NE(VpiObjectOf(lhs), VpiObjectOf(By("top.v")));
+  EXPECT_EQ(VpiObjectOf(lhs), VpiObjectOf(By("top.g[1].v")));
+  EXPECT_STREQ(vpi_get_str(vpiName, lhs), "v");
 }
 
 }  // namespace

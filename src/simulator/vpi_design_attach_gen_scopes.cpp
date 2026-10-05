@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -84,7 +85,44 @@ std::string PathKey(const HierPath& path) {
   return key;
 }
 
+// §27.4 with §37.17: `flat`, the object of a declaration of a generate block
+// instance the run keys under a flattened name, `g_1_v`, put in the place of
+// `alias`, the object the block's own name for it, `g[1].v`, made: named as
+// declared, under the gen scope, and full-named through it. The passes before
+// resolved the block's expressions to `flat`, and it holds what they built.
+void FoldInto(VpiObject* flat, VpiObject* alias) {
+  VpiObject* scope = alias->parent;
+  if (flat->parent != nullptr) std::erase(flat->parent->children, flat);
+  std::replace(scope->children.begin(), scope->children.end(), alias, flat);
+  flat->parent = scope;
+  flat->name = alias->name;
+  flat->full_name = alias->full_name;
+  flat->index = alias->index;
+}
+
 }  // namespace
+
+void AttachGenBlockStorage(const RtlirDesign* design,
+                           const VpiObjectMap& objects) {
+  // §27.4: a variable or net a generate block instance declares is named
+  // under that instance's gen scope. The run keys it under a flattened name
+  // and its alias under the block's, and an object was made for each.
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const RtlirGenBlockMember& member : mod->gen_block_members) {
+          if (member.kind != RtlirGenBlockMember::Kind::kStorage) continue;
+          VpiObject* scope = VpiGenScopeOf(instance, member.gen_block_path);
+          VpiObject* alias =
+              scope == nullptr ? nullptr : ChildNamed(scope, member.name);
+          VpiObject* flat = FindObjectForFlatName(
+              objects, VpiFlatName(prefix, member.storage));
+          if (alias == nullptr || flat == nullptr || alias == flat) continue;
+          FoldInto(flat, alias);
+        }
+      });
+}
 
 void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build) {

@@ -236,6 +236,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachPrimitives(design, object_map_, *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design, subroutines);
+  AttachGenBlockStorage(design, object_map_);
 }
 
 void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,

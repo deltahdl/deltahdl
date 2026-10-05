@@ -425,6 +425,7 @@ TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
   vpiHandle high = vpi_handle(vpiHighConn, a);
   ASSERT_NE(high, nullptr);
   EXPECT_NE(VpiObjectOf(high), VpiObjectOf(By("top.v")));
+  EXPECT_STREQ(vpi_get_str(vpiName, high), "v");
 }
 
 }  // namespace

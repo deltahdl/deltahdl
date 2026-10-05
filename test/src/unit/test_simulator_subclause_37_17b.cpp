@@ -789,5 +789,25 @@ TEST_F(VariablesOfARun, AValuePutToAnOuterPackedSelectLandsInItsElement) {
   EXPECT_EQ(IntOf(Var("top.m")), 0x44556611);
 }
 
+// A variable a generate block declares is named as declared, under the gen
+// scope of its block instance, and full-named through it (§27.4); the
+// instance holds no variable of a name joining the two, and an expression
+// written in the block reaches that variable, its value shared (#5068).
+TEST_F(VariablesOfARun, AGenerateBlockVariableIsNamedUnderItsGenScope) {
+  Run("module top;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    int v;\n"
+      "    initial v = 7 + i;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle v = Var("top.g[1].v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, v), "v");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, v), "top.g[1].v");
+  EXPECT_EQ(IntOf(v), 8);
+  EXPECT_EQ(Named(vpiVariables, Var("top.g[1]"), "v"), v);
+  EXPECT_EQ(CountOf(vpiVariables, Var("top")), 0);
+}
+
 }  // namespace
 }  // namespace delta
