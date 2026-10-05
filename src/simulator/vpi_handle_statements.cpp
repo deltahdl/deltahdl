@@ -137,6 +137,17 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
   if (ref->type == vpiPropertyInst || ref->type == vpiPropFormalDecl) {
     return TryResolvePropertyDeclRelation(type, ref, out);
   }
+  // §37.52: a clocked property reaches the property it clocks, and a case
+  // property item the property it branches to, held apart from its
+  // conditions.
+  if (type == vpiPropertyExpr && ref->type == vpiClockedProp) {
+    out = PropertySpecExpr(ref);
+    return true;
+  }
+  if (type == vpiPropertyExpr && ref->type == vpiCasePropertyItem) {
+    out = ref->body;
+    return true;
+  }
   if (ref->type != vpiPropertySpec) return false;
   if (type == vpiDisableCondition) {
     out = ref->disable_condition;

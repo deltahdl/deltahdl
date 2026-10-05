@@ -1,4 +1,5 @@
 #include <string_view>
+#include <vector>
 
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -117,6 +118,14 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
   }
   if (type == vpiInternalScope) {
     CollectInternalScopes(ref, iter);
+    return true;
+  }
+  // §37.52 details 4 and 5: the expressions a case property item groups, none
+  // for the default item; its property is reached apart from them.
+  if (type == vpiExpr && ref->type == vpiCasePropertyItem) {
+    for (VpiHandle condition : VpiCaseItemConditions(ref)) {
+      iter->children.push_back(condition);
+    }
     return true;
   }
   // The `stmt` class §37.60 fills is a grouping (§37.4.1), so the iteration

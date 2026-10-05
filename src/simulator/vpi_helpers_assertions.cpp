@@ -528,16 +528,13 @@ bool VpiIsPropertyVariableValueAccessible() {
 
 std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item) {
   // §37.52 detail 4: a case property item groups every case condition that
-  // branches to the same property statement. Its condition members are the
-  // children other than the property-expr branch (the diagram's case property
-  // item -> property expr edge). The default case item carries no condition
+  // branches to the same property statement. They are its children; the
+  // property it branches to (the diagram's case property item -> property expr
+  // edge) is held in VpiObject::body, since a condition and a property may be
+  // objects of one kind. The default case item carries no condition
   // expression (detail 5), so it groups none.
-  std::vector<VpiHandle> conditions;
-  if (!case_item) return conditions;
-  for (auto* child : case_item->children) {
-    if (!VpiIsPropertyExprType(child->type)) conditions.push_back(child);
-  }
-  return conditions;
+  if (!case_item) return {};
+  return case_item->children;
 }
 
 VpiHandle VpiCasePropertyConditionExpr(VpiHandle case_property) {
@@ -550,7 +547,10 @@ VpiHandle VpiCasePropertyConditionExpr(VpiHandle case_property) {
   if (!case_property) return nullptr;
   for (auto* child : case_property->children) {
     if (child->type == vpiCasePropertyItem) continue;
-    if (VpiIsExprType(child->type) || child->type == vpiExpr) return child;
+    if (VpiIsExprType(child->type) || child->type == vpiExpr ||
+        VpiIsOperandObject(child)) {
+      return child;
+    }
   }
   return nullptr;
 }

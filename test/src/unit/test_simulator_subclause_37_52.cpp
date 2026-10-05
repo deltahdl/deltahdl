@@ -189,9 +189,10 @@ TEST(PropertySpecModel, OperationReportsOpStrongProperty) {
 }
 
 // Detail 4: a case property item groups all case conditions that branch to the
-// same property statement; the property-expr branch is not one of the
-// conditions.
+// same property statement; the property-expr branch, held apart from them, is
+// not one of the conditions, though it may be an object of a condition's kind.
 TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
+  VpiContext ctx;
   VpiObject item;
   item.type = vpiCasePropertyItem;
   VpiObject c0;
@@ -199,8 +200,9 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiObject c1;
   c1.type = vpiExpr;
   VpiObject branch;
-  branch.type = vpiClockedProp;  // the property statement (a property expr)
-  item.children = {&c0, &c1, &branch};
+  branch.type = vpiExpr;  // the property statement, a Boolean property
+  item.children = {&c0, &c1};
+  item.body = &branch;
 
   auto conditions = VpiCaseItemConditions(&item);
   ASSERT_EQ(conditions.size(), 2u);
@@ -209,7 +211,7 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
 
   // The branch is reached as the item's property expression, not as a
   // condition.
-  EXPECT_EQ(VpiPropertyExprChild(&item), &branch);
+  EXPECT_EQ(ctx.Handle(vpiPropertyExpr, &item), &branch);
 }
 
 // Detail 5: the default case item has no condition expression, so it groups
@@ -524,6 +526,73 @@ TEST_F(PropertyOperationsOfARun, BinaryOperatorsJoinTwoProperties) {
     EXPECT_EQ(OpOf(kSides[0]), vpiOverlapImplyOp) << join.name;
     EXPECT_EQ(OpOf(kSides[1]), vpiOverlapImplyOp) << join.name;
   }
+}
+
+// A clocked property and a case property, each named for what it shows.
+constexpr const char* kClockedAndCaseProperties =
+    "module top; logic clk1, clk2, a, b; logic [1:0] sel;\n"
+    "  k1: assert property (@(posedge clk1) a |=> @(posedge clk2) b);\n"
+    "  s1: assert property (@(posedge clk1)\n"
+    "        case (sel) 0, 1: a; default: b; endcase);\n"
+    "endmodule\n";
+
+class ClockedAndCasePropertiesOfARun : public PropertyOperationsOfARun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run(kClockedAndCaseProperties);
+  }
+
+  // The objects of `type` `ref` reaches, in order; none for a null iterator.
+  static std::vector<vpiHandle> Reached(int type, vpiHandle ref) {
+    std::vector<vpiHandle> reached;
+    vpiHandle it = ref == nullptr ? nullptr : vpi_iterate(type, ref);
+    if (it == nullptr) return reached;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      reached.push_back(h);
+    }
+    return reached;
+  }
+};
+
+// An operand written under a clocking event of its own is a clocked property,
+// reaching that event and the property it clocks (§16.13.2) (#5095).
+TEST_F(ClockedAndCasePropertiesOfARun, AClockedOperandIsAClockedProperty) {
+  vpiHandle implication = PropertyOf("k1");
+  EXPECT_EQ(OpOf(implication), vpiNonOverlapImplyOp);
+  const std::vector<vpiHandle> kSides = OperandsOf(implication);
+  ASSERT_EQ(kSides.size(), 2u);
+  EXPECT_STREQ(vpi_get_str(vpiName, kSides[0]), "a");
+  vpiHandle clocked = kSides[1];
+  EXPECT_EQ(vpi_get(vpiType, clocked), vpiClockedProp);
+  vpiHandle event = vpi_handle(vpiClockingEvent, clocked);
+  ASSERT_NE(event, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, event), vpiPosedgeOp);
+  vpiHandle clocked_property = vpi_handle(vpiPropertyExpr, clocked);
+  ASSERT_NE(clocked_property, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, clocked_property), "b");
+}
+
+// A case property reaches its case expression and an item per property it
+// branches to, each grouping its expressions (detail 4), the default's
+// iteration NULL (detail 5) (§16.12.16) (#5096).
+TEST_F(ClockedAndCasePropertiesOfARun, ACasePropertyReachesItsItems) {
+  vpiHandle property = PropertyOf("s1");
+  ASSERT_NE(property, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, property), vpiCaseProperty);
+  vpiHandle condition = vpi_handle(vpiCondition, property);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, condition), "sel");
+  const std::vector<vpiHandle> kItems = Reached(vpiCasePropertyItem, property);
+  ASSERT_EQ(kItems.size(), 2u);
+  EXPECT_EQ(Reached(vpiExpr, kItems[0]).size(), 2u);
+  EXPECT_EQ(vpi_iterate(vpiExpr, kItems[1]), nullptr);
+  vpiHandle first = vpi_handle(vpiPropertyExpr, kItems[0]);
+  vpiHandle second = vpi_handle(vpiPropertyExpr, kItems[1]);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, first), "a");
+  EXPECT_STREQ(vpi_get_str(vpiName, second), "b");
 }
 
 }  // namespace

@@ -307,10 +307,10 @@ bool VpiIsOpStrongValidOp(int op);
 bool VpiIsPropertyVariableValueAccessible();
 
 // §37.52 detail 4: the case conditions a case property item groups - its
-// condition members, each of which branches to the item's property statement,
-// in order. A case property item's property statement (the diagram's case
-// property item -> property expr edge) is excluded. The default case item has
-// no condition expression, so it groups none (detail 5).
+// children, each of which branches to the item's property statement, in
+// order. The property statement (the diagram's case property item -> property
+// expr edge) is held in VpiObject::body, apart from them. The default case
+// item has no condition expression, so it groups none (detail 5).
 std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item);
 
 // §37.72: the object definitions the `pattern` class groups. §37.4.1 makes a

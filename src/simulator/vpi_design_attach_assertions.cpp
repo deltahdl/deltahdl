@@ -386,11 +386,35 @@ int AbortOp(const PropertyExprNode& node) {
   return node.synchronous ? vpiSyncRejectOnOp : vpiRejectOnOp;
 }
 
-}  // namespace
+// §37.52 with §16.12.16: the case property `node`, reaching its case
+// expression through vpiCondition and an item per property it branches to,
+// each grouping the expressions written before that property (detail 4),
+// the default's none (detail 5).
+VpiObject* CaseProperty(const PropertyExprNode& node,
+                        const VpiStmtBuild& with) {
+  VpiObject* obj = with.build.alloc();
+  obj->type = vpiCaseProperty;
+  VpiObject* condition = with.expression(node.boolean);
+  if (condition != nullptr) obj->children.push_back(condition);
+  for (size_t i = 0; i < node.operands.size(); ++i) {
+    VpiObject* item = with.build.alloc();
+    item->type = vpiCasePropertyItem;
+    item->parent = obj;
+    if (i < node.case_values.size()) {
+      for (const Expr* value : node.case_values[i]) {
+        VpiObject* expression = with.expression(value);
+        if (expression != nullptr) item->children.push_back(expression);
+      }
+    }
+    item->body = OperandOf(node, i, with);
+    obj->children.push_back(item);
+  }
+  return obj;
+}
 
-VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
+// §37.52: the property expr `node` stands for, its own clock aside.
+VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
                                  const VpiStmtBuild& with) {
-  if (node == nullptr) return nullptr;
   using Kind = PropertyExprNode::Kind;
   switch (node->kind) {
     case Kind::kBoolean:
@@ -422,9 +446,27 @@ VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
           AbortOp(*node),
           {with.expression(node->boolean), OperandOf(*node, 0, with)}, false,
           with.build);
+    case Kind::kCase:
+      return CaseProperty(*node, with);
     default:
       return nullptr;
   }
+}
+
+}  // namespace
+
+VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
+                                 const VpiStmtBuild& with) {
+  if (node == nullptr) return nullptr;
+  VpiObject* property = UnclockedPropertyExpr(node, with);
+  if (property == nullptr || node->clock.empty()) return property;
+  // §37.52 with §16.13.2: a property written under a clocking event of its
+  // own is a clocked property, reaching that event and the property.
+  VpiObject* clocked = with.build.alloc();
+  clocked->type = vpiClockedProp;
+  clocked->clocking_event = VpiEventCondition(node->clock, with);
+  clocked->children.push_back(property);
+  return clocked;
 }
 
 VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,

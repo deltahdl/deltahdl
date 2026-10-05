@@ -383,7 +383,8 @@ struct VpiObject {
   // §37.63: the statement a process runs, and for a statement of a run's
   // procedure body the process it runs in; vpiStmt and vpiProcess read them
   // where the run set them. A run hangs a body from the scope it stands in,
-  // where a name finds it, rather than from the process.
+  // where a name finds it, rather than from the process. §37.52: for a case
+  // property item, the property it branches to, apart from its conditions.
   VpiObject* body = nullptr;
   VpiObject* process = nullptr;
   // §37.55: an assertion's fail action, reached through vpiElseStmt, where a
