@@ -828,6 +828,27 @@ VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
   return begin;
 }
 
+// §37.63 with §37.65: the statement a procedure runs. The parser lifts the
+// event control an always or always_ff procedure opens with into the
+// procedure's sensitivity, keeping the statement it guards as the body, so
+// that control is built here from the events, @* writing none, guarding the
+// body; an always_comb or always_latch procedure's sensitivity is inferred
+// (§9.2.2.2, §9.2.2.3) rather than written, and so stands for no control.
+VpiObject* WalkProcessBody(const RtlirProcess& proc, const BlockParent& parent,
+                           const BodyWalk& walk) {
+  const bool kAlways = proc.kind == RtlirProcessKind::kAlways ||
+                       proc.kind == RtlirProcessKind::kAlwaysFF;
+  if (!kAlways || (proc.sensitivity.empty() && !proc.is_star_sensitivity)) {
+    return WalkStmt(proc.body, parent, walk);
+  }
+  Stmt control{};
+  control.kind = StmtKind::kEventControl;
+  control.events = proc.sensitivity;
+  control.is_star_event = proc.is_star_sensitivity;
+  control.body = proc.body;
+  return MakeControlOrAssign(control, parent, walk);
+}
+
 // §37.63: the object a procedure stands as, one of the three kinds the
 // `process` class groups, with detail 1's always type for an always procedure.
 VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
@@ -877,7 +898,7 @@ void AttachInstanceProcedures(VpiObject* instance,
         kIsAssertion ? nullptr : MakeProcess(proc, scope, instance_walk.build);
     const BlockParent kParent{scope, scope->full_name};
     if (walk.process != nullptr) {
-      walk.process->body = WalkStmt(proc.body, kParent, walk);
+      walk.process->body = WalkProcessBody(proc, kParent, walk);
     } else if (proc.body != nullptr) {
       // The body of such a process is the assertion itself, whose label names
       // the assertion (§16.5) rather than a block around it.
