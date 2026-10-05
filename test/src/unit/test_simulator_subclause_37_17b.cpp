@@ -7,6 +7,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -714,6 +715,60 @@ TEST_F(VariablesOfARun, AVariablesTypespecIsTheUnitsTypedef) {
   Run(kTypedefs);
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTypespec, Var("top.u"))),
                "ue_t");
+}
+
+// The right side of the continuous assignment that drives `target`, read off
+// the instance `top`.
+vpiHandle RhsDriving(const char* target) {
+  vpiHandle lhs = vpi_handle_by_name(VpiText(target), nullptr);
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+  while (vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it)) {
+    if (VpiObjectOf(vpi_handle(vpiLhs, assign)) == VpiObjectOf(lhs)) {
+      return vpi_handle(vpiRhs, assign);
+    }
+  }
+  return nullptr;
+}
+
+constexpr const char* kPackedSelects =
+    "module top; logic [3:0][7:0] m = 32'h44332211; integer i = 1;\n"
+    "  wire [7:0] y, z; wire b;\n"
+    "  assign y = m[i]; assign z = m[2]; assign b = m[2][1];\n"
+    "endmodule\n";
+
+// Detail 26: a select of an outer packed dimension is a logic var vector the
+// size of the element it selects, whose parent is the vector it selects
+// from, holding the element its index now names (#4986)...
+TEST_F(VariablesOfARun, AVaryingOuterPackedSelectIsAVectorOfItsElement) {
+  Run(kPackedSelects);
+  vpiHandle rhs = RhsDriving("top.y");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiLogicVar);
+  EXPECT_EQ(vpi_get(vpiSize, rhs), 8);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, rhs)), VpiObjectOf(Var("top.m")));
+  EXPECT_EQ(IntOf(rhs), 0x22);
+}
+
+// ...named by its index where that is a constant...
+TEST_F(VariablesOfARun, AConstantOuterPackedSelectIsNamedByItsIndex) {
+  Run(kPackedSelects);
+  vpiHandle rhs = RhsDriving("top.z");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiLogicVar);
+  EXPECT_EQ(vpi_get(vpiSize, rhs), 8);
+  EXPECT_STREQ(vpi_get_str(vpiName, rhs), "m[2]");
+  EXPECT_EQ(IntOf(rhs), 0x33);
+}
+
+// ...and a select indexing every packed dimension is the var bit it names.
+TEST_F(VariablesOfARun, ASelectOfEveryPackedDimensionIsItsVarBit) {
+  Run(kPackedSelects);
+  vpiHandle rhs = RhsDriving("top.b");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiRegBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, rhs), "m[2][1]");
+  EXPECT_EQ(IntOf(rhs), 1);
 }
 
 }  // namespace

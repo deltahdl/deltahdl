@@ -759,5 +759,28 @@ TEST_F(NetTypesOfARun, TheNetTypesNameIsItsConstant) {
       "vpiWand");
 }
 
+// Detail 31: a select of an outer packed dimension of a net is a logic net
+// vector the size of the element it selects, whose parent is the net it
+// selects from, holding the element its index now names (#4986).
+TEST_F(NetBitsOfARun, AnOuterPackedSelectOfANetIsANetVector) {
+  Run("module top; wire [3:0][7:0] n = 32'h44332211; integer i = 1;\n"
+      "  wire [7:0] y; assign y = n[i];\n"
+      "endmodule\n");
+  vpiHandle y = vpi_handle_by_name(VpiText("top.y"), nullptr);
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+  vpiHandle rhs = nullptr;
+  while (vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it)) {
+    if (VpiObjectOf(vpi_handle(vpiLhs, assign)) == VpiObjectOf(y)) {
+      rhs = vpi_handle(vpiRhs, assign);
+    }
+  }
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiLogicNet);
+  EXPECT_EQ(vpi_get(vpiSize, rhs), 8);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, rhs)), VpiObjectOf(Net()));
+  EXPECT_EQ(IntOf(rhs), 0x22);
+}
+
 }  // namespace
 }  // namespace delta

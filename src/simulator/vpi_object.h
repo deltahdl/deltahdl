@@ -2,11 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/envelope_viewport.h"
+#include "common/packed_range.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_user.h"
 
@@ -196,6 +198,19 @@ struct VpiObject {
   // significant end of its parent's storage of the bit it stands for, which its
   // value is read from and written to; -1 on every other object.
   int bit_offset = -1;
+
+  // §37.16 detail 31, §37.17 detail 26: the packed dimensions a select of this
+  // object indexes, outermost first - a vector's own, or for one selected out
+  // of a vector with more than one, the dimensions the select left unindexed.
+  // Empty on every other object.
+  std::vector<PackedRange> packed_dims;
+
+  // For a select whose index is not a constant, the dimension it indexes and
+  // the offset above the least significant end of its parent's storage that
+  // the dimension's elements count from; the bits it stands for are fixed
+  // only when its value is read (vpi_value.cpp). Unset on every other object.
+  std::optional<PackedRange> select_dim;
+  int select_base_offset = 0;
 
   VpiObject* left_range = nullptr;
   VpiObject* right_range = nullptr;

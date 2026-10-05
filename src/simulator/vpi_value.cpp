@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -445,18 +446,34 @@ static Logic4Word BitOfValue(const Logic4Vec& whole, int offset) {
                     (whole.words[kWord].bval >> kShift) & 1};
 }
 
+// §37.16 detail 31, §37.17 detail 26: the `width` bits at `offset` of `whole`,
+// copied into `words`, as a value of their own.
+static Logic4Vec SliceOfValue(const Logic4Vec& whole, int64_t offset, int width,
+                              std::vector<Logic4Word>& words) {
+  words.assign((static_cast<std::size_t>(width) + 63) / 64, Logic4Word{0, 0});
+  for (int k = 0; k < width; ++k) {
+    const Logic4Word kBit = BitOfValue(whole, static_cast<int>(offset + k));
+    words[k / 64].aval |= kBit.aval << (k % 64);
+    words[k / 64].bval |= kBit.bval << (k % 64);
+  }
+  Logic4Vec view;
+  view.width = static_cast<uint32_t>(width);
+  view.nwords = static_cast<uint32_t>(words.size());
+  view.words = words.data();
+  return view;
+}
+
 static void DispatchGetValueByFormat(
     VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
     std::vector<std::vector<s_vpi_vecval>>& vec_pool,
     std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
-  // A net bit or var bit reads its own bit of its parent's storage.
+  // A net bit or var bit reads its own bit of its parent's storage, and a
+  // select leaving packed dimensions unindexed the bits it spans.
   if (obj->bit_offset >= 0) {
-    Logic4Word bit = BitOfValue(obj->var->value, obj->bit_offset);
-    Logic4Vec bit_view;
-    bit_view.width = 1;
-    bit_view.nwords = 1;
-    bit_view.words = &bit;
-    DispatchIntegerFormat(bit_view, value, str_pool, vec_pool, strength_pool);
+    std::vector<Logic4Word> words;
+    const Logic4Vec kSlice = SliceOfValue(obj->var->value, obj->bit_offset,
+                                          std::max(obj->size, 1), words);
+    DispatchIntegerFormat(kSlice, value, str_pool, vec_pool, strength_pool);
     return;
   }
   const Logic4Vec& v = obj->var->value;
@@ -500,9 +517,31 @@ static void DispatchGetValueByFormat(
 // §37.16, §37.17: a net bit or var bit selected by an index that is not a
 // constant, which has no bit of its parent's storage of its own.
 static bool IsVaryingBit(const VpiObject& obj) {
-  return (obj.type == vpiNetBit || obj.type == vpiRegBit) &&
+  return (obj.type == vpiNetBit || obj.type == vpiRegBit ||
+          obj.select_dim.has_value()) &&
          obj.bit_offset < 0 && obj.parent != nullptr &&
          obj.index_expr != nullptr;
+}
+
+// The index a varying select's index expression now holds; none where it
+// holds an x or z bit (§11.5.1).
+static std::optional<int64_t> VaryingIndex(VpiHandle obj) {
+  VpiHandle index = obj->index_expr;
+  if (index->var == nullptr) return std::nullopt;
+  VpiRefreshElementCopy(*index);
+  const Logic4Vec& held = index->var->value;
+  if (held.width == 0 || held.is_real || !held.IsKnown()) return std::nullopt;
+  return SelectBoundValue(held);
+}
+
+// §37.16 detail 31, §37.17 detail 26: the offset in its parent's storage of
+// the bits a varying select that records the dimension it indexes now
+// stands for; none where its index names no element of the dimension.
+static std::optional<int64_t> VaryingOffset(VpiHandle obj) {
+  const std::optional<int64_t> kIndex = VaryingIndex(obj);
+  if (!kIndex || !obj->select_dim->Contains(*kIndex)) return std::nullopt;
+  return obj->select_base_offset +
+         (obj->select_dim->OffsetOf(*kIndex) * std::max(obj->size, 1));
 }
 
 // The bit of its vector a varying bit stands for when a value is read or
@@ -510,40 +549,58 @@ static bool IsVaryingBit(const VpiObject& obj) {
 // index with an x or z bit, or one naming no bit of the vector, selects none
 // (§11.5.1).
 static VpiHandle VaryingBitTarget(VpiHandle obj) {
-  VpiHandle index = obj->index_expr;
-  if (index->var == nullptr) return nullptr;
-  VpiRefreshElementCopy(*index);
-  const Logic4Vec& held = index->var->value;
-  if (held.width == 0 || held.is_real || !held.IsKnown()) return nullptr;
-  const int64_t kIndex = SelectBoundValue(held);
+  if (obj->select_dim && obj->size > 1) return nullptr;
+  const std::optional<int64_t> kIndex = VaryingIndex(obj);
+  const std::optional<int64_t> kOffset =
+      obj->select_dim ? VaryingOffset(obj) : std::nullopt;
+  if (!kIndex || (obj->select_dim && !kOffset)) return nullptr;
   for (VpiHandle bit : obj->parent->children) {
+    const bool kSelected =
+        kOffset ? bit->bit_offset == *kOffset : bit->index == *kIndex;
     if (bit != obj && bit->type == obj->type && bit->bit_offset >= 0 &&
-        bit->index == kIndex) {
+        kSelected) {
       return bit;
     }
   }
   return nullptr;
 }
 
-// §38.15 for a varying bit: the value of the bit its index selects, or, when
-// it selects none, x of a 4-state vector and 0 of a 2-state one (§11.5.1).
+// §38.15 for a varying select: the value of the bits its index selects, or,
+// when it selects none, x of a 4-state vector and 0 of a 2-state one in each
+// of its bits (§11.5.1).
 static void GetVaryingBitValue(
     VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
     std::vector<std::vector<s_vpi_vecval>>& vec_pool,
     std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
-  VpiHandle target = VaryingBitTarget(obj);
-  if (target != nullptr && target->var != nullptr) {
+  const Variable* whole = obj->parent->var;
+  const int kWidth = std::max(obj->size, 1);
+  std::vector<Logic4Word> words;
+  if (obj->select_dim) {
+    const std::optional<int64_t> kOffset = VaryingOffset(obj);
+    if (kOffset && whole != nullptr) {
+      DispatchIntegerFormat(SliceOfValue(whole->value, *kOffset, kWidth, words),
+                            value, str_pool, vec_pool, strength_pool);
+      return;
+    }
+  } else if (VpiHandle target = VaryingBitTarget(obj);
+             target != nullptr && target->var != nullptr) {
     DispatchGetValueByFormat(target, value, str_pool, vec_pool, strength_pool);
     return;
   }
-  const Variable* whole = obj->parent->var;
   const bool kTwoState = whole != nullptr && !whole->is_4state;
-  Logic4Word bit = kTwoState ? Logic4Word{0, 0} : Logic4Word{1, 1};
-  Logic4Vec bit_view;
-  bit_view.width = 1;
-  bit_view.nwords = 1;
-  bit_view.words = &bit;
-  DispatchIntegerFormat(bit_view, value, str_pool, vec_pool, strength_pool);
+  const uint64_t kFill = kTwoState ? 0 : ~uint64_t{0};
+  words.assign((static_cast<std::size_t>(kWidth) + 63) / 64,
+               Logic4Word{kFill, kFill});
+  if (kWidth % 64 != 0) {
+    const uint64_t kMask = (uint64_t{1} << (kWidth % 64)) - 1;
+    words.back().aval &= kMask;
+    words.back().bval &= kMask;
+  }
+  Logic4Vec fill;
+  fill.width = static_cast<uint32_t>(kWidth);
+  fill.nwords = static_cast<uint32_t>(words.size());
+  fill.words = words.data();
+  DispatchIntegerFormat(fill, value, str_pool, vec_pool, strength_pool);
 }
 
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
@@ -705,7 +762,9 @@ static void PutValueWriteBit(VpiHandle obj, const s_vpi_value* value) {
 
 static void PutValueWriteWord(VpiHandle obj, const s_vpi_value* value) {
   if (obj->bit_offset >= 0) {
-    PutValueWriteBit(obj, value);
+    // A select leaving packed dimensions unindexed spans more than one bit,
+    // which a write of one bit would misplace; it is written to nowhere.
+    if (obj->size <= 1) PutValueWriteBit(obj, value);
     return;
   }
   if (value->format == kVpiIntVal) {

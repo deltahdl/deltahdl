@@ -1,13 +1,16 @@
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -18,6 +21,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -178,6 +182,7 @@ struct AssignBuild {
   SimContext* sim;
   AssignNames names;
   VpiCalleeResolver callees;
+  std::function<std::string_view(std::string)> keep;
 };
 
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
@@ -251,6 +256,83 @@ VpiObject* VaryingBitObject(VpiObject* base, const Expr* index,
   return bit;
 }
 
+// §37.16 detail 31, §37.17 detail 26: the kind a select out of `root` that
+// leaves packed dimensions unindexed is, a vector of the kind `root` is: a
+// logic var or a bit var as the variable is four- or two-state, or the net
+// kind of a net.
+int SliceKind(const VpiObject& root) {
+  if (root.net != nullptr || VpiIsNetsType(root.type)) return root.type;
+  return root.var != nullptr && !root.var->is_4state ? vpiBitVar : kVpiReg;
+}
+
+// The bit of `root` at `offset` above the least significant end of its
+// storage; null where it has none.
+VpiObject* BitAtOffset(const VpiObject& root, int64_t offset) {
+  for (VpiObject* child : root.children) {
+    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
+        child->bit_offset == offset) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+// A select the run builds an object of its own for out of the vector `root`,
+// `width` bits wide, the packed dimensions it leaves unindexed `rest`: a bit
+// of `root` where it leaves none, and otherwise a vector of `root`'s kind.
+VpiObject* SliceObject(VpiObject* root, std::vector<PackedRange> rest,
+                       int64_t width, const AssignBuild& build) {
+  VpiObject* slice = build.alloc();
+  slice->type = rest.empty()
+                    ? (VpiIsNetsType(root->type) ? vpiNetBit : vpiRegBit)
+                    : SliceKind(*root);
+  slice->parent = root;
+  slice->var = root->var;
+  slice->net = root->net;
+  slice->size = static_cast<int>(width);
+  slice->packed_dims = std::move(rest);
+  return slice;
+}
+
+// §37.16 detail 31, §37.17 detail 26: a select of `base`, a vector or a slice
+// of one, by `index` along its outermost packed dimension. Where the select
+// leaves dimensions unindexed it is a vector of `base`'s root's kind, sized
+// by those dimensions, and where it indexes the last it is one of the root's
+// bits; either way its vpiParent is the root, the largest packed array
+// containing it. A constant index fixes the bits now and names the select by
+// it; any other fixes them when its value is read, as a varying bit's does.
+// Null for an index out of range and for a select of a varying slice.
+VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
+                              const AssignBuild& build) {
+  if (base->select_dim || index == nullptr) return nullptr;
+  VpiObject* root = base->bit_offset >= 0 ? base->parent : base;
+  const int64_t kBaseOffset = base->bit_offset >= 0 ? base->bit_offset : 0;
+  const PackedRange kDim = base->packed_dims.front();
+  std::vector<PackedRange> rest(base->packed_dims.begin() + 1,
+                                base->packed_dims.end());
+  const int64_t kWidth = PackedDimsWidth(rest);
+  if (index->kind != ExprKind::kIntegerLiteral) {
+    VpiObject* select = SliceObject(root, std::move(rest), kWidth, build);
+    select->select_dim = kDim;
+    select->select_base_offset = static_cast<int>(kBaseOffset);
+    select->index_expr = ExpressionObject(index, build);
+    if (select->type == vpiRegBit && select->index_expr != nullptr) {
+      select->children.push_back(select->index_expr);
+    }
+    return select;
+  }
+  if (!kDim.Contains(index->int_val)) return nullptr;
+  const int64_t kOffset =
+      kBaseOffset + (kDim.OffsetOf(index->int_val) * kWidth);
+  if (rest.empty()) return BitAtOffset(*root, kOffset);
+  VpiObject* slice = SliceObject(root, std::move(rest), kWidth, build);
+  slice->bit_offset = static_cast<int>(kOffset);
+  const std::string kSuffix = "[" + std::to_string(index->int_val) + "]";
+  slice->name = build.keep(std::string(base->name) + kSuffix);
+  slice->full_name = base->full_name + kSuffix;
+  return slice;
+}
+
 // §37.58: a select of one bit. Of an integer var, a time var or a parameter it
 // is a bit select reaching the object through vpiParent and its index through
 // vpiIndex; of a vector net or a logic or bit variable it is that object's own
@@ -270,6 +352,9 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
       select->index_expressions.push_back(select->index_expr);
     }
     return select;
+  }
+  if (!base->packed_dims.empty() || base->select_dim) {
+    return PackedSelectObject(base, expr->index, build);
   }
   if (expr->index == nullptr) return nullptr;
   if (expr->index->kind != ExprKind::kIntegerLiteral) {
@@ -514,9 +599,11 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
   // names resolve in the instance itself.
   static const GenBlockPrefixes kNoGenBlocks;
   return ExpressionObject(
-      expr,
-      AssignBuild{
-          build.alloc, &ctx, AssignNames{objects, prefix, kNoGenBlocks}, {}});
+      expr, AssignBuild{build.alloc,
+                        &ctx,
+                        AssignNames{objects, prefix, kNoGenBlocks},
+                        {},
+                        build.keep});
 }
 
 VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
@@ -529,7 +616,7 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
       expr,
       AssignBuild{build.alloc, &ctx,
                   AssignNames{objects, site.prefix, kNoGenBlocks, site.scope},
-                  VpiCalleesAt(site)});
+                  VpiCalleesAt(site), build.keep});
 }
 
 void VpiContext::AttachContinuousAssignments(
@@ -559,7 +646,11 @@ void VpiContext::AttachContinuousAssignments(
           AssignNames{object_map_, prefix, ca.gen_block_prefixes},
           VpiCalleesAt({*design, *mod, prefix,
                         CalleeScope(*mod, ca.gen_block_prefixes, scope),
-                        subroutines})};
+                        subroutines}),
+          [this](std::string name) {
+            name_pool_.push_back(std::move(name));
+            return std::string_view(name_pool_.back());
+          }};
       MakeContinuousAssignment(ca, scope, build);
     }
   });

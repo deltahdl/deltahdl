@@ -95,9 +95,11 @@ std::vector<int64_t> IndicesAtOffset(const PackedDims& dims, int64_t offset) {
 // and its index, which vpiIndex reaches as a constant (detail 13). Of a value
 // with more than one packed dimension, a bit is named by an index in each, and
 // its index is the innermost. A var bit's vpiIndex iteration reaches its
-// indices, starting with its own and working outward.
+// indices, starting with its own and working outward. The parent keeps the
+// dimensions, which a select of it indexes.
 void MakeVectorBits(const BitTarget& target, const VpiAttachBuild& build) {
   VpiObject* parent = target.parent;
+  parent->packed_dims = target.dims;
   for (int64_t offset = PackedDimsWidth(target.dims) - 1; offset >= 0;
        --offset) {
     const std::vector<int64_t> kIndices = IndicesAtOffset(target.dims, offset);
