@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -510,6 +512,102 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
+}
+
+// §38.34 with Table 38-3: a value in any format the table lists is decoded
+// into every word of the object it is put to (#5101).
+class VpiPutValueFormats : public VpiPutValueSim {
+ protected:
+  // The variable `name`, `width` bits wide and 0, after `value` is put to it.
+  const Logic4Vec& PutTo(const char* name, uint32_t width, s_vpi_value value) {
+    auto* var = sim_ctx_.CreateVariable(name, width);
+    var->value = MakeLogic4VecVal(arena_, width, 0);
+    vpi_ctx_.Attach(sim_ctx_);
+    vpi_put_value(vpi_handle_by_name(VpiText(name), nullptr), &value, nullptr,
+                  vpiNoDelay);
+    return var->value;
+  }
+};
+
+TEST_F(VpiPutValueFormats, ABinaryStringSetsEachBitXAndZIncluded) {
+  s_vpi_value val = {};
+  val.format = vpiBinStrVal;
+  val.value.str = VpiText("1x0z");
+  const Logic4Vec& v = PutTo("bs", 4, val);
+  EXPECT_EQ(v.words[0].aval, 0b1100u);
+  EXPECT_EQ(v.words[0].bval, 0b0101u);
+}
+
+TEST_F(VpiPutValueFormats, AnOctalStringSetsThreeBitsPerDigit) {
+  s_vpi_value val = {};
+  val.format = vpiOctStrVal;
+  val.value.str = VpiText("751");
+  EXPECT_EQ(PutTo("os", 9, val).ToUint64(), 0751u);
+}
+
+TEST_F(VpiPutValueFormats, AHexStringSetsFourBitsPerDigit) {
+  s_vpi_value val = {};
+  val.format = vpiHexStrVal;
+  val.value.str = VpiText("DeadBeef");
+  EXPECT_EQ(PutTo("hs", 32, val).ToUint64(), 0xDEADBEEFu);
+}
+
+TEST_F(VpiPutValueFormats, ANegativeDecimalStringIsTwosComplement) {
+  s_vpi_value val = {};
+  val.format = vpiDecStrVal;
+  val.value.str = VpiText("-5");
+  EXPECT_EQ(PutTo("dn", 8, val).ToUint64(), 0xFBu);
+}
+
+TEST_F(VpiPutValueFormats, ADecimalStringReachesPastTheFirstWord) {
+  s_vpi_value val = {};
+  val.format = vpiDecStrVal;
+  val.value.str = VpiText("18446744073709551621");  // 2^64 + 5
+  const Logic4Vec& v = PutTo("dw", 72, val);
+  ASSERT_EQ(v.nwords, 2u);
+  EXPECT_EQ(v.words[0].aval, 5u);
+  EXPECT_EQ(v.words[1].aval, 1u);
+}
+
+TEST_F(VpiPutValueFormats, AStringSetsEightBitsPerCharacter) {
+  s_vpi_value val = {};
+  val.format = vpiStringVal;
+  val.value.str = VpiText("AB");
+  EXPECT_EQ(PutTo("ss", 16, val).ToUint64(), 0x4142u);
+}
+
+TEST_F(VpiPutValueFormats, ATimeSetsTheHighAndLowWords) {
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.high = 3;
+  time.low = 7;
+  s_vpi_value val = {};
+  val.format = vpiTimeVal;
+  val.value.time = &time;
+  EXPECT_EQ(PutTo("ts", 64, val).ToUint64(), (uint64_t{3} << 32) | 7);
+}
+
+TEST_F(VpiPutValueFormats, AVectorSetsEveryWordItsArrayHolds) {
+  s_vpi_vecval vec[3] = {{1, 0}, {2, 0}, {3, 4}};
+  s_vpi_value val = {};
+  val.format = vpiVectorVal;
+  val.value.vector = vec;
+  const Logic4Vec& v = PutTo("vs", 96, val);
+  ASSERT_EQ(v.nwords, 2u);
+  EXPECT_EQ(v.words[0].aval, (uint64_t{2} << 32) | 1);
+  EXPECT_EQ(v.words[0].bval, 0u);
+  EXPECT_EQ(v.words[1].aval, 3u);
+  EXPECT_EQ(v.words[1].bval, 4u);
+}
+
+TEST_F(VpiPutValueFormats, ANegativeIntegerFillsAWideObject) {
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = -1;
+  const Logic4Vec& v = PutTo("in", 96, val);
+  ASSERT_EQ(v.nwords, 2u);
+  EXPECT_EQ(v.words[0].aval, ~uint64_t{0});
+  EXPECT_EQ(v.words[1].aval, 0xFFFFFFFFu);
 }
 
 }  // namespace

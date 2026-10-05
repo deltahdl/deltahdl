@@ -656,68 +656,30 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
   return false;
 }
 
-// §37.16, §37.17: a value put to a net bit or var bit is put to its bit of
-// the parent's storage, and one put to a select leaving packed dimensions
-// unindexed (§37.16 detail 31, §37.17 detail 26) to the `size` bits it spans,
-// from the least significant up. They are taken from the bit pattern a
-// whole object's write stores of a scalar, integer or real value: the scalar
-// in the low bit and 0 above it, and the integer or real as 64 bits, which
-// PutValuePattern gives, false for a format it has none of.
-static bool PutValuePattern(const s_vpi_value* value, uint64_t& aval,
-                            uint64_t& bval) {
-  if (value->format == kVpiIntVal) {
-    aval = static_cast<uint64_t>(value->value.integer);
-  } else if (value->format == kVpiRealVal) {
-    aval = static_cast<uint64_t>(value->value.real);
-  } else if (value->format == kVpiScalarVal) {
-    int s = value->value.scalar;
-    aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
-    bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
-  } else {
-    return false;
-  }
-  return true;
-}
-
-static void PutValueWriteSlice(VpiHandle obj, const s_vpi_value* value) {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
-  if (!PutValuePattern(value, aval, bval)) return;
+// §38.34 with Table 38-3: the value `value` gives, decoded from whichever
+// format it is in, written to every bit of the target variable, or, for a net
+// bit or var bit, to its bit of the parent's storage, and for a select leaving
+// packed dimensions unindexed (§37.16 detail 31, §37.17 detail 26) to the
+// `size` bits it spans, from the least significant up. A format that gives no
+// bits writes nothing.
+static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
   Logic4Vec& whole = obj->var->value;
-  for (int k = 0; k < std::max(obj->size, 1); ++k) {
-    const auto kBit = static_cast<uint32_t>(obj->bit_offset + k);
+  const bool kSelect = obj->bit_offset >= 0;
+  const uint32_t kWidth = kSelect
+                              ? static_cast<uint32_t>(std::max(obj->size, 1))
+                              : std::max(whole.width, uint32_t{1});
+  std::vector<Logic4Word> bits;
+  if (!VpiPutValueBits(*value, kWidth, bits)) return;
+  const uint64_t kBase = kSelect ? static_cast<uint64_t>(obj->bit_offset) : 0;
+  for (uint32_t k = 0; k < kWidth; ++k) {
+    const uint64_t kBit = kBase + k;
     if (kBit / 64 >= whole.nwords) return;
     const uint64_t kMask = uint64_t{1} << (kBit % 64);
-    const bool kA = k < 64 && ((aval >> k) & 1) != 0;
-    const bool kB = k < 64 && ((bval >> k) & 1) != 0;
+    const bool kA = ((bits[k / 64].aval >> (k % 64)) & 1) != 0;
+    const bool kB = ((bits[k / 64].bval >> (k % 64)) & 1) != 0;
     Logic4Word& word = whole.words[kBit / 64];
     word.aval = (word.aval & ~kMask) | (kA ? kMask : 0);
     word.bval = (word.bval & ~kMask) | (kB ? kMask : 0);
-  }
-}
-
-// §38.34: stores the supplied scalar/integer/real value into the target
-// variable's first four-state word, or a bit or slice's bits of its parent.
-// Formats with no direct word encoding here (e.g. string/vector) are left for
-// the caller's other paths and are ignored.
-static void PutValueWriteWord(VpiHandle obj, const s_vpi_value* value) {
-  if (obj->bit_offset >= 0) {
-    PutValueWriteSlice(obj, value);
-    return;
-  }
-  if (value->format == kVpiIntVal) {
-    auto new_val = static_cast<uint64_t>(value->value.integer);
-    obj->var->value.words[0].aval = new_val;
-    obj->var->value.words[0].bval = 0;
-  } else if (value->format == kVpiRealVal) {
-    auto new_val = static_cast<uint64_t>(value->value.real);
-    obj->var->value.words[0].aval = new_val;
-    obj->var->value.words[0].bval = 0;
-  } else if (value->format == kVpiScalarVal) {
-    int s = value->value.scalar;
-    // Canonical encoding: x=(aval=1,bval=1), z=(aval=0,bval=1).
-    obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
-    obj->var->value.words[0].bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
   }
 }
 
@@ -750,7 +712,7 @@ static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
                                        int mode, Scheduler* scheduler) {
   if (scheduler) scheduler->NoteWriteAttempt();
 
-  PutValueWriteWord(obj, value);
+  PutValueWriteBits(obj, value);
 
   // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
   // value takes effect now and is held as the forced value.

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -138,6 +140,13 @@ VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode);
 // Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default
 // and by the compile-based variants for the mode compiled into them.
 int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode);
+
+// §38.34 with Table 38-3 of §38.15: the `width` bits the value `value` gives,
+// decoded from whichever format it is in, in `words`; false for a format that
+// gives none (vpiObjTypeVal, a misc value) or a value whose text or pointer
+// gives no bits. Defined in vpi_put_value_bits.cpp, used by vpi_value.cpp.
+bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
+                     std::vector<Logic4Word>& words);
 
 // Defined in vpi_systf.cpp, used by vpi_handle.cpp.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
