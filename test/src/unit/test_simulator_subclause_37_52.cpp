@@ -400,7 +400,10 @@ constexpr const char* kPropertyOperators =
 
 class PropertyOperationsOfARun : public VpiDesignRun {
  protected:
-  void SetUp() override { Run(kPropertyOperators); }
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run(kPropertyOperators);
+  }
 
   // The property expr the property spec of the assertion `name` reaches.
   static vpiHandle PropertyOf(const char* name) {
