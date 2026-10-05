@@ -419,5 +419,97 @@ TEST_F(FrameModelInARun, AFrameActivatedFromAnotherReportsItAsItsParent) {
   EXPECT_TRUE(g_frame_has_a_thread);
 }
 
+// §37.44 detail 1: a frame is activated as each task is entered, as it is for
+// each function, so the frame standing inside a task enable is the task's,
+// the outermost of its call chain (#4940).
+TEST_F(FrameModelInARun, ATaskEnableActivatesAFrame) {
+  RegisterFrameProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic tk();\n"
+      "    $probe;\n"
+      "  endtask\n"
+      "  initial tk();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_frame_found);
+  EXPECT_EQ(g_frame_is_active, 1);
+  EXPECT_TRUE(g_frame_has_a_thread);
+  EXPECT_FALSE(g_frame_has_a_parent_frame);
+}
+
+// §37.43 detail 4: the frame active is the running thread's own. A task
+// another thread entered and is waiting inside leaves its frame active in
+// that thread, so a function this thread calls meanwhile is activated from no
+// frame of its own call chain and reports no parent frame (#4940).
+TEST_F(FrameModelInARun, AnotherThreadsTaskFrameIsNoParent) {
+  RegisterFrameProbe();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  task automatic wait_for(input int n);\n"
+      "    #n;\n"
+      "  endtask\n"
+      "  function automatic int one();\n"
+      "    $probe;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial wait_for(5);\n"
+      "  initial #1 r = one();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_frame_found);
+  EXPECT_FALSE(g_frame_has_a_parent_frame);
+}
+
+// The frames the run started and ended, as §38.36.1's frame callbacks report
+// them.
+int g_frames_started = 0;
+int g_frames_ended = 0;
+
+PLI_INT32 CountFrameCallback(p_cb_data data) {
+  if (data->reason == cbStartOfFrame) ++g_frames_started;
+  if (data->reason == cbEndOfFrame) ++g_frames_ended;
+  return 0;
+}
+
+// §38.36.1 with §37.3.8: each task enable starts a frame and ends it when the
+// task completes, however long it waits inside (#4940).
+TEST_F(FrameModelInARun, EachTaskEnableStartsAndEndsAFrame) {
+  g_frames_started = 0;
+  g_frames_ended = 0;
+  for (int reason : {cbStartOfFrame, cbEndOfFrame}) {
+    s_cb_data data = {};
+    data.reason = reason;
+    data.cb_rtn = &CountFrameCallback;
+    ASSERT_NE(vpi_register_cb(&data), nullptr);
+  }
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic wait_for(input int n);\n"
+      "    #n;\n"
+      "  endtask\n"
+      "  initial begin wait_for(1); wait_for(2); wait_for(3); end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_frames_started, 3);
+  EXPECT_EQ(g_frames_ended, 3);
+}
+
 }  // namespace
 }  // namespace delta

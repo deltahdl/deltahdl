@@ -15,11 +15,15 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vpi_design_attach.h"
 
 namespace delta {
 
 ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena) {
+  // §37.44 detail 1: entering the task method activates a frame in the
+  // thread, left when the task completes however long it runs.
+  VpiActiveFrameScope frame;
   StmtResult outcome = StmtResult::kDone;
   for (auto* s : call.method->func_body_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);

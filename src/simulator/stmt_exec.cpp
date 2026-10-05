@@ -32,6 +32,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vpi_design_attach.h"
 
 namespace delta {
 
@@ -506,6 +507,7 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
 // the task was disabled.
 static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
                                    SimContext& ctx, Arena& arena) {
+  VpiActiveFrameScope frame;  // §37.44 detail 1, as in ExecFunctionBody.
   bool has_name = !func->name.empty();
   for (auto* s : func->func_body_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);

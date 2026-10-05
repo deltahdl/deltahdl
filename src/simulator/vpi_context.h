@@ -690,10 +690,10 @@ class VpiContext {
   VpiHandle InteractiveScope() const { return interactive_scope_; }
 
   // §37.43 detail 4: record which frame is the one currently active. There is
-  // at most one active frame at a time in a given thread, and an application
-  // reaches it through vpi_handle(vpiFrame, NULL) (see Handle).
-  void SetActiveFrame(VpiHandle frame) { active_frame_ = frame; }
-  VpiHandle ActiveFrame() const { return active_frame_; }
+  // at most one active frame at a time in a given thread, the running one's
+  // here, and an application reaches it through vpi_handle(vpiFrame, NULL).
+  void SetActiveFrame(VpiHandle frame);
+  VpiHandle ActiveFrame() const;
 
   // §37.42 detail 3: record which system task or function call is currently
   // invoking a PLI application. An application reaches it through
@@ -739,8 +739,8 @@ class VpiContext {
   // §37.43 detail 4: activate the frame of a subroutine the run has just
   // entered, answering with the frame that was active, and put that one back
   // when the subroutine returns. Written beside the rest of it.
-  VpiHandle ActivateFrame();
-  void RestoreActiveFrame(VpiHandle previous);
+  VpiHandle ActivateFrame(const void*& thread);
+  void RestoreActiveFrame(VpiHandle previous, const void* thread);
 
   // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
   // is that occurrence, delivered on the way out of the VPI routine that
@@ -836,9 +836,9 @@ class VpiContext {
   int reset_reset_value_ = 0;
   int reset_diag_value_ = 0;
   VpiHandle interactive_scope_ = nullptr;
-  // §37.43 detail 4: the frame currently active, returned by
-  // vpi_handle(vpiFrame, NULL).
-  VpiHandle active_frame_ = nullptr;
+  // §37.43 detail 4: the frame active in each thread, keyed by its process
+  // (null outside one); the running thread's is vpi_handle(vpiFrame, NULL).
+  std::unordered_map<const void*, VpiHandle> active_frames_;
   // §37.42 detail 3: the system task or function call currently invoking a PLI
   // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;

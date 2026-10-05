@@ -168,20 +168,40 @@ VpiObject* FirstChildOfType(VpiObject* obj, int type) {
   return nullptr;
 }
 
+// The thread a frame is active in: the process the run is executing, null
+// outside one, as when a case drives the context by hand.
+const void* FrameThreadOf(SimContext* sim_ctx) {
+  return sim_ctx == nullptr ? nullptr : sim_ctx->CurrentProcess();
+}
+
 }  // namespace
 
-VpiHandle VpiContext::ActivateFrame() {
+void VpiContext::SetActiveFrame(VpiHandle frame) {
+  active_frames_[FrameThreadOf(sim_ctx_)] = frame;
+}
+
+VpiHandle VpiContext::ActiveFrame() const {
+  auto found = active_frames_.find(FrameThreadOf(sim_ctx_));
+  return found == active_frames_.end() ? nullptr : found->second;
+}
+
+VpiHandle VpiContext::ActivateFrame(const void*& thread) {
   // §36.6: a run holding no PLI application has no design attached and nothing
   // to reach a frame through, so it pays nothing for this.
   if (sim_ctx_ == nullptr) return nullptr;
 
-  VpiHandle outer = active_frame_;
-  VpiHandle thread = ThreadObjectFor(sim_ctx_->CurrentProcess());
+  // §37.43 detail 4: at most one frame is active at a time in each thread, so
+  // the frame a call chain activates is kept with the thread it runs in. A
+  // task suspended across time leaves its frame active in its own thread
+  // while other threads activate and leave frames of their own.
+  thread = FrameThreadOf(sim_ctx_);
+  VpiHandle outer = ActiveFrame();
+  VpiHandle proc_thread = ThreadObjectFor(sim_ctx_->CurrentProcess());
   // §37.43 detail 5: "The vpiParent relation shall indicate the frame from
   // which the child frame was activated." The outermost frame of a call chain
   // was activated from no frame, so it hangs off the thread instead, which is
   // the diagram's frame--thread edge and reports no parent frame.
-  VpiHandle holder = outer != nullptr ? outer : thread;
+  VpiHandle holder = outer != nullptr ? outer : proc_thread;
   if (holder == nullptr) return nullptr;
 
   // A call chain of the same shape entered again reuses the frame already made
@@ -198,7 +218,7 @@ VpiHandle VpiContext::ActivateFrame() {
     holder->children.push_back(frame);
   }
   frame->active = true;
-  active_frame_ = frame;
+  active_frames_[thread] = frame;
   // §37.3.8: a frame is a transient object too, and cbStartOfFrame reports the
   // beginning of one. Detail 4 of §37.43 has at most one frame active at a time
   // in a thread, so the frame's life is the activation this ends rather than
@@ -207,26 +227,29 @@ VpiHandle VpiContext::ActivateFrame() {
   return outer;
 }
 
-void VpiContext::RestoreActiveFrame(VpiHandle previous) {
+void VpiContext::RestoreActiveFrame(VpiHandle previous, const void* thread) {
   if (sim_ctx_ == nullptr) return;
-  // §37.43 (vpiActive): the frame being left is no longer the active one, and
-  // the frame it was activated from becomes active again.
+  // §37.43 (vpiActive): the frame being left is no longer the active one in
+  // its thread, and the frame it was activated from becomes active again. The
+  // thread is the one the frame was activated in, which a task torn down while
+  // another thread runs still names.
   //
   // §37.3.8: leaving it ends that frame's life, which is what cbEndOfFrame is
   // there to report.
-  if (active_frame_ != nullptr) {
-    DispatchCallbacks(cbEndOfFrame, active_frame_);
-    active_frame_->active = false;
+  VpiHandle& active = active_frames_[thread];
+  if (active != nullptr) {
+    DispatchCallbacks(cbEndOfFrame, active);
+    active->active = false;
   }
-  active_frame_ = previous;
-  if (active_frame_ != nullptr) active_frame_->active = true;
+  active = previous;
+  if (active != nullptr) active->active = true;
 }
 
 VpiActiveFrameScope::VpiActiveFrameScope()
-    : outer_(GetGlobalVpiContext().ActivateFrame()) {}
+    : outer_(GetGlobalVpiContext().ActivateFrame(thread_)) {}
 
 VpiActiveFrameScope::~VpiActiveFrameScope() {
-  GetGlobalVpiContext().RestoreActiveFrame(outer_);
+  GetGlobalVpiContext().RestoreActiveFrame(outer_, thread_);
 }
 
 namespace {

@@ -885,7 +885,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref,
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // §37.43 detail 4: there is at most one active frame at a time in a given
   // thread, and an application reaches it with vpi_handle(vpiFrame, NULL).
-  if (!ref && type == vpiFrame) return active_frame_;
+  if (!ref && type == vpiFrame) return ActiveFrame();
 
   // §37.42 detail 3: the system task or function that invoked the application
   // is reached with vpi_handle(vpiSysTfCall, NULL).

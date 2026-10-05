@@ -55,6 +55,9 @@ class VpiActiveFrameScope {
   VpiActiveFrameScope& operator=(const VpiActiveFrameScope&) = delete;
 
  private:
+  // The thread the frame was activated in, which it is left in, declared first
+  // so that it is set before the activation writes it.
+  const void* thread_ = nullptr;
   VpiObject* outer_ = nullptr;
 };
 
