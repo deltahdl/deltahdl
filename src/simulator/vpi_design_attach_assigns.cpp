@@ -146,10 +146,13 @@ struct AssignNames {
 // itself, declares under `name`, the innermost first, or the index variable
 // a foreach loop around it declares (§12.7.3); null where none does, the
 // instance's own declarations being looked up after. A block's declarations
-// hang beneath it (§37.12), and the walk stops at the instance.
-VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name) {
+// hang beneath it (§37.12), and the walk stops at the instance. `gen` picks
+// the generate block instances around `scope` (§27.4) rather than the blocks.
+VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name,
+                           bool gen) {
   for (; scope != nullptr && !VpiIsInstanceType(scope->type);
        scope = scope->parent) {
+    if ((scope->type == vpiGenScope) != gen) continue;
     for (VpiObject* var : scope->loop_vars) {
       if (var != nullptr && var->name == name) return var;
     }
@@ -164,14 +167,19 @@ VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name) {
 }
 
 VpiHandle Resolve(const AssignNames& names, std::string_view name) {
-  VpiHandle declared = BlockDeclaration(names.scope, name);
+  VpiHandle declared = BlockDeclaration(names.scope, name, false);
   if (declared != nullptr) return declared;
+  // §27.4: a generate block's declarations, through the flattened key the run
+  // stores each under, whose object AttachGenBlockStorage makes the block's.
   for (auto it = names.gen.rbegin(); it != names.gen.rend(); ++it) {
     VpiHandle obj = FindObjectForFlatName(
         names.objects,
         VpiFlatName(names.prefix, std::string(*it) + std::string(name)));
     if (obj != nullptr) return obj;
   }
+  // What a generate block instance holds under no such key, a loop's genvar.
+  declared = BlockDeclaration(names.scope, name, true);
+  if (declared != nullptr) return declared;
   return FindObjectForFlatName(names.objects, VpiFlatName(names.prefix, name));
 }
 
