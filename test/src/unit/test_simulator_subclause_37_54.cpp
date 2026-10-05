@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -289,6 +291,136 @@ TEST(SequenceExprModel, MatchItemsCollectAssignmentAndTfCallChildren) {
   EXPECT_EQ(items[1], &call);
 
   EXPECT_TRUE(VpiExprMatchItems(nullptr).empty());
+}
+
+// One assertion per sequence operator form of §16.9, each named for what it
+// shows.
+constexpr const char* kSequenceOperators =
+    "module top; logic clk, a, b, c, d;\n"
+    "  d1: assert property (@(posedge clk) a ##1 b);\n"
+    "  d2: assert property (@(posedge clk) a ##[1:3] b);\n"
+    "  d3: assert property (@(posedge clk) ##2 a);\n"
+    "  r1: assert property (@(posedge clk) a[*2] ##1 b);\n"
+    "  r2: assert property (@(posedge clk) a[->1:2] ##1 b);\n"
+    "  r3: assert property (@(posedge clk) a[=3] ##1 b);\n"
+    "  j1: assert property (@(posedge clk) (a ##1 b) intersect (c ##1 d));\n"
+    "  m1: assert property (@(posedge clk) first_match(a ##[1:2] b));\n"
+    "  p1: assert property (@(posedge clk) a ##1 b |-> c);\n"
+    "endmodule\n";
+
+class SequenceExprsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run(kSequenceOperators);
+  }
+
+  // The property expr the property spec of the assertion `name` reaches.
+  static vpiHandle PropertyOf(const char* name) {
+    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
+    vpiHandle spec =
+        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion);
+    return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
+  }
+
+  // The operator of the operation `op`, 0 where it is no operation.
+  static int OpOf(vpiHandle op) {
+    if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
+    return vpi_get(vpiOpType, op);
+  }
+
+  // The operands of `op` in the order vpiOperand reaches them.
+  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
+    std::vector<vpiHandle> operands;
+    vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
+    if (it == nullptr) return operands;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      operands.push_back(h);
+    }
+    return operands;
+  }
+
+  // Each operand of `op` as its name, a constant as its value, and another
+  // operation as "op".
+  static std::vector<std::string> Spelled(vpiHandle op) {
+    std::vector<std::string> spelled;
+    for (vpiHandle operand : OperandsOf(op)) {
+      const int kType = vpi_get(vpiType, operand);
+      if (kType == vpiOperation) {
+        spelled.emplace_back("op");
+      } else if (kType == vpiConstant) {
+        s_vpi_value value = {};
+        value.format = vpiIntVal;
+        vpi_get_value(operand, &value);
+        spelled.push_back(std::to_string(value.value.integer));
+      } else {
+        const char* name = vpi_get_str(vpiName, operand);
+        spelled.emplace_back(name == nullptr ? "" : name);
+      }
+    }
+    return spelled;
+  }
+};
+
+// A cycle delay takes its two sequences and its range, the right bound only
+// where it differs from the left, and a leading one its sequence and range
+// (detail 3) (#5094).
+TEST_F(SequenceExprsOfARun, CycleDelaysTakeTheirRanges) {
+  EXPECT_EQ(OpOf(PropertyOf("d1")), vpiCycleDelayOp);
+  EXPECT_EQ(Spelled(PropertyOf("d1")),
+            (std::vector<std::string>{"a", "b", "1"}));
+  EXPECT_EQ(Spelled(PropertyOf("d2")),
+            (std::vector<std::string>{"a", "b", "1", "3"}));
+  EXPECT_EQ(OpOf(PropertyOf("d3")), vpiUnaryCycleDelayOp);
+  EXPECT_EQ(Spelled(PropertyOf("d3")), (std::vector<std::string>{"a", "2"}));
+}
+
+// A repetition takes the sequence repeated and its bounds, the right only
+// where it differs from the left, each of the three its own operator
+// (detail 3) (#5094).
+TEST_F(SequenceExprsOfARun, RepetitionsTakeTheirBounds) {
+  const struct {
+    const char* name;
+    int op;
+    std::vector<std::string> spelled;
+  } kRepeats[] = {{"r1", vpiConsecutiveRepeatOp, {"a", "2"}},
+                  {"r2", vpiGotoRepeatOp, {"a", "1", "2"}},
+                  {"r3", vpiRepeatOp, {"a", "3"}}};
+  for (const auto& repeat : kRepeats) {
+    vpiHandle chain = PropertyOf(repeat.name);
+    EXPECT_EQ(OpOf(chain), vpiCycleDelayOp) << repeat.name;
+    const std::vector<vpiHandle> kParts = OperandsOf(chain);
+    ASSERT_FALSE(kParts.empty()) << repeat.name;
+    EXPECT_EQ(OpOf(kParts[0]), repeat.op) << repeat.name;
+    EXPECT_EQ(Spelled(kParts[0]), repeat.spelled) << repeat.name;
+  }
+}
+
+// An intersect joins two sequences and a first_match holds one (detail 2)
+// (#5094).
+TEST_F(SequenceExprsOfARun, JoinedAndMatchedSequences) {
+  vpiHandle joined = PropertyOf("j1");
+  EXPECT_EQ(OpOf(joined), vpiIntersectOp);
+  const std::vector<vpiHandle> kSides = OperandsOf(joined);
+  ASSERT_EQ(kSides.size(), 2u);
+  EXPECT_EQ(OpOf(kSides[0]), vpiCycleDelayOp);
+  EXPECT_EQ(OpOf(kSides[1]), vpiCycleDelayOp);
+  vpiHandle matched = PropertyOf("m1");
+  EXPECT_EQ(OpOf(matched), vpiFirstMatchOp);
+  const std::vector<vpiHandle> kMatched = OperandsOf(matched);
+  ASSERT_EQ(kMatched.size(), 1u);
+  EXPECT_EQ(OpOf(kMatched[0]), vpiCycleDelayOp);
+}
+
+// A sequence antecedent stands as the sequence expr it is (§37.52) (#5094).
+TEST_F(SequenceExprsOfARun, AnAntecedentIsItsSequenceExpr) {
+  vpiHandle implication = PropertyOf("p1");
+  EXPECT_EQ(OpOf(implication), vpiOverlapImplyOp);
+  const std::vector<vpiHandle> kSides = OperandsOf(implication);
+  ASSERT_EQ(kSides.size(), 2u);
+  EXPECT_EQ(OpOf(kSides[0]), vpiCycleDelayOp);
+  EXPECT_EQ(Spelled(kSides[0]), (std::vector<std::string>{"a", "b", "1"}));
+  EXPECT_STREQ(vpi_get_str(vpiName, kSides[1]), "c");
 }
 
 }  // namespace

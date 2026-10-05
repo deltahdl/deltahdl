@@ -24,6 +24,7 @@ enum class DataTypeKind : uint8_t;
 struct Expr;
 struct ModuleItem;
 struct PropertyExprNode;
+struct SeqLinearBody;
 struct RtlirAssertion;
 struct RtlirPropertyDecl;
 struct RtlirDesign;
@@ -334,6 +335,14 @@ struct VpiPropertySpecParts {
   const Expr* disable = nullptr;
   const PropertyExprNode* property = nullptr;
 };
+
+// §37.54: the sequence expr the linear body `body` stands for: its operands
+// joined by cycle delays and repeated, its intersects, conjuncts and
+// alternatives, under first_match where written, each built through `with`;
+// null for a body holding a part not built, a match item, a throughout or an
+// operand clocked on its own.
+VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
+                                 const VpiStmtBuild& with);
 
 // §37.52: the property expr the property tree `node` stands for: the
 // expression of a Boolean, or the operation of a property operator (detail

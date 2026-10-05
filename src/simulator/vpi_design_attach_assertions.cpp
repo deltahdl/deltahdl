@@ -1,4 +1,7 @@
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -245,27 +248,118 @@ VpiObject* PropertyOperation(int op_type,
   return op;
 }
 
-// §16.9: whether `body` is one Boolean expression and nothing beside it.
-bool IsSingleBoolean(const SeqLinearBody& body) {
-  return body.operands.size() == 1 && body.delays.size() == 1 &&
-         body.delays[0].min == 0 && body.delays[0].max == 0 &&
-         body.repetitions.size() == 1 &&
-         body.repetitions[0].kind == SeqRepetition::Kind::kNone &&
-         (body.match_items.empty() || body.match_items[0].empty()) &&
-         body.throughouts.empty() && body.intersects.empty() &&
-         body.conjuncts.empty() && body.alternatives.empty() &&
-         !body.first_match;
+// §37.54 detail 3: the bound `value` of a range or a repetition, `$` the
+// unbounded constant.
+VpiObject* BoundConstant(uint32_t value, const VpiAttachBuild& build) {
+  if (value != SeqCycleDelay::kUnbounded) return VpiIntConstant(value, build);
+  VpiObject* constant = build.alloc();
+  constant->type = vpiConstant;
+  constant->const_type = vpiUnboundedConst;
+  return constant;
 }
 
-// §37.52 with §37.54: the sequence `sequence` as an operand of a property
-// operator, the Boolean expression it is where it is one; null for one of
-// any other form.
+// §37.54 detail 3: the left bound `min` onto `operands`, and the right bound
+// `max` where it differs from the left.
+void AppendBounds(std::vector<VpiObject*>& operands, uint32_t min, uint32_t max,
+                  const VpiAttachBuild& build) {
+  operands.push_back(BoundConstant(min, build));
+  if (max != min) operands.push_back(BoundConstant(max, build));
+}
+
+// §16.9.2: the operand `index` of the chain `body` under the repetition it
+// carries, the sequence repeated first and then its bounds (detail 3).
+VpiObject* RepeatedOperand(const SeqLinearBody& body, size_t index,
+                           const VpiStmtBuild& with) {
+  VpiObject* operand = with.expression(body.operands[index]);
+  if (index >= body.repetitions.size()) return operand;
+  const SeqRepetition& repetition = body.repetitions[index];
+  int op = vpiRepeatOp;
+  switch (repetition.kind) {
+    case SeqRepetition::Kind::kNone:
+      return operand;
+    case SeqRepetition::Kind::kConsecutive:
+      op = vpiConsecutiveRepeatOp;
+      break;
+    case SeqRepetition::Kind::kGoto:
+      op = vpiGotoRepeatOp;
+      break;
+    default:
+      break;
+  }
+  std::vector<VpiObject*> operands{operand};
+  AppendBounds(operands, repetition.min, repetition.max, with.build);
+  return PropertyOperation(op, operands, false, with.build);
+}
+
+// §16.9.1 and §16.9.2: the operands of the chain `body` joined left to right
+// by the cycle delays between them, each with its two sequences and its
+// range, and a delay before the first a unary cycle delay over it (detail 3).
+VpiObject* ChainExpr(const SeqLinearBody& body, const VpiStmtBuild& with) {
+  if (body.operands.empty()) return nullptr;
+  VpiObject* chain = RepeatedOperand(body, 0, with);
+  if (!body.delays.empty() &&
+      (body.delays[0].min != 0 || body.delays[0].max != 0)) {
+    std::vector<VpiObject*> operands{chain};
+    AppendBounds(operands, body.delays[0].min, body.delays[0].max, with.build);
+    chain =
+        PropertyOperation(vpiUnaryCycleDelayOp, operands, false, with.build);
+  }
+  for (size_t i = 1; i < body.operands.size(); ++i) {
+    std::vector<VpiObject*> operands{chain, RepeatedOperand(body, i, with)};
+    if (i < body.delays.size()) {
+      AppendBounds(operands, body.delays[i].min, body.delays[i].max,
+                   with.build);
+    }
+    chain = PropertyOperation(vpiCycleDelayOp, operands, false, with.build);
+  }
+  return chain;
+}
+
+// §16.9.5 and §16.9.6: the chain `body` intersected with each chain of its
+// intersect, the whole and-ed with each of its conjuncts, left to right.
+VpiObject* ConjunctionExpr(const SeqLinearBody& body,
+                           const VpiStmtBuild& with) {
+  VpiObject* joined = ChainExpr(body, with);
+  for (const SeqLinearBody& other : body.intersects) {
+    joined = PropertyOperation(vpiIntersectOp, {joined, ChainExpr(other, with)},
+                               false, with.build);
+  }
+  for (const SeqLinearBody& other : body.conjuncts) {
+    joined =
+        PropertyOperation(vpiCompAndOp, {joined, ConjunctionExpr(other, with)},
+                          false, with.build);
+  }
+  return joined;
+}
+
+// Whether every part of `body` is one the sequence exprs below are built of:
+// no operand with a clocking event of its own (§37.56), no match item and no
+// throughout.
+bool IsModelledSequence(const SeqLinearBody& body) {
+  const auto kUnclocked = [](const std::vector<EventExpr>& clock) {
+    return clock.empty();
+  };
+  const auto kNoItems = [](const std::vector<SeqMatchAssign>& items) {
+    return items.empty();
+  };
+  if (!body.throughouts.empty() || !body.first_match_items.empty() ||
+      !std::ranges::all_of(body.clocks, kUnclocked) ||
+      !std::ranges::all_of(body.match_items, kNoItems)) {
+    return false;
+  }
+  for (const auto* parts :
+       {&body.intersects, &body.conjuncts, &body.alternatives}) {
+    if (!std::ranges::all_of(*parts, IsModelledSequence)) return false;
+  }
+  return true;
+}
+
+// §37.52 with §37.54: the sequence `sequence` as a property expr or as an
+// operand of a property operator; null for one holding a part not built.
 VpiObject* SequenceOperand(const ModuleItem* sequence,
                            const VpiStmtBuild& with) {
-  if (sequence == nullptr || !IsSingleBoolean(sequence->seq_linear)) {
-    return nullptr;
-  }
-  return with.expression(sequence->seq_linear.operands.front());
+  if (sequence == nullptr) return nullptr;
+  return VpiSequenceExprObject(sequence->seq_linear, with);
 }
 
 // The property expr of the operand `index` of `node`; null where it has none.
@@ -454,6 +548,22 @@ VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
 }
 
 }  // namespace
+
+VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
+                                 const VpiStmtBuild& with) {
+  if (!IsModelledSequence(body)) return nullptr;
+  // §16.9.7 and §16.9.8: the alternatives of an or, left to right, and the
+  // whole under the first_match it is the operand of.
+  VpiObject* whole = ConjunctionExpr(body, with);
+  for (const SeqLinearBody& other : body.alternatives) {
+    whole = PropertyOperation(
+        vpiCompOrOp, {whole, ConjunctionExpr(other, with)}, false, with.build);
+  }
+  if (body.first_match) {
+    whole = PropertyOperation(vpiFirstMatchOp, {whole}, false, with.build);
+  }
+  return whole;
+}
 
 VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
                                  const VpiStmtBuild& with) {

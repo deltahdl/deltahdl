@@ -354,15 +354,20 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
   }
   // §16.16 (a) has an inferred clock stand as though written, and §16.15 lets
   // a default disable iff give the condition. A property of operators is the
-  // tree the parser read, and a negated Boolean the not over it (§16.12.3);
-  // a sequence (§37.54) stands for operations not modelled.
+  // tree the parser read, a sequential property the sequence (§37.54), and a
+  // negated Boolean the not over it (§16.12.3).
   PropertyExprNode boolean;
   boolean.boolean = property.assert_expr;
   PropertyExprNode negated;
   negated.kind = PropertyExprNode::Kind::kNot;
   negated.operands.push_back(&boolean);
+  PropertyExprNode sequence;
+  sequence.kind = PropertyExprNode::Kind::kSequence;
+  sequence.sequence = property.assert_sequence;
   const PropertyExprNode* tree = property.assert_property;
-  if (tree == nullptr && property.assert_sequence == nullptr) {
+  if (tree == nullptr && property.assert_sequence != nullptr) {
+    tree = &sequence;
+  } else if (tree == nullptr) {
     tree = property.assert_negated ? &negated : &boolean;
   }
   return VpiMakePropertySpecOf(
