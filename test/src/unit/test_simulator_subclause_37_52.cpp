@@ -403,31 +403,6 @@ constexpr const char* kPropertyOperators =
 // What reads the property expr of an assertion back from a run.
 class PropertyExprsOfARun : public VpiDesignRun {
  protected:
-  // The property expr the property spec of the assertion `name` reaches.
-  static vpiHandle PropertyOf(const char* name) {
-    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
-    vpiHandle spec =
-        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion);
-    return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
-  }
-
-  // The operator of the operation `op`, 0 where it is no operation.
-  static int OpOf(vpiHandle op) {
-    if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
-    return vpi_get(vpiOpType, op);
-  }
-
-  // The operands of `op` in the order vpiOperand reaches them.
-  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
-    std::vector<vpiHandle> operands;
-    vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
-    if (it == nullptr) return operands;
-    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
-      operands.push_back(h);
-    }
-    return operands;
-  }
-
   // The names of the operands of `op`, an operand without one as "".
   static std::vector<std::string> OperandNames(vpiHandle op) {
     std::vector<std::string> names;

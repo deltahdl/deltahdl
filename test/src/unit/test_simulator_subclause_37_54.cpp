@@ -315,31 +315,6 @@ class SequenceExprsOfARun : public VpiDesignRun {
     Run(kSequenceOperators);
   }
 
-  // The property expr the property spec of the assertion `name` reaches.
-  static vpiHandle PropertyOf(const char* name) {
-    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
-    vpiHandle spec =
-        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion);
-    return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
-  }
-
-  // The operator of the operation `op`, 0 where it is no operation.
-  static int OpOf(vpiHandle op) {
-    if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
-    return vpi_get(vpiOpType, op);
-  }
-
-  // The operands of `op` in the order vpiOperand reaches them.
-  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
-    std::vector<vpiHandle> operands;
-    vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
-    if (it == nullptr) return operands;
-    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
-      operands.push_back(h);
-    }
-    return operands;
-  }
-
   // Each operand of `op` as its name, a constant as its value, and another
   // operation as "op".
   static std::vector<std::string> Spelled(vpiHandle op) {

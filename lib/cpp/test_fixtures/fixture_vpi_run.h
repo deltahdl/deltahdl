@@ -9,6 +9,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -65,6 +66,32 @@ class VpiDesignRun : public ::testing::Test {
       if (name == vpi_get_str(vpiName, obj)) return obj;
     }
     return nullptr;
+  }
+
+  // §37.50 and §37.52: the property expr the property spec of the assertion
+  // `name` of `top` reaches, null for none.
+  static vpiHandle PropertyOf(const char* name) {
+    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
+    vpiHandle spec =
+        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion);
+    return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
+  }
+
+  // §37.59: the operator of the operation `op`, 0 where it is no operation.
+  static int OpOf(vpiHandle op) {
+    if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
+    return vpi_get(vpiOpType, op);
+  }
+
+  // The operands of `op` in the order vpiOperand reaches them.
+  static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
+    std::vector<vpiHandle> operands;
+    vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
+    if (it == nullptr) return operands;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      operands.push_back(h);
+    }
+    return operands;
   }
 
   // The object `name` reaches from the top of the design, null for none.
