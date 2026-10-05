@@ -338,9 +338,9 @@ struct VpiPropertySpecParts {
 
 // §37.54: the sequence expr the linear body `body` stands for: its operands
 // joined by cycle delays and repeated, its intersects, conjuncts and
-// alternatives, under first_match where written, each built through `with`;
-// null for a body holding a part not built, a match item, a throughout or an
-// operand clocked on its own.
+// alternatives, its throughouts and its within, its operands' match items,
+// under first_match where written, each built through `with`; null for a body
+// holding an operand clocked on its own or match items inside a first_match.
 VpiObject* VpiSequenceExprObject(const SeqLinearBody& body,
                                  const VpiStmtBuild& with);
 

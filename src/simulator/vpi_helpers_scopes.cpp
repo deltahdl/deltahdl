@@ -122,6 +122,12 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
   }
   // §37.52 details 4 and 5: the expressions a case property item groups, none
   // for the default item; its property is reached apart from them.
+  // §37.54: the assignments and tf calls written as an expr's match items.
+  if (type == vpiMatchItem) {
+    for (VpiHandle item : VpiExprMatchItems(ref))
+      iter->children.push_back(item);
+    return true;
+  }
   if (type == vpiExpr && ref->type == vpiCasePropertyItem) {
     for (VpiHandle condition : VpiCaseItemConditions(ref)) {
       iter->children.push_back(condition);

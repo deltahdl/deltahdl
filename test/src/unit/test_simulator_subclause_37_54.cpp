@@ -306,6 +306,12 @@ constexpr const char* kSequenceOperators =
     "  j1: assert property (@(posedge clk) (a ##1 b) intersect (c ##1 d));\n"
     "  m1: assert property (@(posedge clk) first_match(a ##[1:2] b));\n"
     "  p1: assert property (@(posedge clk) a ##1 b |-> c);\n"
+    "  t1: assert property (@(posedge clk) a throughout (b ##1 c));\n"
+    "  w1: assert property (@(posedge clk) (a ##1 b) within (c ##3 d));\n"
+    "  property q;\n"
+    "    int n;\n"
+    "    @(posedge clk) (a, n = 1, n += 2) ##1 b;\n"
+    "  endproperty\n"
     "endmodule\n";
 
 class SequenceExprsOfARun : public VpiDesignRun {
@@ -396,6 +402,51 @@ TEST_F(SequenceExprsOfARun, AnAntecedentIsItsSequenceExpr) {
   EXPECT_EQ(OpOf(kSides[0]), vpiCycleDelayOp);
   EXPECT_EQ(Spelled(kSides[0]), (std::vector<std::string>{"a", "b", "1"}));
   EXPECT_STREQ(vpi_get_str(vpiName, kSides[1]), "c");
+}
+
+// A throughout takes its expression and its sequence, and a within its two
+// sequences as written (detail 2, §16.9.9, §16.9.10) (#5097).
+TEST_F(SequenceExprsOfARun, ThroughoutAndWithinAreTheirOperators) {
+  vpiHandle throughout = PropertyOf("t1");
+  EXPECT_EQ(OpOf(throughout), vpiThroughoutOp);
+  EXPECT_EQ(Spelled(throughout), (std::vector<std::string>{"a", "op"}));
+  const std::vector<vpiHandle> kHeld = OperandsOf(throughout);
+  ASSERT_EQ(kHeld.size(), 2u);
+  EXPECT_EQ(Spelled(kHeld[1]), (std::vector<std::string>{"b", "c", "1"}));
+  vpiHandle within = PropertyOf("w1");
+  EXPECT_EQ(OpOf(within), vpiWithinOp);
+  const std::vector<vpiHandle> kSides = OperandsOf(within);
+  ASSERT_EQ(kSides.size(), 2u);
+  EXPECT_EQ(Spelled(kSides[0]), (std::vector<std::string>{"a", "b", "1"}));
+  EXPECT_EQ(Spelled(kSides[1]), (std::vector<std::string>{"c", "d", "3"}));
+}
+
+// An operand written with match items reaches each through vpiMatchItem, an
+// assignment to the local variable it names with its operator (§16.10)
+// (#5099).
+TEST_F(SequenceExprsOfARun, AnOperandReachesItsMatchItems) {
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "q");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, decl);
+  ASSERT_NE(spec, nullptr);
+  vpiHandle chain = vpi_handle(vpiPropertyExpr, spec);
+  EXPECT_EQ(OpOf(chain), vpiCycleDelayOp);
+  const std::vector<vpiHandle> kParts = OperandsOf(chain);
+  ASSERT_FALSE(kParts.empty());
+  EXPECT_STREQ(vpi_get_str(vpiName, kParts[0]), "a");
+  std::vector<vpiHandle> items;
+  vpiHandle it = vpi_iterate(vpiMatchItem, kParts[0]);
+  ASSERT_NE(it, nullptr);
+  for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+    items.push_back(h);
+  }
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, items[0]), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiOpType, items[0]), vpiAssignmentOp);
+  EXPECT_EQ(vpi_get(vpiOpType, items[1]), vpiAddOp);
+  vpiHandle target = vpi_handle(vpiLhs, items[0]);
+  ASSERT_NE(target, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, target), "n");
 }
 
 }  // namespace

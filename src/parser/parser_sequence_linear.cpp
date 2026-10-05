@@ -706,6 +706,7 @@ struct ParserSeqLinearHelpers {
       // §16.13.1: a chain naming a clock of its own is not wrapped.
       if (!body.clocks.empty()) return false;
       WrapWithinOperand(p, body);
+      body.within = true;
       body.intersects.emplace_back();
       SeqLinearBody& enclosing = body.intersects.back();
       enclosing.locals = body.locals;

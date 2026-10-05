@@ -266,11 +266,63 @@ void AppendBounds(std::vector<VpiObject*>& operands, uint32_t min, uint32_t max,
   if (max != min) operands.push_back(BoundConstant(max, build));
 }
 
-// §16.9.2: the operand `index` of the chain `body` under the repetition it
-// carries, the sequence repeated first and then its bounds (detail 3).
+// §16.10 and §16.11: the match item `item` written with an operand of a
+// sequence, hung from `holder`: a tf call as the call it is, and an assignment
+// to the local variable it names with its operator (§37.64).
+VpiObject* MatchItemObject(const SeqMatchAssign& item, VpiObject* holder,
+                           const VpiStmtBuild& with) {
+  if (item.call != nullptr) return with.expression(item.call);
+  VpiObject* assignment = with.build.alloc();
+  assignment->type = vpiAssignment;
+  assignment->parent = holder;
+  VpiObject* local = with.build.alloc();
+  local->type = vpiRefObj;
+  local->parent = assignment;
+  local->name = with.build.keep(std::string(item.lvar));
+  assignment->lhs = local;
+  assignment->rhs = with.expression(item.rhs);
+  std::string_view spelling = TokenKindName(item.op);
+  if (spelling.size() >= 2 && spelling.front() == '\'' &&
+      spelling.back() == '\'') {
+    spelling = spelling.substr(1, spelling.size() - 2);
+  }
+  assignment->op_type = VpiAssignmentOpType(spelling);
+  assignment->blocking = true;
+  return assignment;
+}
+
+// §37.54: the operand `object` reaching the match items `items` through
+// vpiMatchItem: itself where it is an expression of its own, and otherwise a
+// ref obj bound to the net or variable it names (§37.15), which other
+// references to that object share.
+VpiObject* WithMatchItems(VpiObject* object,
+                          const std::vector<SeqMatchAssign>& items,
+                          const VpiStmtBuild& with) {
+  if (object == nullptr || items.empty()) return object;
+  VpiObject* holder = object;
+  if (!VpiIsExprType(object->type)) {
+    holder = with.build.alloc();
+    holder->type = vpiRefObj;
+    holder->name = object->name;
+    holder->full_name = object->full_name;
+    holder->actual = object;
+  }
+  for (const SeqMatchAssign& item : items) {
+    VpiObject* made = MatchItemObject(item, holder, with);
+    if (made != nullptr) holder->children.push_back(made);
+  }
+  return holder;
+}
+
+// §16.9.2: the operand `index` of the chain `body` with its match items,
+// under the repetition it carries, the sequence repeated first and then its
+// bounds (detail 3).
 VpiObject* RepeatedOperand(const SeqLinearBody& body, size_t index,
                            const VpiStmtBuild& with) {
   VpiObject* operand = with.expression(body.operands[index]);
+  if (index < body.match_items.size()) {
+    operand = WithMatchItems(operand, body.match_items[index], with);
+  }
   if (index >= body.repetitions.size()) return operand;
   const SeqRepetition& repetition = body.repetitions[index];
   int op = vpiRepeatOp;
@@ -291,37 +343,140 @@ VpiObject* RepeatedOperand(const SeqLinearBody& body, size_t index,
   return PropertyOperation(op, operands, false, with.build);
 }
 
-// §16.9.1 and §16.9.2: the operands of the chain `body` joined left to right
-// by the cycle delays between them, each with its two sequences and its
-// range, and a delay before the first a unary cycle delay over it (detail 3).
-VpiObject* ChainExpr(const SeqLinearBody& body, const VpiStmtBuild& with) {
-  if (body.operands.empty()) return nullptr;
-  VpiObject* chain = RepeatedOperand(body, 0, with);
-  if (!body.delays.empty() &&
-      (body.delays[0].min != 0 || body.delays[0].max != 0)) {
+// One element of a chain: the delay written before it and the sequence it
+// is, an operand or a throughout over a span of operands.
+struct ChainElement {
+  SeqCycleDelay before;
+  VpiObject* sequence = nullptr;
+};
+
+// §16.9.1 and §16.9.2: `elements` joined left to right by the cycle delays
+// between them, each with its two sequences and its range, and a delay
+// before the first a unary cycle delay over it (detail 3).
+VpiObject* JoinChain(const std::vector<ChainElement>& elements,
+                     const VpiStmtBuild& with) {
+  if (elements.empty()) return nullptr;
+  VpiObject* chain = elements[0].sequence;
+  const SeqCycleDelay& lead = elements[0].before;
+  if (lead.min != 0 || lead.max != 0) {
     std::vector<VpiObject*> operands{chain};
-    AppendBounds(operands, body.delays[0].min, body.delays[0].max, with.build);
+    AppendBounds(operands, lead.min, lead.max, with.build);
     chain =
         PropertyOperation(vpiUnaryCycleDelayOp, operands, false, with.build);
   }
-  for (size_t i = 1; i < body.operands.size(); ++i) {
-    std::vector<VpiObject*> operands{chain, RepeatedOperand(body, i, with)};
-    if (i < body.delays.size()) {
-      AppendBounds(operands, body.delays[i].min, body.delays[i].max,
-                   with.build);
-    }
+  for (size_t i = 1; i < elements.size(); ++i) {
+    std::vector<VpiObject*> operands{chain, elements[i].sequence};
+    AppendBounds(operands, elements[i].before.min, elements[i].before.max,
+                 with.build);
     chain = PropertyOperation(vpiCycleDelayOp, operands, false, with.build);
   }
   return chain;
 }
 
-// §16.9.5 and §16.9.6: the chain `body` intersected with each chain of its
-// intersect, the whole and-ed with each of its conjuncts, left to right.
+// §16.9.9: the widest throughout of `body` other than `inside` whose span
+// starts at the operand `index` and ends before `end`; null where none does.
+const SeqThroughout* ThroughoutAt(const SeqLinearBody& body, size_t index,
+                                  size_t end, const SeqThroughout* inside) {
+  const SeqThroughout* widest = nullptr;
+  for (const SeqThroughout& span : body.throughouts) {
+    if (&span == inside || span.first != index || span.last >= end) continue;
+    if (widest == nullptr || span.last > widest->last) widest = &span;
+  }
+  return widest;
+}
+
+// `delay` with `ticks` taken off both its bounds, an unbounded one kept.
+SeqCycleDelay Shortened(SeqCycleDelay delay, uint32_t ticks) {
+  delay.min -= std::min(ticks, delay.min);
+  if (delay.max != SeqCycleDelay::kUnbounded) {
+    delay.max -= std::min(ticks, delay.max);
+  }
+  return delay;
+}
+
+std::vector<ChainElement> ChainElements(const SeqLinearBody& body, size_t begin,
+                                        size_t end, const SeqThroughout* inside,
+                                        const VpiStmtBuild& with);
+
+// §16.9.9: `span` as the throughout written, its condition and the sequence
+// its operands are, that sequence's own leading delay `lead` ticks.
+VpiObject* ThroughoutExpr(const SeqLinearBody& body, const SeqThroughout& span,
+                          const VpiStmtBuild& with) {
+  std::vector<ChainElement> held =
+      ChainElements(body, span.first, span.last + 1, &span, with);
+  if (!held.empty()) {
+    held[0].before.min = span.lead;
+    held[0].before.max = span.lead;
+  }
+  return PropertyOperation(vpiThroughoutOp,
+                           {with.expression(span.cond), JoinChain(held, with)},
+                           false, with.build);
+}
+
+// The elements the operands of `body` from `begin` to before `end` make, a
+// throughout's span other than `inside` one element of its own (§16.9.9).
+std::vector<ChainElement> ChainElements(const SeqLinearBody& body, size_t begin,
+                                        size_t end, const SeqThroughout* inside,
+                                        const VpiStmtBuild& with) {
+  std::vector<ChainElement> elements;
+  for (size_t i = begin; i < end;) {
+    const SeqCycleDelay kBefore =
+        i < body.delays.size() ? body.delays[i] : SeqCycleDelay{};
+    const SeqThroughout* span = ThroughoutAt(body, i, end, inside);
+    if (span == nullptr) {
+      elements.push_back({kBefore, RepeatedOperand(body, i, with)});
+      ++i;
+      continue;
+    }
+    elements.push_back(
+        {Shortened(kBefore, span->lead), ThroughoutExpr(body, *span, with)});
+    i = span->last + 1;
+  }
+  return elements;
+}
+
+// §16.9.1: the chain `body` as the sequence expr its operands make.
+VpiObject* ChainExpr(const SeqLinearBody& body, const VpiStmtBuild& with) {
+  return JoinChain(ChainElements(body, 0, body.operands.size(), nullptr, with),
+                   with);
+}
+
+// §16.9.10: the chain `body` wraps the first operand of a within as
+// `1[*0:$] ##1 seq1 ##1 1[*0:$]`; the chain seq1 was, the wrapping taken off.
+SeqLinearBody UnwrappedWithin(const SeqLinearBody& body) {
+  SeqLinearBody inner;
+  const size_t kLast = body.operands.size() - 1;
+  for (size_t i = 1; i < kLast; ++i) {
+    inner.operands.push_back(body.operands[i]);
+    inner.delays.push_back(i == 1 ? Shortened(body.delays[i], 1)
+                                  : body.delays[i]);
+    inner.match_items.push_back(body.match_items[i]);
+    inner.repetitions.push_back(body.repetitions[i]);
+  }
+  for (SeqThroughout span : body.throughouts) {
+    span.first -= 1;
+    span.last -= 1;
+    inner.throughouts.push_back(span);
+  }
+  return inner;
+}
+
+// §16.9.5, §16.9.6 and §16.9.10: the chain `body`, or the within it is the
+// first operand of, intersected with each further chain of its intersect,
+// the whole and-ed with each of its conjuncts, left to right.
 VpiObject* ConjunctionExpr(const SeqLinearBody& body,
                            const VpiStmtBuild& with) {
-  VpiObject* joined = ChainExpr(body, with);
-  for (const SeqLinearBody& other : body.intersects) {
-    joined = PropertyOperation(vpiIntersectOp, {joined, ChainExpr(other, with)},
+  const bool kWithin =
+      body.within && body.operands.size() >= 3 && !body.intersects.empty();
+  VpiObject* joined =
+      kWithin ? PropertyOperation(vpiWithinOp,
+                                  {ChainExpr(UnwrappedWithin(body), with),
+                                   ChainExpr(body.intersects.front(), with)},
+                                  false, with.build)
+              : ChainExpr(body, with);
+  for (size_t i = kWithin ? 1 : 0; i < body.intersects.size(); ++i) {
+    joined = PropertyOperation(vpiIntersectOp,
+                               {joined, ChainExpr(body.intersects[i], with)},
                                false, with.build);
   }
   for (const SeqLinearBody& other : body.conjuncts) {
@@ -333,18 +488,14 @@ VpiObject* ConjunctionExpr(const SeqLinearBody& body,
 }
 
 // Whether every part of `body` is one the sequence exprs below are built of:
-// no operand with a clocking event of its own (§37.56), no match item and no
-// throughout.
+// no operand with a clocking event of its own (§37.56) and no match item
+// written inside a first_match.
 bool IsModelledSequence(const SeqLinearBody& body) {
   const auto kUnclocked = [](const std::vector<EventExpr>& clock) {
     return clock.empty();
   };
-  const auto kNoItems = [](const std::vector<SeqMatchAssign>& items) {
-    return items.empty();
-  };
-  if (!body.throughouts.empty() || !body.first_match_items.empty() ||
-      !std::ranges::all_of(body.clocks, kUnclocked) ||
-      !std::ranges::all_of(body.match_items, kNoItems)) {
+  if (!body.first_match_items.empty() ||
+      !std::ranges::all_of(body.clocks, kUnclocked)) {
     return false;
   }
   for (const auto* parts :
