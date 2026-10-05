@@ -3,7 +3,6 @@
 #include <string_view>
 #include <vector>
 
-#include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
