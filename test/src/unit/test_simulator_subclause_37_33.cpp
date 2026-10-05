@@ -570,7 +570,9 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesTheDefnOfItsOwnInstance) {
     vpiHandle own = Named(vpiClassDefn, By(inst), "A");
     ASSERT_NE(own, nullptr);
     for (const std::string& var : {"a", "b"}) {
-      vpiHandle obj = vpi_handle(vpiClassObj, By(inst + "." + var));
+      std::string path = inst;
+      path.append(".").append(var);
+      vpiHandle obj = vpi_handle(vpiClassObj, By(path));
       ASSERT_NE(obj, nullptr);
       vpiHandle typespec = vpi_handle(vpiClassTypespec, obj);
       EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
