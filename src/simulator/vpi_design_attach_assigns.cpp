@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <functional>
 #include <initializer_list>
 #include <string>
@@ -454,6 +455,29 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   HangOn(obj, names, build.names);
 }
 
+// §37.42 with §23.9: the scope a func call an assignment makes, written in
+// the generate block instances `prefixes` names, resolves its callee from
+// first: the innermost of them declaring a task or function, whose gen scope
+// is found through the path one of those declarations records, and the
+// instance `instance` where none does.
+const VpiObject* CalleeScope(const RtlirModule& mod,
+                             const GenBlockPrefixes& prefixes,
+                             VpiHandle instance) {
+  for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
+    const std::string_view kBlock = *it;
+    const auto kDeclared =
+        std::ranges::find_if(mod.gen_block_subroutines,
+                             [kBlock](const RtlirGenBlockSubroutine& sub) {
+                               return !sub.gen_block_prefixes.empty() &&
+                                      sub.gen_block_prefixes.back() == kBlock;
+                             });
+    if (kDeclared == mod.gen_block_subroutines.end()) continue;
+    VpiHandle block = VpiGenScopeOf(instance, kDeclared->gen_block_path);
+    return block != nullptr ? block : instance;
+  }
+  return instance;
+}
+
 }  // namespace
 
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
@@ -498,16 +522,16 @@ void VpiContext::AttachContinuousAssignments(
     // The elaborator splits one statement into an assignment per element of
     // a concatenation it writes; the statement is one object.
     std::unordered_set<const ModuleItem*> made;
-    // §37.42: a function an assignment calls is resolved from the instance.
-    const VpiCalleeResolver kCallees =
-        VpiCalleesAt({*design, *mod, prefix, scope, subroutines});
     for (const RtlirContAssign& ca : mod->assigns) {
       if (ca.source_item == nullptr || !made.insert(ca.source_item).second) {
         continue;
       }
-      AssignBuild build{[this] { return AllocObject(); }, sim_ctx_,
-                        AssignNames{object_map_, prefix, ca.gen_block_prefixes},
-                        kCallees};
+      AssignBuild build{
+          [this] { return AllocObject(); }, sim_ctx_,
+          AssignNames{object_map_, prefix, ca.gen_block_prefixes},
+          VpiCalleesAt({*design, *mod, prefix,
+                        CalleeScope(*mod, ca.gen_block_prefixes, scope),
+                        subroutines})};
       MakeContinuousAssignment(ca, scope, build);
     }
   });

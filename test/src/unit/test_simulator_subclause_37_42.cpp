@@ -407,6 +407,23 @@ TEST_F(CallsOfARun, AFunctionCallReachesItsFunction) {
             VpiObjectOf(f));
 }
 
+// A func call a generate block's continuous assignment makes reaches the
+// function of the block, which hides the module's of the same name (§23.9).
+TEST_F(CallsOfARun, AGenerateBlockAssignmentReachesItsBlocksFunction) {
+  Run("module top;\n"
+      "  function int f(int x); return x; endfunction\n"
+      "  if (1) begin : g\n"
+      "    function int f(int x); return x + 1; endfunction\n"
+      "    wire [31:0] w;\n"
+      "    assign w = f(3);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top.g"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, CallOnTheRight())),
+            VpiObjectOf(f));
+}
+
 // What the calltf of $probe read each time it ran: the call that invoked it
 // (detail 3), whether that call is user-defined (detail 5) and what it
 // decompiles to, empty where it reports nothing (detail 9).

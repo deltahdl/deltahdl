@@ -35,10 +35,13 @@ bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
 
 // §37.17 detail 6 and §37.22: a variable's leftmost bounds and a range's
 // bounds, recorded where the declaration has them and null where the range is
-// empty.
+// empty; and, as §37.41 draws them, the bounds of a function's return range.
 bool TryResolveRangeBounds(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiLeftRange && type != vpiRightRange) return false;
-  if (ref->type != vpiRange && !VpiIsVariablesType(ref->type)) return false;
+  if (ref->type != vpiRange && ref->type != vpiFunction &&
+      !VpiIsVariablesType(ref->type)) {
+    return false;
+  }
   out = type == vpiLeftRange ? ref->left_range : ref->right_range;
   return true;
 }

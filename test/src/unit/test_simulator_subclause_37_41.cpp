@@ -381,6 +381,31 @@ TEST_F(TaskFuncsOfARun, AFunctionReturnsThroughAVariableOfItsOwnName) {
   EXPECT_EQ(vpi_get(vpiSize, i), 32);
 }
 
+// The figure's vpiLeftRange and vpiRightRange: a function reaches the bounds
+// of the packed range its return type declares, as written, and none where
+// the type declares no range.
+TEST_F(TaskFuncsOfARun, AFunctionReachesTheBoundsOfItsReturnRange) {
+  Run("module top; function logic [7:0] f(); return 0; endfunction\n"
+      "  function logic [0:3] g(); return 0; endfunction\n"
+      "  function int h(); return 0; endfunction endmodule\n");
+  auto bound = [](int type, vpiHandle tf) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(vpi_handle(type, tf), &value);
+    return value.value.integer;
+  };
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  ASSERT_NE(vpi_handle(vpiLeftRange, f), nullptr);
+  EXPECT_EQ(bound(vpiLeftRange, f), 7);
+  EXPECT_EQ(bound(vpiRightRange, f), 0);
+  vpiHandle g = Named(vpiTaskFunc, By("top"), "g");
+  EXPECT_EQ(bound(vpiLeftRange, g), 0);
+  EXPECT_EQ(bound(vpiRightRange, g), 3);
+  vpiHandle h = Named(vpiTaskFunc, By("top"), "h");
+  EXPECT_EQ(vpi_handle(vpiLeftRange, h), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRightRange, h), nullptr);
+}
+
 // ...while a void function returns nothing and has size 0, and a function of
 // an integer, a real or a time returns the kind of value its type names.
 TEST_F(TaskFuncsOfARun, AVoidFunctionHasNoReturnVariable) {

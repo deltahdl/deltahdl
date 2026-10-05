@@ -3,6 +3,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
@@ -193,9 +194,16 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
   ret->parent = tf;
   ret->automatic = tf->automatic;
   ret->decl_signed = type.is_signed;
+  InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
   if (item.return_array_dims.empty()) {
-    InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
     ret->size = static_cast<int>(DeclaredTypeWidth(type, sb.ctx));
+  }
+  // The figure's vpiLeftRange and vpiRightRange: the bounds of the leftmost
+  // packed dimension the return type writes, none where it writes none.
+  const PackedDims kDims = WrittenPackedDims(&type, sb.ctx);
+  if (!kDims.empty()) {
+    tf->left_range = VpiIntConstant(kDims.front().left, sb.build);
+    tf->right_range = VpiIntConstant(kDims.front().right, sb.build);
   }
   tf->return_var = ret;
   tf->func_type = FuncTypeOf(type);
