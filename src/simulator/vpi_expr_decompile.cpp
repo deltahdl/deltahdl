@@ -165,8 +165,8 @@ std::optional<std::string> RenderDistItem(const ConstraintDistItem& item) {
 
 // §18.5.3: an expression_or_dist, the dist_list braced after `dist`.
 std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
-  const std::optional<std::string> kExpr = RenderText(item.expr);
-  if (!kExpr || !item.has_dist) return kExpr;
+  std::optional<std::string> expr = RenderText(item.expr);
+  if (!expr || !item.has_dist) return expr;
   std::string list;
   for (const ConstraintDistItem& dist_item : item.dist) {
     const std::optional<std::string> kItem = RenderDistItem(dist_item);
@@ -174,7 +174,7 @@ std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
     if (!list.empty()) list += ", ";
     list += *kItem;
   }
-  return VpiDecompileJoin({*kExpr, "dist", "{" + list + "}"});
+  return VpiDecompileJoin({*expr, "dist", "{" + list + "}"});
 }
 
 // §18.5.7.1: a foreach's array and its loop variables, a variable left out
