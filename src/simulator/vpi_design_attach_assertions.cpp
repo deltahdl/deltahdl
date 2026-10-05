@@ -542,6 +542,14 @@ VpiObject* ClockedRun(const SeqLinearBody& body, size_t start, size_t end,
   return clocked;
 }
 
+// §16.13.1: whether a clock is written before the operand `i` of `body`, the
+// operands after it carrying the same event as the clock in force.
+bool ClockWrittenAt(const SeqLinearBody& body, size_t i) {
+  if (i >= body.clocks.size() || body.clocks[i].empty()) return false;
+  return i == 0 || body.clocks[i - 1].empty() ||
+         body.clocks[i - 1][0].signal != body.clocks[i][0].signal;
+}
+
 // §37.56 with §16.13.1: the chain `body`, whose operands name clocks of their
 // own, as a multiclock sequence expr reaching a clocked seq per run of
 // operands on one clock, the first run's the clock `flowing` into the chain
@@ -558,7 +566,7 @@ VpiObject* MulticlockExpr(const SeqLinearBody& body,
   };
   for (size_t start = 0; start < kCount;) {
     size_t end = start + 1;
-    while (end < kCount && kClockAt(end) == nullptr) ++end;
+    while (end < kCount && !ClockWrittenAt(body, end)) ++end;
     const std::vector<EventExpr>* clock =
         kClockAt(start) != nullptr ? kClockAt(start) : flowing;
     VpiObject* clocked = ClockedRun(body, start, end, clock, with);

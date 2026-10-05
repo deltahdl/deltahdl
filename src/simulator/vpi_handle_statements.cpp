@@ -109,6 +109,18 @@ static bool TryResolvePropertyDeclRelation(int type, VpiHandle ref,
   return true;
 }
 
+// §37.56: a clocked seq reaches the sequence expr its run of operands is.
+// Annex M names no type for the sequence expr class, so the tagless edge is
+// read with the type of the object it reaches.
+static bool TryResolveClockedSeqRelation(int type, VpiHandle ref,
+                                         VpiHandle& out) {
+  if (ref->type != vpiClockedSeq) return false;
+  VpiHandle held = PropertySpecExpr(ref);
+  if (held == nullptr || held->type != type) return false;
+  out = held;
+  return true;
+}
+
 // §37.50: the edges a concurrent assertion draws to its clock, its property
 // and its actions; §37.52: those a property spec draws to its disable
 // condition and its property expression. Each is a relation tag no object
@@ -144,15 +156,6 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
     out = PropertySpecExpr(ref);
     return true;
   }
-  // §37.56: a clocked seq reaches the sequence expr its run of operands is.
-  // Annex M names no type for the sequence expr class, so the tagless edge is
-  // read with the type of the object it reaches.
-  if (ref->type == vpiClockedSeq) {
-    VpiHandle held = PropertySpecExpr(ref);
-    if (held == nullptr || held->type != type) return false;
-    out = held;
-    return true;
-  }
   if (type == vpiPropertyExpr && ref->type == vpiCasePropertyItem) {
     out = ref->body;
     return true;
@@ -169,6 +172,7 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
 
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveAssertionRelation(type, ref, out) ||
+         TryResolveClockedSeqRelation(type, ref, out) ||
          TryResolveForAndBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out) ||
          TryResolveUserSystfRelation(type, ref, out);
