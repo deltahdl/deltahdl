@@ -148,16 +148,10 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.35: an instance reaches the gates and switches it instantiates, each
   // with its terminals. RtlirModule::gate_insts kept each instantiation, and
   // no pass read it, so vpiPrimitive reached nothing for any design.
-  if (design == nullptr || design->top_modules.empty() ||
-      design->top_modules.front() == nullptr) {
-    return;
-  }
-  const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* instance =
-            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
-        if (instance == nullptr) return;
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
         for (const ModuleItem* item : mod->gate_insts) {
           // An instance array (§28.3.6) is a primitive array, which this
           // pass makes nothing of.

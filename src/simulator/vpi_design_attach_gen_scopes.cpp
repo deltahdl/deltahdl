@@ -91,16 +91,9 @@ void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.85: a generate block instance is a gen scope, and the instances of a
   // loop generate's block are the elements of a gen scope array. The scopes
   // the run's keys made for them were all modules, and no array was made.
-  if (design == nullptr || design->top_modules.empty() ||
-      design->top_modules.front() == nullptr) {
-    return;
-  }
-  const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* instance =
-            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
-        if (instance == nullptr) return;
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
         std::unordered_set<std::string> walked;
         for (const RtlirGenBlockMember& member : mod->gen_block_members) {
           if (!walked.insert(PathKey(member.gen_block_path)).second) {

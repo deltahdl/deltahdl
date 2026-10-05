@@ -153,4 +153,25 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
   }
 }
 
+// The same walk, visiting each scope with the object the run built for its
+// instance among `objects`, which the first top is keyed under by its own
+// name; a scope with no object is passed over, as is a design with no top.
+template <typename Visit>
+void WalkInstanceObjects(
+    const RtlirDesign* design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    Visit visit) {
+  if (design == nullptr || design->top_modules.empty() ||
+      design->top_modules.front() == nullptr) {
+    return;
+  }
+  const std::string kFirstTop(design->top_modules.front()->name);
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        VpiObject* instance =
+            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
+        if (instance != nullptr) visit(mod, prefix, instance);
+      });
+}
+
 }  // namespace delta
