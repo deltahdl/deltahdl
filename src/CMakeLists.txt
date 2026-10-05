@@ -293,6 +293,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_free_variables.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
+    simulator/eval_systask_bits.cpp
     simulator/eval_typename.cpp
     simulator/eval_systask_cast.cpp
     simulator/eval_expr.cpp

@@ -8,6 +8,10 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -330,6 +334,36 @@ TEST(BitsSim, ACallIsSizedWithoutBeingMade) {
                        "endmodule\n",
                        f),
             "32 12 0\n");
+}
+
+// §20.6.2 with §36.8.3: $bits determines its result without evaluating the
+// expression it encloses, so a call of a user system function is sized by
+// the width its registration gives the result and its calltf is not run
+// (#5128).
+TEST(BitsSim, AUserSystemFunctionIsSizedWithoutItsCalltfRunning) {
+  static int calls = 0;
+  calls = 0;
+  VpiContext vpi;
+  SetGlobalVpiContext(&vpi);
+  s_vpi_systf_data data = {};
+  data.type = vpiSysFunc;
+  data.sysfunctype = vpiSizedFunc;
+  data.tfname = VpiText("$user_f");
+  data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
+    ++calls;
+    return 0;
+  };
+  data.sizetf = [](PLI_BYTE8*) -> PLI_INT32 { return 16; };
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%0d\", $bits($user_f()));\n"
+      "endmodule\n",
+      f);
+  SetGlobalVpiContext(nullptr);
+  EXPECT_EQ(kOut, "16\n");
+  EXPECT_EQ(calls, 0);
 }
 
 }  // namespace

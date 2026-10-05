@@ -158,4 +158,9 @@ Logic4Vec EvalTypenameOfExpression(const Expr* expr, SimContext& ctx,
 // Defined in eval_systask_query.cpp.
 std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena);
 
+// §20.6.2: $bits, the number of bits its argument holds as a bit stream, or
+// the width of the type it names, found without evaluating it. Defined in
+// eval_systask_bits.cpp.
+Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena);
+
 }  // namespace delta
