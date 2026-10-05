@@ -1,6 +1,0 @@
-w=1 at 0
-forced err=0
-w=0 at 1
-sv sees 0 at 2
-released value=1
-w=1 at 3

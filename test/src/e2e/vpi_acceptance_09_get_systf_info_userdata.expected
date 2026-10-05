@@ -1,5 +1,0 @@
-$probe type=task user_data=registered line=9 prev=none
-put_userdata=1
-$probe type=task user_data=registered line=9 prev=stored
-$probe type=task user_data=registered line=10 prev=none
-put_userdata=1

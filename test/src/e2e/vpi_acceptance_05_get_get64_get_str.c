@@ -12,7 +12,9 @@ static PLI_INT32 calltf(PLI_BYTE8* ud) {
              str_of(vpiType, l), copy);
   vpi_printf("objid64 nonzero=%d get(vpiType,obj)=%d(vpiClassObj=%d)\n", vpi_get64(vpiObjId, obj) != 0,
              vpi_get(vpiType, obj), vpiClassObj);
-  vpi_printf("s def=%s top def=%s\n", str_of(vpiDefName, by_name("top.u", 0)), str_of(vpiDefName, by_name("top", 0)));
+  char sub_def[16];
+  strncpy(sub_def, str_of(vpiDefName, by_name("top.u", 0)), 15); sub_def[15] = 0;
+  vpi_printf("s def=%s top def=%s\n", sub_def, str_of(vpiDefName, by_name("top", 0)));
   return 0;
 }
 static void startup(void) { reg_task("$probe", calltf, 0); }
