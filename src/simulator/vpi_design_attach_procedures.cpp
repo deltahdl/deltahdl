@@ -218,11 +218,36 @@ int BlockVariableKind(const Stmt& decl, const BodyWalk& walk) {
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }
 
+// §37.12: the key the run makes the storage of the variable `name` the block
+// `stmt` declares under, as BindNamedBlockVariable (stmt_exec_control.cpp)
+// enters it when the block runs: the instance's prefix, the generate block
+// instance the procedure stands in, and the named blocks from the outermost
+// in; empty where no named block encloses the variable, which the run keys
+// under no such path.
+std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
+                                const BlockParent& parent,
+                                const BodyWalk& walk) {
+  std::string scopes = stmt.label.empty() ? "" : std::string(stmt.label) + ".";
+  for (const BlockParent* outer = &parent; outer != nullptr;
+       outer = outer->outer) {
+    if (outer->block != nullptr && !outer->block->label.empty()) {
+      scopes.insert(0, std::string(outer->block->label) + ".");
+    }
+  }
+  if (scopes.empty()) return {};
+  const bool kInGenBlock =
+      walk.gen_prefixes != nullptr && !walk.gen_prefixes->empty();
+  const std::string kGen =
+      kInGenBlock ? std::string(walk.gen_prefixes->back()) : "";
+  return VpiFlatName(walk.prefix, kGen + scopes + std::string(name));
+}
+
 // §37.12 (figure): the variables a block declares hang from it, each named
-// under the block's path. A block parameter is a block item declaration but no
-// variable.
+// under the block's path and keyed as the run keys its storage. A block
+// parameter is a block item declaration but no variable.
 void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
-                        const std::string& path, const BodyWalk& walk) {
+                        const std::string& path, const BlockParent& parent,
+                        const BodyWalk& walk) {
   for (const Stmt* item : BlockItems(stmt)) {
     if (item == nullptr || item->kind != StmtKind::kVarDecl ||
         item->var_is_param) {
@@ -233,6 +258,7 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
     var->parent = block;
     var->name = walk.build.keep(std::string(item->var_name));
     var->full_name = path + "." + std::string(item->var_name);
+    var->run_key = BlockVariableRunKey(item->var_name, stmt, parent, walk);
     block->children.push_back(var);
   }
 }
@@ -732,7 +758,7 @@ VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
   if (stmt.kind == StmtKind::kFork) {
     block->join_type = JoinTypeOf(stmt.join_kind);
   }
-  MakeBlockVariables(block, stmt, path, walk);
+  MakeBlockVariables(block, stmt, path, parent, walk);
   WalkSubStmts(stmt, BlockParent{block, path, &stmt, &parent}, walk);
   return block;
 }

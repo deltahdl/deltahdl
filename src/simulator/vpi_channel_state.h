@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <unordered_map>
 
@@ -21,6 +22,11 @@ struct VpiChannelState {
   std::string output_channel_flushed;
   std::string log_file_buffer;
   std::string log_file_flushed;
+  // §38.30 with Annex D.7: the run's standard output, which the run copies to
+  // its log file, once connected; text for the output channel and log file is
+  // written straight there from then on, and waits in the buffers above until
+  // then.
+  std::ostream* run_output = nullptr;
   // Test hook that drives vpi_flush() down its failure return.
   bool flush_should_fail = false;
 

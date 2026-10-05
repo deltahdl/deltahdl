@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_constants.h"
@@ -109,6 +110,31 @@ TEST_F(VpiHandleByNameSim, HandleByNameFindsRuntimeVariable) {
   vpiHandle h = vpi_handle_by_name(VpiText("counter"), nullptr);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_get(vpiType, h), vpiReg);
+}
+
+class NamesOfARun : public VpiDesignRun {};
+
+// §38.21 with §37.10 detail 5: a package member is found by its full name,
+// the package's name and `::` before its own, whatever the kind of member
+// (#4935).
+TEST_F(NamesOfARun, APackageMemberIsFoundByItsFullName) {
+  Run("package pkg; parameter int P = 42; int pv = 8; endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle parameter = By("pkg::P");
+  ASSERT_NE(parameter, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, parameter), vpiParameter);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, parameter), "pkg::P");
+  vpiHandle variable = By("pkg::pv");
+  ASSERT_NE(variable, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, variable), "pkg::pv");
+}
+
+// §37.10 detail 6: splitting a name at `::` reaches no object of the
+// compilation unit, which no name reaches (#4935).
+TEST_F(NamesOfARun, ACompilationUnitItemIsNotFoundThroughItsScope) {
+  Run("int g = 3;\n"
+      "module top; int x = $unit::g; endmodule\n");
+  EXPECT_EQ(By("$unit::g"), nullptr);
 }
 
 }  // namespace

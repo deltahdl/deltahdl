@@ -1,0 +1,6 @@
+in startup
+disp 0
+in calltf 1
+in calltf 2
+in calltf 3
+disp 1

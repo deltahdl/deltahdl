@@ -48,6 +48,7 @@
 #include "simulator/dpi_binding.h"
 #include "simulator/foreign_code.h"
 #include "simulator/lowerer.h"
+#include "simulator/output_log.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -506,6 +507,9 @@ int SimulateDesign(const delta::CliOptions& opts,
 
   delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
+  // §38.30 and §38.27: a PLI application's text reaches the run's standard
+  // output, in order with the design's own, for as long as the run lasts.
+  delta::GetGlobalVpiContext().ConnectOutputChannel(&sim_ctx.Log().Out());
   // §11.11: the run selects the same member of a min:typ:max expression that
   // ElaborateDesign folded parameters at, which EvalMinTypMax in
   // src/simulator/evaluation.cpp reads back through SimContext::GetDelayMode.
@@ -544,6 +548,7 @@ int SimulateDesign(const delta::CliOptions& opts,
   // tasks opened as well as one --vcd asked for, and does nothing when the run
   // opened none.
   sim_ctx.CloseVcdDump();
+  delta::GetGlobalVpiContext().ConnectOutputChannel(nullptr);
   // §20.10: a $fatal or an $error the run called is an error of the run.
   return diag.HasErrors() || sim_ctx.HasRuntimeErrors() ? 1 : 0;
 }

@@ -562,8 +562,8 @@ PLI_BYTE8* VpiContext::GetStr(int property, VpiHandle obj) {
   // §38.11: vpi_get_str() returns string property values. The value is placed
   // in a single temporary buffer reused by every call - so a pointer from an
   // earlier call is overwritten by the next - and that buffer is distinct from
-  // str_pool_, the storage for s_vpi_value strings. A null raw result (null or
-  // protected object, or a property with no string) yields null, not "".
+  // value_pools_, the storage for s_vpi_value strings. A null raw result (null
+  // or protected object, or a property with no string) yields null, not "".
   const char* raw = GetStrRaw(property, obj);
   if (!raw) return nullptr;
   // Reserve once so repeated assigns of typical-length strings keep writing

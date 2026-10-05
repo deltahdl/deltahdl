@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -373,13 +374,41 @@ PLI_INT32 vpi_get_vlog_info(s_vpi_vlog_info* info) {
 
 namespace delta {
 
+void VpiContext::WriteOutputChannel(std::string_view text) {
+  if (channels_.run_output != nullptr) {
+    *channels_.run_output << text;
+    return;
+  }
+  channels_.output_channel_buffer.append(text);
+}
+
+void VpiContext::WriteLogFile(std::string_view text) {
+  // Annex D.7: once connected, the run's standard output copies to the log
+  // file what WriteOutputChannel writes to it, so the text is written once.
+  if (channels_.run_output != nullptr) return;
+  channels_.log_file_buffer.append(text);
+}
+
+void VpiContext::ConnectOutputChannel(std::ostream* out) {
+  channels_.run_output = out;
+  if (out == nullptr) return;
+  // A startup routine prints before the run has an output to print to, so its
+  // text waits in the buffers and goes out here, ahead of the design's own.
+  *out << channels_.output_channel_flushed << channels_.output_channel_buffer;
+  channels_.output_channel_flushed.clear();
+  channels_.output_channel_buffer.clear();
+  channels_.log_file_flushed.clear();
+  channels_.log_file_buffer.clear();
+}
+
 int VpiContext::Flush() {
   // §38.5: flush the buffered output of both the simulator's output channel and
   // the current log file. Committing each buffer into its committed stream and
   // clearing it is the observable effect of forcing the buffered text out. If
   // the underlying flush cannot complete, report failure and leave the buffers
-  // intact so nothing is lost.
+  // intact so nothing is lost. A run's standard output is flushed itself.
   if (channels_.flush_should_fail) return 1;
+  if (channels_.run_output != nullptr) channels_.run_output->flush();
   channels_.output_channel_flushed.append(channels_.output_channel_buffer);
   channels_.output_channel_buffer.clear();
   channels_.log_file_flushed.append(channels_.log_file_buffer);

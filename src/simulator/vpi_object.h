@@ -28,6 +28,10 @@ struct VpiObject {
   std::string_view name;
   std::string full_name;
   Variable* var = nullptr;
+  // §37.12: for a variable a named block declares, whose storage the run makes
+  // only when the block runs, the key it makes it under; `var` is bound to it
+  // when first read or written once it exists. Empty for any other object.
+  std::string run_key;
   Net* net = nullptr;
   VpiObject* parent = nullptr;
   int direction = 0;

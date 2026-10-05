@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 
@@ -7,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -327,9 +329,12 @@ TEST_F(VpiGetValueSim, GetValueStringFormat) {
   EXPECT_STREQ(val.value.str, "AB");
 }
 
+// §38.15, Table 38-3 (vpiTimeVal row): the value is handed back in an
+// s_vpi_time the routine owns, value.time pointing at it, its high and low
+// words the value's upper and lower 32 bits (#4960).
 TEST_F(VpiGetValueSim, GetValueTimeFormat) {
-  auto* var = sim_ctx_.CreateVariable("t", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 500);
+  auto* var = sim_ctx_.CreateVariable("t", 64);
+  var->value = MakeLogic4VecVal(arena_, 64, (uint64_t{3} << 32) | 500);
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("t"), nullptr);
@@ -338,7 +343,34 @@ TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   s_vpi_value val = {};
   val.format = vpiTimeVal;
   vpi_get_value(h, &val);
-  EXPECT_EQ(val.value.integer, 500);
+  ASSERT_NE(val.value.time, nullptr);
+  EXPECT_EQ(val.value.time->type, vpiSimTime);
+  EXPECT_EQ(val.value.time->high, 3u);
+  EXPECT_EQ(val.value.time->low, 500u);
+}
+
+// §38.15, Table 38-3 (vpiDecStrVal row): the value as a string of decimal
+// digits in memory the routine owns, a signed variable's negative value
+// written with its sign and an unsigned one's as its magnitude (#4959).
+TEST_F(VpiGetValueSim, GetValueDecStrFormatHonoursSignedness) {
+  auto* sv = sim_ctx_.CreateVariable("sv", 8);
+  sv->value = MakeLogic4VecVal(arena_, 8, 0xFB);
+  sv->is_signed = true;
+  sv->value.is_signed = true;
+  auto* uv = sim_ctx_.CreateVariable("uv", 8);
+  uv->value = MakeLogic4VecVal(arena_, 8, 0xFB);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  s_vpi_value val = {};
+  val.format = vpiDecStrVal;
+  vpi_get_value(vpi_handle_by_name(VpiText("sv"), nullptr), &val);
+  ASSERT_NE(val.value.str, nullptr);
+  EXPECT_STREQ(val.value.str, "-5");
+  val = {};
+  val.format = vpiDecStrVal;
+  vpi_get_value(vpi_handle_by_name(VpiText("uv"), nullptr), &val);
+  ASSERT_NE(val.value.str, nullptr);
+  EXPECT_STREQ(val.value.str, "251");
 }
 
 // §38.15, Table 38-3 (vpiIntVal row): any x or z bit in the object value is
@@ -650,6 +682,27 @@ TEST_F(VpiGetValueSim, GetValueStringBufferDistinctFromGetStr) {
   EXPECT_NE(static_cast<const void*>(val.value.str),
             static_cast<const void*>(name));  // the two buffers are distinct
   EXPECT_STREQ(name, "nm");                   // the name buffer is left intact
+}
+
+class BlockVariableValuesOfARun : public VpiDesignRun {};
+
+// §38.15 with §37.12: the object of a variable a named block declares reads
+// the value the block left in it, in the top and in an instance below it
+// alike, though its storage is made only when the block runs (#4996).
+TEST_F(BlockVariableValuesOfARun, ABlockVariableReadsWhatTheBlockLeft) {
+  Run("module m; initial begin : blk int v; v = 7; end endmodule\n"
+      "module top; m i0(); initial begin : blk int v; v = 3; end\n"
+      "endmodule\n");
+  const char* const kNames[] = {"top.blk.v", "top.i0.blk.v"};
+  const int kValues[] = {3, 7};
+  for (size_t i = 0; i < 2; ++i) {
+    vpiHandle v = vpi_handle_by_name(VpiText(kNames[i]), nullptr);
+    ASSERT_NE(v, nullptr) << kNames[i];
+    s_vpi_value val = {};
+    val.format = vpiIntVal;
+    vpi_get_value(v, &val);
+    EXPECT_EQ(val.value.integer, kValues[i]) << kNames[i];
+  }
 }
 
 }  // namespace

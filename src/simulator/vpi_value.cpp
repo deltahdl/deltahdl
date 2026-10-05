@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <functional>
 #include <optional>
 #include <string>
@@ -13,9 +14,11 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "simulator/eval_format_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -28,6 +31,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_value_pools.h"
 
 namespace delta {
 
@@ -199,6 +203,37 @@ static void GetValueIntVal(const Logic4Vec& v, s_vpi_value* value) {
   value->value.integer = static_cast<int>(aval & ~bval);
 }
 
+// §38.15, Table 38-3 (vpiDecStrVal row): the value as a string of decimal
+// digits, a signed one's negative value written with its sign. The row allows
+// no character for an unknown bit, so an x or z bit reads as 0, as the
+// vpiIntVal row has it.
+static void GetValueDecStr(const Logic4Vec& v, s_vpi_value* value,
+                           std::vector<std::string>& pool) {
+  std::vector<Logic4Word> known(v.words, v.words + v.nwords);
+  for (Logic4Word& word : known) {
+    word.aval &= ~word.bval;
+    word.bval = 0;
+  }
+  Logic4Vec digits = v;
+  digits.words = known.data();
+  pool.push_back(FormatDecimalDigits(digits));
+  value->value.str = VpiText(pool.back().c_str());
+}
+
+// §38.15, Table 38-3 (vpiTimeVal row): the value in an s_vpi_time the routine
+// owns, value.time pointing at it, its high and low words the value's upper
+// and lower 32 bits.
+static void GetValueTime(const Logic4Vec& v, s_vpi_value* value,
+                         std::deque<s_vpi_time>& pool) {
+  const uint64_t kValue = v.ToUint64();
+  s_vpi_time& time = pool.emplace_back();
+  time.type = vpiSimTime;
+  time.high = static_cast<PLI_UINT32>(kValue >> 32);
+  time.low = static_cast<PLI_UINT32>(kValue & 0xFFFFFFFFu);
+  time.real = 0.0;
+  value->value.time = &time;
+}
+
 // §38.15: unpack the IEEE-754 pattern that a real object stores in its
 // four-state word (§6.13 lays that pattern into the value bits). §6.12 makes
 // a shortreal single precision, and RealVecToDouble reads which precision the
@@ -273,13 +308,11 @@ static bool GetValueIsRefused(VpiHandle obj, s_vpi_value* value,
   return false;
 }
 
-static void DispatchIntegerFormat(
-    const Logic4Vec& v, s_vpi_value* value, std::vector<std::string>& str_pool,
-    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
-    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
+static void DispatchIntegerFormat(const Logic4Vec& v, s_vpi_value* value,
+                                  VpiValuePools& pools) {
   // §38.15, Table 38-3: fill the value buffer according to the requested
   // format. Each arm is the format-specific conversion; most delegate to a
-  // dedicated helper, while the scalar/real/time arms are short inline reads.
+  // dedicated helper, while the scalar and real arms are short inline reads.
   switch (value->format) {
     case kVpiIntVal:
       GetValueIntVal(v, value);
@@ -292,28 +325,31 @@ static void DispatchIntegerFormat(
           ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
       break;
     case kVpiBinStrVal:
-      GetValueBinStr(v, value, str_pool);
+      GetValueBinStr(v, value, pools.strings);
+      break;
+    case kVpiDecStrVal:
+      GetValueDecStr(v, value, pools.strings);
       break;
     case kVpiHexStrVal:
-      GetValueHexStr(v, value, str_pool);
+      GetValueHexStr(v, value, pools.strings);
       break;
     case kVpiOctStrVal:
-      GetValueOctStr(v, value, str_pool);
+      GetValueOctStr(v, value, pools.strings);
       break;
     case kVpiStringVal:
-      GetValueStringVal(v, value, str_pool);
+      GetValueStringVal(v, value, pools.strings);
       break;
     case kVpiTimeVal:
-      value->value.integer = static_cast<int>(v.ToUint64());
+      GetValueTime(v, value, pools.times);
       break;
     case kVpiVectorVal:
-      GetValueVector(v, value, vec_pool);
+      GetValueVector(v, value, pools.vectors);
       break;
     case kVpiStrengthVal:
-      GetValueStrength(v, value, strength_pool);
+      GetValueStrength(v, value, pools.strengths);
       break;
     case kVpiObjTypeVal:
-      GetValueObjType(v, value, vec_pool);
+      GetValueObjType(v, value, pools.vectors);
       break;
     default:
       break;
@@ -346,17 +382,15 @@ static Logic4Vec SliceOfValue(const Logic4Vec& whole, int64_t offset, int width,
   return view;
 }
 
-static void DispatchGetValueByFormat(
-    VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
-    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
-    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
+static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
+                                     VpiValuePools& pools) {
   // A net bit or var bit reads its own bit of its parent's storage, and a
   // select leaving packed dimensions unindexed the bits it spans.
   if (obj->bit_offset >= 0) {
     std::vector<Logic4Word> words;
     const Logic4Vec kSlice = SliceOfValue(obj->var->value, obj->bit_offset,
                                           std::max(obj->size, 1), words);
-    DispatchIntegerFormat(kSlice, value, str_pool, vec_pool, strength_pool);
+    DispatchIntegerFormat(kSlice, value, pools);
     return;
   }
   const Logic4Vec& v = obj->var->value;
@@ -367,7 +401,7 @@ static void DispatchGetValueByFormat(
     // integer using the rounding defined in §6.12.1 (round to nearest, ties
     // away from zero) and then formats that integer.
     if (value->format == kVpiObjTypeVal) {
-      GetValueObjType(v, value, vec_pool);
+      GetValueObjType(v, value, pools.vectors);
       return;
     }
     double d = ObjectRealValue(v);
@@ -380,8 +414,8 @@ static void DispatchGetValueByFormat(
       // with at most 16 digits of precision.
       char buf[64];
       std::snprintf(buf, sizeof(buf), "%.16g", d);
-      str_pool.emplace_back(buf);
-      value->value.str = VpiText(str_pool.back().c_str());
+      pools.strings.emplace_back(buf);
+      value->value.str = VpiText(pools.strings.back().c_str());
       return;
     }
     // §6.12.1 rounding: nearest integer, ties away from zero.
@@ -391,10 +425,10 @@ static void DispatchGetValueByFormat(
     int_view.width = 64;
     int_view.nwords = 1;
     int_view.words = &iw;
-    DispatchIntegerFormat(int_view, value, str_pool, vec_pool, strength_pool);
+    DispatchIntegerFormat(int_view, value, pools);
     return;
   }
-  DispatchIntegerFormat(v, value, str_pool, vec_pool, strength_pool);
+  DispatchIntegerFormat(v, value, pools);
 }
 
 // §37.16, §37.17: a net bit or var bit selected by an index that is not a
@@ -452,10 +486,8 @@ static VpiHandle VaryingBitTarget(VpiHandle obj) {
 // §38.15 for a varying select: the value of the bits its index selects, or,
 // when it selects none, x of a 4-state vector and 0 of a 2-state one in each
 // of its bits (§11.5.1).
-static void GetVaryingBitValue(
-    VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
-    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
-    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
+static void GetVaryingBitValue(VpiHandle obj, s_vpi_value* value,
+                               VpiValuePools& pools) {
   const Variable* whole = obj->parent->var;
   const int kWidth = std::max(obj->size, 1);
   std::vector<Logic4Word> words;
@@ -463,12 +495,12 @@ static void GetVaryingBitValue(
     const std::optional<int64_t> kOffset = VaryingOffset(obj);
     if (kOffset && whole != nullptr) {
       DispatchIntegerFormat(SliceOfValue(whole->value, *kOffset, kWidth, words),
-                            value, str_pool, vec_pool, strength_pool);
+                            value, pools);
       return;
     }
   } else if (VpiHandle target = VaryingBitTarget(obj);
              target != nullptr && target->var != nullptr) {
-    DispatchGetValueByFormat(target, value, str_pool, vec_pool, strength_pool);
+    DispatchGetValueByFormat(target, value, pools);
     return;
   }
   const bool kTwoState = whole != nullptr && !whole->is_4state;
@@ -484,7 +516,16 @@ static void GetVaryingBitValue(
   fill.width = static_cast<uint32_t>(kWidth);
   fill.nwords = static_cast<uint32_t>(words.size());
   fill.words = words.data();
-  DispatchIntegerFormat(fill, value, str_pool, vec_pool, strength_pool);
+  DispatchIntegerFormat(fill, value, pools);
+}
+
+// §37.12: binds the object of a variable a named block declares to the storage
+// the run made for it when the block ran, after the model was built, once that
+// storage exists.
+static void BindRunStorage(VpiObject& obj, SimContext* sim) {
+  if (obj.var == nullptr && !obj.run_key.empty() && sim != nullptr) {
+    obj.var = sim->FindVariable(obj.run_key);
+  }
 }
 
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
@@ -508,12 +549,13 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
   if (IsVaryingBit(*obj)) {
-    GetVaryingBitValue(obj, value, str_pool_, vec_pool_, strength_pool_);
+    GetVaryingBitValue(obj, value, value_pools_);
     return;
   }
   VpiRefreshElementCopy(*obj);
+  BindRunStorage(*obj, sim_ctx_);
   if (!obj->var) return;
-  DispatchGetValueByFormat(obj, value, str_pool_, vec_pool_, strength_pool_);
+  DispatchGetValueByFormat(obj, value, value_pools_);
 }
 
 // Applies the §37.31/§37.26/§37.35/§37.3.5 target-kind restrictions that hold
@@ -825,6 +867,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
+  BindRunStorage(*obj, sim_ctx_);
   if (PutValueResolveWritableTarget(obj, scheduler_)) return nullptr;
 
   if (!value) return nullptr;

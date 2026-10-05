@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <iosfwd>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -18,6 +19,7 @@
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
+#include "simulator/vpi_value_pools.h"
 
 namespace delta {
 
@@ -336,14 +338,17 @@ class VpiContext {
   int Flush();
 
   // Support hooks for the flush model. Writes feed buffered text into either
-  // channel; the buffer accessors report what is still pending and the flushed
-  // accessors report what a flush has committed.
-  void WriteOutputChannel(std::string_view text) {
-    channels_.output_channel_buffer.append(text);
-  }
-  void WriteLogFile(std::string_view text) {
-    channels_.log_file_buffer.append(text);
-  }
+  // channel, or into the run's standard output once ConnectOutputChannel has
+  // connected it; the buffer accessors report what is still pending and the
+  // flushed accessors report what a flush has committed.
+  void WriteOutputChannel(std::string_view text);
+  void WriteLogFile(std::string_view text);
+
+  // §38.30 and §38.27: makes `out`, the run's standard output, which the run
+  // copies to its log file, the tool's output channel and log file, writing to
+  // it first whatever text they hold, flushed or not; null, once the run is
+  // over, returns them to their buffers.
+  void ConnectOutputChannel(std::ostream* out);
   const std::string& OutputChannelBuffer() const {
     return channels_.output_channel_buffer;
   }
@@ -899,7 +904,7 @@ class VpiContext {
   std::vector<std::string> invocation_file_args_;
   std::vector<PLI_BYTE8*> invocation_argv_;
 
-  std::vector<std::string> str_pool_;
+  VpiValuePools value_pools_;
 
   // §36.10: the names of the objects Attach makes. A design object is keyed in
   // the simulator on a whole flat string, and the components this splits it
@@ -923,21 +928,11 @@ class VpiContext {
 
   // §38.11: vpi_get_str() places its result in one temporary buffer that every
   // call reuses, so an earlier returned pointer is clobbered by a later call.
-  // It is deliberately separate storage from str_pool_ (the buffer that backs
-  // s_vpi_value strings), which the clause requires to be a different buffer.
+  // It is deliberately separate storage from value_pools_ (the buffers that
+  // back s_vpi_value strings), which the clause requires to be different.
   std::string get_str_buffer_;
 
   std::string save_restart_location_;
-
-  // §38.15: vpi_get_value() owns the memory for the vector arm of the value
-  // union; each retrieval keeps its s_vpi_vecval array alive here until the
-  // context is torn down. Inner vectors own their own storage, so growing the
-  // outer pool never invalidates a previously handed-out array pointer.
-  std::vector<std::vector<s_vpi_vecval>> vec_pool_;
-
-  // §38.15: likewise the routine owns the s_vpi_strengthval array handed back
-  // for the strength arm of the value union.
-  std::vector<std::vector<s_vpi_strengthval>> strength_pool_;
 
   // §38.16: by default vpi_get_value_array() returns the retrieved section in
   // VPI-allocated, read-only storage. One reusable buffer backs the value arm;

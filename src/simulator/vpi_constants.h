@@ -27,6 +27,7 @@ constexpr int kVpiCallback = vpiCallback;
 constexpr int kVpiTimeQueue = vpiTimeQueue;
 
 constexpr int kVpiBinStrVal = vpiBinStrVal;
+constexpr int kVpiDecStrVal = vpiDecStrVal;
 constexpr int kVpiOctStrVal = vpiOctStrVal;
 constexpr int kVpiHexStrVal = vpiHexStrVal;
 constexpr int kVpiScalarVal = vpiScalarVal;
