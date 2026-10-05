@@ -81,6 +81,12 @@ std::optional<PackedDims> DeclaredPackedDims(const DataType* type,
 // it wrote none.
 PackedDims WrittenPackedDims(const DataType* type, SimContext& ctx);
 
+// §7.4.2: one unpacked dimension `dim` as the declaration wrote it, a range
+// `[left:right]` or a size `[n]` standing for `[0:n-1]`, evaluated in the
+// scope `ctx` has set. Empty for a dynamic, queue or associative dimension,
+// and for a size that is not positive.
+std::optional<PackedRange> WrittenUnpackedDim(const Expr* dim, SimContext& ctx);
+
 // §37.16, §37.17: give each vector net its net bits and each packed variable
 // its var bits.
 void AttachVectorBits(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -202,6 +208,14 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
 void AttachVariableRanges(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
+
+// §37.17 details 4 and 6 for a variable a task or function declares (§37.41):
+// give `obj` a range object per dimension it was declared with, the unpacked
+// dimensions `unpacked_dims` where it writes any and otherwise the packed
+// dimensions `type` writes, and the leftmost one's bounds.
+void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
+                          const std::vector<Expr*>& unpacked_dims,
+                          SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written in the
 // instance whose objects `objects` keys under `prefix`; null for a kind of

@@ -134,6 +134,8 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
         DeclaredVariableKind(arg.data_type, !arg.unpacked_dims.empty(), where,
                              sb.design),
         tf->automatic, sb.build);
+    AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
+                         sb.build);
     VpiObject* io_decl = sb.build.alloc();
     io_decl->type = vpiIODecl;
     io_decl->name = var->name;
@@ -193,7 +195,7 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
   ret->parent = tf;
   ret->automatic = tf->automatic;
   ret->decl_signed = type.is_signed;
-  InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
+  AttachDeclaredRanges(ret, type, item.return_array_dims, sb.ctx, sb.build);
   if (item.return_array_dims.empty()) {
     ret->size = static_cast<int>(DeclaredTypeWidth(type, sb.ctx));
   }
@@ -224,11 +226,14 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
     }
     const bool kAutomatic =
         stmt->var_is_automatic || (tf->automatic && !stmt->var_is_static);
-    MakeVariable(tf, stmt->var_name,
-                 DeclaredVariableKind(stmt->var_decl_type,
-                                      !stmt->var_unpacked_dims.empty(), where,
-                                      sb.design),
-                 kAutomatic, sb.build);
+    VpiObject* var =
+        MakeVariable(tf, stmt->var_name,
+                     DeclaredVariableKind(stmt->var_decl_type,
+                                          !stmt->var_unpacked_dims.empty(),
+                                          where, sb.design),
+                     kAutomatic, sb.build);
+    AttachDeclaredRanges(var, stmt->var_decl_type, stmt->var_unpacked_dims,
+                         sb.ctx, sb.build);
   }
 }
 
@@ -249,6 +254,8 @@ void MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   tf->automatic = item->is_automatic || (where.automatic && !item->is_static);
   if (where.scope != nullptr) where.scope->children.push_back(tf);
   sb.made[{item, where.key}] = tf;
+  // A declared width or range reads the parameters of the scope declaring it.
+  InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
   MakeIoDecls(tf, *item, where, sb);
   MakeReturnVariable(tf, *item, where, sb);
   MakeBodyVariables(tf, *item, where, sb);

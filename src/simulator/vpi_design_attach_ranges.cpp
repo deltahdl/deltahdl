@@ -5,6 +5,8 @@
 
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -81,6 +83,21 @@ void AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
 }
 
 }  // namespace
+
+void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
+                          const std::vector<Expr*>& unpacked_dims,
+                          SimContext& ctx, const VpiAttachBuild& build) {
+  std::vector<DimBounds> dims;
+  for (const Expr* dim : unpacked_dims) {
+    dims.push_back(WrittenUnpackedDim(dim, ctx));
+  }
+  if (dims.empty()) {
+    for (const PackedRange& dim : WrittenPackedDims(&type, ctx)) {
+      dims.emplace_back(dim);
+    }
+  }
+  AttachRanges(obj, dims, build);
+}
 
 void AttachVariableRanges(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,

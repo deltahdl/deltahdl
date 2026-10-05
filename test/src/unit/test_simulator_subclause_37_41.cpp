@@ -302,6 +302,15 @@ TEST_F(TaskFuncDeclaration, SignedIsFalseWithoutAReturnVariable) {
 // are read back from the model the run built.
 class TaskFuncsOfARun : public VpiDesignRun {};
 
+// The integer a bound `relation`, vpiLeftRange or vpiRightRange, of `obj`
+// reaches.
+int BoundOf(int relation, vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(vpi_handle(relation, obj), &value);
+  return value.value.integer;
+}
+
 // §37.41 (#4939): each task and function a module declares is a task or
 // function of each of its instances, full-named under the instance...
 TEST_F(TaskFuncsOfARun, AModuleDeclaresItsTasksAndFunctions) {
@@ -388,22 +397,47 @@ TEST_F(TaskFuncsOfARun, AFunctionReachesTheBoundsOfItsReturnRange) {
   Run("module top; function logic [7:0] f(); return 0; endfunction\n"
       "  function logic [0:3] g(); return 0; endfunction\n"
       "  function int h(); return 0; endfunction endmodule\n");
-  auto bound = [](int type, vpiHandle tf) {
-    s_vpi_value value = {};
-    value.format = vpiIntVal;
-    vpi_get_value(vpi_handle(type, tf), &value);
-    return value.value.integer;
-  };
   vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
   ASSERT_NE(vpi_handle(vpiLeftRange, f), nullptr);
-  EXPECT_EQ(bound(vpiLeftRange, f), 7);
-  EXPECT_EQ(bound(vpiRightRange, f), 0);
+  EXPECT_EQ(BoundOf(vpiLeftRange, f), 7);
+  EXPECT_EQ(BoundOf(vpiRightRange, f), 0);
   vpiHandle g = Named(vpiTaskFunc, By("top"), "g");
-  EXPECT_EQ(bound(vpiLeftRange, g), 0);
-  EXPECT_EQ(bound(vpiRightRange, g), 3);
+  EXPECT_EQ(BoundOf(vpiLeftRange, g), 0);
+  EXPECT_EQ(BoundOf(vpiRightRange, g), 3);
   vpiHandle h = Named(vpiTaskFunc, By("top"), "h");
   EXPECT_EQ(vpi_handle(vpiLeftRange, h), nullptr);
   EXPECT_EQ(vpi_handle(vpiRightRange, h), nullptr);
+}
+
+// §37.17 details 4 and 6 (#5056): the return variable, an argument's variable
+// and a body's variable each reach the bounds of their leftmost dimension, an
+// unpacked one before a packed one, and a range object per dimension; a
+// variable whose type writes no range reaches neither.
+TEST_F(TaskFuncsOfARun, ATaskFuncsVariablesReachTheirRanges) {
+  Run("module top; function logic [7:0] f(input logic [3:0] a);\n"
+      "  logic [0:5] v; logic [1:0] w [2:9]; int n; return 0; endfunction\n"
+      "endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  vpiHandle ret = vpi_handle(vpiReturn, f);
+  ASSERT_NE(vpi_handle(vpiLeftRange, ret), nullptr);
+  EXPECT_EQ(BoundOf(vpiLeftRange, ret), 7);
+  EXPECT_EQ(BoundOf(vpiRightRange, ret), 0);
+  vpiHandle a = vpi_handle(vpiExpr, Named(vpiIODecl, f, "a"));
+  EXPECT_EQ(BoundOf(vpiLeftRange, a), 3);
+  EXPECT_EQ(BoundOf(vpiRightRange, a), 0);
+  vpiHandle v = Named(vpiVariables, f, "v");
+  EXPECT_EQ(BoundOf(vpiLeftRange, v), 0);
+  EXPECT_EQ(BoundOf(vpiRightRange, v), 5);
+  vpiHandle w = Named(vpiVariables, f, "w");
+  EXPECT_EQ(BoundOf(vpiLeftRange, w), 2);
+  EXPECT_EQ(BoundOf(vpiRightRange, w), 9);
+  vpiHandle ranges = vpi_iterate(vpiRange, w);
+  ASSERT_NE(ranges, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, vpi_scan(ranges)), 8);
+  vpi_free_object(ranges);
+  vpiHandle n = Named(vpiVariables, f, "n");
+  EXPECT_EQ(vpi_iterate(vpiRange, n), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLeftRange, n), nullptr);
 }
 
 // ...while a void function returns nothing and has size 0, and a function of

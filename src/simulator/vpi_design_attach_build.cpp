@@ -6,10 +6,13 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/queue_dim.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_object.h"
@@ -119,6 +122,19 @@ std::optional<PackedDims> DeclaredPackedDims(const DataType* type,
   if (kSpan == 0 || width % kSpan != 0) return std::nullopt;
   dims.push_back(PackedRange::Implicit(static_cast<uint32_t>(width / kSpan)));
   return dims;
+}
+
+std::optional<PackedRange> WrittenUnpackedDim(const Expr* dim,
+                                              SimContext& ctx) {
+  if (dim == nullptr || IsQueueDim(dim) || IsAssocIndexDim(dim, ctx)) {
+    return std::nullopt;
+  }
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    return EvaluatedRange(dim->lhs, dim->rhs, ctx);
+  }
+  const int64_t kSize = BoundValue(EvalExpr(dim, ctx, ctx.GetArena()));
+  if (kSize <= 0) return std::nullopt;
+  return PackedRange{0, kSize - 1};
 }
 
 }  // namespace delta
