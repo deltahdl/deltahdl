@@ -299,16 +299,18 @@ bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.48/§37.56/§37.15/§37.14/§37.30/§37.83: a clocking block's prefix and
-// clocking event, a clocked seq's clocking event, a clocking io decl's expr, a
-// ref obj's typespec, and vpiParent of port bits, ref objs, modport interface
-// typespecs, and attributes.
-// §37.14/§37.56: the clocking-block prefix, a clocking I/O declaration's
-// expression, and the clocking event of a clocking block or of a clocked seq
-// within a multiclock sequence expression -- the same relation a property spec
-// and a clocked property use, served through the public vpi_handle path so a
-// client walking the clocked-seq members can reach each one's clock. §37.24: a
-// reference object's typespec.
+// §37.48 detail 1: the delay of a clocking block's default input or output
+// skew, or of a clocking io decl's own.
+static bool TryResolveClockingSkew(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiInputSkew && type != vpiOutputSkew) return false;
+  out = type == vpiInputSkew ? ref->input_skew : ref->output_skew;
+  return true;
+}
+
+// §37.48/§37.56/§37.24: a clocking block's prefix and clocking event, a
+// clocking io decl's expression, the clocking event of a clocked seq within a
+// multiclock sequence expression - the same relation a property spec and a
+// clocked property use - and a reference object's typespec.
 static bool TryResolveClockingRelation(int type, VpiHandle ref,
                                        VpiHandle& out) {
   if (type == vpiPrefix && ref->type == vpiClockingBlock) {
@@ -317,10 +319,6 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
   }
   if (type == vpiExpr && ref->type == vpiClockingIODecl) {
     out = VpiClockingIODeclExpr(ref);
-    return true;
-  }
-  if (type == vpiInputSkew || type == vpiOutputSkew) {
-    out = type == vpiInputSkew ? ref->input_skew : ref->output_skew;
     return true;
   }
   if (type == vpiTypespec && ref->type == vpiRefObj) {
@@ -410,6 +408,7 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
 bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
                                          VpiHandle& out) {
   return TryResolveClockingRelation(type, ref, out) ||
+         TryResolveClockingSkew(type, ref, out) ||
          TryResolveParentRelation(type, ref, out);
 }
 
