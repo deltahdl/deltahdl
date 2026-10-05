@@ -375,6 +375,16 @@ int VpiGetLineNo(VpiHandle obj) {
   return VpiHasLocationProperties(obj->type) ? obj->line_no : vpiUndefined;
 }
 
+// §37.48 detail 1: the edge of a clocking block's default input or output skew,
+// or of a clocking io decl's own, that `property` names; vpiUndefined for an
+// object of any other kind.
+int ClockingEdge(int property, const VpiObject& obj) {
+  if (obj.type != vpiClockingBlock && obj.type != vpiClockingIODecl) {
+    return vpiUndefined;
+  }
+  return property == vpiInputEdge ? obj.input_edge : obj.output_edge;
+}
+
 // Handles a first block of the simple integer/Boolean/stored-value properties.
 // Sets handled=true and returns the value on a match; otherwise leaves handled
 // false so the caller can try the next block. The per-case spec references are
@@ -407,6 +417,9 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
       return obj->index;
     case kVpiDirection:
       return obj->direction;
+    case vpiInputEdge:
+    case vpiOutputEdge:
+      return ClockingEdge(property, *obj);
     // §37.39: a module path reports which kind of path it is, the polarity of
     // the path and of its data path, and whether it carries an ifnone
     // condition; a path term reports the edge it is sensitive to. The diagram

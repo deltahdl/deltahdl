@@ -319,6 +319,10 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
     out = VpiClockingIODeclExpr(ref);
     return true;
   }
+  if (type == vpiInputSkew || type == vpiOutputSkew) {
+    out = type == vpiInputSkew ? ref->input_skew : ref->output_skew;
+    return true;
+  }
   if (type == vpiTypespec && ref->type == vpiRefObj) {
     out = VpiRefObjTypespec(ref);
     return true;

@@ -55,6 +55,14 @@ struct VpiObject {
   int data_polarity = 0;
   int edge = 0;
   bool mod_path_has_if_none = false;
+  // §37.48 detail 1: a clocking block's default input and output skews, and a
+  // clocking io decl's own: the edges vpiInputEdge and vpiOutputEdge report
+  // (vpiNoEdge where none is written) and the delays vpiInputSkew and
+  // vpiOutputSkew reach (null where none is written).
+  int input_edge = 0;
+  int output_edge = 0;
+  VpiObject* input_skew = nullptr;
+  VpiObject* output_skew = nullptr;
 
   // §37.39: which of a module path's three path-term relations reaches this
   // term. vpiModPathOut reaches the output terms; of the input terms,

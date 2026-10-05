@@ -312,5 +312,58 @@ TEST_F(ClockingBlocksOfARun, AClockingBlockReachesItsIoDecls) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, b)), VpiObjectOf(By("top.b")));
 }
 
+// Detail 1: a clocking block reports its default skews' edges and reaches
+// their delays; an io decl its own, or, where it writes none, the block's
+// default for its direction, its output skew reached as the expression itself.
+TEST_F(ClockingBlocksOfARun, SkewsAndEdgesAreTheBlocksDefaultsAndAnIoDeclsOwn) {
+  Run("module top; logic clk, a, b, c;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input negedge #2 output #3;\n"
+      "    input posedge #1 a; input c; output b;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(vpi_get(vpiInputEdge, cb), vpiNegedge);
+  EXPECT_EQ(vpi_get(vpiOutputEdge, cb), vpiNoEdge);
+  vpiHandle in_skew = vpi_handle(vpiInputSkew, cb);
+  ASSERT_NE(in_skew, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, in_skew), vpiDelayControl);
+  vpiHandle a = Named(vpiClockingIODecl, cb, "a");
+  vpiHandle b = Named(vpiClockingIODecl, cb, "b");
+  vpiHandle c = Named(vpiClockingIODecl, cb, "c");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(vpi_get(vpiInputEdge, a), vpiPosedge);
+  EXPECT_EQ(vpi_get(vpiInputEdge, c), vpiNegedge);
+  EXPECT_EQ(vpi_handle(vpiInputSkew, b), nullptr);
+  vpiHandle out_skew = vpi_handle(vpiOutputSkew, b);
+  ASSERT_NE(out_skew, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(out_skew, &value);
+  EXPECT_EQ(value.value.integer, 3);
+}
+
+// A clocking block a generate block declares is each generate block
+// instance's, named under it, and not its module's (§37.12).
+TEST_F(ClockingBlocksOfARun, AGenerateBlocksClockingBlockIsItsGenScopes) {
+  Run("module top; logic clk, a;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    clocking cb @(posedge clk); input a; endclocking\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_iterate(vpiClockingBlock, By("top")), nullptr);
+  vpiHandle g1 = By("top.g[1]");
+  ASSERT_NE(g1, nullptr);
+  vpiHandle cb = Named(vpiClockingBlock, g1, "cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, cb), "top.g[1].cb");
+  vpiHandle a = Named(vpiClockingIODecl, cb, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, a)), VpiObjectOf(By("top.a")));
+}
+
 }  // namespace
 }  // namespace delta
