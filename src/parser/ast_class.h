@@ -126,6 +126,45 @@ struct ConstraintDistRef {
   std::vector<ConstraintDistItem> items;
 };
 
+// §18.5 (A.1.10): what one item of a constraint block is. A
+// constraint_block_item is a solve-before ordering or a constraint_expression,
+// and a constraint_expression one of the other six.
+enum class ConstraintItemKind : uint8_t {
+  kExpression,   // [ soft ] expression_or_dist ;
+  kUnique,       // uniqueness_constraint ;
+  kImplication,  // expression -> constraint_set
+  kIfElse,       // if ( expression ) constraint_set [ else constraint_set ]
+  kForeach,      // foreach ( array [ loop_variables ] ) constraint_set
+  kDisableSoft,  // disable soft constraint_primary ;
+  kSolveBefore,  // solve solve_before_list before solve_before_list ;
+};
+
+// §18.5: one item of a constraint block as the source wrote it, so that the
+// block can be written back in order (§37.59's vpiDecompile of a randomize()
+// call with an inline block, §18.7). `expr` is the expression of an
+// expression_or_dist, the antecedent of an implication, the condition of an
+// if-else, the array a foreach iterates or the primary a disable soft names.
+// `body` is the constraint_set an implication, an if-else or a foreach governs,
+// and `else_body` the one after an else.
+struct ConstraintItem {
+  ConstraintItemKind kind = ConstraintItemKind::kExpression;
+  // §18.5.13: the expression_or_dist is written `soft`.
+  bool soft = false;
+  Expr* expr = nullptr;
+  // §18.5.3: the dist_list of an expression_or_dist written with one.
+  bool has_dist = false;
+  std::vector<ConstraintDistItem> dist;
+  // §18.5.4: the range_list of a uniqueness constraint; §18.5.9: the
+  // solve_before_list before `before`, with `after` the one after it.
+  std::vector<Expr*> exprs;
+  std::vector<Expr*> after;
+  // §18.5.7.1: the loop variables of a foreach, empty where one is skipped.
+  std::vector<std::string_view> loop_vars;
+  std::vector<ConstraintItem*> body;
+  bool has_else = false;
+  std::vector<ConstraintItem*> else_body;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -216,6 +255,12 @@ struct ClassMember {
   // for a runtime randomize() call and the elaborator can check the restricted
   // range_list member forms this subclause requires.
   std::vector<std::vector<Expr*>> constraint_unique_refs;
+
+  // §18.5: the items of this constraint block in source order, and whether the
+  // parser read every one of them; a block with an item it could not read
+  // keeps none, so nothing reads a partial block as the whole.
+  std::vector<ConstraintItem*> constraint_items;
+  bool constraint_items_parsed = false;
 
   DataType data_type;
   std::string_view name;

@@ -72,6 +72,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_generate.cpp
     parser/parser_class.cpp
     parser/parser_class_constraints.cpp
+    parser/parser_constraint_items.cpp
     parser/parser_class_override.cpp
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp

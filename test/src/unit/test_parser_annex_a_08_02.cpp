@@ -550,33 +550,4 @@ TEST(SubroutineCallExprParsing, SystemTfCallDataTypeAndExpression) {
               "endmodule\n"));
 }
 
-// A system_tf_call records where it ends, just past its closing parenthesis,
-// which is what §37.42's vpiDecompile reads the call back from.
-TEST(SubroutineCallExprParsing, SystemTfCallRecordsWhereItEnds) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"hi\", 1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->range.end.line, expr->range.start.line);
-  EXPECT_EQ(expr->range.end.column - expr->range.start.column, 17u);
-}
-
-// A system_tf_call written without parentheses ends just past its name.
-TEST(SubroutineCallExprParsing, SystemTfCallWithoutArgumentsEndsAfterItsName) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $finish;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->range.end.line, expr->range.start.line);
-  EXPECT_EQ(expr->range.end.column - expr->range.start.column, 7u);
-}
-
 }  // namespace

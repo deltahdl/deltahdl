@@ -90,6 +90,7 @@ class Parser {
   friend struct ParserPropertySpecHelpers;
   friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
+  friend struct ParserConstraintItemHelpers;
   friend struct ParserClassOverrideHelpers;
   friend struct ParserConfigHelpers;
   // Expect reports through the diagnostic engine and is reached from nowhere

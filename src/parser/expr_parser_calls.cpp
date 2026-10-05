@@ -1,9 +1,7 @@
-#include <cstdint>
 #include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
-#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -94,15 +92,6 @@ void Parser::ParseSysCallArgs(Expr* call) {
   }
 }
 
-// The position just past `tok`, where a construct ending in it ends. §37.42's
-// vpiDecompile reads a system call back from the text between its start and
-// this, src/ having no printer that could write the call out again.
-static SourceLoc LocAfter(const Token& tok) {
-  SourceLoc loc = tok.loc;
-  loc.column += static_cast<uint32_t>(tok.text.size());
-  return loc;
-}
-
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
 
@@ -140,7 +129,6 @@ Expr* Parser::ParseSystemCall() {
   call->kind = ExprKind::kSystemCall;
   call->callee = tok.text;
   call->range.start = tok.loc;
-  call->range.end = LocAfter(tok);
   if (!Match(TokenKind::kLParen)) {
     if (AtSelectBracket()) return ParseSelectExpr(call);
     return call;
@@ -149,7 +137,7 @@ Expr* Parser::ParseSystemCall() {
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);
   }
-  call->range.end = LocAfter(Expect(TokenKind::kRParen, Subclause("13.5")));
+  Expect(TokenKind::kRParen, Subclause("13.5"));
   CheckDisplayFormatLiterals(call, diag_);
   // A.8.4 (printed page 1211): a system function call is a primary, and a
   // method call's root is any primary (method_call_root), so the call may be

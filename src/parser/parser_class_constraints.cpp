@@ -7,6 +7,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/parser.h"
+#include "parser/parser_constraint_items_internal.h"
 
 namespace delta {
 
@@ -457,6 +458,8 @@ bool Parser::TryCaptureIfElseConstraint(ClassMember* member) {
 // block and an external constraint block (18.5.1), so an external block's
 // relations are captured the same way and its body receives the same checks.
 void Parser::ScanConstraintBodyRelations(ClassMember* member) {
+  // §18.5: the block's items in source order, read ahead of the scan.
+  ParserConstraintItemHelpers::Capture(*this, member);
   int depth = 1;
   // 18.5.11: track whether the token just before the current identifier was a
   // '.' or '::' qualifier, so a member/scope-qualified name (obj.f, pkg::f) is
