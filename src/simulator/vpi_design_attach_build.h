@@ -233,26 +233,28 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
-// What the objects one statement reaches are built with: the build, and the
+// What the objects one statement reaches are built with: the build; the
 // expression object an expression the statement writes stands as, null for
-// one not modelled.
+// one not modelled; and the object a statement it holds stands as, hung from
+// the object given and walked for the objects it holds in turn, null for one
+// the run builds no object for.
 struct VpiStmtBuild {
   const VpiAttachBuild& build;
   std::function<VpiObject*(const Expr*)> expression;
+  std::function<VpiObject*(const Stmt*, VpiObject*)> statement;
 };
 
-// §37.64, §37.65, §37.68 and §37.79: the kind of object `stmt` stands as when
-// it is an assignment, an event control, a delay control, or an assign,
-// deassign, force or release statement; 0 for a statement of another kind.
-int VpiControlOrAssignKind(const Stmt& stmt);
+// §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object
+// `stmt` stands as when it is an assignment, an event or delay control, an
+// assign, deassign, force or release, an if or if-else, a case, a forever,
+// while, repeat, do-while, for or foreach loop, or a wait, wait fork or
+// ordered wait; 0 for a statement of another kind.
+int VpiBuiltStmtKind(const Stmt& stmt);
 
-// The objects `obj`, made for `stmt` with the kind above, reaches: an
-// assignment's two sides, operator, blocking and intra-assignment timing
-// control, an event control's condition, a delay control's delay, and the
-// sides of an assign, deassign, force or release. The statement a control
-// guards is the caller's to build.
-void VpiFillControlOrAssign(VpiObject* obj, const Stmt& stmt,
-                            const VpiStmtBuild& with);
+// The objects `obj`, made for `stmt` with the kind above, reaches: the
+// expressions its figure draws and the statements it holds, each built
+// through `with`.
+void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with);
 
 // §37.42: a system task or function an application registered, as a call
 // that names it finds it: the systf object vpi_register_systf returned for it
@@ -287,10 +289,8 @@ struct VpiCallBuild {
 // statement it runs; §37.12: an object per block its procedures write, nested
 // as the blocks are, each with the variables it declares; §37.62: an event
 // statement per trigger, §37.42: a call statement per task, method task and
-// system task call, §37.64: an assignment per assignment, §37.65 and §37.68:
-// an event or delay control per control, and §37.79: an object per assign,
-// deassign, force and release, each hung from the block or statement it
-// stands in.
+// system task call, and an object per statement VpiBuiltStmtKind names, each
+// hung from the block or statement it stands in.
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build);
 

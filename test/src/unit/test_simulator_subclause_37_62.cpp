@@ -76,18 +76,14 @@ std::vector<int> g_stmt_blocking;
 std::vector<std::string> g_triggered_event_names;
 std::vector<int> g_triggered_event_types;
 
-// The statements the begin block the module's procedure runs holds, which is
-// where §37.63 and §37.12 have an application find them: the procedure
-// reaches its body through vpiStmt, and the block the statements it holds.
-PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
-  vpiHandle mod = vpi_handle_by_name(VpiText("top"), nullptr);
-  if (mod == nullptr) return 0;
-  vpiHandle procs = vpi_iterate(vpiProcess, mod);
-  vpiHandle body = procs ? vpi_handle(vpiStmt, vpi_scan(procs)) : nullptr;
-  vpiHandle itr = body ? vpi_iterate(vpiStmt, body) : nullptr;
-  if (itr == nullptr) return 0;
-  while (vpiHandle stmt = vpi_scan(itr)) {
-    if (vpi_get(vpiType, stmt) != vpiEventStmt) continue;
+// Records the event statement `stmt` is, and every one the statements it
+// holds are, in the order written: those of a block through vpiStmt's
+// iteration (§37.12), and the body and else branch of any other statement
+// through vpiStmt and vpiElseStmt (§37.71).
+void ReadEventStatements(vpiHandle stmt) {
+  if (stmt == nullptr) return;
+  const int kType = vpi_get(vpiType, stmt);
+  if (kType == vpiEventStmt) {
     // §37.62: the one property the figure draws on the event statement.
     g_stmt_blocking.push_back(vpi_get(vpiBlocking, stmt));
     // §37.4.3: the figure's untagged single arrow, walked with vpi_handle()
@@ -96,7 +92,27 @@ PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
     g_triggered_event_types.push_back(event ? vpi_get(vpiType, event) : 0);
     const char* name = event ? vpi_get_str(vpiName, event) : nullptr;
     g_triggered_event_names.emplace_back(name ? name : "");
+    return;
   }
+  if (kType == vpiBegin || kType == vpiNamedBegin) {
+    vpiHandle itr = vpi_iterate(vpiStmt, stmt);
+    while (vpiHandle held = itr ? vpi_scan(itr) : nullptr) {
+      ReadEventStatements(held);
+    }
+    return;
+  }
+  ReadEventStatements(vpi_handle(vpiStmt, stmt));
+  ReadEventStatements(vpi_handle(vpiElseStmt, stmt));
+}
+
+// The statements the module's procedure runs, which is where §37.63 has an
+// application find them: the procedure reaches its body through vpiStmt.
+PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("top"), nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle procs = vpi_iterate(vpiProcess, mod);
+  if (procs == nullptr) return 0;
+  ReadEventStatements(vpi_handle(vpiStmt, vpi_scan(procs)));
   return 0;
 }
 

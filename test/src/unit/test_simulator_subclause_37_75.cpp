@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -312,6 +313,54 @@ TEST_F(DoWhileForeach, NeitherLoopReportsABodyWhenItCarriesNoStatement) {
     .foreach_array = &array;
 
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&foreach)), nullptr);
+}
+
+// The do-while and foreach loops of a run: those a design's procedures write,
+// built from the elaborated design rather than by hand (#5008).
+class DoWhileAndForeachLoopsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle FirstBody() {
+    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+    return it ? vpi_handle(vpiStmt, vpi_scan(it)) : nullptr;
+  }
+};
+
+// A do-while loop reaches the condition it tests and the statement it runs.
+TEST_F(DoWhileAndForeachLoopsOfARun, ADoWhileLoopIsAnObjectOfTheRun) {
+  Run("module top; int i; initial do i = i + 1; while (i < 3); endmodule\n");
+  vpiHandle loop = FirstBody();
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiDoWhile);
+  EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiCondition, loop)), vpiLtOp);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
+}
+
+// A foreach loop reaches the array it indexes (detail 1), its index
+// variables in order with a null operation for one skipped (detail 2), and
+// its body.
+TEST_F(DoWhileAndForeachLoopsOfARun, AForeachLoopIsAnObjectOfTheRun) {
+  Run("module top; int m [2][3]; initial foreach (m[, j]) m[0][j] = j;\n"
+      "endmodule\n");
+  vpiHandle loop = FirstBody();
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiForeachStmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, loop)),
+            VpiObjectOf(By("top.m")));
+  vpiHandle vars = vpi_iterate(vpiLoopVars, loop);
+  ASSERT_NE(vars, nullptr);
+  vpiHandle skipped = vpi_scan(vars);
+  vpiHandle j = vpi_scan(vars);
+  ASSERT_NE(skipped, nullptr);
+  ASSERT_NE(j, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, skipped), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, skipped), vpiNullOp);
+  EXPECT_EQ(vpi_get(vpiType, j), vpiIntVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, j), "j");
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
 }
 
 }  // namespace

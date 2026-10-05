@@ -49,8 +49,9 @@ bool VpiIsScopeObject(VpiHandle obj);
 bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter);
 
 // §37.12 detail 1: the scope named `name` nested in `parent` through a
-// statement that is no scope, such as an unnamed begin declaring nothing,
-// which adds no level to the names of the scopes inside it; null for none.
+// statement that is no scope, such as an unnamed begin declaring nothing, or
+// through an unnamed one, such as a for loop declaring its variables, either
+// of which adds no level to the names of the scopes inside it; null for none.
 // Defined in vpi_helpers_scopes.cpp, used by vpi_design_walk.h.
 VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name);
 

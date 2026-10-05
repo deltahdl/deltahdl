@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -156,6 +157,43 @@ TEST_F(WhileRepeat, TheConditionExpressionIsNotTakenForTheBody) {
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&while_stmt)), nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&while_stmt))),
             &condition);
+}
+
+// The while and repeat loops of a run: those a design's procedures write,
+// built from the elaborated design rather than by hand (#5000).
+class WhileAndRepeatLoopsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle LoopOf(const char* scope) {
+    vpiHandle it = vpi_iterate(vpiProcess, By(scope));
+    return it == nullptr ? nullptr : vpi_handle(vpiStmt, vpi_scan(it));
+  }
+};
+
+// A while loop reaches the condition it tests and the statement it repeats.
+TEST_F(WhileAndRepeatLoopsOfARun, AWhileLoopIsAnObjectOfTheRun) {
+  Run("module top; int i; initial while (i < 3) i = i + 1; endmodule\n");
+  vpiHandle loop = LoopOf("top");
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiWhile);
+  vpiHandle condition = vpi_handle(vpiCondition, loop);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, condition), vpiLtOp);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
+}
+
+// A repeat loop's count written as a name is the variable it names.
+TEST_F(WhileAndRepeatLoopsOfARun, ARepeatLoopReachesItsCount) {
+  Run("module top; int n = 2; initial repeat (n) #1 ; endmodule\n");
+  vpiHandle loop = LoopOf("top");
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiRepeat);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, loop)),
+            VpiObjectOf(By("top.n")));
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiDelayControl);
 }
 
 }  // namespace

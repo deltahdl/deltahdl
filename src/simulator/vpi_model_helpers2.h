@@ -152,6 +152,11 @@ bool VpiIsVariablesType(int type);
 // VpiIsExprType leaves the two out for the protection rule it serves.
 bool VpiIsExprOperandType(int type);
 
+// The same of an object: one of those kinds that is not a function call
+// written as a statement (§37.42), which a statement holding both a condition
+// and a body tells its condition by.
+bool VpiIsOperandObject(VpiHandle obj);
+
 // §37.59: the relations of a part select (vpiLeftRange, vpiRightRange,
 // vpiParent) and an indexed part select (vpiBaseExpr, vpiWidthExpr,
 // vpiParent); §37.58, §37.16 and §37.17: of a bit select, net bit and var bit

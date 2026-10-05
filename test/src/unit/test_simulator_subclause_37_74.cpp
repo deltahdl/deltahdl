@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -251,6 +255,50 @@ TEST_F(For, ForWithoutBodyReportsNoStatement) {
   for_stmt.for_inc_stmts = {&increment};
 
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&for_stmt)), nullptr);
+}
+
+// The for loops of a run: those a design's procedures write, built from the
+// elaborated design rather than by hand (#5007).
+class ForLoopsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle TheLoop() {
+    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+    vpiHandle loop = it ? vpi_handle(vpiStmt, vpi_scan(it)) : nullptr;
+    if (loop != nullptr) EXPECT_EQ(vpi_get(vpiType, loop), vpiFor);
+    return loop;
+  }
+};
+
+// A for loop reaches the statements its header writes, its condition and its
+// body, each where the figure draws it, and declares no variable here.
+TEST_F(ForLoopsOfARun, AForLoopIsAnObjectOfTheRun) {
+  Run("module top; int i, s;\n"
+      "  initial for (i = 0; i < 3; i = i + 1) s = i;\n"
+      "endmodule\n");
+  vpiHandle loop = TheLoop();
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiLocalVarDecls, loop), 0);
+  vpiHandle init = vpi_handle(vpiForInitStmt, loop);
+  vpiHandle step = vpi_handle(vpiForIncStmt, loop);
+  ASSERT_NE(init, nullptr);
+  ASSERT_NE(step, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, init), vpiAssignment);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, init)), VpiObjectOf(By("top.i")));
+  EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiRhs, step)), vpiAddOp);
+  EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiCondition, loop)), vpiLtOp);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, body)), VpiObjectOf(By("top.s")));
+}
+
+// A for loop declaring its variable has local variables, which §37.12 detail
+// 2 makes it a scope for: it is one of the instance's scopes.
+TEST_F(ForLoopsOfARun, AForLoopDeclaringItsVariableIsAScope) {
+  Run("module top; initial for (int j = 0; j < 2; j = j + 1) ; endmodule\n");
+  vpiHandle loop = TheLoop();
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiLocalVarDecls, loop), 1);
+  EXPECT_EQ(KindsOf(vpiInternalScope, By("top")), std::vector<int>{vpiFor});
 }
 
 }  // namespace

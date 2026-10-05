@@ -26,13 +26,19 @@ bool VpiIsScopeObject(VpiHandle obj) {
 
 namespace {
 
+// Whether `obj` is a statement, or a case item (§37.72), which holds one.
+bool VpiIsStmtOrCaseItem(VpiHandle obj) {
+  return obj != nullptr &&
+         (VpiIsScopeBodyStmtObject(obj) || obj->type == vpiCaseItem);
+}
+
 // Whether `obj` is a statement that is no scope: an unnamed begin or fork
-// declaring nothing (§37.12 detail 1), or any other statement but a for loop
-// declaring its variables (detail 2). It stands between the scope around it
-// and the scopes written inside it without being one they are nested in.
+// declaring nothing (§37.12 detail 1), or any other statement but a foreach
+// loop or a for loop declaring its variables (detail 2). It stands between the
+// scope around it and the scopes written inside it without being one they are
+// nested in.
 bool VpiIsStmtThatIsNoScope(VpiHandle obj) {
-  return obj != nullptr && VpiIsScopeBodyStmtObject(obj) &&
-         !VpiIsScopeObject(obj);
+  return VpiIsStmtOrCaseItem(obj) && !VpiIsScopeObject(obj);
 }
 
 // §37.12 (figure): the scopes `scope` holds, reached through vpiInternalScope:
@@ -127,7 +133,12 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
 
 VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name) {
   for (VpiObject* child : parent->children) {
-    if (!VpiIsStmtThatIsNoScope(child)) continue;
+    // A loop that is a scope but has no name, such as a for loop declaring
+    // its variables, adds no level to a name either.
+    const bool kNamesNoLevel =
+        VpiIsStmtThatIsNoScope(child) ||
+        (VpiIsStmtOrCaseItem(child) && child->name.empty());
+    if (!kNamesNoLevel) continue;
     for (VpiObject* nested : child->children) {
       if (nested != nullptr && nested->name == name &&
           VpiIsScopeObject(nested)) {

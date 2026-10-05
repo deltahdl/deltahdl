@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -124,6 +127,22 @@ TEST_F(Forever, ForeverDrawsNoConditionEdge) {
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&forever_stmt)), nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
             &body);
+}
+
+// A forever loop of a run reaches the statement it repeats (#5003).
+class ForeverLoopsOfARun : public VpiDesignRun {};
+
+TEST_F(ForeverLoopsOfARun, AForeverLoopIsAnObjectOfTheRun) {
+  Run("module top; initial forever begin #1 $finish; end endmodule\n");
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle loop = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(loop, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiForever);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, body), vpiBegin);
+  EXPECT_EQ(KindsOf(vpiStmt, body), std::vector<int>{vpiDelayControl});
 }
 
 }  // namespace

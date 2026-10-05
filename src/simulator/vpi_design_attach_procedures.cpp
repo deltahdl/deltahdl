@@ -745,37 +745,27 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
                    [&](const Stmt* sub) { WalkStmt(sub, parent, walk); });
 }
 
-// §37.64, §37.65, §37.68 and §37.79: the object an assignment, an event or
-// delay control, or an assign, deassign, force or release statement stands
-// as, with the expressions it writes; null for a statement of another kind. A
-// control holds the statement it guards.
-VpiObject* MakeControlOrAssign(const Stmt& stmt, const BlockParent& parent,
-                               const BodyWalk& walk) {
-  const int kKind = VpiControlOrAssignKind(stmt);
+// The object a statement the builder of vpi_design_attach_statements.cpp
+// knows stands as, with the expressions it writes and the statements it holds,
+// each hung from it; null for a statement of another kind.
+VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
+                         const BodyWalk& walk) {
+  const int kKind = VpiBuiltStmtKind(stmt);
   if (kKind == 0) return nullptr;
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
   const VpiCallSite kSite = CallSiteOf(parent, walk);
-  VpiFillControlOrAssign(obj, stmt, {walk.build, [&](const Expr* expr) {
-                                       return VpiCallSiteExpression(
-                                           expr, walk.objects, kSite,
-                                           walk.calls.ctx, walk.build);
-                                     }});
-  if (kKind == vpiEventControl || kKind == vpiDelayControl) {
-    WalkStmt(stmt.body, BlockParent{obj, parent.path, nullptr, &parent}, walk);
-  }
+  VpiFillStmt(obj, stmt,
+              {walk.build,
+               [&](const Expr* expr) {
+                 return VpiCallSiteExpression(expr, walk.objects, kSite,
+                                              walk.calls.ctx, walk.build);
+               },
+               [&](const Stmt* held, VpiObject* holder) {
+                 return WalkStmt(
+                     held, BlockParent{holder, parent.path, nullptr, &parent},
+                     walk);
+               }});
   return obj;
-}
-
-// The statements a statement the run builds no object for holds. A for
-// loop's initializations and steps are its own (§37.74) rather than statements
-// of the scope around it, so only its body is walked.
-void WalkUnbuiltStmt(const Stmt& stmt, const BlockParent& parent,
-                     const BodyWalk& walk) {
-  if (stmt.kind == StmtKind::kFor) {
-    WalkStmt(stmt.for_body, parent, walk);
-    return;
-  }
-  WalkSubStmts(stmt, parent, walk);
 }
 
 // §37.12: the object a block stands as, nested in the scope or statement around
@@ -805,11 +795,11 @@ VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
   if (kAtomic != 0) return MakeAtomicStatement(stmt, kAtomic, parent, walk);
   VpiObject* call = MakeCallStatement(stmt, parent, walk);
   if (call != nullptr) return call;
-  VpiObject* made = MakeControlOrAssign(stmt, parent, walk);
+  VpiObject* made = MakeBuiltStmt(stmt, parent, walk);
   if (made != nullptr) return made;
   const int kBlock = BlockKind(stmt);
   if (kBlock != 0) return MakeBlock(stmt, kBlock, parent, walk);
-  WalkUnbuiltStmt(stmt, parent, walk);
+  WalkSubStmts(stmt, parent, walk);
   return nullptr;
 }
 
@@ -846,7 +836,7 @@ VpiObject* WalkProcessBody(const RtlirProcess& proc, const BlockParent& parent,
   control.events = proc.sensitivity;
   control.is_star_event = proc.is_star_sensitivity;
   control.body = proc.body;
-  return MakeControlOrAssign(control, parent, walk);
+  return MakeBuiltStmt(control, parent, walk);
 }
 
 // §37.63: the object a procedure stands as, one of the three kinds the
@@ -916,11 +906,8 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   // instance whose procedure writes it, and detail 1 makes a named one, and an
   // unnamed one declaring a block item, a scope; §37.62: each event trigger
   // is an event statement, §37.42: each call of a task, a method task or a
-  // system task a call statement, §37.64: each assignment an assignment,
-  // §37.65 and §37.68: each event and delay control a control holding the
-  // statement it guards, and §37.79: each assign, deassign, force and release
-  // an object of its kind, each hung from the block or statement it stands
-  // in.
+  // system task a call statement, and each statement VpiBuiltStmtKind names
+  // an object of its kind, each hung from the block or statement it stands in.
   if (design == nullptr || design->top_modules.empty() ||
       design->top_modules.front() == nullptr) {
     return;

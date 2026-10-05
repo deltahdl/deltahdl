@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -184,6 +187,57 @@ TEST_F(Waits, ElseStatementIsNullWhenTheOrderedWaitHasOnlyABody) {
   wait_fork.type = vpiWaitFork;
   wait_fork.children = {&body};
   EXPECT_EQ(VpiOrderedWaitElseStmt(&wait_fork), nullptr);
+}
+
+// The waits of a run: those a design's procedures write, built from the
+// elaborated design rather than by hand (#5001).
+class WaitsOfARun : public VpiDesignRun {
+ protected:
+  // The statements the begin block `top`'s first procedure runs holds.
+  static std::vector<vpiHandle> BlockStatements() {
+    std::vector<vpiHandle> stmts;
+    vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+    vpiHandle block = procs ? vpi_handle(vpiStmt, vpi_scan(procs)) : nullptr;
+    vpiHandle it = block ? vpi_iterate(vpiStmt, block) : nullptr;
+    while (vpiHandle stmt = it ? vpi_scan(it) : nullptr) stmts.push_back(stmt);
+    return stmts;
+  }
+};
+
+// A wait reaches the condition it waits on and the statement it guards; a wait
+// fork, which waits on no condition, reaches none.
+TEST_F(WaitsOfARun, AWaitAndAWaitForkAreObjectsOfTheRun) {
+  Run("module top; bit c; int a;\n"
+      "  initial begin fork #1; join_none wait fork; wait (c) a = 1; end\n"
+      "  initial #2 c = 1;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kStmts = BlockStatements();
+  ASSERT_EQ(kStmts.size(), 3U);
+  EXPECT_EQ(vpi_get(vpiType, kStmts[1]), vpiWaitFork);
+  EXPECT_EQ(vpi_handle(vpiCondition, kStmts[1]), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, kStmts[2]), vpiWait);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, kStmts[2])),
+            VpiObjectOf(By("top.c")));
+  vpiHandle guarded = vpi_handle(vpiStmt, kStmts[2]);
+  ASSERT_NE(guarded, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, guarded), vpiAssignment);
+}
+
+// An ordered wait reaches its action through vpiStmt and its else action
+// through vpiElseStmt.
+TEST_F(WaitsOfARun, AnOrderedWaitReachesBothActions) {
+  Run("module top; event a, b; int r;\n"
+      "  initial begin wait_order (a, b) r = 1; else r = 2; end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kStmts = BlockStatements();
+  ASSERT_EQ(kStmts.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kStmts[0]), vpiOrderedWait);
+  vpiHandle action = vpi_handle(vpiStmt, kStmts[0]);
+  vpiHandle otherwise = vpi_handle(vpiElseStmt, kStmts[0]);
+  ASSERT_NE(action, nullptr);
+  ASSERT_NE(otherwise, nullptr);
+  EXPECT_NE(VpiObjectOf(action), VpiObjectOf(otherwise));
+  EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
 }
 
 }  // namespace

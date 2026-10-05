@@ -11,6 +11,10 @@ bool VpiIsExprOperandType(int type) {
   return VpiIsExprType(type) || VpiIsNetsType(type) || VpiIsVariablesType(type);
 }
 
+bool VpiIsOperandObject(VpiHandle obj) {
+  return VpiIsExprOperandType(obj->type) && !obj->written_as_stmt;
+}
+
 bool VpiIsExprObject(VpiHandle obj) {
   return VpiIsExprType(obj->type) && !obj->written_as_stmt;
 }

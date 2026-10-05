@@ -247,8 +247,8 @@ TEST_F(AtomicStatementsOfARun, ANullStatementIsAnObjectOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, body)), VpiObjectOf(proc));
 }
 
-// A break and a continue are objects of the run, standing in the block that
-// holds them and running in its procedure.
+// A break and a continue are objects of the run, standing in the block or the
+// if statement that holds them and running in the procedure.
 TEST_F(AtomicStatementsOfARun, ABreakAndAContinueAreObjectsOfTheRun) {
   Run("module top; initial for (int i = 0; i < 2; i++) begin : lp\n"
       "  if (i == 0) continue;\n"
@@ -256,7 +256,9 @@ TEST_F(AtomicStatementsOfARun, ABreakAndAContinueAreObjectsOfTheRun) {
       "end endmodule\n");
   vpiHandle lp = By("top.lp");
   ASSERT_NE(lp, nullptr);
-  EXPECT_EQ(KindsOf(vpiContinue, lp), std::vector<int>{vpiContinue});
+  vpiHandle branch = First(vpiIf, lp);
+  ASSERT_NE(branch, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiStmt, branch)), vpiContinue);
   EXPECT_EQ(KindsOf(vpiBreak, lp), std::vector<int>{vpiBreak});
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, First(vpiBreak, lp))),
             VpiObjectOf(First(vpiProcess, By("top"))));

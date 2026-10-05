@@ -2,6 +2,7 @@
 
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -31,7 +32,7 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   // first expression child. Null when none is attached.
   if (!loop || !VpiIsWhileOrRepeatType(loop->type)) return nullptr;
   for (auto* child : loop->children) {
-    if (VpiIsExprObject(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }
@@ -47,7 +48,7 @@ VpiHandle VpiForConditionExpr(VpiHandle for_stmt) {
   // rather than among its children. Null when no condition is attached.
   if (!for_stmt) return nullptr;
   for (auto* child : for_stmt->children) {
-    if (VpiIsExprObject(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }
@@ -63,7 +64,7 @@ VpiHandle VpiDoWhileConditionExpr(VpiHandle do_while) {
   // attached.
   if (!do_while) return nullptr;
   for (auto* child : do_while->children) {
-    if (VpiIsExprObject(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }

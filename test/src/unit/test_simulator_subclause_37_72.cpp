@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -272,6 +275,63 @@ TEST_F(CasePattern, AStructPatternReachesItsMemberPattern) {
   VpiObject leaf;
   leaf.type = vpiAnyPattern;
   EXPECT_EQ(vpi_handle(vpiPattern, VpiHandleOf(&leaf)), nullptr);
+}
+
+// The case statements of a run: those a design's procedures write, built from
+// the elaborated design rather than by hand (#5005).
+class CaseStatementsOfARun : public VpiDesignRun {
+ protected:
+  static std::vector<vpiHandle> Scanned(vpiHandle it) {
+    std::vector<vpiHandle> objects;
+    while (vpiHandle obj = it ? vpi_scan(it) : nullptr) objects.push_back(obj);
+    return objects;
+  }
+};
+
+// A case reaches its type, the expression it selects on, and an item per case
+// item, each grouping its expressions and reaching its statement; the default
+// item groups none (detail 2).
+TEST_F(CaseStatementsOfARun, ACaseIsAnObjectOfTheRun) {
+  Run("module top; int a, b;\n"
+      "  initial casez (a) 1, 2: b = 1; default: b = 0; endcase\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs =
+      Scanned(vpi_iterate(vpiProcess, By("top")));
+  ASSERT_EQ(kProcs.size(), 1U);
+  vpiHandle selection = vpi_handle(vpiStmt, kProcs[0]);
+  ASSERT_NE(selection, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, selection), vpiCase);
+  EXPECT_EQ(vpi_get(vpiCaseType, selection), vpiCaseZ);
+  EXPECT_EQ(vpi_get(vpiQualifier, selection), vpiNoQualifier);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, selection)),
+            VpiObjectOf(By("top.a")));
+  const std::vector<vpiHandle> kItems =
+      Scanned(vpi_iterate(vpiCaseItem, selection));
+  ASSERT_EQ(kItems.size(), 2U);
+  EXPECT_EQ(Scanned(vpi_iterate(vpiExpr, kItems[0])).size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiStmt, kItems[0])), vpiAssignment);
+  EXPECT_EQ(vpi_iterate(vpiExpr, kItems[1]), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiStmt, kItems[1])), vpiAssignment);
+}
+
+// A unique or priority keyword, and a case inside, are the case's qualifier;
+// a plain case keyword is an exact match.
+TEST_F(CaseStatementsOfARun, ACaseReportsItsQualifier) {
+  Run("module top; int a, b;\n"
+      "  initial unique case (a) 0: b = 1; endcase\n"
+      "  initial priority case (a) inside 1: b = 1; endcase\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs =
+      Scanned(vpi_iterate(vpiProcess, By("top")));
+  ASSERT_EQ(kProcs.size(), 2U);
+  vpiHandle unique = vpi_handle(vpiStmt, kProcs[0]);
+  vpiHandle inside = vpi_handle(vpiStmt, kProcs[1]);
+  ASSERT_NE(unique, nullptr);
+  ASSERT_NE(inside, nullptr);
+  EXPECT_EQ(vpi_get(vpiCaseType, unique), vpiCaseExact);
+  EXPECT_EQ(vpi_get(vpiQualifier, unique), vpiUniqueQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, inside),
+            vpiPriorityQualifier | vpiInsideQualifier);
 }
 
 }  // namespace

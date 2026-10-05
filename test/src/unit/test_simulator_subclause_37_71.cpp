@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -276,6 +279,67 @@ TEST_F(IfIfElse, ConditionalStatementReportsQualifier) {
   VpiObject plain_if;
   plain_if.type = vpiIf;
   EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&plain_if)), vpiNoQualifier);
+}
+
+// The if statements of a run: those a design's procedures write, built from
+// the elaborated design rather than by hand (#5004).
+class IfStatementsOfARun : public VpiDesignRun {
+ protected:
+  // The statements the procedures of `top` run, in order.
+  static std::vector<vpiHandle> Bodies() {
+    std::vector<vpiHandle> bodies;
+    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+    while (vpiHandle proc = it ? vpi_scan(it) : nullptr) {
+      bodies.push_back(vpi_handle(vpiStmt, proc));
+    }
+    return bodies;
+  }
+};
+
+// An if reaches its condition, written as a name here, and the statement it
+// guards, and no else statement; it carries no qualifier.
+TEST_F(IfStatementsOfARun, AnIfIsAnObjectOfTheRun) {
+  Run("module top; int a, b; initial if (a) b = 1; endmodule\n");
+  const std::vector<vpiHandle> kBodies = Bodies();
+  ASSERT_EQ(kBodies.size(), 1U);
+  vpiHandle branch = kBodies[0];
+  ASSERT_NE(branch, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, branch), vpiIf);
+  EXPECT_EQ(vpi_get(vpiQualifier, branch), vpiNoQualifier);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, branch)),
+            VpiObjectOf(By("top.a")));
+  vpiHandle then = vpi_handle(vpiStmt, branch);
+  ASSERT_NE(then, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, then), vpiAssignment);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, branch), nullptr);
+}
+
+// An if-else reaches the two statements it chooses between, an else if being
+// an if of its own; a unique or priority keyword is its qualifier.
+TEST_F(IfStatementsOfARun, AnIfElseReachesBothBranches) {
+  Run("module top; int a, b;\n"
+      "  initial unique if (a == 1) b = 1; else b = 2;\n"
+      "  initial priority if (a) b = 1; else if (b) a = 2;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kBodies = Bodies();
+  ASSERT_EQ(kBodies.size(), 2U);
+  vpiHandle unique = kBodies[0];
+  ASSERT_NE(unique, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, unique), vpiIfElse);
+  EXPECT_EQ(vpi_get(vpiQualifier, unique), vpiUniqueQualifier);
+  EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiCondition, unique)), vpiEqOp);
+  vpiHandle then = vpi_handle(vpiStmt, unique);
+  vpiHandle otherwise = vpi_handle(vpiElseStmt, unique);
+  ASSERT_NE(then, nullptr);
+  ASSERT_NE(otherwise, nullptr);
+  EXPECT_NE(VpiObjectOf(then), VpiObjectOf(otherwise));
+  EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
+  vpiHandle priority = kBodies[1];
+  ASSERT_NE(priority, nullptr);
+  EXPECT_EQ(vpi_get(vpiQualifier, priority), vpiPriorityQualifier);
+  vpiHandle nested = vpi_handle(vpiElseStmt, priority);
+  ASSERT_NE(nested, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, nested), vpiIf);
 }
 
 }  // namespace

@@ -11,19 +11,6 @@
 
 namespace delta {
 
-namespace {
-
-// §37.58: whether `child` is an expression a control is written over - an
-// object of the expr class, or a net or variable, which `simple expr` draws
-// beside the others - rather than the statement the control guards. A
-// condition written as a bare name, @(clk) or #d, is the net or variable the
-// name stands for, which the expr class alone left out.
-bool IsOperandExpr(VpiHandle child) {
-  return VpiIsExprOperandType(child->type) && !child->written_as_stmt;
-}
-
-}  // namespace
-
 // ===========================================================================
 // §37.65 Event control, §37.68 Delay control, §37.69 Repeat control. The three
 // timing controls §37.64 draws an assignment reaching, which are read together
@@ -68,7 +55,7 @@ VpiHandle VpiEventControlConditionExpr(VpiHandle event_control) {
   // this scan. Null when no condition operand is attached.
   if (!event_control) return nullptr;
   for (auto* child : event_control->children) {
-    if (IsOperandExpr(child) || child->type == vpiSequenceInst ||
+    if (VpiIsOperandObject(child) || child->type == vpiSequenceInst ||
         child->type == vpiNamedEvent) {
       return child;
     }
@@ -88,7 +75,7 @@ VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control) {
   // own type is vpiEventControl and is left to the generic traversal.
   if (!repeat_control) return nullptr;
   for (auto* child : repeat_control->children) {
-    if (IsOperandExpr(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }
@@ -126,7 +113,7 @@ VpiHandle VpiDelayControlDelayExpr(VpiHandle delay_control) {
   // cannot serve it. Null when no delay operand is attached.
   if (!delay_control) return nullptr;
   for (auto* child : delay_control->children) {
-    if (IsOperandExpr(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }

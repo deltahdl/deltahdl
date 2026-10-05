@@ -1,10 +1,13 @@
+#include <cstddef>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -136,9 +139,126 @@ void FillAssignment(VpiObject* obj, const Stmt& stmt,
   MakeIntraAssignmentControl(obj, stmt, with);
 }
 
+// `child` among the children of `obj`, where one was made.
+void AddChild(VpiObject* obj, VpiObject* child) {
+  if (child != nullptr) obj->children.push_back(child);
+}
+
+// §37.71 and §37.72: the qualifier a unique, unique0 or priority keyword gives
+// an if or case statement, with §37.72's inside and tagged bits for a case
+// inside (§12.5.4) and a case matches (§12.6.1). Annex M gives unique0 no bit
+// of its own; §12.4.2 makes it a unique that reports no violation where no
+// branch matches, so it reports the unique bit.
+int QualifierOf(const Stmt& stmt) {
+  int qualifier = vpiNoQualifier;
+  if (stmt.qualifier == CaseQualifier::kUnique ||
+      stmt.qualifier == CaseQualifier::kUnique0) {
+    qualifier |= vpiUniqueQualifier;
+  } else if (stmt.qualifier == CaseQualifier::kPriority) {
+    qualifier |= vpiPriorityQualifier;
+  }
+  if (stmt.case_inside) qualifier |= vpiInsideQualifier;
+  if (stmt.case_matches) qualifier |= vpiTaggedQualifier;
+  return qualifier;
+}
+
+// §37.72: a case statement's type, the keyword it opens with, its qualifier,
+// the expression it selects on, and an item per case item of §12.5 grouping
+// the expressions that branch to its statement (detail 1); a default item
+// groups none (detail 2).
+void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
+  obj->case_type = stmt.case_kind == TokenKind::kKwCasex   ? vpiCaseX
+                   : stmt.case_kind == TokenKind::kKwCasez ? vpiCaseZ
+                                                           : vpiCaseExact;
+  obj->qualifier = QualifierOf(stmt);
+  AddChild(obj, with.expression(stmt.condition));
+  for (const CaseItem& item : stmt.case_items) {
+    VpiObject* made = with.build.alloc();
+    made->type = vpiCaseItem;
+    made->parent = obj;
+    made->process = obj->process;
+    made->default_case_item = item.is_default;
+    obj->children.push_back(made);
+    for (const Expr* pattern : item.patterns) {
+      AddChild(made, with.expression(pattern));
+    }
+    with.statement(item.body, made);
+  }
+}
+
+// §37.74: the statements one part of a for header writes, built under the for
+// statement and held apart from its children, where the body is looked for.
+std::vector<VpiObject*> HeaderStmts(VpiObject* obj,
+                                    const std::vector<Stmt*>& stmts,
+                                    const VpiStmtBuild& with) {
+  const std::size_t kBefore = obj->children.size();
+  for (const Stmt* header : stmts) with.statement(header, obj);
+  const auto kFirst =
+      obj->children.begin() + static_cast<std::ptrdiff_t>(kBefore);
+  std::vector<VpiObject*> made(kFirst, obj->children.end());
+  obj->children.erase(kFirst, obj->children.end());
+  return made;
+}
+
+// §37.74: a for statement's header, its condition and its body, and whether
+// it declares its loop variables, which §37.12 detail 2 makes it a scope for.
+void FillFor(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
+  obj->local_var_decls =
+      !stmt.for_init_types.empty() &&
+      stmt.for_init_types.front().kind != DataTypeKind::kImplicit;
+  AddChild(obj, with.expression(stmt.for_cond));
+  obj->for_init_stmts = HeaderStmts(obj, stmt.for_inits, with);
+  obj->for_inc_stmts = HeaderStmts(obj, stmt.for_steps, with);
+  obj->body = with.statement(stmt.for_body, obj);
+}
+
+// §37.75: the array a foreach statement indexes (detail 1), its index
+// variables in order with none for one skipped (detail 2), which §12.7.3
+// declares as int variables of the statement, and its body.
+void FillForeach(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
+  obj->foreach_array = with.expression(stmt.expr);
+  for (std::string_view name : stmt.foreach_vars) {
+    VpiObject* var = nullptr;
+    if (!name.empty()) {
+      var = with.build.alloc();
+      var->type = vpiIntVar;
+      var->name = with.build.keep(std::string(name));
+      var->parent = obj;
+    }
+    obj->loop_vars.push_back(var);
+  }
+  obj->body = with.statement(stmt.body, obj);
+}
+
+// §37.67: an ordered wait's events, in order, and the statements of its
+// action block, the else action second.
+void FillOrderedWait(VpiObject* obj, const Stmt& stmt,
+                     const VpiStmtBuild& with) {
+  for (const Expr* event : stmt.wait_order_events) {
+    AddChild(obj, with.expression(event));
+  }
+  with.statement(stmt.then_branch, obj);
+  with.statement(stmt.else_branch, obj);
+}
+
+// The objects a statement holding a condition and the statements it runs
+// reaches: §37.66's while and repeat, §37.67's wait, §37.70's forever,
+// §37.71's if and if-else, and §37.75's do-while.
+void FillConditional(VpiObject* obj, const Stmt& stmt,
+                     const VpiStmtBuild& with) {
+  if (stmt.kind == StmtKind::kIf) obj->qualifier = QualifierOf(stmt);
+  AddChild(obj, with.expression(stmt.condition));
+  if (stmt.kind == StmtKind::kIf) {
+    with.statement(stmt.then_branch, obj);
+    with.statement(stmt.else_branch, obj);
+    return;
+  }
+  obj->body = with.statement(stmt.body, obj);
+}
+
 }  // namespace
 
-int VpiControlOrAssignKind(const Stmt& stmt) {
+int VpiBuiltStmtKind(const Stmt& stmt) {
   switch (stmt.kind) {
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
@@ -155,37 +275,77 @@ int VpiControlOrAssignKind(const Stmt& stmt) {
       return vpiForce;
     case StmtKind::kRelease:
       return vpiRelease;
+    case StmtKind::kIf:
+      return stmt.else_branch != nullptr ? vpiIfElse : vpiIf;
+    case StmtKind::kCase:
+      return vpiCase;
+    case StmtKind::kForever:
+      return vpiForever;
+    case StmtKind::kWhile:
+      return vpiWhile;
+    case StmtKind::kRepeat:
+      return vpiRepeat;
+    case StmtKind::kDoWhile:
+      return vpiDoWhile;
+    case StmtKind::kFor:
+      return vpiFor;
+    case StmtKind::kForeach:
+      return vpiForeachStmt;
+    case StmtKind::kWait:
+      return vpiWait;
+    case StmtKind::kWaitFork:
+      return vpiWaitFork;
+    case StmtKind::kWaitOrder:
+      return vpiOrderedWait;
     default:
       return 0;
   }
 }
 
-void VpiFillControlOrAssign(VpiObject* obj, const Stmt& stmt,
-                            const VpiStmtBuild& with) {
+void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   switch (stmt.kind) {
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
       FillAssignment(obj, stmt, with);
       return;
-    case StmtKind::kEventControl: {
+    case StmtKind::kEventControl:
       // §37.65: the condition the control waits on, which an implicit event
-      // list leaves unwritten.
-      VpiObject* condition =
-          stmt.is_star_event ? nullptr : EventCondition(stmt.events, with);
-      if (condition != nullptr) obj->children.push_back(condition);
+      // list leaves unwritten, and the statement it guards.
+      AddChild(obj, stmt.is_star_event ? nullptr
+                                       : EventCondition(stmt.events, with));
+      obj->body = with.statement(stmt.body, obj);
       return;
-    }
-    case StmtKind::kDelay: {
-      // §37.68: the delay the control waits, reached through vpiDelay.
-      VpiObject* delay = with.expression(stmt.delay);
-      if (delay != nullptr) obj->children.push_back(delay);
+    case StmtKind::kDelay:
+      // §37.68: the delay the control waits, reached through vpiDelay, and the
+      // statement it delays.
+      AddChild(obj, with.expression(stmt.delay));
+      obj->body = with.statement(stmt.body, obj);
       return;
-    }
-    default:
+    case StmtKind::kAssign:
+    case StmtKind::kDeassign:
+    case StmtKind::kForce:
+    case StmtKind::kRelease:
       // §37.79: the target an assign, deassign, force or release names, and
       // the expression an assign or force drives it with.
       obj->lhs = with.expression(stmt.lhs);
       obj->rhs = with.expression(stmt.rhs);
+      return;
+    case StmtKind::kCase:
+      FillCase(obj, stmt, with);
+      return;
+    case StmtKind::kFor:
+      FillFor(obj, stmt, with);
+      return;
+    case StmtKind::kForeach:
+      FillForeach(obj, stmt, with);
+      return;
+    case StmtKind::kWaitOrder:
+      FillOrderedWait(obj, stmt, with);
+      return;
+    case StmtKind::kWaitFork:
+      return;
+    default:
+      FillConditional(obj, stmt, with);
       return;
   }
 }

@@ -179,7 +179,7 @@ VpiHandle VpiCaseConditionExpr(VpiHandle case_stmt) {
   // selects on was reachable from the case by no route.
   if (!case_stmt) return nullptr;
   for (auto* child : case_stmt->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }
@@ -281,7 +281,8 @@ bool VpiIsBodyStmtOwnerType(int type) {
   // from the children so that none of them stands where the body is looked for;
   // and §37.75 from a do-while and from a foreach statement, whose other edges
   // reach a condition, the array being indexed and the index variables, none of
-  // them a statement.
+  // them a statement; and §37.72 from a case item, whose others reach its
+  // conditions.
   //
   // Every kind but the process and §37.66's two loops was left out, so the
   // relation fell through to the traversal that looks for a child whose own
@@ -294,7 +295,7 @@ bool VpiIsBodyStmtOwnerType(int type) {
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
          VpiIsWaitType(type) || type == vpiForever ||
          VpiIsIfOrIfElseType(type) || type == vpiExpectStmt || type == vpiFor ||
-         type == vpiDoWhile || type == vpiForeachStmt;
+         type == vpiDoWhile || type == vpiForeachStmt || type == vpiCaseItem;
 }
 
 bool VpiIsWaitType(int type) {
@@ -315,7 +316,7 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
   // edge.
   if (!wait) return nullptr;
   for (auto* child : wait->children) {
-    if (VpiIsExprObject(child) || child->type == vpiSequenceInst) {
+    if (VpiIsOperandObject(child) || child->type == vpiSequenceInst) {
       return child;
     }
   }
@@ -437,7 +438,7 @@ VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
   // when none is attached.
   if (!if_stmt) return nullptr;
   for (auto* child : if_stmt->children) {
-    if (VpiIsExprObject(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }
