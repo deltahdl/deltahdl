@@ -383,6 +383,16 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->parent;
     return true;
   }
+  // §37.16 detail 31, §37.17 detail 26: a select of a packed vector that
+  // leaves dimensions unindexed, or whose index varies, reaches the vector it
+  // selects from, the largest packed array containing it.
+  const bool kPackedSelect = ref->select_dim.has_value() ||
+                             (ref->bit_offset >= 0 && ref->type != vpiNetBit &&
+                              ref->type != vpiRegBit);
+  if (kPackedSelect && ref->parent != nullptr) {
+    out = ref->parent;
+    return true;
+  }
   // §37.58 (figure): a bit select reaches the vector it selects into through
   // vpiParent. The relation is a tag no object's type is, so the traversal this
   // falls through to reached the vector from none of its bit-selects.
