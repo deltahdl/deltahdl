@@ -192,6 +192,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                                   return std::string_view(name_pool_.back());
                                 },
                                 sim_ctx_->GetArena()};
+    // The scopes the passes below hang a generate block's objects from are
+    // the gen scopes this makes.
+    AttachGenScopes(design, object_map_, kBuild);
     // A continuous assignment's bit select is the bit made here, so the bits
     // come first.
     AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);

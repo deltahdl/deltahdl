@@ -643,6 +643,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_builtins.cpp
     simulator/vpi_design_attach_classes.cpp
     simulator/vpi_design_attach_elements.cpp
+    simulator/vpi_design_attach_gen_scopes.cpp
     simulator/vpi_design_attach_instances.cpp
     simulator/vpi_design_attach_members.cpp
     simulator/vpi_design_attach_params.cpp

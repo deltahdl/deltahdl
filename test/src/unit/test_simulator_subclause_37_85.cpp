@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -225,6 +228,60 @@ TEST_F(Generates, GenVarReferenceInAGenScopeIsALocalParameter) {
   net_ref.parent = &gen_scope;
 
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&net_ref)), 0);
+}
+
+// The generates of a run: those a design writes, built from the elaborated
+// design rather than by hand (#4958, #5069).
+class GeneratesOfARun : public VpiDesignRun {};
+
+constexpr const char* kGenerates =
+    "module top;\n"
+    "  for (genvar i = 0; i < 3; i++) begin : g logic v; end\n"
+    "  if (1) begin : c logic w; end\n"
+    "endmodule\n";
+
+// A loop generate's block instance is a gen scope, an element of the loop's
+// array reaching its index, the genvar's value in its iteration.
+TEST_F(GeneratesOfARun, ALoopBlockInstanceIsAGenScope) {
+  Run(kGenerates);
+  vpiHandle block = By("top.g[2]");
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, block), vpiGenScope);
+  EXPECT_EQ(vpi_get(vpiArrayMember, block), 1);
+  vpiHandle index = vpi_handle(vpiIndex, block);
+  ASSERT_NE(index, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(index, &value);
+  EXPECT_EQ(value.value.integer, 2);
+}
+
+// The instances of a loop generate's block are the elements of a gen scope
+// array the instance reaches, sized by their number (detail 1) and reaching
+// each by its index.
+TEST_F(GeneratesOfARun, ALoopsBlocksAreAGenScopeArray) {
+  Run(kGenerates);
+  EXPECT_EQ(KindsOf(vpiGenScopeArray, By("top")),
+            std::vector<int>{vpiGenScopeArray});
+  vpiHandle it = vpi_iterate(vpiGenScopeArray, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle array = vpi_scan(it);
+  ASSERT_NE(array, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, array), "g");
+  EXPECT_EQ(vpi_get(vpiSize, array), 3);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(array, 1)),
+            VpiObjectOf(By("top.g[1]")));
+}
+
+// A conditional generate's block instance is a gen scope of its own, the
+// element of no array.
+TEST_F(GeneratesOfARun, AConditionalBlockInstanceIsAGenScope) {
+  Run(kGenerates);
+  vpiHandle block = By("top.c");
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, block), vpiGenScope);
+  EXPECT_EQ(vpi_get(vpiArrayMember, block), 0);
+  EXPECT_EQ(vpi_handle(vpiIndex, block), nullptr);
 }
 
 }  // namespace

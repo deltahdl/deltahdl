@@ -317,6 +317,12 @@ struct VpiCallBuild {
   const VpiSubroutineObjects& subroutines;
 };
 
+// §37.85: make each generate block instance of each instance the gen scope it
+// is, and each iteration of a loop generate an element, reached by its index,
+// of the gen scope array the instance holds for the loop's block.
+void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
+                     const VpiAttachBuild& build);
+
 // §37.14 details 3, 4 and 10: link each port of each instance to its higher
 // connection, the expression the instantiation wrote for it, and its lower
 // one, the instance's own net or variable of the port. The ports are those
