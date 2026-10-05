@@ -825,22 +825,44 @@ VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
   return process;
 }
 
-// The assertions one instance writes as items, each in the generate block
-// instance writing it, and the procedures it declares with the objects their
-// bodies hold, walked with `instance_walk`, whose process each procedure's
-// own replaces. An assertion the elaborator carries as a process is no
-// procedure the source wrote, a concurrent one being the item's (§37.50).
+// `make` called for each entry of `items`, an item `instance` writes, with
+// the generate block instance writing it and what a statement written there
+// builds the objects it reaches with, a name resolving in that block first
+// (§27.4).
+template <typename Scoped, typename Make>
+void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
+                       const std::vector<Scoped>& items, const Make& make) {
+  for (const Scoped& entry : items) {
+    VpiObject* scope = VpiGenScopeOf(instance, entry.gen_block_path);
+    if (scope == nullptr || entry.item == nullptr) continue;
+    BodyWalk walk = instance_walk;
+    walk.gen_prefixes = &entry.gen_block_prefixes;
+    const BlockParent kParent{scope, scope->full_name};
+    make(entry, scope, StmtBuildAt(kParent, walk));
+  }
+}
+
+// The properties one instance declares and the assertions it writes as
+// items, each in the generate block instance writing it, and the procedures
+// it declares with the objects their bodies hold, walked with
+// `instance_walk`, whose process each procedure's own replaces. A property
+// is built ahead of the assertions instantiating it (§37.51). An assertion
+// the elaborator carries as a process is no procedure the source wrote, a
+// concurrent one being the item's (§37.50).
 void AttachInstanceProcedures(VpiObject* instance,
                               const BodyWalk& instance_walk) {
-  for (const RtlirAssertion& assertion : instance_walk.mod.assertions) {
-    VpiObject* scope = VpiGenScopeOf(instance, assertion.gen_block_path);
-    if (scope == nullptr || assertion.item == nullptr) continue;
-    BodyWalk walk = instance_walk;
-    walk.gen_prefixes = &assertion.gen_block_prefixes;
-    VpiMakeItemAssertion(
-        *assertion.item, scope, walk.calls.ctx,
-        StmtBuildAt(BlockParent{scope, scope->full_name}, walk));
-  }
+  AttachScopedItems(instance, instance_walk,
+                    instance_walk.mod.declared_properties,
+                    [](const RtlirPropertyDecl& declared, VpiObject* scope,
+                       const VpiStmtBuild& with) {
+                      VpiMakePropertyDecl(*declared.item, scope, with);
+                    });
+  AttachScopedItems(
+      instance, instance_walk, instance_walk.mod.assertions,
+      [&instance_walk](const RtlirAssertion& assertion, VpiObject* scope,
+                       const VpiStmtBuild& with) {
+        VpiMakeItemAssertion(assertion, scope, instance_walk.calls.ctx, with);
+      });
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
     // A process stands in the generate block instance its path names.
     VpiObject* scope = VpiGenScopeOf(instance, proc.gen_block_path);

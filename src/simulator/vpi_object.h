@@ -499,6 +499,8 @@ struct VpiObject {
   // a subroutine the design declares, the task or function object of that
   // declaration, which vpiTask or vpiFunction reaches.
   VpiObject* tf_decl = nullptr;
+  // §37.51: for a property inst, the property decl it instantiates.
+  VpiObject* property_decl = nullptr;
 
   // §37.77 (figure): for a disable a run built, the task, function, named
   // begin or named fork it names, which vpiExpr reaches. It is held apart
@@ -546,10 +548,11 @@ struct VpiObject {
   VpiObject* user_systf = nullptr;
 
   // §37.42 (figure): the arguments a tf call was written with, in order, which
-  // the vpiArgument iteration walks. They are held here rather than among the
-  // call's children because an argument may name a scope standing around the
-  // call, and hung below the call that scope would make the walks down the
-  // model's children a loop. Empty for every object that is no tf call.
+  // the vpiArgument iteration walks, as it walks a property inst's (§37.51).
+  // They are held here rather than among the call's children because an
+  // argument may name a scope standing around the call, and hung below the
+  // call that scope would make the walks down the model's children a loop.
+  // Empty for every object that is neither.
   std::vector<VpiObject*> arguments;
 
   // §37.60 with §37.59: whether a tf call was written as a statement. Both

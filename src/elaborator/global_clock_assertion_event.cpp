@@ -215,6 +215,13 @@ Stmt* SubstituteGlobalClockEventControls(
   if (IsGlobalClockLeadingEvent(stmt->events)) {
     SubstituteGlobalClockLeadingEvent(owner.Mutable()->events, global_event);
   }
+  // §16.5.2: a concurrent assertion embedded in procedural code and clocked by
+  // $global_clock is clocked by the declaration's event, as one written as an
+  // item is.
+  if (IsGlobalClockLeadingEvent(stmt->assert_clock)) {
+    SubstituteGlobalClockLeadingEvent(owner.Mutable()->assert_clock,
+                                      global_event);
+  }
   SubstituteGlobalClockInSubStmts(owner, global_event);
   return owner.current;
 }

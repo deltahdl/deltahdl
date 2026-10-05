@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -154,7 +156,7 @@ TEST(PropertyDeclModel, PropertyInstResolvesItsDeclaration) {
   inst.type = vpiPropertyInst;
   VpiObject decl;
   decl.type = vpiPropertyDecl;
-  inst.children = {&decl};
+  inst.property_decl = &decl;
   EXPECT_EQ(VpiPropertyInstDecl(&inst), &decl);
 
   VpiObject lone;
@@ -221,6 +223,104 @@ TEST(PropertyDeclModel, PropertyDeclAndFormalReportTheirNames) {
   // No full name stored on the formal -> the full-name query falls back to the
   // simple name.
   EXPECT_STREQ(ctx.GetStr(vpiFullName, &formal), "a");
+}
+
+class PropertyDeclsOfARun : public VpiDesignRun {
+ protected:
+  // The name of what `relation` reaches from `ref`, empty for nothing.
+  static std::string NameReached(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
+  }
+
+  // The names of the objects of `relation` `ref` reaches, in the order
+  // reached.
+  static std::vector<std::string> NamesOf(int relation, vpiHandle ref) {
+    std::vector<std::string> names;
+    vpiHandle it = vpi_iterate(relation, ref);
+    if (it == nullptr) return names;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      names.emplace_back(vpi_get_str(vpiName, h));
+    }
+    return names;
+  }
+};
+
+// A property a module declares is a property decl of its instance, named in
+// it, reaching its formals in the order declared (detail 1), each of no
+// direction (detail 5) and a default value through vpiExpr (detail 4), and its
+// property spec (#5086).
+TEST_F(PropertyDeclsOfARun, AnInstanceReachesThePropertyItDeclares) {
+  Run("module top; logic clk, rst, a, b;\n"
+      "  property p(x, y = b);\n"
+      "    @(posedge clk) disable iff (rst) a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.p");
+  EXPECT_EQ(NamesOf(vpiPropFormalDecl, decl),
+            (std::vector<std::string>{"x", "y"}));
+  vpiHandle y = Named(vpiPropFormalDecl, decl, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, y), vpiNoDirection);
+  EXPECT_EQ(NameReached(vpiExpr, y), "b");
+  EXPECT_EQ(NameReached(vpiExpr, Named(vpiPropFormalDecl, decl, "x")), "");
+  vpiHandle spec = vpi_handle(vpiPropertySpec, decl);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
+  EXPECT_EQ(NameReached(vpiDisableCondition, spec), "rst");
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+}
+
+// A property a generate block declares is one of that block's instance
+// (§37.12, §27.4) (#5086).
+TEST_F(PropertyDeclsOfARun, AGenerateBlockReachesThePropertyItDeclares) {
+  Run("module top; logic clk, a;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g\n"
+      "    property q; @(posedge clk) a; endproperty\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top.g[0]"), "q");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.g[0].q");
+  EXPECT_EQ(Named(vpiPropertyDecl, By("top"), "q"), nullptr);
+}
+
+// An assertion instantiating a declared property reaches a property inst
+// through vpiProperty, which reaches the declaration and its arguments in the
+// order of the formals, a default standing for one not given (detail 2)
+// (#5086).
+TEST_F(PropertyDeclsOfARun, AnAssertionReachesThePropertyInstItWrites) {
+  Run("module top; logic clk, a, b;\n"
+      "  property p(x, y = b); @(posedge clk) x; endproperty\n"
+      "  a1: assert property (p(a));\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inst), vpiPropertyInst);
+  vpiHandle decl = vpi_handle(vpiPropertyDecl, inst);
+  ASSERT_NE(decl, nullptr);
+  EXPECT_TRUE(
+      vpi_compare_objects(decl, Named(vpiPropertyDecl, By("top"), "p")));
+  EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a", "b"}));
+}
+
+// One embedded in a procedure reaches its property inst the same way (#5086).
+TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
+  Run("module top; logic clk, a;\n"
+      "  property p(x); x; endproperty\n"
+      "  always @(posedge clk) p1: assert property (p(a));\n"
+      "endmodule\n");
+  vpiHandle p1 = Named(vpiAssertion, By("top"), "p1");
+  ASSERT_NE(p1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, p1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inst), vpiPropertyInst);
+  EXPECT_EQ(NameReached(vpiPropertyDecl, inst), "p");
+  EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a"}));
 }
 
 }  // namespace

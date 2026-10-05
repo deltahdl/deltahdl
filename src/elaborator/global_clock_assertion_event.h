@@ -41,7 +41,8 @@ bool SubstituteGlobalClockLeadingEvent(
 // control into `global_event`, by the same substitution
 // SubstituteGlobalClockLeadingEvent makes on a leading clocking event, so the
 // process suspends on the declared event rather than on a system call naming
-// no signal.
+// no signal. A concurrent assertion's leading clock written as $global_clock is
+// rewritten the same way (§16.5.2).
 //
 // Returns the statement tree to use, which is `stmt` itself where nothing was
 // rewritten -- where no event control named $global_clock, and where

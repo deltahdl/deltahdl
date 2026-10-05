@@ -8,6 +8,7 @@
 
 namespace delta {
 
+struct EventExpr;
 struct ModuleItem;
 
 // The scopes a generate construct opens (§27.4) and the hierarchical path
@@ -159,6 +160,17 @@ struct RtlirGenBlockClocking {
   GenBlockPrefixes gen_block_prefixes;
 };
 
+// §37.12 and §37.51 with §27.4: a property a module body declares, with the
+// generate block instance declaring it, which is the scope it belongs to.
+struct RtlirPropertyDecl {
+  const ModuleItem* item = nullptr;
+  // The generate block instances between the module and the declaration,
+  // outermost first; empty for a property of the module itself.
+  HierPath gen_block_path;
+  // §27.4: the prefixes of those instances, innermost last.
+  GenBlockPrefixes gen_block_prefixes;
+};
+
 // §37.49 with §27.4: an assertion a module body writes as an item, with the
 // generate block instance it stands in. The instances of a loop generate block
 // share one body, so the item alone says not which instance wrote the entry.
@@ -170,6 +182,10 @@ struct RtlirAssertion {
   // §27.4: the prefixes of those instances, innermost last, whose
   // declarations a name the assertion writes finds first.
   GenBlockPrefixes gen_block_prefixes;
+  // §16.5.2 and §14.14: where the item's leading clock is $global_clock, the
+  // event this instance's effective global clocking declaration names; null
+  // where the clock written stands.
+  const std::vector<EventExpr>* leading_clock = nullptr;
 };
 
 // Appends `member` to `members` as a declaration of the generate block instance

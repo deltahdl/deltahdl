@@ -23,6 +23,7 @@ struct EventExpr;
 enum class DataTypeKind : uint8_t;
 struct Expr;
 struct ModuleItem;
+struct RtlirAssertion;
 struct RtlirDesign;
 struct RtlirModule;
 struct Stmt;
@@ -323,6 +324,33 @@ void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
 VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
                                const VpiStmtBuild& with);
 
+// §37.52: what a property spec is made of: the clock written or inferred for
+// it, its disable condition, and the expression of a Boolean property, null
+// for a property of any other form.
+struct VpiPropertySpecParts {
+  const std::vector<EventExpr>& clock;
+  const Expr* disable = nullptr;
+  const Expr* boolean = nullptr;
+};
+
+// §37.52: the property spec of `parts`, hung from `holder`.
+VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
+                                 const VpiPropertySpecParts& parts,
+                                 const VpiStmtBuild& with);
+
+// §37.51: the property inst the spec `instance` writes, an instance of a
+// declared property, hung from the assertion `holder`, reaching the property
+// decl of that name the scope around `holder` declares and its arguments, each
+// built through `with`.
+VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
+                               const VpiStmtBuild& with);
+
+// §37.12 and §37.51: the property decl of the property `decl` declares, hung
+// from `scope`, the instance or the generate block instance declaring it,
+// with its formals and its property spec, each built through `with`.
+VpiObject* VpiMakePropertyDecl(const ModuleItem& decl, VpiObject* scope,
+                               const VpiStmtBuild& with);
+
 // The objects `obj`, made for `stmt` with the kind above, reaches: the
 // expressions its figure draws and the statements it holds, each built
 // through `with`.
@@ -382,12 +410,13 @@ void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
-// §37.49 and §37.50: the assertion object of the concurrent assertion `item`
-// writes as an item, hung from `scope`, the generate block instance writing it
-// or the instance itself, with its clock, its property spec and its actions,
-// each built through `with`; none for a deferred immediate assertion, which
-// stands as the statement its process runs.
-void VpiMakeItemAssertion(const ModuleItem& item, VpiObject* scope,
+// §37.49 and §37.50: the assertion object of the concurrent assertion an
+// instance writes as an item, `assertion`, hung from `scope`, the generate
+// block instance writing it or the instance itself, with its clock, its
+// property spec and its actions, each built through `with`; none for a
+// deferred immediate assertion, which stands as the statement its process
+// runs.
+void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
                           SimContext& ctx, const VpiStmtBuild& with);
 
 // §37.49: give the assertion `obj` the location of its text, `range`: its

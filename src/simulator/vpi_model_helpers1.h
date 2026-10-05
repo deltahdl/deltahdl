@@ -381,7 +381,8 @@ VpiHandle VpiPropFormalTypespec(VpiHandle formal);
 
 // §37.51 detail 4: the initialization expression of a property formal, reached
 // through vpiExpr. The diagram draws this target as a named event or a property
-// expression; null when the formal has no initialization expression.
+// expression, a net or variable named among them; null when the formal has no
+// initialization expression.
 VpiHandle VpiPropFormalInitExpr(VpiHandle formal);
 
 // §37.51 detail 2: a property formal as seen by the property-instance argument
@@ -406,8 +407,9 @@ std::vector<VpiHandle> VpiPropertyInstArguments(
 bool VpiIsPropertyArgumentType(int type);
 
 // §37.51: the property declaration a property instance instantiates (the
-// diagram's property inst -> property decl edge), its vpiPropertyDecl child;
-// null for a null handle or an instance with no declaration attached.
+// diagram's property inst -> property decl edge), held in
+// VpiObject::property_decl; null for a null handle or an instance with no
+// declaration attached.
 VpiHandle VpiPropertyInstDecl(VpiHandle property_inst);
 
 // §37.56: the clocked-seq members of a multiclock sequence expression. The

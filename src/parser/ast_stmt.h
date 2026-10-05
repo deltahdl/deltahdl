@@ -290,6 +290,10 @@ struct Stmt {
   // default clocking or the procedure, rather than written, which §37.50
   // reports as vpiIsClockInferred.
   bool assert_clock_inferred = false;
+  // §16.12.1 and §37.50: the instance of a declared property the spec of a
+  // concurrent assertion embedded in procedural code is, kept by the
+  // elaborator where it substitutes the property's body; null for any other.
+  const Expr* assert_instance = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

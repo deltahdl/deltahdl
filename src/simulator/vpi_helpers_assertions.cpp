@@ -625,10 +625,13 @@ VpiHandle VpiPropFormalTypespec(VpiHandle formal) {
 VpiHandle VpiPropFormalInitExpr(VpiHandle formal) {
   // §37.51 detail 4: a formal's initialization expression is reached through
   // vpiExpr; the diagram draws its target as a named event or a property
-  // expression. Report the first such child, or null when the formal has none.
+  // expression, a net or variable named standing as the Boolean expression it
+  // reads (§37.58). Report the first such child, or null when the formal has
+  // none.
   if (!formal) return nullptr;
   for (auto* child : formal->children) {
-    if (child->type == vpiNamedEvent || VpiIsPropertyExprType(child->type)) {
+    if (child->type == vpiNamedEvent || VpiIsPropertyExprType(child->type) ||
+        VpiIsOperandObject(child)) {
       return child;
     }
   }
@@ -659,13 +662,10 @@ bool VpiIsPropertyArgumentType(int type) {
 
 VpiHandle VpiPropertyInstDecl(VpiHandle property_inst) {
   // §37.51: a property instance resolves to the property declaration it
-  // instantiates, modeled as a vpiPropertyDecl child. Report the first one, or
-  // null when the handle is null or no declaration is attached.
-  if (!property_inst) return nullptr;
-  for (auto* child : property_inst->children) {
-    if (child->type == vpiPropertyDecl) return child;
-  }
-  return nullptr;
+  // instantiates, which belongs to the scope declaring it (§37.12) and so is
+  // held apart from the instance's children. Null when the handle is null or
+  // no declaration is attached.
+  return property_inst == nullptr ? nullptr : property_inst->property_decl;
 }
 
 std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(

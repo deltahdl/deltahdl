@@ -383,5 +383,71 @@ TEST_F(ConcurrentAssertionsOfARun, ABareNameIsABooleanPropertySpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
+// A restrict property reaches the clock it writes, or the default clocking's
+// inferred, and its property spec, as any concurrent assertion does, though
+// the run never checks it (§16.14.4) (#5088).
+TEST_F(ConcurrentAssertionsOfARun, ARestrictReachesItsClockAndPropertySpec) {
+  Run("module top; logic clk, a;\n"
+      "  default clocking cb @(negedge clk); endclocking\n"
+      "  r1: restrict property (@(posedge clk) a);\n"
+      "  r2: restrict property (a);\n"
+      "endmodule\n");
+  vpiHandle r1 = Named(vpiAssertion, By("top"), "r1");
+  vpiHandle r2 = Named(vpiAssertion, By("top"), "r2");
+  ASSERT_NE(r1, nullptr);
+  ASSERT_NE(r2, nullptr);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, r1)), "posedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, r1), 0);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, r2)), "negedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, r2), 1);
+  vpiHandle spec = vpi_handle(vpiProperty, r1);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, spec), vpiPropertySpec);
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+}
+
+// An assertion on $global_clock reaches the event the global clocking
+// declaration its instance resolves to names (§16.5.2, §14.14), each instance
+// of one module its own (#5089).
+TEST_F(ConcurrentAssertionsOfARun, AGlobalClockIsTheEventItsInstanceResolves) {
+  Run("module child(input logic clk, a);\n"
+      "  a1: assert property (@$global_clock a);\n"
+      "endmodule\n"
+      "module rise(input logic clk, a);\n"
+      "  global clocking @(posedge clk); endclocking\n"
+      "  child c(clk, a);\n"
+      "endmodule\n"
+      "module fall(input logic clk, a);\n"
+      "  global clocking @(negedge clk); endclocking\n"
+      "  child c(clk, a);\n"
+      "endmodule\n"
+      "module top; logic clk, a;\n"
+      "  rise u1(clk, a);\n"
+      "  fall u2(clk, a);\n"
+      "endmodule\n");
+  vpiHandle up = Named(vpiAssertion, By("top.u1.c"), "a1");
+  vpiHandle down = Named(vpiAssertion, By("top.u2.c"), "a1");
+  ASSERT_NE(up, nullptr);
+  ASSERT_NE(down, nullptr);
+  vpiHandle rising = vpi_handle(vpiClockingEvent, up);
+  vpiHandle falling = vpi_handle(vpiClockingEvent, down);
+  ASSERT_NE(rising, nullptr);
+  ASSERT_NE(falling, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, rising), vpiPosedgeOp);
+  EXPECT_EQ(vpi_get(vpiOpType, falling), vpiNegedgeOp);
+}
+
+// One embedded in a procedure is clocked the same way (#5089).
+TEST_F(ConcurrentAssertionsOfARun, AProceduralGlobalClockIsTheDeclaredEvent) {
+  Run("module top; logic clk, a;\n"
+      "  global clocking @(negedge clk); endclocking\n"
+      "  always @(posedge clk) p1: assert property (@$global_clock a);\n"
+      "endmodule\n");
+  vpiHandle p1 = Named(vpiAssertion, By("top"), "p1");
+  ASSERT_NE(p1, nullptr);
+  EXPECT_EQ(EdgeOf(vpi_handle(vpiClockingEvent, p1)), "negedge clk");
+  EXPECT_EQ(vpi_get(vpiIsClockInferred, p1), 0);
+}
+
 }  // namespace
 }  // namespace delta

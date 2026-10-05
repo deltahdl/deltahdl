@@ -193,6 +193,18 @@ static void StampGenBlockInstance(std::vector<Item>& items, size_t first,
   }
 }
 
+// Stamp the generate block instance `path`, with its name prefixes, onto every
+// entry appended to `items` at or after index `first`, the scope it stands in.
+template <typename Scoped>
+static void StampGenBlockScope(std::vector<Scoped>& items, size_t first,
+                               const HierPath& path,
+                               const GenBlockPrefixes& prefixes) {
+  for (size_t i = first; i < items.size(); ++i) {
+    items[i].gen_block_path = path;
+    items[i].gen_block_prefixes = prefixes;
+  }
+}
+
 // §27.4: what an ordinary item elaborates to belongs to one instance of the
 // generate block, but every instance shares the one body AST. Stamp this
 // instance's loop-index values onto whatever the item produced, which is the
@@ -217,6 +229,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_udp = mod->udp_insts.size();
   size_t first_child = mod->children.size();
   size_t first_assertion = mod->assertions.size();
+  size_t first_property = mod->declared_properties.size();
   ElaborateItem(item, mod);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
@@ -238,11 +251,12 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   for (size_t i = first_proc; i < mod->processes.size(); ++i) {
     mod->processes[i].gen_block_path = gen_block_path_;
   }
-  // §37.49: an assertion the block writes is an object of this instance.
-  for (size_t i = first_assertion; i < mod->assertions.size(); ++i) {
-    mod->assertions[i].gen_block_path = gen_block_path_;
-    mod->assertions[i].gen_block_prefixes = gen_prefix_scopes_;
-  }
+  // §37.49 and §37.12: an assertion the block writes, and a property it
+  // declares, is an object of this instance.
+  StampGenBlockScope(mod->assertions, first_assertion, gen_block_path_,
+                     gen_prefix_scopes_);
+  StampGenBlockScope(mod->declared_properties, first_property, gen_block_path_,
+                     gen_prefix_scopes_);
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);
   StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_,

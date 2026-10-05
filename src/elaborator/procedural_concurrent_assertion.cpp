@@ -282,7 +282,9 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   }
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
-  if (decl == nullptr || !BodyIsRead(stmt, decl, diag)) return;
+  if (decl == nullptr) return;
+  stmt->assert_instance = instance;
+  if (!BodyIsRead(stmt, decl, diag)) return;
   SubstitutePropertyBody(stmt, decl, registry, arena);
 }
 

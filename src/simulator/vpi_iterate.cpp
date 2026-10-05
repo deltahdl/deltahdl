@@ -212,7 +212,10 @@ struct VpiIterateStores {
 // vpiWaitingProcesses reaches the waiting threads and its vpiIndex reaches the
 // locating index expressions.
 void ComputeTfAndEventModes(int type, VpiHandle ref, VpiIterateModes& m) {
-  m.tf_argument = ref && VpiIsTfCallType(ref->type) && type == vpiArgument;
+  // §37.51: a property inst's vpiArgument walks the same list a call's does.
+  m.tf_argument =
+      ref && (VpiIsTfCallType(ref->type) || ref->type == vpiPropertyInst) &&
+      type == vpiArgument;
   // §37.57 (figure): a let expression carries a vpiArgument edge of its own,
   // and detail 1 gives it a rule the tf call's edge does not have.
   m.let_argument = ref && ref->type == vpiLetExpr && type == vpiArgument;

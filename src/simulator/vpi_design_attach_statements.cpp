@@ -325,7 +325,11 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     AddChild(obj, with.expression(stmt.assert_expr));
   } else {
     if (stmt.kind != StmtKind::kExpect) VpiFillAssertionClock(obj, stmt, with);
-    VpiMakePropertySpec(obj, stmt, with);
+    if (stmt.assert_instance != nullptr) {
+      VpiMakePropertyInst(obj, *stmt.assert_instance, with);
+    } else {
+      VpiMakePropertySpec(obj, stmt, with);
+    }
   }
   with.statement(stmt.assert_pass_stmt, obj);
   obj->else_stmt = with.statement(stmt.assert_fail_stmt, obj);
@@ -348,19 +352,30 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
       property.assert_property == nullptr) {
     return nullptr;
   }
-  // §37.52: the clock, which §16.16 (a) has an inferred one stand as though
-  // written, the disable condition, which §16.15 lets a default disable iff
-  // give, and the property expression. A sequence (§37.54) or a property of
-  // operators, under a `not` included, stands for operations not modelled.
+  // §16.16 (a) has an inferred clock stand as though written, and §16.15 lets
+  // a default disable iff give the condition. A sequence (§37.54) or a
+  // property of operators, under a `not` included, stands for operations not
+  // modelled.
+  const bool kBoolean = property.assert_sequence == nullptr &&
+                        property.assert_property == nullptr &&
+                        !property.assert_negated;
+  return VpiMakePropertySpecOf(
+      holder,
+      VpiPropertySpecParts{property.assert_clock, property.assert_disable_iff,
+                           kBoolean ? property.assert_expr : nullptr},
+      with);
+}
+
+VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
+                                 const VpiPropertySpecParts& parts,
+                                 const VpiStmtBuild& with) {
+  // §37.52: the clock, the disable condition and the property expression.
   VpiObject* spec = with.build.alloc();
   spec->type = vpiPropertySpec;
   spec->parent = holder;
-  spec->clocking_event = EventCondition(property.assert_clock, with);
-  spec->disable_condition = with.expression(property.assert_disable_iff);
-  if (property.assert_sequence == nullptr &&
-      property.assert_property == nullptr && !property.assert_negated) {
-    AddChild(spec, with.expression(property.assert_expr));
-  }
+  spec->clocking_event = EventCondition(parts.clock, with);
+  spec->disable_condition = with.expression(parts.disable);
+  AddChild(spec, with.expression(parts.boolean));
   holder->children.push_back(spec);
   return spec;
 }

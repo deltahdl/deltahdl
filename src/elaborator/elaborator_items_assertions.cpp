@@ -11,11 +11,13 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/multiclock_sequence_rules.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
 #include "parser/ast_expr.h"
@@ -603,6 +605,9 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
+  RtlirPropertyDecl declared;
+  declared.item = item;
+  mod->declared_properties.push_back(declared);
   // §16.12.22: the sequences the body uses as properties and as antecedents
   // are checked where the body is declared, once for every instance.
   ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
@@ -691,12 +696,62 @@ static ModuleItem* CheckerInstanceAssertion(
   return copy;
 }
 
-void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
-                                             RtlirModule* mod) {
-  item = CheckerInstanceAssertion(item, mod, checker_tree_actuals_, arena_);
+// §16.14.7, §16.15 and §16.16 (a): the clock and the disable condition an
+// assertion `mod` writes takes where it names none, the default clocking's
+// event and the default disable iff's condition.
+static InferredAtInstance InferredAt(const RtlirModule* mod) {
   InferredAtInstance inferred;
   inferred.clock = DefaultClockingEvent(mod);
   inferred.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
+  return inferred;
+}
+
+// §16.14.4: a restrict property is not verified in simulation, so it draws no
+// report and runs no process. §37.50 reaches its clock and its property spec
+// all the same, resolved as an assert property's are: its instance substituted
+// (§16.12.1), the default disable condition taken (§16.15) and the default
+// clocking's event where it writes no clock (§16.16 (a)).
+static void ElaborateRestrictPropertyItem(ModuleItem* item,
+                                          const RtlirModule* mod, Arena& arena,
+                                          const PropertyRegistry& registry,
+                                          DiagEngine& diag) {
+  const InferredAtInstance kInferred = InferredAt(mod);
+  diag.PushSuppress();
+  SubstitutePropertyInstance(item, arena, registry, kInferred, diag);
+  diag.PopSuppress();
+  Stmt* body = item->body;
+  if (body == nullptr) return;
+  if (body->assert_disable_iff == nullptr) {
+    body->assert_disable_iff = kInferred.disable;
+  }
+  if (item->sensitivity.empty()) {
+    item->sensitivity = kInferred.clock;
+    body->assert_clock_inferred = !kInferred.clock.empty();
+  }
+  if (body->assert_clock.empty()) body->assert_clock = item->sensitivity;
+}
+
+// §16.5.2 and §14.14: the leading clock of the assertion `item` that `mod`
+// last recorded, where it is $global_clock, as this instance resolves it, the
+// event of `global_event`. The item, which every instance of the module
+// shares, keeps the clock as written.
+static void RecordGlobalLeadingClock(const ModuleItem* item, RtlirModule* mod,
+                                     const std::vector<EventExpr>* global_event,
+                                     Arena& arena) {
+  if (mod == nullptr || mod->assertions.empty() || global_event == nullptr ||
+      item->body == nullptr) {
+    return;
+  }
+  auto* clock = arena.Create<std::vector<EventExpr>>(item->body->assert_clock);
+  if (SubstituteGlobalClockLeadingEvent(*clock, *global_event)) {
+    mod->assertions.back().leading_clock = clock;
+  }
+}
+
+void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
+                                             RtlirModule* mod) {
+  item = CheckerInstanceAssertion(item, mod, checker_tree_actuals_, arena_);
+  InferredAtInstance inferred = InferredAt(mod);
   SubstitutePropertyInstance(item, arena_, property_registry_, inferred, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_, inferred);
   // §16.15: an assertion without a disable iff clause of its own, in the
@@ -832,7 +887,9 @@ static bool IsAssertionItem(ModuleItemKind kind) {
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
   // §37.49: the run makes each an object of its instance.
   if (mod != nullptr && IsAssertionItem(item->kind)) {
-    mod->assertions.push_back({item, {}, {}});
+    RtlirAssertion assertion;
+    assertion.item = item;
+    mod->assertions.push_back(assertion);
   }
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
@@ -843,7 +900,7 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kAssertProperty:
       ElaborateAssertPropertyItem(item, mod);
-      return true;
+      break;
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
       // §16.14.3: a cover statement's optional pass statement shall not include
@@ -860,15 +917,17 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       // the clocked boolean form is a process as an assert property is; a
       // cover sequence has no body and takes the path's validation alone.
       ElaborateAssertPropertyItem(item, mod);
-      return true;
+      break;
     case ModuleItemKind::kAssumeProperty:
       // Annex F.5.3.1 defines an assume property statement's satisfaction as
       // the assert property statement's, so it takes the same path.
       ElaborateAssertPropertyItem(item, mod);
-      return true;
+      break;
     case ModuleItemKind::kRestrictProperty:
       ValidateClockingBlock(item, mod);
-      return true;
+      ElaborateRestrictPropertyItem(item, mod, arena_, property_registry_,
+                                    diag_);
+      break;
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
       if (mod != nullptr) RecordClockingBlock(item, mod);
@@ -879,6 +938,8 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       // ahead of the items, its effect being independent of its position.
       return true;
   }
+  RecordGlobalLeadingClock(item, mod, module_global_clocking_event_, arena_);
+  return true;
 }
 
 }  // namespace delta

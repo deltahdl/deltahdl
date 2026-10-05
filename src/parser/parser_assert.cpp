@@ -684,10 +684,15 @@ ModuleItem* Parser::ParseRestrictProperty() {
   ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
                                                   TokenKind::kRParen);
   // §16.2 has a simulator not check a restrict property, and §16.14.4 says the
-  // statement is not verified in simulation, so its spec is skipped without
-  // the §16.14 non-evaluation report the other concurrent assertions draw
-  // when this tool cannot evaluate them: here, not evaluating is the rule.
-  item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  // statement is not verified in simulation, so a spec beyond the forms read
+  // is skipped without the §16.14 non-evaluation report the other concurrent
+  // assertions draw when this tool cannot evaluate them: here, not evaluating
+  // is the rule. The forms read are kept, for §37.50 reaches the clock and the
+  // property spec of a restrict as of any concurrent assertion.
+  if (!ReadStaticPropertySpec(item, StmtKind::kAssumeImmediate) &&
+      item->prop_instance_name.empty()) {
+    item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  }
   Expect(TokenKind::kRParen, Subclause("16.14.4"));
   Expect(TokenKind::kSemicolon, Subclause("16.14.4"));
   return EndedAtLastToken(item, lexer_);

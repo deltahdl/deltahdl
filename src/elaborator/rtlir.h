@@ -733,8 +733,10 @@ struct RtlirModule {
   // ValidateClockingBlock) and this is what lets the run have them at all.
   std::vector<ModuleItem*> clocking_blocks;
   // §16.14 and §16.4: the assertions written as items of the module, the
-  // concurrent ones and the deferred immediate ones, in source order.
+  // concurrent ones and the deferred immediate ones, in source order; §37.12:
+  // the properties it and its generate blocks declare, each of its scope.
   std::vector<RtlirAssertion> assertions;
+  std::vector<RtlirPropertyDecl> declared_properties;
   // §25.5 with §37.7: an interface's modport declarations, in source order;
   // empty for every other kind of definition.
   std::vector<const ModportDecl*> modports;

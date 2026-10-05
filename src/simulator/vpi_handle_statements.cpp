@@ -91,6 +91,24 @@ static VpiHandle PropertySpecExpr(VpiHandle spec) {
   return nullptr;
 }
 
+// §37.51: the edges a property inst draws to its declaration and its disable
+// condition, and the one a prop formal decl draws to its default value.
+static bool TryResolvePropertyDeclRelation(int type, VpiHandle ref,
+                                           VpiHandle& out) {
+  if (ref->type == vpiPropFormalDecl) {
+    if (type != vpiExpr) return false;
+    out = VpiPropFormalInitExpr(ref);
+    return true;
+  }
+  if (type == vpiPropertyDecl) {
+    out = VpiPropertyInstDecl(ref);
+    return true;
+  }
+  if (type != vpiDisableCondition) return false;
+  out = ref->disable_condition;
+  return true;
+}
+
 // §37.50: the edges a concurrent assertion draws to its clock, its property
 // and its actions; §37.52: those a property spec draws to its disable
 // condition and its property expression. Each is a relation tag no object
@@ -115,6 +133,9 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
       default:
         return false;
     }
+  }
+  if (ref->type == vpiPropertyInst || ref->type == vpiPropFormalDecl) {
+    return TryResolvePropertyDeclRelation(type, ref, out);
   }
   if (ref->type != vpiPropertySpec) return false;
   if (type == vpiDisableCondition) {
