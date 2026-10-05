@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -12,8 +13,6 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
-#include "lexer/token.h"
-#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -222,123 +221,6 @@ static void GetValueObjType(const Logic4Vec& v, s_vpi_value* value,
     value->format = kVpiVectorVal;
     GetValueVector(v, value, pool);
   }
-}
-
-// ===========================================================================
-// §37.3.4 Delays and values.
-// ===========================================================================
-
-bool VpiObjectCarriesSourceDelay(int type) {
-  // §37.3.4: the object kinds that can carry a delay written within the
-  // SystemVerilog source - nets, primitives, module paths, timing checks, and
-  // continuous assignments. "Primitive" covers the gate, switch, and udp forms
-  // as well as the primitive supertype. Other delays (module input port delays,
-  // inter-module path delays) do not appear in the source and so are excluded.
-  switch (type) {
-    case vpiNet:
-    case vpiPrimitive:
-    case vpiGate:
-    case vpiSwitch:
-    case vpiUdp:
-    case vpiModPath:
-    case vpiTchk:
-    case vpiContAssign:
-    // §37.47 (figure): the vpiDelay edge is drawn on the unnamed enclosure that
-    // holds the continuous assignment and its bits alike, so a cont assign bit
-    // reaches the same source-written delay its assignment does.
-    case vpiContAssignBit:
-      return true;
-    default:
-      return false;
-  }
-}
-
-VpiHandle VpiSourceDelayExpr(VpiHandle obj) {
-  // §37.3.4: the vpiDelay relation reaches the source-specified delay
-  // expression of a delay-carrying object. It is a designated expression, not a
-  // child found by type (a single delay is a plain constant-valued expression),
-  // so it is held on the object directly. Null when the handle is null, is not
-  // a delay-carrying kind, or carries no source delay.
-  if (!obj) return nullptr;
-  if (!VpiObjectCarriesSourceDelay(obj->type)) return nullptr;
-  return obj->delay_expr;
-}
-
-bool VpiSourceDelayExprIsListOp(VpiHandle expr) {
-  // §37.3.4: when more than one delay is specified the vpiDelay expression
-  // shall be an operation whose vpiOpType is vpiListOp; a single delay is a
-  // plain constant-valued expression instead. This holds iff the expression is
-  // that operation form.
-  return expr && expr->type == vpiOperation && expr->op_type == vpiListOp;
-}
-
-bool VpiExpressionHasSideEffects(const VpiObject* obj) {
-  // §37.3.5: the mark records the classification described in the subclause; an
-  // absent object cannot have side effects.
-  return obj && obj->has_side_effects;
-}
-
-// §11.4.1 lists the assignment operators as the simple "=" together with "the C
-// assignment operators and special bitwise assignment operators: +=, -=, *=,
-// /=, %=, &=, |=, ^=, <<=, >>=, <<<=, and >>>=". Each of them stores into its
-// left-hand side, which is the state change §37.3.5 calls a side effect.
-static bool IsAssignmentOperator(TokenKind op) {
-  switch (op) {
-    case TokenKind::kEq:
-    case TokenKind::kPlusEq:
-    case TokenKind::kMinusEq:
-    case TokenKind::kStarEq:
-    case TokenKind::kSlashEq:
-    case TokenKind::kPercentEq:
-    case TokenKind::kAmpEq:
-    case TokenKind::kPipeEq:
-    case TokenKind::kCaretEq:
-    case TokenKind::kLtLtEq:
-    case TokenKind::kGtGtEq:
-    case TokenKind::kLtLtLtEq:
-    case TokenKind::kGtGtGtEq:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §37.3.5's first two bullets, which are decided by the expression's own form:
-// an assignment operator (§11.4.1) or an increment or decrement operator
-// (§11.4.2), the latter written either side of its operand.
-static bool ExprIsSideEffectingForm(const Expr* expr) {
-  if (expr->kind == ExprKind::kUnary || expr->kind == ExprKind::kPostfixUnary) {
-    return expr->op == TokenKind::kPlusPlus ||
-           expr->op == TokenKind::kMinusMinus;
-  }
-  return expr->kind == ExprKind::kBinary && IsAssignmentOperator(expr->op);
-}
-
-bool VpiSourceExprHasSideEffects(const Expr* expr) {
-  if (expr == nullptr) return false;
-  if (ExprIsSideEffectingForm(expr)) return true;
-
-  // §37.3.5's fourth bullet: "Expressions in which other expressions with side
-  // effects appear as operands, arguments, or index expressions." Every place a
-  // subexpression can be written is one of those three, so the whole expression
-  // is walked rather than a chosen few of its edges.
-  const Expr* const kEdges[] = {
-      expr->lhs,        expr->rhs,         expr->condition, expr->true_expr,
-      expr->false_expr, expr->base,        expr->index,     expr->index_end,
-      expr->with_expr,  expr->repeat_count};
-  for (const Expr* edge : kEdges) {
-    if (VpiSourceExprHasSideEffects(edge)) return true;
-  }
-  for (const Expr* arg : expr->args) {
-    if (VpiSourceExprHasSideEffects(arg)) return true;
-  }
-  for (const Expr* element : expr->elements) {
-    if (VpiSourceExprHasSideEffects(element)) return true;
-  }
-  for (const Expr* key : expr->pattern_keys) {
-    if (VpiSourceExprHasSideEffects(key)) return true;
-  }
-  return false;
 }
 
 static void RecordVpiError(s_vpi_error_info& error, const char* message) {
@@ -732,19 +614,19 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
   return false;
 }
 
-// §38.34: stores the supplied scalar/integer/real value into the target
-// variable's first four-state word. Formats with no direct word encoding here
-// (e.g. string/vector) are left for the caller's other paths and are ignored.
-// §37.16, §37.17: a value put to a net bit or var bit is put to its bit of the
-// parent's storage, which the low bit of the scalar, integer or real value the
-// caller supplied gives.
-static void PutValueWriteBit(VpiHandle obj, const s_vpi_value* value) {
+// §37.16, §37.17: a value put to a net bit or var bit is put to its bit of
+// the parent's storage, and one put to a select leaving packed dimensions
+// unindexed (§37.16 detail 31, §37.17 detail 26) to the `size` bits it spans,
+// from the least significant up. They are taken from the bit pattern a
+// whole object's write stores of a scalar, integer or real value: the scalar
+// in the low bit and 0 above it, and the integer or real as 64 bits.
+static void PutValueWriteSlice(VpiHandle obj, const s_vpi_value* value) {
   uint64_t aval = 0;
   uint64_t bval = 0;
   if (value->format == kVpiIntVal) {
-    aval = static_cast<uint64_t>(value->value.integer) & 1;
+    aval = static_cast<uint64_t>(value->value.integer);
   } else if (value->format == kVpiRealVal) {
-    aval = static_cast<uint64_t>(value->value.real) & 1;
+    aval = static_cast<uint64_t>(value->value.real);
   } else if (value->format == kVpiScalarVal) {
     int s = value->value.scalar;
     aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
@@ -753,20 +635,25 @@ static void PutValueWriteBit(VpiHandle obj, const s_vpi_value* value) {
     return;
   }
   Logic4Vec& whole = obj->var->value;
-  const auto kWord = static_cast<uint32_t>(obj->bit_offset) / 64;
-  if (kWord >= whole.nwords) return;
-  const uint64_t kMask = uint64_t{1}
-                         << (static_cast<uint32_t>(obj->bit_offset) % 64);
-  Logic4Word& word = whole.words[kWord];
-  word.aval = (word.aval & ~kMask) | (aval != 0 ? kMask : 0);
-  word.bval = (word.bval & ~kMask) | (bval != 0 ? kMask : 0);
+  for (int k = 0; k < std::max(obj->size, 1); ++k) {
+    const auto kBit = static_cast<uint32_t>(obj->bit_offset + k);
+    if (kBit / 64 >= whole.nwords) return;
+    const uint64_t kMask = uint64_t{1} << (kBit % 64);
+    const bool kA = k < 64 && ((aval >> k) & 1) != 0;
+    const bool kB = k < 64 && ((bval >> k) & 1) != 0;
+    Logic4Word& word = whole.words[kBit / 64];
+    word.aval = (word.aval & ~kMask) | (kA ? kMask : 0);
+    word.bval = (word.bval & ~kMask) | (kB ? kMask : 0);
+  }
 }
 
+// §38.34: stores the supplied scalar/integer/real value into the target
+// variable's first four-state word, or a bit or slice's bits of its parent.
+// Formats with no direct word encoding here (e.g. string/vector) are left for
+// the caller's other paths and are ignored.
 static void PutValueWriteWord(VpiHandle obj, const s_vpi_value* value) {
   if (obj->bit_offset >= 0) {
-    // A select leaving packed dimensions unindexed spans more than one bit,
-    // which a write of one bit would misplace; it is written to nowhere.
-    if (obj->size <= 1) PutValueWriteBit(obj, value);
+    PutValueWriteSlice(obj, value);
     return;
   }
   if (value->format == kVpiIntVal) {
@@ -874,10 +761,26 @@ static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
 }
 
 // The object a value put to `obj` is written to: `obj` itself, or for a
-// varying bit (§37.16, §37.17) the bit its index selects, null when it selects
-// none and nothing is written (§11.5.1).
-static VpiHandle PutValueTargetOf(VpiHandle obj) {
-  return IsVaryingBit(*obj) ? VaryingBitTarget(obj) : obj;
+// varying bit (§37.16, §37.17) the bit its index selects, and for a varying
+// select leaving packed dimensions unindexed a slice, made through `alloc`, of
+// the bits its index names; null when it names none and nothing is written
+// (§11.5.1).
+static VpiHandle PutValueTargetOf(VpiHandle obj,
+                                  const std::function<VpiObject*()>& alloc) {
+  if (!IsVaryingBit(*obj)) return obj;
+  if (!obj->select_dim || obj->size <= 1) return VaryingBitTarget(obj);
+  // A varying select leaving packed dimensions unindexed stands for the bits
+  // its index names when the value is put, made a slice of them here.
+  const std::optional<int64_t> kOffset = VaryingOffset(obj);
+  if (!kOffset) return nullptr;
+  VpiObject* slice = alloc();
+  slice->type = obj->type;
+  slice->parent = obj->parent;
+  slice->var = obj->parent->var;
+  slice->net = obj->parent->net;
+  slice->size = obj->size;
+  slice->bit_offset = static_cast<int>(*kOffset);
+  return slice;
 }
 
 VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
@@ -902,7 +805,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
-  obj = PutValueTargetOf(obj);
+  obj = PutValueTargetOf(obj, [this] { return AllocObject(); });
   if (obj == nullptr) return nullptr;
 
   bool has_delay = PutValueHasDelay(mode, time);

@@ -771,5 +771,23 @@ TEST_F(VariablesOfARun, ASelectOfEveryPackedDimensionIsItsVarBit) {
   EXPECT_EQ(IntOf(rhs), 1);
 }
 
+// §38.34: a value put to such a select lands in the bits of the vector it
+// spans, those a constant index names and those a varying index names when
+// the value is put (#5066).
+TEST_F(VariablesOfARun, AValuePutToAnOuterPackedSelectLandsInItsElement) {
+  Run(kPackedSelects);
+  vpiHandle constant = RhsDriving("top.z");
+  vpiHandle varying = RhsDriving("top.y");
+  ASSERT_NE(constant, nullptr);
+  ASSERT_NE(varying, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 0x55;
+  vpi_put_value(constant, &value, nullptr, vpiNoDelay);
+  value.value.integer = 0x66;
+  vpi_put_value(varying, &value, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntOf(Var("top.m")), 0x44556611);
+}
+
 }  // namespace
 }  // namespace delta
