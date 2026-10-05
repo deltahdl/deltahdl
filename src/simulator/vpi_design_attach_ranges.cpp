@@ -88,6 +88,7 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
                           const std::vector<Expr*>& unpacked_dims,
                           SimContext& ctx, const VpiAttachBuild& build) {
   std::vector<DimBounds> dims;
+  dims.reserve(unpacked_dims.size());
   for (const Expr* dim : unpacked_dims) {
     dims.push_back(WrittenUnpackedDim(dim, ctx));
   }
