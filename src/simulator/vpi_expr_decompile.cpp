@@ -128,37 +128,45 @@ std::optional<std::string> RenderList(
 std::optional<std::string> RenderConstraintSet(
     const std::vector<ConstraintItem*>& items);
 
+// The text of `expr` alone, nothing where it cannot be rendered.
+std::optional<std::string> RenderText(const Expr* expr) {
+  const std::optional<Piece> kPiece = Render(expr);
+  if (!kPiece) return std::nullopt;
+  return kPiece->text;
+}
+
+// §18.5.3 with §11.4.13: a dist_item's bracketed range, its two ends or a
+// centre and the tolerance about it.
+std::optional<std::string> RenderDistRange(const ConstraintDistItem& item) {
+  const bool kAboutCentre = item.tolerance != nullptr;
+  const std::optional<std::string> kLo = RenderText(item.lo);
+  const std::optional<std::string> kEnd =
+      RenderText(kAboutCentre ? item.tolerance : item.hi);
+  if (!kLo || !kEnd) return std::nullopt;
+  std::string_view separator = ":";
+  if (kAboutCentre) separator = item.tolerance_relative ? "+%-" : "+/-";
+  return "[" + *kLo + std::string(separator) + *kEnd + "]";
+}
+
 // §18.5.3: one dist_item, a value, a bracketed range or `default`, with the
 // weight it is written with.
 std::optional<std::string> RenderDistItem(const ConstraintDistItem& item) {
-  std::string text = "default";
+  std::optional<std::string> text = std::string("default");
   if (item.is_range) {
-    const Expr* end = item.tolerance != nullptr ? item.tolerance : item.hi;
-    const std::optional<Piece> kLo = Render(item.lo);
-    const std::optional<Piece> kEnd = Render(end);
-    if (!kLo || !kEnd) return std::nullopt;
-    std::string_view separator = ":";
-    if (item.tolerance != nullptr) {
-      separator = item.tolerance_relative ? "+%-" : "+/-";
-    }
-    text = "[" + kLo->text + std::string(separator) + kEnd->text + "]";
+    text = RenderDistRange(item);
   } else if (!item.is_default) {
-    const std::optional<Piece> kValue = Render(item.value);
-    if (!kValue) return std::nullopt;
-    text = kValue->text;
+    text = RenderText(item.value);
   }
-  if (item.weight == nullptr) return text;
-  const std::optional<Piece> kWeight = Render(item.weight);
+  if (!text || item.weight == nullptr) return text;
+  const std::optional<std::string> kWeight = RenderText(item.weight);
   if (!kWeight) return std::nullopt;
-  return VpiDecompileJoin(
-      {text, item.per_element ? ":=" : ":/", kWeight->text});
+  return VpiDecompileJoin({*text, item.per_element ? ":=" : ":/", *kWeight});
 }
 
 // §18.5.3: an expression_or_dist, the dist_list braced after `dist`.
 std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
-  const std::optional<Piece> kExpr = Render(item.expr);
-  if (!kExpr) return std::nullopt;
-  if (!item.has_dist) return kExpr->text;
+  const std::optional<std::string> kExpr = RenderText(item.expr);
+  if (!kExpr || !item.has_dist) return kExpr;
   std::string list;
   for (const ConstraintDistItem& dist_item : item.dist) {
     const std::optional<std::string> kItem = RenderDistItem(dist_item);
@@ -166,15 +174,15 @@ std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
     if (!list.empty()) list += ", ";
     list += *kItem;
   }
-  return VpiDecompileJoin({kExpr->text, "dist", "{" + list + "}"});
+  return VpiDecompileJoin({*kExpr, "dist", "{" + list + "}"});
 }
 
 // §18.5.7.1: a foreach's array and its loop variables, a variable left out
 // standing as nothing between its commas.
 std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
-  const std::optional<Piece> kArray = Render(item.expr);
+  const std::optional<std::string> kArray = RenderText(item.expr);
   if (!kArray) return std::nullopt;
-  std::string text = kArray->text + "[";
+  std::string text = *kArray + "[";
   for (std::size_t i = 0; i < item.loop_vars.size(); ++i) {
     if (i > 0) text += ", ";
     text += item.loop_vars[i];
@@ -182,57 +190,67 @@ std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
   return VpiDecompileJoin({"foreach", VpiDecompileParenthesize(text + "]")});
 }
 
-// §18.5 (A.1.10): one constraint block item, terminated as the source
-// terminates it. An implication's antecedent keeps the parentheses that stop
-// the implication taking part of it away.
-std::optional<std::string> RenderConstraintItem(const ConstraintItem& item) {
-  std::optional<std::string> head;
+// §18.5 (A.1.10): an item the source ends with a semicolon, an
+// expression_or_dist, a uniqueness constraint, a disable soft or a
+// solve-before.
+std::optional<std::string> RenderTerminatedItem(const ConstraintItem& item) {
+  std::optional<std::string> text;
   switch (item.kind) {
     case ConstraintItemKind::kExpression:
-      head = RenderExpressionOrDist(item);
-      if (!head) return std::nullopt;
-      return VpiDecompileJoin({item.soft ? "soft" : "", *head}) + ";";
+      text = RenderExpressionOrDist(item);
+      if (text) text = VpiDecompileJoin({item.soft ? "soft" : "", *text});
+      break;
     case ConstraintItemKind::kUnique:
-      head = RenderList(item.exprs, {});
-      if (!head) return std::nullopt;
-      return "unique {" + *head + "};";
-    case ConstraintItemKind::kDisableSoft: {
-      const std::optional<Piece> kPrimary = Render(item.expr);
-      if (!kPrimary) return std::nullopt;
-      return VpiDecompileJoin({"disable", "soft", kPrimary->text}) + ";";
-    }
-    case ConstraintItemKind::kSolveBefore: {
+      text = RenderList(item.exprs, {});
+      if (text) text = "unique {" + *text + "}";
+      break;
+    case ConstraintItemKind::kDisableSoft:
+      text = RenderText(item.expr);
+      if (text) text = VpiDecompileJoin({"disable", "soft", *text});
+      break;
+    default: {
       const std::optional<std::string> kBefore = RenderList(item.exprs, {});
       const std::optional<std::string> kAfter = RenderList(item.after, {});
-      if (!kBefore || !kAfter) return std::nullopt;
-      return VpiDecompileJoin({"solve", *kBefore, "before", *kAfter}) + ";";
-    }
-    case ConstraintItemKind::kImplication: {
-      const std::optional<Piece> kAntecedent = Render(item.expr);
-      if (!kAntecedent) return std::nullopt;
-      head = AsLeftOperand(*kAntecedent,
-                           InfixBindingPower(TokenKind::kArrow).first)
-                 .text +
-             " ->";
+      if (kBefore && kAfter) {
+        text = VpiDecompileJoin({"solve", *kBefore, "before", *kAfter});
+      }
       break;
     }
-    case ConstraintItemKind::kIfElse: {
-      const std::optional<Piece> kCondition = Render(item.expr);
-      if (!kCondition) return std::nullopt;
-      head =
-          VpiDecompileJoin({"if", VpiDecompileParenthesize(kCondition->text)});
-      break;
-    }
-    case ConstraintItemKind::kForeach:
-      head = RenderForeachHead(item);
-      break;
   }
+  if (!text) return std::nullopt;
+  return *text + ";";
+}
+
+// §18.5.5, §18.5.6 and §18.5.7.1: what an implication, an if-else or a foreach
+// writes before the constraint set it governs. An implication's antecedent
+// keeps the parentheses that stop the implication taking part of it away.
+std::optional<std::string> RenderGoverningHead(const ConstraintItem& item) {
+  if (item.kind == ConstraintItemKind::kForeach) return RenderForeachHead(item);
+  const std::optional<Piece> kExpr = Render(item.expr);
+  if (!kExpr) return std::nullopt;
+  if (item.kind == ConstraintItemKind::kIfElse) {
+    return VpiDecompileJoin({"if", VpiDecompileParenthesize(kExpr->text)});
+  }
+  const Piece kAntecedent =
+      AsLeftOperand(*kExpr, InfixBindingPower(TokenKind::kArrow).first);
+  return VpiDecompileJoin({kAntecedent.text, "->"});
+}
+
+// §18.5 (A.1.10): one constraint block item, terminated as the source
+// terminates it, or followed by the constraint sets it governs.
+std::optional<std::string> RenderConstraintItem(const ConstraintItem& item) {
+  if (item.kind != ConstraintItemKind::kImplication &&
+      item.kind != ConstraintItemKind::kIfElse &&
+      item.kind != ConstraintItemKind::kForeach) {
+    return RenderTerminatedItem(item);
+  }
+  const std::optional<std::string> kHead = RenderGoverningHead(item);
   const std::optional<std::string> kBody = RenderConstraintSet(item.body);
-  if (!head || !kBody) return std::nullopt;
-  if (!item.has_else) return VpiDecompileJoin({*head, *kBody});
+  if (!kHead || !kBody) return std::nullopt;
+  if (!item.has_else) return VpiDecompileJoin({*kHead, *kBody});
   const std::optional<std::string> kElse = RenderConstraintSet(item.else_body);
   if (!kElse) return std::nullopt;
-  return VpiDecompileJoin({*head, *kBody, "else", *kElse});
+  return VpiDecompileJoin({*kHead, *kBody, "else", *kElse});
 }
 
 // §18.5: a constraint set or block, its items one space apart in braces.
