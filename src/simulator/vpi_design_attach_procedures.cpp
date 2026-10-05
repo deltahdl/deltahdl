@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/string_methods.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
@@ -219,15 +222,20 @@ const ClassDecl* FindClassDecl(const BodyWalk& walk, std::string_view name) {
   return decl != nullptr ? decl : ClassNamed(walk.design.cu_class_decls, name);
 }
 
+// §37.17: the object kind of a variable declared with `type` in the instance,
+// leaving its unpacked dimensions aside.
+int TypeVariableKind(const DataType& type, const BodyWalk& walk) {
+  if (type.kind == DataTypeKind::kNamed) {
+    return VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name);
+  }
+  return VpiDataTypeVariableKind(type.kind);
+}
+
 // §37.17: the object kind of a variable a block declares, as a module's of its
 // type is. An unpacked array of events is a named event array (§37.27), and
 // one of any other element one array var (§37.17 detail 1).
 int BlockVariableKind(const Stmt& decl, const BodyWalk& walk) {
-  const DataType& type = decl.var_decl_type;
-  const int kKind =
-      type.kind == DataTypeKind::kNamed
-          ? VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name)
-          : VpiDataTypeVariableKind(type.kind);
+  const int kKind = TypeVariableKind(decl.var_decl_type, walk);
   if (decl.var_unpacked_dims.empty()) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }
@@ -313,16 +321,6 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
   return {};
 }
 
-// §8.4: the class a variable of the instance's module named `name` holds a
-// handle of, empty for a variable of no class type and for no variable.
-std::string_view ClassOfVariable(const RtlirModule& mod,
-                                 std::string_view name) {
-  for (const RtlirVariable& var : mod.variables) {
-    if (var.name == name) return var.class_type_name;
-  }
-  return {};
-}
-
 // Whether `name` is a built-in system function, every one the standard defines
 // listed by the clause defining it: §14.14, §16.14.7, §18.13, §19.9, and the
 // functions of §20.3 to §20.15, §21.3 and §21.6. $cast (§8.16), $system
@@ -383,19 +381,123 @@ CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   return shape;
 }
 
+// The kind of value a built-in method is called on: a string (§6.16), an enum
+// (§6.19.5), a fixed-size, dynamic or associative array or a queue (§7.4,
+// §7.5, §7.8, §7.10), or none of them.
+enum class BuiltInHolder : uint8_t {
+  kNone,
+  kString,
+  kEnum,
+  kFixedArray,
+  kDynamicArray,
+  kAssocArray,
+  kQueue,
+};
+
+// Whether `method` is one of the built-in methods of a value of `holder`'s
+// kind, every one listed by name: §6.16's of a string, §6.19.5's of an enum,
+// §7.5's of a dynamic array, §7.9's of an associative array, §7.10.2's of a
+// queue, and §7.12's of any unpacked array but the ordering methods of
+// §7.12.2, which an associative array has none of. Each is a function.
+bool IsBuiltInMethod(BuiltInHolder holder, std::string_view method) {
+  static constexpr std::string_view kEnum[] = {"first", "last", "next",
+                                               "prev",  "num",  "name"};
+  static constexpr std::string_view kDynamic[] = {"size", "delete"};
+  static constexpr std::string_view kAssoc[] = {
+      "num", "size", "delete", "exists", "first", "last", "next", "prev"};
+  static constexpr std::string_view kQueue[] = {
+      "size",     "insert",     "delete",   "pop_front",
+      "pop_back", "push_front", "push_back"};
+  static constexpr std::string_view kManipulation[] = {
+      "find",       "find_index",
+      "find_first", "find_first_index",
+      "find_last",  "find_last_index",
+      "min",        "max",
+      "unique",     "unique_index",
+      "sum",        "product",
+      "and",        "or",
+      "xor",        "map"};
+  static constexpr std::string_view kOrdering[] = {"reverse", "sort", "rsort",
+                                                   "shuffle"};
+  const auto kLists = [method](const auto& names) {
+    return std::ranges::any_of(
+        names, [method](std::string_view name) { return name == method; });
+  };
+  switch (holder) {
+    case BuiltInHolder::kString:
+      return StringMethodWritesItsObject(method) ||
+             StringMethodAnswersAValue(method);
+    case BuiltInHolder::kEnum:
+      return kLists(kEnum);
+    case BuiltInHolder::kNone:
+      return false;
+    default:
+      break;
+  }
+  if (kLists(kManipulation)) return true;
+  if (holder == BuiltInHolder::kAssocArray) return kLists(kAssoc);
+  if (kLists(kOrdering)) return true;
+  if (holder == BuiltInHolder::kDynamicArray) return kLists(kDynamic);
+  return holder == BuiltInHolder::kQueue && kLists(kQueue);
+}
+
+// §7.8: whether the unpacked dimension `dim` gives an associative array its
+// index type: a data type keyword, the wildcard, or a name standing for a type
+// or a class.
+bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
+  static constexpr std::string_view kIndexTypes[] = {
+      "string", "int",   "integer", "byte", "shortint", "longint",
+      "bit",    "logic", "reg",     "time", "*"};
+  if (dim.kind != ExprKind::kIdentifier) return false;
+  return std::ranges::any_of(
+             kIndexTypes, [&](std::string_view t) { return t == dim.text; }) ||
+         walk.design.type_kinds.contains(dim.text) ||
+         FindClassDecl(walk, dim.text) != nullptr;
+}
+
+// The kind of built-in value a block declares with `decl`: an array of the kind
+// its first unpacked dimension makes, a dynamic array's `[]` being recorded as
+// no dimension and a queue's as `[$]`; else a string or an enum, written as
+// one or through a typedef.
+BuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
+  if (!decl.var_unpacked_dims.empty()) {
+    const Expr* dim = decl.var_unpacked_dims.front();
+    if (dim == nullptr) return BuiltInHolder::kDynamicArray;
+    if (IsQueueDim(dim)) return BuiltInHolder::kQueue;
+    return IsAssocDim(*dim, walk) ? BuiltInHolder::kAssocArray
+                                  : BuiltInHolder::kFixedArray;
+  }
+  const int kKind = TypeVariableKind(decl.var_decl_type, walk);
+  if (kKind == vpiStringVar) return BuiltInHolder::kString;
+  return kKind == vpiEnumVar ? BuiltInHolder::kEnum : BuiltInHolder::kNone;
+}
+
+// The same, of a variable of the instance's module.
+BuiltInHolder ModuleHolder(const RtlirVariable& var) {
+  if (var.is_queue) return BuiltInHolder::kQueue;
+  if (var.is_dynamic) return BuiltInHolder::kDynamicArray;
+  if (var.is_assoc) return BuiltInHolder::kAssocArray;
+  if (var.num_unpacked_dims > 0) return BuiltInHolder::kFixedArray;
+  if (var.is_string) return BuiltInHolder::kString;
+  const bool kEnum =
+      !var.enum_type_name.empty() || var.decl_kind == DataTypeKind::kEnum;
+  return kEnum ? BuiltInHolder::kEnum : BuiltInHolder::kNone;
+}
+
 // §8.4: the variable a call's prefix names, as the class it holds a handle of
-// (empty for a variable of no class type and for no variable) and the object
-// standing for it.
-struct ClassVar {
+// (empty for a variable of no class type and for no variable), the kind of
+// built-in value it is, and the object standing for it.
+struct PrefixVar {
   std::string_view cls;
+  BuiltInHolder holder = BuiltInHolder::kNone;
   VpiObject* object = nullptr;
 };
 
 // §23.9: the variable `name` names in the scope `parent` stands for: one a
 // block declares, the innermost around the statement first, or else one of the
 // instance's module.
-ClassVar FindClassVar(const BlockParent& parent, std::string_view name,
-                      const BodyWalk& walk) {
+PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
+                        const BodyWalk& walk) {
   for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
     if (at->block == nullptr) continue;
     for (const Stmt* item : BlockItems(*at->block)) {
@@ -406,25 +508,40 @@ ClassVar FindClassVar(const BlockParent& parent, std::string_view name,
       const DataType& type = item->var_decl_type;
       return {type.kind == DataTypeKind::kNamed ? type.type_name
                                                 : std::string_view(),
-              ChildNamed(at->scope, name)};
+              BlockHolder(*item, walk), ChildNamed(at->scope, name)};
     }
   }
-  return {ClassOfVariable(walk.mod, name),
-          FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, name))};
+  PrefixVar var;
+  var.object =
+      FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, name));
+  for (const RtlirVariable& decl : walk.mod.variables) {
+    if (decl.name != name) continue;
+    var.cls = decl.class_type_name;
+    var.holder = ModuleHolder(decl);
+    break;
+  }
+  return var;
 }
 
 // §37.42: a method task or method function call, applied through `access`,
-// which joins two names, to a class var of the scope the call stands in.
+// which joins two names, to a variable of the scope the call stands in: a
+// class var, whose class says what the method is, or a string, an enum or an
+// unpacked array, whose built-in methods are functions no design declares.
 CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
                           const BodyWalk& walk) {
-  const ClassVar kVar = FindClassVar(parent, access.lhs->text, walk);
-  const MethodCall kCall = ClassMethodCall(walk, kVar.cls, access.rhs->text);
-  if (kCall.type == 0) return {};
-  CallShape shape{kCall.type, access.rhs->text};
+  const PrefixVar kVar = FindPrefixVar(parent, access.lhs->text, walk);
+  MethodCall call;
+  if (kVar.holder == BuiltInHolder::kNone) {
+    call = ClassMethodCall(walk, kVar.cls, access.rhs->text);
+  } else if (IsBuiltInMethod(kVar.holder, access.rhs->text)) {
+    call.type = vpiMethodFuncCall;
+  }
+  if (call.type == 0) return {};
+  CallShape shape{call.type, access.rhs->text};
   shape.prefix = kVar.object;
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
-  shape.user_defined = kCall.declared;
+  shape.user_defined = call.declared;
   return shape;
 }
 

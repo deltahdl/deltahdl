@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -665,6 +666,54 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallOnABlockVariableIsAnObject) {
   ASSERT_NE(By("top.b.obj"), nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, call)),
             VpiObjectOf(By("top.b.obj")));
+}
+
+// A built-in method of a queue (§7.10.2), an associative array (§7.9), a
+// string (§6.16) or an enum (§6.19.5) the module declares, called as a
+// statement, is a method func call applied to the variable, and is not
+// user-defined (#5035).
+TEST_F(CallStatementsOfARun, ABuiltInMethodOfAModuleVariableIsAMethodFuncCall) {
+  Run("module top; int q[$]; int aa[string]; string s = \"ab\";\n"
+      "  typedef enum {A, B} e_t; e_t e;\n"
+      "  initial begin q.push_back(1); aa.delete(); s.putc(0, \"c\");\n"
+      "    e.next(); end\n"
+      "endmodule\n");
+  for (const auto& [method, holder] :
+       std::vector<std::pair<std::string, std::string>>{{"push_back", "q"},
+                                                        {"delete", "aa"},
+                                                        {"putc", "s"},
+                                                        {"next", "e"}}) {
+    vpiHandle call = Named(vpiMethodFuncCall, By("top"), method);
+    ASSERT_NE(call, nullptr) << method;
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)),
+                 holder.c_str());
+    EXPECT_EQ(vpi_get(vpiUserDefn, call), 0) << method;
+  }
+}
+
+// A block's dynamic array (§7.5) and fixed-size array take the methods of
+// theirs and §7.12's alike, and the prefix is the block's variable.
+TEST_F(CallStatementsOfARun, ABuiltInMethodOfABlockArrayIsAMethodFuncCall) {
+  Run("module top; initial begin : b\n"
+      "  int d[]; int f[2]; d.delete(); f.sort();\n"
+      "end endmodule\n");
+  vpiHandle del = Named(vpiMethodFuncCall, By("top.b"), "delete");
+  vpiHandle sort = Named(vpiMethodFuncCall, By("top.b"), "sort");
+  ASSERT_NE(del, nullptr);
+  ASSERT_NE(sort, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, del)),
+            VpiObjectOf(By("top.b.d")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, sort)),
+            VpiObjectOf(By("top.b.f")));
+}
+
+// §7.12.3's reduction methods apply to an associative array as to any other
+// unpacked array.
+TEST_F(CallStatementsOfARun, AnAssociativeArraysReductionIsAMethodFuncCall) {
+  Run("module top; int aa[int]; initial aa.sum(); endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
 }
 
 constexpr const char* kPackageTask = "package p; task t; endtask endpackage\n";
