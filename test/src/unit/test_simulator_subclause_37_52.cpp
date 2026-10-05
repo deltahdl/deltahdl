@@ -400,13 +400,9 @@ constexpr const char* kPropertyOperators =
     "  j4: assert property (@(posedge clk) (a |-> b) iff (a |-> c));\n"
     "endmodule\n";
 
-class PropertyOperationsOfARun : public VpiDesignRun {
+// What reads the property expr of an assertion back from a run.
+class PropertyExprsOfARun : public VpiDesignRun {
  protected:
-  void SetUp() override {
-    VpiDesignRun::SetUp();
-    Run(kPropertyOperators);
-  }
-
   // The property expr the property spec of the assertion `name` reaches.
   static vpiHandle PropertyOf(const char* name) {
     vpiHandle assertion = Named(vpiAssertion, By("top"), name);
@@ -440,6 +436,14 @@ class PropertyOperationsOfARun : public VpiDesignRun {
       names.emplace_back(name == nullptr ? "" : name);
     }
     return names;
+  }
+};
+
+class PropertyOperationsOfARun : public PropertyExprsOfARun {
+ protected:
+  void SetUp() override {
+    PropertyExprsOfARun::SetUp();
+    Run(kPropertyOperators);
   }
 };
 
@@ -536,10 +540,10 @@ constexpr const char* kClockedAndCaseProperties =
     "        case (sel) 0, 1: a; default: b; endcase);\n"
     "endmodule\n";
 
-class ClockedAndCasePropertiesOfARun : public PropertyOperationsOfARun {
+class ClockedAndCasePropertiesOfARun : public PropertyExprsOfARun {
  protected:
   void SetUp() override {
-    VpiDesignRun::SetUp();
+    PropertyExprsOfARun::SetUp();
     Run(kClockedAndCaseProperties);
   }
 

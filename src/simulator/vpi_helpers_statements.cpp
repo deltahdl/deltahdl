@@ -228,19 +228,18 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
   // itself an expression - the example recurses into each - so the operands are
   // the operation's expression children, in the order it was written.
   //
-  // Nothing served the relation. vpiOperand is a relation tag and no object's
-  // type is one, so the generic child walk this fell through to reached no
-  // operand of any operation, and the clause's own traverseExpr() descended
-  // into nothing.
-  //
   // §37.58 draws the nets and variables classes inside `simple expr`, so a net
   // or variable an operation reads is one of its operands. VpiIsExprType leaves
   // the two out for the protection rule it serves, and taken here alone it left
   // every operation over the design's nets with no operand at all.
   std::vector<VpiHandle> operands;
   if (!operation || operation->type != vpiOperation) return operands;
+  // §37.52 draws a property operation's operands as property exprs.
   for (auto* child : operation->children) {
-    if (VpiIsExprOperandType(child->type)) operands.push_back(child);
+    if (VpiIsExprOperandType(child->type) ||
+        VpiIsPropertyExprType(child->type)) {
+      operands.push_back(child);
+    }
   }
   return operands;
 }
