@@ -655,11 +655,15 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // replacing the original use of vpiArray". The two helpers that answer it
     // were reached by nothing, so every element answered FALSE.
     // §37.85: a gen scope is an array member where it is an iteration of a
-    // loop generate, an element of its gen scope array.
+    // loop generate, an element of its gen scope array; §37.5, §37.6 and
+    // §37.35: an instance or a primitive where it is an element of an
+    // instance array (§37.11).
     case vpiArrayMember:
-      return VpiBool(VpiVariableIsArrayMember(obj) ||
-                     VpiNetIsArrayMember(obj) ||
-                     (obj->type == vpiGenScope && obj->array_member));
+      return VpiBool(
+          VpiVariableIsArrayMember(obj) || VpiNetIsArrayMember(obj) ||
+          ((obj->type == vpiGenScope || VpiIsInstanceType(obj->type) ||
+            VpiIsPrimitiveType(obj->type)) &&
+           obj->array_member));
     // §37.20 (figure): a reg array reports whether it is a memory. §37.20
     // detail 1 turned vpiMemory and vpiMemoryWord into methods returning
     // vpiRegArray and vpiReg, so what tells a memory from any other array

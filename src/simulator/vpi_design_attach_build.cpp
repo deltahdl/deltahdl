@@ -42,6 +42,10 @@ PackedRange EvaluatedRange(Expr* left, Expr* right, SimContext& ctx) {
 
 }  // namespace
 
+PackedRange VpiEvaluatedRange(Expr* left, Expr* right, SimContext& ctx) {
+  return EvaluatedRange(left, right, ctx);
+}
+
 VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build) {
   VpiObject* constant = build.alloc();
   constant->type = vpiConstant;

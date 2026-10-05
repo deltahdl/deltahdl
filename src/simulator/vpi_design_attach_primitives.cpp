@@ -1,8 +1,15 @@
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "simulator/instance_prefix_override.h"
+#include "simulator/sim_context.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -106,25 +113,26 @@ struct PrimSite {
   const VpiObjectMap& objects;
 };
 
-// §37.35: the gate or switch `item` instantiates at `site`, named by its
-// instance name, reporting its primitive type and as its size the number of
-// its inputs (detail 1), with a prim term per terminal in the order written -
-// its direction, its index from zero (detail 3) and the expression it
-// connects.
-void MakePrimitive(const ModuleItem& item, const PrimSite& site,
-                   SimContext& ctx, const VpiAttachBuild& build) {
-  VpiObject* instance = site.instance;
-  const PrimShape kShape = ShapeOf(item.gate_kind);
+// §37.35: a gate or switch of `kind` hung from `instance`, named `name`,
+// reporting its primitive type and as its size the number of its inputs
+// (detail 1), with a prim term per terminal in the order written - its
+// direction, its index from zero (detail 3) and the expression it connects,
+// `terminals` giving each in turn.
+VpiObject* MakePrimitiveObject(GateKind kind, std::string_view name,
+                               const std::vector<VpiObject*>& terminals,
+                               VpiObject* instance,
+                               const VpiAttachBuild& build) {
+  const PrimShape kShape = ShapeOf(kind);
   VpiObject* prim = build.alloc();
   prim->type = kShape.is_switch ? vpiSwitch : vpiGate;
   prim->prim_type = kShape.prim_type;
   prim->parent = instance;
-  if (!item.gate_inst_name.empty()) {
-    prim->name = build.keep(std::string(item.gate_inst_name));
-    prim->full_name = VpiScopedFullName(instance, item.gate_inst_name);
+  if (!name.empty()) {
+    prim->name = build.keep(std::string(name));
+    prim->full_name = VpiScopedFullName(instance, name);
   }
   instance->children.push_back(prim);
-  const std::size_t kCount = item.gate_terminals.size();
+  const std::size_t kCount = terminals.size();
   int inputs = 0;
   for (std::size_t i = 0; i < kCount; ++i) {
     VpiObject* term = build.alloc();
@@ -133,12 +141,73 @@ void MakePrimitive(const ModuleItem& item, const PrimSite& site,
     term->index = static_cast<int>(i);
     term->direction = TerminalDirection(kShape, i, kCount);
     if (term->direction == kVpiInput) ++inputs;
-    VpiObject* expr = VpiInstanceExpression(
-        item.gate_terminals[i], site.objects, site.prefix, ctx, build);
-    if (expr != nullptr) term->children.push_back(expr);
+    if (terminals[i] != nullptr) term->children.push_back(terminals[i]);
     prim->children.push_back(term);
   }
   prim->size = inputs;
+  return prim;
+}
+
+// The expressions `item`'s terminals are written as at `site`.
+std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
+                                        const PrimSite& site, SimContext& ctx,
+                                        const VpiAttachBuild& build) {
+  std::vector<VpiObject*> terminals;
+  terminals.reserve(item.gate_terminals.size());
+  for (const Expr* terminal : item.gate_terminals) {
+    terminals.push_back(
+        VpiInstanceExpression(terminal, site.objects, site.prefix, ctx, build));
+  }
+  return terminals;
+}
+
+// §28.3.6: what one element of an instance array connects to: the bit at
+// `offset` of a terminal as wide as the array (`length` elements), the
+// rightmost element taking the least significant bit, and a terminal of any
+// other width whole.
+VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length) {
+  if (whole == nullptr || whole->size != length || length <= 1) return whole;
+  for (VpiObject* bit : whole->children) {
+    if ((bit->type == vpiNetBit || bit->type == vpiRegBit) &&
+        bit->bit_offset == offset) {
+      return bit;
+    }
+  }
+  return whole;
+}
+
+// §37.11 with §28.3.6: the instance array of gates or switches `item`
+// declares at `site`, a gate or switch array over a primitive per element,
+// each named by its index and reaching it (§37.35 detail 4).
+void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
+                        SimContext& ctx, const VpiAttachBuild& build) {
+  const PackedRange kRange = [&] {
+    InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
+                                 site.prefix.empty() ? "" : site.prefix + ".");
+    return VpiEvaluatedRange(item.inst_range_left, item.inst_range_right, ctx);
+  }();
+  const int64_t kLength = kRange.HighIndex() - kRange.LowIndex() + 1;
+  VpiObject* array = VpiMakeInstanceArray(
+      site.instance,
+      ShapeOf(item.gate_kind).is_switch ? vpiSwitchArray : vpiGateArray,
+      item.gate_inst_name, kRange, build);
+  const std::vector<VpiObject*> kWhole =
+      TerminalObjects(item, site, ctx, build);
+  for (int64_t index = kRange.LowIndex(); index <= kRange.HighIndex();
+       ++index) {
+    std::vector<VpiObject*> terminals;
+    terminals.reserve(kWhole.size());
+    for (VpiObject* whole : kWhole) {
+      terminals.push_back(
+          ElementTerminal(whole, kRange.OffsetOf(index), kLength));
+    }
+    const std::string kName =
+        std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";
+    VpiAddArrayElement(array,
+                       MakePrimitiveObject(item.gate_kind, kName, terminals,
+                                           site.instance, build),
+                       index, build);
+  }
 }
 
 }  // namespace
@@ -148,17 +217,25 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.35: an instance reaches the gates and switches it instantiates, each
   // with its terminals. RtlirModule::gate_insts kept each instantiation, and
   // no pass read it, so vpiPrimitive reached nothing for any design.
-  WalkInstanceObjects(
-      design, objects,
-      [&](const RtlirModule* mod, const std::string& prefix,
-          VpiObject* instance) {
-        for (const ModuleItem* item : mod->gate_insts) {
-          // An instance array (§28.3.6) is a primitive array, which this
-          // pass makes nothing of.
-          if (item == nullptr || item->inst_range_left != nullptr) continue;
-          MakePrimitive(*item, {instance, prefix, objects}, ctx, build);
-        }
-      });
+  WalkInstanceObjects(design, objects,
+                      [&](const RtlirModule* mod, const std::string& prefix,
+                          VpiObject* instance) {
+                        for (const ModuleItem* item : mod->gate_insts) {
+                          if (item == nullptr) continue;
+                          const PrimSite kSite{instance, prefix, objects};
+                          // §28.3.6: an instantiation declaring a range is an
+                          // instance array.
+                          if (item->inst_range_left != nullptr &&
+                              item->inst_range_right != nullptr) {
+                            MakePrimitiveArray(*item, kSite, ctx, build);
+                            continue;
+                          }
+                          MakePrimitiveObject(
+                              item->gate_kind, item->gate_inst_name,
+                              TerminalObjects(*item, kSite, ctx, build),
+                              instance, build);
+                        }
+                      });
 }
 
 }  // namespace delta

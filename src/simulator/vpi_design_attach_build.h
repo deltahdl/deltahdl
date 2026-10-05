@@ -317,9 +317,32 @@ struct VpiCallBuild {
   const VpiSubroutineObjects& subroutines;
 };
 
+// §11.5.1: the range written `[left:right]`, its bounds evaluated in the scope
+// the attach set.
+PackedRange VpiEvaluatedRange(Expr* left, Expr* right, SimContext& ctx);
+
+// §37.11: an instance array of `kind` named `name` under `holder`, of the
+// size `range` makes, reaching that range as its one range object (detail 2)
+// and its bounds through vpiLeftRange and vpiRightRange.
+VpiObject* VpiMakeInstanceArray(VpiObject* holder, int kind,
+                                std::string_view name, const PackedRange& range,
+                                const VpiAttachBuild& build);
+
+// §37.11 with §37.5 detail 2 and §37.35 detail 4: `element` as the element of
+// `array` at `index`, which it reaches through vpiIndex as a constant and
+// which the array reaches it by (§38.19); it keeps its place in its scope.
+void VpiAddArrayElement(VpiObject* array, VpiObject* element, int64_t index,
+                        const VpiAttachBuild& build);
+
+// §37.11: make each instance array of modules, interfaces or programs an
+// array object over its elements.
+void AttachInstanceArrays(const RtlirDesign* design,
+                          const VpiObjectMap& objects,
+                          const VpiAttachBuild& build);
+
 // §37.35: give each instance a gate or switch per primitive it instantiates,
-// each with a prim term per terminal. An instance array of primitives is left
-// for its primitive array.
+// each with a prim term per terminal, and §37.11: a gate or switch array per
+// instance array of them, over a primitive per element.
 void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build);
 

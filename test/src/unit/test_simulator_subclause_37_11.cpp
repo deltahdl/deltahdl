@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_two_fixed_unpacked_dims.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -306,6 +307,78 @@ TEST(InstanceArrayPublic, AModuleWithNoArraysIteratesToNone) {
   EXPECT_EQ(vpi_iterate(vpiPrimitiveArray, VpiHandleOf(&mod)), nullptr);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// The instance arrays of a run: those a design declares, built from the
+// elaborated design rather than by hand (#4932, #5070).
+class InstanceArraysOfARun : public VpiDesignRun {
+ protected:
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // The first terminal of `prim`.
+  static vpiHandle FirstTerm(vpiHandle prim) {
+    vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
+    return it == nullptr ? nullptr : vpi_scan(it);
+  }
+};
+
+// A module instance array is an object over its elements, sized and ranged as
+// declared and reaching each by its index, which each element reaches too.
+TEST_F(InstanceArraysOfARun, AModuleArrayIsAnObjectOverItsElements) {
+  Run("module sub; endmodule\n"
+      "module top; sub arr[2:4] (); endmodule\n");
+  vpiHandle arr = By("top.arr");
+  ASSERT_NE(arr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, arr), vpiModuleArray);
+  EXPECT_EQ(vpi_get(vpiSize, arr), 3);
+  EXPECT_EQ(IntOf(vpi_handle(vpiLeftRange, arr)), 2);
+  EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, arr)), 4);
+  EXPECT_EQ(KindsOf(vpiModule, arr).size(), 3U);
+  vpiHandle element = By("top.arr[3]");
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(arr, 3)), VpiObjectOf(element));
+  EXPECT_EQ(vpi_get(vpiArrayMember, element), 1);
+  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, element)), 3);
+}
+
+// An interface instance array is an interface array.
+TEST_F(InstanceArraysOfARun, AnInterfaceArrayIsAnInterfaceArray) {
+  Run("interface ifc; endinterface\n"
+      "module top; ifc ifs[0:1] (); endmodule\n");
+  vpiHandle ifs = By("top.ifs");
+  ASSERT_NE(ifs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, ifs), vpiInterfaceArray);
+  EXPECT_EQ(vpi_get(vpiSize, ifs), 2);
+}
+
+// A gate instance array is a gate array over a gate per element, each reaching
+// its index, and an element's terminal on a vector as wide as the array is
+// that vector's bit the element takes, the rightmost element the least
+// significant (§28.3.6).
+TEST_F(InstanceArraysOfARun, AGateArrayIsAnObjectOverItsGates) {
+  Run("module top; wire [3:0] y; logic [3:0] a, b;\n"
+      "  and g[3:0] (y, a, b);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiGateArray, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle array = vpi_scan(it);
+  ASSERT_NE(array, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, array), "g");
+  EXPECT_EQ(vpi_get(vpiSize, array), 4);
+  vpiHandle g2 = vpi_handle_by_index(array, 2);
+  ASSERT_NE(g2, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g2), vpiGate);
+  EXPECT_EQ(vpi_get(vpiArrayMember, g2), 1);
+  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, g2)), 2);
+  vpiHandle out = FirstTerm(g2);
+  ASSERT_NE(out, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, out)),
+            VpiObjectOf(vpi_handle_by_index(By("top.y"), 2)));
 }
 
 }  // namespace

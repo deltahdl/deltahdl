@@ -18,6 +18,12 @@ bool VpiHasAccessByIndex(int type) {
     case vpiRegArray:        // a reg array indexes its elements
     case vpiPackedArrayVar:  // a packed array indexes its elements
     case vpiGenScopeArray:   // §37.85: a gen scope array indexes its gen scopes
+    case vpiModuleArray:     // §37.11: an instance array indexes its elements
+    case vpiInterfaceArray:
+    case vpiProgramArray:
+    case vpiGateArray:
+    case vpiSwitchArray:
+    case vpiUdpArray:
       return true;
     default:
       return false;
