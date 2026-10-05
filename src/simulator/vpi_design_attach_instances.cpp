@@ -231,7 +231,10 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                                     static_cast<int>(data - systfs_.data()));
                                 return found;
                               },
-                              call_site_objects_, kClasses, subroutines};
+                              call_site_objects_,
+                              kClasses,
+                              subroutines,
+                              kUnitTypespecs};
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(design, object_map_, *sim_ctx_, kBuild);
   }

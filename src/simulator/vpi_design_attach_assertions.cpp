@@ -111,10 +111,10 @@ int FormalTypespecKind(TokenKind keyword) {
 }
 
 // §37.25: the typespec the typedef `name` declares in the scopes from
-// `holder` out to the instance, or else in the compilation unit `unit`; null
-// where none of them declares one.
+// `holder` out to the instance, or else among the compilation unit's,
+// `unit`; null where none of them declares one.
 VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
-                           const VpiObject* unit) {
+                           const VpiObjectMap& unit) {
   for (const VpiObject* scope = holder; scope != nullptr;
        scope = scope->parent) {
     for (VpiObject* child : scope->children) {
@@ -122,11 +122,8 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
     }
     if (VpiIsInstanceType(scope->type)) break;
   }
-  if (unit == nullptr) return nullptr;
-  for (VpiObject* child : unit->children) {
-    if (VpiIsTypespecType(child->type) && child->name == name) return child;
-  }
-  return nullptr;
+  auto it = unit.find(name);
+  return it == unit.end() ? nullptr : it->second;
 }
 
 // §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
@@ -142,7 +139,7 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                              : nullptr;
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     VpiObject* named =
-        TypedefTypespec(formal->parent, type->type_name, at.unit);
+        TypedefTypespec(formal->parent, type->type_name, at.unit_typespecs);
     if (named != nullptr) formal->children.push_back(named);
     return;
   }

@@ -353,12 +353,12 @@ VpiObject* VpiRangeObject(VpiObject* parent,
                           const VpiAttachBuild& build);
 
 // Where a property decl is built: `scope`, the instance or the generate block
-// instance declaring it; `unit`, the compilation unit's scope, whose typedefs
-// a formal's type may name, null where it has none; and the run its packed
-// dimensions are evaluated in.
+// instance declaring it; the typespecs of the compilation unit's typedefs,
+// which a formal's type may name; and the run its packed dimensions are
+// evaluated in.
 struct VpiPropertyDeclSite {
   VpiObject* scope;
-  const VpiObject* unit;
+  const VpiObjectMap& unit_typespecs;
   SimContext& ctx;
 };
 
@@ -403,6 +403,8 @@ struct VpiCallBuild {
   VpiCallSiteObjects& sites;
   const VpiClassDefnObjects& classes;
   const VpiSubroutineObjects& subroutines;
+  // §37.25: the typespecs the compilation unit's typedefs declare, by name.
+  const VpiObjectMap& unit_typespecs;
 };
 
 // §11.5.1: the range written `[left:right]`, its bounds evaluated in the scope
