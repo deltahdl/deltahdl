@@ -414,6 +414,7 @@ VpiHandle VpiDisableExpr(VpiHandle disable) {
   // is handled by the caller scoping this relation to the plain disable
   // statement.
   if (!disable) return nullptr;
+  if (disable->disable_target != nullptr) return disable->disable_target;
   for (auto* child : disable->children) {
     if (VpiIsDisableTargetType(child->type)) return child;
   }

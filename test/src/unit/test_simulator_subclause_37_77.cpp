@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -173,6 +176,79 @@ TEST_F(Disables, EitherKindIsReachedAsTheBodyOfALoop) {
               &body)
         << "disable kind " << disable_kind;
   }
+}
+
+// The disables of a run: those a design's procedures write, built from the
+// elaborated design rather than by hand (#5009).
+class DisablesOfARun : public VpiDesignRun {
+ protected:
+  // The statement the `n`th procedure of `top` runs, counting from zero.
+  static vpiHandle NthBody(int n) {
+    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+    vpiHandle proc = nullptr;
+    for (int i = 0; i <= n && it != nullptr; ++i) proc = vpi_scan(it);
+    return proc == nullptr ? nullptr : vpi_handle(vpiStmt, proc);
+  }
+};
+
+// A named block disabling itself names itself (§9.6.2), which vpiExpr
+// reaches.
+TEST_F(DisablesOfARun, ABlockDisablingItselfIsReached) {
+  Run("module top; initial begin : blk disable blk; end endmodule\n");
+  vpiHandle blk = By("top.blk");
+  ASSERT_NE(blk, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, blk);
+  ASSERT_NE(it, nullptr);
+  vpiHandle disable = vpi_scan(it);
+  ASSERT_NE(disable, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, disable), vpiDisable);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)), VpiObjectOf(blk));
+}
+
+// A disable of a task the module declares reaches the task.
+TEST_F(DisablesOfARun, ADisableOfATaskReachesTheTask) {
+  Run("module top; task t; #5; endtask\n"
+      "  initial t;\n"
+      "  initial #1 disable t;\n"
+      "endmodule\n");
+  vpiHandle delay = NthBody(1);
+  ASSERT_NE(delay, nullptr);
+  vpiHandle disable = vpi_handle(vpiStmt, delay);
+  ASSERT_NE(disable, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, disable), vpiDisable);
+  vpiHandle task = vpi_handle(vpiExpr, disable);
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, task), vpiTask);
+  EXPECT_STREQ(vpi_get_str(vpiName, task), "t");
+}
+
+// A hierarchical name is resolved component by component from the block it
+// starts at.
+TEST_F(DisablesOfARun, AHierarchicalNameReachesTheBlockItNames) {
+  Run("module top; initial begin : outer\n"
+      "  begin : inner #1; end disable outer.inner;\n"
+      "end endmodule\n");
+  vpiHandle outer = By("top.outer");
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(KindsOf(vpiStmt, outer),
+            (std::vector<int>{vpiNamedBegin, vpiDisable}));
+  vpiHandle it = vpi_iterate(vpiDisable, outer);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, vpi_scan(it))),
+            VpiObjectOf(By("top.outer.inner")));
+}
+
+// A disable fork names nothing to disable.
+TEST_F(DisablesOfARun, ADisableForkReachesNothing) {
+  Run("module top; initial begin fork #1; join_none disable fork; end\n"
+      "endmodule\n");
+  vpiHandle block = NthBody(0);
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(KindsOf(vpiStmt, block),
+            (std::vector<int>{vpiFork, vpiDisableFork}));
+  vpiHandle it = vpi_iterate(vpiDisableFork, block);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, vpi_scan(it)), nullptr);
 }
 
 }  // namespace

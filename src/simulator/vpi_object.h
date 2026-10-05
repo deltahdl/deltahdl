@@ -469,6 +469,12 @@ struct VpiObject {
   // declaration, which vpiTask or vpiFunction reaches.
   VpiObject* tf_decl = nullptr;
 
+  // §37.77 (figure): for a disable a run built, the task, function, named
+  // begin or named fork it names, which vpiExpr reaches. It is held apart
+  // from the children because a block may disable itself, and a walk down the
+  // children would then reach the block again from inside it.
+  VpiObject* disable_target = nullptr;
+
   // §37.42 detail 1: the with-clause a method call carries (an expression, or a
   // constraint for randomize), reached through vpiWith. The relation is
   // available only for the methods that accept a with clause - the randomize

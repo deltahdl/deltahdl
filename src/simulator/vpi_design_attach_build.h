@@ -247,8 +247,9 @@ struct VpiStmtBuild {
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object
 // `stmt` stands as when it is an assignment, an event or delay control, an
 // assign, deassign, force or release, an if or if-else, a case, a forever,
-// while, repeat, do-while, for or foreach loop, or a wait, wait fork or
-// ordered wait; 0 for a statement of another kind.
+// while, repeat, do-while, for or foreach loop, a wait, wait fork or ordered
+// wait, or a disable or disable fork (§37.77); 0 for a statement of another
+// kind.
 int VpiBuiltStmtKind(const Stmt& stmt);
 
 // The objects `obj`, made for `stmt` with the kind above, reaches: the

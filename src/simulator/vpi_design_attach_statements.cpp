@@ -10,6 +10,7 @@
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -256,6 +257,42 @@ void FillConditional(VpiObject* obj, const Stmt& stmt,
   obj->body = with.statement(stmt.body, obj);
 }
 
+// The components of the hierarchical name `expr` is written as, outermost
+// first; false for an expression that is no such name.
+bool NameParts(const Expr* expr, std::vector<std::string_view>& parts) {
+  if (expr == nullptr) return false;
+  if (expr->kind == ExprKind::kIdentifier) {
+    parts.push_back(expr->text);
+    return true;
+  }
+  if (expr->kind != ExprKind::kMemberAccess || expr->rhs == nullptr ||
+      !NameParts(expr->lhs, parts)) {
+    return false;
+  }
+  parts.push_back(expr->rhs->text);
+  return true;
+}
+
+// §37.77 with §9.6.2: the task, function, named begin or named fork the
+// disable written as `name` names, the name resolved upward from `from`, the
+// block or statement the disable stands in (§23.8): the first component is a
+// scope around the statement of that name, which is how a block disables
+// itself, or one a scope around it holds, and each further component is held
+// by the one before. Null where the name reaches none of the four.
+VpiObject* DisableTarget(VpiObject* from, const Expr* name) {
+  std::vector<std::string_view> parts;
+  if (!NameParts(name, parts)) return nullptr;
+  for (VpiObject* scope = from; scope != nullptr; scope = scope->parent) {
+    VpiObject* found =
+        scope->name == parts.front() ? scope : ChildNamed(scope, parts.front());
+    for (std::size_t i = 1; found != nullptr && i < parts.size(); ++i) {
+      found = ChildNamed(found, parts[i]);
+    }
+    if (found != nullptr && VpiIsDisableTargetType(found->type)) return found;
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 int VpiBuiltStmtKind(const Stmt& stmt) {
@@ -297,6 +334,10 @@ int VpiBuiltStmtKind(const Stmt& stmt) {
       return vpiWaitFork;
     case StmtKind::kWaitOrder:
       return vpiOrderedWait;
+    case StmtKind::kDisable:
+      return vpiDisable;
+    case StmtKind::kDisableFork:
+      return vpiDisableFork;
     default:
       return 0;
   }
@@ -342,7 +383,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     case StmtKind::kWaitOrder:
       FillOrderedWait(obj, stmt, with);
       return;
+    case StmtKind::kDisable:
+      obj->disable_target = DisableTarget(obj->parent, stmt.expr);
+      return;
     case StmtKind::kWaitFork:
+    case StmtKind::kDisableFork:
       return;
     default:
       FillConditional(obj, stmt, with);
