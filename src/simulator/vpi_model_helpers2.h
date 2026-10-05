@@ -360,6 +360,12 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility);
 // function that is not a class member - reports vpiPublicVis.
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility);
 
+// §37.17 detail 24 and §37.41 detail 4: the vpiVisibility `obj` reports, by
+// the two rules above for a task or function and for a variable, a class
+// defn's member being one whose parent is the class defn; vpiUndefined for an
+// object of any other kind, which has no such property.
+int VpiObjectVisibility(VpiHandle obj);
+
 // §37.41 (figure): vpiMethod, the Boolean the task func enclosure carries. TRUE
 // for a task or function declared as a class item - what detail 4 calls a class
 // member - and FALSE for every other object.

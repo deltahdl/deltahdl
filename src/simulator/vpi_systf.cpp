@@ -720,4 +720,18 @@ std::vector<std::string_view> VpiNamePathComponents(std::string_view name) {
   return parts;
 }
 
+std::vector<std::string_view> VpiHandleNameComponents(std::string_view name) {
+  std::vector<std::string_view> parts;
+  for (std::string_view part : VpiNamePathComponents(name)) {
+    const std::size_t kColons = part.find("::");
+    if (parts.empty() || kColons == std::string_view::npos) {
+      parts.push_back(part);
+      continue;
+    }
+    parts.push_back(part.substr(0, kColons));
+    parts.push_back(part.substr(kColons + 2));
+  }
+  return parts;
+}
+
 }  // namespace delta

@@ -405,10 +405,6 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
     *matched = VpiIsClassMethodType(obj_type);
     return true;
   }
-  if (modes.class_derived) {
-    *matched = obj_type == vpiClassDefn;
-    return true;
-  }
   if (modes.extends_argument) {
     *matched = VpiIsExprType(obj_type);
     return true;
@@ -782,6 +778,10 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     const bool kDescend = VpiIsStructUnionOrClassVar(ref->type) ||
                           VpiIsVariableArrayType(ref->type);
     CollectVariableDriversOrLoads(ref, modes.variable_driver, kDescend, iter);
+    return true;
+  }
+  if (modes.class_derived) {
+    iter->children = ref->derived_classes;
     return true;
   }
   if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {

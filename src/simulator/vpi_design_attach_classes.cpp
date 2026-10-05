@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -7,12 +8,16 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -174,7 +179,85 @@ void MakeExtends(const MadeClassDefn& derived,
   VpiObject* base = BaseClassDefn(derived, made);
   if (base == nullptr) return;
   typespec->children.push_back(base);
-  base->children.push_back(derived.defn);
+  base->derived_classes.push_back(derived.defn);
+}
+
+// §37.17 detail 24 and §37.41 detail 4: the visibility `member` was declared
+// with, 0 for a member declared neither local nor protected.
+int DeclaredVisibility(const ClassMember& member) {
+  if (member.is_local) return vpiLocalVis;
+  return member.is_protected ? vpiProtectedVis : 0;
+}
+
+// §37.17 with §6.18 and §8.3: the kind of variable a property of `type`
+// is, a class var where the type names a class or a typedef of one.
+int PropertyKind(const DataType& type, const RtlirDesign& design,
+                 const std::vector<MadeClassDefn>& made) {
+  if (type.kind != DataTypeKind::kNamed) {
+    return VpiDataTypeVariableKind(type.kind);
+  }
+  const bool kNamesMadeClass =
+      std::ranges::any_of(made, [&](const MadeClassDefn& candidate) {
+        return candidate.decl->name == type.type_name;
+      });
+  if (kNamesMadeClass || design.type_targets.contains(type.type_name)) {
+    return vpiClassVar;
+  }
+  const auto kFound = design.type_kinds.find(type.type_name);
+  if (kFound == design.type_kinds.end()) return kVpiReg;
+  return VpiDataTypeVariableKind(kFound->second);
+}
+
+// §37.31 detail 1 with §37.17: the variable a property of the class stands
+// as, static or automatic, of the kind its type takes and an array var where
+// it declares unpacked dimensions. Detail 25 full-names a static property
+// through its class defn, and gives an automatic one no full name.
+void MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
+                  const RtlirDesign& design,
+                  const std::vector<MadeClassDefn>& made,
+                  const VpiAttachBuild& build) {
+  VpiObject* var = build.alloc();
+  var->type = member.unpacked_dims.empty()
+                  ? PropertyKind(member.data_type, design, made)
+                  : vpiArrayVar;
+  var->name = build.keep(std::string(member.name));
+  var->full_name = VpiClassMemberFullName(member.is_static, "",
+                                          owner.defn->full_name, member.name);
+  var->parent = owner.defn;
+  var->visibility = DeclaredVisibility(member);
+  owner.defn->children.push_back(var);
+}
+
+// §37.31 detail 1 with §37.41: the task or function a method the class
+// declares stands as, a method of the class defn with the visibility it was
+// declared with.
+void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
+                const VpiAttachBuild& build) {
+  const ModuleItem* item = member.method;
+  if (item == nullptr) return;
+  VpiObject* method = build.alloc();
+  method->type =
+      item->kind == ModuleItemKind::kTaskDecl ? vpiTask : vpiFunction;
+  method->name = build.keep(std::string(item->name));
+  method->parent = owner.defn;
+  method->visibility = DeclaredVisibility(member);
+  owner.defn->children.push_back(method);
+}
+
+// §37.31: the properties and methods of the class `owner` was made for, in
+// the order the class declares them. A parameter is no property of it.
+void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
+                 const std::vector<MadeClassDefn>& made,
+                 const VpiAttachBuild& build) {
+  for (const ClassMember* member : owner.decl->members) {
+    if (member == nullptr) continue;
+    if (member->kind == ClassMemberKind::kMethod) {
+      MakeMethod(owner, *member, build);
+    } else if (member->kind == ClassMemberKind::kProperty &&
+               !member->is_param) {
+      MakeProperty(owner, *member, design, made, build);
+    }
+  }
 }
 
 }  // namespace
@@ -190,9 +273,10 @@ void AttachClassDefinitions(const RtlirDesign* design,
   MakeInstanceClassDefns(*design, objects, build, made);
   MakePackageClassDefns(*design, objects, build, made);
   MakeUnitClassDefns(*design, objects, build, made);
-  for (const MadeClassDefn& derived : made) {
-    if (!derived.decl->base_class.empty()) {
-      MakeExtends(derived, made, objects, ctx, build);
+  for (const MadeClassDefn& owner : made) {
+    MakeMembers(owner, *design, made, build);
+    if (!owner.decl->base_class.empty()) {
+      MakeExtends(owner, made, objects, ctx, build);
     }
   }
 }

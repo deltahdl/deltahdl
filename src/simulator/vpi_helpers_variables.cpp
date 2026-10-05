@@ -510,6 +510,18 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
   return vpiPublicVis;
 }
 
+int VpiObjectVisibility(VpiHandle obj) {
+  const bool kClassMember =
+      obj->parent != nullptr && obj->parent->type == vpiClassDefn;
+  if (VpiIsClassMethodType(obj->type)) {
+    return VpiTaskFuncVisibility(kClassMember, obj->visibility);
+  }
+  if (VpiIsVariablesType(obj->type)) {
+    return VpiVariableVisibility(kClassMember, obj->visibility);
+  }
+  return vpiUndefined;
+}
+
 bool VpiTaskFuncIsMethod(VpiHandle tf) {
   // §37.41 (figure): "-> method / bool: vpiMethod" is drawn on the task func
   // enclosure, and detail 4 says what a method is - "a task or function that is

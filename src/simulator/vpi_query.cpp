@@ -618,6 +618,10 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // figure draws and no application can read.
     case vpiMethod:
       return VpiBool(VpiTaskFuncIsMethod(obj));
+    // §37.17 detail 24 and §37.41 detail 4: the visibility a variable or a
+    // task or function reports, its declared one where it is a class member.
+    case vpiVisibility:
+      return VpiObjectVisibility(obj);
     // §37.17 and §37.28: a variable's or parameter's sign is its
     // declaration's, recorded when the run built it.
     case vpiSigned:

@@ -116,7 +116,7 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
 
   // §38.21: the name may be simple or hierarchical, so resolve it one path
   // component at a time from the leftmost (outermost) scope to the rightmost.
-  std::vector<std::string_view> parts = VpiNamePathComponents(name);
+  std::vector<std::string_view> parts = VpiHandleNameComponents(name);
 
   std::vector<VpiHandle> path;
   VpiHandle current = nullptr;

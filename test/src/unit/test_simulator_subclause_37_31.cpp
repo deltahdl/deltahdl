@@ -194,19 +194,20 @@ TEST_F(ClassDefinition, ConstraintIterationExcludesInlineConstraints) {
 }
 
 // D5: a class defn's vpiDerivedClasses iteration returns the class defns
-// derived from it. The targets are class-defn objects, so a child of any other
-// kind (here a constraint) is not reported.
+// derived from it, which the base holds apart from its children: a class defn
+// among its children (here one nested in it) is not derived from it.
 TEST_F(ClassDefinition, DerivedClassesIterationReturnsDerivedClassDefns) {
   VpiObject derived_a;
   derived_a.type = vpiClassDefn;
   VpiObject derived_b;
   derived_b.type = vpiClassDefn;
-  VpiObject not_a_class;
-  not_a_class.type = vpiConstraint;
+  VpiObject nested;
+  nested.type = vpiClassDefn;
 
   VpiObject base;
   base.type = vpiClassDefn;
-  base.children = {&derived_a, &not_a_class, &derived_b};
+  base.children = {&nested};
+  base.derived_classes = {&derived_a, &derived_b};
 
   vpiHandle it = vpi_iterate(vpiDerivedClasses, VpiHandleOf(&base));
   ASSERT_NE(it, nullptr);
@@ -363,6 +364,64 @@ TEST_F(ClassDefinitionsOfARun, ABaseClassIteratesItsDerivedClasses) {
       "  class B extends Base; endclass class C; endclass endmodule\n");
   EXPECT_EQ(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "Base")),
             (std::vector<std::string>{"A", "B"}));
+}
+
+// ...which it holds apart from what it declares: neither an iteration of its
+// class defns nor a name walked through it reaches one (#5045).
+TEST_F(ClassDefinitionsOfARun, ABaseClassDeclaresNoClassDerivedFromIt) {
+  Run("module top; class Base; endclass class A extends Base; endclass\n"
+      "endmodule\n");
+  EXPECT_TRUE(NamesOf(vpiClassDefn, DefnIn(By("top"), "Base")).empty());
+  EXPECT_EQ(By("top.Base.A"), nullptr);
+}
+
+constexpr const char* kPacket =
+    "module top; class Packet; static int Id; int len; local byte tag;\n"
+    "  function int size(); return 4; endfunction\n"
+    "  protected task run(); endtask endclass endmodule\n";
+
+// Detail 1 (#5041): a class defn iterates its properties, static and
+// automatic alike, each of the kind its type takes...
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsProperties) {
+  Run(kPacket);
+  vpiHandle defn = DefnIn(By("top"), "Packet");
+  EXPECT_EQ(NamesOf(vpiVariables, defn),
+            (std::vector<std::string>{"Id", "len", "tag"}));
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, defn, "tag")), vpiByteVar);
+}
+
+// ...a static one full-named through its class and reached by that name
+// (§37.17 detail 25)...
+TEST_F(ClassDefinitionsOfARun, AStaticPropertyIsNamedThroughItsClass) {
+  Run(kPacket);
+  vpiHandle id = By("top.Packet::Id");
+  ASSERT_NE(id, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, id), vpiIntVar);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, id), "top.Packet::Id");
+}
+
+// ...each reporting the visibility it was declared with (§37.17 detail 24).
+TEST_F(ClassDefinitionsOfARun, APropertyReportsItsVisibility) {
+  Run(kPacket);
+  vpiHandle defn = DefnIn(By("top"), "Packet");
+  EXPECT_EQ(vpi_get(vpiVisibility, Named(vpiVariables, defn, "tag")),
+            vpiLocalVis);
+  EXPECT_EQ(vpi_get(vpiVisibility, Named(vpiVariables, defn, "len")),
+            vpiPublicVis);
+}
+
+// Detail 1 (#5042): a class defn iterates its methods, each a method of the
+// kind it was declared as, reporting its visibility (§37.41 details 4 and 5).
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsMethods) {
+  Run(kPacket);
+  vpiHandle defn = DefnIn(By("top"), "Packet");
+  EXPECT_EQ(NamesOf(vpiMethods, defn),
+            (std::vector<std::string>{"run", "size"}));
+  vpiHandle run = Named(vpiMethods, defn, "run");
+  EXPECT_EQ(vpi_get(vpiType, run), vpiTask);
+  EXPECT_EQ(vpi_get(vpiMethod, run), 1);
+  EXPECT_EQ(vpi_get(vpiVisibility, run), vpiProtectedVis);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiMethods, defn, "size")), vpiFunction);
 }
 
 }  // namespace

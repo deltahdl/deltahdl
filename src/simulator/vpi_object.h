@@ -587,6 +587,16 @@ struct VpiObject {
   // default.
   bool inline_constraint = false;
 
+  // §37.31 detail 5: the class defns derived from this one, which its
+  // vpiDerivedClasses iteration returns. They are kept apart from the children
+  // because the base declares none of them, so no other relation reaches them.
+  std::vector<VpiObject*> derived_classes;
+
+  // §37.17 detail 24 and §37.41 detail 4: the visibility a class member was
+  // declared with, vpiLocalVis or vpiProtectedVis, and 0 for one declared
+  // with neither.
+  int visibility = 0;
+
   // §37.33 detail 1: a class object's identifier, reported through
   // vpi_get(vpiObjId). It is a 64-bit value guaranteed unique among all live
   // dynamic objects that carry this property for as long as the object lives;

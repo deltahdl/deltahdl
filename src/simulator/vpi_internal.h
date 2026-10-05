@@ -124,6 +124,11 @@ int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode);
 // Defined in vpi_systf.cpp, used by vpi_handle.cpp.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
 
+// §38.21 with §37.17 detail 25: the components vpi_handle_by_name() walks,
+// those of VpiNamePathComponents with a `C::m` below the outermost split into
+// the class defn C and its static member m. Defined in vpi_systf.cpp.
+std::vector<std::string_view> VpiHandleNameComponents(std::string_view name);
+
 // §37.42: the systf object vpi_register_systf returned for the registration at
 // `index` among those the context holds, found among the context's `objects`
 // by the mark and position it was made with; null where none is. Defined in
