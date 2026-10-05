@@ -729,11 +729,12 @@ class VpiContext {
   void ResetErrorStatus() { last_error_ = {}; }
 
   // §37.44: the VPI object standing for one of the run's threads, and the pass
-  // that brings the set of them up to date with the run. Both are written in
-  // src/simulator/vpi_design_attach.cpp, beside the rest of what puts the
-  // design within reach of a PLI application.
+  // that brings the set of them up to date with the run, written in
+  // src/simulator/vpi_design_attach.cpp; §37.33 details 2 and 5: the class obj
+  // a class var references now, written in vpi_class_objects.cpp.
   VpiHandle ThreadObjectFor(Process* proc);
   void RefreshThreadObjects();
+  VpiHandle ClassObjectOf(VpiObject& class_var);
 
   // §37.43 detail 4: activate the frame of a subroutine the run has just
   // entered, answering with the frame that was active, and put that one back
@@ -914,11 +915,11 @@ class VpiContext {
   // callbacks with an error they have not returned from yet.
   bool dispatching_error_callbacks_ = false;
 
-  // §37.44: the run this context is attached to, and the thread object standing
-  // for each of its processes. The run is held because a thread comes and goes
-  // while the design executes, so the objects are made against it as it stands.
+  // §37.44 and §37.33: the run this context is attached to, and the object
+  // standing for each of its processes and class objects, which come and go
+  // while the design executes and so are made against the run as it stands.
   SimContext* sim_ctx_ = nullptr;
-  std::unordered_map<Process*, VpiObject*> thread_objects_;
+  std::unordered_map<const void*, VpiObject*> run_objects_;
 
   // §38.11: vpi_get_str() places its result in one temporary buffer that every
   // call reuses, so an earlier returned pointer is clobbered by a later call.

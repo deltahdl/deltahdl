@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -145,13 +146,15 @@ int BareAtomicKind(StmtKind kind) {
 // §37.42: what a call statement stands as. `type` is the kind of tf call, zero
 // for a statement that calls nothing the walk resolves; `name` is the
 // subroutine it calls; `prefix` is the object a method is applied to (detail
-// 2); `user_defined` is the figure's vpiUserDefn; `systf` is the systf object
+// 2), or the class var a chain of `prefix_members` starts from;
+// `user_defined` is the figure's vpiUserDefn; `systf` is the systf object
 // a call of a registered system task reaches; and `called` is the task or
 // function object of the declaration a task, function or method call calls.
 struct CallShape {
   int type = 0;
   std::string_view name;
   VpiObject* prefix = nullptr;
+  std::vector<std::string_view> prefix_members;
   bool user_defined = false;
   VpiObject* systf = nullptr;
   VpiObject* called = nullptr;
@@ -519,6 +522,20 @@ VpiObject* MethodObject(const BodyWalk& walk, const ClassDecl* owner,
   return nullptr;
 }
 
+// §37.42: a call of the method `name` that `call` resolves it to, applied to
+// `prefix`; nothing where it resolves to none.
+CallShape MethodShape(const MethodCall& call, std::string_view name,
+                      VpiObject* prefix, const BodyWalk& walk) {
+  if (call.type == 0) return {};
+  CallShape shape{call.type, name};
+  shape.prefix = prefix;
+  // Detail 11 tells a built-in method call apart from the rest, and the
+  // figure's vpiUserDefn is what says which a method call is.
+  shape.user_defined = call.declared;
+  shape.called = MethodObject(walk, call.owner, name);
+  return shape;
+}
+
 // §37.42: a method task or method function call, applied through `access`,
 // which joins two names, to a variable of the scope the call stands in: a
 // class var, whose class says what the method is, or a string, an enum or an
@@ -532,13 +549,68 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   } else if (IsBuiltInMethod(kVar.holder, access.rhs->text)) {
     call.type = vpiMethodFuncCall;
   }
-  if (call.type == 0) return {};
-  CallShape shape{call.type, access.rhs->text};
-  shape.prefix = kVar.object;
-  // Detail 11 tells a built-in method call apart from the rest, and the
-  // figure's vpiUserDefn is what says which a method call is.
-  shape.user_defined = call.declared;
-  shape.called = MethodObject(walk, call.owner, access.rhs->text);
+  return MethodShape(call, access.rhs->text, kVar.object, walk);
+}
+
+// §8.4 with §8.13: the class the property `name` of the class `cls`, or of a
+// class it extends, holds a handle of; empty where neither declares it with a
+// named type. The bound stops a chain of extensions that loops.
+std::string_view PropertyClass(const BodyWalk& walk, std::string_view cls,
+                               std::string_view name) {
+  constexpr int kMaxDepth = 64;
+  for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
+    const ClassDecl* decl = FindClassDecl(walk, cls);
+    if (decl == nullptr) return {};
+    for (const ClassMember* member : decl->members) {
+      if (member == nullptr || member->kind != ClassMemberKind::kProperty ||
+          member->name != name) {
+        continue;
+      }
+      const DataType& type = member->data_type;
+      return type.kind == DataTypeKind::kNamed ? type.type_name
+                                               : std::string_view();
+    }
+    cls = decl->base_class;
+  }
+  return {};
+}
+
+// The plain names a chain of member accesses joins, `a.b.c` as a, b and c,
+// appended to `names`; false where a link is anything else.
+bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
+  if (expr.kind == ExprKind::kIdentifier) {
+    names.push_back(expr.text);
+    return true;
+  }
+  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution ||
+      expr.lhs == nullptr || expr.rhs == nullptr) {
+    return false;
+  }
+  return ChainNames(*expr.lhs, names) && ChainNames(*expr.rhs, names);
+}
+
+// §37.42 detail 2 with §8.4: a method call applied through a chain of members
+// to a class var of the scope, a.b.run(). The class of the chain's last member
+// says what the method is, and the call is applied to that member in the
+// object the var references, which is read when the prefix is asked for.
+CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
+                               const BodyWalk& walk) {
+  std::vector<std::string_view> names;
+  if (access.rhs->kind != ExprKind::kIdentifier ||
+      !ChainNames(*access.lhs, names) || names.size() < 2) {
+    return {};
+  }
+  const PrefixVar kVar = FindPrefixVar(parent, names.front(), walk);
+  if (kVar.holder != BuiltInHolder::kNone) return {};
+  std::string_view cls = kVar.cls;
+  for (std::size_t i = 1; i < names.size(); ++i) {
+    cls = PropertyClass(walk, cls, names[i]);
+  }
+  CallShape shape = MethodShape(ClassMethodCall(walk, cls, access.rhs->text),
+                                access.rhs->text, kVar.object, walk);
+  if (shape.type != 0) {
+    shape.prefix_members.assign(names.begin() + 1, names.end());
+  }
   return shape;
 }
 
@@ -565,8 +637,14 @@ CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
     return SubroutineCallShape(
         VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee), callee->text);
   }
-  if (callee->kind != ExprKind::kMemberAccess || !JoinsTwoNames(*callee)) {
+  if (callee->kind != ExprKind::kMemberAccess || callee->lhs == nullptr ||
+      callee->rhs == nullptr) {
     return {};
+  }
+  if (!JoinsTwoNames(*callee)) {
+    return callee->is_scope_resolution
+               ? CallShape{}
+               : MemberChainCallShape(*callee, parent, walk);
   }
   // §26.3: a package's subroutine behind the package's name, `p::t`.
   if (callee->is_scope_resolution) {
@@ -616,6 +694,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
   call->name = walk.build.keep(std::string(kShape.name));
   call->tf_prefix = kShape.prefix;
+  call->prefix_members = kShape.prefix_members;
   call->tf_decl = kShape.called;
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;

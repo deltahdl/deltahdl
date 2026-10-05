@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
@@ -105,6 +106,12 @@ VpiObject* VpiCollectionElement(VpiObject& array, int index,
 
 void VpiRefreshElementCopy(VpiObject& element) {
   if (element.var == nullptr) return;
+  if (element.property_of != nullptr) {
+    const Logic4Vec* held =
+        VpiHeldPropertyValue(*element.property_of, element.name);
+    if (held != nullptr) CopyWords(*held, element.var->value);
+    return;
+  }
   const VpiObject* holder = element.member_of;
   if (holder != nullptr && holder->var != nullptr) {
     CopyBits(holder->var->value, element.member_offset, element.var->value, 0,

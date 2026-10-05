@@ -784,6 +784,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
     return GetCoverageControlState().CoverageGet(CoverageScopeName(obj),
                                                  *coverage_type);
   }
+  // §37.33 detail 2: a class var reports the identifier of the object its
+  // value names now.
+  if (obj->type == vpiClassVar) obj->referenced_object = ClassObjectOf(*obj);
   // The integer properties whose value depends on the object kind are
   // dispatched first; if one of them matches, its value is returned directly.
   // Everything else is a simple field/Boolean/ternary property handled by the
@@ -832,7 +835,8 @@ PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
     // vpi_get() must narrow the same value to PLI_INT32.
     case vpiObjId:
       if (obj->type == vpiClassVar) {
-        return obj->referenced_object ? obj->referenced_object->obj_id : 0;
+        const VpiObject* referenced = ClassObjectOf(*obj);
+        return referenced != nullptr ? referenced->obj_id : 0;
       }
       return obj->obj_id;
     // Every other property is a 32-bit integer or Boolean property; widen the

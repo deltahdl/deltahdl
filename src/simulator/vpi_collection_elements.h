@@ -15,8 +15,9 @@ VpiObject* VpiCollectionElement(VpiObject& array, int index,
                                 const VpiAttachBuild& build);
 
 // Copies an element of a queue, dynamic or associative array in from the store
-// it lives in, and a member of an unpacked struct or union in from the bits of
-// the var holding it, before its value is read; nothing for any other object.
+// it lives in, a member of an unpacked struct or union in from the bits of the
+// var holding it, and a property variable of a class obj in from the object,
+// before its value is read; nothing for any other object.
 void VpiRefreshElementCopy(VpiObject& element);
 
 // Copies a value written to such an element or member back where it lives.

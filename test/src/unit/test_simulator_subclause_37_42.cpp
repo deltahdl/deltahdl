@@ -613,6 +613,34 @@ TEST_F(CallStatementsOfARun, AnInheritedMethodCallReachesTheBaseMethod) {
             VpiObjectOf(Named(vpiMethods, base, "run")));
 }
 
+// A method called through a member chain, a.b.run(), is a method task call
+// too, of the class the chain's last member holds a handle of, found through
+// a property its class inherits (§8.13), and applied to that member: the class
+// var b in the object a references now (detail 2, #5031).
+TEST_F(CallStatementsOfARun, AMethodTaskCallThroughAMemberChain) {
+  Run("module top;\n"
+      "  class B; task run(); endtask endclass\n"
+      "  class H; B b = new; endclass\n"
+      "  class A extends H; endclass\n"
+      "  A a = new;\n"
+      "  initial a.b.run();\n"
+      "endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "run");
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+            VpiObjectOf(
+                Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run")));
+  vpiHandle prefix = vpi_handle(vpiPrefix, call);
+  ASSERT_NE(prefix, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, prefix), vpiClassVar);
+  EXPECT_EQ(VpiObjectOf(prefix),
+            VpiObjectOf(Named(vpiVariables,
+                              vpi_handle(vpiClassObj, By("top.a")), "b")));
+}
+
 // A semaphore's get is a task of the built-in class (§15.3.3), so a call of it
 // is a method task call that is not user-defined...
 TEST_F(CallStatementsOfARun, ABuiltInClassTaskCallIsNotUserDefined) {

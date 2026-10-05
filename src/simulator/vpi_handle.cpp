@@ -15,6 +15,7 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -125,6 +126,9 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
     NamePathStep step{current, scope, parts[i], is_last};
     current = ResolveNamePathComponent(step, object_map_);
     if (current == nullptr) break;
+    if (current->type == vpiClassVar) {
+      current->referenced_object = ClassObjectOf(*current);
+    }
     path.push_back(current);
   }
   if (current == nullptr) path.push_back(nullptr);
@@ -140,36 +144,6 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   // reachable by name even when an object happens to be registered under it.
   if (!VpiHandleByNameAccessible(*current)) return nullptr;
   return current;
-}
-
-bool VpiHasAccessByIndex(int type) {
-  switch (type) {
-    case kVpiModule:         // §38.19: module indexes its ports
-    case kVpiPort:           // a port indexes its bits
-    case kVpiNet:            // a net indexes its bits
-    case kVpiReg:            // a reg indexes its bits
-    case vpiBitVar:          // §37.17: so does a bit variable
-    case vpiMemory:          // a memory indexes its words
-    case vpiNetArray:        // an array net indexes its elements
-    case vpiRegArray:        // a reg array indexes its elements
-    case vpiPackedArrayVar:  // a packed array indexes its elements
-    case vpiGenScopeArray:   // §37.85: a gen scope array indexes its gen scopes
-      return true;
-    default:
-      return false;
-  }
-}
-
-int VpiGenScopeArraySize(VpiHandle gen_scope_array) {
-  // §37.85 detail 1: the size of a gen scope array is the number of elements in
-  // the array, i.e. the gen scope objects it holds. It is counted from the
-  // array's gen scope element children rather than read from any stored width.
-  if (!gen_scope_array) return 0;
-  int count = 0;
-  for (auto* child : gen_scope_array->children) {
-    if (child->type == vpiGenScope) ++count;
-  }
-  return count;
 }
 
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
@@ -869,9 +843,13 @@ bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
 // Runs the designated-pointer relation groups in their original order, stopping
 // at the first group that resolves the relation. Returns true (with the result
 // in `out`) when one fired; false when none did, leaving the caller to fall
-// back on the generic child/parent traversal.
-bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
-  return TryResolveSelectRelation(type, ref, out) ||
+// back on the generic child/parent traversal. `object_of` reads the object a
+// class var references in the run.
+template <typename ObjectOf>
+bool TryResolveDesignatedRelation(int type, VpiHandle ref,
+                                  const ObjectOf& object_of, VpiHandle& out) {
+  return TryResolveRunClassRelation(type, ref, object_of, out) ||
+         TryResolveSelectRelation(type, ref, out) ||
          TryResolveConnectionRelation(type, ref, out) ||
          TryResolveClassAndActualRelation(type, ref, out) ||
          TryResolveClockingAndParentRelation(type, ref, out) ||
@@ -936,7 +914,12 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
   VpiHandle designated = nullptr;
-  if (TryResolveDesignatedRelation(type, ref, designated)) return designated;
+  const auto kClassObjectOf = [this](VpiObject& var) {
+    return ClassObjectOf(var);
+  };
+  if (TryResolveDesignatedRelation(type, ref, kClassObjectOf, designated)) {
+    return designated;
+  }
 
   if (ref->parent && ref->parent->type == type) return ref->parent;
 

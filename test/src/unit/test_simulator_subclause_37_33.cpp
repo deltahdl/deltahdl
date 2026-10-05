@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -443,6 +444,68 @@ TEST(ClassVariablesDesign, ADeclaredClassVariableIsAClassVarObject) {
   EXPECT_EQ(g_class_var_name, "p");
   EXPECT_EQ(g_declared_type, vpiClassVar);
   EXPECT_TRUE(g_variables_class_reached_it);
+}
+
+// §37.33 against a run: a class var reaches through vpiClassObj the object its
+// value names now (detail 5), made once per object, with that object's nonzero
+// vpiObjId, which the var reports too (details 1 and 2), the class typespec
+// the object was created with, and a variable per property, inherited ones
+// included, holding the value the object holds (detail 6). Nothing wrote the
+// reference a class var reads, so vpiClassObj reached nothing in a run.
+class ClassObjectsOfARun : public VpiDesignRun {
+ protected:
+  static int IntValueOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+TEST_F(ClassObjectsOfARun, AClassVarReachesTheObjectItsValueNames) {
+  Run("module top;\n"
+      "  class B; int k = 7; endclass\n"
+      "  class A; int n = 5; logic [3:0] q = 4'b1010; B b = new; endclass\n"
+      "  class C extends A; int m = 9; endclass\n"
+      "  A a = new;\n"
+      "  C d = new;\n"
+      "  A c;\n"
+      "  A z;\n"
+      "  initial c = d;\n"
+      "endmodule\n");
+  vpiHandle a = By("top.a");
+  ASSERT_NE(a, nullptr);
+  vpiHandle obj = vpi_handle(vpiClassObj, a);
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, obj), vpiClassObj);
+  EXPECT_EQ(vpi_handle(vpiClassObj, a), obj);
+  EXPECT_NE(vpi_get64(vpiObjId, obj), 0);
+  EXPECT_EQ(vpi_get64(vpiObjId, a), vpi_get64(vpiObjId, obj));
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiClassTypespec, obj)), "A");
+  EXPECT_EQ(NamesOf(vpiVariables, obj),
+            (std::vector<std::string>{"b", "n", "q"}));
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, obj, "n")), 5);
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, obj, "q")), 10);
+  vpiHandle b = Named(vpiVariables, obj, "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, b), vpiClassVar);
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, vpi_handle(vpiClassObj, b), "k")),
+            7);
+
+  vpiHandle derived = vpi_handle(vpiClassObj, By("top.c"));
+  ASSERT_NE(derived, nullptr);
+  EXPECT_EQ(derived, vpi_handle(vpiClassObj, By("top.d")));
+  EXPECT_NE(vpi_get64(vpiObjId, derived), vpi_get64(vpiObjId, obj));
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiClassTypespec, derived)),
+               "C");
+  EXPECT_EQ(NamesOf(vpiVariables, derived),
+            (std::vector<std::string>{"b", "m", "n", "q"}));
+  EXPECT_EQ(IntValueOf(Named(vpiVariables, derived, "m")), 9);
+
+  vpiHandle z = By("top.z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(vpi_handle(vpiClassObj, z), nullptr);
+  EXPECT_EQ(vpi_get64(vpiObjId, z), 0);
 }
 
 }  // namespace

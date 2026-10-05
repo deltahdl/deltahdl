@@ -119,8 +119,8 @@ VpiHandle VpiContext::DesignObjectForFlatName(std::string_view flat_name) {
 
 VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   if (proc == nullptr) return nullptr;
-  auto it = thread_objects_.find(proc);
-  if (it != thread_objects_.end()) {
+  auto it = run_objects_.find(proc);
+  if (it != run_objects_.end()) {
     // §37.44 (vpiActive): the property belongs to the process, so it is read
     // when asked for rather than frozen into the object when it was made.
     it->second->active = proc->active;
@@ -129,7 +129,7 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   auto* obj = AllocObject();
   obj->type = vpiThread;
   obj->active = proc->active;
-  thread_objects_[proc] = obj;
+  run_objects_[proc] = obj;
   // §37.3.8: a thread is one of the transient objects whose life "may be
   // tracked through various callbacks", and cbStartOfThread is the one that
   // reports its beginning. This is where the thread becomes an object of the

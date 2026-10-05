@@ -13,6 +13,7 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct ClassObject;
 struct QueueObject;
 
 struct VpiObject {
@@ -426,6 +427,11 @@ struct VpiObject {
   VpiObject* member_of = nullptr;
   uint32_t member_offset = 0;
 
+  // §37.33 detail 6: of a property variable of a class obj, the run's class
+  // object holding it under the variable's name. `var` holds a copy of the
+  // value, refreshed as an element's is.
+  const ClassObject* property_of = nullptr;
+
   // §38.35: for a static unpacked array, the declared index values of each
   // unpacked dimension in left-to-right (declaration) order - so a[2:0][3:5]
   // holds {{2,1,0},{3,4,5}}. The size of this list is the number of unpacked
@@ -453,6 +459,10 @@ struct VpiObject {
   // the class variable "packet". Null for a tf call that is not a method call,
   // where the vpiPrefix relation does not apply.
   VpiObject* tf_prefix = nullptr;
+  // Of a method applied through a chain of members, "a.b.run()", the members
+  // past that class variable, "b": the method is applied to the member they
+  // name in the objects the class variables reference when it is asked for.
+  std::vector<std::string_view> prefix_members;
 
   // §37.42 (figure): for a task, function, method task or method func call of
   // a subroutine the design declares, the task or function object of that
