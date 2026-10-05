@@ -129,9 +129,7 @@ std::optional<std::string> RenderList(
 std::optional<Piece> RenderCall(const Expr& expr) {
   std::string callee(expr.callee);
   if (expr.kind == ExprKind::kCall) {
-    if (expr.with_expr != nullptr || expr.inline_constraint != nullptr) {
-      return std::nullopt;
-    }
+    if (expr.inline_constraint != nullptr) return std::nullopt;
     const std::optional<Piece> kCallee = Render(expr.lhs);
     if (!kCallee) return std::nullopt;
     callee = kCallee->text;
@@ -141,7 +139,18 @@ std::optional<Piece> RenderCall(const Expr& expr) {
   const std::optional<std::string> kArgs =
       RenderList(expr.args, expr.arg_names);
   if (!kArgs) return std::nullopt;
-  return Piece{callee + "(" + *kArgs + ")"};
+  std::string text = callee + "(" + *kArgs + ")";
+  // §7.12: an array manipulation method's with clause, its expression in the
+  // parentheses it is written in, or its array range in brackets (§7.12.1).
+  if (expr.with_expr != nullptr) {
+    const std::optional<Piece> kWith = Render(expr.with_expr);
+    if (!kWith) return std::nullopt;
+    text = VpiDecompileJoin({text, "with",
+                             expr.with_has_parens
+                                 ? VpiDecompileParenthesize(kWith->text)
+                                 : kWith->text});
+  }
+  return Piece{text};
 }
 
 // §11.5.1 and §11.4.13: the separator between the two expressions of a part

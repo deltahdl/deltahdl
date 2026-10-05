@@ -589,6 +589,13 @@ TEST_F(ExpressionsOfARun, ACallDecompilesWithItsArguments) {
   EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "f(a + 1, a)");
 }
 
+// ...an array method call with its with clause (#5038)...
+TEST_F(ExpressionsOfARun, AWithClauseDecompilesAfterItsCall) {
+  Run("module top; int arr[3]; wire [31:0] y;\n"
+      "  assign y = arr.sum() with (item*2); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "arr.sum() with (item * 2)");
+}
+
 // ...a cast with the type it casts to...
 TEST_F(ExpressionsOfARun, ACastDecompilesWithItsType) {
   Run("module top; wire [7:0] a; wire [31:0] y; assign y = int'(a+1); "
