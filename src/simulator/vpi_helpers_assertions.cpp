@@ -244,10 +244,11 @@ bool VpiImmediateAssertionHasElseStmt(int type) {
 // figure reached nothing through the public routine.
 VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion) {
   // §37.55: the asserted expression, reached through vpiExpr and modeled as the
-  // assertion's first expression child. Null when none is attached.
+  // assertion's first expression child, a net or variable a bare name stands
+  // for among them (§37.58's simple expr). Null when none is attached.
   if (!assertion) return nullptr;
   for (auto* child : assertion->children) {
-    if (VpiIsExprObject(child)) return child;
+    if (VpiIsOperandObject(child)) return child;
   }
   return nullptr;
 }

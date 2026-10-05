@@ -176,9 +176,9 @@ TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
 TEST(ImmediateAssertionModel, TraversalsSkipUnrelatedChildren) {
   VpiObject assertion;
   assertion.type = vpiImmediateAssume;
-  VpiObject net_child;
-  net_child.type = vpiNet;
-  assertion.children = {&net_child};
+  VpiObject module_child;
+  module_child.type = vpiModule;
+  assertion.children = {&module_child};
   EXPECT_EQ(VpiImmediateAssertionExpr(&assertion), nullptr);
   EXPECT_EQ(VpiImmediateAssertionStmt(&assertion), nullptr);
   EXPECT_EQ(VpiImmediateAssertionElseStmt(&assertion), nullptr);
