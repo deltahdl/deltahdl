@@ -593,21 +593,25 @@ const VpiObject* CalleeScope(const RtlirModule& mod,
 
 }  // namespace
 
-VpiObject* VpiInstanceExpression(
-    const Expr* expr, const VpiObjectMap& objects, const std::string& prefix,
-    SimContext& ctx, const VpiAttachBuild& build,
-    const std::vector<std::string_view>* gen_prefixes) {
+VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const std::string& prefix, SimContext& ctx,
+                                 const VpiAttachBuild& build) {
   // An expression an instance writes outside every generate block resolves
   // its names in the instance itself.
   static const GenBlockPrefixes kNoGenBlocks;
+  return VpiGenBlockExpression(expr, {objects, prefix, kNoGenBlocks}, ctx,
+                               build);
+}
+
+VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
+                                 SimContext& ctx, const VpiAttachBuild& build) {
   return ExpressionObject(
-      expr, AssignBuild{build.alloc,
-                        &ctx,
-                        AssignNames{objects, prefix,
-                                    gen_prefixes != nullptr ? *gen_prefixes
-                                                            : kNoGenBlocks},
-                        {},
-                        build.keep});
+      expr,
+      AssignBuild{build.alloc,
+                  &ctx,
+                  AssignNames{names.objects, names.prefix, names.gen_prefixes},
+                  {},
+                  build.keep});
 }
 
 VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,

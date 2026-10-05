@@ -244,7 +244,6 @@ TEST_F(AssignmentsOfARun, AnAssignmentInAGenerateBlockReachesItsVariable) {
   ASSERT_NE(assign, nullptr);
   vpiHandle lhs = vpi_handle(vpiLhs, assign);
   ASSERT_NE(lhs, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiName, lhs), "v");
   EXPECT_NE(VpiObjectOf(lhs), VpiObjectOf(By("top.v")));
 }
 

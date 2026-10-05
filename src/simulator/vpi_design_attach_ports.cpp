@@ -38,8 +38,9 @@ void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
     port->high_conn =
         binding.unconnected
             ? nullptr
-            : VpiInstanceExpression(binding.connection, objects, prefix, ctx,
-                                    build, &inst.gen_block_prefixes);
+            : VpiGenBlockExpression(binding.connection,
+                                    {objects, prefix, inst.gen_block_prefixes},
+                                    ctx, build);
   }
   for (VpiObject* port : module->children) {
     if (port->type != kVpiPort || port->low_conn != nullptr ||

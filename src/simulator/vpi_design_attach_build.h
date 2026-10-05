@@ -223,13 +223,26 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
                           SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written in the
-// instance whose objects `objects` keys under `prefix`, and in the generate
-// block instances `gen_prefixes` names, innermost last, whose declarations a
-// name finds first (§27.4); null for a kind of expression not modelled.
-VpiObject* VpiInstanceExpression(
-    const Expr* expr, const VpiObjectMap& objects, const std::string& prefix,
-    SimContext& ctx, const VpiAttachBuild& build,
-    const std::vector<std::string_view>* gen_prefixes = nullptr);
+// instance whose objects `objects` keys under `prefix`; null for a kind of
+// expression not modelled.
+VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const std::string& prefix, SimContext& ctx,
+                                 const VpiAttachBuild& build);
+
+// Where the names of an expression written in an instance resolve: the
+// instance, whose objects `objects` keys under `prefix`, and the generate
+// block instances it stands in, by their prefixes, innermost last, whose
+// declarations a name finds first (§27.4).
+struct VpiExprNames {
+  const VpiObjectMap& objects;
+  const std::string& prefix;
+  const std::vector<std::string_view>& gen_prefixes;
+};
+
+// The same of an expression written in the generate block instances `names`
+// carries.
+VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
+                                 SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written at `site`
 // in the instance whose objects `objects` keys, a name in it resolving first

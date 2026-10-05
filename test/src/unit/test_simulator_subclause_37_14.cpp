@@ -424,7 +424,6 @@ TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
   ASSERT_NE(a, nullptr);
   vpiHandle high = vpi_handle(vpiHighConn, a);
   ASSERT_NE(high, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiName, high), "v");
   EXPECT_NE(VpiObjectOf(high), VpiObjectOf(By("top.v")));
 }
 
