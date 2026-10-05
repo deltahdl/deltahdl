@@ -1,0 +1,3 @@
+vars=3 empty-iterate-null=1
+release iterator early=1 release var=1 free_object=1
+no error after releases=1

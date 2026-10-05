@@ -1,0 +1,6 @@
+mcd nonzero=1 not-stdout=1 one-bit=1
+printf=7 vprintf=7 name-matches=1 flush=0
+close=0
+file=line 1|line 2|
+to stdout
+stdout via mcd 1: 10

@@ -1,0 +1,4 @@
+get on defn var val: err=1
+put on defn var: err=1
+get on obj var: value=4 err=0
+sv val=4

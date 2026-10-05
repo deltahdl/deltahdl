@@ -1,0 +1,3 @@
+hello 42
+via vprintf ok
+counts 9 15 flush=0

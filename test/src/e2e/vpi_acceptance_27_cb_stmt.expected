@@ -1,0 +1,7 @@
+module-wide cbStmt handle=one
+stmt vpiBegin
+stmt vpiAssignment
+stmt vpiAssignment
+stmt vpiDelayControl
+stmt vpiAssignment
+statements 5

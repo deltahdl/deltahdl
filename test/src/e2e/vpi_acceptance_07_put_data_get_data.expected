@@ -1,0 +1,2 @@
+put_data outside save: rc=0 err=1
+get_data outside restart: rc=0 err=1

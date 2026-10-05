@@ -1,0 +1,4 @@
+bad name: null sev>0=1 same-twice=1 state=vpiRun message=yes
+after good call: 0
+vpi_get on NULL: sev>0=1
+undefined relation: sev>0=1
