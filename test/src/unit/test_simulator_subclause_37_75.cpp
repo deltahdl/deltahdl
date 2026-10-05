@@ -363,5 +363,22 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AForeachLoopIsAnObjectOfTheRun) {
   EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
 }
 
+// A name the body of a foreach loop writes for an index variable is that
+// variable, which the loop declares (§12.7.3, #5062).
+TEST_F(DoWhileAndForeachLoopsOfARun, TheBodyNamesTheLoopsIndexVariable) {
+  Run("module top; int k; int a [3]; initial foreach (a[k]) a[k] = k;\n"
+      "endmodule\n");
+  vpiHandle loop = FirstBody();
+  ASSERT_NE(loop, nullptr);
+  vpiHandle vars = vpi_iterate(vpiLoopVars, loop);
+  ASSERT_NE(vars, nullptr);
+  vpiHandle k = vpi_scan(vars);
+  ASSERT_NE(k, nullptr);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, body)), VpiObjectOf(k));
+  EXPECT_NE(VpiObjectOf(k), VpiObjectOf(By("top.k")));
+}
+
 }  // namespace
 }  // namespace delta

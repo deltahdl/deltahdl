@@ -23,6 +23,7 @@
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -124,16 +125,42 @@ int UnaryOpType(TokenKind op) {
   }
 }
 
-// Where the names of one continuous assignment resolve: the instance it was
-// elaborated in, keyed as the simulator keys it, and the generate blocks it
-// stands in, innermost last, whose declarations a name finds first.
+// Where the names of one assignment resolve: the instance it was elaborated
+// in, keyed as the simulator keys it; the generate blocks it stands in,
+// innermost last, whose declarations a name finds first; and, for an
+// expression a procedure's statement writes, the block or statement it stands
+// in, whose blocks' declarations a name finds ahead of all of those.
 struct AssignNames {
   const std::unordered_map<std::string_view, VpiObject*>& objects;
   const std::string& prefix;
   const GenBlockPrefixes& gen;
+  const VpiObject* scope = nullptr;
 };
 
+// §23.9: the variable or named event a block around `scope`, or `scope`
+// itself, declares under `name`, the innermost first, or the index variable
+// a foreach loop around it declares (§12.7.3); null where none does, the
+// instance's own declarations being looked up after. A block's declarations
+// hang beneath it (§37.12), and the walk stops at the instance.
+VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name) {
+  for (; scope != nullptr && !VpiIsInstanceType(scope->type);
+       scope = scope->parent) {
+    for (VpiObject* var : scope->loop_vars) {
+      if (var != nullptr && var->name == name) return var;
+    }
+    for (VpiObject* child : scope->children) {
+      const bool kDeclares = VpiIsVariablesType(child->type) ||
+                             child->type == vpiNamedEvent ||
+                             child->type == vpiNamedEventArray;
+      if (kDeclares && child->name == name) return child;
+    }
+  }
+  return nullptr;
+}
+
 VpiHandle Resolve(const AssignNames& names, std::string_view name) {
+  VpiHandle declared = BlockDeclaration(names.scope, name);
+  if (declared != nullptr) return declared;
   for (auto it = names.gen.rbegin(); it != names.gen.rend(); ++it) {
     VpiHandle obj = FindObjectForFlatName(
         names.objects,
@@ -495,13 +522,14 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
 VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build) {
-  // Its names resolve in the instance, as VpiInstanceExpression's do; its
-  // callees resolve at the site.
+  // Its names resolve in the blocks around the site and then in the
+  // instance, as VpiInstanceExpression's do; its callees resolve at the site.
   static const GenBlockPrefixes kNoGenBlocks;
   return ExpressionObject(
-      expr, AssignBuild{build.alloc, &ctx,
-                        AssignNames{objects, site.prefix, kNoGenBlocks},
-                        VpiCalleesAt(site)});
+      expr,
+      AssignBuild{build.alloc, &ctx,
+                  AssignNames{objects, site.prefix, kNoGenBlocks, site.scope},
+                  VpiCalleesAt(site)});
 }
 
 void VpiContext::AttachContinuousAssignments(

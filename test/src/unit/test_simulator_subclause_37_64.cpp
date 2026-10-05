@@ -213,5 +213,26 @@ TEST_F(AssignmentsOfARun, AnIntraAssignmentRepeatIsARepeatControl) {
             VpiObjectOf(By("top.c")));
 }
 
+// An assignment written in a nested block reaches the variable of the block
+// around it that declares the name, rather than the module's (#5062).
+TEST_F(AssignmentsOfARun, AnAssignmentReachesTheVariableItsBlockDeclares) {
+  Run("module top; int v, w;\n"
+      "  initial begin : b int v; begin v = w; end end\n"
+      "endmodule\n");
+  vpiHandle b = By("top.b");
+  ASSERT_NE(b, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, b);
+  ASSERT_NE(it, nullptr);
+  vpiHandle inner = vpi_scan(it);
+  ASSERT_NE(inner, nullptr);
+  vpiHandle stmts = vpi_iterate(vpiStmt, inner);
+  ASSERT_NE(stmts, nullptr);
+  vpiHandle assign = vpi_scan(stmts);
+  ASSERT_NE(assign, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, assign)),
+            VpiObjectOf(By("top.b.v")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, assign)), VpiObjectOf(By("top.w")));
+}
+
 }  // namespace
 }  // namespace delta

@@ -226,9 +226,10 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written at `site`
-// in the instance whose objects `objects` keys, a func call in it reaching the
-// function its callee resolves to there (§37.42); null for a kind of
-// expression not modelled.
+// in the instance whose objects `objects` keys, a name in it resolving first
+// to a declaration of the blocks around the site (§23.9) and a func call in it
+// reaching the function its callee resolves to there (§37.42); null for a kind
+// of expression not modelled.
 VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build);

@@ -909,5 +909,18 @@ TEST_F(CallStatementsOfARun, TheInvokingCallDecompilesToItsCall) {
   EXPECT_EQ(g_probe_sightings[0].decompile, "$probe(a * (a + 1))");
 }
 
+// A name a call argument written in a block names is the block's declaration,
+// which shadows the module's of that name (§23.9, #5062).
+TEST_F(CallStatementsOfARun, AnArgumentNamesTheBlocksDeclaration) {
+  Run("module top; int x;\n"
+      "  initial begin : b int x; $display(x); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiSysTaskCall, By("top.b"), "$display");
+  ASSERT_NE(call, nullptr);
+  vpiHandle it = vpi_iterate(vpiArgument, call);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.b.x")));
+}
+
 }  // namespace
 }  // namespace delta
