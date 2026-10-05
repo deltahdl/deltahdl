@@ -227,4 +227,27 @@ TEST(AssocArrayElaboration, AssocSliceInRandsequenceCodeBlockRejected) {
                             "7.4.6"));
 }
 
+// §7.8 with §12.7.3: a built-in index type is recorded by the keyword the
+// declaration wrote, which width and signedness alone leave ambiguous between
+// int and integer and between bit and logic, and a typedef index by its name
+// alone (#5065).
+TEST(AssocArrayElaboration, IndexKeywordIsRecorded) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m; typedef int idx_t;\n"
+      "  int a [int]; int b [integer]; int c [bit]; int d [logic];\n"
+      "  int e [idx_t];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto& vars = design->top_modules[0]->variables;
+  ASSERT_EQ(vars.size(), 5U);
+  EXPECT_EQ(vars[0].assoc_index_keyword, "int");
+  EXPECT_EQ(vars[1].assoc_index_keyword, "integer");
+  EXPECT_EQ(vars[2].assoc_index_keyword, "bit");
+  EXPECT_EQ(vars[3].assoc_index_keyword, "logic");
+  EXPECT_EQ(vars[4].assoc_index_keyword, "");
+  EXPECT_EQ(vars[4].assoc_index_type_name, "idx_t");
+}
+
 }  // namespace

@@ -125,6 +125,7 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var,
       t == "shortint" || t == "longint" || t == "bit" || t == "logic" ||
       t == "reg" || t == "time" || t == "*") {
     var.is_assoc = true;
+    var.assoc_index_keyword = t;
     var.is_string_index = (t == "string");
     var.is_wildcard_index = (t == "*");
     // §7.8.4 keys an entry off the index cast to the declared index width, so

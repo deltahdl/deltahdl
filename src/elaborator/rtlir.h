@@ -289,13 +289,11 @@ struct RtlirVariable {
   // §7.4.2 admits a negative bound, and `int x [-3:5]` counts from -3.
   int64_t unpacked_lo = 0;
   bool is_descending = false;
-  // §7.4.2: full per-dimension extents of a fixed multidimensional unpacked
-  // array, outermost first, so the simulator can materialize one leaf variable
-  // per element (arr[i0][i1]...) and distribute a nested assignment pattern
-  // into it. Populated only when every unpacked dimension is a fixed
-  // range/const dimension; left empty for single-dimension, queue, dynamic, or
-  // associative arrays (which keep the single-dimension
-  // unpacked_size/unpacked_lo above).
+  // §7.4.2: the extents of a fixed multidimensional unpacked array, outermost
+  // first, from which the simulator makes a variable per element (arr[i0][i1])
+  // and into which it distributes a nested assignment pattern; empty unless
+  // every unpacked dimension is fixed, and for one dimension, which
+  // unpacked_size and unpacked_lo above describe.
   std::vector<uint32_t> unpacked_dim_sizes;
   // §11.5.2: the address bounds of each unpacked dimension that folded to
   // constants, in declaration order, filled for a one-dimensional declaration
@@ -321,16 +319,18 @@ struct RtlirVariable {
   bool is_string_index = false;
   bool is_wildcard_index = false;
   bool is_class_index = false;
-  // Signedness of an integral associative-array index type. Determines whether
-  // an index expression is sign- or zero-extended to the index width and the
-  // resulting key ordering (§7.8.4). Built-in integral index types are signed.
+  // §7.8.4: whether an integral index type is signed, which extends an index
+  // to the index width and orders the keys; the built-in integral ones are.
   bool is_index_signed = true;
   uint32_t assoc_index_width = 32;
+  // §7.8 with §12.7.3: a built-in index type's keyword as written (int,
+  // integer, bit, logic, string, * ...), which width and signedness leave
+  // ambiguous; empty for a class or typedef index.
+  std::string_view assoc_index_keyword;
   std::string_view assoc_index_class_name;
-  // §7.8 with §12.7.3: the typedef an associative array's index type names,
-  // `int m[color_t]`, empty for a built-in or class index. A foreach over the
-  // array gives its loop variable the index type, so where the typedef names
-  // an enumeration the variable is of it and §6.19.5's methods apply.
+  // §7.8 with §12.7.3: the typedef an index type names, `int m[color_t]`,
+  // empty otherwise; a foreach loop variable over the array is of that type,
+  // an enumeration's methods (§6.19.5) applying where it names one.
   std::string_view assoc_index_type_name;
   std::string_view class_type_name;
   // §8.25: the declaration's own data type where it names a class, which is
