@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
@@ -49,6 +50,21 @@ inline VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
     }
   }
   return nullptr;
+}
+
+// §27.4 with §37.12: the generate block instance the block path `path` names
+// below `instance`, outermost first, each step named by its block's name and,
+// in a loop generate, its index; the instance itself for an empty path, and
+// null where a block on the path has no object.
+inline VpiHandle VpiGenScopeOf(VpiHandle instance, const HierPath& path) {
+  VpiHandle scope = instance;
+  for (const HierStep& step : path) {
+    if (scope == nullptr) return nullptr;
+    std::string name(step.name);
+    if (step.has_index) name += "[" + std::to_string(step.index) + "]";
+    scope = ChildNamed(scope, name);
+  }
+  return scope;
 }
 
 // Whether `child` is the sub-object an index select of `index` names (§38.19).

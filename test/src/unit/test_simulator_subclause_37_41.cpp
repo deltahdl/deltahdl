@@ -337,5 +337,101 @@ TEST_F(TaskFuncsOfARun, ASubroutineReportsItsLifetime) {
   EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("pkg"), "k")), 0);
 }
 
+// The figure's io decl relation (#5048): a task reaches an io decl per
+// argument it declares, each with the direction written or the one the
+// argument before it carries (§13.3), and reaching through vpiExpr the
+// variable the argument declares in the task's scope (§37.13).
+TEST_F(TaskFuncsOfARun, AnArgumentIsAnIoDeclOfItsTask) {
+  Run("module top; task automatic t(input int a, output logic [3:0] b, c,\n"
+      "  ref int d); endtask endmodule\n");
+  vpiHandle t = Named(vpiTaskFunc, By("top"), "t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, t),
+            (std::vector<std::string>{"a", "b", "c", "d"}));
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, t, "a")), vpiInput);
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, t, "c")), vpiOutput);
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, t, "d")), vpiRef);
+  vpiHandle b = vpi_handle(vpiExpr, Named(vpiIODecl, t, "b"));
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, b), vpiLogicVar);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, b), "top.t.b");
+}
+
+// Details 1 to 3 and 12 (#5049): a function holds its return in a variable
+// of its own name and type, reached through vpiReturn, whose size is the
+// function's, and the figure's vpiFuncType says what kind of value it
+// returns...
+TEST_F(TaskFuncsOfARun, AFunctionReturnsThroughAVariableOfItsOwnName) {
+  Run("module top; function logic [7:0] f(); return 0; endfunction\n"
+      "  function logic signed [3:0] s(); return 0; endfunction\n"
+      "  function int i(); return 0; endfunction endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  vpiHandle ret = vpi_handle(vpiReturn, f);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, ret), vpiLogicVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, ret), "f");
+  EXPECT_EQ(vpi_get(vpiSize, ret), 8);
+  EXPECT_EQ(vpi_get(vpiSize, f), 8);
+  EXPECT_EQ(vpi_get(vpiFuncType, f), vpiSizedFunc);
+  vpiHandle s = Named(vpiTaskFunc, By("top"), "s");
+  EXPECT_EQ(vpi_get(vpiFuncType, s), vpiSizedSignedFunc);
+  EXPECT_EQ(vpi_get(vpiSigned, s), 1);
+  vpiHandle i = Named(vpiTaskFunc, By("top"), "i");
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, i)), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiSize, i), 32);
+}
+
+// ...while a void function returns nothing and has size 0, and a function of
+// an integer, a real or a time returns the kind of value its type names.
+TEST_F(TaskFuncsOfARun, AVoidFunctionHasNoReturnVariable) {
+  Run("module top; function void v(); endfunction\n"
+      "  function integer n(); return 0; endfunction\n"
+      "  function real r(); return 0; endfunction\n"
+      "  function time t(); return 0; endfunction endmodule\n");
+  vpiHandle v = Named(vpiTaskFunc, By("top"), "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_handle(vpiReturn, v), nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, v), 0);
+  EXPECT_EQ(vpi_get(vpiFuncType, Named(vpiTaskFunc, By("top"), "n")),
+            vpiIntFunc);
+  EXPECT_EQ(vpi_get(vpiFuncType, Named(vpiTaskFunc, By("top"), "r")),
+            vpiRealFunc);
+  EXPECT_EQ(vpi_get(vpiFuncType, Named(vpiTaskFunc, By("top"), "t")),
+            vpiTimeFunc);
+}
+
+// A task or function is a scope (#5050), reaching the variables its body
+// declares, each automatic as written or as the subroutine's lifetime makes it
+// (§13.3.1, §13.4.2).
+TEST_F(TaskFuncsOfARun, AFunctionDeclaresTheVariablesItsBodyDeclares) {
+  Run("module top; function int f(); int tmp; automatic int a;\n"
+      "  return tmp; endfunction\n"
+      "  function automatic int g(); int loc; static int keep;\n"
+      "  return loc; endfunction endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  vpiHandle g = Named(vpiTaskFunc, By("top"), "g");
+  EXPECT_EQ(NamesOf(vpiVariables, f), (std::vector<std::string>{"a", "tmp"}));
+  vpiHandle tmp = Named(vpiVariables, f, "tmp");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, tmp), "top.f.tmp");
+  EXPECT_EQ(vpi_get(vpiAutomatic, tmp), 0);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiVariables, f, "a")), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiVariables, g, "loc")), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiVariables, g, "keep")), 0);
+}
+
+// A task a generate block declares is a task of the block's instance, one per
+// instance of a loop generate's block, and none of the module's (#5053).
+TEST_F(TaskFuncsOfARun, AGenerateBlockTaskIsATaskOfTheBlock) {
+  Run("module top; for (genvar i = 0; i < 2; i++) begin : g\n"
+      "  task t(); endtask end endmodule\n");
+  EXPECT_TRUE(NamesOf(vpiTaskFunc, By("top")).empty());
+  vpiHandle t0 = Named(vpiTaskFunc, By("top.g[0]"), "t");
+  vpiHandle t1 = Named(vpiTaskFunc, By("top.g[1]"), "t");
+  ASSERT_NE(t0, nullptr);
+  ASSERT_NE(t1, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, t1), "top.g[1].t");
+  EXPECT_NE(VpiObjectOf(t0), VpiObjectOf(t1));
+}
+
 }  // namespace
 }  // namespace delta

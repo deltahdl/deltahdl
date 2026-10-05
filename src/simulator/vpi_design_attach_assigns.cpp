@@ -143,11 +143,13 @@ VpiHandle Resolve(const AssignNames& names, std::string_view name) {
 }
 
 // What building one assignment's expressions needs: somewhere to allocate an
-// object, the run a constant's value is evaluated in, and the names.
+// object, the run a constant's value is evaluated in, the names, and the
+// functions the calls in them resolve to.
 struct AssignBuild {
   std::function<VpiObject*()> alloc;
   SimContext* sim;
   AssignNames names;
+  VpiCalleeResolver callees;
 };
 
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
@@ -279,11 +281,15 @@ VpiObject* SelectObject(const Expr* expr, const AssignBuild& build) {
 }
 
 // §37.42 with §37.59: a call of a function or system function, carrying its
-// arguments in order, which vpiArgument reaches.
+// arguments in order, which vpiArgument reaches, and a function call reaching
+// the function it calls.
 VpiObject* CallObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* call = build.alloc();
   call->type =
       expr->kind == ExprKind::kSystemCall ? vpiSysFuncCall : vpiFuncCall;
+  if (call->type == vpiFuncCall && expr->lhs != nullptr && build.callees) {
+    call->tf_decl = build.callees(*expr->lhs);
+  }
   for (const Expr* arg : expr->args) {
     VpiObject* obj = ExpressionObject(arg, build);
     if (obj != nullptr) call->arguments.push_back(obj);
@@ -452,16 +458,18 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
 
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build) {
+                                 const VpiAttachBuild& build,
+                                 const VpiCalleeResolver& callees) {
   // An expression an instance writes outside every generate block, whose
   // names resolve in the instance itself.
   static const GenBlockPrefixes kNoGenBlocks;
   return ExpressionObject(
       expr, AssignBuild{build.alloc, &ctx,
-                        AssignNames{objects, prefix, kNoGenBlocks}});
+                        AssignNames{objects, prefix, kNoGenBlocks}, callees});
 }
 
-void VpiContext::AttachContinuousAssignments(const RtlirDesign* design) {
+void VpiContext::AttachContinuousAssignments(
+    const RtlirDesign* design, const VpiSubroutineObjects& subroutines) {
   // §37.47: a module reaches the continuous assignments it holds. Nothing made
   // one, so the relation reached none and no net had a driver or a load
   // (§37.46).
@@ -478,13 +486,16 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design) {
     // The elaborator splits one statement into an assignment per element of
     // a concatenation it writes; the statement is one object.
     std::unordered_set<const ModuleItem*> made;
+    // §37.42: a function an assignment calls is resolved from the instance.
+    const VpiCalleeResolver kCallees =
+        VpiCalleesAt({*design, *mod, prefix, scope, subroutines});
     for (const RtlirContAssign& ca : mod->assigns) {
       if (ca.source_item == nullptr || !made.insert(ca.source_item).second) {
         continue;
       }
-      AssignBuild build{
-          [this] { return AllocObject(); }, sim_ctx_,
-          AssignNames{object_map_, prefix, ca.gen_block_prefixes}};
+      AssignBuild build{[this] { return AllocObject(); }, sim_ctx_,
+                        AssignNames{object_map_, prefix, ca.gen_block_prefixes},
+                        kCallees};
       MakeContinuousAssignment(ca, scope, build);
     }
   });

@@ -397,6 +397,16 @@ TEST_F(CallsOfARun, ASystemFunctionCallIsASysFuncCallObject) {
   EXPECT_EQ(vpi_get(vpiType, CallOnTheRight()), vpiSysFuncCall);
 }
 
+// A func call standing as an expression reaches the function it calls, as a
+// func call statement does (#5051).
+TEST_F(CallsOfARun, AFunctionCallReachesItsFunction) {
+  Run(kFunctionCall);
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, CallOnTheRight())),
+            VpiObjectOf(f));
+}
+
 // What the calltf of $probe read each time it ran: the call that invoked it
 // (detail 3), whether that call is user-defined (detail 5) and what it
 // decompiles to, empty where it reports nothing (detail 9).
@@ -621,6 +631,33 @@ TEST_F(CallStatementsOfARun, ACallStatementReachesItsArguments) {
   EXPECT_EQ(vpi_get(vpiType, vpi_scan(it)), vpiConstant);
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_scan(it)), "x");
   EXPECT_EQ(KindsOf(vpiArgument, task).size(), 2U);
+}
+
+// A func call passed as a call statement's argument reaches its function too
+// (#5051).
+TEST_F(CallStatementsOfARun, AnArgumentsFunctionCallReachesItsFunction) {
+  Run("module top; int a; function int g(int x); return x; endfunction\n"
+      "  task t(int v); endtask initial t(g(a)); endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  vpiHandle it = vpi_iterate(vpiArgument, call);
+  ASSERT_NE(it, nullptr);
+  vpiHandle arg = vpi_scan(it);
+  EXPECT_EQ(vpi_get(vpiType, arg), vpiFuncCall);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, arg)),
+            VpiObjectOf(Named(vpiTaskFunc, By("top"), "g")));
+}
+
+// A call written in a generate block reaches the task of the block's own
+// instance (#5053).
+TEST_F(CallStatementsOfARun, AGenerateBlockCallReachesItsBlocksTask) {
+  Run("module top; for (genvar i = 0; i < 2; i++) begin : g\n"
+      "  task t(); endtask initial t; end endmodule\n");
+  vpiHandle call = BodyOf("top.g[1]");
+  ASSERT_NE(call, nullptr);
+  vpiHandle task = Named(vpiTaskFunc, By("top.g[1]"), "t");
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task));
 }
 
 // The call a registered system task's calltf reaches is the model's object

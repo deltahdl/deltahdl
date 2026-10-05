@@ -9,7 +9,6 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -165,75 +164,21 @@ int CallKindOf(const ModuleItem& decl, int task, int function) {
   return decl.kind == ModuleItemKind::kFunctionDecl ? function : 0;
 }
 
-// A task or function a call resolves to, and the flat name of the scope the
-// object made for it is keyed under; a null declaration for none.
-struct ResolvedSubroutine {
-  const ModuleItem* decl = nullptr;
-  std::string scope;
-};
-
-// The task or function `decls` declare under `name`, null where they declare
-// none.
-const ModuleItem* SubroutineNamed(const std::vector<ModuleItem*>& decls,
-                                  std::string_view name) {
-  for (const ModuleItem* decl : decls) {
-    if (decl != nullptr && decl->name == name &&
-        CallKindOf(*decl, vpiTaskCall, vpiFuncCall) != 0) {
-      return decl;
-    }
-  }
-  return nullptr;
-}
-
-// §26.2: the same, of the package the design declares under `package`.
-ResolvedSubroutine PackageSubroutine(const RtlirDesign& design,
-                                     std::string_view package,
-                                     std::string_view name) {
-  for (const PackageDecl* decl : design.packages) {
-    if (decl == nullptr || decl->name != package) continue;
-    const ModuleItem* found = SubroutineNamed(decl->items, name);
-    if (found != nullptr) return {found, std::string(package)};
-  }
-  return {};
-}
-
-// The task or function a call of `name` resolves to: one the instance's
-// module, one of its generate blocks or the compilation unit declares, or, by
-// §26.3, one the module imports from a package by its name or with a wildcard.
-ResolvedSubroutine NamedSubroutine(const BodyWalk& walk,
-                                   std::string_view name) {
-  if (const ModuleItem* found =
-          SubroutineNamed(walk.mod.function_decls, name)) {
-    return {found, walk.prefix};
-  }
-  if (const ModuleItem* found =
-          SubroutineNamed(walk.design.cu_function_decls, name)) {
-    return {found, "$unit"};
-  }
-  for (const RtlirGenBlockSubroutine& sub : walk.mod.gen_block_subroutines) {
-    if (sub.decl != nullptr && sub.decl->name == name) {
-      return {sub.decl, walk.prefix};
-    }
-  }
-  for (const RtlirImport& entry : walk.mod.imports) {
-    if (!entry.is_wildcard && entry.item_name != name) continue;
-    ResolvedSubroutine found =
-        PackageSubroutine(walk.design, entry.package_name, name);
-    if (found.decl != nullptr) return found;
-  }
-  return {};
-}
-
 // §37.42: a task or function call named `name` of the subroutine `sub`
-// resolves to, reaching the task or function object made for it, which a
-// subroutine of a generate block has none of.
-CallShape SubroutineCallShape(const ResolvedSubroutine& sub,
-                              std::string_view name, const BodyWalk& walk) {
+// resolves to, reaching the task or function object made for it.
+CallShape SubroutineCallShape(const VpiCalledSubroutine& sub,
+                              std::string_view name) {
   if (sub.decl == nullptr) return {};
   CallShape shape{CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall), name};
-  auto found = walk.calls.subroutines.find({sub.decl, sub.scope});
-  if (found != walk.calls.subroutines.end()) shape.called = found->second;
+  shape.called = sub.object;
   return shape;
+}
+
+// Where a statement standing in `parent` is written, as a call it holds
+// resolves the subroutine it calls.
+VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
+  return {walk.design, walk.mod, walk.prefix, parent.scope,
+          walk.calls.subroutines};
 }
 
 // The class among `decls` named `name`, null for none.
@@ -605,14 +550,6 @@ bool JoinsTwoNames(const Expr& access) {
          access.rhs->kind == ExprKind::kIdentifier;
 }
 
-// §37.42 with §26.3: a task or function call naming a package's subroutine
-// behind the package's name, `p::t`.
-CallShape PackageCallShape(const Expr& access, const BodyWalk& walk) {
-  return SubroutineCallShape(
-      PackageSubroutine(walk.design, access.lhs->text, access.rhs->text),
-      access.rhs->text, walk);
-}
-
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
 // scope `parent` stands for, calls. A task is enabled with or without an
 // argument list (§13.3), so the callee is the expression itself where no list
@@ -625,25 +562,31 @@ CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
   const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
   if (callee == nullptr) return {};
   if (callee->kind == ExprKind::kIdentifier) {
-    return SubroutineCallShape(NamedSubroutine(walk, callee->text),
-                               callee->text, walk);
+    return SubroutineCallShape(
+        VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee), callee->text);
   }
   if (callee->kind != ExprKind::kMemberAccess || !JoinsTwoNames(*callee)) {
     return {};
   }
-  if (callee->is_scope_resolution) return PackageCallShape(*callee, walk);
+  // §26.3: a package's subroutine behind the package's name, `p::t`.
+  if (callee->is_scope_resolution) {
+    return SubroutineCallShape(
+        VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee),
+        callee->rhs->text);
+  }
   return MethodCallShape(*callee, parent, walk);
 }
 
-// §37.42: the arguments `expr` was written with, in order, each the
-// expression object the instance's names resolve it to (§37.58, §37.59), an
-// empty position being detail 8's empty argument. An expression of a kind the
-// model builds no object for is passed over.
+// §37.42: the arguments `expr`, standing in `parent`, was written with, in
+// order, each the expression object the instance's names resolve it to
+// (§37.58, §37.59), an empty position being detail 8's empty argument. An
+// expression of a kind the model builds no object for is passed over.
 void MakeCallArguments(VpiObject* call, const Expr& expr,
-                       const BodyWalk& walk) {
+                       const BlockParent& parent, const BodyWalk& walk) {
   if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
     return;
   }
+  const VpiCalleeResolver kCallees = VpiCalleesAt(CallSiteOf(parent, walk));
   for (const Expr* actual : expr.args) {
     VpiObject* arg = nullptr;
     if (actual == nullptr) {
@@ -651,7 +594,7 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
       VpiMakeEmptyArgument(arg);
     } else {
       arg = VpiInstanceExpression(actual, walk.objects, walk.prefix,
-                                  walk.calls.ctx, walk.build);
+                                  walk.calls.ctx, walk.build, kCallees);
     }
     if (arg != nullptr) call->arguments.push_back(arg);
   }
@@ -677,7 +620,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;
   call->written_as_stmt = true;
-  MakeCallArguments(call, *stmt.expr, walk);
+  MakeCallArguments(call, *stmt.expr, parent, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
     call->decompile = VpiExprDecompile(stmt.expr);
     walk.calls.sites[{stmt.expr, walk.prefix}] = call;
@@ -775,19 +718,6 @@ VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
   return begin;
 }
 
-// The scope a process of `instance` stands in: the generate block instance
-// its path names, outermost first, or the instance itself for an empty path.
-VpiObject* ProcessScope(VpiObject* instance, const HierPath& path) {
-  VpiObject* scope = instance;
-  for (const HierStep& step : path) {
-    if (scope == nullptr) return nullptr;
-    std::string name(step.name);
-    if (step.has_index) name += "[" + std::to_string(step.index) + "]";
-    scope = ChildNamed(scope, name);
-  }
-  return scope;
-}
-
 // §37.63: the object a procedure stands as, one of the three kinds the
 // `process` class groups, with detail 1's always type for an always procedure.
 VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
@@ -827,7 +757,8 @@ VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
 void AttachInstanceProcedures(VpiObject* instance,
                               const BodyWalk& instance_walk) {
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
-    VpiObject* scope = ProcessScope(instance, proc.gen_block_path);
+    // A process stands in the generate block instance its path names.
+    VpiObject* scope = VpiGenScopeOf(instance, proc.gen_block_path);
     if (scope == nullptr) continue;
     const bool kIsAssertion =
         proc.is_static_assertion || proc.is_concurrent_clocked;

@@ -125,12 +125,61 @@ std::string VpiScopedFullName(const VpiObject* scope, std::string_view name);
 using VpiSubroutineObjects =
     std::map<std::pair<const ModuleItem*, std::string>, VpiObject*>;
 
-// §37.41: give each module instance and each package a task or function per
-// one it declares, and make one per task or function of the compilation unit,
-// each named, full-named and reporting its lifetime. Answers the objects made.
+// §37.41: give each module instance, generate block instance and package a
+// task or function per one it declares, and make one per task or function of
+// the compilation unit, each named, full-named, reporting its lifetime and
+// holding its io decls, its return variable and the variables its body
+// declares, a return variable's width read in the run `ctx`. Answers the
+// objects made.
 VpiSubroutineObjects AttachSubroutines(const RtlirDesign* design,
                                        const VpiObjectMap& objects,
+                                       SimContext& ctx,
                                        const VpiAttachBuild& build);
+
+// §37.42: the task or function a call resolves to, its declaration and the
+// object made for it, null where none was made; a null declaration where the
+// call resolves to none.
+struct VpiCalledSubroutine {
+  const ModuleItem* decl = nullptr;
+  VpiObject* object = nullptr;
+};
+
+// Where a call is written: the design; the module of the instance writing it
+// and the flat name the instance's objects are keyed under; the scope object
+// it stands in, the instance or a block of it; and the tasks and functions
+// made.
+struct VpiCallSite {
+  const RtlirDesign& design;
+  const RtlirModule& mod;
+  const std::string& prefix;
+  const VpiObject* scope;
+  const VpiSubroutineObjects& made;
+};
+
+// §26.2: the task or function the package `package` declares under `name`.
+VpiCalledSubroutine VpiPackageSubroutine(const RtlirDesign& design,
+                                         std::string_view package,
+                                         std::string_view name,
+                                         const VpiSubroutineObjects& made);
+
+// The task or function a call of `name` written at `site` resolves to: one a
+// generate block enclosing it declares, the innermost first (§27.4), one the
+// instance's module or the compilation unit declares, or, by §26.3, one the
+// module imports from a package by its name or with a wildcard.
+VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
+                                       std::string_view name);
+
+// The same for the callee `callee` of a call: a name alone, or a package's
+// subroutine behind the package's name, `p::f`; none for any other callee.
+VpiCalledSubroutine VpiCalleeSubroutine(const VpiCallSite& site,
+                                        const Expr& callee);
+
+// §37.42: the task or function object a call's callee resolves to from where
+// the call is written, null where none was made.
+using VpiCalleeResolver = std::function<VpiObject*(const Expr& callee)>;
+
+// The resolver of the callees of calls written at `site`.
+VpiCalleeResolver VpiCalleesAt(const VpiCallSite& site);
 
 // §37.31: the class defn made for each class declaration, keyed by the
 // declaration and the flat name of the scope it was made in: an instance's
@@ -155,11 +204,13 @@ void AttachVariableRanges(const RtlirDesign* design,
                           const VpiAttachBuild& build);
 
 // §37.58, §37.59: the expression object `expr` stands for, written in the
-// instance whose objects `objects` keys under `prefix`; null for a kind of
-// expression not modelled.
+// instance whose objects `objects` keys under `prefix`, a func call in it
+// reaching the function `callees` resolves its callee to (§37.42); null for a
+// kind of expression not modelled.
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
-                                 const VpiAttachBuild& build);
+                                 const VpiAttachBuild& build,
+                                 const VpiCalleeResolver& callees = {});
 
 // §37.42: a system task or function an application registered, as a call
 // that names it finds it: the systf object vpi_register_systf returned for it
