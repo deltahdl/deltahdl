@@ -31,18 +31,6 @@ struct MadeClassDefn {
   std::string prefix;
 };
 
-// §37.3.1 with §37.10 detail 5: the full name of the class `name` declared in
-// `scope`, written after an instance's name and a dot or after the `::` that
-// ends a package's full name; a class of the compilation unit, which no scope
-// object holds, under `$unit::`.
-std::string ClassDefnFullName(const VpiObject* scope, std::string_view name) {
-  if (scope == nullptr) return VpiCompilationUnitFullName(name);
-  if (scope->full_name.ends_with("::")) {
-    return scope->full_name + std::string(name);
-  }
-  return scope->full_name + "." + std::string(name);
-}
-
 // §37.31: the class defn `decl` stands as, hung from the scope declaring it
 // where a scope object holds it, reporting its name and whether it is virtual.
 void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
@@ -52,7 +40,7 @@ void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
   VpiObject* defn = build.alloc();
   defn->type = vpiClassDefn;
   defn->name = build.keep(std::string(decl->name));
-  defn->full_name = ClassDefnFullName(scope, decl->name);
+  defn->full_name = VpiScopedFullName(scope, decl->name);
   defn->parent = scope;
   defn->is_virtual = decl->is_virtual;
   if (scope != nullptr) scope->children.push_back(defn);
@@ -230,8 +218,9 @@ void MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
 
 // §37.31 detail 1 with §37.41: the task or function a method the class
 // declares stands as, a method of the class defn full-named through it
-// (detail 5), with the visibility it was declared with and virtual where it
-// was declared virtual or pure virtual (§8.20, §8.21).
+// (detail 5), with the visibility it was declared with, virtual where it
+// was declared virtual or pure virtual (§8.20, §8.21), and automatic, the
+// one lifetime §8.6 gives a method.
 void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
                 const VpiAttachBuild& build) {
   const ModuleItem* item = member.method;
@@ -244,6 +233,7 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   method->parent = owner.defn;
   method->visibility = DeclaredVisibility(member);
   method->is_virtual = member.is_virtual || member.is_pure_virtual;
+  method->automatic = true;
   owner.defn->children.push_back(method);
 }
 
@@ -264,6 +254,14 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
 }
 
 }  // namespace
+
+std::string VpiScopedFullName(const VpiObject* scope, std::string_view name) {
+  if (scope == nullptr) return VpiCompilationUnitFullName(name);
+  if (scope->full_name.ends_with("::")) {
+    return scope->full_name + std::string(name);
+  }
+  return scope->full_name + "." + std::string(name);
+}
 
 VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            const VpiObjectMap& objects,

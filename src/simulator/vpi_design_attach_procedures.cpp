@@ -145,17 +145,17 @@ int BareAtomicKind(StmtKind kind) {
 
 // §37.42: what a call statement stands as. `type` is the kind of tf call, zero
 // for a statement that calls nothing the walk resolves; `name` is the
-// subroutine it calls;
-// `prefix` is the object a method is applied to (detail 2); `user_defined`
-// is the figure's vpiUserDefn; `systf` is the systf object a call of a
-// registered system task reaches.
+// subroutine it calls; `prefix` is the object a method is applied to (detail
+// 2); `user_defined` is the figure's vpiUserDefn; `systf` is the systf object
+// a call of a registered system task reaches; and `called` is the task or
+// function object of the declaration a task, function or method call calls.
 struct CallShape {
   int type = 0;
   std::string_view name;
   VpiObject* prefix = nullptr;
   bool user_defined = false;
   VpiObject* systf = nullptr;
-  VpiObject* method = nullptr;
+  VpiObject* called = nullptr;
 };
 
 // §13.3 and §13.4: the kind of tf call a call of `decl` is, `task` for a task
@@ -165,47 +165,75 @@ int CallKindOf(const ModuleItem& decl, int task, int function) {
   return decl.kind == ModuleItemKind::kFunctionDecl ? function : 0;
 }
 
-// The kind of tf call a call of the subroutine `decls` declares under `name`
-// is, zero where they declare none.
-int DeclaredCallKind(const std::vector<ModuleItem*>& decls,
-                     std::string_view name) {
+// A task or function a call resolves to, and the flat name of the scope the
+// object made for it is keyed under; a null declaration for none.
+struct ResolvedSubroutine {
+  const ModuleItem* decl = nullptr;
+  std::string scope;
+};
+
+// The task or function `decls` declare under `name`, null where they declare
+// none.
+const ModuleItem* SubroutineNamed(const std::vector<ModuleItem*>& decls,
+                                  std::string_view name) {
   for (const ModuleItem* decl : decls) {
-    if (decl == nullptr || decl->name != name) continue;
-    const int kKind = CallKindOf(*decl, vpiTaskCall, vpiFuncCall);
-    if (kKind != 0) return kKind;
+    if (decl != nullptr && decl->name == name &&
+        CallKindOf(*decl, vpiTaskCall, vpiFuncCall) != 0) {
+      return decl;
+    }
   }
-  return 0;
+  return nullptr;
 }
 
 // §26.2: the same, of the package the design declares under `package`.
-int PackageCallKind(const RtlirDesign& design, std::string_view package,
-                    std::string_view name) {
+ResolvedSubroutine PackageSubroutine(const RtlirDesign& design,
+                                     std::string_view package,
+                                     std::string_view name) {
   for (const PackageDecl* decl : design.packages) {
     if (decl == nullptr || decl->name != package) continue;
-    const int kKind = DeclaredCallKind(decl->items, name);
-    if (kKind != 0) return kKind;
+    const ModuleItem* found = SubroutineNamed(decl->items, name);
+    if (found != nullptr) return {found, std::string(package)};
   }
-  return 0;
+  return {};
 }
 
-// The kind of tf call a call of `name` is, of a task or function the
-// instance's module, one of its generate blocks or the compilation unit
-// declares, or, by §26.3, one the module imports from a package by its name or
-// with a wildcard; zero for none.
-int NamedCallKind(const BodyWalk& walk, std::string_view name) {
-  int kind = DeclaredCallKind(walk.mod.function_decls, name);
-  if (kind == 0) kind = DeclaredCallKind(walk.design.cu_function_decls, name);
+// The task or function a call of `name` resolves to: one the instance's
+// module, one of its generate blocks or the compilation unit declares, or, by
+// §26.3, one the module imports from a package by its name or with a wildcard.
+ResolvedSubroutine NamedSubroutine(const BodyWalk& walk,
+                                   std::string_view name) {
+  if (const ModuleItem* found =
+          SubroutineNamed(walk.mod.function_decls, name)) {
+    return {found, walk.prefix};
+  }
+  if (const ModuleItem* found =
+          SubroutineNamed(walk.design.cu_function_decls, name)) {
+    return {found, "$unit"};
+  }
   for (const RtlirGenBlockSubroutine& sub : walk.mod.gen_block_subroutines) {
-    if (kind == 0 && sub.decl != nullptr && sub.decl->name == name) {
-      kind = CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall);
+    if (sub.decl != nullptr && sub.decl->name == name) {
+      return {sub.decl, walk.prefix};
     }
   }
   for (const RtlirImport& entry : walk.mod.imports) {
-    if (kind == 0 && (entry.is_wildcard || entry.item_name == name)) {
-      kind = PackageCallKind(walk.design, entry.package_name, name);
-    }
+    if (!entry.is_wildcard && entry.item_name != name) continue;
+    ResolvedSubroutine found =
+        PackageSubroutine(walk.design, entry.package_name, name);
+    if (found.decl != nullptr) return found;
   }
-  return kind;
+  return {};
+}
+
+// §37.42: a task or function call named `name` of the subroutine `sub`
+// resolves to, reaching the task or function object made for it, which a
+// subroutine of a generate block has none of.
+CallShape SubroutineCallShape(const ResolvedSubroutine& sub,
+                              std::string_view name, const BodyWalk& walk) {
+  if (sub.decl == nullptr) return {};
+  CallShape shape{CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall), name};
+  auto found = walk.calls.subroutines.find({sub.decl, sub.scope});
+  if (found != walk.calls.subroutines.end()) shape.called = found->second;
+  return shape;
 }
 
 // The class among `decls` named `name`, null for none.
@@ -565,7 +593,7 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
   shape.user_defined = call.declared;
-  shape.method = MethodObject(walk, call.owner, access.rhs->text);
+  shape.called = MethodObject(walk, call.owner, access.rhs->text);
   return shape;
 }
 
@@ -580,9 +608,9 @@ bool JoinsTwoNames(const Expr& access) {
 // §37.42 with §26.3: a task or function call naming a package's subroutine
 // behind the package's name, `p::t`.
 CallShape PackageCallShape(const Expr& access, const BodyWalk& walk) {
-  return CallShape{
-      PackageCallKind(walk.design, access.lhs->text, access.rhs->text),
-      access.rhs->text};
+  return SubroutineCallShape(
+      PackageSubroutine(walk.design, access.lhs->text, access.rhs->text),
+      access.rhs->text, walk);
 }
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
@@ -597,7 +625,8 @@ CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
   const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
   if (callee == nullptr) return {};
   if (callee->kind == ExprKind::kIdentifier) {
-    return CallShape{NamedCallKind(walk, callee->text), callee->text};
+    return SubroutineCallShape(NamedSubroutine(walk, callee->text),
+                               callee->text, walk);
   }
   if (callee->kind != ExprKind::kMemberAccess || !JoinsTwoNames(*callee)) {
     return {};
@@ -644,7 +673,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
   call->name = walk.build.keep(std::string(kShape.name));
   call->tf_prefix = kShape.prefix;
-  call->tf_decl = kShape.method;
+  call->tf_decl = kShape.called;
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;
   call->written_as_stmt = true;

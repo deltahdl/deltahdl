@@ -454,9 +454,9 @@ struct VpiObject {
   // where the vpiPrefix relation does not apply.
   VpiObject* tf_prefix = nullptr;
 
-  // §37.42 (figure): for a method task or method func call of a method the
-  // design declares, the task or function its class defn holds for it, which
-  // vpiTask or vpiFunction reaches.
+  // §37.42 (figure): for a task, function, method task or method func call of
+  // a subroutine the design declares, the task or function object of that
+  // declaration, which vpiTask or vpiFunction reaches.
   VpiObject* tf_decl = nullptr;
 
   // §37.42 detail 1: the with-clause a method call carries (an expression, or a

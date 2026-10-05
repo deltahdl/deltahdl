@@ -421,6 +421,8 @@ TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsMethods) {
   EXPECT_EQ(vpi_get(vpiType, run), vpiTask);
   EXPECT_EQ(vpi_get(vpiMethod, run), 1);
   EXPECT_EQ(vpi_get(vpiVisibility, run), vpiProtectedVis);
+  // §8.6 (#5052): a method's lifetime is automatic.
+  EXPECT_EQ(vpi_get(vpiAutomatic, run), 1);
   EXPECT_EQ(vpi_get(vpiType, Named(vpiMethods, defn, "size")), vpiFunction);
 }
 

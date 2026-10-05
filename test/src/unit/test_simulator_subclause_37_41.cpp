@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -292,6 +296,45 @@ TEST_F(TaskFuncDeclaration, SignedIsFalseWithoutAReturnVariable) {
 
   EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&task)), 0);
   EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&void_fn)), 0);
+}
+
+// A design run with a PLI application registered, whose tasks and functions
+// are read back from the model the run built.
+class TaskFuncsOfARun : public VpiDesignRun {};
+
+// §37.41 (#4939): each task and function a module declares is a task or
+// function of each of its instances, full-named under the instance...
+TEST_F(TaskFuncsOfARun, AModuleDeclaresItsTasksAndFunctions) {
+  Run("module top; function int f(); return 1; endfunction\n"
+      "  task t(); endtask endmodule\n");
+  EXPECT_EQ(NamesOf(vpiTaskFunc, By("top")),
+            (std::vector<std::string>{"f", "t"}));
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  EXPECT_EQ(vpi_get(vpiType, f), vpiFunction);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiTaskFunc, By("top"), "t")), vpiTask);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, f), "top.f");
+}
+
+// ...a package's is full-named through the package (detail 5)...
+TEST_F(TaskFuncsOfARun, APackageSubroutineIsFullNamedThroughItsPackage) {
+  Run("package pkg; function int g(); return 1; endfunction endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle g = Named(vpiTaskFunc, By("pkg"), "g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, g), "pkg::g");
+}
+
+// ...and each reports its lifetime (detail 11), static unless declared
+// automatic or declared in a scope whose default lifetime is automatic.
+TEST_F(TaskFuncsOfARun, ASubroutineReportsItsLifetime) {
+  Run("module top; function automatic int a(); return 1; endfunction\n"
+      "  function int s(); return 1; endfunction endmodule\n"
+      "package automatic pkg; task d(); endtask\n"
+      "  task static k(); endtask endpackage\n");
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top"), "a")), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top"), "s")), 0);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("pkg"), "d")), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("pkg"), "k")), 0);
 }
 
 }  // namespace

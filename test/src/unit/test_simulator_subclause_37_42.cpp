@@ -525,6 +525,31 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
 }
 
+// A task call statement reaches the task it calls and a func call statement
+// the function, each the declaration's object in the instance (#5024)...
+TEST_F(CallStatementsOfARun, ACallStatementReachesItsDeclaration) {
+  Run("module top; task t; endtask function void f(); endfunction\n"
+      "  initial begin t; f(); end endmodule\n");
+  vpiHandle task = Named(vpiTaskCall, By("top"), "t");
+  vpiHandle func = Named(vpiFuncCall, By("top"), "f");
+  ASSERT_NE(task, nullptr);
+  ASSERT_NE(func, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, task)),
+            VpiObjectOf(Named(vpiTaskFunc, By("top"), "t")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, func)),
+            VpiObjectOf(Named(vpiTaskFunc, By("top"), "f")));
+}
+
+// ...a package's where the call names the package's subroutine (§26.3).
+TEST_F(CallStatementsOfARun, APackageTaskCallReachesThePackageTask) {
+  Run("package p; task t; endtask endpackage\n"
+      "module top; initial p::t; endmodule\n");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+            VpiObjectOf(Named(vpiTaskFunc, By("p"), "t")));
+}
+
 // The method task call reaches the task method of the class it calls, and a
 // method func call the function method, each the method its class defn holds
 // (#5025)...

@@ -484,6 +484,7 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
   if (type == vpiProcess) return VpiIsProcessType(obj->type);
   // §37.12: vpiInternalScope is drawn to the `scope` class likewise.
   if (type == vpiInternalScope) return VpiIsInternalScopeType(obj->type);
+  if (type == vpiTaskFunc) return VpiIsTaskFuncType(obj->type);
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();
   // §37.10: the vpiNetTypedef iteration reaches the instance's nettype

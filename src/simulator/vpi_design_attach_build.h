@@ -20,6 +20,7 @@ struct ClassDecl;
 struct DataType;
 enum class DataTypeKind : uint8_t;
 struct Expr;
+struct ModuleItem;
 struct RtlirDesign;
 struct RtlirModule;
 struct VpiObject;
@@ -112,6 +113,25 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiObjectMap& unit_typespecs,
                       const VpiAttachBuild& build);
 
+// §37.3.1 with §37.10 detail 5: the full name of `name` declared in `scope`,
+// written after an instance's name and a dot or after the `::` that ends a
+// package's full name, and under `$unit::` where no scope object holds it.
+std::string VpiScopedFullName(const VpiObject* scope, std::string_view name);
+
+// §37.41: the task or function object made for each task or function
+// declaration, keyed by the declaration and the flat name of the scope it was
+// made in: an instance's path, a package's name, or "$unit" for the
+// compilation unit.
+using VpiSubroutineObjects =
+    std::map<std::pair<const ModuleItem*, std::string>, VpiObject*>;
+
+// §37.41: give each module instance and each package a task or function per
+// one it declares, and make one per task or function of the compilation unit,
+// each named, full-named and reporting its lifetime. Answers the objects made.
+VpiSubroutineObjects AttachSubroutines(const RtlirDesign* design,
+                                       const VpiObjectMap& objects,
+                                       const VpiAttachBuild& build);
+
 // §37.31: the class defn made for each class declaration, keyed by the
 // declaration and the flat name of the scope it was made in: an instance's
 // path, a package's name, or "$unit" for the compilation unit.
@@ -159,13 +179,15 @@ using VpiCallSiteObjects =
 // What the procedure walk builds a call statement with: the run, which an
 // argument's value is read through; the registration a system call's name
 // resolves to; the record of the call statements made, which a run's
-// invocation of a registered system task finds its own call among; and the
-// class defns made, whose methods a method call reaches.
+// invocation of a registered system task finds its own call among; the
+// class defns made, whose methods a method call reaches; and the tasks and
+// functions made, which a task or func call reaches.
 struct VpiCallBuild {
   SimContext& ctx;
   std::function<VpiRegisteredSystf(std::string_view)> systf;
   VpiCallSiteObjects& sites;
   const VpiClassDefnObjects& classes;
+  const VpiSubroutineObjects& subroutines;
 };
 
 // §37.63: give each instance a process per procedure it declares, reaching the

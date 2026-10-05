@@ -201,6 +201,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);
     const VpiClassDefnObjects kClasses =
         AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
+    const VpiSubroutineObjects kSubroutines =
+        AttachSubroutines(design, object_map_, kBuild);
     AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // §37.42: a system call finds the registration its name resolves to, and
@@ -217,7 +219,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                                     static_cast<int>(data - systfs_.data()));
                                 return found;
                               },
-                              call_site_objects_, kClasses};
+                              call_site_objects_, kClasses, kSubroutines};
     AttachProcedures(design, object_map_, kCalls, kBuild);
   }
   AttachContinuousAssignments(design);
