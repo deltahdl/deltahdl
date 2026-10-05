@@ -111,6 +111,23 @@ bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.54: the assignments and tf calls written as an expr's match items;
+// §37.52 details 4 and 5: the expressions a case property item groups, none
+// for the default item, its property reached apart from them. Answers whether
+// `type` and `ref` name either relation.
+static bool CollectAssertionParts(int type, VpiHandle ref, VpiHandle iter) {
+  std::vector<VpiHandle> parts;
+  if (type == vpiMatchItem) {
+    parts = VpiExprMatchItems(ref);
+  } else if (type == vpiExpr && ref->type == vpiCasePropertyItem) {
+    parts = VpiCaseItemConditions(ref);
+  } else {
+    return false;
+  }
+  for (VpiHandle part : parts) iter->children.push_back(part);
+  return true;
+}
+
 bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
   if (type == vpiAssertion && VpiIsInstanceType(ref->type)) {
     VpiCollectInstanceAssertions(ref, iter);
@@ -120,20 +137,7 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
     CollectInternalScopes(ref, iter);
     return true;
   }
-  // §37.52 details 4 and 5: the expressions a case property item groups, none
-  // for the default item; its property is reached apart from them.
-  // §37.54: the assignments and tf calls written as an expr's match items.
-  if (type == vpiMatchItem) {
-    for (VpiHandle item : VpiExprMatchItems(ref))
-      iter->children.push_back(item);
-    return true;
-  }
-  if (type == vpiExpr && ref->type == vpiCasePropertyItem) {
-    for (VpiHandle condition : VpiCaseItemConditions(ref)) {
-      iter->children.push_back(condition);
-    }
-    return true;
-  }
+  if (CollectAssertionParts(type, ref, iter)) return true;
   // The `stmt` class §37.60 fills is a grouping (§37.4.1), so the iteration
   // reaches the statements the block holds, each of the kind it is, in the
   // order written, and none of the block's variables.
