@@ -229,8 +229,9 @@ void MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
 }
 
 // §37.31 detail 1 with §37.41: the task or function a method the class
-// declares stands as, a method of the class defn with the visibility it was
-// declared with.
+// declares stands as, a method of the class defn full-named through it
+// (detail 5), with the visibility it was declared with and virtual where it
+// was declared virtual or pure virtual (§8.20, §8.21).
 void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
                 const VpiAttachBuild& build) {
   const ModuleItem* item = member.method;
@@ -239,8 +240,10 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   method->type =
       item->kind == ModuleItemKind::kTaskDecl ? vpiTask : vpiFunction;
   method->name = build.keep(std::string(item->name));
+  method->full_name = owner.defn->full_name + "::" + std::string(item->name);
   method->parent = owner.defn;
   method->visibility = DeclaredVisibility(member);
+  method->is_virtual = member.is_virtual || member.is_pure_virtual;
   owner.defn->children.push_back(method);
 }
 
@@ -262,13 +265,14 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
 
 }  // namespace
 
-void AttachClassDefinitions(const RtlirDesign* design,
-                            const VpiObjectMap& objects, SimContext& ctx,
-                            const VpiAttachBuild& build) {
+VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
+                                           const VpiObjectMap& objects,
+                                           SimContext& ctx,
+                                           const VpiAttachBuild& build) {
   // §37.31: each class a design declares is a class defn, reached from the
   // instance or package declaring it, or with a NULL reference for a class of
   // the compilation unit. Nothing made one, so vpiClassDefn reached none.
-  if (design == nullptr) return;
+  if (design == nullptr) return {};
   std::vector<MadeClassDefn> made;
   MakeInstanceClassDefns(*design, objects, build, made);
   MakePackageClassDefns(*design, objects, build, made);
@@ -279,6 +283,11 @@ void AttachClassDefinitions(const RtlirDesign* design,
       MakeExtends(owner, made, objects, ctx, build);
     }
   }
+  VpiClassDefnObjects defns;
+  for (const MadeClassDefn& owner : made) {
+    defns[{owner.decl, owner.prefix}] = owner.defn;
+  }
+  return defns;
 }
 
 }  // namespace delta

@@ -16,6 +16,7 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct ClassDecl;
 struct DataType;
 enum class DataTypeKind : uint8_t;
 struct Expr;
@@ -111,13 +112,21 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiObjectMap& unit_typespecs,
                       const VpiAttachBuild& build);
 
+// §37.31: the class defn made for each class declaration, keyed by the
+// declaration and the flat name of the scope it was made in: an instance's
+// path, a package's name, or "$unit" for the compilation unit.
+using VpiClassDefnObjects =
+    std::map<std::pair<const ClassDecl*, std::string>, VpiObject*>;
+
 // §37.31: give each module instance and each package a class defn per class it
 // declares, and make one per class of the compilation unit, reached with a
-// NULL reference; and details 5 and 6: give each derived class its extends
-// object and hang it from its base's derived classes.
-void AttachClassDefinitions(const RtlirDesign* design,
-                            const VpiObjectMap& objects, SimContext& ctx,
-                            const VpiAttachBuild& build);
+// NULL reference, each with its properties and methods; and details 5 and 6:
+// give each derived class its extends object and hang it from its base's
+// derived classes. Answers the class defns it made.
+VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
+                                           const VpiObjectMap& objects,
+                                           SimContext& ctx,
+                                           const VpiAttachBuild& build);
 
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
@@ -148,14 +157,15 @@ using VpiCallSiteObjects =
     std::map<std::pair<const Expr*, std::string>, VpiObject*>;
 
 // What the procedure walk builds a call statement with: the run, which an
-// argument's value is read through; the
-// registration a system call's name resolves to; and the record of the call
-// statements made, which a run's invocation of a registered system task finds
-// its own call among.
+// argument's value is read through; the registration a system call's name
+// resolves to; the record of the call statements made, which a run's
+// invocation of a registered system task finds its own call among; and the
+// class defns made, whose methods a method call reaches.
 struct VpiCallBuild {
   SimContext& ctx;
   std::function<VpiRegisteredSystf(std::string_view)> systf;
   VpiCallSiteObjects& sites;
+  const VpiClassDefnObjects& classes;
 };
 
 // §37.63: give each instance a process per procedure it declares, reaching the

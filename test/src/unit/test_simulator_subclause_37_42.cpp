@@ -266,7 +266,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   user_fn.builtin_method = false;
   VpiObject user_fn_obj;
   user_fn_obj.type = vpiFunction;
-  user_fn.children = {&user_fn_obj};
+  user_fn.tf_decl = &user_fn_obj;
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, VpiHandleOf(&user_fn))),
             &user_fn_obj);
 
@@ -523,6 +523,42 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "obj");
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
+}
+
+// The method task call reaches the task method of the class it calls, and a
+// method func call the function method, each the method its class defn holds
+// (#5025)...
+TEST_F(CallStatementsOfARun, AMethodCallReachesItsMethod) {
+  Run("module top;\n"
+      "  class C; task run(); endtask function void go(); endfunction\n"
+      "  endclass\n"
+      "  C obj = new;\n"
+      "  initial begin obj.run(); obj.go(); end\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  vpiHandle run = Named(vpiMethodTaskCall, By("top"), "run");
+  vpiHandle go = Named(vpiMethodFuncCall, By("top"), "go");
+  ASSERT_NE(run, nullptr);
+  ASSERT_NE(go, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, run)),
+            VpiObjectOf(Named(vpiMethods, defn, "run")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, go)),
+            VpiObjectOf(Named(vpiMethods, defn, "go")));
+}
+
+// ...the base class's where the method is inherited (§8.13).
+TEST_F(CallStatementsOfARun, AnInheritedMethodCallReachesTheBaseMethod) {
+  Run("module top;\n"
+      "  class B; task run(); endtask endclass\n"
+      "  class D extends B; endclass\n"
+      "  D obj = new;\n"
+      "  initial obj.run();\n"
+      "endmodule\n");
+  vpiHandle base = Named(vpiClassDefn, By("top"), "B");
+  vpiHandle call = BodyOf("top");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+            VpiObjectOf(Named(vpiMethods, base, "run")));
 }
 
 // A semaphore's get is a task of the built-in class (§15.3.3), so a call of it

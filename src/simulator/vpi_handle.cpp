@@ -742,8 +742,8 @@ bool TryResolveIndexRelation(int type, VpiHandle ref, VpiHandle& out) {
 }
 
 // §37.42/§37.61: a method call's prefix and with-clause, a dynamically
-// prefixed object's prefix, and the NULL function/task of a built-in method
-// call.
+// prefixed object's prefix, and the function or task a method call calls,
+// NULL for a built-in method's.
 bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiPrefix && VpiIsMethodCallType(ref->type)) {
     out = ref->tf_prefix;
@@ -757,14 +757,9 @@ bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->tf_with_method ? ref->tf_with : nullptr;
     return true;
   }
-  if (type == vpiFunction && ref->type == vpiMethodFuncCall &&
-      ref->builtin_method) {
-    out = nullptr;
-    return true;
-  }
-  if (type == vpiTask && ref->type == vpiMethodTaskCall &&
-      ref->builtin_method) {
-    out = nullptr;
+  if ((type == vpiFunction && ref->type == vpiMethodFuncCall) ||
+      (type == vpiTask && ref->type == vpiMethodTaskCall)) {
+    out = ref->builtin_method ? nullptr : ref->tf_decl;
     return true;
   }
   return false;

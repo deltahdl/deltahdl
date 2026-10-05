@@ -155,6 +155,7 @@ struct CallShape {
   VpiObject* prefix = nullptr;
   bool user_defined = false;
   VpiObject* systf = nullptr;
+  VpiObject* method = nullptr;
 };
 
 // §13.3 and §13.4: the kind of tf call a call of `decl` is, `task` for a task
@@ -297,10 +298,12 @@ int BuiltInClassCallKind(std::string_view cls, std::string_view method) {
 }
 
 // §37.42: what a method call calls - the kind of tf call it is, zero for a
-// method the walk resolves to nothing, and whether the design declares it.
+// method the walk resolves to nothing, whether the design declares it, and if
+// it does the class declaring it.
 struct MethodCall {
   int type = 0;
   bool declared = false;
+  const ClassDecl* owner = nullptr;
 };
 
 // The method `method` of the class `cls`, found in the class or, by §8.13, in
@@ -315,7 +318,8 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
     if (decl == nullptr) return {BuiltInClassCallKind(cls, method), false};
     const ModuleItem* found = MethodNamed(*decl, method);
     if (found != nullptr) {
-      return {CallKindOf(*found, vpiMethodTaskCall, vpiMethodFuncCall), true};
+      return {CallKindOf(*found, vpiMethodTaskCall, vpiMethodFuncCall), true,
+              decl};
     }
     cls = decl->base_class;
   }
@@ -524,6 +528,24 @@ PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
   return var;
 }
 
+// §37.42 with §37.31: the task or function the class defn made for `owner`
+// holds under `name`, the defn of the instance walked or else of the
+// compilation unit; null where none was made.
+VpiObject* MethodObject(const BodyWalk& walk, const ClassDecl* owner,
+                        std::string_view name) {
+  if (owner == nullptr) return nullptr;
+  for (const std::string& scope : {walk.prefix, std::string("$unit")}) {
+    auto found = walk.calls.classes.find({owner, scope});
+    if (found == walk.calls.classes.end()) continue;
+    for (VpiObject* child : found->second->children) {
+      if (VpiIsClassMethodType(child->type) && child->name == name) {
+        return child;
+      }
+    }
+  }
+  return nullptr;
+}
+
 // §37.42: a method task or method function call, applied through `access`,
 // which joins two names, to a variable of the scope the call stands in: a
 // class var, whose class says what the method is, or a string, an enum or an
@@ -543,6 +565,7 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
   shape.user_defined = call.declared;
+  shape.method = MethodObject(walk, call.owner, access.rhs->text);
   return shape;
 }
 
@@ -621,6 +644,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
   call->name = walk.build.keep(std::string(kShape.name));
   call->tf_prefix = kShape.prefix;
+  call->tf_decl = kShape.method;
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;
   call->written_as_stmt = true;

@@ -454,6 +454,11 @@ struct VpiObject {
   // where the vpiPrefix relation does not apply.
   VpiObject* tf_prefix = nullptr;
 
+  // §37.42 (figure): for a method task or method func call of a method the
+  // design declares, the task or function its class defn holds for it, which
+  // vpiTask or vpiFunction reaches.
+  VpiObject* tf_decl = nullptr;
+
   // §37.42 detail 1: the with-clause a method call carries (an expression, or a
   // constraint for randomize), reached through vpiWith. The relation is
   // available only for the methods that accept a with clause - the randomize

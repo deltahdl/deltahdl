@@ -424,5 +424,24 @@ TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsMethods) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiMethods, defn, "size")), vpiFunction);
 }
 
+// §37.41 detail 5 (#5046): a method is full-named through its class defn...
+TEST_F(ClassDefinitionsOfARun, AMethodIsFullNamedThroughItsClass) {
+  Run(kPacket);
+  vpiHandle run = Named(vpiMethods, DefnIn(By("top"), "Packet"), "run");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, run), "top.Packet::run");
+}
+
+// ...and (#5047) reports whether it is virtual, pure virtual among them.
+TEST_F(ClassDefinitionsOfARun, AVirtualMethodReportsVpiVirtual) {
+  Run("module top; virtual class Shape;\n"
+      "  virtual function int area(); return 0; endfunction\n"
+      "  pure virtual function int sides();\n"
+      "  function int id(); return 1; endfunction endclass endmodule\n");
+  vpiHandle defn = DefnIn(By("top"), "Shape");
+  EXPECT_EQ(vpi_get(vpiVirtual, Named(vpiMethods, defn, "area")), 1);
+  EXPECT_EQ(vpi_get(vpiVirtual, Named(vpiMethods, defn, "sides")), 1);
+  EXPECT_EQ(vpi_get(vpiVirtual, Named(vpiMethods, defn, "id")), 0);
+}
+
 }  // namespace
 }  // namespace delta
