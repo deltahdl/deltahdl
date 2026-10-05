@@ -19,6 +19,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
@@ -279,6 +280,8 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
                                         : std::string_view();
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
+  // §37.42 detail 9: the call decompiles to the one the source wrote.
+  if (call_site != nullptr) call->decompile = VpiExprDecompile(call_site);
   // §37.42 detail 5: every call built here is of a registration an
   // application made, so it is user-defined, and the figure's arrow reaches
   // the systf object that registration returned.

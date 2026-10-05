@@ -398,16 +398,20 @@ TEST_F(CallsOfARun, ASystemFunctionCallIsASysFuncCallObject) {
 }
 
 // What the calltf of $probe read each time it ran: the call that invoked it
-// (detail 3) and whether that call is user-defined (detail 5).
+// (detail 3), whether that call is user-defined (detail 5) and what it
+// decompiles to, empty where it reports nothing (detail 9).
 struct ProbeSighting {
   vpiHandle call;
   int user_defn;
+  std::string decompile;
 };
 std::vector<ProbeSighting> g_probe_sightings;
 
 PLI_INT32 ProbeCalltf(PLI_BYTE8* /*user_data*/) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
-  g_probe_sightings.push_back({call, vpi_get(vpiUserDefn, call)});
+  const char* decompile = vpi_get_str(vpiDecompile, call);
+  g_probe_sightings.push_back({call, vpi_get(vpiUserDefn, call),
+                               decompile != nullptr ? decompile : ""});
   return 0;
 }
 
@@ -736,6 +740,29 @@ TEST_F(CallStatementsOfARun, AScopedCallOfAPackageTaskIsATaskCall) {
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
   EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+}
+
+// A system task call statement decompiles to the call it makes, its arguments
+// decompiled as any expression is (detail 9, #5021)...
+TEST_F(CallStatementsOfARun, ASystemTaskCallStatementDecompilesToItsCall) {
+  Run("module top; int a; initial $display(\"a=%0d\",  a+1); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, BodyOf("top")),
+               "$display(\"a=%0d\", a + 1)");
+}
+
+// ...one written with no arguments to its name alone...
+TEST_F(CallStatementsOfARun, ASystemTaskCallWithNoArgumentsIsItsName) {
+  Run("module top; initial $probe; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, BodyOf("top")), "$probe");
+}
+
+// ...and the call a calltf reaches decompiles the same way, though the model
+// holds no statement for a call a task's body writes.
+TEST_F(CallStatementsOfARun, TheInvokingCallDecompilesToItsCall) {
+  Run("module top; int a; task t; $probe(a*(a+1)); endtask\n"
+      "  initial t; endmodule\n");
+  ASSERT_EQ(g_probe_sightings.size(), 1U);
+  EXPECT_EQ(g_probe_sightings[0].decompile, "$probe(a * (a + 1))");
 }
 
 }  // namespace

@@ -19,6 +19,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -609,8 +610,9 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
 // it calls; a label written on it names the begin §9.3.5 makes around it
 // instead. It is marked as written as a statement, which tells a function call
 // standing as one from a function call standing as an expression. A system
-// task or function call is recorded as the call statement it is, which a run's
-// invocation of a registered system task or function stands as (detail 3).
+// task or function call decompiles to the call written (detail 9), and is
+// recorded as the call statement it is, which a run's invocation of a
+// registered system task or function stands as (detail 3).
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
@@ -624,6 +626,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   call->written_as_stmt = true;
   MakeCallArguments(call, *stmt.expr, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
+    call->decompile = VpiExprDecompile(stmt.expr);
     walk.calls.sites[{stmt.expr, walk.prefix}] = call;
   }
   return call;

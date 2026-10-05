@@ -482,9 +482,10 @@ struct VpiObject {
   // vpi_get_systf_info(). False by default.
   bool user_defined = false;
 
-  // §37.42 detail 9: a system task or function call reports, through the
-  // vpiDecompile string property, a functionally equivalent call to the one in
-  // the original source. Empty when the call carries no decompiled form.
+  // §37.59 detail 2 and §37.42 detail 9: an expression, or a system task or
+  // function call, reports through the vpiDecompile string property one
+  // functionally equivalent to the one in the original source. Empty when the
+  // object carries no decompiled form.
   std::string decompile;
 
   // §37.42 (figure): the systf object vpi_register_systf returned for the

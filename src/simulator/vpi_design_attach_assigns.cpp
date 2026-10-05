@@ -20,6 +20,8 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_expr_decompile.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -314,8 +316,7 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
 // name stands for, a constant, a select, a call, or an operation over these.
 // The kinds of expression the switch does not name are not modelled and give
 // null.
-VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
-  if (expr == nullptr) return nullptr;
+VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
     case ExprKind::kIdentifier:
       return Resolve(build.names, expr->text);
@@ -355,6 +356,19 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
     default:
       return nullptr;
   }
+}
+
+VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
+  if (expr == nullptr) return nullptr;
+  VpiObject* obj = ModelledExpression(expr, build);
+  // §37.59 detail 2: an expression object made for what the source wrote
+  // decompiles to it. A name stands for the net or variable it resolves to,
+  // which is no object of this expression's own.
+  if (obj != nullptr && expr->kind != ExprKind::kIdentifier &&
+      VpiIsExprType(obj->type)) {
+    obj->decompile = VpiExprDecompile(expr);
+  }
+  return obj;
 }
 
 // §37.46: the names an assignment's left side drives -- a net written whole,

@@ -474,13 +474,13 @@ static const char* VpiConfigStr(VpiHandle obj) {
   return obj->config_name.c_str();
 }
 
-// §37.42 detail 9: vpiDecompile hands back a functionally equivalent call to
-// the one written in the source. It is drawn on the system task/function calls;
-// any other object kind, and a system call that stored no decompiled form,
-// yields null rather than an empty string.
+// §37.59 detail 2 and §37.42 detail 9: vpiDecompile hands back an expression,
+// or a system task or function call, functionally equivalent to the one written
+// in the source. It is drawn on the expressions and the system task calls; any
+// other object kind, and one that stored no decompiled form, yields null rather
+// than an empty string.
 static const char* VpiDecompileStr(VpiHandle obj) {
-  if (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)
-    return nullptr;
+  if (!VpiIsExprType(obj->type) && obj->type != vpiSysTaskCall) return nullptr;
   return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
 }
 
@@ -548,8 +548,9 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
       return VpiCellStr(obj);
     case kVpiConfig:
       return VpiConfigStr(obj);
-    // §37.42 detail 9: a system task or function call decompiles to a
-    // functionally equivalent call through the vpiDecompile string property.
+    // §37.59 detail 2 and §37.42 detail 9: an expression, or a system task or
+    // function call, decompiles to a functionally equivalent one through the
+    // vpiDecompile string property.
     case vpiDecompile:
       return VpiDecompileStr(obj);
     default:

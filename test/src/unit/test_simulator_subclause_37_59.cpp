@@ -509,5 +509,120 @@ TEST_F(ExpressionsOfARun, AnImplicationIsAnImplyOperation) {
   EXPECT_EQ(vpi_get(vpiOpType, Rhs()), vpiImplyOp);
 }
 
+// Detail 2: an expression of a run decompiles to an equivalent one, each
+// operand and operator one space apart however the source spaced them...
+TEST_F(ExpressionsOfARun, AnOperationDecompilesOneSpaceApart) {
+  Run("module top; wire [7:0] a, b, y; assign y = a+b; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a + b");
+}
+
+// ...parenthesized where precedence needs it and nowhere else, without white
+// space of their own...
+TEST_F(ExpressionsOfARun, ParenthesesStandWherePrecedenceNeedsThem) {
+  Run("module top; wire [7:0] a, b, c, y; assign y = (a + b) * c; "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "(a + b) * c");
+}
+
+TEST_F(ExpressionsOfARun, ParenthesesPrecedenceDoesNotNeedAreDropped) {
+  Run("module top; wire [7:0] a, b, c, y; assign y = a + (b * c); "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a + b * c");
+}
+
+// ...including those keeping a right operand of a left associative operator
+// whole...
+TEST_F(ExpressionsOfARun, ARightOperandOfALeftAssociativeOperatorStaysWhole) {
+  Run("module top; wire [7:0] a, b, c, y; assign y = a - (b - c); "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a - (b - c)");
+}
+
+// ...a unary operator one space from its operand...
+TEST_F(ExpressionsOfARun, AUnaryOperatorStandsOneSpaceFromItsOperand) {
+  Run("module top; wire [7:0] a, b, y; assign y = ~(a & b) + -a; "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "~ (a & b) + - a");
+}
+
+// ...a conditional whose condition is itself one in parentheses...
+TEST_F(ExpressionsOfARun, AConditionalDecompilesWithItsOperators) {
+  Run("module top; wire s, t; wire [7:0] a, b, y;\n"
+      "  assign y = (s?t:s) ? a+1 : b; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "(s ? t : s) ? a + 1 : b");
+}
+
+// ...a constant as the literal written...
+TEST_F(ExpressionsOfARun, AConstantDecompilesToItsLiteral) {
+  Run("module top; wire [7:0] y; assign y = 8'hA5; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "8'hA5");
+}
+
+// ...a select with what it selects into...
+TEST_F(ExpressionsOfARun, ASelectDecompilesAfterItsBase) {
+  Run(kPartSelect);
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a[7:4]");
+}
+
+TEST_F(ExpressionsOfARun, AnIndexedPartSelectDecompilesAfterItsBase) {
+  Run(kIndexedPartSelect);
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a[2+:4]");
+}
+
+// ...a concatenation and a replication with their elements...
+TEST_F(ExpressionsOfARun, AConcatenationDecompilesWithItsElements) {
+  Run("module top; wire [3:0] a, b; wire [7:0] y; assign y = {a,b}; "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "{a, b}");
+}
+
+TEST_F(ExpressionsOfARun, AReplicationDecompilesWithItsMultiplier) {
+  Run(kReplication);
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "{2{a}}");
+}
+
+// ...a call with its arguments...
+TEST_F(ExpressionsOfARun, ACallDecompilesWithItsArguments) {
+  Run("module top;\n"
+      "  function automatic int f(int x, int z); return x; endfunction\n"
+      "  wire [31:0] a, y; assign y = f(a+1,a); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "f(a + 1, a)");
+}
+
+// ...a cast with the type it casts to...
+TEST_F(ExpressionsOfARun, ACastDecompilesWithItsType) {
+  Run("module top; wire [7:0] a; wire [31:0] y; assign y = int'(a+1); "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "int'(a + 1)");
+}
+
+// ...an inside expression with its set, ranges among it...
+TEST_F(ExpressionsOfARun, AnInsideExpressionDecompilesWithItsSet) {
+  Run("module top; wire [7:0] a; wire y; assign y = a inside {1,[2:3]}; "
+      "endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "a inside {1, [2:3]}");
+}
+
+// ...a streaming concatenation with its direction...
+TEST_F(ExpressionsOfARun, AStreamDecompilesWithItsDirection) {
+  Run("module top; wire [7:0] a, y; assign y = {<<{a}}; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "{<< {a}}");
+}
+
+// ...a min:typ:max in its parentheses...
+TEST_F(ExpressionsOfARun, AMinTypMaxDecompilesInItsParentheses) {
+  Run("module top; wire a, b, c, y; assign y = (a:b:c); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, Rhs()), "(a : b : c)");
+}
+
+// ...and each operand of an operation decompiles on its own.
+TEST_F(ExpressionsOfARun, AnOperandDecompilesOnItsOwn) {
+  Run("module top; wire [7:0] a, b, c, y; assign y = (a + b) * c; "
+      "endmodule\n");
+  std::vector<vpiHandle> operands = OperandsOf(Rhs());
+  ASSERT_EQ(operands.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, operands[0]), "a + b");
+}
+
 }  // namespace
 }  // namespace delta

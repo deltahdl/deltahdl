@@ -645,6 +645,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_typespecs.cpp
     simulator/vpi_design_attach_vars.cpp
     simulator/vpi_design_viewports.cpp
+    simulator/vpi_expr_decompile.cpp
     simulator/vpi_handle.cpp
     simulator/vpi_handle_statements.cpp
     simulator/vpi_helpers_assertions.cpp
