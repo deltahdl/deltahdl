@@ -177,11 +177,11 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
   return true;
 }
 
-// §4.4.2.6: "The code specified by blocking assignments in checkers, program
-// blocks and the code in action blocks of concurrent assertions are scheduled
-// in the Reactive region", which §4.4.2.5 states again from the property's
-// side: "During property evaluation, pass/fail code shall be scheduled in the
-// Reactive region of the current time slot." The action therefore does not run
+// §4.4.2.6: the Reactive region is where blocking assignments in checkers and
+// program blocks are scheduled, and the action blocks of concurrent assertions
+// with them, which §4.4.2.5 states again from the property's side: pass and
+// fail code that property evaluation produces is scheduled in the current time
+// slot's Reactive region. The action therefore does not run
 // where the property was evaluated, and §4.4's region order is what that buys:
 // the design's Active-region code has settled before a testbench reacts to the
 // assertion, so nothing the action writes can be read by the design in the same

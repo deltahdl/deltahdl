@@ -67,15 +67,15 @@ static void ScheduleNbaEvent(Event* event, uint64_t delay_ticks,
                                    region, event);
 }
 
-// §4.9.4: "The values in effect when the update is placed in the event
-// region are used to compute both the right-hand value and the left-hand
-// target." EvalExpr on a bare identifier hands back the variable's own vec
-// (evaluation.cpp), and copying a Logic4Vec copies its `words` pointer rather
-// than the words (common/types.h), so a sampled right-hand value aliases the
-// storage it was read from. A whole-variable write replaces that storage and
-// cannot be seen through the alias, but an in-place writer reaches through it
-// and changes what a pending update will store: the packed struct member
-// deposit WriteResolvedField makes (statement_assign.cpp) left
+// §4.9.4: both the right-hand value and the left-hand target are computed from
+// the values standing when the update is placed in the event region. EvalExpr
+// on a bare identifier hands back the variable's own vec (evaluation.cpp), and
+// copying a Logic4Vec copies its `words` pointer rather than the words
+// (common/types.h), so a sampled right-hand value aliases the storage it was
+// read from. A whole-variable write replaces that storage and cannot be seen
+// through the alias, but an in-place writer reaches through it and changes what
+// a pending update will store: the packed struct member deposit
+// WriteResolvedField makes (statement_assign.cpp) left
 // `s = 16'hAABB; d <= s; s.b = 8'h00;` storing 16'h00BB, and the CoerceTo2State
 // in SetupWholeVarNbaCallback below writes through the alias in the other
 // direction, clearing the source variable's x and z bits when the target is
