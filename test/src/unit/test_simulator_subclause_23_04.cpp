@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -43,9 +44,13 @@ void ExpectOuterReadsThroughNestedAssign(SimFixture& f, const char* src,
   EXPECT_EQ(r->value.ToUint64(), expected);
 }
 
+// §23.4 makes the outer module's name space visible to a nested module, so the
+// nested initial assigns the outer x. The source is valid and elaborates with
+// no error; each one reported is named in the failure, rather than the case
+// reading x back out of a design the elaborator rejected.
 TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
   SimFixture f;
-  auto* v = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  module inner;\n"
@@ -53,7 +58,13 @@ TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
       "  endmodule\n"
       "  inner i1();\n"
       "endmodule\n",
-      f, "x");
+      f);
+  ASSERT_NE(design, nullptr);
+  for (const Diagnostic& d : f.diag.Diagnostics()) {
+    EXPECT_NE(d.severity, DiagSeverity::kError) << d.message;
+  }
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
