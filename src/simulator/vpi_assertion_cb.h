@@ -16,16 +16,16 @@
 namespace delta {
 
 // §39.4.2: place `cb_rtn` on `assertion` for `reason`, with `user_data` carried
-// through to every call of it. "If the callback is successfully placed, a
-// handle to the callback is returned ... If there were errors on placing the
-// callback, a NULL handle is returned": no assertion, no routine to call, or a
-// reason that may not be placed on an assertion of that kind are those errors.
+// through to every call of it. A placement that succeeds answers a handle to
+// the callback, and one that fails answers NULL: no assertion, no routine to
+// call, or a reason that may not be placed on an assertion of that kind are
+// those errors.
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
                                  vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data);
 
-// §39.4.2: "This handle can be used to remove the callback via
-// vpi_remove_cb()." True when `cb_handle` was such a handle and the placement
+// §39.4.2: vpi_remove_cb() removes a callback by the handle its placement
+// answered. True when `cb_handle` was such a handle and the placement
 // it named was removed, which is what tells vpi_remove_cb() that the handle was
 // an assertion callback's rather than a simulation callback's.
 bool VpiRemoveAssertionCb(VpiHandle cb_handle);

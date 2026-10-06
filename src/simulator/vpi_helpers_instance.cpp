@@ -90,9 +90,9 @@ bool VpiIsInstanceType(int type) {
 }
 
 void VpiCollectInstanceAssertions(VpiHandle scope, VpiHandle iter) {
-  // §39.3.1 step b: "Iterate all assertions in an instance: pass the
-  // appropriate instance handle as a reference handle to vpi_iterate()." All of
-  // them is what the step asks for, and an assertion is written wherever the
+  // §39.3.1 step b: the assertions of an instance are iterated by passing
+  // vpi_iterate() the instance's handle as the reference. All of them is what
+  // the step asks for, and an assertion is written wherever the
   // instance body admits one - directly, inside a begin block, inside a
   // procedure, inside a generate scope - so the walk descends through the
   // scopes the body holds rather than reading off its immediate children.

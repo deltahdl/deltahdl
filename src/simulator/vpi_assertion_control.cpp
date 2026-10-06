@@ -21,9 +21,10 @@ std::uint64_t VpiAssertionAttemptStart(const s_vpi_time* time) {
          static_cast<std::uint64_t>(time->low);
 }
 
-// §39.5.2: "Only assertion statement handles are valid here, not sequence or
-// property instances." A handle that is neither names nothing this control can
-// act on, and the assertion the model acts on is named by that handle.
+// §39.5.2: these controls take a handle to an assertion statement, and a
+// sequence or property instance is not one. A handle that is neither names
+// nothing this control can act on, and the assertion the model acts on is named
+// by that handle.
 bool VpiAssertionControlTarget(VpiHandle assertion, std::string_view& name) {
   if (assertion == nullptr) return false;
   if (!AssertionApi::IsAssertionStatementHandle(assertion->type)) return false;

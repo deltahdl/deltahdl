@@ -122,9 +122,9 @@ struct VpiObject {
   bool is_systf = false;
 
   // §39.4.2: whether this callback object stands in for an assertion callback
-  // placed with vpi_register_assertion_cb(). "If the callback is successfully
-  // placed, a handle to the callback is returned. This handle can be used to
-  // remove the callback via vpi_remove_cb()", and the removal has to reach the
+  // placed with vpi_register_assertion_cb(). A successful placement answers a
+  // handle to the callback, which vpi_remove_cb() removes it by, and the
+  // removal has to reach the
   // assertion model rather than the simulation-callback table, so the two kinds
   // of callback object are told apart here. `assertion_cb_handle` is what the
   // placement answered with, which is what the removal names.

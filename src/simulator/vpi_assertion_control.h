@@ -1,7 +1,7 @@
 #pragma once
 
-// §39.5: the control functions of the assertion API - "how to obtain assertion
-// system control and assertion control information". Each is a vpi_control()
+// §39.5: the control functions of the assertion API, which control the
+// assertion system and single assertions. Each is a vpi_control()
 // operation whose arguments §39.5.1 and §39.5.2 fix, and each acts on the
 // assertion model of simulator/dpi_runtime.h, so the reading of the arguments
 // stands here between vpi_control() and that model.
@@ -21,25 +21,25 @@ bool VpiIsAssertionControl(int operation);
 bool VpiIsAssertionAttemptControl(int operation);
 bool VpiIsAssertionStepControl(int operation);
 
-// §39.5.1: "To control the assertion system, use vpi_control() with one of the
-// following constants and a second handle argument that is a vpiHandle for a
-// scope. A NULL handle signifies that the control applies to all assertions
-// regardless of scope." 1 where the control was applied, 0 where it was not.
+// §39.5.1: the assertion system is controlled by vpi_control() with one of the
+// clause's constants and a scope handle, a NULL handle applying the control to
+// every assertion whatever its scope. 1 where the control was applied, 0 where
+// it was not.
 PLI_INT32 VpiAssertionSysControl(int operation, VpiHandle scope);
 
-// §39.5.2: the second argument "shall be a valid assertion handle", and "only
-// assertion statement handles are valid here, not sequence or property
-// instances". 1 where the control was applied, 0 where it was not.
+// §39.5.2: the second argument has to be a valid handle to an assertion
+// statement, and a sequence or property instance is not one. 1 where the
+// control was applied, 0 where it was not.
 PLI_INT32 VpiAssertionControl(int operation, VpiHandle assertion);
 
-// §39.5.2: with the attempt start time as the third argument, "as a pointer to
-// a correctly initialized s_vpi_time structure" - vpiAssertionKill, which
-// discards the given attempt, and vpiAssertionDisableStep.
+// §39.5.2: with the attempt start time as the third argument, given as a
+// pointer to an s_vpi_time structure initialized for it - vpiAssertionKill,
+// which discards the given attempt, and vpiAssertionDisableStep.
 PLI_INT32 VpiAssertionAttemptControl(int operation, VpiHandle assertion,
                                      const s_vpi_time* attempt_start_time);
 
-// §39.5.2: vpiAssertionEnableStep, whose fourth argument "shall be a step
-// control constant" - vpiAssertionClockSteps, the per-assertion/clock-tick
+// §39.5.2: vpiAssertionEnableStep, whose fourth argument has to be one of the
+// step control constants - vpiAssertionClockSteps, the per-assertion/clock-tick
 // stepping the clause defines.
 PLI_INT32 VpiAssertionStepControl(int operation, VpiHandle assertion,
                                   const s_vpi_time* attempt_start_time,

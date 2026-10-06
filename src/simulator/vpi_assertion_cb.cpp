@@ -12,7 +12,8 @@
 namespace delta {
 namespace {
 
-// §39.4.2: "A pointer to the time of the callback" - the model keeps a time as
+// §39.4.2: the routine is given a pointer to the callback's time - the model
+// keeps a time as
 // one 64-bit count of simulation time units, and s_vpi_time carries it in the
 // two halves vpiSimTime names.
 s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
@@ -29,9 +30,9 @@ s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
 // supplied when the callback was registered.
 //
 // The attempt information follows the clause's own rule about when there is
-// any: "On lock, unlock, disable, enable, reset, kill, pass action, fail
-// action, vacuous action, and nonvacuous action callbacks, the returned
-// p_vpi_attempt_info info pointer is NULL", which is what the model reports
+// any: a lock, unlock, disable, enable, reset, kill, pass action, fail action,
+// vacuous action or nonvacuous action callback is given a NULL
+// p_vpi_attempt_info pointer, which is what the model reports
 // through the args it delivers, and attemptStartTime is what fills it. The
 // detail union is left as the clause leaves it for a start or success callback,
 // where only attemptStartTime is valid: the expressions a failure or a step
