@@ -247,7 +247,7 @@ static void ScoreSampledValue(CoverPoint* cp, const Matches& matches) {
       ValueHitsBinOfKind(cp, CoverBinKind::kIllegal, matches);
   bool value_is_ignored =
       ValueHitsBinOfKind(cp, CoverBinKind::kIgnore, matches);
-  // A value "lies within a defined bin" if it matches any non-default bin,
+  // A value falls in a defined bin if it matches any non-default bin,
   // including illegal and ignore bins. The default bin catches only what the
   // defined bins miss (LRM 19.5).
   bool matched_defined = false;

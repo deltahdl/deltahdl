@@ -406,8 +406,8 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
 
     obj->tchk_ref_term = MakeTchkTerm(AllocObject(), check.ref_signal,
                                       check.ref_edge, obj, name_pool_);
-    // Detail 1: the data term denotes the data_event "if any"; a check written
-    // without one has no data signal and so no term.
+    // Detail 1: the data term denotes the data_event where the check has one; a
+    // check written without one has no data signal and so no term.
     if (!check.data_signal.empty()) {
       obj->tchk_data_term = MakeTchkTerm(AllocObject(), check.data_signal,
                                          check.data_edge, obj, name_pool_);

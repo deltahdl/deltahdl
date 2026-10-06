@@ -258,15 +258,15 @@ class CoverageDB {
   // keeps. A cross_set_expression yields a queue of the cross's CrossQueueType,
   // each element a value tuple of type CrossValType — one component per
   // coverpoint of the cross (LRM 19.6.1.3). A candidate bin tuple's value tuple
-  // is "present in the cross_set_expression" when it equals one of the queue's
-  // elements. Selection is subject to the same matches policy as the with
-  // covergroup expression (LRM 19.6.1.2): the policy counts, per candidate, how
-  // many of its value tuples are present in the queue, keeping the candidate
-  // when every value tuple is present for the $ form (require_all), otherwise
-  // when at least min_count are — which is one when no matches clause is
-  // written, the default policy where a single value tuple of the bin tuple
-  // present in the queue selects it. Returns the kept candidate indices, in
-  // order (LRM 19.6.1.4).
+  // counts as one the cross_set_expression holds when it equals one of the
+  // queue's elements. Selection is subject to the same matches policy as the
+  // with covergroup expression (LRM 19.6.1.2): the policy counts, per
+  // candidate, how many of its value tuples are present in the queue, keeping
+  // the candidate when every value tuple is present for the $ form
+  // (require_all), otherwise when at least min_count are — which is one when no
+  // matches clause is written, the default policy where a single value tuple of
+  // the bin tuple present in the queue selects it. Returns the kept candidate
+  // indices, in order (LRM 19.6.1.4).
   static std::vector<size_t> SelectCrossBinTuplesBySetExpression(
       const std::vector<std::vector<std::vector<int64_t>>>&
           candidate_bin_tuples,
@@ -430,9 +430,9 @@ class CoverageDB {
   static bool TransitionBinAllowed(const CoverPoint* cp);
 
   // A transition bin specification must describe at least one transition, i.e.
-  // two successive sample points. A specification of "length 0" — a single
-  // value range, or a single value range whose repeat_range evaluates to 1 —
-  // is illegal. Returns true when the spec spans at least two sample points
+  // two successive sample points. A specification of length zero, a single
+  // value range, or a single value range whose repeat_range evaluates to 1, is
+  // illegal. Returns true when the spec spans at least two sample points
   // (LRM 19.5.2).
   static bool TransitionLengthLegal(size_t sample_points);
 

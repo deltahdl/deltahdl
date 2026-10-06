@@ -57,7 +57,7 @@ enum class ConstraintKind : uint8_t {
 
 // 18.5.7.2: the operand by which an array reduction method joins the elements.
 // sum folds with addition, product with multiplication, and/or/xor with the
-// corresponding bitwise operator — the "relevant operand for each method".
+// corresponding bitwise operator, each method joining by its own operator.
 enum class ArrayReductionOp : uint8_t {
   kSum,
   kProduct,
@@ -667,8 +667,8 @@ class ConstraintSolver {
   void SeedHonoredSoft(const ConstraintExpr& inner,
                        const std::vector<ConstraintExpr>& extra);
 
-  // 18.8: an inactive variable "is treated the same as if it had not been
-  // declared rand or randc", so its value is a state value the solve reads and
+  // 18.8: an inactive variable is handled as though it had been declared
+  // neither rand nor randc, so its value is a state value the solve reads and
   // never writes. Report whether the named variable is one of those: true only
   // when it is a known variable that is inactive. A name this solver does not
   // hold is not a variable whose value is being held, so it reports false and

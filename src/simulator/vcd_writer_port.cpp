@@ -84,8 +84,8 @@ static std::string_view VcdPortStateList(Direction direction) {
       break;
   }
   // The unknown-direction list: 0 low, 1 high, ? unknown, F three-state. An
-  // inout is both ends at once, which is what 0 and 1 there stand for ("both
-  // input and output are active with 0/1 value"), and a dumped object that is
+  // inout is both ends at once, which is what 0 and 1 there stand for: input
+  // and output both active, at 0 or at 1. A dumped object that is
   // no port at all has no direction to state.
   return "01?F";
 }

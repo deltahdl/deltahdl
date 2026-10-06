@@ -242,10 +242,11 @@ bool VpiVarSelectConstantSelectOf(VpiHandle select) {
 
   VpiVarSelectConstantSelectQuery query;
 
-  // "every associated index expression is an elaboration-time constant
-  // expression". The index expressions are the ones vpi_iterate(vpiIndex, sel)
-  // reaches - the select's expression children - and an index that is an
-  // elaboration-time constant stands as a constant expression object.
+  // The first condition: each index expression of the select is a constant
+  // expression at elaboration time. The index expressions are the ones
+  // vpi_iterate(vpiIndex, sel) reaches - the select's expression children - and
+  // an index that is an elaboration-time constant stands as a constant
+  // expression object.
   query.all_indices_constant = true;
   for (const VpiObject* child : select->children) {
     if (!VpiIsExprType(child->type)) continue;

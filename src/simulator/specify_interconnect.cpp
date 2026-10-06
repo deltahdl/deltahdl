@@ -65,8 +65,8 @@ std::string InterconnectScopeOf(const std::string& name) {
 }
 
 // How deep in the hierarchy a name sits. A larger number is further from the
-// top, which is what "hierarchically below" means for the up- and
-// down-hierarchy annotation rules.
+// top, which is what standing below another in the hierarchy means for the up-
+// and down-hierarchy annotation rules.
 std::size_t InterconnectDepth(const std::string& name) {
   std::size_t depth = 0;
   for (char c : name) {

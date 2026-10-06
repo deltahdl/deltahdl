@@ -34,8 +34,8 @@ struct StructFieldInfo;
 // class and the classes it inherits from (8.13). Evaluating a constraint
 // expression with neither in scope leaves an unqualified call resolving to no
 // method at all, and a call that resolves to nothing yields zero -- which is
-// exactly the value 18.5.11 requires be the function's return value, "treated
-// as a state variable" by the constraint that consumes it.
+// exactly the value 18.5.11 requires be the function's return value, which
+// the constraint that consumes it holds fixed as it would a state variable.
 //
 // Holds the object in scope for as long as the guard lives, and steps back out
 // when it is destroyed, so an evaluation that returns early cannot leave the

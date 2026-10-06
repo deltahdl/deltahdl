@@ -463,8 +463,8 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
 
   // Resolve through any existing alias chain to the representative of the
   // underlying object so the new handle points straight at it. The fresh handle
-  // is a distinct object (a different pointer than the one passed in), which is
-  // the "may create two distinct handles" latitude the standard grants.
+  // is a distinct object (a different pointer than the one passed in), which
+  // the standard allows, as it lets two handles to one object be distinct.
   VpiObject* rep = ResolveSameObject(object);
 
   // §37.2.4: "A tool can create a handle that refers to an object only during

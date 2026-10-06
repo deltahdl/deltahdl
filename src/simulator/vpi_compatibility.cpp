@@ -73,9 +73,10 @@ bool VpiModeHasMemoryObjects(int mode) {
   return mode == vpiMode1364v1995 || mode == vpiMode1364v2001;
 }
 
-// Rows 3 and 4 with C.4.3 item 3: vpiIntegerVar and vpiTimeVar "can be arrays"
-// in every IEEE 1364 standard and vpiRealVar in IEEE Std 1364-2001 and
-// 1364-2005, "instead of simple variables", so an unpacked array of one of
+// Rows 3 and 4 with C.4.3 item 3: every IEEE 1364 standard lets a vpiIntegerVar
+// or vpiTimeVar object stand for an array as well as a simple variable, and
+// IEEE Std 1364-2001 and 1364-2005 let a vpiRealVar do the same, so an unpacked
+// array of one of
 // those kinds is an object of that kind under such a mode, told from the
 // simple variable by the vpiArray property. The kind such a mode reads
 // `array` as, or 0 for an array it reads as an array object.
@@ -92,8 +93,8 @@ int Vpi1364ArrayAsVariableKind(delta::VpiHandle array, int mode) {
 }
 
 // The vpiType an IEEE 1364 mode reports for `obj`, or 0 where it reports the
-// kind this standard does. Row 1 has "unpacked unidimensional reg arrays"
-// characterized as vpiMemory objects; an array of more dimensions is the
+// kind this standard does. Row 1 has an unpacked reg array of one dimension
+// reported as a vpiMemory object; an array of more dimensions is the
 // vpiRegArray IEEE Std 1364-2001 introduced for it.
 int Vpi1364Type(delta::VpiHandle obj, int mode) {
   if (delta::VpiIsArrayVarType(obj->type)) {
@@ -110,10 +111,10 @@ int Vpi1364Type(delta::VpiHandle obj, int mode) {
   return 0;
 }
 
-// Row 3 and C.4.3 item 3: the vpiArray property "returned TRUE when they were
-// arrays" for the integer, time and real variables an IEEE 1364 mode reads an
-// array as, and "indicated when vpiReg types represented elements of
-// vpiRegArrays"; FALSE for every other object under such a mode.
+// Row 3 and C.4.3 item 3: under an IEEE 1364 mode the vpiArray property is
+// TRUE for an integer, time or real variable that the mode reads an array as,
+// and for a vpiReg that is an element of a vpiRegArray; FALSE for every other
+// object.
 int Vpi1364ArrayProperty(delta::VpiHandle obj, int mode) {
   if (delta::VpiIsArrayVarType(obj->type)) {
     return Vpi1364ArrayAsVariableKind(obj, mode) != 0 ? 1 : 0;

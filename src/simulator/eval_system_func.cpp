@@ -481,10 +481,11 @@ static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
   }
 }
 
-// D.2: "The specified net shall be a scalar or a bit-select of a vector net."
-// An argument that names no net, or that names a vector net whole, is neither,
-// and the call is reported under D.2 rather than counting the drivers of no
-// net or of the vector's bit 0. Returns whether the argument is one of the two.
+// D.2: the net $countdrivers is given has to be a scalar net or one bit
+// selected from a vector net. An argument that names no net, or that names a
+// vector net whole, is neither, and the call is reported under D.2 rather than
+// counting the drivers of no net or of the vector's bit 0. Returns whether the
+// argument is one of the two.
 static bool CheckCountDriversNet(const Expr* expr, const Expr* net_arg,
                                  const Net* net, SimContext& ctx) {
   std::string_view fault;

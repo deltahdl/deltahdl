@@ -209,9 +209,10 @@ void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
 }
 
 // 18.6.1: enumerate the rand/randc class-handle members visible on the object.
-// Each such member names a sub-object: because randomize() sets "all the random
-// variables and objects", every referenced object is randomized in turn. Walk
-// the inheritance chain so inherited random object handles are included.
+// Each such member names a sub-object: because randomize() gives a value to
+// every random variable and object, every referenced object is randomized in
+// turn. Walk the inheritance chain so inherited random object handles are
+// included.
 void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
                               std::vector<std::string>& out) {
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {

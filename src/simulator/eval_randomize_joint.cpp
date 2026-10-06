@@ -146,8 +146,8 @@ void CollectJointRefs(const Expr* e, const std::string& prefix,
 // property, the relation is evaluated in the owner's scope so a member access
 // like left.v reads the trial value from the referenced object, and the
 // original property values are restored. This lets the solver see every
-// referenced variable at its trial value simultaneously, which is what "solved
-// simultaneously" requires.
+// referenced variable at its trial value simultaneously, which is what solving
+// the variables together requires.
 //
 // One property value replaced for the duration of a trial evaluation, together
 // with the value it held before (or the fact that it held none).

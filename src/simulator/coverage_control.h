@@ -326,8 +326,9 @@ class CoverageControlState {
     return it != scopes_.end() && it->second.collecting;
   }
 
-  // Genuine state transitions a scope has undergone. These make the "no effect"
-  // rule observable: a redundant start, stop, or reset must not advance them.
+  // Genuine state transitions a scope has undergone. These make observable the
+  // rule that a call asking for the state a scope is already in changes
+  // nothing: a redundant start, stop, or reset must not advance them.
   std::uint64_t StartCount(const std::string& scope) const {
     return Field(scope, &ScopeState::started);
   }

@@ -125,8 +125,8 @@ enum class VcdVarSelection : uint8_t {
   // Only the objects a $dumpvars scope list named. Which those are is marked on
   // the signals themselves, so a second call adds to them.
   kListedObjects,
-  // A $dumpvars with no arguments ran, which "dumps all the variables in the
-  // model to the VCD file". A later scope list adds nothing to that, so this
+  // A $dumpvars with no arguments ran, which puts every variable of the model
+  // in the VCD file. A later scope list adds nothing to that, so this
   // state does not narrow again.
   kEveryObjectByTask,
 };

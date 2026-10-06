@@ -23,7 +23,8 @@ void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
                    double* real) {
   s_vpi_time t = {};
   // GetTime selects the result form from t.type: a scaled real, or the raw
-  // 64-bit simulation-time count. A null object means "the whole design", which
+  // 64-bit simulation-time count. A null object stands for the design as a
+  // whole, which
   // GetTime reads in the simulation time unit.
   t.type = want_scaled_real ? kVpiScaledRealTime : kVpiSimTime;
   GetGlobalVpiContext().GetTime(nullptr, &t);
