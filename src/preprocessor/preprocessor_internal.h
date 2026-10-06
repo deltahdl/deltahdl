@@ -72,14 +72,13 @@ void RestoreComments(std::string& text, size_t from,
 // literals of a line or a macro's text.
 bool AtTripleQuote(std::string_view line, size_t i);
 
-// Where the §5.6.1 escaped identifier whose '\' stands at `i` ends: at the
-// white space ending it, every character before that being the identifier's,
-// '"' included. A backtick ends it here too, so that the macro scans still
-// read a macro usage written there. Defined in
-// src/preprocessor/preprocessor_inline.cpp, and read by the scans that follow
-// the string literals of a line, which a '"' inside the identifier opens none
-// of.
-size_t EndOfEscapedIdentifier(std::string_view line, size_t i);
+// The index after the §5.6.1 escaped identifier whose '\' stands at `i`: the
+// identifier runs to the next white space, and every character before that is
+// its own, '"' included. Defined in src/preprocessor/preprocessor_macros.cpp
+// for the tracker of a usage's actual arguments, and read as well by the scans
+// that follow the string literals of a line, which a '"' inside the identifier
+// opens none of.
+size_t EndOfEscapedIdentifier(std::string_view text, size_t i);
 
 // Where a scan along one line stands among A.8.8's string literals: outside
 // every one, inside a quoted_string, or inside a triple_quoted_string.

@@ -176,9 +176,7 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   return SubstituteParams(macro.body, macro.params, resolved_views);
 }
 
-// The index after the escaped identifier (5.6.1) opening at text[i], which
-// runs from its backslash to the next white space.
-static size_t EndOfEscapedIdentifier(std::string_view text, size_t i) {
+size_t EndOfEscapedIdentifier(std::string_view text, size_t i) {
   while (i < text.size() &&
          !std::isspace(static_cast<unsigned char>(text[i]))) {
     ++i;

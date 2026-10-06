@@ -231,23 +231,18 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
-size_t EndOfEscapedIdentifier(std::string_view line, size_t i) {
-  ++i;
-  while (i < line.size() && line[i] != '`' &&
-         !std::isspace(static_cast<unsigned char>(line[i]))) {
-    ++i;
-  }
-  return i;
-}
-
 // Steps a scan standing outside every string over the character at `i`, over
 // the escaped identifier a '\' opens there, or over the '"' or `"""` opening a
 // string there. §22.5.1's `" is a macro-quote rather than a string's quote,
 // macro usages between `" and `" being expanded, and a '"' inside a §5.6.1
-// escaped identifier is one of its characters; neither opens a string.
+// escaped identifier is one of its characters; neither opens a string. The
+// step over an escaped identifier ends at a backtick inside it, so that the
+// scans looking for a backtick still read a macro usage written there.
 static size_t StepOutsideString(std::string_view line, size_t i,
                                 StringLiteralState& state) {
-  if (line[i] == '\\') return EndOfEscapedIdentifier(line, i);
+  if (line[i] == '\\') {
+    return std::min(EndOfEscapedIdentifier(line, i), line.find('`', i + 1));
+  }
   if (line[i] != '"' || (i > 0 && line[i - 1] == '`')) return i + 1;
   if (!AtTripleQuote(line, i)) {
     state = StringLiteralState::kQuoted;
