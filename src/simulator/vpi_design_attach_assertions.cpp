@@ -684,6 +684,16 @@ void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
   }
 }
 
+void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx) {
+  // §22.12: the position is read where the text was written, the file and
+  // line a line of the preprocessor's joined text came from.
+  if (!loc.IsValid()) return;
+  const SourceManager& sources = ctx.GetDiag().Sources();
+  const SourceLoc kWritten = sources.ResolveToOrigin(loc);
+  obj->line_no = static_cast<int>(kWritten.line);
+  obj->file = std::string(sources.FilePath(kWritten.file_id));
+}
+
 void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
                           SimContext& ctx, const VpiStmtBuild& with) {
   const ModuleItem& item = *assertion.item;

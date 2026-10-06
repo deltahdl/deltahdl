@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
@@ -32,6 +33,32 @@
 namespace delta {
 
 namespace {
+
+// §37.59 with §37.58: the kind of expr an actual naming no variable is: a call
+// of a function a func call, of a system function a sys func call, a literal
+// a constant, and any other expression the operation its operator makes.
+int RunTimeArgumentKind(const Expr& actual) {
+  switch (actual.kind) {
+    case ExprKind::kCall:
+      return vpiFuncCall;
+    case ExprKind::kSystemCall:
+      return vpiSysFuncCall;
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kStringLiteral:
+      return vpiConstant;
+    default:
+      return vpiOperation;
+  }
+}
+
+// §37.58: the vpiConstType of a constant the literal `actual` is.
+int RunTimeConstType(const Expr& actual) {
+  if (actual.kind == ExprKind::kRealLiteral) return vpiRealConst;
+  if (actual.kind == ExprKind::kStringLiteral) return vpiStringConst;
+  return vpiIntConst;
+}
 
 // §36.4: one task/function argument as the application reaches it. An actual
 // that names a variable is carried by that variable itself, so a write through
@@ -75,7 +102,8 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
         actual->text.size());
     arg->var = named;
   } else {
-    arg->type = vpiOperation;
+    arg->type = RunTimeArgumentKind(*actual);
+    if (arg->type == vpiConstant) arg->const_type = RunTimeConstType(*actual);
     auto* holder = arena.Create<Variable>();
     if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
     arg->var = holder;
@@ -278,6 +306,10 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
     call = AllocObject();
     call->name = data.tfname != nullptr ? std::string_view(data.tfname)
                                         : std::string_view();
+    // §37.3.3: the call stands for the text its call site was written as.
+    if (call_site != nullptr) {
+      VpiRecordWrittenLocation(call, call_site->range.start, ctx);
+    }
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
   // §37.42 detail 9: the call decompiles to the one the source wrote.

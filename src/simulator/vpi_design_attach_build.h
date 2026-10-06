@@ -468,6 +468,11 @@ void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
 void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
                                 SimContext& ctx);
 
+// §37.3.3: give `obj`, which stands for source text starting at `loc`, the
+// file and line that text was written on, which vpiFile and vpiLineNo read; a
+// position the parser did not record leaves both as they were.
+void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx);
+
 // §37.11: make each instance array of modules, interfaces or programs an
 // array object over its elements.
 void AttachInstanceArrays(const RtlirDesign* design,

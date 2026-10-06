@@ -669,5 +669,47 @@ TEST_F(ExpressionsOfARun, AnOperandDecompilesOnItsOwn) {
   EXPECT_STREQ(vpi_get_str(vpiDecompile, operands[0]), "a + b");
 }
 
+// The vpiType of each argument of the call of `$probe` its calltf was last
+// run for, in order.
+std::vector<int>& ProbedArgumentKinds() {
+  static std::vector<int> kinds;
+  return kinds;
+}
+
+class ArgumentsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    ProbedArgumentKinds().clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
+      vpiHandle it =
+          vpi_iterate(vpiArgument, vpi_handle(vpiSysTfCall, nullptr));
+      for (vpiHandle h = it != nullptr ? vpi_scan(it) : nullptr; h != nullptr;
+           h = vpi_scan(it)) {
+        ProbedArgumentKinds().push_back(vpi_get(vpiType, h));
+      }
+      return 0;
+    };
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+// §37.42 with §37.59: an argument a user system task's call carries while
+// its calltf runs is the kind of expr its actual is, a call of a function a
+// func call, of a system function a sys func call and a literal a constant,
+// an operator's expression alone an operation (#5111).
+TEST_F(ArgumentsOfARun, ARunTimeArgumentIsTheKindOfExprItsActualIs) {
+  Run("module top; int x;\n"
+      "  function int inc(); return 1; endfunction\n"
+      "  initial $probe(inc(), 5, x + 1, $time);\n"
+      "endmodule\n");
+  EXPECT_EQ(ProbedArgumentKinds(),
+            (std::vector<int>{vpiFuncCall, vpiConstant, vpiOperation,
+                              vpiSysFuncCall}));
+}
+
 }  // namespace
 }  // namespace delta

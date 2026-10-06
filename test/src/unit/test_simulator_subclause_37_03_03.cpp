@@ -302,5 +302,49 @@ TEST_F(VpiLocationInARun, ADeclarationOfTheOtherFileReportsItsOwnLine) {
   EXPECT_EQ(g_top_net_line, 2);
 }
 
+// The line and file of each call of `$where` its calltf was run for, read
+// off the call through vpiSysTfCall, in the order the calls ran.
+std::vector<std::pair<int, std::string>>& WhereCallLocations() {
+  static std::vector<std::pair<int, std::string>> locations;
+  return locations;
+}
+
+PLI_INT32 WhereCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  const char* file = vpi_get_str(vpiFile, call);
+  WhereCallLocations().emplace_back(vpi_get(vpiLineNo, call),
+                                    file == nullptr ? "" : file);
+  return 0;
+}
+
+// §37.3.3: a statement is written in the source text, so a system task call
+// reports the line and file it stands on, whether the design attach built its
+// object, as for one in an initial block, or the call built its own, as for
+// one in a task's body (#5110).
+TEST_F(VpiLocationInARun, ASystemTaskCallReportsItsOwnLineAndFile) {
+  WhereCallLocations().clear();
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$where");
+  data.calltf = &WhereCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task tk; $where; endtask\n"
+      "  initial begin\n"
+      "    $where;\n"
+      "    tk();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(WhereCallLocations(), (std::vector<std::pair<int, std::string>>{
+                                      {4, "<test>"}, {2, "<test>"}}));
+}
+
 }  // namespace
 }  // namespace delta

@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
@@ -102,6 +103,7 @@ VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
   obj->parent = parent.scope;
   obj->process = walk.process;
   if (!stmt.label.empty()) obj->name = walk.build.keep(std::string(stmt.label));
+  VpiRecordWrittenLocation(obj, stmt.range.start, walk.calls.ctx);
   parent.scope->children.push_back(obj);
   return obj;
 }
@@ -755,6 +757,7 @@ VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
                      const BodyWalk& walk) {
   std::string path;
   VpiObject* block = MakeScopeObject(kind, stmt.label, parent, walk, path);
+  VpiRecordWrittenLocation(block, stmt.range.start, walk.calls.ctx);
   if (stmt.kind == StmtKind::kFork) {
     block->join_type = JoinTypeOf(stmt.join_kind);
   }
