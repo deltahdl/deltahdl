@@ -334,5 +334,26 @@ TEST_F(CaseStatementsOfARun, ACaseReportsItsQualifier) {
             vpiPriorityQualifier | vpiInsideQualifier);
 }
 
+// Annex M gives vpiQualifier no unique0 bit; §12.5.3 makes a unique0-case
+// assert the same absence of overlap a unique-case does, so a case written
+// with unique0 reports the unique qualifier, beside the inside bit when it
+// matches by set membership (#5063).
+TEST_F(CaseStatementsOfARun, AUnique0CaseReportsTheUniqueQualifier) {
+  Run("module top; int a, b;\n"
+      "  initial unique0 case (a) 0: b = 1; endcase\n"
+      "  initial unique0 case (a) inside 1: b = 1; endcase\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs =
+      Scanned(vpi_iterate(vpiProcess, By("top")));
+  ASSERT_EQ(kProcs.size(), 2U);
+  vpiHandle exact = vpi_handle(vpiStmt, kProcs[0]);
+  vpiHandle inside = vpi_handle(vpiStmt, kProcs[1]);
+  ASSERT_NE(exact, nullptr);
+  ASSERT_NE(inside, nullptr);
+  EXPECT_EQ(vpi_get(vpiQualifier, exact), vpiUniqueQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, inside),
+            vpiUniqueQualifier | vpiInsideQualifier);
+}
+
 }  // namespace
 }  // namespace delta

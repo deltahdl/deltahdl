@@ -342,5 +342,23 @@ TEST_F(IfStatementsOfARun, AnIfElseReachesBothBranches) {
   EXPECT_EQ(vpi_get(vpiType, nested), vpiIf);
 }
 
+// Annex M gives vpiQualifier no unique0 bit; §12.4.2 makes a unique0-if
+// assert the same absence of overlap a unique-if does, so an if or if-else
+// written with unique0 reports the unique qualifier, and no other bit (#5063).
+TEST_F(IfStatementsOfARun, AUnique0IfReportsTheUniqueQualifier) {
+  Run("module top; int a, b;\n"
+      "  initial unique0 if (a) b = 1;\n"
+      "  initial unique0 if (a == 1) b = 1; else if (a == 2) b = 2;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kBodies = Bodies();
+  ASSERT_EQ(kBodies.size(), 2U);
+  ASSERT_NE(kBodies[0], nullptr);
+  ASSERT_NE(kBodies[1], nullptr);
+  EXPECT_EQ(vpi_get(vpiType, kBodies[0]), vpiIf);
+  EXPECT_EQ(vpi_get(vpiQualifier, kBodies[0]), vpiUniqueQualifier);
+  EXPECT_EQ(vpi_get(vpiType, kBodies[1]), vpiIfElse);
+  EXPECT_EQ(vpi_get(vpiQualifier, kBodies[1]), vpiUniqueQualifier);
+}
+
 }  // namespace
 }  // namespace delta
