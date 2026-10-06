@@ -142,8 +142,8 @@ struct PulseControlSpecparam {
   std::string_view output;
   // The hierarchical prefix of the module instance whose specify block declared
   // this PATHPULSE$ specparam, ending in a `.` and empty for a module
-  // elaborated as a top. §30.7.1 says a specparam naming no module path "shall
-  // apply to all module paths defined in a module", so it narrows the paths of
+  // elaborated as a top. §30.7.1 has a specparam naming no module path cover
+  // every module path the module defines, so it narrows the paths of
   // the instance that declared it and no others; this is what matches it
   // against PathDelay::inst_prefix in simulator/specify_path_delay.h.
   std::string_view inst_prefix;

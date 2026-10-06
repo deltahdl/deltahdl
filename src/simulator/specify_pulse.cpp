@@ -488,8 +488,8 @@ void SpecifyManager::ResolvePulseControlSpecparams(
   // existing path (e.g. a non-first terminal of a multiple-path declaration)
   // matches nothing and is thereby ignored.
   //
-  // §30.7.1 says such a specparam applies "to all module paths defined in a
-  // module", and a module here is one instance of it: §30.3 puts the specify
+  // §30.7.1 has such a specparam cover every module path the module defines,
+  // and a module here is one instance of it: §30.3 puts the specify
   // block inside the module declaration, so each instance declares its own
   // paths. Matching PathDelay::inst_prefix is what keeps a PATHPULSE$ declared
   // in one instance of a cell off the paths of another instance of it.

@@ -222,9 +222,9 @@ std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
 // name a path and whose condition holds.
 //
 // The condition is tested here and again in SelectActivePath below, and taking
-// it first is the point. §30.5.3 states both halves in one sentence -- active
-// paths are "those whose input has transitioned most recently in time, and
-// either they have no condition or their conditions are true" -- and reading
+// it first is the point. §30.5.3 states both halves in one sentence -- an
+// active path is one whose input changed latest and that is either
+// unconditioned or has a condition that holds -- and reading
 // the time first lets a path whose condition is false set it and drop every
 // live path at an earlier one, leaving nothing to govern an output that is
 // plainly transitioning.

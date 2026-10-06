@@ -227,8 +227,8 @@ static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
   return latest;
 }
 
-// §30.5.3's condition half for a candidate that is not an ifnone path: "either
-// they have no condition or their conditions are true". A path the specify
+// §30.5.3's condition half for a candidate that is not an ifnone path: it is
+// either unconditioned or its condition holds. A path the specify
 // block wrote without a condition carries no PathDelay::condition_expr and is
 // always active. A state-dependent one (§30.4.4) is active when its condition
 // evaluates true, which §30.4.4.1 extends to an x or z result;
@@ -250,8 +250,8 @@ static bool ConditionalPathIsActive(const PathDelay& pd,
 
 // Whether a conditional module path between the same two terminals as
 // `ifnone_path` came out true. §30.4.4.4 makes that the whole of the ifnone
-// question: the keyword "is used to specify a default state-dependent path
-// delay when all other conditions for the path are false", so the ifnone path
+// question: the keyword gives the state-dependent delay a path takes by default
+// when every other condition on it is false, so the ifnone path
 // is active exactly when this answers false. The candidates are already
 // restricted to one path output and one set of sources, so src_port and
 // dst_port are what say two of them are paths between the same terminals.
@@ -272,9 +272,8 @@ static bool CorrespondingConditionIsTrue(
 // conditions are evaluated in a pass of their own first: §30.4.4.4 answers for
 // an ifnone path only once every corresponding condition has an answer. A path
 // output no state-dependent path reaches leaves each ifnone candidate active,
-// which is the clause's rule that an ifnone path with no corresponding
-// state-dependent module paths "shall be treated the same as an unconditional
-// simple module path".
+// which is the clause's rule that an ifnone path with no matching
+// state-dependent module path behaves as an unconditional simple module path.
 static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
   for (PathCandidate& candidate : candidates) {
     if (!candidate.path->is_ifnone) continue;
@@ -283,13 +282,13 @@ static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
   }
 }
 
-// §30.4.3 (printed page 874): an edge-sensitive path models delays "which
-// only occur when a specified edge occurs at the source signal", detected on
+// §30.4.3 (printed page 874): an edge-sensitive path models a delay that
+// applies only when the source signal makes the named edge, detected on
 // the LSB of a vector source, so it is active only where the source's latest
 // change was its edge -- the posedge of a `posedge` path, the negedge of a
 // `negedge` one, either of an `edge` one. A path from a select of the source
 // reads the edge of the select's least significant bit. A path written with no
-// edge "shall be considered active on any transition at the input terminal".
+// edge is active whatever transition its input terminal makes.
 static bool EdgeSensitivePathIsActive(const PathDelay& pd, SimContext& ctx) {
   if (pd.edge == SpecifyEdge::kNone) return true;
   const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);

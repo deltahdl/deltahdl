@@ -1,8 +1,8 @@
 // §30.7's pulse filtering, applied to the driver of a module path output.
 //
 // The delay itself is only half of what a module path does. §30.7 opens by
-// saying that "two consecutive scheduled transitions closer together in time
-// than the module path delay are deemed a pulse", and then that the reject and
+// treating two scheduled transitions in a row that lie nearer in time than the
+// module path delay as a pulse, and then says that the reject and
 // error limits belonging to the delay forming the pulse's trailing edge decide
 // whether it reaches the output, reaches it as x, or does not appear at all.
 // Figure 30-5 is the worked case: with `(A => Y) = 7, 9;` a pulse of width 4 on
@@ -62,7 +62,7 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
   // §30.6 (printed page 885): at the port the delay the instance's own logic
   // took is already spent, so the path delay runs from its source's transition
   // and only what is left of it is waited out -- none where the logic took
-  // longer, "the larger of the two delays" being the logic's then.
+  // longer, the greater of the two delays being the logic's then.
   uint64_t delay = mp.delay;
   if (drive.at_port) {
     const uint64_t kSpent = drive.ctx.CurrentTime().ticks - mp.source_ticks;
@@ -77,11 +77,11 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
 // and `trailing` the earlier; `settled` is the value the output already holds
 // and returns to.
 //
-// Without showcancelled the answer is that "the leading edge is cancelled. No
-// transition takes place when the initial and final states of the pulse are the
-// same, leaving no indication a schedule was ever present", which is a return
-// that drives nothing. With it, "this style causes the leading edge to be
-// scheduled to X and the trailing edge to be scheduled from X" -- the two edges
+// Without showcancelled the answer is that the leading edge is dropped, and
+// where the pulse starts and ends at one state the output never moves and
+// shows no sign a schedule existed, which is a return that drives nothing. With
+// it, the leading edge is scheduled into x and the trailing edge out of it --
+// the two edges
 // being the output's own, in time order, so the x begins at the earlier
 // schedule and the output leaves it at the later. Figure 30-7 is the case:
 // `(in => out) = (4, 6);` with `in` falling at 10 and rising at 11 schedules
@@ -183,9 +183,9 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
     if (next.SameValueAs(val)) {
       // §30.5.3 (printed page 885): a source moving in the very step the
       // transition was scheduled in transitioned simultaneously with the one
-      // that scheduled it -- "if, the last time they transitioned, A and B did
-      // so simultaneously, then the smallest of the two rise delays would be
-      // chosen" -- so the delay is selected again among them.
+      // that scheduled it -- where A and B last moved together, the clause
+      // takes the smaller of their two rise delays -- so the delay is selected
+      // again among them.
       if (ctx.CurrentTime().ticks == scheduled.ticks) {
         lead = ResolveTransitionDelay(drive, old_val, val);
         target = scheduled + SimTime{lead.ticks};

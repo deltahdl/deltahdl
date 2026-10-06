@@ -121,8 +121,8 @@ struct Variable {
   const StructTypeInfo* local_layout = nullptr;
 
   // §30.5.3: the simulation time this variable's value last changed, in ticks.
-  // "Active specify paths are those whose input has transitioned most recently
-  // in time", and choosing among the module paths reaching one output is the
+  // The active specify paths are the ones whose input changed latest, and
+  // choosing among the module paths reaching one output is the
   // only thing that asks. Nothing writes it but the watcher
   // WatchModulePathSources in src/simulator/module_path_delay.cpp arms, and
   // that arms only on the source terminal of a registered module path, so it
@@ -138,8 +138,8 @@ struct Variable {
   // empty everywhere else.
   std::vector<uint64_t> bit_change_ticks;
   // §30.4.3 (printed page 874): which edge the change recorded last was at the
-  // least significant bit, where "the edge transition shall be detected" of a
-  // vector source -- kEdgeRise for §9.4.2's posedge (0 to x, z or 1, and x or z
+  // least significant bit, which is where a vector source's edge is detected
+  // -- kEdgeRise for §9.4.2's posedge (0 to x, z or 1, and x or z
   // to 1), kEdgeFall for its negedge, 0 for a change that left the bit alone.
   // An edge-sensitive module path from this variable is active on its own edge
   // alone. Written by the same watcher, and per bit, beside bit_change_ticks,

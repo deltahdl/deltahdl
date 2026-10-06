@@ -7,8 +7,8 @@
 // the design states it: the output is driven by ordinary logic, and the module
 // path only says how long that logic's answer takes to appear. So a module path
 // delay is applied where the driver of the path output would otherwise commit
-// its value, and §30.6 settles the two against each other -- "the larger of the
-// two delays for each path shall be used" -- rather than adding them.
+// its value, and §30.6 settles the two against each other -- each path takes
+// whichever of the two delays is greater -- rather than adding them.
 //
 // The delay brings §30.7 with it. Two consecutive transitions scheduled on the
 // path output closer together in time than the delay are a pulse, and the
@@ -105,21 +105,20 @@ struct ModulePathDrive {
 // `to`, selected over the paths that reach that output from one of
 // `drive.sources`.
 //
-// §30.5.3 selects in two steps: "Active specify paths are those whose input has
-// transitioned most recently in time", and then "a delay shall be selected from
-// among them ... by comparing the correct delay for the specific transition
-// being scheduled from each specify path and choosing the smallest".
+// §30.5.3 selects in two steps: the active paths are the ones whose input
+// changed latest, and among those each path's delay for the transition being
+// scheduled is compared and the smallest is taken.
 // SelectActivePath in simulator/specify_path_delay.h is both steps; what is
 // gathered here is the candidate list it works on, whose transition times come
 // from Variable::last_change_ticks on each path's source.
 //
 // A candidate's condition is the other half of that activity test: §30.5.3 asks
-// for the paths whose input transitioned most recently "and either they have no
-// condition or their conditions are true". A path written without a condition
+// for the paths whose input changed latest and that are either unconditioned or
+// have a condition that holds. A path written without a condition
 // is active; a state-dependent one (§30.4.4) is active when
 // PathDelay::condition_expr evaluates true here, an x or z result counting as
-// true per §30.4.4.1. An ifnone path is §30.4.4.4's default, applying "when all
-// other conditions for the path are false", so it is active exactly when no
+// true per §30.4.4.1. An ifnone path is §30.4.4.4's default, applying when
+// every other condition on the path is false, so it is active exactly when no
 // conditional path between the same two terminals evaluated true -- which also
 // leaves an ifnone path that no state-dependent path corresponds to active, the
 // unconditional simple module path that clause asks for.

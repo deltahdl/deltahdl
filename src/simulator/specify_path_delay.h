@@ -42,11 +42,10 @@ struct PathDelay {
   std::string src_select;
   std::string dst_select;
   // §30.7.1 (printed page 888): the first path input and first path output
-  // terminal of the declaration this path came from. "When a module path
-  // declaration declares multiple paths, the PATHPULSE$ specparam shall only be
-  // specified for the first path input terminal and the first path output
-  // terminal", and the limits it gives "shall apply to all other paths in the
-  // multiple path declaration", so a path-specific PATHPULSE$ is matched
+  // terminal of the declaration this path came from. A declaration of several
+  // paths takes its PATHPULSE$ specparam on its first input and first output
+  // terminal alone, and the limits that specparam gives cover every other path
+  // the declaration makes, so a path-specific PATHPULSE$ is matched
   // against these. Empty on a path no declaration made, which is matched by
   // its own terminals.
   std::string decl_src_port;

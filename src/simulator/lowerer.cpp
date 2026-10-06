@@ -703,8 +703,8 @@ void Lowerer::RegisterDesignTiming() {
                              ctx_, arena_, mgr);
   }
   ctx_.SetLoweringInstancePrefix("");
-  // §30.5.3 selects among the module paths "whose input has transitioned most
-  // recently in time", and nothing records when a signal last changed. This
+  // §30.5.3 selects among the module paths whose input changed latest, and
+  // nothing records when a signal last changed. This
   // arms the watcher that does, on the source terminal of every path just
   // registered, before the scheduler runs anything -- a source that transitions
   // before it is watched leaves no time behind for the selection to read.

@@ -624,8 +624,8 @@ static ExecTask RunInertialContAssignDelay(
 }
 
 // §30.4: the net this assignment drives, which is the signal a module path can
-// name as its destination. §30.4.1 makes that destination "a net or variable
-// that is connected to a module output port or inout port", and §10.3.2 lets
+// name as its destination. §30.4.1 makes that destination a net or variable
+// wired to an output or inout port of the module, and §10.3.2 lets
 // the driver of such a net name a select of it, so the destination is the same
 // net whichever way the left-hand side is written: the identifier of a bare
 // target, and the base of a select. That is the name MakeContAssignDriver above
