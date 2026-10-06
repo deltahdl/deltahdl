@@ -89,10 +89,10 @@ SampledValue SampleAutomaticVariable(uint64_t current_value);
 // §16.5.1: local variables (see §16.10) are one of the exceptions to the
 // preponed-sample rule — like automatic and active free checker variables,
 // their sampled value is their current value rather than a value read from the
-// Preponed region. §16.10 restates this directly ("the sampled value of a local
-// variable is the current value, see 16.5.1"). Modeling local-variable sampling
-// with its own entry point keeps that weave explicit at the point production
-// code consults a local variable's sampled value.
+// Preponed region. §16.10 says the same of a local variable directly, pointing
+// back to §16.5.1. Modeling local-variable sampling with its own entry point
+// keeps that weave explicit at the point production code consults a local
+// variable's sampled value.
 SampledValue SampleLocalVariable(uint64_t current_value);
 
 // §16.5.1: active free checker variables are the third kind (with automatic and
@@ -196,19 +196,18 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew);
 // §16.5.1: the sampled values of the variables that clocked concurrent
 // assertions read.
 //
-// §16.5.1 states the rule this holds: "The sampled value of a variable in a
-// time slot corresponding to time greater than 0 is the value of this variable
-// in the Preponed region of this time slot", and at time 0 it is the variable's
-// default sampled value. §16.5.2 says why a live read will not do: "In an
-// assertion, the sampled value is the only valid value of a variable during a
-// clock tick", so `cond = 1; clk = 1;` and `clk = 1; cond = 1;` reach one
-// verdict rather than two.
+// §16.5.1 states the rule this holds: after time 0, a variable's sampled value
+// in a time slot is the value it had in that slot's Preponed region, and at
+// time 0 it is the variable's default sampled value. §16.5.2 says why a live
+// read will not do: inside an assertion, a variable's sampled value is the one
+// value it has at a clock tick, so `cond = 1; clk = 1;` and
+// `clk = 1; cond = 1;` reach one verdict rather than two.
 //
 // Nothing writes into a Preponed region to fill this. §4.4.2.1 supplies the
-// equivalence that makes it unnecessary -- "Sampling in the Preponed region is
-// equivalent to sampling in the previous Postponed region" -- so Refill runs at
-// the end of a time slot and what it copies there is the next slot's Preponed
-// value.
+// equivalence that makes it unnecessary -- a sample taken in the Preponed
+// region equals one taken in the Postponed region before it -- so Refill runs
+// at the end of a time slot and what it copies there is the next slot's
+// Preponed value.
 //
 // Only the variables an enrolled assertion reads are held, and a variable
 // nothing enrolled reads back as absent so its caller keeps the live value.
@@ -224,10 +223,10 @@ struct SampleSite {
 class AssertionSampleStore {
  public:
   // Enrols `var`, whose value at the moment of the call is taken as its default
-  // sampled value: §16.5.1 makes that "the value assigned in its declaration,
-  // or, in the absence of such an assignment, ... the default (or
-  // uninitialized) value of the corresponding type", which is what a variable
-  // holds after its declaration is lowered and before any process has run.
+  // sampled value: §16.5.1 makes that the value its declaration assigns, or
+  // the default, uninitialized value of its type where the declaration assigns
+  // none, which is what a variable holds after its declaration is lowered and
+  // before any process has run.
   // Enrolling the same variable twice keeps the first default.
   void Register(const Variable* var, Arena& arena);
 
@@ -235,17 +234,15 @@ class AssertionSampleStore {
   // value, so `var` is never enrolled and a read of it answers the live value.
   void ExcludeFromSampling(const Variable* var) { excluded_.insert(var); }
 
-  // §16.6: "Elements of dynamic arrays, queues, and associative arrays that
-  // are sampled for assertion expression evaluation may get removed from the
-  // array or the array may get resized before the assertion expression is
-  // evaluated. These specific array elements sampled for assertion expression
-  // evaluation shall continue to exist within the scope of the assertion until
-  // the assertion expression evaluation completes." A queue a property reads
-  // an element of is enrolled whole, its elements at the moment of the call
-  // being their default sampled values, and Refill copies them as it copies
-  // a variable's value, so a select made while the property is evaluated reads
-  // the element the queue held in the Preponed region whatever the queue holds
-  // now.
+  // §16.6: an element of a dynamic array, queue or associative array that an
+  // assertion expression samples may leave the array, or the array may be
+  // resized, before the expression is evaluated, and the sampled element has to
+  // live on in the assertion's scope until that evaluation is done. A queue a
+  // property reads an element of is enrolled whole, its elements at the moment
+  // of the call being their default sampled values, and Refill copies them as
+  // it copies a variable's value, so a select made while the property is
+  // evaluated reads the element the queue held in the Preponed region whatever
+  // the queue holds now.
   void RegisterQueue(const QueueObject* queue, Arena& arena);
 
   // Copies every enrolled variable's value and every enrolled queue's
@@ -303,12 +300,11 @@ class AssertionSampleStore {
   void SetClockTicks(uint32_t ticked) { clock_ticks_ = ticked; }
   uint32_t ClockTicks() const { return clock_ticks_; }
 
-  // §16.9.3: "When these functions are called at or before the simulation time
-  // step in which the first clocking event occurs, the results are computed by
-  // comparing the sampled value of the expression with its default sampled
-  // value." Raised around one evaluation of a value-change function's argument,
-  // this makes every read answer that default, so the comparison is made on the
-  // expression the source wrote rather than on one variable of it.
+  // §16.9.3: called no later than the time step of the first clocking event,
+  // these functions compare the expression's sampled value with its default
+  // sampled value. Raised around one evaluation of a value-change function's
+  // argument, this makes every read answer that default, so the comparison is
+  // made on the expression the source wrote rather than on one variable of it.
   void SetReadingDefaults(bool on) { reading_defaults_ = on; }
 
   // §16.9.3: the sampled value a sampled-value-function call site saw at the
@@ -316,9 +312,9 @@ class AssertionSampleStore {
   // site has not been evaluated that many times yet. The key is the call site's
   // own expression node: it is unique to one position in the source and is
   // evaluated once per tick of the clock the function samples on, so the
-  // sequence of values it has seen is "the sampled value of the expression from
-  // the most recent strictly prior time step in which the clocking event
-  // occurred" and the ticks before that.
+  // sequence of values it has seen is the expression's sampled value at the
+  // latest earlier time step that held a clocking event, and at the ticks
+  // before that.
   // A site evaluated several times at one tick with different operands --
   // §16.9.3's `$past(b[i])` in a for loop over i -- keeps one history per
   // `variant`, the value the site's select indices took, so each iteration

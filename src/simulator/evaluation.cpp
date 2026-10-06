@@ -210,8 +210,8 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   if (var->is_event)
     return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
   auto val = var->value;
-  // §16.5.2: "In an assertion, the sampled value is the only valid value of a
-  // variable during a clock tick." While a clocked concurrent assertion's
+  // §16.5.2: inside an assertion, a variable's sampled value is the one value
+  // it has at a clock tick. While a clocked concurrent assertion's
   // property is being evaluated, a variable named in it therefore reads the
   // value §16.5.1 samples for this time slot rather than the value standing
   // now. The store answers nothing for a variable no such assertion reads and

@@ -553,11 +553,10 @@ Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return value;
 }
 
-// §16.9.3's answer for a value-change function called "at or before the
-// simulation time step in which the first clocking event occurs": the
-// comparison is against the expression's default sampled value, which §16.5.1
-// makes the value its declaration assigned or the uninitialized value of its
-// type.
+// §16.9.3's answer for a value-change function called no later than the time
+// step of the first clocking event: the comparison is against the expression's
+// default sampled value, which §16.5.1 makes the value its declaration assigned
+// or the uninitialized value of its type.
 static Logic4Vec EvalDefaultSampledArg(const Expr* arg, SimContext& ctx,
                                        Arena& arena) {
   auto& samples = ctx.AssertionSamples();
@@ -571,9 +570,9 @@ static Logic4Vec EvalDefaultSampledArg(const Expr* arg, SimContext& ctx,
 }
 
 // Whether the least significant bit is the known value `one`. §16.9.3's $rose
-// and $fell are written on that bit alone -- "the LSB of the expression changed
-// to 1" -- and an x or a z is neither 1 nor 0, so a bit carrying one is
-// answered no by both questions.
+// and $fell are written on that bit alone -- $rose asks whether the
+// expression's LSB went to 1 -- and an x or a z is neither 1 nor 0, so a bit
+// carrying one is answered no by both questions.
 static bool LsbIs(const Logic4Vec& v, bool one) {
   if (v.nwords == 0) return false;
   if ((v.words[0].bval & 1) != 0) return false;
@@ -581,9 +580,9 @@ static bool LsbIs(const Logic4Vec& v, bool one) {
 }
 
 // Whether two sampled values differ, which is the question §16.9.3 asks of
-// $stable and $changed: "the value of the expression did not change". Every bit
-// counts, including the x and z a 4-state value carries, so the comparison is
-// over both planes rather than through a numeric projection.
+// $stable and $changed, whether the expression's value stayed the same. Every
+// bit counts, including the x and z a 4-state value carries, so the comparison
+// is over both planes rather than through a numeric projection.
 static bool SampledValuesDiffer(const Logic4Vec& a, const Logic4Vec& b) {
   if (a.width != b.width) return true;
   for (uint32_t i = 0; i < a.nwords && i < b.nwords; ++i) {
@@ -611,8 +610,8 @@ static Logic4Vec ValueChangeAnswer(std::string_view name,
   return MakeLogic4VecVal(arena, 1, result ? 1 : 0);
 }
 
-// §16.9.3: "number_of_ticks" of $past, which defaults to 1 -- "The default of 1
-// is used for the empty number_of_ticks argument" -- and is a constant.
+// §16.9.3: the number_of_ticks argument of $past, which is a constant and is 1
+// where the call leaves it empty.
 static uint32_t PastTickCount(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2 || expr->args[1] == nullptr) return 1;
   auto n = EvalExpr(expr->args[1], ctx, arena).ToUint64();
@@ -626,11 +625,10 @@ static uint32_t PastTickCount(const Expr* expr, SimContext& ctx, Arena& arena) {
 // §16.9.3's functions are keyed by their own call site. Each is evaluated once
 // per tick of the clock it samples on -- the assertion's clock where it is
 // written in one, the procedure's where it is not -- so the value the site saw
-// last is "the sampled value of the expression from the most recent strictly
-// prior time step in which the clocking event occurred", which is what $past
-// returns and what the four value-change functions compare against. Before the
-// site has a history the clause names the comparison itself: the expression's
-// default sampled value.
+// last is the expression's sampled value at the latest earlier time step that
+// held a clocking event, which is what $past returns and what the four
+// value-change functions compare against. Before the site has a history the
+// clause names the comparison itself: the expression's default sampled value.
 //
 // §16.9.4's five future functions read a value sampled at the *next* global
 // clock tick, which no evaluation standing at this one can read. What reaches
@@ -725,9 +723,9 @@ static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
 }
 
 // §16.9.4's four future predicates, each defined against §16.9.3's own
-// value-change function of the same shape: $rising_gclk is "the sampled value
-// of the LSB of the expression is changing to 1 at the next global clocking
-// tick", which is $rose over the pair (next tick, this tick), and
+// value-change function of the same shape: $rising_gclk asks whether the
+// sampled LSB of the expression goes to 1 at the next global clocking tick,
+// which is $rose over the pair (next tick, this tick), and
 // $falling_gclk, $steady_gclk and $changing_gclk stand in the same relation to
 // $fell, $stable and $changed. Naming the analogue rather than restating the
 // rule keeps the x and z handling of LsbIs and SampledValuesDiffer answering

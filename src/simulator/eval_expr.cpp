@@ -513,8 +513,8 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   return MakeLogic4Vec(arena, 1);
 }
 
-// §16.5.2: "In an assertion, the sampled value is the only valid value of a
-// variable during a clock tick", and §16.5.1 puts no condition on where the
+// §16.5.2: inside an assertion, a variable's sampled value is the one value it
+// has at a clock tick, and §16.5.1 puts no condition on where the
 // variable is declared, so a variable a property reaches across an instance
 // boundary reads the value sampled for this time slot exactly as one the
 // module declares itself. The store answers nothing outside a clocked

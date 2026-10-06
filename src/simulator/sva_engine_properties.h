@@ -286,8 +286,8 @@ inline constexpr uint64_t kNoMulticlockTick = ~static_cast<uint64_t>(0);
 
 // §16.13.2: the nearest tick of `clock_ticks` at which a multiclocked operand
 // is evaluated relative to time `from`. When `inclusive` is true a tick
-// coincident with `from` qualifies (the "possibly overlapping" / "non-strictly
-// subsequent" reading); when false only strictly future ticks qualify.
+// coincident with `from` qualifies (the reading under which the next tick may
+// fall at the same time); when false only strictly future ticks qualify.
 // `clock_ticks` shall be in increasing time order. Returns kNoMulticlockTick
 // when no qualifying tick exists.
 uint64_t NearestClockTickAtOrAfter(uint64_t from,

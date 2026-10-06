@@ -330,12 +330,12 @@ void Lowerer::LowerModuleProcesses(const RtlirModule* mod) {
 // of simulator/assertion_read_names.h name what is enrolled;
 // Lowerer::RegisterDesignAssertionSampling is where the enrolment happens.
 //
-// §16.9.3: "The use of these functions is not limited to assertion features;
-// they may be used as expressions in procedural code as well." Each reads the
-// sampled value of its argument, so the variables that argument names have to
-// be enrolled wherever the call is written -- a `$sampled(x)` in a $display
-// reads the store as much as one inside a property does, and a variable the
-// store never heard of answers with its live value.
+// §16.9.3: these functions are not confined to assertions, and procedural code
+// may call them as expressions too. Each reads the sampled value of its
+// argument, so the variables that argument names have to be enrolled wherever
+// the call is written -- a `$sampled(x)` in a $display reads the store as much
+// as one inside a property does, and a variable the store never heard of
+// answers with its live value.
 static bool IsSampledValueFunction(std::string_view name) {
   return name == "$sampled" || name == "$past" || name == "$rose" ||
          name == "$fell" || name == "$stable" || name == "$changed" ||
@@ -451,8 +451,8 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // value functions is completed at the global clocking tick that follows its
   // own clock's, which is the event carried here.
   p->gclk_future_event = proc.gclk_future_event;
-  // §16.9.3 has the sampled value functions "not limited to assertion
-  // features", so the variables they name are enrolled wherever the call is
+  // §16.9.3 lets the sampled value functions appear outside assertions too,
+  // so the variables they name are enrolled wherever the call is
   // written and not only where a concurrent assertion's property stands. The
   // names are recorded here and resolved once the whole design is lowered,
   // because a property may name a variable of a child instance that does not
@@ -802,9 +802,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
   // of the time slot the clock tick falls in. No event reaches a Preponed
   // region -- the scheduler drains it once, ahead of the iterative regions, and
-  // never returns to it -- and §4.4.2.1 makes that unnecessary: "Sampling in
-  // the Preponed region is equivalent to sampling in the previous Postponed
-  // region." The sample is therefore taken once a time slot has finished, where
+  // never returns to it -- and §4.4.2.1 makes that unnecessary: a sample taken
+  // in the Preponed region equals one taken in the Postponed region before it.
+  // The sample is therefore taken once a time slot has finished, where
   // it is the next slot's Preponed value. Registering it here rather than
   // beside the first assertion keeps it to one registration per run; it does
   // nothing while no assertion has enrolled a variable.

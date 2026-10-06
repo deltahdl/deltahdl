@@ -90,9 +90,9 @@ struct PendingReportScope {
   }
 };
 
-// §16.5: "Concurrent assertions ... are evaluated in the Observed region", and
-// §16.14.6 has one embedded in procedural code "evaluated as though it were a
-// separate concurrent assertion", so where the statement is written does not
+// §16.5: a concurrent assertion is evaluated in the Observed region, and
+// §16.14.6 evaluates one embedded in procedural code as it would a concurrent
+// assertion standing on its own, so where the statement is written does not
 // change the region its property is evaluated in. A module-item concurrent
 // assertion is carried by a process the scheduler already resumes there
 // (Process::is_concurrent_clocked, see ResumeMaybeReactive in

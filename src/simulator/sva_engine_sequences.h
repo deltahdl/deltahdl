@@ -143,8 +143,8 @@ FirstMatchMatches EvalFirstMatch(
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);
 
-// §16.9.6: one match of an operand of `intersect`, as referenced by the
-// "computed as follows" bullets: the number of clock ticks the match spans (its
+// §16.9.6: one match of an operand of `intersect`, as the clause's bulleted
+// computation refers to it: the number of clock ticks the match spans (its
 // length) and the clock tick on which the match completes (its match point).
 // Because the two operands of an intersect begin their evaluation attempt on
 // the same clock tick, two operand matches of equal length necessarily complete
