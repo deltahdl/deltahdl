@@ -245,15 +245,15 @@ void Preprocessor::TakeLineFileOverrideId() {
   line_file_override_id_ = it->second;
 }
 
-// §22.4 (printed page 705): "When the filename is enclosed in double quotes
-// ("filename"), for a relative path the compiler's current working directory,
-// and optionally user-specified locations are searched", and "When the
-// filename is an absolute path, only that filename is included". The including
-// file's own directory, `src_dir`, and the -I directories are this tool's
-// user-specified locations, searched after the working directory; a name in
-// angle brackets is looked for in those alone. Looked for beside the including
-// file alone, a quoted name went unfound whenever that file was named on the
-// command line without a directory, since its directory then read as empty.
+// §22.4 (printed page 705): a relative filename written in double quotes is
+// looked for in the compiler's current working directory and then in any
+// locations the user names, while an absolute filename is taken as it stands
+// and nowhere else. The including file's own directory, `src_dir`, and the -I
+// directories are this tool's user-specified locations, searched after the
+// working directory; a name in angle brackets is looked for in those alone.
+// Looked for beside the including file alone, a quoted name went unfound
+// whenever that file was named on the command line without a directory, since
+// its directory then read as empty.
 std::string Preprocessor::ResolveInclude(std::string_view filename,
                                          const std::string& src_dir,
                                          bool quoted) {

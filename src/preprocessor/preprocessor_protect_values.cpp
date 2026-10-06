@@ -504,11 +504,11 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   // data rather than left standing over whatever the text goes on to hold. The
   // digest still to be checked holds the key it needs already.
   digest_decrypt_key_.clear();
-  // §22.12 has a compiler maintain "the current line number and file name of
-  // the file being compiled", and the recovered design is in no file the user
-  // holds: its lines are numbered from the top of the block while the envelope
-  // stands wherever it stands in the enclosing file. Reading it under the
-  // enclosing file's id paired those halves, so an envelope at line 400 of
+  // §22.12 has a compiler keep track of which file it is compiling and which
+  // line of that file it has reached, and the recovered design is in no file
+  // the user holds: its lines are numbered from the top of the block while the
+  // envelope stands wherever it stands in the enclosing file. Reading it under
+  // the enclosing file's id paired those halves, so an envelope at line 400 of
   // top.sv holding a design whose third line was rejected reported top.sv:3 and
   // quoted line 3 of top.sv, which is some other line entirely.
   //
