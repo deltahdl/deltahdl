@@ -144,6 +144,36 @@ static void InitInterfaceHeader(RtlirModule* mod, const ModuleDecl* decl) {
   }
 }
 
+// §20.4.1: the time unit and precision $timeunit and $timeprecision report
+// for an element. §3.14.2.3 orders their sources: the element's own
+// timeunit or timeprecision declaration, then the last `timescale directive
+// before it in the compilation unit, then the compilation unit's own
+// declaration; absent all three, the TimeScale struct's 1 ns / 1 ns default
+// stands.
+static void InitRtlirModuleTimescale(RtlirModule* mod, const ModuleDecl* decl,
+                                     const CompilationUnit* unit) {
+  if (decl->has_timeunit) {
+    mod->timescale.unit = decl->time_unit;
+    mod->timescale.magnitude = decl->time_unit_magnitude;
+  } else if (decl->has_directive_timescale) {
+    mod->timescale.unit = decl->directive_timescale.unit;
+    mod->timescale.magnitude = decl->directive_timescale.magnitude;
+  } else if (unit->has_cu_timeunit) {
+    mod->timescale.unit = unit->cu_time_unit;
+    mod->timescale.magnitude = unit->cu_time_unit_magnitude;
+  }
+  if (decl->has_timeprecision) {
+    mod->timescale.precision = decl->time_prec;
+    mod->timescale.prec_magnitude = decl->time_prec_magnitude;
+  } else if (decl->has_directive_timescale) {
+    mod->timescale.precision = decl->directive_timescale.precision;
+    mod->timescale.prec_magnitude = decl->directive_timescale.prec_magnitude;
+  } else if (unit->has_cu_timeprecision) {
+    mod->timescale.precision = unit->cu_time_prec;
+    mod->timescale.prec_magnitude = unit->cu_time_prec_magnitude;
+  }
+}
+
 // Initialize the standalone (non-port, non-item) header fields of a freshly
 // created RtlirModule from its declaration.
 static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
@@ -180,34 +210,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->unconnected_drive = decl->has_net_directives ? decl->unconnected_drive
                                                     : unit->unconnected_drive;
   mod->attrs = ResolveAttributes(decl->attrs, diag);
-
-  // §20.4.1: capture the time unit/precision $timeunit/$timeprecision report
-  // for this element. §3.14.2.3 (printed page 60) orders the sources: a local
-  // timeunit/timeprecision declaration wins; "Else, if a `timescale directive
-  // has been previously specified (within the compilation unit), then the time
-  // unit shall be set to the units of the last `timescale directive"; else the
-  // compilation unit's value applies, and absent all three the 1 ns / 1 ns
-  // default of the TimeScale struct stands in.
-  if (decl->has_timeunit) {
-    mod->timescale.unit = decl->time_unit;
-    mod->timescale.magnitude = decl->time_unit_magnitude;
-  } else if (decl->has_directive_timescale) {
-    mod->timescale.unit = decl->directive_timescale.unit;
-    mod->timescale.magnitude = decl->directive_timescale.magnitude;
-  } else if (unit->has_cu_timeunit) {
-    mod->timescale.unit = unit->cu_time_unit;
-    mod->timescale.magnitude = unit->cu_time_unit_magnitude;
-  }
-  if (decl->has_timeprecision) {
-    mod->timescale.precision = decl->time_prec;
-    mod->timescale.prec_magnitude = decl->time_prec_magnitude;
-  } else if (decl->has_directive_timescale) {
-    mod->timescale.precision = decl->directive_timescale.precision;
-    mod->timescale.prec_magnitude = decl->directive_timescale.prec_magnitude;
-  } else if (unit->has_cu_timeprecision) {
-    mod->timescale.precision = unit->cu_time_prec;
-    mod->timescale.prec_magnitude = unit->cu_time_prec_magnitude;
-  }
+  InitRtlirModuleTimescale(mod, decl, unit);
 
   RtlirImport std_import;
   std_import.package_name = "std";

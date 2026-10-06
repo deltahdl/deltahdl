@@ -24,7 +24,4 @@ PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp
 
 # Nothing under src/ reads the data; each is filed.
 ClosedEnvelopes src/preprocessor/protect_envelope.h #3602
-FsmStatePragmas src/lexer/lexer.h #3603
-FsmPartSelectPragmas src/lexer/lexer.h #3603
-FsmConcatPragmas src/lexer/lexer.h #3603
 ProtectViewports src/preprocessor/preprocessor.h #3284
