@@ -45,7 +45,14 @@ class AigGraph {
 
   uint32_t AddLatch(uint32_t next_state);
 
+  // Every node allocated, the constant node and each input among them.
   size_t NodeCount() const;
+
+  // The nodes the graph still describes: the constant node, every input, and
+  // every AND node an output or a latch's next state reaches. A pass that
+  // rebuilds a cone leaves the nodes it replaced allocated, so after one this
+  // is fewer than NodeCount().
+  size_t ReachableNodeCount() const;
 
   std::vector<AigNode> nodes;
   std::vector<uint32_t> inputs;

@@ -90,6 +90,44 @@ TEST(Aig, OrViaDeMorgan) {
   EXPECT_GT(AigVar(c), 0);
 }
 
+// An AND node no output reaches is still allocated, so NodeCount() counts it,
+// but the graph no longer describes it: the constant node, the three inputs and
+// a & b are what remain.
+TEST(Aig, ReachableNodeCountLeavesOutAnUnreachedAnd) {
+  AigGraph graph;
+  auto a = graph.AddInput();
+  auto b = graph.AddInput();
+  auto c = graph.AddInput();
+  graph.AddOutput(graph.AddAnd(a, b));
+  graph.AddAnd(a, c);
+  EXPECT_EQ(graph.NodeCount(), 6);
+  EXPECT_EQ(graph.ReachableNodeCount(), 5);
+}
+
+// A latch's next state reaches the AND that feeds it though no output does,
+// and its state input is counted with the other inputs; the AND of a and the
+// state, which nothing reads, is not.
+TEST(Aig, ReachableNodeCountFollowsALatchNextState) {
+  AigGraph graph;
+  auto a = graph.AddInput();
+  auto b = graph.AddInput();
+  auto state = graph.AddLatch(graph.AddAnd(a, b));
+  graph.AddAnd(a, state);
+  EXPECT_EQ(graph.NodeCount(), 6);
+  EXPECT_EQ(graph.ReachableNodeCount(), 5);
+}
+
+// A complemented output reaches the node beneath it as a plain one does, and
+// an input no output reads is counted all the same.
+TEST(Aig, ReachableNodeCountKeepsEveryInputAndComplementedOutputs) {
+  AigGraph graph;
+  auto a = graph.AddInput();
+  auto b = graph.AddInput();
+  graph.AddInput();
+  graph.AddOutput(graph.AddOr(a, b));
+  EXPECT_EQ(graph.ReachableNodeCount(), 5);
+}
+
 TEST(SynthLower, AlwaysCombSimpleAssign) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

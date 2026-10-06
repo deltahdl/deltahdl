@@ -1,1 +1,1 @@
-synthesis: 4 AIG nodes, 2 inputs, 1 outputs, 0 latches
+synthesis: 10 AIG nodes, 4 inputs, 2 outputs, 0 latches

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace delta {
 
@@ -83,6 +84,24 @@ uint32_t AigGraph::AddLatch(uint32_t next_state) {
 }
 
 size_t AigGraph::NodeCount() const { return nodes.size(); }
+
+size_t AigGraph::ReachableNodeCount() const {
+  std::vector<bool> reached(nodes.size(), false);
+  reached[0] = true;
+  for (uint32_t id : inputs) reached[id] = true;
+  std::vector<uint32_t> pending;
+  for (uint32_t lit : outputs) pending.push_back(AigVar(lit));
+  for (const auto& latch : latches) pending.push_back(AigVar(latch.second));
+  while (!pending.empty()) {
+    uint32_t id = pending.back();
+    pending.pop_back();
+    if (reached[id]) continue;
+    reached[id] = true;
+    pending.push_back(AigVar(nodes[id].fanin0));
+    pending.push_back(AigVar(nodes[id].fanin1));
+  }
+  return static_cast<size_t>(std::count(reached.begin(), reached.end(), true));
+}
 
 uint64_t AigGraph::HashKey(uint32_t lit0, uint32_t lit1) {
   return (static_cast<uint64_t>(lit0) << 32) | static_cast<uint64_t>(lit1);

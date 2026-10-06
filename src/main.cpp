@@ -470,12 +470,12 @@ int RunSynthesis(const delta::CliOptions& opts,
   }
 
   if (opts.dump_aig) {
-    std::cout << "AIG: " << aig->NodeCount() << " nodes, " << aig->inputs.size()
-              << " inputs, " << aig->outputs.size() << " outputs, "
-              << aig->latches.size() << " latches\n";
+    std::cout << "AIG: " << aig->ReachableNodeCount() << " nodes, "
+              << aig->inputs.size() << " inputs, " << aig->outputs.size()
+              << " outputs, " << aig->latches.size() << " latches\n";
   }
 
-  std::cout << "synthesis: " << aig->NodeCount() << " AIG nodes, "
+  std::cout << "synthesis: " << aig->ReachableNodeCount() << " AIG nodes, "
             << aig->inputs.size() << " inputs, " << aig->outputs.size()
             << " outputs, " << aig->latches.size() << " latches\n";
   return 0;
