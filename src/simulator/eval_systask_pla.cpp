@@ -200,8 +200,8 @@ void EvaluatePla(const Expr* call, const PlaTaskKind& k, SimContext& ctx,
     // lowest memory address corresponds to the most significant output term.
     PlaSetBit(result, m - 1 - j, out_bit);
   }
-  // §20.16.1: "the output terms are updated without any delay" - an immediate
-  // (blocking) write into the output-terms lvalue.
+  // §20.16.1: the output terms take their new values with no delay - an
+  // immediate (blocking) write into the output-terms lvalue.
   PerformBlockingAssign(call->args[2], result, ctx, arena);
 }
 

@@ -28,9 +28,9 @@ namespace delta {
 
 // §20.15.6 Table 20-11 status code values returned through the trailing
 // `status` output argument of every stochastic-analysis queue task and
-// function. Value 7 ("not enough memory, cannot create queue") is defined by
-// the table but has no deterministic trigger in the model, so nothing emits
-// it.
+// function. Value 7, a queue that could not be created for want of memory, is
+// defined by the table but has no deterministic trigger in the model, so
+// nothing emits it.
 enum QueueStatus : std::uint8_t {
   kQOk = 0,                 // OK
   kQFullCannotAdd = 1,      // queue full, cannot add

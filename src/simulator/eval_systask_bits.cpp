@@ -129,20 +129,20 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   auto* arg = expr->args[0];
-  // §20.6.2 (printed page 629): "the number of bits required to hold an
-  // expression as a bit stream", which for a fixed-size unpacked array is
-  // every element's bits -- 16 for `logic [7:0] m [0:1]`, of a net array as
-  // of a variable one. Read as an expression the name is one element's worth,
-  // so it is sized from the array's shape instead.
+  // §20.6.2 (printed page 629): the bit count of the expression packed into a
+  // bit stream, which for a fixed-size unpacked array is every element's bits
+  // -- 16 for `logic [7:0] m [0:1]`, of a net array as of a variable one. Read
+  // as an expression the name is one element's worth, so it is sized from the
+  // array's shape instead.
   if (uint64_t bits = FixedArrayBits(arg, ctx, arena); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
   if (uint64_t tw = NamedTypeBits(arg, ctx, arena); tw > 0) {
     return MakeLogic4VecVal(arena, 32, tw);
   }
-  // §20.6.2: the value "shall be determined without actual evaluation of the
-  // expression it encloses", so a call of a function is sized by the type it
-  // is declared to return and is not made.
+  // §20.6.2: the value is found without evaluating the enclosed expression, so
+  // a call of a function is sized by the type it is declared to return and is
+  // not made.
   if (arg->kind == ExprKind::kCall) {
     SubroutineTarget target = FindSubroutineTarget(arg, ctx, arena);
     if (target.func != nullptr) {

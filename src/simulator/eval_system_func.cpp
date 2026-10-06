@@ -173,9 +173,8 @@ std::string ExtractStringArg(const Expr* arg) {
 }
 
 // §20.1 catalogues the system tasks and system functions SystemVerilog has,
-// each under the subclause that defines it, and states that "Clause 21
-// presents additional system tasks and system functions that are specific to
-// I/O operations". A name no classifier claimed is one this tool can carry out
+// each under the subclause that defines it, and leaves the ones for I/O to
+// Clause 21. A name no classifier claimed is one this tool can carry out
 // no part of, whether it is a misspelling, a task of the standard not
 // implemented here, or a name the standard has never had. The three are not
 // told apart, which would take the standard's whole catalogue; what they share

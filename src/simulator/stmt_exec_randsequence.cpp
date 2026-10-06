@@ -208,10 +208,10 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap) {
   auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
-  // §20.2: "The $finish system task causes the simulator to exit and pass
-  // control back to the host operating system", so the iterations after the one
-  // that ran it do not generate. SimContext::RequestFinish raises the stop the
-  // process loops guard on, and this loop guards on it for the same reason.
+  // §20.2: $finish makes the simulator exit and hands control back to the
+  // host operating system, so the iterations after the one that ran it do not
+  // generate. SimContext::RequestFinish raises the stop the process loops guard
+  // on, and this loop guards on it for the same reason.
   for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result =
         co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, cap);

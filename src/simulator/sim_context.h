@@ -450,9 +450,9 @@ class SimContext : public DeclaredNameTables,
   }
 
   // §20.15.6: the live registry of stochastic-analysis queues, keyed by the
-  // q_id supplied to $q_initialize. Its membership drives the "undefined
-  // q_id" status, and each entry's capacity and occupancy drive the "queue
-  // full" and "queue empty" statuses.
+  // q_id supplied to $q_initialize. Its membership drives the status for a
+  // q_id no queue has, and each entry's capacity and occupancy drive the
+  // statuses for a full queue and an empty one.
   std::unordered_map<uint64_t, StochasticQueue>& StochasticQueues() {
     return stochastic_queues_;
   }

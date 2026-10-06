@@ -774,8 +774,8 @@ static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
 // explicitly threaded spec wins; otherwise the run-time context supplies the
 // configuration installed by the most recent $timeformat call (or the Table
 // 20-3 defaults when none has run yet). This is what makes a plain
-// $display/$fmonitor with %t honor $timeformat "for all %t formats in the
-// design until another $timeformat system task is invoked". A field width
+// $display/$fmonitor with %t honor $timeformat, whose setting governs every %t
+// in the design until the next $timeformat call replaces it. A field width
 // written into the specifier overrides that configuration's minimum field
 // width alone, as §21.2.1.3 has a field width override the automatic sizing
 // and a width of 0 mean the minimum width with no leading spaces: §16.3's
