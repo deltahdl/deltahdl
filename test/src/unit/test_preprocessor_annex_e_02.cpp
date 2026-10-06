@@ -130,4 +130,21 @@ TEST(Preprocessor, DefaultDecayTime_FiniteAfterInfinite) {
   EXPECT_EQ(pp.DefaultDecayTime(), 42u);
 }
 
+// E.2 sets no limit on where the directive is written, and §22.2 leaves any
+// such limit to a directive's own description, so one written inside a module
+// is read like any other: no report, and the decay time it gives is recorded.
+TEST(Preprocessor, DefaultDecayTime_InsideAModuleIsAccepted) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "module m;\n"
+                           "`default_decay_time 5\n"
+                           "  trireg t;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
+  EXPECT_EQ(pp.DefaultDecayTime(), 5u);
+}
+
 }  // namespace

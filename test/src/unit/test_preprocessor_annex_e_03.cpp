@@ -110,4 +110,21 @@ TEST(Preprocessor, DefaultTriregStrength_LaterDirectiveReplacesEarlier) {
   EXPECT_EQ(pp.DefaultTriregStrength(), 200u);
 }
 
+// E.3 sets no limit on where the directive is written, and §22.2 leaves any
+// such limit to a directive's own description, so one written inside a module
+// is read like any other: no report, and the strength it gives is recorded.
+TEST(Preprocessor, DefaultTriregStrength_InsideAModuleIsAccepted) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "module m;\n"
+                           "`default_trireg_strength 30\n"
+                           "  trireg t;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_TRUE(pp.HasDefaultTriregStrength());
+  EXPECT_EQ(pp.DefaultTriregStrength(), 30u);
+}
+
 }  // namespace

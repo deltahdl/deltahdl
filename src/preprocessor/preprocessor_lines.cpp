@@ -614,16 +614,13 @@ bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
     OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;
   }
+  // E.2 and E.3 set no limit on where either directive is written, unlike
+  // E.4's `delay_mode_distributed, so each is read wherever it stands.
   if (StartsWithDirective(line, "default_decay_time")) {
-    if (RejectInsideDesignElement("default_decay_time", loc, Subclause::None()))
-      return true;
     HandleDefaultDecayTime(AfterDirective(line, "default_decay_time"), loc);
     return true;
   }
   if (StartsWithDirective(line, "default_trireg_strength")) {
-    if (RejectInsideDesignElement("default_trireg_strength", loc,
-                                  Subclause::None()))
-      return true;
     HandleDefaultTriregStrength(AfterDirective(line, "default_trireg_strength"),
                                 loc);
     return true;
