@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_stmt.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -688,6 +690,24 @@ void VpiFillSimEventCbData(s_cb_data& data, s_vpi_time& time,
   if (data.reason == cbValueChange && obj != nullptr) {
     data.index = VpiVariableIsArrayMember(obj) ? obj->index : 0;
   }
+}
+
+// §38.36.2: whether the registration `i` among `callbacks` is a
+// cbNextSimTime a run's `scheduler` holds that is not yet due: such a
+// callback is called before the first time slot after the one it was
+// registered in, and once, so a due one is taken off here.
+bool NextSimTimeNotDue(std::vector<s_cb_data>& callbacks,
+                       const std::vector<VpiObject*>& handles, size_t i,
+                       const Scheduler* scheduler) {
+  if (callbacks[i].reason != cbNextSimTime || scheduler == nullptr) {
+    return false;
+  }
+  if (i >= handles.size() ||
+      handles[i]->event_time >= scheduler->CurrentTime().ticks) {
+    return true;
+  }
+  callbacks[i].reason = -1;
+  return false;
 }
 
 // §38.36.3: the routine is passed a pointer to an s_cb_data structure that is

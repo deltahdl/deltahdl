@@ -262,16 +262,15 @@ void VpiWriteDecodedBits(VpiObject& obj, const std::vector<Logic4Word>& bits,
   }
 }
 
-void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, uint64_t delay,
-                    int mode, Scheduler& scheduler, VpiObject& event) {
+void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
+                    Scheduler& scheduler, VpiObject& event) {
   const uint32_t kWidth = VpiPutWidth(obj);
   std::vector<Logic4Word> bits;
   if (!VpiPutValueBits(value, kWidth, bits)) return;
-  const uint64_t kAt = scheduler.CurrentTime().ticks + delay;
+  const uint64_t kAt = event.event_time;
   RemovePendingPuts(obj, mode, kAt);
   event.type = vpiSchedEvent;
   event.scheduled = true;
-  event.event_time = kAt;
   event.put_superseded = std::make_shared<bool>(false);
   obj.scheduled_puts.push_back(&event);
   Event* queued = scheduler.GetEventPool().Acquire();

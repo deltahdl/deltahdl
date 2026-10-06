@@ -810,25 +810,87 @@ static VpiHandle CancelScheduledEvent(VpiHandle obj) {
   return nullptr;
 }
 
+// §38.36.2 with §4.4.2.9: whether a put with `flags` is refused for being
+// made while a cbReadOnlySynch routine runs, as `at_read_only_synch` says one
+// is: no value is written, and no event scheduled, then; a cancel writes none.
+static bool PutValueRefusedInReadOnlySynch(bool at_read_only_synch, int flags,
+                                           s_vpi_error_info& error) {
+  if (!at_read_only_synch || (flags & ~vpiReturnEvent) == vpiCancelEvent) {
+    return false;
+  }
+  RecordVpiError(error,
+                 "vpi_put_value(): no value may be written from a "
+                 "cbReadOnlySynch callback");
+  return true;
+}
+
+// §38.34: release the force on `obj` as the procedural release of §10.6.2
+// does in the run `sim`, or, outside a run, clear its forced state.
+static void PutValueRelease(VpiObject& obj, SimContext* sim) {
+  if (sim != nullptr) {
+    ReleaseForcedTarget(obj.var, obj.net, *sim, sim->GetArena());
+  } else {
+    obj.var->is_forced = false;
+  }
+}
+
+// The run a put writes in: its scheduler and context, null outside one, its
+// simulation time unit, and how a handle for a scheduled event is made.
+struct PutValueRun {
+  Scheduler* scheduler;
+  SimContext* sim;
+  int sim_time_unit;
+  std::function<VpiObject*()> alloc;
+};
+
+// §38.34: write `value` to the resolved target `obj` under `flags`, at the
+// delay `time` gives, in `run`: a put with a delay in a run is an event in its
+// queue, and any other is written now, the waiters on the object or the class
+// property it is woken; the scheduled event's handle where vpiReturnEvent
+// asked for it, else null.
+static VpiHandle PutValueWrite(VpiObject* obj, s_vpi_value* value,
+                               const s_vpi_time* time, int flags,
+                               const PutValueRun& run) {
+  const bool kReturnEvent = (flags & vpiReturnEvent) != 0;
+  const int kMode = flags & ~vpiReturnEvent;
+  const bool kHasDelay = PutValueHasDelay(kMode, time);
+  if (kHasDelay && run.scheduler != nullptr) {
+    VpiObject* event = run.alloc();
+    event->event_time = run.scheduler->CurrentTime().ticks +
+                        VpiPutDelayTicks(*obj, *time, run.sim_time_unit);
+    VpiSchedulePut(*obj, *value, kMode, *run.scheduler, *event);
+    return kReturnEvent ? event : nullptr;
+  }
+
+  PutValueApplyWriteAndForce(obj, value, kMode, run.scheduler);
+  if (!kHasDelay) VpiStoreElementCopy(*obj);
+  if (obj->property_of != nullptr && run.sim != nullptr) {
+    NotifyPropertyWrite(*obj, *run.sim);
+  }
+
+  // §38.34: a handle to the scheduled event is returned only when
+  // vpiReturnEvent was requested and a delay actually scheduled an event; in
+  // every other case (no bit mask, no delay, or nothing scheduled) the return
+  // value is NULL.
+  if (!kReturnEvent || !kHasDelay) return nullptr;
+  VpiObject* ev = run.alloc();
+  ev->type = vpiSchedEvent;
+  ev->scheduled = true;
+  return ev;
+}
+
 VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
                                s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
-  if (PutValueIsSealed(*obj, last_error_)) return nullptr;
-
-  if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;
-
-  // §38.36.2 with §4.4.2.9: no value is written, and no event scheduled,
-  // while a cbReadOnlySynch routine runs; a cancel writes none.
-  if (at_read_only_synch_time_ && (flags & ~vpiReturnEvent) != vpiCancelEvent) {
-    RecordVpiError(last_error_,
-                   "vpi_put_value(): no value may be written from a "
-                   "cbReadOnlySynch callback");
+  if (PutValueIsSealed(*obj, last_error_) ||
+      PutValueTargetIsRejected(obj, last_error_) ||
+      PutValueRefusedInReadOnlySynch(at_read_only_synch_time_, flags,
+                                     last_error_)) {
     return nullptr;
   }
 
   // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
   // delay-mode selector that lives in the low bits of the flags word.
-  bool return_event = (flags & vpiReturnEvent) != 0;
   int mode = flags & ~vpiReturnEvent;
 
   // §38.34: vpiCancelEvent removes a previously scheduled event. The object
@@ -854,49 +916,22 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   BindRunStorage(*obj, sim_ctx_);
   if (PutValueResolveWritableTarget(obj, scheduler_)) return nullptr;
 
-  if (!value) return nullptr;
-
-  if (PutValueFormatIsRejected(obj, value, last_error_)) return nullptr;
+  if (!value || PutValueFormatIsRejected(obj, value, last_error_)) {
+    return nullptr;
+  }
 
   // §38.34: vpiReleaseFlag releases a forced value, the same operation as the
   // procedural release of §10.6.2, and writes the object's post-release value
   // back through value_p so the caller can observe what the object settled to.
   if (mode == vpiReleaseFlag) {
-    if (sim_ctx_ != nullptr) {
-      ReleaseForcedTarget(obj->var, obj->net, *sim_ctx_, sim_ctx_->GetArena());
-    } else {
-      obj->var->is_forced = false;
-    }
+    PutValueRelease(*obj, sim_ctx_);
     GetValue(obj, value);
     return nullptr;
   }
 
-  // §38.34: a put with a delay mode and a delay is an event in the queue,
-  // which a run's scheduler holds.
-  if (has_delay && scheduler_ != nullptr) {
-    VpiObject* event = AllocObject();
-    VpiSchedulePut(*obj, *value, VpiPutDelayTicks(*obj, *time, sim_time_unit_),
-                   mode, *scheduler_, *event);
-    return return_event ? event : nullptr;
-  }
-
-  PutValueApplyWriteAndForce(obj, value, mode, scheduler_);
-  if (!has_delay) VpiStoreElementCopy(*obj);
-  if (obj->property_of != nullptr && sim_ctx_ != nullptr) {
-    NotifyPropertyWrite(*obj, *sim_ctx_);
-  }
-
-  // §38.34: a handle to the scheduled event is returned only when
-  // vpiReturnEvent was requested and a delay actually scheduled an event; in
-  // every other case (no bit mask, no delay, or nothing scheduled) the return
-  // value is NULL.
-  if (return_event && has_delay) {
-    auto* ev = AllocObject();
-    ev->type = vpiSchedEvent;
-    ev->scheduled = true;
-    return ev;
-  }
-  return nullptr;
+  return PutValueWrite(
+      obj, value, time, flags,
+      {scheduler_, sim_ctx_, sim_time_unit_, [this] { return AllocObject(); }});
 }
 
 // §38.35: the value formats vpi_put_value_array() accepts. The int/vector/time/

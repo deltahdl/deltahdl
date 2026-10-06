@@ -11,6 +11,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"

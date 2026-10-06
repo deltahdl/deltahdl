@@ -546,6 +546,19 @@ bool CloseMcdChannelBit(int bit, PLI_UINT32 mcd, VpiChannelState& channels) {
   return false;
 }
 
+// §38.25: flush one channel other than the tool's own: the file a run opened
+// on it, or the text its buffer holds, which is appended to its committed
+// stream; false where the file's flush failed.
+bool FlushMcdChannel(VpiChannelState& channels, PLI_UINT32 channel) {
+  auto file = channels.mcd_files.find(channel);
+  if (file != channels.mcd_files.end()) return std::fflush(file->second) == 0;
+  auto it = channels.mcd_channel_buffers.find(channel);
+  if (it == channels.mcd_channel_buffers.end()) return true;
+  channels.mcd_channel_flushed[channel].append(it->second);
+  it->second.clear();
+  return true;
+}
+
 // §38.24: close the file an fd from $fopen names. An fd is one value rather
 // than a set of channels, so it names one file and there is no channel to
 // release. Returns 0 when the file was open and the fd itself when it was not,
@@ -613,15 +626,7 @@ PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
       if (Flush() != 0) return 1;
       continue;
     }
-    auto file = channels_.mcd_files.find(channel);
-    if (file != channels_.mcd_files.end()) {
-      if (std::fflush(file->second) != 0) return 1;
-      continue;
-    }
-    auto it = channels_.mcd_channel_buffers.find(channel);
-    if (it == channels_.mcd_channel_buffers.end()) continue;
-    channels_.mcd_channel_flushed[channel].append(it->second);
-    it->second.clear();
+    if (!FlushMcdChannel(channels_, channel)) return 1;
   }
 
   // §38.25: every named output buffer was flushed, so report success.

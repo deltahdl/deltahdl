@@ -159,13 +159,13 @@ uint32_t VpiPutWidth(const VpiObject& obj);
 void VpiWriteDecodedBits(VpiObject& obj, const std::vector<Logic4Word>& bits,
                          uint32_t width);
 
-// §38.34: schedule the put of `value` to `obj`, `delay` ticks from now under
-// the delay mode `mode`, as an event that writes it and notifies the object's
-// watchers when it takes place, `event` becoming the vpiSchedEvent standing
-// for it; the events already pending on `obj` that the mode removes are
-// removed first. Defined in vpi_put_value_bits.cpp.
-void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, uint64_t delay,
-                    int mode, Scheduler& scheduler, VpiObject& event);
+// §38.34: schedule the put of `value` to `obj` at the time `event` carries as
+// its event time, under the delay mode `mode`, as an event that writes it and
+// notifies the object's watchers when it takes place, `event` becoming the
+// vpiSchedEvent standing for it; the events already pending on `obj` that the
+// mode removes are removed first. Defined in vpi_put_value_bits.cpp.
+void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
+                    Scheduler& scheduler, VpiObject& event);
 
 // §38.34 with §38.13: the delay `time` gives, in ticks of the simulation time
 // unit `sim_unit`, a vpiScaledRealTime one read in the time unit of `obj`.

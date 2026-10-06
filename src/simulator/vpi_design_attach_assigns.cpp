@@ -645,9 +645,8 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   // §38.32: what the run keys the assignment's delays under, the instance and
   // the net it drives, which a vpi_put_delays gives it new ones under.
   if (!names.empty()) {
-    const std::string& kPrefix = build.names.prefix;
-    obj->run_key =
-        (kPrefix.empty() ? "" : kPrefix + ".") + std::string(names[0]);
+    const std::string& prefix = build.names.prefix;
+    obj->run_key = (prefix.empty() ? "" : prefix + ".") + std::string(names[0]);
   }
   HangOn(obj, names, build.names);
   names.clear();
