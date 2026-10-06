@@ -44,7 +44,7 @@ static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 // type_name alone: `pkg::nib_t v;` declared as a block item found nothing
 // under "nib_t", and was created at the 32-bit carrier CreateDeclVariable
 // substitutes for a type nothing could size -- v = -1 read 4294967295 and
-// $bits(v) 32, where §6.18's "type the name stands for" is four bits wide.
+// $bits(v) 32, where the type §6.18 has that name stand for is four bits wide.
 static std::string TypeTableKey(const DataType& type) {
   if (type.scope_name.empty()) return std::string(type.type_name);
   return std::string(type.scope_name) + "::" + std::string(type.type_name);
