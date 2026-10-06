@@ -203,8 +203,8 @@ bool TryBindNamedAggregateFormal(const FunctionArg& param, SimContext& ctx) {
 // DataTypeKind::kNamed no width at all, and BindValueArg resizes only a
 // non-zero width, so a formal written `nib p` was never resized and held
 // whatever width the caller's expression happened to have: `8'hFF` passed to a
-// four-bit formal read 255. §10.8 makes "the passing of a value to a subroutine
-// input, output, or inout argument" an assignment-like context, so §10.7
+// four-bit formal read 255. §10.8 makes passing a value to a subroutine's
+// input, output or inout argument an assignment-like context, so §10.7
 // truncates or extends into the formal's declared width.
 //
 // A class-typed formal is passed the object handle (§8.2, printed page 180),

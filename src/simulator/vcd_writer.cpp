@@ -246,7 +246,7 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
     case VcdDataType::kShortint:
     case VcdDataType::kLongint:
     case VcdDataType::kByte:
-    // §6.11.2: "logic and reg denote the same type", so an object declared
+    // §6.11.2: logic and reg name one and the same type, so an object declared
     // with either carries the reg keyword Syntax 21-20 lists -- lent to logic
     // by Table 21-11, and reg's own.
     case VcdDataType::kReg:

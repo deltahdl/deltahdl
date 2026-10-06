@@ -290,15 +290,14 @@ static const Expr* AsArrayConcatPattern(const Expr* item) {
 // argument untouched when the widths already match, and TryQueueBlockingAssign
 // moves the run straight into q->elements.
 //
-// §6.8 makes each destination "an abstraction of a data storage element" that
-// "shall store a value from one assignment to the next", so `b = {a}` on
-// same-width arrays must not leave b[0] and a[0] as one buffer. The queue has
-// the stronger rule: §7.10.3 says that "when the target of an assignment is an
-// entire queue, references to any element of the original queue shall become
-// outdated", and §7.10.4 says the same of these very assignments. Splicing
-// q->elements in by pointer is what makes an outdated reference behave as a
-// live one -- after `q = {q, 6}` a write through the old element would reach
-// the new queue.
+// §6.8 makes each destination a data object that keeps its value from one
+// assignment to the next, so `b = {a}` on same-width arrays must not leave b[0]
+// and a[0] as one buffer. The queue has the stronger rule: §7.10.3 has an
+// assignment to a whole queue leave every reference to an element of the
+// original queue outdated, and §7.10.4 says the same of these very assignments.
+// Splicing q->elements in by pointer is what makes an outdated reference behave
+// as a live one -- after `q = {q, 6}` a write through the old element would
+// reach the new queue.
 //
 // Copying here rather than inside each collector reaches both entry points at
 // the one place the run is produced, and asks no collector for an arena.

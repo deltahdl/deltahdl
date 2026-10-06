@@ -294,8 +294,8 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // ResizeToWidth leaves a value alone at a target of 0, so such a local keeps
   // the behaviour it had.
   //
-  // §6.8 also calls a variable "an abstraction of a data storage element"
-  // that "shall store a value from one assignment to the next". An initializer
+  // §6.8 also has a variable stand for a data storage element that keeps its
+  // value from one assignment to the next. An initializer
   // that reads another variable is answered with that variable's own Logic4Vec,
   // and a Logic4Vec copies its words pointer, so `bit [7:0] y = x;` left y and
   // x one element. The declaration is quiet about it -- nothing writes in place
@@ -312,8 +312,8 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
       SizeLocalInitializer(EvalLocalInitializer(type, init, ctx, arena), *v,
                            declared, arena),
       arena);
-  // §6.11.2: "when a 4-state value is automatically converted to a 2-state
-  // value, any unknown or high-impedance bits shall be converted to zeros", and
+  // §6.11.2: a 4-state value converted automatically to a 2-state one has every
+  // unknown or high-impedance bit turned to zero, and
   // §6.8 makes a variable declaration assignment an assignment to the declared
   // variable, so a 2-state local declared from a 4-state initializer holds
   // zeros where that initializer held x or z. The flag was recorded above and

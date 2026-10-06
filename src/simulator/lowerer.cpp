@@ -689,8 +689,8 @@ void Lowerer::RegisterDesignTiming() {
     // SimContext::FindVariable reaches the specparam of this instance.
     RegisterModuleGates(scope.module->gate_insts, scope.inst_prefix, ctx_,
                         arena_, mgr);
-    // §6.20.5 admits two declaration sites for a specparam -- "inside a specify
-    // block or in the module body" -- and §32.4.3 states no exception for
+    // §6.20.5 admits two declaration sites for a specparam -- a specify block
+    // and the module body -- and §32.4.3 states no exception for
     // either, so the module-body ones are bound beside the in-block ones
     // RegisterSpecifyBlocks binds. Only the name has to be bound: the storage
     // the annotated value lands in was lowered above, because

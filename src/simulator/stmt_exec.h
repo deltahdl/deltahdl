@@ -22,12 +22,11 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // statement calls this first and evaluates the expression only when it returns
 // false, so a system call whose task form is added later is handled at all of
 // them at once. §36.5 makes that last sentence a rule rather than a
-// convenience: a user-defined system task "can be used in the same places a
-// SystemVerilog void function can be used", which is this position and no
-// other, so every registration whose type is vpiSysTask is called from here.
-// Defined in systf_call_statement.cpp rather than stmt_exec.cpp, beside the
-// SystemCallNamesARegisteredTask (see evaluation.h) that the expression
-// evaluator asks the same question with.
+// convenience: a user-defined system task may appear wherever a void function
+// may, which is this position and no other, so every registration whose type is
+// vpiSysTask is called from here. Defined in systf_call_statement.cpp rather
+// than stmt_exec.cpp, beside the SystemCallNamesARegisteredTask (see
+// evaluation.h) that the expression evaluator asks the same question with.
 bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
 // §13.4.4: spawn the background processes of a fork...join_none reached from a

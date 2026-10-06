@@ -37,16 +37,15 @@ Logic4Vec AssocAllocValue(const AssocArrayObject* aa, Arena& arena) {
   // carries its pattern in a width that says which pattern it is (§6.12), so
   // it is the one value left as it stands.
   //
-  // §7.8.7 allocates the entry "with its default or user-specified initial
-  // value": the value is what the entry takes, and §6.8 then makes the entry
-  // "an abstraction of a data storage element" that "shall store a value from
-  // one assignment to the next". So the entry owes its own words. Returning
-  // *init handed back the array's own default_value or elem_init buffer, and
-  // TryWriteAssocMemberField writes through the words with DepositBitField
-  // rather than replacing them, so a member write to one defaulted key landed
-  // in every other defaulted key and in the stored default besides. The other
-  // branch already allocates, ResizeToWidth building its result at a width
-  // this one does not reach.
+  // §7.8.7 allocates the entry with the default or the user-given initial
+  // value: the value is what the entry takes, and §6.8 then makes the entry a
+  // data object that keeps its value from one assignment to the next. So the
+  // entry owes its own words. Returning *init handed back the array's own
+  // default_value or elem_init buffer, and TryWriteAssocMemberField writes
+  // through the words with DepositBitField rather than replacing them, so a
+  // member write to one defaulted key landed in every other defaulted key and
+  // in the stored default besides. The other branch already allocates,
+  // ResizeToWidth building its result at a width this one does not reach.
   if (init->is_real || init->width >= aa->elem_width)
     return OwnRhsWords(*init, arena);
   return ResizeToWidth(*init, aa->elem_width, arena);

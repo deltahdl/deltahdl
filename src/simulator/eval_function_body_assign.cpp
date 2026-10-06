@@ -394,8 +394,8 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // context this dispatch has no test for: `new` resolved against a property of
   // the enclosing class, and the compound operator over one.
   if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena)) return;
-  // §6.8: "A variable is an abstraction of a data storage element. A variable
-  // shall store a value from one assignment to the next." Two variables are two
+  // §6.8: a variable stands for a data storage element and keeps its value from
+  // one assignment to the next. Two variables are two
   // storage elements. No clause has to forbid them sharing one buffer -- the
   // object model the clause describes already makes them separate -- but
   // EvalExpr answers a bare identifier with the source variable's own

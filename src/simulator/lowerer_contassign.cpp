@@ -886,8 +886,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     co_await AnyChangeAwaiter{ctx, read_vars};
   }
 }
-// §6.6 (printed page 91): a net's value "shall be determined by the values of
-// its drivers", and it is high impedance only where "no driver is connected".
+// §6.6 (printed page 91): a net's drivers determine its value, and it is high
+// impedance only where no driver is connected to it.
 // A delayed assignment's driver is connected from the start but has computed
 // no value until its first transition lands after the delay (§28.16, printed
 // page 856; §10.3.3), so until then it drives x, at its drive strength, on the

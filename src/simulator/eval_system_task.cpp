@@ -84,14 +84,13 @@ Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 32, ctx.UrandomRange(min_val, max_val));
 }
 
-// §6.9: a data object "declared ... without a range specification shall be
-// considered 1-bit wide and is known as a scalar", and one declared with a
-// range is a vector. The declaration is what that definition keys on, not the
-// width, so `wire [0:0] w` is a vector here: it is one bit wide and yet carries
-// the range the sentence turns on. Reading the width as well as the range
-// covers the net whose declared bounds this scope could not fold, which
-// RecordPackedRange leaves unrecorded while the storage it sized still says the
-// net is multibit.
+// §6.9: a data object declared with no range is one bit wide and called a
+// scalar, and one declared with a range is a vector. The declaration is what
+// that definition keys on, not the width, so `wire [0:0] w` is a vector here:
+// it is one bit wide and yet carries the range the sentence turns on. Reading
+// the width as well as the range covers the net whose declared bounds this
+// scope could not fold, which RecordPackedRange leaves unrecorded while the
+// storage it sized still says the net is multibit.
 static bool IsScalarNet(const Variable& var) {
   return !var.has_packed_range && var.value.width == 1;
 }

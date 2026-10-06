@@ -429,9 +429,8 @@ bool CarriesItsOwnSource(const Net& net) {
          net.type == NetType::kTri0 || net.type == NetType::kTri1;
 }
 
-// §6.6: "If no driver is connected to a net, its value shall be
-// high-impedance (z)", which a net left with nothing reaching it across its
-// switches is.
+// §6.6: a net no driver is connected to has the high-impedance value z, which
+// a net left with nothing reaching it across its switches is.
 void LeaveUndriven(Net& net, Arena& arena) {
   net.resolved_strength = NetStrength{};
   net.bit_strengths.clear();

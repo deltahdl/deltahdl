@@ -61,8 +61,8 @@ void CoerceTo2State(Logic4Vec& v) {
 
 // A right-hand value that owns its words, for a store to keep.
 //
-// §6.8: "A variable is an abstraction of a data storage element. A variable
-// shall store a value from one assignment to the next." Two variables are two
+// §6.8: a variable stands for a data storage element and keeps its value from
+// one assignment to the next. Two variables are two
 // storage elements, and no clause has to forbid them sharing one buffer: the
 // object model the clause describes already makes them separate. EvalExpr
 // answers a bare identifier with the variable's own Logic4Vec (EvalIdentifier,

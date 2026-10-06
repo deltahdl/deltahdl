@@ -732,15 +732,14 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          Arena& arena) {
   const Expr* expr = actual.expr;
   int arg_index = actual.index;
-  // §6.8: a variable is "an abstraction of a data storage element" that
-  // "shall store a value from one assignment to the next", and the formal is a
-  // second one. EvalExpr answers a bare identifier, an unpacked-array element
-  // select and a class property with the source's own Logic4Vec, and a
-  // Logic4Vec copies its words pointer, so a formal took the actual's storage.
-  // The coercion below is what shows it: §6.11.2 converts "any unknown or
-  // high-impedance bits ... to zeros", and it must convert the formal's copy --
-  // `note(x)` with a `bit [7:0]` formal cleared the caller's x inside a call
-  // that only read it.
+  // §6.8: a variable stands for a data storage element and keeps its value from
+  // one assignment to the next, and the formal is a second one. EvalExpr
+  // answers a bare identifier, an unpacked-array element select and a class
+  // property with the source's own Logic4Vec, and a Logic4Vec copies its words
+  // pointer, so a formal took the actual's storage. The coercion below is what
+  // shows it: §6.11.2 turns every unknown or high-impedance bit into zero, and
+  // it must convert the formal's copy -- `note(x)` with a `bit [7:0]` formal
+  // cleared the caller's x inside a call that only read it.
   //
   // The copy is taken here, where the value is produced, rather than around the
   // resize below. That resize runs only on a width mismatch and returns its
@@ -783,8 +782,8 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // actual's flag, so re-impose the declaration's on the cell too.
   auto* var = ctx.CreateLocalVariable(
       param.name, val.width, DeclaredTypeIsSigned(param.data_type, ctx));
-  // §6.11.2: a formal is an object declared with a type, and §10.8 makes "the
-  // passing of a value to a subroutine input, output, or inout argument" an
+  // §6.11.2: a formal is an object declared with a type, and §10.8 makes
+  // passing a value to a subroutine's input, output or inout argument an
   // assignment-like context, so an unknown copied into a 2-state formal becomes
   // zero. The flag also decides whether an assignment to the formal inside the
   // body converts, which it could not while every formal was left at Variable's

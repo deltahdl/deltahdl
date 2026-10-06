@@ -191,12 +191,12 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   return outer > 0 ? base * outer : base;
 }
 
-// §6.18: "the type of the object is the type the name stands for", so a
-// variable declared with a typedef of `string` is a string, and §6.16 gives one
-// no declared width and the initial value "". Every declaration path recognised
-// a string by DataType::kind alone, which is kNamed for such a name, so the
-// declaration fell to the 32-bit carrier substituted for a type nothing could
-// size and was never registered as a string: %s, the string methods and a
+// §6.18: an object declared with a type name has the type the name stands for,
+// so a variable declared with a typedef of `string` is a string, and §6.16
+// gives one no declared width and the initial value "". Every declaration path
+// recognised a string by DataType::kind alone, which is kNamed for such a name,
+// so the declaration fell to the 32-bit carrier substituted for a type nothing
+// could size and was never registered as a string: %s, the string methods and a
 // string comparison all read it as a bit vector. The resolved kind the
 // elaborator records beside the width is what answers it.
 // §6.11.1/§6.18: whether the declared type is signed, whether written with the

@@ -180,15 +180,15 @@ PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
 
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena) {
-  // §6.8 makes a variable "an abstraction of a data storage element" that
-  // "shall store a value from one assignment to the next", and §8.7 makes a
-  // property one: "each property declared in the class shall be initialized to
-  // its explicit default value or its uninitialized value if no default is
-  // provided". A property and the variable an initializer read are two storage
-  // elements; nothing has to forbid their sharing one buffer for a write
-  // through the sharing to be wrong. A by-value `Logic4Vec` parameter reads as
-  // though it already owned its bits and does not -- copying one copies the
-  // words pointer and not the words -- and that is the trap this site sets.
+  // §6.8 makes a variable a data object that keeps its value from one
+  // assignment to the next, and §8.7 makes a property one, initializing each
+  // property the class declares to its explicit default or, lacking one, to its
+  // uninitialized value. A property and the variable an initializer read are
+  // two storage elements; nothing has to forbid their sharing one buffer for a
+  // write through the sharing to be wrong. A by-value `Logic4Vec` parameter
+  // reads as though it already owned its bits and does not -- copying one
+  // copies the words pointer and not the words -- and that is the trap this
+  // site sets.
   //
   // So the copy is taken on entry, above every exit. It used to wrap the
   // conversion below, which covered the coercion but not the two early returns
@@ -215,8 +215,8 @@ Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
   // crossing the real boundary rather than reinterpreting its bits, and it
   // resizes everything that does not cross it.
   //
-  // §6.11.2 has the coercion below convert "any unknown or high-impedance bits
-  // ... to zeros", and it writes in place, so it has to land on the property's
+  // §6.11.2 has the coercion below turn every unknown or high-impedance bit to
+  // zero, and it writes in place, so it has to land on the property's
   // own value rather than on the variable the caller read. The copy above is
   // what makes that so, whether or not the conversion allocated: its tail is a
   // ResizeToWidth that hands its argument back untouched at a matching width,

@@ -693,8 +693,8 @@ void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
                          Arena& arena, SpecifyManager& mgr);
 
 // §6.20.5: bind the specparams one module instance declared in its module body,
-// outside every specify block -- "A specparam ... may be declared inside a
-// specify block or in the module body" -- to SpecifyManager, so §32.4.3's LABEL
+// outside every specify block -- a specparam may be declared in a specify
+// block or in the module body -- to SpecifyManager, so §32.4.3's LABEL
 // annotation reaches them as it reaches the ones RegisterSpecifyBlocks binds.
 // §32.4.3 states no exception for either declaration site.
 // `names` is RtlirModule::specparam_names (src/elaborator/rtlir.h), each entry

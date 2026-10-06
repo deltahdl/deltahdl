@@ -450,8 +450,8 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     auto* stored = arena.Create<std::string>(ArrayElementKey(name, var, i));
     auto* elem = ctx.CreateVariable(*stored, var.width);
     RecordPackedRange(var.dtype, elem, ctx, arena);
-    // §6.11.2: in a 2-state type "any unknown or high-impedance bits shall be
-    // converted to zeros", and the flag is what decides whether that
+    // §6.11.2: in a 2-state type every unknown or high-impedance bit is turned
+    // to zero, and the flag is what decides whether that
     // conversion runs at all -- WriteVar coerces only when it is clear, so an
     // element left at Variable's 4-state default keeps an x a runtime write
     // put there. The two makers of array leaves disagreed about this:

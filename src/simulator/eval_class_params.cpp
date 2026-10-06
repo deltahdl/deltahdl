@@ -144,7 +144,7 @@ static bool IsDollarValue(const Expr* e) {
 
 // Whether `value`, assigned to a parameter of `obj`'s class, leaves it holding
 // `$`: `$` itself, or a name that `names_unbounded` says holds it -- §6.20.7
-// makes it "legal ... to assign a $ parameter to another parameter".
+// lets a $ parameter be assigned to another parameter.
 static void MarkIfUnbounded(ClassObject* obj, std::string_view pname,
                             const Expr* value, bool names_unbounded) {
   bool unbounded = IsDollarValue(value) ||

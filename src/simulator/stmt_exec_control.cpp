@@ -271,14 +271,13 @@ static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
     // its negative values as huge positive ones.
     auto* v = ctx.CreateLocalVariable(
         init->lhs->text, w, DeclaredTypeIsSigned(stmt->for_init_types[i], ctx));
-    // §6.11.2: "when a 4-state value is automatically converted to a 2-state
-    // value, any unknown or high-impedance bits shall be converted to zeros",
-    // and it is this flag that WriteVar consults to make the conversion when
-    // the initializer runs as an ordinary assignment below. It defaults to
-    // true, so an `int` counter initialized from a 4-state variable kept the
-    // unknown bits the clause converts. The width needs no such repair here:
-    // the assignment goes through WriteVar, which applies §10.7 to the cell
-    // this created.
+    // §6.11.2: a 4-state value converted automatically to a 2-state one has
+    // every unknown or high-impedance bit turned to zero, and it is this flag
+    // that WriteVar consults to make the conversion when the initializer runs
+    // as an ordinary assignment below. It defaults to true, so an `int` counter
+    // initialized from a 4-state variable kept the unknown bits the clause
+    // converts. The width needs no such repair here: the assignment goes
+    // through WriteVar, which applies §10.7 to the cell this created.
     v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], ctx);
   }
 }

@@ -320,11 +320,11 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
           init->lhs->text, w,
           DeclaredTypeIsSigned(stmt->for_init_types[i], exec.ctx));
       // §6.11.2: the declared type decides whether the loop variable can hold
-      // an unknown at all -- "when a 4-state value is automatically converted
-      // to a 2-state value, any unknown or high-impedance bits shall be
-      // converted to zeros" -- and the flag defaults to true, so an `int`
-      // counter kept the x and z its initializer read. CreateFuncLocalVar sets
-      // the same flag for an ordinary body local from the same answer.
+      // an unknown at all -- a 4-state value converted automatically to a
+      // 2-state one has every unknown or high-impedance bit turned to zero --
+      // and the flag defaults to true, so an `int` counter kept the x and z its
+      // initializer read. CreateFuncLocalVar sets the same flag for an ordinary
+      // body local from the same answer.
       v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], exec.ctx);
       // §10.7 sizes the right-hand side to the left-hand side, and the width
       // the type declares reached the cell CreateLocalVariable made and was
@@ -621,8 +621,8 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   // stored null.
   if (TryFuncReturnClassNew(stmt->expr, exec.func_name, exec.ctx, exec.arena))
     return;
-  // §6.8, printed page 105: a variable "shall store a value from one assignment
-  // to the next", so the implicit return variable and the returned one are two
+  // §6.8, printed page 105: a variable keeps its value from one assignment to
+  // the next, so the implicit return variable and the returned one are two
   // storage elements and neither may hold the other's words. EvalExpr answers a
   // bare identifier's, an unpacked element's or a class property's own vector,
   // and ResizeToWidth passes a value already at the declared width straight

@@ -108,7 +108,7 @@ void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
     return;
   }
   // §6.16: a parameter declared string holds a value of arbitrary length, and
-  // the subclause rules that for it "no truncation occurs". Neither half of
+  // the subclause rules that such a value is never truncated. Neither half of
   // the lowering below can honour that. EvalTypeWidth gives kString no width,
   // so decl_width is 0 and the fallback takes 32, keeping four characters of
   // the ten in §6.16's own example `parameter string default_name = "John

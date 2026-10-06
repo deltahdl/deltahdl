@@ -373,8 +373,8 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
       if (StoreSpecializationParam(info, i, sizer, obj, arena)) continue;
       if (pexpr) {
         // §6.8 makes the object's stored parameter and whatever the default
-        // expression read two data storage elements, each storing "a value
-        // from one assignment to the next". EvalExpr on a bare identifier
+        // expression read two data storage elements, each keeping its own value
+        // from one assignment to the next. EvalExpr on a bare identifier
         // answers with the variable's own vector (evaluation.cpp), and a
         // Logic4Vec copy carries the words pointer rather than the words
         // (src/common/types.h), so storing it as it arrived left the two as
