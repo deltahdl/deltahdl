@@ -189,16 +189,16 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
   std::string_view root = CompoundRootName(lhs);
   const ArrayInfo* info = ctx.FindArrayInfo(root);
   if (info == nullptr) return PackedRootVariable(root, ctx);
-  // §7.4.4 also has dimensions "defined in stages with typedef", and only the
-  // range the declaration itself wrote is recorded: `typedef bsix mem_type
-  // [0:3]; mem_type ba [0:7];` leaves one dimension known, so `ba[0]` is a leaf
-  // of that dimension and `ba[0][0]` is the second dimension the record does
-  // not have rather than a bit of a packed object. The two names have the same
-  // shape, and what tells them apart is whether the element type stands for an
-  // array, which the elaborated tables do not yet say -- #3598. Until they do,
-  // an element type written as a name is left to the element the writer below
-  // materializes, and an element type that is an integral type of its own is a
-  // packed object whose bits this addresses.
+  // §7.4.4 also lets dimensions be built up in stages through a typedef, and
+  // only the range the declaration itself wrote is recorded:
+  // `typedef bsix mem_type [0:3]; mem_type ba [0:7];` leaves one dimension
+  // known, so `ba[0]` is a leaf of that dimension and `ba[0][0]` is the second
+  // dimension the record does not have rather than a bit of a packed object.
+  // The two names have the same shape, and what tells them apart is whether the
+  // element type stands for an array, which the elaborated tables do not yet
+  // say -- #3598. Until they do, an element type written as a name is left to
+  // the element the writer below materializes, and an element type that is an
+  // integral type of its own is a packed object whose bits this addresses.
   if (info->elem_type_kind == DataTypeKind::kNamed) return nullptr;
   return DeepestElementPrefix(lhs, ctx, arena);
 }

@@ -212,7 +212,7 @@ std::string AssocStringKey(const Logic4Vec& val);
 std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
                                           Arena& arena);
 
-// §7.4.5: "A slice name of an unpacked array is an unpacked array." Appends the
+// §7.4.5: a slice of an unpacked array is itself an unpacked array. Appends the
 // elements `expr` addresses to `out`, in ascending index order, when `expr` is
 // such a slice; returns false and leaves `out` untouched when it is not, so a
 // caller can fall back to reading the expression as a single value. Use this

@@ -524,8 +524,8 @@ static Net* NetNamedBy(const Expr* e, SimContext& ctx) {
   return FindHierarchicalNet(e, ctx);
 }
 
-// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
-// fashion as a scalar or vector net", so `assign n[1] = ...` on `wire n[0:2]`
+// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
+// vector net would be, so `assign n[1] = ...` on `wire n[0:2]`
 // drives the element n[1] as a whole, the net held under "n[1]"
 // (CreateDeclaredNet in lowerer_register.cpp). The index of a net_lvalue is a
 // constant_select (A.8.5), so the element is fixed at lowering. Null for a

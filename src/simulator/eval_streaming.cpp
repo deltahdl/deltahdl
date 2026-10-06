@@ -144,12 +144,12 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       StreamSliceRange range) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
-  // §7.4.5: a `with` range may reach past the array, and "reading from an
-  // unpacked array of any kind with an invalid index shall return the value
-  // specified in Table 7-1" -- 'x for a 4-state integral element type, '0 for a
-  // 2-state one. A zero-filled vector is the 2-state answer given for both,
-  // which turns an entry that does not exist into a known zero and loses the
-  // distinction the stream is supposed to carry.
+  // §7.4.5: a `with` range may reach past the array, and a read of an unpacked
+  // array of any kind at an invalid index returns what Table 7-1 lists -- 'x
+  // for a 4-state integral element type, '0 for a 2-state one. A zero-filled
+  // vector is the 2-state answer given for both, which turns an entry that does
+  // not exist into a known zero and loses the distinction the stream is
+  // supposed to carry.
   auto nonexistent = [&] {
     return info->is_4state
                ? MakeAllX(ctx.GetArena(), info->elem_width)

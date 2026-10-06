@@ -124,26 +124,25 @@ Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
   if (!BuildCompoundLhsName(lhs, ctx, arena, compound)) return nullptr;
   if (auto* var = ctx.FindVariable(compound)) return var;
   const ArrayInfo* info = ctx.FindArrayInfo(CompoundRootName(lhs));
-  // §7.4.5: "Writing to an array with an invalid index shall perform no
-  // operation, with the exceptions of writing to element [$+1] of a queue
-  // (described in 7.10.1) and creating a new element of an associative array
-  // (described in 7.8.6)" -- and neither exception is an indexed name of this
-  // shape, both being reached by their own writers before this one. The caller
-  // is told rather than left to fall through, because the fallback resolution
-  // walks the name down to the array's base carrier and would write a bit of
-  // that instead.
+  // §7.4.5: a write at an invalid index does nothing, except a write to
+  // element [$+1] of a queue (§7.10.1) and one creating an element of an
+  // associative array (§7.8.6) -- and neither exception is an indexed name of
+  // this shape, both being reached by their own writers before this one. The
+  // caller is told rather than left to fall through, because the fallback
+  // resolution walks the name down to the array's base carrier and would write
+  // a bit of that instead.
   if (info != nullptr && OutermostIndexIsOutOfRange(lhs, *info, ctx, arena)) {
     if (absent_element != nullptr) *absent_element = true;
     return nullptr;
   }
   // The index is one the array holds, or one no recorded extent contradicts:
-  // §7.4.4's dimensions may be "defined in stages with typedef", and only the
-  // range the declaration itself wrote is recorded, so a second index of such
-  // an array is answered by no extent at all and the element is materialized
-  // here. It takes the array's own element width rather than a fixed 32 --
-  // WriteVar sizes the value to the cell -- and the scope the write happens in,
-  // so a name §23.9 keeps inside an instance can be read back where it was
-  // written.
+  // §7.4.4's dimensions may be built up in stages through a typedef, and only
+  // the range the declaration itself wrote is recorded, so a second index of
+  // such an array is answered by no extent at all and the element is
+  // materialized here. It takes the array's own element width rather than a
+  // fixed 32 -- WriteVar sizes the value to the cell -- and the scope the write
+  // happens in, so a name §23.9 keeps inside an instance can be read back where
+  // it was written.
   uint32_t width = info != nullptr ? info->elem_width : 32;
   auto& name = *arena.Create<std::string>(std::move(compound));
   return ctx.HasLocalScope() ? ctx.CreateLocalVariable(name, width)

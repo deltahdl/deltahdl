@@ -20,10 +20,9 @@
 
 namespace delta {
 
-// §7.4.2: "A fixed-size unpacked dimension may also be specified by a single
-// positive constant integer expression to specify the number of elements in the
-// unpacked dimension, as in C. In this case, [size] shall mean the same as
-// [0:size-1]." The clause's own example gives `int Array[8][32]` and
+// §7.4.2: as in C, a fixed-size unpacked dimension may instead be written as a
+// single positive constant integer giving its element count, `[size]` then
+// meaning `[0:size-1]`. The clause's own example gives `int Array[8][32]` and
 // `int Array[0:7][0:31]` as the same declaration, so the size form is the
 // ascending range counting from zero and is returned here as that range's upper
 // bound.
@@ -120,16 +119,16 @@ static void CreateBlockArrayLeaves(const BlockArrayLeaves& b, size_t d,
   }
 }
 
-// §7.4.4: "A multidimensional array is an array of arrays. Multidimensional
-// arrays can be declared by including multiple dimensions in a single
-// declaration", and §7.4.2 has the dimensions following the identifier set the
-// unpacked ones, so every one of them is one of the array's. This read the
-// first and built the array as though the declaration had stopped there, so
-// `int a[0:1][0:2]` in a begin-end block was two elements rather than six and a
-// write to `a[1][2]` reached a leaf nothing had created. The declaration among
-// a module's items builds all of them, and what the two paths must agree on --
-// the leaf names, and the per-dimension extents $size, foreach and $readmemh
-// read off dim_los/dim_sizes -- is what this now records as that one does.
+// §7.4.4: a multidimensional array is an array of arrays, and one declaration
+// may give it several dimensions at once, and §7.4.2 has the dimensions
+// following the identifier set the unpacked ones, so every one of them is one
+// of the array's. This read the first and built the array as though the
+// declaration had stopped there, so `int a[0:1][0:2]` in a begin-end block was
+// two elements rather than six and a write to `a[1][2]` reached a leaf nothing
+// had created. The declaration among a module's items builds all of them, and
+// what the two paths must agree on -- the leaf names, and the per-dimension
+// extents $size, foreach and $readmemh read off dim_los/dim_sizes -- is what
+// this now records as that one does.
 void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                               SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty()) return;

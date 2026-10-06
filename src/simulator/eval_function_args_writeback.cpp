@@ -194,7 +194,7 @@ static void CollectElementWritebacks(const FunctionArg& formal,
 }
 
 // §7.7 (printed page 162) makes the rules of array argument passing by value
-// "the same as for array assignment", and §13.5 (printed 348) copies an
+// those of array assignment, and §13.5 (printed 348) copies an
 // output or inout formal to its actual on return, so a dynamic array, queue or
 // associative array formal goes back whole: `mk(d)` with `output int arr[]`
 // sized by `new[3]` leaves d of size 3. Such a formal holds its elements in the

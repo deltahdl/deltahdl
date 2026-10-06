@@ -73,11 +73,10 @@ static void FillSliceSourceFromPacked(const Stmt* stmt,
 // `dst.base[dst.dst_lo .. dst.dst_lo+dst.dst_count)`, resizing/coercing as for
 // a scalar write. Source position i fills the window's i'th element in the
 // destination array's declared order: §7.4.5 makes both sides unpacked arrays,
-// and §7.6 pairs one with another by position rather than by index --
-// "Correspondence between elements is determined by the left-to-right order of
-// elements in each array". §7.6 also settles the window itself, since "an
-// assignment where the left-hand side contains a slice is treated as a single
-// assignment to the entire slice".
+// and §7.6 pairs one with another by position rather than by index, matching
+// elements by their left-to-right order in each array. §7.6 also settles the
+// window itself, since it treats an assignment to a slice as one assignment to
+// the whole slice.
 static void WriteUnpackedSliceElements(const UnpackedSliceTarget& dst,
                                        const std::vector<Logic4Vec>& src,
                                        SimContext& ctx, Arena& arena) {
@@ -159,9 +158,8 @@ static std::vector<DeclaredDim> DeclaredDims(const ArrayInfo& info) {
 }
 
 // Appends the name of every element under `prefix` across `dims` from `d`
-// on, each dimension walked from its left bound (§7.6: "Correspondence
-// between elements is determined by the left-to-right order of elements in
-// each array").
+// on, each dimension walked from its left bound (§7.6 matches elements by
+// their left-to-right order in each array).
 static void AppendLeftToRight(const std::vector<DeclaredDim>& dims, size_t d,
                               const std::string& prefix,
                               std::vector<std::string>& out) {

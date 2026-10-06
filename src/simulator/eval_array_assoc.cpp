@@ -1,7 +1,7 @@
 // §7.9: the associative array methods, and the key handling they need.
 //
-// §7.9.1 makes an associative array's index "an arbitrary expression of a
-// singular type", so a key is either a string or an integral value and the
+// §7.9.1 lets an associative array's index be any expression of a singular
+// type, so a key is either a string or an integral value and the
 // methods split along that line all the way down. §7.9.2's num() and size(),
 // §7.9.3's delete(), §7.9.4's exists(), and §7.9.5 through §7.9.8's first(),
 // last(), next() and prev() -- the traversal methods, which write the key they

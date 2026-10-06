@@ -255,8 +255,8 @@ struct QueueObject {
   uint64_t AllocateId() { return ++next_elem_id_; }
 
   // §7.10.3: gives every element the queue holds a fresh identity, which is
-  // what "when the target of an assignment is an entire queue, references to
-  // any element of the original queue shall become outdated" requires.
+  // what the clause requires: assigning to a whole queue leaves every
+  // reference to an element of the original queue outdated.
   void AssignFreshIds();
 
   // §7.10.3: gives an identity to each element appended since the last call and

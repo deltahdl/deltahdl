@@ -70,10 +70,10 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
     stride *= span(inner.back().left, inner.back().right);
   }
   PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
-  // §7.4.4: packed dimensions "can also be defined in stages with typedef",
-  // and those the name stands for vary most rapidly, inside the ones written
-  // where it is used: `bsix [1:10] v5` under `typedef bit [1:5] bsix` is ten
-  // elements of the five bits [1:5].
+  // §7.4.4: packed dimensions may also be built up in stages through a
+  // typedef, and those the name stands for vary most rapidly, inside the ones
+  // written where it is used: `bsix [1:10] v5` under `typedef bit [1:5] bsix`
+  // is ten elements of the five bits [1:5].
   uint64_t outer = span(range.left, range.right) * stride;
   if (dt->kind == DataTypeKind::kNamed && outer > 0 && v->value.width > outer &&
       v->value.width % outer == 0) {
@@ -195,8 +195,8 @@ static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
   return created;
 }
 
-// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
-// fashion as a scalar or vector net", so each element is a net of its own,
+// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
+// vector net would be, so each element is a net of its own,
 // driven and resolved apart from the others, and §6.7.1 leaves one no driver
 // reaches at z. `wire n[0:2]; assign n[1] = 1'b1;` drives n[1] alone,
 // so n[0] and n[2] read z; a single net standing for all three had n[1]

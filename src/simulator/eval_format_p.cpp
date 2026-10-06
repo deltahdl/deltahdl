@@ -212,11 +212,11 @@ static std::optional<std::string> BuildFormatPStruct(std::string_view name,
   return FormatStructValueForP(*st, val, ctx);
 }
 
-// §7.6 (printed page 160): array elements correspond "by the left-to-right
-// order of elements in each array", so int A[7:0] = B of int B[1:8] puts B[1]
-// in A[7], and §10.9.1's array pattern matches its items "element for element"
-// in that order. %p's pattern, which §21.2.1.6 requires be "a legal
-// interpretation of the assignment pattern syntax", thus lists a dimension
+// §7.6 (printed page 160): array elements correspond by their left-to-right
+// order in each array, so int A[7:0] = B of int B[1:8] puts B[1] in A[7], and
+// §10.9.1's array pattern matches its items one to one with the elements in
+// that order. %p's pattern, which §21.2.1.6 requires to read as valid
+// assignment pattern syntax, thus lists a dimension
 // spanning addresses [lo, lo+size-1] from its left bound: its i-th item is the
 // i-th address from the top when the dimension was declared descending.
 static uint32_t LeftToRightAddress(uint32_t lo, uint32_t size, bool descending,

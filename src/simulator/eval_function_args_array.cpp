@@ -261,7 +261,7 @@ static bool BindQueueToMultiDimFormal(const QueueFormalBinding& binding,
 }
 
 // Binds a dynamic-array/queue actual to a fixed-size formal. §7.7 (printed
-// page 162) accepts one of equal size, which "requires run-time check", and
+// page 162) accepts one of equal size, checked at run time, and
 // the elements correspond left to right as §7.6's assignment has them: the
 // formal `string arr[4:1]` takes the queue's element 0 at arr[4]. The formal
 // is materialized as per-element variables under its own bounds. `loc` is

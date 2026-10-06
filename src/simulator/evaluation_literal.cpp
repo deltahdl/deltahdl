@@ -182,8 +182,8 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   if (base == 0 && type.scope_name.empty())
     base = MethodClassTypedefWidth(type.type_name, ctx);
   if (base == 0) return SpecializedTypedefWidth(type, ctx);
-  // §7.4.4: "Multiple packed dimensions can also be defined in stages with
-  // typedef", and a dimension written where the name is used stacks on the ones
+  // §7.4.4: packed dimensions may also be built up in stages through a
+  // typedef, and a dimension written where the name is used stacks on the ones
   // the typedef itself carries -- `bsix [1:10] v5` on a `typedef bit [1:5]
   // bsix` is 50 bits. The table holds what the name stands for; the use-site
   // range is how many of those the declaration asks for.

@@ -418,11 +418,10 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
 // §7.4.5: copies a slice of an unpacked array into an array, as in the clause's
 // own `busB = busA[7:6];` -- the slice names two elements and the destination
 // holds them as two elements, rather than as the one value their concatenation
-// would make. §7.6 pairs the two by position -- "Correspondence between
-// elements is determined by the left-to-right order of elements in each array"
-// -- so the slice arrives in the source array's declared order and is written
-// in the destination's, leaving `busB[1]` holding `busA[7]` whichever way each
-// of the two was declared.
+// would make. §7.6 pairs the two by position, matching elements by their
+// left-to-right order in each array, so the slice arrives in the source array's
+// declared order and is written in the destination's, leaving `busB[1]` holding
+// `busA[7]` whichever way each of the two was declared.
 static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
                               const ArrayInfo& dst, SimContext& ctx,
                               Arena& arena) {
@@ -525,17 +524,16 @@ static void AnnounceAssocElementWrite(const Expr* base, ClassObject* owner,
   }
 }
 
-// §7.8: "An entry for a nonexistent associative array element shall be
-// allocated when it is used as the target of an assignment", and the array
-// the target names is a declared one under its bare name or, since §8.5 puts
-// no restriction on a property's type, a property of an object: the running
-// method's own by its bare name (§8.11), or any object's through a handle,
-// `o.count[k] = v`. FindAssocArrayOfBase reads both, and the class property
-// is what the resolution answers where FindAssocArray knows no array of the
-// name -- which is where such a write went before: every writer of
-// TrySelectBlockingAssign declined it and the value went nowhere, so UVM's
-// severity counts, `m_severity_count[s] = 0` in a method of
-// uvm_report_server, left the array at size 0.
+// §7.8: assigning to an associative array element that does not exist yet
+// allocates an entry for it, and the array the target names is a declared one
+// under its bare name or, since §8.5 puts no restriction on a property's type,
+// a property of an object: the running method's own by its bare name (§8.11),
+// or any object's through a handle, `o.count[k] = v`. FindAssocArrayOfBase
+// reads both, and the class property is what the resolution answers where
+// FindAssocArray knows no array of the name -- which is where such a write went
+// before: every writer of TrySelectBlockingAssign declined it and the value
+// went nowhere, so UVM's severity counts, `m_severity_count[s] = 0` in a method
+// of uvm_report_server, left the array at size 0.
 //
 // §7.8 with §7.4: where the array is an element of an associative array whose
 // elements are associative arrays, `m["a"][1] = 41`, the write is a write of
@@ -631,7 +629,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     return true;
   }
 
-  // §7.10.1 has an invalid index "cause a write operation to be ignored", so
+  // §7.10.1 has a write at an invalid index ignored, so
   // the branch below and the x/z one above store nothing and owe no
   // notification: an event on a write that did not happen is a spurious one.
 
@@ -692,11 +690,11 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
   auto* q = FindQueueOfBase(expr->base, ctx, arena);
   if (!q) return false;
   // §7.10.1: an invalid index -- a 4-state expression holding an x or z bit,
-  // or a value outside 0...$ -- makes the read "return the value appropriate
-  // for a nonexistent array entry of the queue's element type (as described in
-  // Table 7-1 in 7.4.5)", so such an index yields a value rather than nothing.
-  // §10.10 makes the item contribute one element to the concatenation whatever
-  // its index turned out to be, so every path here pushes exactly one element.
+  // or a value outside 0...$ -- makes the read return what Table 7-1 (§7.4.5)
+  // lists for a nonexistent entry of the queue's element type, so such an index
+  // yields a value rather than nothing. §10.10 makes the item contribute one
+  // element to the concatenation whatever its index turned out to be, so every
+  // path here pushes exactly one element.
   bool idx_xz = false;
   auto idx = EvalQueueIndex(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz || idx < 0 || static_cast<size_t>(idx) >= q->elements.size())
@@ -817,13 +815,13 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
   CollectQueueItem(expr, ctx, arena, out);
 }
 
-// §7.5.1: "The optional initialization expression is used to initialize the
-// dynamic array." Each entry it initializes is a store of its own, so each
+// §7.5.1: the optional initialization expression gives the dynamic array its
+// initial contents. Each entry it initializes is a store of its own, so each
 // takes a copy of the source entry's words rather than the pointer to them a
 // plain Logic4Vec assignment would leave the two sharing. The clause is
-// explicit about what the sharing would break: reinitializing with new "is
-// destructive ... and all preexisting references to array elements become
-// outdated", and an entry still pointing at the source's words is exactly such
+// explicit about what the sharing would break: reinitializing with new
+// destroys the old contents and leaves every earlier reference to an element
+// outdated, and an entry still pointing at the source's words is exactly such
 // a reference left live. `saved` carries the same hazard on the self-
 // initializing form `d = new[n](d)`, since it is a vector copy whose entries
 // are themselves pointer copies of what the array held before the resize.
@@ -902,8 +900,8 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
 
     auto saved = q->elements;
-    // §7.5.1: with no initialization expression "the elements are initialized
-    // to the default value for their type" -- each element initialized, so
+    // §7.5.1: with no initialization expression each element starts at its
+    // type's default value -- each element initialized, so
     // each is a storage element of its own under §6.8 and needs its own words.
     // resize(n, value) copy-constructs every element it adds from the one
     // value it is handed, and a Logic4Vec copy copies the `words` pointer, so

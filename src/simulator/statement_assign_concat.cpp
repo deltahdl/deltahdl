@@ -230,30 +230,31 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   return EvalRhsForUnstructuredTarget(stmt, ctx_width, ctx, arena);
 }
 
-// particular bit from a vector, packed array, packed structure, parameter, or
-// concatenation", so it is one bit -- or, where one index of a packed
-// multidimensional array addresses an element rather than a bit (§7.4.1), that
-// element. A part-select addresses "several contiguous bits": "the number of
-// bits selected is equal to the width expression" for an indexed one and the
-// span of its two constant indices for a non-indexed one, which is the same
-// number read off the pair PartSelectTargetIndices resolves for all three
-// forms. §11.6.1's Table 11-21 sizes no select, so these widths are §11.5.1's.
+// §11.5.1: how wide a select is as an expression. A bit-select picks one bit
+// out of a vector, packed array, packed structure, parameter or concatenation,
+// so it is one bit -- or, where one index of a packed multidimensional array
+// addresses an element rather than a bit (§7.4.1), that element. A part-select
+// addresses a run of adjacent bits, as many as the width expression says for an
+// indexed one and the span of its two constant indices for a non-indexed one,
+// which is the same number read off the pair PartSelectTargetIndices resolves
+// for all three forms. §11.6.1's Table 11-21 sizes no select, so these widths
+// are §11.5.1's.
 //
 // An address outside the declared bounds changes none of it: §11.5.1 gives the
-// invalid reference a value rather than an absence -- "the value returned by
-// the reference shall be x for 4-state and 0 for 2-state values" -- and says
-// separately that such a write "shall have no effect on the data stored".
+// invalid reference a value rather than an absence -- x for a 4-state type and
+// 0 for a 2-state one -- and says separately that such a write leaves the
+// stored data untouched.
 //
 // Zero is answered where the select names no bits: a part-select whose bounds
 // or width expression carry x or z, and an indexed one whose width is zero. An
 // unknown base index leaves an indexed part-select its stated width, §11.5.1
-// letting that base "vary at run time", and a bit-select whose index carries x
+// letting that base change at run time, and a bit-select whose index carries x
 // or z is one bit like any other, that clause covering the out-of-bounds
 // address and the unknown one in one sentence.
 //
 // §11.4.14.1 asks the same question of a streaming-concatenation target
-// element, each stream_expression being "converted to a bit-stream and
-// appended", so this is declared in statement_assign_internal.h and the
+// element, each stream_expression being turned into a bit-stream and
+// appended, so this is declared in statement_assign_internal.h and the
 // streaming unpack shares it rather than restating these four shapes.
 uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena) {

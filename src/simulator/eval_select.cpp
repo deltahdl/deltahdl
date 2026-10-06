@@ -297,10 +297,10 @@ std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
 // §7.4.5: the run of elements an unpacked-array slice addresses. The slice may
 // be written on the array itself (`arr[lo:hi]`) or on one dimension of a
 // multidimensional array whose other dimensions carry single index values
-// (`A[i][lo:hi]`) -- "Slices of an array can only apply to one dimension, but
-// other dimensions can have single index values in an expression". Either way
-// the addressed elements are stored as leaf variables under `base`, so the two
-// forms differ only in how that name is spelled.
+// (`A[i][lo:hi]`) -- a slice spans one dimension only, while the others may
+// carry single index values. Either way the addressed elements are stored as
+// leaf variables under `base`, so the two forms differ only in how that name is
+// spelled.
 struct UnpackedSliceRun {
   std::string base;
   uint32_t lo;
@@ -365,20 +365,20 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
          ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
 }
 
-// §7.4.5: "A slice name of an unpacked array is an unpacked array", and §7.6
-// pairs one unpacked array with another by position: "Correspondence between
-// elements is determined by the left-to-right order of elements in each array",
-// so `int A[7:0]` and `int B[1:8]` assign `B[1]` to `A[7]`. The run is
-// therefore appended in the declared order of the array it comes from rather
-// than by ascending index. §7.4.5's own `busA[7:6]` is written on a `busA
-// [7:0]`, whose first element is `busA[7]`; that slice contributes `busA[7]`
-// first. Reversing both ends of a copy changes nothing, so this only becomes
-// visible against a destination that runs the other way.
+// §7.4.5: a slice of an unpacked array is itself an unpacked array, and §7.6
+// pairs one unpacked array with another by position, matching elements by
+// their left-to-right order in each array, so `int A[7:0]` and `int B[1:8]`
+// assign `B[1]` to `A[7]`. The run is therefore appended in the declared order
+// of the array it comes from rather than by ascending index. §7.4.5's own
+// `busA[7:6]` is written on a `busA [7:0]`, whose first element is `busA[7]`;
+// that slice contributes `busA[7]` first. Reversing both ends of a copy changes
+// nothing, so this only becomes visible against a destination that runs the
+// other way.
 //
 // Each element is answered as a value, not as a handle on the element it was
-// read from. §6.8 makes that element its own storage -- "A variable is an
-// abstraction of a data storage element. A variable shall store a value from
-// one assignment to the next" -- and an array element is such an element, so a
+// read from. §6.8 makes that element its own storage -- a variable stands for
+// a data storage element and keeps its value from one assignment to the next
+// -- and an array element is such an element, so a
 // run pushed as `v->value` handed a whole row of them out by pointer. Every
 // caller stores what it collects, into a destination slice's elements, a
 // destination array's, or a queue's, and none reads back through the entries,
@@ -399,8 +399,8 @@ bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
         run.is_descending ? (run.lo + run.count - 1 - i) : (run.lo + i);
     auto n = run.base + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(n);
-    // §7.4.5: "Reading from an unpacked array of any kind with an invalid index
-    // shall return the value specified in Table 7-1", which gives a 4-state
+    // §7.4.5: a read of an unpacked array of any kind at an invalid index
+    // returns what Table 7-1 lists, which gives a 4-state
     // element 'x and only a 2-state one '0. This is the same answer
     // TryArrayElementSelect and TryCompoundDefaultElem give for the element
     // spelling of the same read.

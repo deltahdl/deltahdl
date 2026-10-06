@@ -327,7 +327,7 @@ static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
 // multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
 // compound select (eval_select.cpp) and a nested assignment pattern resolve to
 // it. `item` is the part of the declaration initializer that reached this
-// subtree: §10.9.1 has "the braces shall match the array dimensions", so the
+// subtree: §10.9.1 has the braces follow the array's dimensions, so the
 // initializer is a tree of the array's own shape and the walk carries the
 // sub-pattern for the current dimension down beside the prefix it already
 // carried. This is the step the two makers of array leaves differed by -- the
@@ -513,15 +513,14 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
                         Subclause("7.5.1"));
     return true;
   }
-  // §7.5.1: with no initialization expression "the elements are initialized to
-  // the default value for their type" -- elements, each one initialized, and
-  // §6.8 makes each "an abstraction of a data storage element" that "shall
-  // store a value from one assignment to the next", so each owes its own
-  // words. vector::assign(n, value) copy-constructs every slot it makes from
-  // the single value it is handed, and a Logic4Vec copy carries the `words`
-  // pointer rather than the words, so filling that way gave `int d[] =
-  // new[4];` one buffer read four times. Building the elements one at a time
-  // gives each its own allocation.
+  // §7.5.1: with no initialization expression each element starts at its
+  // type's default value -- elements, each one initialized, and §6.8 makes
+  // each a data object that keeps its value from one assignment to the next,
+  // so each owes its own words. vector::assign(n, value) copy-constructs every
+  // slot it makes from the single value it is handed, and a Logic4Vec copy
+  // carries the `words` pointer rather than the words, so filling that way gave
+  // `int d[] = new[4];` one buffer read four times. Building the elements one
+  // at a time gives each its own allocation.
   q->elements.clear();
   q->elements.reserve(static_cast<size_t>(sz));
   for (int64_t i = 0; i < sz; ++i)
@@ -530,13 +529,13 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
     auto* src_expr = init_expr->args[1];
     if (src_expr && src_expr->kind == ExprKind::kIdentifier) {
       if (auto* src = ctx.FindQueue(src_expr->text)) {
-        // §7.5.1: "The optional initialization expression is used to
-        // initialize the dynamic array." Each entry it initializes is a store
+        // §7.5.1: the optional initialization expression gives the dynamic
+        // array its initial contents. Each entry it initializes is a store
         // of its own, so each takes a copy of the source entry's words rather
         // than the pointer a plain Logic4Vec assignment would leave the two
         // sharing. The clause says what the sharing breaks: reinitializing
-        // with new "is destructive ... and all preexisting references to array
-        // elements become outdated", and an entry still naming the source's
+        // with new destroys the old contents and leaves every earlier reference
+        // to an element outdated, and an entry still naming the source's
         // words is exactly such a reference left live.
         size_t copy_len = std::min(q->elements.size(), src->elements.size());
         for (size_t i = 0; i < copy_len; ++i)
