@@ -45,9 +45,9 @@ struct ClockingLowerScope {
   Arena& arena;
 };
 
-// §14.4: "the default input skew is 1step", which names the value the signal
-// held in the time step before the clocking event rather than a delay measured
-// after it. The parser writes that skew as a literal spelled `1step`
+// §14.4: an input skew left unwritten is 1step, which names the value the
+// signal held in the time step before the clocking event rather than a delay
+// measured after it. The parser writes that skew as a literal spelled `1step`
 // (Parser::ParseClockingSkew), and the mark travels with the signal because
 // ClockingManager reads a recorded previous-step value for it and an elapsed
 // skew for every other.
@@ -55,8 +55,8 @@ bool IsOneStepSkew(const Expr* delay) {
   return delay != nullptr && delay->text == "1step";
 }
 
-// §14.4's clocking skew as a number of time units. The clause makes a skew "a
-// constant expression", which elaboration has already checked
+// §14.4's clocking skew as a number of time units. The clause requires a skew
+// to be a constant expression, which elaboration has already checked
 // (Elaborator::ValidateClockingBlock), so it is folded here against the context
 // the design is being lowered into. A 1step skew measures no delay at all and
 // is carried by the mark above instead.
@@ -145,12 +145,11 @@ ClockingSignal ClockingSignalOf(const ClockingSignalDecl& decl,
 // where the declaration names nothing the run could reach it by.
 //
 // §14.3 requires a name unless the block is the default or the global clocking,
-// and §14.10 makes the event a block triggers "the event associated with the
-// clocking block name", so an anonymous block has no name for a clockvar or an
-// `@(cb)` to spell and there is nothing to register it under. A clocking event
-// that is neither a name nor a hierarchical name names no variable the clock
-// watcher could attach to, which is the other way a declaration arrives with
-// nothing here to use.
+// and §14.10 makes the event a block triggers the one its name carries, so an
+// anonymous block has no name for a clockvar or an `@(cb)` to spell and there
+// is nothing to register it under. A clocking event that is neither a name nor
+// a hierarchical name names no variable the clock watcher could attach to,
+// which is the other way a declaration arrives with nothing here to use.
 //
 // §14.3 (printed page 354) with §23.6: the event may name its clock by a
 // hierarchical name, `@(posedge top.clk)`, which is kept as it is spelled and
@@ -248,7 +247,7 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     PlaceClockingBlockInGenBlock(gen, *block, ctx_, arena_);
     auto& mgr = ctx_.AcquireClockingManager();
     mgr.Register(*block);
-    // §14.12: "the default clocking" and §14.14's global clocking are the two
+    // §14.12's default clocking and §14.14's global clocking are the two
     // the source can name without naming the block, so which block each is has
     // to be recorded beside the registration.
     if (item->is_default_clocking) {
@@ -257,15 +256,14 @@ void Lowerer::LowerClockingBlocks(const RtlirModule* mod) {
     }
     if (item->is_global_clocking) mgr.SetGlobalClocking(block->name);
 
-    // §14.10: "Upon processing its specified clocking event, a clocking block
-    // shall trigger the event associated with the clocking block name." That
-    // event is a variable here, because `always @(cb)` resolves `cb` through
-    // SimContext::FindVariable and an event variable is what EventAwaiter
-    // attaches a notify-driven watcher to. ClockingManager::NotifyBlockEvent
-    // notifies it from the Observed region, which is where the clause puts it.
-    // The variable carries the instance prefix for the reason the block does,
-    // and SimContext::FindVariable is what joins a bare `cb` written inside the
-    // instance to it.
+    // §14.10: when its clocking event is processed, a clocking block triggers
+    // the event its name carries. That event is a variable here, because
+    // `always @(cb)` resolves `cb` through SimContext::FindVariable and an
+    // event variable is what EventAwaiter attaches a notify-driven watcher to.
+    // ClockingManager::NotifyBlockEvent notifies it from the Observed region,
+    // which is where the clause puts it. The variable carries the instance
+    // prefix for the reason the block does, and SimContext::FindVariable is
+    // what joins a bare `cb` written inside the instance to it.
     auto* event_var = ctx_.CreateVariable(block->name, 1);
     if (event_var == nullptr) continue;
     event_var->is_event = true;

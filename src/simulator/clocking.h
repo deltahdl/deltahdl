@@ -298,14 +298,14 @@ class ClockingManager {
 
   // §14.13: record what each clocking input holds at the end of the time step
   // now finishing, which is the value a 1step skew samples at the next clocking
-  // event -- the clause puts it "at the Postponed region of the time step skew
-  // time units prior to the clocking event". Attach installs this as the
-  // end-of-step pass; nothing else writes what it records.
+  // event -- the clause takes it in the Postponed region of the time step that
+  // lies the skew's length of time before the clocking event. Attach installs
+  // this as the end-of-step pass; nothing else writes what it records.
   void RecordStepValues(SimContext& ctx);
   // The value `signal_name` held at the end of the previous time step, or
   // nothing when no step has ended since Attach -- before the first one there
-  // is no preceding step, and §14.4's "last value immediately before the
-  // corresponding clock edge" is the value the signal still holds.
+  // is no preceding step, and the value §14.4 samples just ahead of the clock
+  // edge is the value the signal still holds.
   const ClockingValue* PrevStepValue(std::string_view signal_name) const;
   // §14.4: the value `signal_name` held at the end of the last time step at or
   // before `t`, which is what an input with a numeric skew samples at time

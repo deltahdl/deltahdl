@@ -603,8 +603,8 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
   if (member.empty()) return nullptr;
   for (const auto& sig : block->signals) {
     if (sig.signal_name != member) continue;
-    // §14.3: "clocking block outputs (output or inout) are used to drive
-    // values onto their corresponding signals". An input clockvar names a
+    // §14.3: a clocking block's output and inout clockvars are what drive
+    // values onto the signals they stand for. An input clockvar names a
     // sampled value and is not a drive target, so it is left to decline here
     // rather than driven.
     if (sig.direction == ClockingDir::kInput) return nullptr;
@@ -614,10 +614,9 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
   return nullptr;
 }
 
-// §14.16: "Clocking block outputs (output or inout) are used to drive values
-// onto their corresponding signals, but at a specified time. In other words,
-// the corresponding signal changes value at the indicated clocking event as
-// modified by the output skew." A synchronous drive is written with the
+// §14.16: a clocking block's output and inout clockvars drive their signals at
+// a set time: the signal takes its new value at the named clocking event,
+// shifted by the output skew. A synchronous drive is written with the
 // nonblocking operator and reaches this function as one, so the clockvar target
 // is recognised here and handed to ClockingManager::ScheduleOutputDrive, which
 // places the value in the Re-NBA region the clause names. Returns whether the

@@ -296,8 +296,8 @@ static void RearmClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                        ctx, sched);
 }
 
-// §14.13: "Upon processing its specified clocking event, a clocking block shall
-// update its sampled values before triggering the clocking block event." The
+// §14.13: when its clocking event is processed, a clocking block refreshes its
+// sampled values first and only then triggers its own block event. The
 // inputs carrying a skew are sampled here, and the explicit #0 ones in the
 // Observed region alongside the event itself, which §14.4 is what puts there.
 static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
