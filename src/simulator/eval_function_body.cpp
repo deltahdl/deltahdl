@@ -892,10 +892,10 @@ static std::string_view StaticLocalFrame(const ModuleItem* func,
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
-  // §37.44 detail 1: "as a thread works its way down a call chain of tasks
-  // and/or functions, a new frame is activated as each new task or function is
-  // entered". This is that entry for a function or a method, and the scope is
-  // what leaves the frame that was active standing again however the body ends
+  // §37.44 detail 1: a thread going down a chain of task and function calls
+  // activates a new frame on entering each one. This is that entry for a
+  // function or a method, and the scope is what leaves the frame that was
+  // active standing again however the body ends
   // -- a return out of the middle of it included.
   VpiActiveFrameScope frame;
   // §13.4.1: the record a `return` of a queue or an array fills, handed to

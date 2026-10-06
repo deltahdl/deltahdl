@@ -108,10 +108,10 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
     if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
     arg->var = holder;
   }
-  // §37.3.5: "VPI gives applications access to arbitrarily complex expressions
-  // from the SystemVerilog source, either as arguments to system tasks or
-  // functions (see 36.4) or by traversing the design hierarchy. Expressions may
-  // have side effects when evaluated." This is that first way, and
+  // §37.3.5: an application reaches the source's expressions, however complex,
+  // either as arguments of system tasks and functions (§36.4) or by walking the
+  // design hierarchy, and evaluating one can have side effects. This is that
+  // first way, and
   // VpiObject::has_side_effects is the mark the value, property and relation
   // routines settle the subclause's rules by. No pass wrote it, so no argument
   // an application was ever handed was an expression with side effects and
@@ -121,9 +121,9 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
   return arg;
 }
 
-// §37.61 detail 1: "The vpiPrefix relation shall be non-NULL when the object
-// represents an expression or task call in the SystemVerilog source code
-// prefixed by a virtual interface or a clocking block". A system task or
+// §37.61 detail 1: vpiPrefix is non-NULL for an object standing for a source
+// expression or task call that a virtual interface or a clocking block
+// prefixes. A system task or
 // function argument written `vif.sig` is such an expression and `vif` is the
 // virtual interface var prefixing it, so this answers that variable and
 // nullptr for an actual written any other way. It is what decides whether the
@@ -155,7 +155,7 @@ std::string_view DynamicPrefixFieldName(const Expr* actual) {
 // virtual interface var the source wrote as the prefix; `member` is the
 // interface instance's variable the named member resolves to; `actual` is the
 // instance the prefix holds at the current simulation time, which §37.61 detail
-// 3 reads as whether the prefix "has a corresponding actual". The last two are
+// 3 reads as whether the prefix has a corresponding actual. The last two are
 // null exactly while the virtual interface holds null.
 struct DynamicPrefix {
   Variable* base = nullptr;

@@ -54,10 +54,10 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range) {
 
 bool VpiIsVariablesType(int type) {
   // §37.4.1: the objects the `variables` class groups are the ones §37.17 draws
-  // inside its dotted enclosure. A class "groups other objects and classes" and
-  // is not one itself, so vpiVariables is not among them: a child carrying it
-  // as its own type is an object of a kind the standard draws nowhere, and the
-  // variables an application is after carry the kinds below.
+  // inside its dotted enclosure. A class groups further objects and classes and
+  // is not an object itself, so vpiVariables is not among them: a child
+  // carrying it as its own type is an object of a kind the standard draws
+  // nowhere, and the variables an application is after carry the kinds below.
   if (VpiIsLogicVarType(type) || VpiIsArrayVarType(type)) return true;
   switch (type) {
     case vpiShortRealVar:
@@ -144,10 +144,9 @@ bool VpiIsVariableSelectType(int type) {
 }
 
 // §37.21 detail 2: the variable kinds that are an array or a vector, whose
-// drivers and loads the detail says "should include driver/load for entire
-// array/vector or any portion of an array/vector to which a handle can be
-// obtained". An unpacked array var (a reg array under §37.17 detail 19 being
-// the same kind) and a packed array var are those.
+// drivers and loads the detail has cover the whole array or vector and every
+// part of it a handle can be had to. An unpacked array var (a reg array under
+// §37.17 detail 19 being the same kind) and a packed array var are those.
 bool VpiIsVariableArrayType(int type) {
   return VpiIsArrayVarType(type) || type == vpiPackedArrayVar;
 }
@@ -211,7 +210,7 @@ std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope) {
 bool VpiArrayVarIsMemory(VpiHandle var) {
   // §37.20 (figure): a reg array reports whether it is a memory through
   // vpiIsMemory. Detail 1 says what a memory is now made of - vpiMemoryWord
-  // "will return objects of type vpiReg" - so an array variable is a memory
+  // answers vpiReg objects - so an array variable is a memory
   // exactly when the words it holds are regs. An array of some other variable
   // kind is an array variable and not a memory, and neither is an object that
   // is not an array variable at all.
@@ -253,7 +252,7 @@ bool VpiVarSelectConstantSelectOf(VpiHandle select) {
     if (child->type != vpiConstant) query.all_indices_constant = false;
   }
 
-  // "the parent of the var select is an unpacked array with static bounds".
+  // The var select's parent is an unpacked array whose bounds are static.
   // §37.17 detail 21 is where those bounds are reported: an unpacked array var
   // whose vpiArrayType is vpiStaticArray has them, and a dynamic, associative
   // or queue array does not.
@@ -262,7 +261,7 @@ bool VpiVarSelectConstantSelectOf(VpiHandle select) {
                                           parent->type == vpiArrayVar &&
                                           parent->array_type == vpiStaticArray;
 
-  // "vpiConstantSelect returns TRUE for the parent of the var select". A parent
+  // vpiConstantSelect is TRUE for the var select's parent. A parent
   // that is itself a var select is answered by this same rule; an array var is
   // the base of the chain and is a constant select when its lifetime is static,
   // which is §37.17 detail 27's first arm - static lifetime and no prefix above
@@ -525,18 +524,18 @@ int VpiObjectVisibility(VpiHandle obj) {
 
 bool VpiTaskFuncIsMethod(VpiHandle tf) {
   // §37.41 (figure): "-> method / bool: vpiMethod" is drawn on the task func
-  // enclosure, and detail 4 says what a method is - "a task or function that is
-  // a class member". §37.31 detail 1 draws a class defn's vpiMethods relation
-  // to that same enclosure, so a task or function declared as a class item is
-  // one and a task or function declared anywhere else is not.
+  // enclosure, and detail 4 says what a method is - a task or function that is
+  // a member of a class. §37.31 detail 1 draws a class defn's vpiMethods
+  // relation to that same enclosure, so a task or function declared as a class
+  // item is one and a task or function declared anywhere else is not.
   if (!tf || !VpiIsClassMethodType(tf->type)) return false;
   return tf->parent != nullptr && tf->parent->type == vpiClassDefn;
 }
 
 bool VpiFunctionIsSigned(VpiHandle function) {
   // §37.41 (figure): "-> sign / bool: vpiSigned" is drawn on the function.
-  // Detail 1 says the function "shall contain an object with the same name,
-  // size, and type as the function", and detail 2 reaches that object through
+  // Detail 1 has the function hold an object of its own name, size and type,
+  // and detail 2 reaches that object through
   // vpiReturn, so the function's signedness is its return object's: §6.11 makes
   // byte, shortint, int, longint and integer signed by default, and leaves the
   // 4-state vector kinds unsigned. A task returns nothing and is not signed.
@@ -848,10 +847,10 @@ bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed) {
 
 VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter) {
   // §37.28 detail 2: hand back the stored typespec verbatim. The detail asks
-  // for the typespec the type parameter has at the end of elaboration "without
-  // resolving typedef aliases", so we deliberately do not run §37.25/§37.30's
-  // alias resolution here - the recorded typespec is returned as-is, even when
-  // it is itself a typedef alias.
+  // for the typespec the type parameter has at the end of elaboration with its
+  // typedef aliases left unresolved, so we deliberately do not run
+  // §37.25/§37.30's alias resolution here - the recorded typespec is returned
+  // as-is, even when it is itself a typedef alias.
   if (!type_parameter || type_parameter->type != vpiTypeParameter) {
     return nullptr;
   }

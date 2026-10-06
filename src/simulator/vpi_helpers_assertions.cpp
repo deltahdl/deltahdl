@@ -758,11 +758,11 @@ VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
 // ===========================================================================
 
 VpiHandle VpiLetFormalDefault(VpiHandle formal) {
-  // §37.57 detail 1: "If a formal has a default value, that value shall appear
-  // as the argument should the instantiation not provide a value for that
-  // argument." The default is the expression the formal was declared with,
-  // which is the formal's first expression child - its typespec, drawn by
-  // §37.53's own edge, is not one. Null where the formal declares no default.
+  // §37.57 detail 1: a formal's default value stands as the argument when the
+  // instantiation gives none. The default is the expression the formal was
+  // declared with, which is the formal's first expression child - its typespec,
+  // drawn by §37.53's own edge, is not one. Null where the formal declares no
+  // default.
   if (!formal) return nullptr;
   for (auto* child : formal->children) {
     if (VpiIsExprType(child->type)) return child;
@@ -825,9 +825,9 @@ bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
 
 bool VpiBitSelectConstantSelectOf(VpiHandle select) {
   // §37.58 detail 3, read off the object rather than from booleans a caller
-  // worked out: "every associated index expression is an elaboration-time
-  // constant expression, and vpiConstantSelect returns TRUE for the parent of
-  // the bit-select."
+  // worked out: each index expression of the select is constant at
+  // elaboration time, and vpiConstantSelect is TRUE for the bit-select's
+  // parent.
   if (!select || select->type != vpiBitSelect) return false;
 
   // The index expressions are the ones vpi_iterate(vpiIndex, sel) reaches - the

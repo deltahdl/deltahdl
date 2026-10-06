@@ -25,7 +25,7 @@ namespace delta {
 bool VpiIsPortsType(int type) {
   // §37.46 (figure): the `ports` enclosure inside both the net drivers and the
   // net loads classes is dotted, so §37.4.1 makes it a class - a grouping of
-  // "other objects and classes" that is never an object itself. §37.14 draws a
+  // further objects and classes that is never an object itself. §37.14 draws a
   // port and a port bit inside it, and §37.4.1 has a relation drawn to a class
   // reach the kinds the class groups, so both are what the two edges mean by a
   // port.
@@ -607,14 +607,13 @@ void CollectMatchingChildren(int type, VpiHandle ref,
 // §37.4.3: a relationship traversed with NULL for the ref_h is one the data
 // model diagrams draw from a circle. Every other relationship is drawn from a
 // reference object and means nothing without one, which §38.23 says in its own
-// terms: the iterator walks "all objects of type type associated with object
-// ref". These are the one-to-many relationships this model draws from a circle
-// and answers by sweeping the objects it holds - §37.5 detail 1's top-level
-// modules ("Top-level modules shall be accessed using vpi_iterate() with a NULL
-// reference object"), §37.80's registered callbacks and §39.3.1's assertions.
-// §37.42's user-defined system tf objects, §37.81's time queue and §37.44's
-// threads are drawn from a circle too and are answered ahead of this out of
-// their own registries.
+// terms: the iterator walks every object of the given type associated with the
+// reference object. These are the one-to-many relationships this model draws
+// from a circle and answers by sweeping the objects it holds - §37.5 detail 1's
+// top-level modules, reached by vpi_iterate() with a NULL reference object,
+// §37.80's registered callbacks and §39.3.1's assertions. §37.42's user-defined
+// system tf objects, §37.81's time queue and §37.44's threads are drawn from a
+// circle too and are answered ahead of this out of their own registries.
 bool VpiIsNullReferenceRelation(int type) {
   // §37.36 (figure) draws the udp defn from a circle too: a UDP definition
   // belongs to no scope, so the application reaches the design's definitions
@@ -639,8 +638,8 @@ bool VpiLetArgumentIsOmitted(VpiHandle actual) {
 // are the seq formal decls of the let declaration the expression's tagless edge
 // reaches, in declaration order, and the actuals are the expressions the
 // instantiation wrote. Detail 1 puts the arguments in formal order and fills an
-// omitted one from its formal's default value, "so that the correspondence
-// between each argument and its respective formal can be made".
+// omitted one from its formal's default value, so that each argument can be
+// matched to its formal.
 //
 // Nothing collected these. vpiArgument is a relation tag and no object's type
 // is one, so the generic child walk this fell through to matched nothing, a let
@@ -773,8 +772,8 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
   if (modes.variable_driver || modes.variable_load) {
     // §37.21 detail 1 descends through a structure, union or class variable;
     // detail 2 says the same of a variable array, whose drivers and loads
-    // "should include driver/load for entire array/vector or any portion of an
-    // array/vector to which a handle can be obtained". Only the aggregate arm
+    // cover the whole array or vector and every part of it a handle can be had
+    // to. Only the aggregate arm
     // was applied, so an array's elements and the selects into them were walked
     // by nothing and the relation reported the whole array's drivers alone.
     const bool kDescend = VpiIsStructUnionOrClassVar(ref->type) ||

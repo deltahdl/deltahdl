@@ -940,7 +940,7 @@ enum class VpiAllocKind : std::uint8_t {
 
 // §37.3.7: map an allocation category to the vpiAllocScheme value that
 // vpi_get(vpiAllocScheme) must report. Unrecognized/other allocations fall
-// through to kVpiOtherScheme, satisfying the "all other objects" default.
+// through to kVpiOtherScheme, the scheme the clause gives every other object.
 int VpiAllocSchemeFor(VpiAllocKind kind);
 
 }  // namespace delta

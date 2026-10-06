@@ -234,8 +234,8 @@ void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
   obj->name = names.back();
   obj->def_name = std::string(decl.name);
   obj->size = static_cast<int>(decl.input_names.size());
-  // §37.36 detail 2: "vpiPrimType returns vpiSeqPrim for sequential UDPs and
-  // vpiCombPrim for combinational UDPs."
+  // §37.36 detail 2: vpiPrimType is vpiSeqPrim for a sequential UDP and
+  // vpiCombPrim for a combinational one.
   obj->prim_type = decl.is_sequential ? vpiSeqPrim : vpiCombPrim;
 }
 

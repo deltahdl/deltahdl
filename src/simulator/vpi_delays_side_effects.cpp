@@ -18,7 +18,8 @@ namespace delta {
 bool VpiObjectCarriesSourceDelay(int type) {
   // §37.3.4: the object kinds that can carry a delay written within the
   // SystemVerilog source - nets, primitives, module paths, timing checks, and
-  // continuous assignments. "Primitive" covers the gate, switch, and udp forms
+  // continuous assignments. A primitive here covers the gate, switch, and udp
+  // forms
   // as well as the primitive supertype. Other delays (module input port delays,
   // inter-module path delays) do not appear in the source and so are excluded.
   switch (type) {
@@ -105,8 +106,9 @@ bool VpiSourceExprHasSideEffects(const Expr* expr) {
   if (expr == nullptr) return false;
   if (ExprIsSideEffectingForm(expr)) return true;
 
-  // §37.3.5's fourth bullet: "Expressions in which other expressions with side
-  // effects appear as operands, arguments, or index expressions." Every place a
+  // §37.3.5's fourth bullet: an expression with side effects as an operand, an
+  // argument or an index expression of another gives that one side effects
+  // too. Every place a
   // subexpression can be written is one of those three, so the whole expression
   // is walked rather than a chosen few of its edges.
   const Expr* const kEdges[] = {

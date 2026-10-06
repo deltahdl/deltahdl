@@ -93,9 +93,9 @@ bool VpiRemoveAssertionCb(VpiHandle cb_handle) {
     return false;
   }
 
-  // §37.2.2 a): "vpi_remove_callback() releases the associated callback
-  // handle", which is what stops the removed callback's handle from being a
-  // live handle to its object, as it does for a simulation callback.
+  // §37.2.2 a): removing a callback releases its handle, which is what stops
+  // the removed callback's handle from being a live handle to its object, as it
+  // does for a simulation callback.
   GetGlobalVpiContext().ReleaseHandle(cb_handle);
   return true;
 }

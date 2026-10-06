@@ -260,7 +260,7 @@ bool VpiPortDelaysApplicable(int port_type) {
 VpiHandle VpiHighConn(VpiHandle obj) {
   // §37.14 details 3 and 10 (shared with §37.15): the higher connection, or
   // NULL when the instance has no connection to the port. A null pointer
-  // already encodes "no connection", so it is handed straight back.
+  // already says there is none, so it is handed straight back.
   if (!obj) return nullptr;
   return obj->high_conn;
 }

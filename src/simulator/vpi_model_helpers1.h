@@ -605,16 +605,17 @@ bool VpiExpressionHasSideEffects(const VpiObject* obj);
 
 // §37.3.5: whether a source expression is one of the forms the subclause lists
 // as having side effects when it is evaluated - an assignment operator
-// (§11.4.1), an increment or decrement operator (§11.4.2), or an expression in
-// which one of those "appear as operands, arguments, or index expressions".
+// (§11.4.1), an increment or decrement operator (§11.4.2), or an expression
+// with one of those as an operand, an argument or an index expression.
 // This is what stamps VpiObject::has_side_effects on the expression objects VPI
 // hands an application, which the predicate above then reads.
 //
 // A function call is the subclause's remaining form, and it is listed with a
-// condition on it: a call has side effects when it changes "the state of the
-// simulation other than via their return values". This tool does not determine
-// that of a call, and §37.3.5 says implementations differ in exactly that
-// ability, so a call is not classified here rather than being classified wrong.
+// condition on it: a call has side effects when it changes the state of the
+// simulation by some means other than its return value. This tool does not
+// determine that of a call, and §37.3.5 says implementations differ in exactly
+// that ability, so a call is not classified here rather than being classified
+// wrong.
 bool VpiSourceExprHasSideEffects(const Expr* expr);
 
 // §37.3.4 (Delays and values): the object kinds whose delays are written within
@@ -758,17 +759,17 @@ bool VpiIsDisableType(int type);
 VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 
 // §37.67 Waits: the else action statement an ordered wait reaches through
-// vpiElseStmt. §9.4.4 gives a wait_order the action block "[ statement_or_null
-// ] [ else statement_or_null ]", so the else is the second statement the object
-// carries; the first is the body the vpiStmt edge reaches. Null for an ordered
-// wait written without an else, and for every other kind - a plain wait and a
-// wait fork have no else action to name.
+// vpiElseStmt. §9.4.4 gives a wait_order an action block of an optional
+// statement followed by an optional else statement, so the else is the second
+// statement the object carries; the first is the body the vpiStmt edge reaches.
+// Null for an ordered wait written without an else, and for every other kind -
+// a plain wait and a wait fork have no else action to name.
 VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait);
 
 // §37.47 (figure): whether an object kind is one of the two the clause's
 // unnamed dotted enclosure holds - a continuous assignment and a continuous
 // assignment bit. §37.4.1 makes an unnamed enclosure a grouping of what is
-// drawn inside it that "shall not be referenced as a group elsewhere", so the
+// drawn inside it that nothing elsewhere refers to as a group, so the
 // vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them and
 // this is what says which those are.
 bool VpiIsContAssignKind(int type);

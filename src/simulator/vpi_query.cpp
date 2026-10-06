@@ -112,13 +112,12 @@ int VpiGetAllocScheme(VpiHandle obj) {
 int VpiGetHasActual(VpiHandle obj) {
   if (!VpiIsDynamicPrefixSourceType(obj->type)) return vpiUndefined;
   // §37.61 detail 3: the two current-simulation-time bullets are written about
-  // the prefix - "whenever the prefix object has a corresponding actual at the
-  // current simulation time" and, for FALSE, "whenever the prefix object has no
-  // corresponding actual" - so a prefixed object's answer is read off the
-  // object that prefixes it. Reading it off the object itself made a reference
-  // through a bound virtual interface report that it had no actual, the
-  // reference carrying none of its own. An object with no prefix has only its
-  // own binding to answer from.
+  // the prefix - TRUE while the prefix object has a corresponding actual at the
+  // current simulation time and FALSE while it has none - so a prefixed
+  // object's answer is read off the object that prefixes it. Reading it off the
+  // object itself made a reference through a bound virtual interface report
+  // that it had no actual, the reference carrying none of its own. An object
+  // with no prefix has only its own binding to answer from.
   const VpiObject* bound = obj->prefix != nullptr ? obj->prefix : obj;
   return VpiObjectHasActual(obj->actual_origin, bound->actual != nullptr) ? 1
                                                                           : 0;
@@ -149,9 +148,9 @@ int VpiGetBlocking(VpiHandle obj) {
 
 // §37.85 details 3 and 4: an object one elaboration of a generate has made a
 // local parameter of - a parameter declared within the gen scope, or a
-// reference to a gen var within it. "References to gen vars within the gen
-// scope shall be treated as local parameters" and "Parameters within the gen
-// scope shall be treated as local parameters", whatever the declaration wrote:
+// reference to a gen var within it. Both a reference to a gen var and a
+// parameter within the gen scope count as local parameters, whatever the
+// declaration wrote:
 // the generate has fixed the value for that elaboration of the scope, so there
 // is nothing an override could reach. A gen var reference is told by what it is
 // bound to (§37.15 detail 3), not by its own kind.
@@ -288,9 +287,9 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     // §37.14 detail 6: a port reports whether it is scalar/vector by its width.
     //
     // §37.3 gives a net the same pair. Its example of a data model diagram is
-    // Figure 37-1, and what it says of it is that "objects of type net have
-    // properties vpiName, vpiVector, and vpiSize with data types string,
-    // Boolean, and integer, respectively" -- so a net answering 0 to vpiVector
+    // Figure 37-1, and what it says of it is that a net object has the
+    // properties vpiName, a string, vpiVector, a Boolean, and vpiSize, an
+    // integer -- so a net answering 0 to vpiVector
     // whatever it was declared as leaves one of the three properties the
     // clause's own example names unanswered for the object it names them on.
     // §37.16 detail 28 is the rule: a bit or logic net with a packed dimension
@@ -655,17 +654,17 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // object not declared packed reports FALSE.
     //
     // §37.18 detail 1: a packed array var, and the struct, union or enum var
-    // objects underlying one, are packed by construction - "vpiVector and
-    // vpiPacked for these objects and their underlying struct var, union var,
-    // or enum var elements shall always be TRUE" - so neither depends on the
+    // objects underlying one, are packed by construction - vpiVector and
+    // vpiPacked are always TRUE for them and for the struct, union and enum var
+    // elements under them - so neither depends on the
     // stored flag, which a packed array left unset reported FALSE from.
     case vpiPacked:
       return VpiBool(obj->packed || obj->type == vpiPackedArrayVar ||
                      VpiVariableIsPackedArrayMember(obj));
     // §37.17 detail 2 and §37.16 detail 2: a variable or a net reports whether
     // it is an element of an array variable or an array net through
-    // vpiArrayMember, the property Annex C.4.3 item 3 has "now used, thus
-    // replacing the original use of vpiArray". The two helpers that answer it
+    // vpiArrayMember, the property Annex C.4.3 item 3 puts in the place
+    // vpiArray once held. The two helpers that answer it
     // were reached by nothing, so every element answered FALSE.
     // §37.85: a gen scope is an array member where it is an iteration of a
     // loop generate, an element of its gen scope array; §37.5, §37.6 and

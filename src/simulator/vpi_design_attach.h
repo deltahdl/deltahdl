@@ -32,20 +32,18 @@ struct VpiObject;
 // and the order the module declared them in live in the elaborated design.
 void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx);
 
-// §37.43: one subroutine activation, as the frame the VPI reaches. "A frame
-// shall represent any dynamically activated procedural scope, together with its
-// locally declared automatic variables, events, and event arrays" (detail 1),
-// and §37.44 detail 1 says when one is activated: "as a thread works its way
-// down a call chain of tasks and/or functions, a new frame is activated as each
-// new task or function is entered". So the activation is an object whose life
+// §37.43: one subroutine activation, as the frame the VPI reaches. Detail 1 has
+// a frame stand for a procedural scope activated at run time, with the
+// automatic variables, events and event arrays it declares, and §37.44 detail 1
+// says when one is activated: on entering each task or function down a
+// thread's chain of calls. So the activation is an object whose life
 // is the call's, which is what this is -- constructed where the body is entered
 // and destroyed however the body leaves, including the early return out of the
 // middle of one.
 //
-// Detail 4 is what it is for: "There is at most only one active frame at any
-// time in a given thread. To get a handle to the currently active frame, use
-// vpi_handle(vpiFrame, NULL)." Nothing in the tool ever made a frame active, so
-// that routine answered null under every design.
+// Detail 4 is what it is for: a thread has at most one active frame at a time,
+// and vpi_handle(vpiFrame, NULL) answers it. Nothing in the tool ever made a
+// frame active, so that routine answered null under every design.
 class VpiActiveFrameScope {
  public:
   VpiActiveFrameScope();

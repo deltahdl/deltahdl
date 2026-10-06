@@ -23,8 +23,8 @@ bool VpiIsExprType(int type) {
   // part-select or indexed part-select, the func/method-func/sys-func calls, a
   // let expression, and the `simple expr` class nested inside it.
   //
-  // That nested class is a class, and §37.4.1 makes one a grouping of "other
-  // objects and classes" rather than a kind of its own, so what the expr class
+  // That nested class is a class, and §37.4.1 makes one a grouping of further
+  // objects and classes rather than a kind of its own, so what the expr class
   // holds is what `simple expr` holds. §37.58 draws it holding a ref obj, a
   // parameter, a spec param, a var select and a bit select, beside the nets and
   // variables classes. Only the ref obj was named here, as though the reference
@@ -324,7 +324,7 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
 
 // §37.47 (figure): the dotted enclosure holding `cont assign` and `cont assign
 // bit` carries no name, and §37.4.1 makes such an enclosure a grouping of the
-// objects drawn inside it that "shall not be referenced as a group elsewhere".
+// objects drawn inside it that nothing elsewhere refers to as a group.
 // So what it groups is answered here rather than published as a class, and the
 // vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them.
 bool VpiIsContAssignKind(int type) {
@@ -353,9 +353,9 @@ VpiHandle SecondBodyStmt(VpiHandle stmt) {
 }  // namespace
 
 // §37.67 (figure): the else action statement an ordered wait reaches through
-// vpiElseStmt. §9.4.4 writes a wait_order's action block as "[
-// statement_or_null ] [ else statement_or_null ]", so the else is the second of
-// the two statements the object carries and the first is the body vpiStmt
+// vpiElseStmt. §9.4.4 gives a wait_order an action block of an optional
+// statement followed by an optional else statement, so the else is the second
+// of the two statements the object carries and the first is the body vpiStmt
 // reaches. vpiElseStmt is a relation tag rather than an object kind, so the
 // walk that looks for a child whose own type is the tag found the else action
 // of no ordered wait a design could hold; the statements are told apart by

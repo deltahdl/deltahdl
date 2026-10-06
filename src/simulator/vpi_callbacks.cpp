@@ -170,7 +170,8 @@ bool VpiIsCallbackHostType(int type) {
 // §37.80 (figure) + detail 2: collect the callback objects an iteration
 // reaches. With a reference object those are the callbacks registered on it -
 // each registered callback whose s_cb_data obj field names it. With none they
-// are the callbacks "not related to the above objects", which is what detail 2
+// are the callbacks tied to none of the objects the diagram names, which is
+// what detail 2
 // gives the NULL-reference form: every callback the diagram's single arrow
 // leaves unreachable, because it was placed on no object at all or on one of a
 // kind that arrow is not drawn from. That form handed back every callback the
@@ -195,9 +196,9 @@ void VpiCollectCallbackObjects(VpiHandle ref,
       }
       continue;
     }
-    // §37.2.3: "Handle equivalence cannot be determined with a C '=='
-    // comparison. The function vpi_compare_objects() compares the objects they
-    // refer to." A callback is placed on an object, not on the handle the
+    // §37.2.3: whether two handles are equivalent is a question for
+    // vpi_compare_objects() and the objects they name, never for a C '=='
+    // comparison. A callback is placed on an object, not on the handle the
     // application happened to register it through, so a second handle to that
     // object has to find it - and pointer equality found it only through the
     // one handle.
@@ -424,13 +425,13 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
     // rather than reporting success a second time.
     if (callbacks_[idx].reason < 0) return 0;
     callbacks_[idx].reason = -1;
-    // §37.2.2: "Handles may also be released as part of the action of other VPI
-    // function calls, in particular: a) vpi_remove_callback() releases the
-    // associated callback handle." Clearing the registration is what stops the
-    // callback from being delivered; releasing the handle is what stops it
-    // being a live handle to the callback object, which the clause has this
-    // routine do and which nothing did - so a removed callback's handle went on
-    // naming a live object and every routine went on accepting it.
+    // §37.2.2: other VPI routines release handles as part of what they do, and
+    // item a) has removing a callback release its handle. Clearing the
+    // registration is what stops the callback from being delivered; releasing
+    // the handle is what stops it being a live handle to the callback object,
+    // which the clause has this routine do and which nothing did - so a removed
+    // callback's handle went on naming a live object and every routine went on
+    // accepting it.
     ReleaseHandle(cb_handle);
     // §37.80: with the handle released, the object that reached this callback
     // through the diagram's single arrow reaches it no longer.

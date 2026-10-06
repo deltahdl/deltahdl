@@ -132,8 +132,8 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   obj->type = vpiThread;
   obj->active = proc->active;
   run_objects_[proc] = obj;
-  // §37.3.8: a thread is one of the transient objects whose life "may be
-  // tracked through various callbacks", and cbStartOfThread is the one that
+  // §37.3.8: a thread is one of the transient objects callbacks can follow
+  // through its life, and cbStartOfThread is the one that
   // reports its beginning. This is where the thread becomes an object of the
   // model, and no site delivered the callback at all.
   DispatchCallbacks(cbStartOfThread, obj);
@@ -145,9 +145,9 @@ void VpiContext::RefreshThreadObjects() {
   for (Process* proc : sim_ctx_->GetScheduler().Threads()) {
     VpiHandle obj = ThreadObjectFor(proc);
     // §37.44 (thread one-to-many thread): the threads this one spawned, which
-    // detail 1 calls "a branch of a fork construct". They hang off the parent
-    // as its thread children, which is where VpiThreadThreads reads them and
-    // where VpiThreadParent reads the link back.
+    // detail 1 counts as threads, being branches of a fork. They hang off the
+    // parent as its thread children, which is where VpiThreadThreads reads them
+    // and where VpiThreadParent reads the link back.
     for (Process* child : proc->children) {
       VpiHandle child_obj = ThreadObjectFor(child);
       if (child_obj->parent != nullptr) continue;
@@ -198,8 +198,8 @@ VpiHandle VpiContext::ActivateFrame(const void*& thread) {
   thread = FrameThreadOf(sim_ctx_);
   VpiHandle outer = ActiveFrame();
   VpiHandle proc_thread = ThreadObjectFor(sim_ctx_->CurrentProcess());
-  // §37.43 detail 5: "The vpiParent relation shall indicate the frame from
-  // which the child frame was activated." The outermost frame of a call chain
+  // §37.43 detail 5: vpiParent of a frame is the frame it was activated from.
+  // The outermost frame of a call chain
   // was activated from no frame, so it hangs off the thread instead, which is
   // the diagram's frame--thread edge and reports no parent frame.
   VpiHandle holder = outer != nullptr ? outer : proc_thread;
@@ -274,8 +274,8 @@ int VpiPortDirectionOf(Direction direction) {
 // One port of a module instance, as the object §37.14's instance-to-port
 // relation reaches. `index` is the position the module declared it in, which
 // detail 9 has vpiPortIndex report and which starts at zero, and `size` is the
-// width detail 6 has vpiScalar and vpiVector read -- "whether the port is 1 bit
-// or more than 1 bit ... not anything about what is connected to the port".
+// width detail 6 has vpiScalar and vpiVector read -- whether the port itself is
+// one bit wide or wider, whatever is connected to it.
 void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
                     VpiHandle module, std::deque<std::string>& names) {
   obj->type = kVpiPort;
@@ -309,8 +309,8 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   port_obj->low_conn = obj;
 }
 
-// §37.3.3: "These properties are applicable to every object that corresponds to
-// some object within the source code." Nothing under src/ ever wrote either
+// §37.3.3: the location properties apply to every object that stands for
+// something in the source code. Nothing under src/ ever wrote either
 // one, so vpiLineNo answered zero and vpiFile answered NULL for every object of
 // every design, and the two location properties could be read back only off an
 // object a test had built and stamped by hand. Where an object stands is a fact
@@ -318,12 +318,12 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
 // design does: this walks the design's declarations and tells each object the
 // run built for one where it is.
 // §36.12.1 Table 36-10 rows 3, 4 and 7: the object kind an elaborated variable
-// carries. In the IEEE 1800 standards "these array types are always represented
-// as vpiRegArray objects, and vpiIntegerVar and vpiTimeVar objects are always
-// non-array variables", a real array is "exclusively represented as vpiRegArray
-// objects", and a vpiRegArray iteration therefore "includes arrays of
-// vpiIntegerVar, vpiTimeVar, and vpiRealVar". So an unpacked array is one kind
-// whatever it holds, and every other variable is the kind it was declared.
+// carries. In the IEEE 1800 standards those arrays are always vpiRegArray
+// objects while vpiIntegerVar and vpiTimeVar objects are never arrays, a real
+// array is a vpiRegArray object and nothing else, and so a vpiRegArray
+// iteration takes in arrays of integer, time and real variables. So an unpacked
+// array is one kind whatever it holds, and every other variable is the kind it
+// was declared.
 int VpiVariableObjectKind(const RtlirVariable& var) {
   // §37.62 (figure): the object an event statement triggers is a named event,
   // and §37.27 draws the array of them beside it. A named event is not a
@@ -585,9 +585,9 @@ VpiObject* DesignPortObject(VpiHandle module, std::string_view port_name) {
 
 void VpiContext::AttachDesignInterModPaths(const RtlirDesign* design) {
   // §37.37: an intermodule path runs between the ports of two module instances,
-  // and detail 1 says how a PLI application gets to one -- "vpi_handle_multi(
-  // vpiInterModPath, port1, port2) can be used". Nothing under src/ made one,
-  // so a run held no intermodule path at all and the whole of this model
+  // and detail 1 has a PLI application reach one with
+  // vpi_handle_multi(vpiInterModPath, port1, port2). Nothing under src/ made
+  // one, so a run held no intermodule path at all and the whole of this model
   // answered for paths a test had built and for none a design connected.
   if (design == nullptr) return;
 
@@ -614,10 +614,9 @@ void VpiContext::AttachDesignInterModPaths(const RtlirDesign* design) {
 
 VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
                                                 const RtlirNet& net) {
-  // §37.3.4: the vpiDelay expression "shall be either an expression that
-  // evaluates to a constant if there is only one delay specified or an
-  // operation if there are more than one delay specified. If multiple delays
-  // are specified, then the operation's vpiOpType shall be vpiListOp."
+  // §37.3.4: the vpiDelay expression is a constant expression when one delay
+  // is given, and an operation whose vpiOpType is vpiListOp when there are
+  // several.
   //
   // §28.16's rise, fall and turn-off delays survive elaboration on RtlirNet in
   // the order the declaration wrote them, and the slots fill left to right, so
@@ -654,8 +653,8 @@ VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
 
 void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
                                               const RtlirDesign* design) {
-  // §37.3.4: "To access the delay expressions that are specified within the
-  // SystemVerilog source code, use the method vpiDelay."
+  // §37.3.4: the delay expressions the source code writes are reached through
+  // vpiDelay.
   //
   // VpiObject::delay_expr is where vpi_handle(vpiDelay, obj) reads that
   // expression from, and nothing under src/ wrote it, so the relation answered
@@ -786,8 +785,8 @@ VpiObject* VpiContext::NettypeDeclarationIn(VpiHandle scope,
   decl->parent = scope;
   scope->children.push_back(decl);
 
-  // §37.23 detail 1: "If the nettype declaration has no associated resolution
-  // function, the vpiWith relation shall return NULL." A declaration written
+  // §37.23 detail 1: vpiWith answers NULL for a nettype declaration with no
+  // resolution function. A declaration written
   // with one reaches the function the clause draws vpiWith to.
   if (!net.resolve_func.empty()) {
     name_pool_.emplace_back(net.resolve_func);
@@ -806,7 +805,7 @@ VpiObject* VpiContext::NettypeDeclarationIn(VpiHandle scope,
 
 void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
   // §37.23 draws a "nettype decl" object carrying the declaration's name, the
-  // resolution function it was written "with", and the nettype it aliases. No
+  // resolution function its with clause names, and the nettype it aliases. No
   // pass built one, so the object the whole subclause is about did not exist in
   // any run: §37.10 detail 1's vpiNetTypedef iteration over an instance reached
   // nothing, and the two details' rules stood over objects a test made.
@@ -866,15 +865,16 @@ static std::vector<VpiObject*> UnenclosedObjects(
 }
 
 void VpiContext::AttachTopModules(const RtlirDesign* design) {
-  // §37.5 detail 1: "Top-level modules shall be accessed using vpi_iterate()
-  // with a NULL reference object", which is where a PLI application walking a
+  // §37.5 detail 1: the top-level modules are reached by vpi_iterate() with a
+  // NULL reference object, which is where a PLI application walking a
   // design begins. Nothing built an object for a top module: the simulator keys
   // an instance's objects on a flat name and a top carries the empty prefix, so
   // what the passes above entered were the top's own contents under their bare
   // names and the top itself was an object of no kind. The iteration that
   // reaches the tops therefore reached none of them, VpiObject::top_module was
   // read by that filter and by vpi_get(vpiTopModule) and was written by
-  // nothing, and §37.1's "using VPI data models" had no first step.
+  // nothing, and walking a design through §37.1's data models had no first
+  // step.
   if (design == nullptr) return;
 
   // A top after the first is keyed under its own name, as an instance is

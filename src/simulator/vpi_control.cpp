@@ -465,8 +465,8 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
   // the standard allows, as it lets two handles to one object be distinct.
   VpiObject* rep = ResolveSameObject(object);
 
-  // §37.2.4: "A tool can create a handle that refers to an object only during
-  // the lifetime of the object." Past that lifetime there is no object for a
+  // §37.2.4: a tool makes a handle to an object only while the object exists.
+  // Past that lifetime there is no object for a
   // handle to refer to, so none is made; a handle handed back here would be
   // invalid from the moment it was created, and §37.2.4 forbids a program both
   // from referring through it and from releasing it.
@@ -597,8 +597,8 @@ void VpiContext::ReleaseFrameOrThreadObject(VpiHandle root) {
   // subelements, and the callbacks placed on any of them.
   ReleaseHandleSubtree(root);
 
-  // §37.3.8: "The life of a transient object may be tracked through various
-  // callbacks", and a frame and a thread are two of the kinds it names. The end
+  // §37.3.8: callbacks can follow a transient object through its life, and a
+  // frame and a thread are two of the kinds it names. The end
   // of one is where cbEndOfFrame and cbEndOfThread are delivered; an
   // application that registered either was called by nothing at all, so the
   // life it was registered to track ran its course unreported.

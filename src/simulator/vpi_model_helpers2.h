@@ -140,7 +140,7 @@ VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 // ===========================================================================
 
 // §37.4.1: `variables` is drawn as a class definition -- bold italic letters in
-// a dotted enclosure -- which "groups other objects and classes" rather than
+// a dotted enclosure -- which groups further objects and classes rather than
 // being an object of its own, so vpiVariables is the name of that group and no
 // object's vpiType is ever it. This answers what the group holds: the object
 // definitions §37.17 draws inside the enclosure, which is what a relation drawn
@@ -174,8 +174,8 @@ bool VpiIsStructUnionOrClassVar(int type);
 bool VpiIsVariableSelectType(int type);
 
 // §37.21 detail 2: the variable kinds that are an array or a vector - the ones
-// whose drivers and loads "should include driver/load for entire array/vector
-// or any portion of an array/vector to which a handle can be obtained".
+// whose drivers and loads cover the whole array or vector and every part of it
+// a handle can be had to.
 bool VpiIsVariableArrayType(int type);
 
 // §37.21 details 1 and 2: the children worth descending into when gathering the

@@ -95,9 +95,9 @@ class Scheduler {
   }
 
   // §37.44: record that the run has switched to `proc`, and hand back the
-  // threads it has switched to so far, in that order. "A thread is a
-  // SystemVerilog process such as an always procedure or a branch of a fork
-  // construct", and a switch to one is where a process becomes that: a process
+  // threads it has switched to so far, in that order. A thread is a
+  // SystemVerilog process, an always procedure or a fork branch for instance,
+  // and a switch to one is where a process becomes that: a process
   // this has never seen is one the run never reached. SimContext::
   // SetCurrentProcess is the one place every resume passes through and is what
   // calls this; VpiContext::RefreshThreadObjects reads the list back.
