@@ -703,14 +703,14 @@ static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
 
 // Write `value` into `var`, coercing to 2-state if needed and notifying.
 static void StoreStreamValueToVar(Variable* var, Logic4Vec value) {
-  // §10.6.2: a force "shall override a procedural assignment ... until a
-  // release procedural statement is executed on the variable". The check is
-  // inside the write rather than at the unpack's entry because §11.4.14.3
-  // unpacks the stream "into one or more variables": a force on one of them
-  // declines that one while the rest take their slices, and declining at the
-  // entry would drop the whole statement. It has to be inside for the deferred
-  // route as well, where the unpack runs from an update-region callback and the
-  // flag that governs the write is the one standing then.
+  // §10.6.2: a force overrides procedural assignments to the variable until a
+  // release is executed on it. The check is inside the write rather than at the
+  // unpack's entry because §11.4.14.3 unpacks the stream into one variable or
+  // several: a force on one of them declines that one while the rest take their
+  // slices, and declining at the entry would drop the whole statement. It has
+  // to be inside for the deferred route as well, where the unpack runs from an
+  // update-region callback and the flag that governs the write is the one
+  // standing then.
   if (var->is_forced) return;
   var->value = value;
   if (!var->is_4state) CoerceTo2State(var->value);

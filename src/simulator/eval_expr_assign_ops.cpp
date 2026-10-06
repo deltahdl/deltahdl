@@ -258,7 +258,7 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     if (var) {
       result = ConvertRealOnAssign(result, expr->lhs, *var, ctx, arena);
       // §10.6.2 and §9.4.2, as StoreOperatorResult states them; §11.3.6 has
-      // the expression "stack" the value and return it whether or not the
+      // the expression keep the value aside and return it whether or not the
       // update lands, so the return below is the value computed rather than
       // what the target still holds.
       StoreOperatorResult(var, result);

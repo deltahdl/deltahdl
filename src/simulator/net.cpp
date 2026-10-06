@@ -646,11 +646,11 @@ static Logic4Vec CombineAllDrivers(const std::vector<Logic4Vec>& drivers,
   return result;
 }
 
-// §10.6.2: "A force procedural statement on a net shall override all drivers of
-// the net -- gate outputs, module outputs, and continuous assignments -- until
-// a release procedural statement is executed on the net." So while the force
-// stands the net has one source and it is the force, and the strength it
-// reports is that source's rather than the overridden drivers'.
+// §10.6.2: a force on a net overrides every driver of it -- gate outputs,
+// module outputs and continuous assignments -- until a release is executed on
+// the net. So while the force stands the net has one source and it is the
+// force, and the strength it reports is that source's rather than the
+// overridden drivers'.
 //
 // Which strength that is: §10.6 gives force no drive_strength syntax to carry
 // one, and §10.3.4 defaults a continuous assignment that specifies none to
@@ -672,11 +672,11 @@ static void ResolveForcedStrength(Net& net) {
   }
 }
 
-// §10.6.2: a force on "a constant bit-select of a vector net, a constant
-// part-select of a vector net" overrides the drivers of those bits and no
-// others, so the resolution below runs as it always does and the forced bits
-// are laid back over its answer. forced_value carries the whole object with
-// those bits in place, which is where they are read from and where they go.
+// §10.6.2: a force on a constant bit-select or part-select of a vector net
+// overrides the drivers of those bits and no others, so the resolution below
+// runs as it always does and the forced bits are laid back over its answer.
+// forced_value carries the whole object with those bits in place, which is
+// where they are read from and where they go.
 static void ApplyPartialForcedValue(Net& net, Arena& arena) {
   const auto& window = net.resolved->forced_window;
   DepositBitField(net.resolved->value, window.dst_lo,
@@ -723,14 +723,13 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   // this one and is dropped before it runs.
   bit_strengths.clear();
 
-  // §10.6.2: "A force procedural statement on a net shall override all drivers
-  // of the net", and a force naming the whole net leaves no bit for a driver to
-  // reach, so the drivers are not resolved at all. A force naming a select of
-  // the net overrides the drivers of those bits alone: the rest of the net goes
-  // on being driven, which is a resolution followed by the forced bits being
-  // laid back over it. Reading the flag alone here dropped every driver of
-  // every bit, so `assign bus = 8'h55;` stopped reaching bits 7:4 and 2:0 the
-  // moment `force bus[3] = 1'b1;` ran.
+  // §10.6.2: a force on a net overrides every driver of it, and a force naming
+  // the whole net leaves no bit for a driver to reach, so the drivers are not
+  // resolved at all. A force naming a select of the net overrides the drivers
+  // of those bits alone: the rest of the net goes on being driven, which is a
+  // resolution followed by the forced bits being laid back over it. Reading the
+  // flag alone here dropped every driver of every bit, so `assign bus = 8'h55;`
+  // stopped reaching bits 7:4 and 2:0 the moment `force bus[3] = 1'b1;` ran.
   if (resolved->WholeIsForced()) {
     ResolveForcedStrength(*this);
     return;

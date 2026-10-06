@@ -29,8 +29,8 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena);
 
 // The two halves of that statement's store, reached by the subroutine body
-// executor as well. §10.4 puts procedural assignments "within procedures such
-// as always, initial, task, and function" and names one set of left-hand sides
+// executor as well. §10.4 puts procedural assignments inside always and initial
+// blocks, tasks and functions and names one set of left-hand sides
 // for all of them, so a body inside a subroutine reaches this dispatch rather
 // than restating which forms count -- which is what left a class method
 // dropping an array assignment, a streaming target, an associative copy, an
@@ -189,12 +189,11 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
 // §10.4.2 gives a nonblocking assignment the same `variable_lvalue` a blocking
 // one takes, and A.8.5 makes a member path -- `s.field`, `h.prop`, `this.prop`
 // -- the first production of variable_lvalue, so the same paths are targets of
-// both forms. Where such a path "requires an evaluation, such as an index
-// expression, class handle, or virtual interface reference", §10.4.2 has it
-// "evaluated at the same time as the expression on the right-hand side": the
-// path is resolved when the statement executes, and a nonblocking assignment
-// defers only the deposit. That is why the resolution is an entity of its own
-// rather than a step inside the write.
+// both forms. Where such a path needs something evaluated -- an index, a class
+// handle, a virtual interface reference -- §10.4.2 evaluates it together with
+// the right-hand expression: the path is resolved when the statement executes,
+// and a nonblocking assignment defers only the deposit. That is why the
+// resolution is an entity of its own rather than a step inside the write.
 // §7.2.1: the run of bits of a class property's value that a member path names.
 // A property declared with a packed struct or union type holds the whole
 // structure in one value (§6.8), so `c.p.b` addresses a window of `p` rather

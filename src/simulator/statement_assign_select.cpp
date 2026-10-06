@@ -334,17 +334,16 @@ static void WriteBitSelectBits(Variable* var, const Expr* lhs,
 // write, is blind to which path ran.
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
-  // §10.6.2: a force "shall override a procedural assignment ... until a
-  // release procedural statement is executed on the variable". Naming a
-  // bit-select or a part-select as the target does not take the statement out
-  // of that class -- the clause's own "shall not be a bit-select or a
-  // part-select of a variable" restricts what may be forced, not what a force
-  // overrides -- so this declines as every whole-variable writer does. It is
-  // the one place the statement form, the compound form, the increment, the
-  // expression forms and the subroutine-body form all pass through. It declines
-  // ahead of the snapshot, as WriteVar (statement_assign_core.cpp) declines
-  // ahead of its own notification: nothing is written, so there is nothing to
-  // compare and nobody to wake.
+  // §10.6.2: a force overrides procedural assignments to the variable until a
+  // release is executed on it. Naming a bit-select or a part-select as the
+  // target does not take the statement out of that class -- the clause's own
+  // bar on forcing a bit-select or part-select of a variable restricts what may
+  // be forced, not what a force overrides -- so this declines as every
+  // whole-variable writer does. It is the one place the statement form, the
+  // compound form, the increment, the expression forms and the subroutine-body
+  // form all pass through. It declines ahead of the snapshot, as WriteVar
+  // (statement_assign_core.cpp) declines ahead of its own notification: nothing
+  // is written, so there is nothing to compare and nobody to wake.
   if (var->is_forced) return;
   Logic4Snapshot before;
   before.Capture(var->value);

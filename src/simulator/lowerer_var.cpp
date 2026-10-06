@@ -57,16 +57,16 @@ static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
                        : MakeLogic4VecVal(arena, var.width, 0);
 }
 
-// §10.5 makes a variable declaration assignment "a special case of procedural
-// assignment", and §10.9.1 evaluates each pattern item in the assignment
-// context of its element, so an item stored on a leaf takes the two steps a
-// runtime write to that element takes: §10.7's resize to the element width, and
-// §6.11.2's conversion of every unknown or high-impedance bit to zero on the
-// way into a 2-state type. The resize is not the second of those: ResizeToWidth
-// answers its argument untouched when the widths already match, and copies the
-// bval plane word for word when they differ, so an x reached a `bit` element
-// either way -- where the same value written to the same element by a statement
-// (WriteVar), or to a scalar of the same type by a declaration
+// §10.5 makes a variable declaration assignment one particular kind of
+// procedural assignment, and §10.9.1 evaluates each pattern item in the
+// assignment context of its element, so an item stored on a leaf takes the two
+// steps a runtime write to that element takes: §10.7's resize to the element
+// width, and §6.11.2's conversion of every unknown or high-impedance bit to
+// zero on the way into a 2-state type. The resize is not the second of those:
+// ResizeToWidth answers its argument untouched when the widths already match,
+// and copies the bval plane word for word when they differ, so an x reached a
+// `bit` element either way -- where the same value written to the same element
+// by a statement (WriteVar), or to a scalar of the same type by a declaration
 // (CoerceVarInitValue), reads 0. The three helpers below each stored their item
 // without it.
 //
@@ -141,10 +141,10 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
       arena);
 }
 
-// §10.9.1: "An index:value specifies an explicit value for a keyed element
-// index." The clause makes it "an error to specify the same index more than
-// once in a single array pattern expression", so the first key that names this
-// element is the only one that can. Null when no index key names it.
+// §10.9.1: an index:value item gives the element at that index an explicit
+// value, and the clause makes naming one index twice in a single array pattern
+// an error, so the first key that names this element is the only one that can.
+// Null when no index key names it.
 static const Expr* FindIndexKeyedItem(const Expr* pat, uint32_t idx,
                                       SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
@@ -156,10 +156,8 @@ static const Expr* FindIndexKeyedItem(const Expr* pat, uint32_t idx,
   return nullptr;
 }
 
-// §10.9.1: "For type:value, if the element or subarray type of the array
-// matches this type, then each element or subarray that has not already been
-// set by an index key above shall be set to the value." Null when no type key
-// matches this kind.
+// §10.9.1: a type:value item sets every element or subarray of a matching type
+// that no index key has already set. Null when no type key matches this kind.
 static const Expr* FindTypeKeyedItem(const Expr* pat, DataTypeKind kind) {
   for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
     if (i >= pat->elements.size()) break;
@@ -170,9 +168,8 @@ static const Expr* FindTypeKeyedItem(const Expr* pat, DataTypeKind kind) {
   return nullptr;
 }
 
-// §10.9.1: "The default:value applies to elements or subarrays that are not
-// matched by either index or type key." Null when the pattern writes no
-// default key.
+// §10.9.1: a default:value item covers the elements or subarrays no index key
+// and no type key matched. Null when the pattern writes no default key.
 static const Expr* FindDefaultKeyedItem(const Expr* pat) {
   for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
     if (i >= pat->elements.size()) break;
@@ -183,8 +180,8 @@ static const Expr* FindDefaultKeyedItem(const Expr* pat) {
 
 // §10.9.1's three matching rules, asked in the order the clause writes them:
 // index key, then type key, then default. Null when none of them covers this
-// element -- which the clause forbids ("Every element shall be covered by one
-// of these rules"), so it is a malformed pattern rather than a defined value.
+// element -- which the clause forbids, requiring one of the rules to cover
+// every element, so it is a malformed pattern rather than a defined value.
 static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
                                  DataTypeKind kind, SimContext& ctx,
                                  Arena& arena) {
@@ -197,8 +194,8 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   // §10.9.1: a key resolves a value that is then evaluated in the assignment
   // context of the element. An element covered by none of the keys is a pattern
-  // the clause forbids -- "Every element shall be covered by one of these
-  // rules" -- and is reported at elaboration; the branch stays reachable for a
+  // the clause forbids, since one of its rules has to cover every element, and
+  // is reported at elaboration; the branch stays reachable for a
   // caller that does not stop on that report, and answers Table 6-7 as the
   // positional maker above and the multidimensional one below do rather than
   // the known zero it gave, which had one spelling of an illegal pattern
@@ -223,12 +220,12 @@ struct MultiDimArray {
 };
 }  // namespace
 
-// §10.9.1: "A syntax resembling replications ... can be used in array
-// assignment patterns as well. Each replication shall represent an entire
-// single dimension." A replicated item is therefore not one element's value but
-// the body of the dimension it stands for, cycled across that dimension's
-// positions -- which is what makes the clause's own `'{2{'{3{y}}}}` the same as
-// `'{'{y,y,y},'{y,y,y}}`. Null when this pattern is not the replicated form.
+// §10.9.1: array assignment patterns can use a form like replication too, each
+// replication standing for one whole dimension. A replicated item is therefore
+// not one element's value but the body of the dimension it stands for, cycled
+// across that dimension's positions -- which is what makes the clause's own
+// `'{2{'{3{y}}}}` the same as `'{'{y,y,y},'{y,y,y}}`. Null when this pattern is
+// not the replicated form.
 static const std::vector<Expr*>* ReplicateBody(const Expr* pat) {
   if (!pat->pattern_keys.empty()) return nullptr;
   if (pat->elements.size() != 1) return nullptr;
@@ -237,11 +234,11 @@ static const std::vector<Expr*>* ReplicateBody(const Expr* pat) {
   return body.empty() ? nullptr : &body;
 }
 
-// §10.9.1: "the braces shall match the array dimensions", so an item that is
+// §10.9.1: the braces follow the array's dimensions, so an item that is
 // itself a brace pattern is the sub-pattern of the next dimension in. Anything
 // else is a value, which is what a type or default key resolves to for a whole
-// subarray -- the clause applies those "recursively ... to each of its elements
-// or subarrays", so such a value reaches every leaf beneath it.
+// subarray -- the clause applies those recursively, down to each element or
+// subarray, so such a value reaches every leaf beneath it.
 static bool IsDimPattern(const Expr* item) {
   return item->kind == ExprKind::kAssignmentPattern ||
          item->kind == ExprKind::kConcatenation;
@@ -314,11 +311,10 @@ static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
       elem->value = MakeLogic4VecVal(m.arena, m.var.width, 0);
     return;
   }
-  // §10.9.1: "Each expression item shall be evaluated in the context of an
-  // assignment to the type of the corresponding element in the array", so the
-  // item is coerced to the element width (a no-op when they already match).
-  // §6.8 then makes the leaf "an abstraction of a data storage element" that
-  // stores a value of its own, so it takes its own words: a bare item name of
+  // §10.9.1: each expression item is evaluated as though assigned to the type
+  // of its element, so the item is coerced to the element width (a no-op when
+  // they already match). §6.8 then makes the leaf a data object that stores a
+  // value of its own, so it takes its own words: a bare item name of
   // the leaf's width is answered with that variable's Logic4Vec, ResizeToWidth
   // hands it straight back, and without the copy every leaf of
   // `'{2{'{3{y}}}}` would share y's storage.

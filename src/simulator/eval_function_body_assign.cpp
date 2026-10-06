@@ -337,14 +337,13 @@ static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
 
 // §10.7 opens by making the left-hand side the context for the right-hand
 // expression, and §11.6.1 makes a context-determined expression one whose bit
-// length "is determined by the bit length of the expression and by the fact
-// that it is part of another expression". §11.6 states the consequence for
-// addition -- "the bit length of the largest operand, including the left-hand
-// side of an assignment, shall be used" -- and gives `logic [16:0] sumB;
-// sumB = a + b;` with sixteen-bit operands as the case that keeps the carry.
-// Evaluating the right-hand side with no context at all lost that carry inside
-// a subroutine while keeping it outside one, because ExecBlockingAssignImpl
-// passes the same width and this executor did not.
+// length depends both on its own operands and on the expression it sits inside.
+// §11.6 states the consequence for addition -- the widest operand, the
+// left-hand side of an assignment counted among them, sets the length -- and
+// gives `logic [16:0] sumB; sumB = a + b;` with sixteen-bit operands as the
+// case that keeps the carry. Evaluating the right-hand side with no context at
+// all lost that carry inside a subroutine while keeping it outside one, because
+// ExecBlockingAssignImpl passes the same width and this executor did not.
 //
 // This is the other half of §10.7 from the resize below it: the resize discards
 // bits the expression produced, and the context is what makes the expression
@@ -383,9 +382,9 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       stmt->lhs->text == ctx.CurrentFuncName()) {
     RecordReturnedTag(stmt->rhs);
   }
-  // §10.4 names one set of left-hand sides for every procedure, "always,
-  // initial, task, and function" alike, so the forms the target's own kind
-  // decides are the module path's own dispatch rather than a list restated
+  // §10.4 names one set of left-hand sides for every procedure, always and
+  // initial blocks, tasks and functions alike, so the forms the target's own
+  // kind decides are the module path's own dispatch rather than a list restated
   // here. Restating them is what left a whole-array assignment, an assignment
   // pattern, a streaming target, an associative copy, an event alias, a virtual
   // interface bind, an unpacked slice and a subarray write dropped in silence

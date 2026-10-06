@@ -529,14 +529,13 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
 // every bit of a 4-state member be x or z, which a uint64_t value could not
 // express and an OR into aval could not have cleared. ExtractBitField is the
 // coercion the mask here used to be -- §10.9.2 evaluates each member expression
-// "in the context of an assignment to the type of the corresponding member" --
-// zero-filling a narrower value and truncating a wider one across every word
-// rather than the first.
+// as though it were assigned to that member's type -- zero-filling a narrower
+// value and truncating a wider one across every word rather than the first.
 //
 // The deposit assigns each bit where the placements used to OR into a zeroed
 // result. That is what makes an x depositable at all, and nothing accumulates
-// across placements: §10.9.2's "Every member shall be covered by one of these
-// rules" is exactly what PatternState::assigned enforces, so no two of the
+// across placements: §10.9.2's demand that one of these rules cover every
+// member is exactly what PatternState::assigned enforces, so no two of the
 // three rules write one member's bits.
 // §10.9.2 (printed page 263) with §5.7.1 (printed 78): a member's value is
 // the expression assigned to the member, so an unbased unsized literal,

@@ -1,7 +1,7 @@
 // §10.3: lowering a continuous assignment into the process that drives its
 // target, and everything that process needs to decide what to drive and when.
 //
-// "The continuous assignment statement shall place a value onto a net", and
+// A continuous assignment puts a value onto a net, and
 // what makes it a group of its own is that the value alone does not settle the
 // question. §10.3.3's delay control decides when the value lands and which of
 // the rise, fall and turn-off delays applies; §28.11's strengths decide what a
@@ -280,12 +280,11 @@ static DriverStrength ComputeEffectiveDriverStrength(
 // The value this assignment contributes to its net's resolution, over the
 // net's full width.
 //
-// §10.7: "The size of the left-hand side of an assignment forms the context for
-// the right-hand expression", and a right-hand side of fewer bits "is padded to
-// the size of the left-hand side", sign-extended where it is signed. For a bare
-// identifier the left-hand side is the net, so the value is extended to it --
-// pushed as it stands it would drive the low bits and leave every bit above
-// them to resolve as undriven.
+// §10.7: the left-hand side's size is the context the right-hand expression is
+// sized in, and a right-hand side of fewer bits is padded out to that size,
+// sign-extended where it is signed. For a bare identifier the left-hand side is
+// the net, so the value is extended to it -- pushed as it stands it would drive
+// the low bits and leave every bit above them to resolve as undriven.
 //
 // For a select the left-hand side is the selected bits, so the padding context
 // is their width, and the driver is that value in place with high impedance
@@ -400,14 +399,14 @@ static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
 // same bits and not even the same width: the whole value as written was
 // compared against the window it lands in.
 //
-// §11.5.1 says which of the value's bits those are. A partially out-of-range
-// part-select "shall, when written, only affect the bits that are in range",
-// and the bits it affects take the value's bits at and above `src_lo` rather
+// §11.5.1 says which of the value's bits those are. A write through a partially
+// out-of-range part-select changes only the bits that are in range, and the
+// bits it affects take the value's bits at and above `src_lo` rather
 // than its least significant ones -- the same projection ContAssignDriverValue
 // makes before depositing them. On a `tri0 [7:0] a`, `a[1 -: 4]` is `a[1:-2]`,
 // so `assign #(2,3) a[1 -: 4] = 4'b0011` lands 2'b00 on a[1:0]: a transition to
-// zero, which §10.3.3's "the second delay controls the falling delay" gives the
-// fall delay, where the whole 4'b0011 is nonzero and took the rise.
+// zero, which §10.3.3 gives its second delay, the fall delay, where the whole
+// 4'b0011 is nonzero and took the rise.
 //
 // The commit path keeps the value as written. ContAssignDriverValue makes this
 // projection for itself, and ApplyHighzStrengthsToValue before it reads the

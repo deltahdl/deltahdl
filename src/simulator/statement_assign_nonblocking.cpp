@@ -459,16 +459,16 @@ static void SetupPartSelectNbaCallback(const NbaWrite& write,
   Logic4Vec rhs_val = write.rhs_val;
   Arena& arena = write.arena;
   write.event->callback = [var, bits, rhs_val, &arena]() {
-    // §10.6.2: a force "shall override a procedural assignment ... until a
-    // release procedural statement is executed on the variable", and §10.4
-    // names a nonblocking assignment as one of the three kinds of procedural
-    // assignment whatever its left-hand side is. The check sits inside the
-    // callback rather than where the event was scheduled, as it does in
-    // SetupWholeVarNbaCallback, because the flag that governs the write is the
-    // one standing when the update region runs and not when it was queued.
-    // WritePartSelect itself does not ask -- its blocking caller WriteBitSelect
-    // asks before it evaluates the indices, which is the wrong moment here --
-    // so this is where a forced target is declined.
+    // §10.6.2: a force overrides procedural assignments to the variable until a
+    // release is executed on it, and §10.4 names a nonblocking assignment as
+    // one of the three kinds of procedural assignment whatever its left-hand
+    // side is. The check sits inside the callback rather than where the event
+    // was scheduled, as it does in SetupWholeVarNbaCallback, because the flag
+    // that governs the write is the one standing when the update region runs
+    // and not when it was queued. WritePartSelect itself does not ask -- its
+    // blocking caller WriteBitSelect asks before it evaluates the indices,
+    // which is the wrong moment here -- so this is where a forced target is
+    // declined.
     if (var->is_forced) return;
     WritePartSelect(var, bits, rhs_val, arena);
     var->NotifyWatchers();
@@ -520,11 +520,11 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
 
 // §10.4.2 gives the nonblocking form the same target the blocking form takes --
 // `nonblocking_assignment ::= variable_lvalue <= [ delay_or_event_control ]
-// expression`, where variable_lvalue "is a data type that is valid for a
-// procedural assignment statement" -- so a select that names an element must
-// reach the same object here as it does in TrySelectBlockingAssign, which asks
-// these two resolvers in this order. §7.4.5: "A single element of a packed or
-// unpacked array can be selected using an indexed name."
+// expression`, where variable_lvalue is any data type a procedural assignment
+// accepts -- so a select that names an element must reach the same object here
+// as it does in TrySelectBlockingAssign, which asks these two resolvers in this
+// order. §7.4.5: an indexed name selects one element of a packed or unpacked
+// array.
 //
 // TryResolveArrayElement answers only a one-dimensional indexed name, declining
 // outright when the select's base is itself a select, so `A[1][2] <= 43` on an
@@ -564,14 +564,13 @@ static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
 //
 // The target is resolved here, where the statement executes, and only the
 // deposit is deferred, for the reason SetupSelectNbaCallback resolves a
-// select's window here: §10.4.2 has an lvalue that "requires an evaluation,
-// such as an index expression, class handle, or virtual interface reference"
-// evaluated "at the same time as the expression on the right-hand side".
-// Calling WriteStructField from the callback would satisfy the clause for
-// neither, since it re-resolves the base itself -- `this` is a property of the
-// running process, which in the update region is no longer the process that
-// executed the statement, and the base handle is read from a variable that may
-// have been assigned since.
+// select's window here: §10.4.2 evaluates whatever an lvalue needs evaluated --
+// an index, a class handle, a virtual interface reference -- together with the
+// right-hand expression. Calling WriteStructField from the callback would
+// satisfy the clause for neither, since it re-resolves the base itself --
+// `this` is a property of the running process, which in the update region is no
+// longer the process that executed the statement, and the base handle is read
+// from a variable that may have been assigned since.
 //
 // Nothing is taken from the event pool until the target resolves, so a path
 // naming no storage -- a null handle, a `this` outside a method -- costs no

@@ -24,11 +24,10 @@ struct StructTypeInfo;
 // concatenation target makes those two different windows and the two are
 // unrelated numbers: `bus[3]` in `assign {w, bus[3]} = ...` takes bit 0 of the
 // value and lands on bit 3 of `bus`. `rhs_width` is §10.7's context the value
-// is evaluated in -- "The size of the left-hand side of an assignment forms the
-// context for the right-hand expression" -- which is the whole concatenation's
-// width, so a later re-evaluation answers what the first one did. A dst_width
-// of zero is the whole of it, which is the singular target: it owns every bit
-// of the value and every bit of itself.
+// is evaluated in -- the size of the assignment's left-hand side -- which is
+// the whole concatenation's width, so a later re-evaluation answers what the
+// first one did. A dst_width of zero is the whole of it, which is the singular
+// target: it owns every bit of the value and every bit of itself.
 struct ProcContAssignWindow {
   uint32_t rhs_width = 0;
   uint32_t src_lo = 0;
@@ -151,15 +150,14 @@ struct Variable {
 
   bool is_forced = false;
   Logic4Vec forced_value{};
-  // §10.6.2 names "a constant bit-select of a vector net, a constant
-  // part-select of a vector net" among the things a force may hold, and holds
-  // exactly what was named: the drivers it overrides are the drivers of those
-  // bits, and the rest of the net goes on being driven. This is the window of
-  // this variable those bits are, empty for a force on the whole of it -- which
-  // is every force on a variable, §10.6.2 having "It shall not be a bit-select
-  // or a part-select of a variable". The value is deposited through the same
-  // window, so forced_value carries the whole object with the forced bits in
-  // place.
+  // §10.6.2 names a constant bit-select or part-select of a vector net among
+  // the things a force may hold, and holds exactly what was named: the drivers
+  // it overrides are the drivers of those bits, and the rest of the net goes on
+  // being driven. This is the window of this variable those bits are, empty for
+  // a force on the whole of it -- which is every force on a variable, §10.6.2
+  // barring a bit-select or part-select of a variable as its target. The value
+  // is deposited through the same window, so forced_value carries the whole
+  // object with the forced bits in place.
   ProcContAssignWindow forced_window{};
   Logic4Vec pending_nba{};
   bool has_pending_nba = false;
@@ -277,8 +275,8 @@ struct Variable {
 
   const Expr* assign_cont_rhs = nullptr;
 
-  // §10.6.1: "Releasing a variable that ... currently has an active assign
-  // procedural continuous assignment shall reestablish that assignment", and
+  // §10.6.1: releasing a variable with an assign procedural continuous
+  // assignment active puts that assignment back in force, and
   // what the assignment gives this variable is its window of the right-hand
   // value rather than the whole of it. The expression alone could not say so,
   // and the release recomputed a window from its own target instead: after

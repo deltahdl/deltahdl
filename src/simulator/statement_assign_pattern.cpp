@@ -94,8 +94,8 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
   if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
   if (match < rhs->elements.size())
     return EvalExpr(rhs->elements[match], ctx, arena);
-  // §10.9.1 forbids an element no rule covers -- "Every element shall be
-  // covered by one of these rules" -- so this is a pattern the elaborator
+  // §10.9.1 forbids an element no rule covers, requiring one of its rules to
+  // cover every element, so this is a pattern the elaborator
   // reports, and what the branch answers is §6.8's Table 6-7 default for the
   // element's own type, as the positional and multidimensional makers answer
   // it. The known zero it gave had one spelling of an illegal pattern reading
@@ -252,19 +252,18 @@ void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
     if (!elem) continue;
     Logic4Vec val = PatternItemAt(rhs, kTarget, i, ctx, arena);
     // §10.9.1 gives the element the value of its pattern item, and §6.8 makes
-    // the element "an abstraction of a data storage element" that "shall store
-    // a value from one assignment to the next" -- its own value, not a handle
-    // on the item's storage. EvalExpr answers a bare item name with that
-    // variable's own Logic4Vec and a Logic4Vec copies its `words` pointer, so
-    // the whole of what separates the two here is the resize allocating -- and
-    // ResizeToWidth returns its argument untouched when the widths already
-    // match, which is precisely the item as wide as the element it fills. That
-    // is why the copy goes outside the resize rather than inside it: inside, it
-    // would miss the only case that aliases. `arr = '{p, 8'h00}` left arr[0]
-    // and the 8-bit `p` one storage element, and the next writer that deposits
-    // in place -- a packed-member assignment such as `p.hi = 4'h0` -- wrote
-    // through both. Redundant on the arms where the resize or the maker
-    // allocated anyway.
+    // the element a data object that keeps its value from one assignment to the
+    // next -- its own value, not a handle on the item's storage. EvalExpr
+    // answers a bare item name with that variable's own Logic4Vec and a
+    // Logic4Vec copies its `words` pointer, so the whole of what separates the
+    // two here is the resize allocating -- and ResizeToWidth returns its
+    // argument untouched when the widths already match, which is precisely the
+    // item as wide as the element it fills. That is why the copy goes outside
+    // the resize rather than inside it: inside, it would miss the only case
+    // that aliases. `arr = '{p, 8'h00}` left arr[0] and the 8-bit `p` one
+    // storage element, and the next writer that deposits in place -- a
+    // packed-member assignment such as `p.hi = 4'h0` -- wrote through both.
+    // Redundant on the arms where the resize or the maker allocated anyway.
     elem->value =
         OwnRhsWords(ResizeToWidth(val, info.elem_width, arena), arena);
     elem->NotifyWatchers();
@@ -551,8 +550,8 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   Logic4Vec stored = SizedAssocElementValue(lhs->base, aa, rhs_val, ctx, arena);
   if (aa->is_string_key) {
     auto key = AssocStringKey(EvalExpr(lhs->index, ctx, arena));
-    // §10.6.1 has an assign "override all procedural assignments to a
-    // variable" and §10.6.2 says the same of a force, and §6.4 makes this
+    // §10.6.1 has an assign override every procedural assignment to a variable
+    // and §10.6.2 says the same of a force, and §6.4 makes this
     // element a variable of its own. A statement standing on it therefore
     // ignores this write exactly as Variable::is_forced makes every other
     // writer ignore one, and an ignored write changed nothing to announce.
@@ -621,8 +620,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     return true;
   }
   if (idx >= 0 && idx < sz) {
-    // §10.6.1's assign and §10.6.2's force both "override all procedural
-    // assignments" to what they stand on, and §6.4 makes this element a
+    // §10.6.1's assign and §10.6.2's force both override every procedural
+    // assignment to what they stand on, and §6.4 makes this element a
     // variable of its own, so a write to a driven element is ignored and there
     // is nothing to announce.
     if (q->ElementIsDriven(static_cast<size_t>(idx))) return true;
@@ -708,11 +707,10 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
 }
 
 // §10.10: an item of an unpacked array concatenation that is itself an unpacked
-// array "shall represent as many elements as exist in that item, arranged in
-// the same left-to-right order as they would appear in the array item itself".
-// Left to right is the order the declaration writes, so an array declared
-// `int a[3:0]` contributes a[3] first and a[0] last, and one declared
-// `int a[0:3]` contributes them the other way round.
+// array stands for all of that item's elements, in the left-to-right order they
+// have in the item. Left to right is the order the declaration writes, so an
+// array declared `int a[3:0]` contributes a[3] first and a[0] last, and one
+// declared `int a[0:3]` contributes them the other way round.
 void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
                                SimContext& ctx, std::vector<Logic4Vec>& out) {
   for (uint32_t i = 0; i < ai.size; ++i) {
@@ -725,12 +723,10 @@ void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
 
 // Collect what one item of an unpacked array concatenation contributes.
 //
-// §10.10.3: "each item of an unpacked array concatenation shall have a
-// self-determined type ... but a complete unpacked array concatenation has no
-// self-determined type. Consequently it shall be illegal for an unpacked array
-// concatenation to appear as an item in another unpacked array concatenation.
-// This rule makes it possible for a vector or string concatenation to appear as
-// an item in an unpacked array concatenation without ambiguity." So braces
+// §10.10.3: every item of an unpacked array concatenation has a self-determined
+// type, but the concatenation as a whole has none, so one unpacked array
+// concatenation may not be an item of another -- which is what lets a vector
+// or string concatenation stand as an item without ambiguity. So braces
 // written inside the outer braces are not a nested array concatenation to be
 // flattened -- they are a vector or string concatenation, self-determined, and
 // they contribute the single value they evaluate to. The clause's own example

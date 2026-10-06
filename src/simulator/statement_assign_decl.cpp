@@ -306,8 +306,8 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
-// §10.5 (printed page 256): "The variable declaration assignment is a special
-// case of procedural assignment as it assigns a value to a variable", and
+// §10.5 (printed page 256): a variable declaration assignment is a kind of
+// procedural assignment, since it gives the variable a value, and
 // §10.9 and §10.10 (printed 260 and 264) make an assignment pattern or a
 // `{...}` assigned to an unpacked array fill its elements. The initializer of
 // a declaration with unpacked dimensions went onto the element-width carrier
@@ -632,8 +632,8 @@ struct DeclaredObject {
 // Applies 4-state coercion and the optional initializer to a freshly created
 // variable, then records it in its static frame when it is static.
 //
-// §10.5 (printed page 256) makes a declaration's initializer "a special case of
-// procedural assignment", which §10.8 makes an assignment-like context, so
+// §10.5 (printed page 256) makes a declaration's initializer a kind of
+// procedural assignment, which §10.8 makes an assignment-like context, so
 // §10.7 truncates or extends it into the width the declaration established. A
 // Logic4Vec carries its own width, so writing the value straight over the
 // variable put the expression's width in the declaration's place instead:

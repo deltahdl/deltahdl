@@ -181,15 +181,15 @@ struct ElementDriveSource {
   uint32_t rhs_width = 0;
 };
 
-// §10.6.1 gives the assign statement "a singular variable reference" and
-// §10.6.2 gives force the same, and §6.4 makes "any data type except an
-// unpacked structure, unpacked union, or unpacked array" singular -- which an
-// element of one is, whatever the container's own type. An element of a queue
-// or of an associative array is therefore a target of both statements, and it
-// is a bare Logic4Vec with no Variable to carry Variable::is_forced or
-// Variable::assign_cont_rhs. What the two statements install is recorded here
-// instead, one record per element, and the container's own writers consult it
-// the way every other writer consults the flags on a Variable.
+// §10.6.1 gives the assign statement a singular variable reference and §10.6.2
+// gives force the same, and §6.4 makes every data type but an unpacked
+// structure, union or array singular -- which an element of one is, whatever
+// the container's own type. An element of a queue or of an associative array is
+// therefore a target of both statements, and it is a bare Logic4Vec with no
+// Variable to carry Variable::is_forced or Variable::assign_cont_rhs. What the
+// two statements install is recorded here instead, one record per element, and
+// the container's own writers consult it the way every other writer consults
+// the flags on a Variable.
 struct ElementDrive {
   ElementDriveSource forced;
   ElementDriveSource assigned;

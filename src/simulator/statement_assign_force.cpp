@@ -63,16 +63,15 @@ static std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs,
 
 // --- §10.6 on an element of a queue or of an associative array ---
 //
-// §6.4 makes "any data type except an unpacked structure, unpacked union, or
-// unpacked array" singular, so an element of one of those containers is a
-// singular variable however the container itself is typed, and §10.6.1's
-// "singular variable reference" and §10.6.2's "reference to a singular
-// variable" both reach it. What such an element does not have is a Variable:
-// its value is a bare Logic4Vec inside a QueueObject or an AssocArrayObject,
-// with nowhere to keep the flag a force sets or the expression it recomputes
-// from. ResolveLhsVariable answers the container's own one-element carrier for
-// it, which no read of the container consults, so both statements settled a
-// variable nothing reads and the element kept the value it had.
+// §6.4 makes every data type but an unpacked structure, union or array
+// singular, so an element of one of those containers is a singular variable
+// however the container itself is typed, and both §10.6.1 and §10.6.2, whose
+// targets include a singular variable, reach it. What such an element does not
+// have is a Variable: its value is a bare Logic4Vec inside a QueueObject or an
+// AssocArrayObject, with nowhere to keep the flag a force sets or the
+// expression it recomputes from. ResolveLhsVariable answers the container's own
+// one-element carrier for it, which no read of the container consults, so both
+// statements settled a variable nothing reads and the element kept its value.
 
 // The element a §10.6 statement names, and the container that holds it. The
 // name is carried because a write to an element is announced through the
@@ -410,7 +409,7 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   spec.forced = true;
   auto rhs_val = EvalExpr(rhs, ctx, arena, spec.window.rhs_width);
   var->is_forced = true;
-  // §10.6.2 overrides "all drivers of the net" that was named, and a constant
+  // §10.6.2 overrides every driver of the net that was named, and a constant
   // select of a vector net names some of its bits: the window travels onto the
   // variable so Net::Resolve can leave the drivers of the rest alone.
   var->forced_window = spec.window;
@@ -437,8 +436,8 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
 static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
                                             SimContext& ctx, Arena& arena,
                                             RhsWatcherSpec spec) {
-  // §10.6.1 gives the assign statement "a singular variable reference or a
-  // concatenation of variables", so nothing it reestablishes stands on a net
+  // §10.6.1 gives the assign statement a singular variable or a concatenation
+  // of variables as its target, so nothing it reestablishes stands on a net
   // and the force's net does not carry over into the assignment that outlives
   // it.
   spec.net = nullptr;
@@ -530,8 +529,8 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
 // records its right-hand side, which a later deassign or release looks for.
 //
 // The window travels onto the variable with the force, so an element naming
-// bits of a net holds those bits alone: §10.6.2's override of "all drivers of
-// the net" reaches the drivers of what was named, which for `force {w, bus[3]}`
+// bits of a net holds those bits alone: §10.6.2's override of every driver of
+// the net reaches the drivers of what was named, which for `force {w, bus[3]}`
 // is bit 3 rather than every bit of `bus`.
 static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                             SimContext& ctx, Arena& arena) {
@@ -546,10 +545,10 @@ static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
   InstallForcedValueWatcher(slot.var, stmt->rhs, ctx, arena, spec);
 }
 
-// Releases or deassigns one element of a concatenation target. §10.6.1: "The
-// deassign procedural statement shall end an assign procedural continuous
-// assignment to a variable", and §10.6.2 ends a force on a release; each
-// element was marked on its own and so is cleared on its own.
+// Releases or deassigns one element of a concatenation target. §10.6.1: a
+// deassign ends the assign procedural continuous assignment to a variable, and
+// §10.6.2 ends a force on a release; each element was marked on its own and so
+// is cleared on its own.
 static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                               SimContext& ctx, Arena& arena) {
   Variable* var = slot.var;
@@ -563,13 +562,12 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
   }
 
   RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
-  // §10.6.2: "When released, the net shall immediately be assigned the value
-  // determined by the drivers of the net."
+  // §10.6.2: a released net at once takes the value its drivers determine.
   if (spec.net != nullptr) spec.net->Resolve(arena);
 
-  // §10.6.1: "Releasing a variable that is driven by a continuous assignment or
-  // currently has an active assign procedural continuous assignment shall
-  // reestablish that assignment", and the element gets back the window of that
+  // §10.6.1: releasing a variable that a continuous assignment drives, or that
+  // has an assign procedural continuous assignment active, puts that assignment
+  // back in force, and the element gets back the window of that
   // assignment's value it held, not the whole of it: without the window,
   // `assign {a, b} = 16'h1234; force {a, b} = ...; release {a, b};` handed `a`
   // the entire sixteen-bit value.
@@ -609,11 +607,11 @@ static void ApplyToConcatElement(const ConcatElemSlot& slot, const Stmt* stmt,
 }
 
 // Distributes a force, an assign, a release or a deassign over the elements of
-// a concatenation target. §10.6.2 admits "a concatenation of these" and §10.6.1
-// "a concatenation of variables", so each element is a target of the statement
-// in its own right and the elements divide the right-hand value the way
-// §11.4.12 divides it for a blocking assignment: the walk runs in reverse so
-// that the rightmost element takes the least significant bits. Returns the
+// a concatenation target. §10.6.2 admits a concatenation of its targets and
+// §10.6.1 a concatenation of variables, so each element is a target of the
+// statement in its own right and the elements divide the right-hand value the
+// way §11.4.12 divides it for a blocking assignment: the walk runs in reverse
+// so that the rightmost element takes the least significant bits. Returns the
 // offset one past the elements it walked, which is where a nesting caller
 // resumes. All four statements walk here, so a release draws the element
 // boundaries exactly where the force drew them.
@@ -708,16 +706,16 @@ static std::string ForceElementKey(const Expr* lhs, SimContext& ctx) {
   return key;
 }
 
-// §10.6.2 gives force and release the same targets, and among them "a net, a
-// constant bit-select of a vector net, a constant part-select of a vector net":
-// all three stand on one net, which is what holds the strength the force
+// §10.6.2 gives force and release the same targets, among them a net and a
+// constant bit-select or part-select of a vector net: all three stand on one
+// net, which is what holds the strength the force
 // settles and what a release re-resolves from its drivers. A select is followed
 // to its base for that reason -- one sentence names the three forms and says
 // the same thing about them -- while a concatenation names no one net and
 // answers none.
 //
-// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
-// fashion as a scalar or vector net", so `force n[0] = 1;` on `wire n[0:1]`
+// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
+// vector net would be, so `force n[0] = 1;` on `wire n[0:1]`
 // forces the net n[0] is, and `force n[1][2] = 1;` a bit of it. Each element
 // of an unpacked array is held under its own key (CreateDeclaredNet in
 // lowerer_register.cpp), and a select naming one stands on that element
@@ -737,11 +735,10 @@ static Net* ForceTargetNet(const Expr* lhs, SimContext& ctx) {
 // The target all four §10.6 statements resolve before they act, and whether the
 // statement is already answered by the resolution.
 //
-// §10.6.2: "The left-hand side of the assignment can be a reference to a
-// singular variable, a net, a constant bit-select of a vector net, a constant
-// part-select of a vector net, or a concatenation of these", and §10.6.1 gives
-// the assign statement "a singular variable reference or a concatenation of
-// variables". §10.6.1 and §10.6.2 give release and deassign the targets their
+// §10.6.2: the left-hand side may be a singular variable, a net, a constant
+// bit-select or part-select of a vector net, or a concatenation of these, and
+// §10.6.1 gives the assign statement a singular variable or a concatenation of
+// variables. §10.6.1 and §10.6.2 give release and deassign the targets their
 // installing statements take, so one resolution answers all four and a release
 // draws the element boundaries exactly where the force drew them.
 //
@@ -777,15 +774,15 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
-  // §10.6.2's "a constant bit-select of a vector net, a constant part-select of
-  // a vector net" are targets in their own right, and ResolveLhsVariable walks
+  // §10.6.2's constant bit-selects and part-selects of a vector net are targets
+  // in their own right, and ResolveLhsVariable walks
   // a select down to its base and discards the index. Without the window,
   // `force bus[3] = 1'b1;` on a `wire [7:0] bus` marked all eight bits forced
   // and stored the one-bit value as the whole net's value -- the net's width
   // among what it overwrote, a Logic4Vec carrying its own. §11.5.1 resolves
   // which bits the select names, through the same call every writer of a select
-  // makes; a select naming no bit of the object is given "no effect on the data
-  // stored", which here is a force that holds nothing and marks nothing.
+  // makes; a select naming no bit of the object leaves the stored data
+  // untouched, which here is a force that holds nothing and marks nothing.
   RhsWatcherSpec spec;
   if (stmt->lhs->kind == ExprKind::kSelect &&
       ArrayElementKeyOf(stmt->lhs, ctx).empty()) {
@@ -799,8 +796,8 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (stmt->kind == StmtKind::kAssign) {
     var->assign_cont_rhs = stmt->rhs;
-    // §10.6.1 gives the assign statement "a singular variable reference or a
-    // concatenation of variables", and this is the singular one: it owns every
+    // §10.6.1 gives the assign statement a singular variable or a concatenation
+    // of variables as its target, and this is the singular one: it owns every
     // bit of the value and every bit of itself, which is the empty window. It
     // is recorded rather than left alone so that an earlier assign through a
     // concatenation leaves no window behind for this one's release to read.
@@ -822,15 +819,14 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// §10.6.2 (printed page 258): released, "the net shall immediately be
-// assigned the value determined by the drivers of the net", and §6.7.1 gives a
-// net no driver reaches the value z. Resolution leaves such a net as it finds
-// it -- a value written there by other means stands until they write again --
-// so `force a = 1; release a;` on an undriven `wire a` went on reading 1. The
-// bits the force held are put back to z here, the drivers' answer when there
-// are none; a trireg keeps them, as the charge it holds with every driver
-// off, and a net type that resolves undriven, tri0 or supply1, is resolved
-// over them.
+// §10.6.2 (printed page 258): a released net at once takes the value its
+// drivers determine, and §6.7.1 gives a net no driver reaches the value z.
+// Resolution leaves such a net as it finds it -- a value written there by other
+// means stands until they write again -- so `force a = 1; release a;` on an
+// undriven `wire a` went on reading 1. The bits the force held are put back to
+// z here, the drivers' answer when there are none; a trireg keeps them, as the
+// charge it holds with every driver off, and a net type that resolves undriven,
+// tri0 or supply1, is resolved over them.
 static void ReleaseUndrivenBits(Net& net, const ProcContAssignWindow& window) {
   if (!net.drivers.empty() || !net.switch_drivers.empty() ||
       net.is_user_nettype || net.type == NetType::kTrireg) {
@@ -863,11 +859,11 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
     var->assign_cont_window = {};
     return StmtResult::kDone;
   }
-  // §10.6.2: "When released, the net shall immediately be assigned the value
-  // determined by the drivers of the net", which is as true of the bits a
-  // select named as of a whole net. The lookup followed the identifier form
-  // alone, so `release bus[3];` cleared the flag and left the net holding the
-  // forced value until some driver happened to notify.
+  // §10.6.2: a released net at once takes the value its drivers determine,
+  // which is as true of the bits a select named as of a whole net. The lookup
+  // followed the identifier form alone, so `release bus[3];` cleared the flag
+  // and left the net holding the forced value until some driver happened to
+  // notify.
   ReleaseForcedTarget(var, ForceTargetNet(stmt->lhs, ctx), ctx, arena);
   // §38.36.1: a cbRelease callback is called after the release.
   GetGlobalVpiContext().NoteForce(cbRelease, var, stmt,

@@ -104,13 +104,13 @@ Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena) {
 }
 
 void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
-  // §10.6.2: "A force statement to a variable shall override a procedural
-  // assignment ... until a release procedural statement is executed on the
-  // variable." Every other writer a blocking assignment reaches declines here;
-  // this one is reached only by §11.4.1's compound operators, which no case
-  // asked the rule of, so `force x = 8'd50; x += 8'd10;` read 60. A force
-  // establishes its own value by writing the field directly rather than through
-  // this, so nothing a force or a release needs is declined.
+  // §10.6.2: a force on a variable overrides procedural assignments to it until
+  // a release is executed on it. Every other writer a blocking assignment
+  // reaches declines here; this one is reached only by §11.4.1's compound
+  // operators, which no case asked the rule of, so
+  // `force x = 8'd50; x += 8'd10;` read 60. A force establishes its own value
+  // by writing the field directly rather than through this, so nothing a force
+  // or a release needs is declined.
   if (var->is_forced) return;
   // §6.16: a string has no declared width, so a string variable -- an element
   // of a fixed-size array of strings among them -- takes the whole text rather

@@ -149,8 +149,8 @@ class LhsIndexPin {
 };
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §10.4 lists "Bit-selects,
-// part-selects, and slices of packed arrays" among the left-hand sides a
+// statement executor in eval_function_body.cpp. §10.4 lists bit-selects,
+// part-selects and slices of packed arrays among the left-hand sides a
 // procedural assignment may take, alongside the elements of the arrays of
 // Clause 7, and this decides which of those a select names and writes it
 // accordingly. Always returns true: a select target is this function's to
@@ -293,7 +293,7 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
 // the same element to decline. §11.5.1: whether the concatenation lvalue
 // element `e`, having resolved to `var`, addresses any bit of it -- false for
 // the select whose address lies wholly outside the declared bounds or carries x
-// or z, whose write "shall have no effect on the data stored", and true for
+// or z, whose write leaves the stored data untouched, and true for
 // every other element shape, each of which names its whole variable. An element
 // this answers false for still occupies ConcatLhsElemWidth's bits of the value.
 bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
@@ -317,8 +317,8 @@ void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_concat.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
-// assignments "within procedures such as always, initial, task, and function",
-// so a concatenation or assignment-pattern target is written the same way in a
+// assignments inside always and initial blocks, tasks and functions alike, so a
+// concatenation or assignment-pattern target is written the same way in a
 // subroutine body as outside one. Returns false when the lhs is neither, so the
 // caller goes on to its other forms.
 bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
