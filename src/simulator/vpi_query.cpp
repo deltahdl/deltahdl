@@ -792,17 +792,16 @@ int VpiContext::Get(int property, VpiHandle obj) {
         "expression with side effects");
     return vpiUndefined;
   }
-  // §40.5.2: "To obtain coverage information, the vpi_get() function is
-  // extended with additional VPI properties that can be obtained from the
-  // following existing handles", of which vpi_get(<coverageType>,
-  // instance_handle) "returns the number of covered items of the given coverage
-  // type in the given instance". That is the figure $coverage_get reports for
-  // the instance (§40.3.2.3), and it is read out of the state §40.5.3's
-  // controls move and §40.3.2's system functions answer from, §40.5 being the
-  // VPI extension of §40.2's one coverage API rather than a second one. Left to
-  // the dispatch below, a coverage type was an unknown property and got the 0
-  // every unknown property gets, so no coverage a PLI application collected
-  // could be read back through the routine this subclause extends.
+  // §40.5.2 extends vpi_get() with coverage properties read from existing
+  // handles, and vpi_get(<coverageType>, instance_handle) among them answers
+  // how many items of that coverage type the instance has covered. That is the
+  // figure $coverage_get reports for the instance (§40.3.2.3), and it is read
+  // out of the state §40.5.3's controls move and §40.3.2's system functions
+  // answer from, §40.5 being the VPI extension of §40.2's one coverage API
+  // rather than a second one. Left to the dispatch below, a coverage type was
+  // an unknown property and got the 0 every unknown property gets, so no
+  // coverage a PLI application collected could be read back through the routine
+  // this subclause extends.
   if (std::optional<int> coverage_type = CoverageTypeForVpiProperty(property)) {
     return GetCoverageControlState().CoverageGet(CoverageScopeName(obj),
                                                  *coverage_type);

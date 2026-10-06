@@ -299,11 +299,10 @@ static Logic4Vec CoverageIntResult(Arena& arena, int value) {
 }
 
 // §40.3.2.1 Table 40-2: the scope_def argument beside the scope says how far
-// the call reaches - `SV_COV_HIER over "the named instance and any hierarchy
-// below it", `SV_COV_MODULE over that instance alone, "excluding any hierarchy
-// in instances below that instance". The two are the §40.3.1 constants 11 and
-// 10; nothing else names a scope definition, and a call that wrote something
-// else wrote a bad argument.
+// the call reaches - `SV_COV_HIER over the instance and everything below it,
+// `SV_COV_MODULE over that instance alone, leaving out the instances below it.
+// The two are the §40.3.1 constants 11 and 10; nothing else names a scope
+// definition, and a call that wrote something else wrote a bad argument.
 constexpr int kSvCovModule = 10;
 constexpr int kSvCovHier = 11;
 
@@ -344,8 +343,8 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   }
   // §40.3.2.1 Table 40-2: the third argument says whether the hierarchy below
   // the named scope is controlled with it. A scope definition the clause does
-  // not name is a bad argument, which is the `SV_COV_ERROR the clause reports
-  // "on all operations ... typically due to errors in arguments".
+  // not name is a bad argument, which is the `SV_COV_ERROR the clause has any
+  // operation report, usually for an argument in error.
   bool include_below = true;
   if (!CoverageScopeDefIncludesBelow(expr, ctx, arena, 2, &include_below)) {
     return status_vec(CoverageStatus::kError);
@@ -363,7 +362,8 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
 
 // Extracts the optional string literal argument (scope name or coverage
 // database name) at `index`. A missing or non-literal argument yields the empty
-// string, matching each §40.3.2 query function's "left empty" fallback.
+// string, matching each §40.3.2 query function's reading of an argument that
+// was left empty.
 static std::string CoverageStrArg(const Expr* expr, size_t index) {
   if (expr->args.size() > index &&
       expr->args[index]->kind == ExprKind::kStringLiteral) {

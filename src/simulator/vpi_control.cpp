@@ -141,9 +141,9 @@ std::optional<int> CoverageTypeForVpiProperty(int property) {
 // function produces, so the detailed outcome -- and the collection-state change
 // it reflects -- is observable to the caller.
 CoverageControlState& VpiContext::GetCoverageControlState() {
-  // §40.2: "This clause defines the coverage API in SystemVerilog" - one API,
-  // of which §40.5's routines are the VPI extension rather than a second one,
-  // and §40.5.3's controls "carry the semantics of $coverage_control()". So
+  // §40.2 defines SystemVerilog's one coverage API, of which §40.5's routines
+  // are the VPI extension rather than a second one, and §40.5.3 gives its
+  // controls the meaning $coverage_control() has. So
   // what a PLI application starts, stops, resets or reads is the coverage of
   // the run it is loaded into: the state the SimContext keeps, which the
   // language's own access functions of §40.3.2 answer out of. Two stores would

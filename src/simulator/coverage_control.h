@@ -107,10 +107,10 @@ class CoverageControlState {
   // elaboration records against each instance it creates. §40.3.2.1 Table 40-2
   // gives the string beside the scope_def two readings, and this is what tells
   // them apart: an instance name is the hierarchical path of one scope, while a
-  // definition name stands for "all instances of the given module" and so names
-  // as many scopes as the design instantiated. That second reading is why
-  // §40.3.2.2 and §40.3.2.3 sum over "hierarchy(ies)" rather than over one
-  // hierarchy. A scope registered without a definition is an instance of
+  // definition name stands for every instance of that module and so names as
+  // many scopes as the design instantiated. That second reading is why
+  // §40.3.2.2 and §40.3.2.3 sum over one or more hierarchies rather than over
+  // one. A scope registered without a definition is an instance of
   // nothing any string can name, and is reachable only by its own path.
   void SetModuleDefinition(const std::string& scope,
                            const std::string& definition) {
@@ -138,12 +138,12 @@ class CoverageControlState {
 
   // §40.3.2.2 ($coverage_get_max): returns the value representing 100% coverage
   // for `coverage_type` over `scope` — the sum of all coverable items of that
-  // type "over the given hierarchy(ies)". `scope` is read per §40.3.2.1, so it
-  // is one instance or, as a module definition name, every instance of that
-  // module, which is the plural the clause writes. That sum is a property of
-  // the design structure, not of the collection state, so it stays constant for
-  // the whole simulation; starting, stopping, or resetting coverage never
-  // changes it.
+  // type over the hierarchy or hierarchies named. `scope` is read per
+  // §40.3.2.1, so it is one instance or, as a module definition name, every
+  // instance of that module, which is the plural the clause writes. That sum is
+  // a property of the design structure, not of the collection state, so it
+  // stays constant for the whole simulation; starting, stopping, or resetting
+  // coverage never changes it.
   //
   // The integer result follows §40.3.2.2: a string the design holds no scope
   // for is a bad argument (`SV_COV_ERROR); scopes with no coverable items of
@@ -234,8 +234,8 @@ class CoverageControlState {
     if (db.coverage_types.find(coverage_type) == db.coverage_types.end()) {
       return CoverageStatus::kNoCoverage;
     }
-    // The data are found and merged. §40.3.2.4 loads them "into the
-    // simulator", so what the database holds of the requested type joins the
+    // The data are found and merged. §40.3.2.4 loads them into the running
+    // simulation, so what the database holds of the requested type joins the
     // coverage this simulation has collected and is reported from then on by
     // §40.3.2.3 - which is the sense in which coverage numbers this simulation
     // generates depend on the load having gone through.
@@ -340,9 +340,9 @@ class CoverageControlState {
   }
 
   // §40.3.2.1 Table 40-2: how far below a root one call reaches depends on the
-  // scope_def argument beside the scope. `SV_COV_HIER names "the named instance
-  // and any hierarchy below it"; `SV_COV_MODULE names "just the named instance,
-  // excluding any hierarchy in instances below that instance". A scope lies
+  // scope_def argument beside the scope. `SV_COV_HIER names the instance and
+  // everything below it; `SV_COV_MODULE names that instance alone, leaving out
+  // the instances below it. A scope lies
   // below another when its hierarchical path continues that path past a dot.
   static bool ScopeIsBelow(const std::string& root,
                            const std::string& candidate) {
@@ -399,8 +399,8 @@ class CoverageControlState {
   // string that is the hierarchical path of a registered scope is that
   // instance, and only that instance; any other string is read as a module
   // definition name, which names every instance of that module. The path is
-  // tried first because the table's note has instance names "referenced by
-  // hierarchical paths", so a string the design registered a scope under is the
+  // tried first because the table's note has an instance named by its
+  // hierarchical path, so a string the design registered a scope under is the
   // scope it registered - reading it as a definition instead would reach that
   // scope only when some other instance happened to share the name. A string
   // that is neither names nothing, which is the nonexisting module §40.3.2.1
@@ -423,10 +423,9 @@ class CoverageControlState {
     CoverageStatus status = ControlOne(control, scopes_.find(root)->second);
     if (!include_below) return status;
     // §40.3.2.1: over a hierarchy, the operation is applied to everything in it
-    // and the status reported is of the hierarchy - `SV_COV_PARTIAL "denotes
-    // that coverage is only partially available in the specified hierarchy",
-    // which is what a scope below the named one reporting something else makes
-    // of a start or a check.
+    // and the status reported is of the hierarchy - `SV_COV_PARTIAL says that
+    // only part of the hierarchy has coverage available, which is what a scope
+    // below the named one reporting something else makes of a start or a check.
     for (auto& entry : scopes_) {
       if (!ScopeIsBelow(root, entry.first)) continue;
       status =
@@ -463,15 +462,15 @@ class CoverageControlState {
         }
         return CoverageStatus::kOk;
       case CoverageControl::kReset:
-        // `SV_COV_RESET "resets all available coverage information in the
-        // specified hierarchy", and the covered-item counts are that
+        // `SV_COV_RESET clears whatever coverage information the hierarchy has,
+        // and the covered-item counts are that
         // information: they are what §40.3.2.3 reads back as the current
         // coverage value, so a reset leaves that value reporting that nothing
         // has been covered rather than the count it stood at. The
         // coverable-item counts §40.3.2.2 reports are not coverage information
         // but a property of the design structure, and a reset leaves them
-        // alone, since that value "shall remain constant across the duration of
-        // the simulation" - which is what keeps coverage% a fraction of the
+        // alone, since that value stays the same for the whole simulation -
+        // which is what keeps coverage% a fraction of the
         // same whole after a reset as before one. The reset has no effect when
         // there is nothing collected to clear, so repeated resets do nothing
         // after the first.
@@ -553,7 +552,7 @@ class CoverageControlState {
     }
   }
 
-  // §40.3.2.5: writes "the current state of coverage" of one type into a
+  // §40.3.2.5: writes the coverage of one type as it now stands into a
   // database entry - the covered-item count every scope stands at, which is
   // what §40.3.2.4 loads back when the same name is merged. The entry holds the
   // state as it was when the save ran rather than a view that follows
@@ -584,7 +583,7 @@ class CoverageControlState {
   // coverage type over the scopes a call names - the scopes the string names,
   // and the hierarchy below each of them where the scope_def argument said to
   // include it. Summing over the instances of a module definition is what
-  // §40.3.2.2 and §40.3.2.3 mean by the count "over the given hierarchy(ies)".
+  // §40.3.2.2 and §40.3.2.3 mean by a count over one or more hierarchies.
   // The §40.3.2.2/§40.3.2.3 result rules are applied to the sum: a string the
   // design holds no scope for is a bad argument, a sum of nothing is no
   // coverage, and a sum too large to represent overflows.
