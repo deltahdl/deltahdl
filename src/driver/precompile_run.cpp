@@ -41,6 +41,17 @@ PreprocConfig PreprocConfigFor(const CliOptions& opts,
   return config;
 }
 
+std::optional<std::string> ReadSource(const std::string& path) {
+  std::ifstream ifs(path);
+  if (!ifs) {
+    std::cerr << "error: cannot open file '" << path << "'\n";
+    return std::nullopt;
+  }
+  std::ostringstream ss;
+  ss << ifs.rdbuf();
+  return ss.str();
+}
+
 namespace {
 
 // One source description as the preprocessor gave it back: the text, the
@@ -52,19 +63,6 @@ struct PreprocessedSource {
   std::vector<OutputLineOrigin> line_origins;
   PrecompiledDirectives directives;
 };
-
-// The contents of `path`, or nothing where it cannot be opened, which is
-// reported.
-std::optional<std::string> ReadSource(const std::string& path) {
-  std::ifstream ifs(path);
-  if (!ifs) {
-    std::cerr << "error: cannot open file '" << path << "'\n";
-    return std::nullopt;
-  }
-  std::ostringstream ss;
-  ss << ifs.rdbuf();
-  return ss.str();
-}
 
 // The entries `all` gained since it held `before`.
 template <typename T>
@@ -107,7 +105,7 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
                                                 Preprocessor& preproc,
                                                 SourceManager& src_mgr) {
   std::optional<std::string> content = ReadSource(path);
-  if (!content || content->empty()) return std::nullopt;
+  if (!content) return std::nullopt;
   uint32_t file_id = src_mgr.AddFile(path, std::move(*content));
   size_t origins = preproc.LineOrigins().size();
   size_t modules = preproc.ModuleDirectivesList().size();

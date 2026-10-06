@@ -1,0 +1,2 @@
+module encrypt_empty_source_file_after;
+endmodule

@@ -17,6 +17,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -136,17 +137,6 @@ void PrintHelp() {
             << "  --dump-aig           Print AIG to stdout\n";
 }
 
-std::string ReadFile(const std::string& path) {
-  std::ifstream ifs(path);
-  if (!ifs) {
-    std::cerr << "error: cannot open file '" << path << "'\n";
-    return "";
-  }
-  std::ostringstream ss;
-  ss << ifs.rdbuf();
-  return ss.str();
-}
-
 struct PreprocResult {
   std::string source;
   // The source each line of `source` was written on, which §22.12 requires a
@@ -191,11 +181,11 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
 
   PreprocResult result;
   for (const auto& path : opts.source_files) {
-    auto content = ReadFile(path);
-    if (content.empty()) {
+    std::optional<std::string> content = delta::ReadSource(path);
+    if (!content) {
       return result;
     }
-    auto file_id = src_mgr.AddFile(path, content);
+    auto file_id = src_mgr.AddFile(path, std::move(*content));
     auto first_line = static_cast<uint32_t>(
         std::count(result.source.begin(), result.source.end(), '\n') + 1);
     result.file_first_lines.emplace_back(first_line, path);
@@ -616,10 +606,10 @@ int RunEnvelopeEncryption(const delta::CliOptions& opts,
                           delta::SourceManager& src_mgr,
                           delta::DiagEngine& diag) {
   for (const auto& path : opts.source_files) {
-    auto content = ReadFile(path);
-    if (content.empty()) return 1;
-    auto file_id = src_mgr.AddFile(path, content);
-    std::cout << delta::EncryptEnvelopes(content, opts.protect.exchange_key,
+    std::optional<std::string> content = delta::ReadSource(path);
+    if (!content) return 1;
+    auto file_id = src_mgr.AddFile(path, *content);
+    std::cout << delta::EncryptEnvelopes(*content, opts.protect.exchange_key,
                                          opts.protect.keys, &diag, file_id);
   }
   return diag.HasErrors() ? 1 : 0;

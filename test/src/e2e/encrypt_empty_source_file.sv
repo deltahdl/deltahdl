@@ -1,0 +1,6 @@
+// A.1.2 (printed page 1172) makes an empty source file valid source text, so
+// --encrypt writes it back as the empty text it is and goes on to the files
+// after it: this file, holding no encryption envelope, comes back unchanged,
+// then nothing for empty.sv, then after.sv unchanged.
+module encrypt_empty_source_file;
+endmodule

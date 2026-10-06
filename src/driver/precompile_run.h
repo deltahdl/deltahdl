@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "driver/cli_options.h"
@@ -15,6 +18,13 @@ namespace delta {
 // (§34.5.28.2).
 PreprocConfig PreprocConfigFor(const CliOptions& opts,
                                ProtectLicenseAsk ask_license);
+
+// The text of the source file at `path`, or nothing where it cannot be opened,
+// which is reported. An empty file answers empty text, which A.1.2 makes valid
+// source text: source_text is an optional timeunits_declaration followed by any
+// number of descriptions, none at all among them. Every run mode that reads the
+// command line's source files reads them through this.
+std::optional<std::string> ReadSource(const std::string& path);
 
 // §33.5.3's separate compilation tool: the invocation that compiles source
 // descriptions into a library rather than binding a design. "It is essential
