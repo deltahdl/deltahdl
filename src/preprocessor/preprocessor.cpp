@@ -889,10 +889,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
       SkipBlockCommentLine(line, file_id, line_num, depth, output);
   };
   ops.run_directive = [&](std::string_view line) {
-    if (TookAnnouncedValue(line, {file_id, line_num, 1}, depth, output)) {
-      return true;
-    }
-    return ProcessDirective(line, file_id, line_num, depth, output);
+    return TookAnnouncedValue(line, {file_id, line_num, 1}, depth, output) ||
+           ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {
     EmitCommentedActiveLine(line, emit, output);
