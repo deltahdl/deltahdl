@@ -235,8 +235,8 @@ void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   }
 }
 
-// §23.3.3.2: an input port "shall have the default initial value corresponding
-// to the data type" when left unconnected, and Table 6-7 gives that value per
+// §23.3.3.2: an input port left unconnected starts at the default initial
+// value of its data type, and Table 6-7 gives that value per
 // type. Fresh storage is created holding x, which is already the 4-state
 // integral default, so only a type whose default is zero needs writing. String
 // and event are excluded for the same reason the body declaration excludes
@@ -250,8 +250,8 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
-// §23.3.3.5 (printed page 748): "each element of the port connection shall be
-// matched to the port left index to left index", so an unpacked array port is
+// §23.3.3.5 (printed page 748): the port's elements pair with the
+// connection's, left index with left index, so an unpacked array port is
 // an array of elements each connected apart, not one value. A one-dimensional
 // port is laid out as a declared array of its kind is, each address held as
 // the net or variable "name[addr]" (CreateDeclaredNet above, and
@@ -312,8 +312,8 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   bool is_net = port.net_type != NetType::kNone;
   if (is_net) {
     // §23.3.3.3 (printed page 747): a port with a net type is a net, whose
-    // value its drivers decide, and an input of one left unconnected "shall
-    // have the value 'z" -- the z CreateNet has just installed, §6.7.1's value
+    // value its drivers decide, and an input of one left unconnected holds
+    // 'z -- the z CreateNet has just installed, §6.7.1's value
     // of a net nothing drives. It holds z until its drivers first resolve, so
     // an output port's connection, which copies the port into the parent's
     // net, copies z there at time 0 rather than an x or a 0 the port never

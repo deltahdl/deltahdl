@@ -296,13 +296,13 @@ ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
 }
 
 Variable* SimContext::FindVariable(std::string_view name) {
-  // §23.6: "The instance name $root refers to the top of the instantiated
-  // design and is used to unambiguously gain access to the top of the design."
-  // A name written from there is absolute, so it is read straight out of
-  // variables_ and never joined to ActiveInstancePrefix(), which would make
-  // the top of the design relative to whichever instance is running. `$root`
-  // cannot spell a local or a prefixed name either, `$` starting no
-  // identifier, so this stands ahead of both lookups below.
+  // §23.6: the instance name $root names the top of the instantiated design
+  // and reaches it without ambiguity. A name written from there is absolute, so
+  // it is read straight out of variables_ and never joined to
+  // ActiveInstancePrefix(), which would make the top of the design relative to
+  // whichever instance is running. `$root` cannot spell a local or a prefixed
+  // name either, `$` starting no identifier, so this stands ahead of both
+  // lookups below.
   //
   // variables_ keys the first top's own declarations under no instance
   // prefix and a later top's under its name (RootedStorageKey).
@@ -329,10 +329,10 @@ Variable* SimContext::FindVariable(std::string_view name) {
     auto it = variables_.find(prefixed);
     if (it != variables_.end()) return it->second;
   }
-  // §23.4: of a module declared inside the one instantiating it, "The outer
-  // name space is visible to the inner module so that any name declared there
-  // can be used", so the boundary §23.9 draws is not there and the search goes
-  // on in the instance holding it -- m1's K for the program nested in `m
+  // §23.4: a module declared inside the one instantiating it sees the outer
+  // module's name space and may use any name declared there, so the boundary
+  // §23.9 draws is not there and the search goes on in the instance holding it
+  // -- m1's K for the program nested in `m
   // #(7) m1()` (§24.3) -- and outward through every nested declaration's
   // instance. Reading the top's key instead answered for an instance at the
   // top alone.
@@ -340,17 +340,16 @@ Variable* SimContext::FindVariable(std::string_view name) {
     return outer;
 
   auto dot = name.find('.');
-  // §23.9: the upward search "shall continue upward until an item by that name
-  // is found or until a module, interface, program, or checker boundary is
-  // encountered. If the item is a variable, it shall stop at a module
-  // boundary". The bare key is the enclosing scope's, so reading it from
-  // inside an instance is that forbidden step. It stays the answer in the
-  // three cases §23.9 does not forbid: with no instance prefix in force it is
-  // the ordinary lookup rather than an upward step; a dotted name is the §23.8
-  // climb, which names the module it reaches; and a name a package import
-  // brought into scope is bound flat under its unqualified spelling rather
-  // than declared in an enclosing module at all, as is each element of an
-  // imported array (IsImportedName). A nested declaration's instance at the
+  // §23.9: the search climbs outward until a declaration of the name turns up
+  // or a module, interface, program or checker boundary stops it, and for a
+  // variable a module boundary stops it. The bare key is the enclosing scope's,
+  // so reading it from inside an instance is that forbidden step. It stays the
+  // answer in the three cases §23.9 does not forbid: with no instance prefix in
+  // force it is the ordinary lookup rather than an upward step; a dotted name
+  // is the §23.8 climb, which names the module it reaches; and a name a package
+  // import brought into scope is bound flat under its unqualified spelling
+  // rather than declared in an enclosing module at all, as is each element of
+  // an imported array (IsImportedName). A nested declaration's instance at the
   // top reached the top's key through the §23.4 search above. §23.6's `$root`
   // is a fourth, answered above rather than here: it names the top of the
   // design outright rather than climbing to it, so no boundary stands between
@@ -795,8 +794,8 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
   return const_cast<ArrayInfo*>(std::as_const(*this).FindArrayInfo(name));
 }
 
-// §23.9: "If it is declared locally, then the local item shall be used; if not,
-// the search shall continue upward". An array a scope declares is therefore
+// §23.9: a local declaration is taken first, and failing one the search climbs
+// outward. An array a scope declares is therefore
 // what its name reads while that scope is on the stack, and a like-named array
 // RegisterArray recorded for the whole run is what the name reads again once
 // the scope is gone.

@@ -62,9 +62,9 @@ std::string HierarchicalReferenceName(const Expr* expr) {
   return StripRootPrefix(name);
 }
 
-// §23.3.1 (printed page 740): "$root is the root of the instantiation tree",
-// and it serves "to disambiguate a local path (which takes precedence) from
-// the rooted path", so a name headed by it is read from there and never from
+// §23.3.1 (printed page 740): $root stands at the root of the instance tree,
+// and it tells a rooted path apart from a local one, which otherwise wins, so
+// a name headed by it is read from there and never from
 // the instance that runs it: in instance A, `B.v` is A's own B while
 // `$root.A_top.B.v` is the B beside A. The name is kept whole, top included,
 // for FindVariable and FindNet to answer from the top of the design alone

@@ -29,11 +29,11 @@
 namespace delta {
 
 // §23.2.2.1 (printed page 732), Example 3: a port written `a[7:4]` names no
-// storage of its own but a select of the module's `a`, "First port is upper 4
-// bits of 'a'", whose declaration `input [7:0] a` gives its direction and
-// width. That vector is what is created for it, once however many ports select
-// from it; a port with a name is created under the name. Nothing for a port
-// that is neither.
+// storage of its own but a select of the module's `a`, the example's first
+// port being the top four bits of `a`, whose declaration `input [7:0] a` gives
+// its direction and width. That vector is what is created for it, once however
+// many ports select from it; a port with a name is created under the name.
+// Nothing for a port that is neither.
 void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
                        SimContext& ctx, Arena& arena) {
   if (!port.name.empty()) {
@@ -105,8 +105,8 @@ static const RtlirPort* FindChildPort(const RtlirModuleInst& inst,
   return nullptr;
 }
 
-// §23.2.2.2 (printed page 734): an explicitly named port specifies "elements
-// ... declared in a module" on the port list, so the port stands for its
+// §23.2.2.2 (printed page 734): an explicitly named port puts items the module
+// declares into the port list, so the port stands for its
 // expression, and its connection is joined to that expression inside the
 // instance. The copy names each object the expression reads under the
 // instance's segment, "u0.r" for r, as MakeLocalPortId names a port's own
@@ -516,8 +516,8 @@ static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
 }
 
 // §23.3.3.5 (printed page 748): an unpacked array port connected to an
-// unpacked array has "each element of the port connection ... matched to the
-// port left index to left index, right index to right index", and each pair
+// unpacked array pairs its elements with the connection's, left index with
+// left index and right index with right index, and each pair
 // is connected as a port of the element's type would be: an input's element
 // takes the connection's continuously, an output's drives it, and an inout's
 // or ref's is the same storage. `input var int i[3]` on `int one[3]` reads

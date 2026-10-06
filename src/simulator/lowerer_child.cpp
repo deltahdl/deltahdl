@@ -257,8 +257,8 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
   }
 }
 
-// §23.3.1 (printed page 740): "A top-level module is implicitly instantiated
-// once, and its instance name is the same as the module name", and each such
+// §23.3.1 (printed page 740): each top-level module is instantiated once,
+// implicitly, under an instance name equal to its module name, and each such
 // instance is a scope of its own (§23.9), so two tops' declarations of one
 // name are two objects. The first top's are keyed under their bare names, as
 // every lookup from the top of the design expects; a later top is lowered as

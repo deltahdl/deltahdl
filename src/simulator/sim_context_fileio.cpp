@@ -39,8 +39,8 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
   q->elem_width = elem_width;
   q->is_4state = is_4state;
   q->max_size = max_size;
-  // §23.9: "If it is declared locally, then the local item shall be used; if
-  // not, the search shall continue upward", and §13.5.1 makes a by-value formal
+  // §23.9: a local declaration is taken first, and failing one the search
+  // climbs outward, and §13.5.1 makes a by-value formal
   // a declaration of the subroutine. A queue declared where a scope is on the
   // stack therefore belongs to that scope and goes away with it, exactly as
   // RegisterArrayInScope puts an array's shape there: registered for the whole
