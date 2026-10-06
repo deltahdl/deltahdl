@@ -310,7 +310,7 @@ TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {
   // the module body, so Parser::ParseTypedItemOrInst reports that second `end`
   // there. This case claims that recovery; the §9.3.2 report this source also
   // draws is named by BlockStatementSyntaxParsing.ParBlockMissingJoinRejected
-  // in test/src/unit/test_parser_annex_a_06_03.cpp.
+  // in test/src/unit/test_parser_annex_a_06_03b.cpp.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 6, "23.2.4"));
 }
