@@ -761,7 +761,7 @@ void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
   array_infos_[name] = info;
 }
 
-// §18.17: "The randsequence statement creates an automatic scope", so the
+// §18.17: a randsequence statement opens an automatic scope, so the
 // array §18.17.7 declares within one of its rules is described by the scope
 // and not by the design. The shape is copied into the arena because the frame
 // holds a pointer, and the arena outlives every scope: what ends with the

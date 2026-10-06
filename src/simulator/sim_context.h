@@ -482,7 +482,7 @@ class SimContext : public DeclaredNameTables,
   // again, and a lookup of the name reads whatever the enclosing scopes or
   // RegisterArray registered for it once the scope is gone. §18.17 needs this
   // for the array §18.17.7 implicitly declares within a randsequence rule,
-  // that statement creating "an automatic scope". The caller must have pushed
+  // that statement opening an automatic scope. The caller must have pushed
   // a scope, as ExecRandsequence and ExecRsProduction in
   // stmt_exec_randsequence.cpp do. `name` must outlive the context.
   void RegisterLocalArray(std::string_view name, const ArrayInfo& info);

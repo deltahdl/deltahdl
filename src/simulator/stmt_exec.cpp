@@ -789,8 +789,8 @@ static ExecTask DispatchBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // return value (§18.17.7) it evaluates the expression into the production's
 // return slot, then unwinds with kReturn.
 //
-// §18.17.7 gives the production's implicit variable "the return type of the
-// production", so a return is an assignment to an object of that type and not
+// §18.17.7 types the production's implicit variable by the production's return
+// type, so a return is an assignment to an object of that type and not
 // a replacement of it, exactly as §13.4.1 makes a function's return one. §10.7
 // then truncates or extends the expression to the object's width. Handing the
 // width to EvalExpr as a context width does not do this on its own: a sized

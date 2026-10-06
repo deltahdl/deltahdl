@@ -38,15 +38,15 @@
 namespace delta {
 
 // A random number in [0, total), for the weighted choice §18.16 gives randcase
-// and §18.17.1 gives a randsequence production. Both say the chance of a choice
-// is proportional to its weight -- §18.17.1: "the probability that a particular
-// production list is generated is proportional to its specified weight" -- and
-// a draw that cannot reach the whole range does not give that.
+// and §18.17.1 gives a randsequence production. Both make the chance of a
+// choice proportional to its weight -- for §18.17.1, the chance that a
+// production list is generated -- and a draw that cannot reach the whole range
+// does not give that.
 //
 // A total wider than 32 bits is not covered by one draw, so the number is
-// composed from two. §18.16 licenses that in as many words: a randcase "can
-// result in multiple calls to $urandom_range() to handle numbers greater than
-// 32 bits". SelectRule drew a single Urandom32 against a 64-bit total, so once
+// composed from two. §18.16 allows that outright: a randcase may call
+// $urandom_range() more than once to handle a number wider than 32 bits.
+// SelectRule drew a single Urandom32 against a 64-bit total, so once
 // a production's weights summed past 2^32 every rule whose cumulative interval
 // began at or beyond that was unreachable, and `a := 64'h1_0000_0000 | b :=
 // 64'h1_0000_0000` selected b with probability zero.
@@ -164,16 +164,15 @@ bool ProductionReturnsString(const RsProduction* p) {
 // left, factored out of the "unwind / abort the production / keep generating"
 // branch every loop in this file repeats.
 //
-// kUnwind covers the two results that leave the whole generation. §18.17.6:
-// "The break statement terminates the sequence generation", and §9.6.2: a
-// disable "shall terminate the activity of a task or a named block", which is
-// something the randsequence statement is running inside, so the generation
-// ends either way and the loop hands the result to its caller unchanged.
-// kAbortProduction covers return, which §18.17.6 gives a narrower reach: it
-// "aborts the generation of the current production", and "sequence generation
-// continues with the next production following the aborted production", so
-// what a return ends is decided at the site rather than here. kKeepGenerating
-// covers the rest.
+// kUnwind covers the two results that leave the whole generation. §18.17.6
+// has break end the sequence generation, and §9.6.2 has a disable end the
+// activity of a task or named block, which is something the randsequence
+// statement is running inside, so the generation ends either way and the loop
+// hands the result to its caller unchanged. kAbortProduction covers return,
+// which §18.17.6 gives a narrower reach: it abandons the production being
+// generated, and generation goes on with the production that follows the
+// abandoned one, so what a return ends is decided at the site rather than
+// here. kKeepGenerating covers the rest.
 enum class RandseqAction : uint8_t {
   kKeepGenerating,
   kAbortProduction,
@@ -292,17 +291,18 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// §18.17.1: "Weight expressions are evaluated when their enclosing production
-// is selected, thus allowing weights to change dynamically." One selection
-// evaluates each rule's weight once, so cache the drawn weights before summing
-// and walk the cached values: rs_weight_specification admits a parenthesized
-// expression and so a function call, and a second evaluation would perform that
-// call's effect twice and let the cumulative walk run against numbers other
-// than the ones the total was drawn from. §18.16 states the same rule for the
-// sibling randcase statement in as many words: "Each weight expression is
-// evaluated at most once (implementations can cache identical expressions) in
-// an unspecified order." A rule that specifies no weight counts 1, which is
-// what §18.17.1 makes the weight of a production list written without ':='.
+// §18.17.1: a weight expression is evaluated when the production holding it is
+// selected, so weights can change from one selection to the next. One
+// selection evaluates each rule's weight once, so cache the drawn weights
+// before summing and walk the cached values: rs_weight_specification admits a
+// parenthesized expression and so a function call, and a second evaluation
+// would perform that call's effect twice and let the cumulative walk run
+// against numbers other than the ones the total was drawn from. §18.16 states
+// the same rule for the sibling randcase statement outright: each weight
+// expression is evaluated no more than once, in an order left unspecified, and
+// an implementation may cache identical ones. A rule that specifies no weight
+// counts 1, which is what §18.17.1 makes the weight of a production list
+// written without ':='.
 // §18.17.1: whether `v` reads as a negative value, which for a signed value is
 // its sign bit being set. The signedness is the evaluated value's rather than
 // anything read off the expression's text, because Syntax 18-14 gives
@@ -314,9 +314,9 @@ static bool WeightIsNegative(const Logic4Vec& v) {
   return ((v.words[top / 64].aval >> (top % 64)) & 1ULL) != 0;
 }
 
-// §18.17.1: "an rs_weight_specification shall evaluate to an integral
-// non-negative value". Returns the weight to draw against, reporting a value
-// that is not one and counting it as zero.
+// §18.17.1: an rs_weight_specification has to yield a non-negative integral
+// value. Returns the weight to draw against, reporting a value that is not one
+// and counting it as zero.
 //
 // Zero is what a reported weight counts as, because it is the one value that
 // cannot decide the draw. A negative weight read through ToUint64 arrived as
@@ -415,8 +415,8 @@ struct RandJoinSeq {
   // rs_code_block Syntax 18-14 lets that rule carry after its weight can be run
   // once the last of them has generated.
   const RsRule* rule = nullptr;
-  // §18.17.7: "a production creates a scope, which encompasses all its rules
-  // and code blocks". This operand's steps interleave with another operand's,
+  // §18.17.7: each production opens a scope spanning all its rules and code
+  // blocks. This operand's steps interleave with another operand's,
   // so that scope cannot sit on the shared stack for the duration -- the next
   // step taken would be some other operand's and would run inside it. Each
   // operand keeps a stack of its own instead, the caller's frames with the
@@ -553,8 +553,8 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
   }
-  // §18.17.7: "passing data to a production is similar to a task call and uses
-  // the same syntax", and ExecRsProduction evaluates a call's actuals in the
+  // §18.17.7: data is passed to a production as to a task, in a task call's
+  // syntax, and ExecRsProduction evaluates a call's actuals in the
   // caller's scope before entering the production's own. Nothing evaluated them
   // here at all, so `rand join D(5) D(20)` ran D with its formal unbound.
   std::vector<Logic4Vec> actuals =
@@ -624,12 +624,12 @@ static ExecTask ExecOneRandJoinStep(const RandseqEngine& eng,
 // §18.17.7: write the implicit variable this operand of a rand join rule
 // declares, once the operand has generated the last production it contributed.
 // Which element it writes is fixed by where the operand is written and not by
-// when it generated: the clause assigns "the elements of the array ... the
-// values returned by the instances of the production according to the syntactic
-// order of appearance", and §18.17.5 reorders generation alone. The clause
-// already reads that way for the ordinary productions, giving the code block of
-// `if (cond) D(5) else D(20)` an `int D[1:2]` whose second element the else
-// branch writes when it is the only branch that generated.
+// when it generated: the clause fills the array's elements with the values the
+// production's instances return in the order those instances are written, and
+// §18.17.5 reorders generation alone. The clause already reads that way for
+// the ordinary productions, giving the code block of `if (cond) D(5) else
+// D(20)` an `int D[1:2]` whose second element the else branch writes when it
+// is the only branch that generated.
 static void StoreRandJoinOperandValue(const RandJoinSeq& seq,
                                       const RuleValueCapture& cap,
                                       SimContext& ctx, Arena& arena) {
@@ -684,14 +684,14 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     }
     if (seqs[chosen].Remaining() == 0) {
       // §18.17.7 reads a rule's trailing code block against what stands to its
-      // left -- "only the return values of productions already generated (i.e.,
-      // to the left of the code block accessing them) can be retrieved" -- and
-      // an operand's whole production list is written to its left. So the block
-      // runs as that operand's last step, which is also the only place inside
-      // its own sequence that keeps it to the right of its own productions;
-      // §18.17.5 says where an operand's productions go and nothing about where
-      // a block trailing its rule lands, and "maintaining the relative order of
-      // each sequence" is what puts it inside that sequence rather than before
+      // left -- a code block can read the return values only of productions
+      // already generated, those written to its left -- and an operand's whole
+      // production list is written to its left. So the block runs as that
+      // operand's last step, which is also the only place inside its own
+      // sequence that keeps it to the right of its own productions; §18.17.5
+      // says where an operand's productions go and nothing about where a block
+      // trailing its rule lands, and its keeping each sequence in its own
+      // relative order is what puts it inside that sequence rather than before
       // every sequence. An operand is chosen only while it has steps remaining,
       // so this runs once per operand and never twice.
       //
@@ -758,10 +758,10 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
 
 // §18.17.7: generate the rule's production list, then run the rs_code_block
 // Syntax 18-14 writes after the rs_weight_specification. The clause reads that
-// block against what stands to its left -- "Only the return values of
-// productions already generated (i.e., to the left of the code block accessing
-// them) can be retrieved" -- and the whole production list is written to its
-// left. §18.17.7's own GenQueue example needs exactly that, giving the rule
+// block against what stands to its left -- a code block can read the return
+// values only of productions already generated, those written to its left --
+// and the whole production list is written to its left. §18.17.7's own
+// GenQueue example needs exactly that, giving the rule
 // `LIST ITEM := 8 { q = { q, ITEM }; }` a code block that reads ITEM, a
 // value-returning production of that same rule. A rand join rule is the case
 // with nothing else: Syntax 18-18 admits only rs_production_items after the
@@ -781,8 +781,8 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
     prods_result = co_await ExecRuleProds(stmt, selected, ctx, arena);
   }
   if (prods_result != StmtResult::kDone) co_return prods_result;
-  // §18.17: "each code block within the randsequence block creates an
-  // anonymous automatic scope", and Syntax 18-14 makes this one of them --
+  // §18.17: every code block inside a randsequence opens an anonymous
+  // automatic scope of its own, and Syntax 18-14 makes this one of them --
   // `rs_rule ::= rs_production_list [ := rs_weight_specification [
   // rs_code_block ] ]`. It ran in the enclosing production's scope instead, so
   // a data declaration A.6.12 admits at the head of an rs_code_block outlived
@@ -893,18 +893,16 @@ ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto result = co_await ExecRsProduction(stmt, top_call, ctx, arena, nullptr);
   ctx.PopScope();
 
-  // §18.17.6: "The break statement terminates the sequence generation. When a
-  // break statement is executed from within a production code block, it forces
-  // a jump out of the randsequence block", and the clause's own example
-  // continues "on the line labeled next_statement". The randsequence statement
-  // therefore absorbs a break and completes normally, and it absorbs nothing
-  // else. §9.6.2 gives a disable a target outside this statement -- it "shall
-  // terminate the activity of a task or a named block", and "execution shall
-  // resume at the statement following the block or following the task-enabling
-  // statement" -- so a disable raised in a production code block travels on to
-  // whichever block or task it named. ExecRsProduction has already absorbed the
-  // return of the top production, which §18.17.6 gives no reach past the
-  // production it aborts.
+  // §18.17.6: a break ends the sequence generation, and one executed in a
+  // production code block leaves the randsequence block altogether, the
+  // clause's own example going on at the line labeled next_statement. The
+  // randsequence statement therefore absorbs a break and completes normally,
+  // and it absorbs nothing else. §9.6.2 gives a disable a target outside this
+  // statement -- it ends the activity of a task or named block, and execution
+  // resumes at the statement after that block or after the task enable -- so a
+  // disable raised in a production code block travels on to whichever block or
+  // task it named. ExecRsProduction has already absorbed the return of the top
+  // production, which §18.17.6 gives no reach past the production it aborts.
   if (result == StmtResult::kBreak) co_return StmtResult::kDone;
   co_return result;
 }

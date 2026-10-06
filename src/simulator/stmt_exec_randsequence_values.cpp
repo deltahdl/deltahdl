@@ -1,17 +1,16 @@
 // The values a randsequence production is called with and the values it
-// returns, which §18.17.7 states as one rule apiece: "Passing data to a
-// production uses the same syntax as a task call", and, within a rule, "a
-// variable is implicitly declared" for each value-returning production the
-// rule names. EvalProductionActuals and BindProductionFormals answer the
-// first, evaluating a call's actual arguments in the caller's scope and
-// binding each formal by position once the production's own scope has been
-// entered. BuildRuleValueCapture and BuildStepValueCapture answer the second,
-// counting how many times a rule names each value-returning production so
-// that one named more than once is registered as the 1..N array §18.17.7
-// declares before any of its appearances generates. SlotForAppearance then
-// says which implicit variable one appearance writes, and
-// StoreRuleProductionValue creates that variable and stores the returned
-// value into it.
+// returns, which §18.17.7 states as one rule apiece: data is passed to a
+// production in a task call's syntax, and a rule implicitly declares a
+// variable for each value-returning production it names. EvalProductionActuals
+// and BindProductionFormals answer the first, evaluating a call's actual
+// arguments in the caller's scope and binding each formal by position once the
+// production's own scope has been entered. BuildRuleValueCapture and
+// BuildStepValueCapture answer the second, counting how many times a rule names
+// each value-returning production so that one named more than once is
+// registered as the 1..N array §18.17.7 declares before any of its appearances
+// generates. SlotForAppearance then says which implicit variable one appearance
+// writes, and StoreRuleProductionValue creates that variable and stores the
+// returned value into it.
 //
 // src/simulator/stmt_exec_randsequence.cpp holds the rest of the statement --
 // §18.16's randcase, §18.17.1's weighted selection of a rule, the production
@@ -169,16 +168,15 @@ static void RegisterRuleValueArrays(const Stmt* stmt,
     info.lo = 1;
     info.size = static_cast<uint32_t>(n);
     uint32_t w = DeclaredTypeWidth(child->return_type, ctx);
-    // §18.17.7: "the type is an array where the element type is the return
-    // type of the production", so record the return type's kind for a read of
-    // an element to consult. §6.16 then makes the element of a string array
-    // that no generation wrote "", the empty string, rather than 32 bits of x;
-    // every other return type EvalTypeWidth gives no width to keeps the
-    // 32-bit carrier.
+    // §18.17.7: the array's elements take the production's return type, so
+    // record the return type's kind for a read of an element to consult. §6.16
+    // then makes the element of a string array that no generation wrote "", the
+    // empty string, rather than 32 bits of x; every other return type
+    // EvalTypeWidth gives no width to keeps the 32-bit carrier.
     info.elem_type_kind = child->return_type.kind;
     info.elem_width = w ? w : (ProductionReturnsString(child) ? 0 : 32);
-    // §18.17: "The randsequence statement creates an automatic scope", and
-    // §18.17.7 declares this array "within a rule", so the name stands for the
+    // §18.17: a randsequence statement opens an automatic scope, and §18.17.7
+    // declares this array inside a rule, so the name stands for the
     // array only while that scope is on the stack. RegisterLocalArray puts the
     // shape in the same scope as the implicit variables
     // StoreRuleProductionValue creates, so PopScope takes both away together: a
