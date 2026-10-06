@@ -24,15 +24,7 @@ struct CliOptions {
   std::vector<std::string> source_files;
   std::string top_module;
   std::string vcd_file;
-  std::string output_file;
-  std::string timescale;
-  std::string fst_file;
-  std::string format;
-  std::string lib_file;
-  std::string target;
   std::vector<std::string> include_dirs;
-  std::vector<std::string> lib_dirs;
-  std::vector<std::string> lib_files;
 
   std::vector<std::string> lib_search_order;
   // §33.3.1 (printed page 935): "all compliant tools shall provide a mechanism
@@ -74,13 +66,11 @@ struct CliOptions {
   // arguments by their starting with the plus (+) character", each kept
   // without that sign, which $test$plusargs and $value$plusargs match without.
   std::vector<std::string> plus_args;
-  uint64_t max_time = 0;
   // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
   // a budget rather than a rule. It exists so a design that generates more
   // instances than the default admits can say so, instead of being refused.
   int64_t max_generate_iterations = delta::kDefaultMaxGenerateIterations;
   uint32_t seed = 0;
-  uint32_t lut_size = 4;
   bool synth_mode = false;
   bool lint_only = false;
   // --parse-only stops after the parse, where --lint-only stops after the
@@ -90,16 +80,11 @@ struct CliOptions {
   bool dump_ir = false;
   bool dump_aig = false;
   bool no_opt = false;
-  bool area_mode = false;
-  bool delay_mode = false;
-  bool retime = false;
-  bool wall = false;
   bool werror = false;
   bool show_version = false;
   bool show_help = false;
   // §11.11's choice among the three values of a min:typ:max expression, set by
-  // --mintypmax. Not delay_mode above, which is the synthesizer's
-  // delay-oriented optimization.
+  // --mintypmax.
   delta::DelayMode mintypmax = delta::DelayMode::kTyp;
   // §36.12.2.2's default VPI compatibility mode for the run, selected by
   // --vpi-compat-mode: one of the vpiCompatibilityMode values Annex M's

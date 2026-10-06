@@ -164,7 +164,6 @@ bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
 bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
                            const char* const argv[], CliOptions& opts) {
   ArgCursor cur{i, argc, argv, opts};
-  if (TakeNumber(arg, "--max-time", cur, opts.max_time)) return true;
   if (TakeNumber(arg, "--seed", cur, opts.seed)) return true;
   return TakeNumber(arg, "--max-generate-iterations", cur,
                     opts.max_generate_iterations);
@@ -256,21 +255,9 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
   ArgCursor cur{i, argc, argv, opts};
   if (TakeValue(arg, "--top", cur, opts.top_module)) return true;
   if (TakeValue(arg, "--vcd", cur, opts.vcd_file)) return true;
-  if (TakeValue(arg, "-o", cur, opts.output_file)) return true;
-  if (TakeValue(arg, "--timescale", cur, opts.timescale)) return true;
-  if (TakeValue(arg, "--fst", cur, opts.fst_file)) return true;
   if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
   if (TryParseMinTypMaxArg(arg, i, argc, argv, opts)) return true;
   return TryParseVpiCompatModeArg(arg, i, argc, argv, opts);
-}
-
-bool TryParseSynthArg(std::string_view arg, int& i, int argc,
-                      const char* const argv[], CliOptions& opts) {
-  ArgCursor cur{i, argc, argv, opts};
-  if (TakeValue(arg, "--target", cur, opts.target)) return true;
-  if (TakeNumber(arg, "--lut-size", cur, opts.lut_size)) return true;
-  if (TakeValue(arg, "--lib", cur, opts.lib_file)) return true;
-  return TakeValue(arg, "--format", cur, opts.format);
 }
 
 bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
@@ -300,10 +287,6 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
   }
   if (arg == "--dump-ir") {
     opts.dump_ir = true;
-    return true;
-  }
-  if (arg == "-Wall") {
-    opts.wall = true;
     return true;
   }
   if (arg == "-Werror") {
@@ -338,26 +321,12 @@ bool TryParseSynthFlag(std::string_view arg, CliOptions& opts) {
     opts.no_opt = true;
     return true;
   }
-  if (arg == "--area") {
-    opts.area_mode = true;
-    return true;
-  }
-  if (arg == "--delay") {
-    opts.delay_mode = true;
-    return true;
-  }
-  if (arg == "--retime") {
-    opts.retime = true;
-    return true;
-  }
   return false;
 }
 
 bool TryParseLibArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
   ArgCursor cur{i, argc, argv, opts};
-  if (TakeValue(arg, "-v", cur, opts.lib_files)) return true;
-  if (TakeValue(arg, "-y", cur, opts.lib_dirs)) return true;
   if (TakeValue(arg, "-L", cur, opts.lib_search_order)) return true;
   if (TakeValue(arg, "--config", cur, opts.config)) return true;
   if (TakeValue(arg, "--load-lib", cur, opts.precompiled_libs)) return true;
@@ -400,7 +369,6 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
   if (TryParseSynthFlag(arg, opts)) return true;
   if (TryParseDefineArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
-  if (TryParseSynthArg(arg, i, argc, argv, opts)) return true;
   if (TryParseLibArg(arg, i, argc, argv, opts)) return true;
   if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) {
     // §34.3.1's options record a refused value on their own struct, which is

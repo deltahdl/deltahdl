@@ -145,19 +145,11 @@ TEST(SeparateCompilationCommandLine, SourceFileNameReachesTheSourceFiles) {
   EXPECT_EQ(opts.source_files, std::vector<std::string>{"adder.sv"});
 }
 
-TEST(SeparateCompilationCommandLine, MaxTimeWithTextForItsValueIsRejected) {
+TEST(SeparateCompilationCommandLine, SeedWithTextForItsValueIsRejected) {
   // std::from_chars answers that the text was not a number. std::stoull threw
   // std::invalid_argument for it and nothing caught the exception, so before
   // issue #3426 was fixed the process terminated here and no case could report
   // at all.
-  CliOptions opts;
-  EXPECT_FALSE(ParseCommandLine({"--max-time", "later"}, opts));
-  EXPECT_TRUE(opts.rejected_argument);
-}
-
-TEST(SeparateCompilationCommandLine, SeedWithTextForItsValueIsRejected) {
-  // --seed is a separate call to TakeNumber in src/driver/cli_options.cpp, so
-  // it is a separate case from --max-time above.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--seed", "random"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -165,53 +157,30 @@ TEST(SeparateCompilationCommandLine, SeedWithTextForItsValueIsRejected) {
 
 TEST(SeparateCompilationCommandLine,
      MaxGenerateIterationsWithTextForItsValueIsRejected) {
-  // The third of the four calls to TakeNumber, and the only one whose field is
+  // The second of the two calls to TakeNumber, and the one whose field is
   // signed.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--max-generate-iterations", "many"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
 }
 
-TEST(SeparateCompilationCommandLine, LutSizeWithTextForItsValueIsRejected) {
-  // The fourth call to TakeNumber, made from TryParseSynthArg rather than from
-  // TryParseSimNumericArg.
-  CliOptions opts;
-  EXPECT_FALSE(ParseCommandLine({"--lut-size", "wide"}, opts));
-  EXPECT_TRUE(opts.rejected_argument);
-}
-
-TEST(SeparateCompilationCommandLine, MaxTimeAboveTheFieldsRangeIsRejected) {
-  // A value too large for CliOptions::max_time is
+TEST(SeparateCompilationCommandLine, SeedAboveTheFieldsRangeIsRejected) {
+  // A value too large for CliOptions::seed, a uint32_t, is
   // std::errc::result_out_of_range, which std::from_chars reports separately
   // from text that is no number at all. std::stoull threw std::out_of_range
-  // for it, which is a second way the same call terminated the process.
+  // for such a value, which is a second way the same call terminated the
+  // process.
   CliOptions opts;
-  EXPECT_FALSE(
-      ParseCommandLine({"--max-time", "99999999999999999999999999"}, opts));
+  EXPECT_FALSE(ParseCommandLine({"--seed", "4294967296"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
-}
-
-TEST(SeparateCompilationCommandLine,
-     MaxTimeWithTrailingTextAfterItsDigitsIsRejected) {
-  // std::from_chars stops at the first character it cannot read, so "100ns"
-  // would set max_time to 100 unless the whole value has to be consumed for
-  // the option to have been given a number.
-  CliOptions opts;
-  EXPECT_FALSE(ParseCommandLine({"--max-time", "100ns"}, opts));
-  EXPECT_TRUE(opts.rejected_argument);
-}
-
-TEST(SeparateCompilationCommandLine, MaxTimeReachesTheMaxTimeField) {
-  // 4200 is not the field's default of 0, so a parser that never read the
-  // value would fail this. The four cases refusing a numeric value above would
-  // all pass against a parser that refused every value; these four are what
-  // rule that parser out.
-  CliOptions opts;
-  EXPECT_TRUE(ParseCommandLine({"--max-time", "4200"}, opts));
-  EXPECT_EQ(opts.max_time, 4200U);
+  EXPECT_EQ(opts.seed, 0U);
 }
 
 TEST(SeparateCompilationCommandLine, SeedReachesTheSeedField) {
+  // 7 is not the field's default of 0, so a parser that never read the value
+  // would fail this. The cases refusing a numeric value above would all pass
+  // against a parser that refused every value; this one and the next are what
+  // rule that parser out.
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"--seed", "7"}, opts));
   EXPECT_EQ(opts.seed, 7U);
@@ -223,13 +192,6 @@ TEST(SeparateCompilationCommandLine, MaxGenerateIterationsReachesItsField) {
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"--max-generate-iterations", "5000"}, opts));
   EXPECT_EQ(opts.max_generate_iterations, 5000);
-}
-
-TEST(SeparateCompilationCommandLine, LutSizeReachesTheLutSizeField) {
-  // 6 is not the field's default of 4.
-  CliOptions opts;
-  EXPECT_TRUE(ParseCommandLine({"--lut-size", "6"}, opts));
-  EXPECT_EQ(opts.lut_size, 6U);
 }
 
 TEST(SeparateCompilationCommandLine,

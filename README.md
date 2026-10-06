@@ -12,14 +12,10 @@ deltahdl [options] <source-files...>
 
 | Option | Description |
 | --- | --- |
-| `-o <name>` | Set output name |
 | `--top <module>` | Top-level module |
 | `-f <file>` | Read options from file |
-| `-v <file>` | Verilog library file |
-| `-y <dir>` | Verilog library directory |
 | `+define+<name>=<value>` | Define macro |
 | `+incdir+<path>` | Include directory |
-| `-Wall` | Enable all warnings |
 | `-Werror` | Treat warnings as errors |
 | `--version` | Show version |
 | `--help` | Show help |
@@ -29,10 +25,7 @@ deltahdl [options] <source-files...>
 | Option | Description |
 | --- | --- |
 | `--vcd <file>` | Dump VCD waveforms |
-| `--fst <file>` | Dump FST waveforms |
-| `--max-time <time>` | Maximum simulation time |
 | `--seed <n>` | Random seed |
-| `--timescale <t/p>` | Override default timescale |
 | `--lint-only` | Parse and elaborate only |
 | `--dump-ast` | Print AST to stdout |
 | `--dump-ir` | Print RTLIR to stdout |
@@ -42,14 +35,7 @@ deltahdl [options] <source-files...>
 | Option | Description |
 | --- | --- |
 | `--synth` | Enable synthesis mode |
-| `--target <name>` | Target technology |
-| `--lut-size <n>` | LUT input count (default 4) |
-| `--lib <file>` | Liberty timing library |
-| `--format <fmt>` | Output format: `blif`, `verilog`, `json`, `edif` |
 | `--no-opt` | Skip optimization passes |
-| `--area` | Area-oriented optimization |
-| `--delay` | Delay-oriented optimization |
-| `--retime` | Enable register retiming |
 | `--dump-aig` | Print AIG to stdout |
 
 ### Viewport Access Values
@@ -77,10 +63,10 @@ Lint-only (parse and elaborate without simulating):
 deltahdl --lint-only design.sv
 ```
 
-Synthesize to BLIF:
+Synthesize a design to an and-inverter graph and print its size:
 
 ```sh
-deltahdl --synth --format blif --top alu alu.sv
+deltahdl --synth --top alu alu.sv
 ```
 
 Use an options file:

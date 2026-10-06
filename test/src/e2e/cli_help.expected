@@ -4,21 +4,18 @@ SystemVerilog IEEE 1800-2023 simulator and synthesizer
 Usage: deltahdl [options] <source-files...>
 
 General:
-  -o <name>            Set output name
   --top <module>       Top-level module
   --mintypmax <val>    min:typ:max member: min, typ or max
   --max-generate-iterations <n>
                        Loop generate iteration budget (default 262144)
   -f <file>            Read options from file
-  -v <file>            Verilog library file
-  -y <dir>             Verilog library directory
   -L <name>            Library search order (repeatable)
   <file>.map           Library map file, read before the sources (33.3.1);
                        lib.map in the working directory when none is named
   +define+<n>=<v>      Define macro
   +incdir+<path>       Include directory
   +<plusarg>           Plusarg for $test$plusargs and $value$plusargs (21.6)
-  -Wall -Werror        Warning controls
+  -Werror              Treat warnings as errors
   --version / --help   Info
 
 Protected envelopes:
@@ -29,10 +26,7 @@ Protected envelopes:
 
 Simulation:
   --vcd <file>         Dump VCD waveforms
-  --fst <file>         Dump FST waveforms
-  --max-time <time>    Maximum simulation time
   --seed <n>           Random seed
-  --timescale <t/p>    Override default timescale
   --vpi-compat-mode <mode>
                        Default VPI compatibility mode (36.12.2.2):
                        1364v1995, 1364v2001, 1364v2005, 1800v2005, 1800v2009
@@ -47,18 +41,11 @@ Simulation:
 
 Synthesis:
   --synth              Synthesis mode
-  --target <name>      Target technology
-  --lut-size <n>       LUT input count (default 4)
-  --lib <file>         Liberty timing library
   --config <name>      Configuration to bind (33.5.4)
   --load-lib <file>    Precompiled library to bind from
   --precompile-into <library>
                        Library to compile sources into
   --precompile-out <file>
                        File the precompiled cells go to
-  --format <fmt>       Output format (blif/verilog/json/edif)
   --no-opt             Skip optimization passes
-  --area               Area-oriented optimization
-  --delay              Delay-oriented optimization
-  --retime             Enable register retiming
   --dump-aig           Print AIG to stdout
