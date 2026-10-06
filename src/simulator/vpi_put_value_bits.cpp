@@ -275,8 +275,12 @@ void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
   obj.scheduled_puts.push_back(&event);
   Event* queued = scheduler.GetEventPool().Acquire();
   queued->superseded = event.put_superseded;
+  // The scheduler runs a superseded event's callback as well, so a put that a
+  // cancel or a later put removed checks for that itself, before it reads the
+  // vpiSchedEvent a cancel frees.
   queued->callback = [target = &obj, sched = &event, bits = std::move(bits),
-                      kWidth]() {
+                      kWidth, removed = event.put_superseded]() {
+    if (*removed) return;
     sched->scheduled = false;
     VpiWriteDecodedBits(*target, bits, kWidth);
     target->var->NotifyWatchers();
