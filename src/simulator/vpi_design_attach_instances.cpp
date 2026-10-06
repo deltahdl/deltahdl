@@ -290,7 +290,7 @@ void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
 void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   // §38.11's example is what a definition name is for: vpi_handle_by_name
   // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
-  // instance of -- "Module top.mod1 is an instance of %s". The instance's own
+  // instance of, which the example prints for top.mod1. The instance's own
   // name is vpiName and is the answer to a different question, so a module
   // reporting it here said that top.mod1 is an instance of mod1.
   //

@@ -172,7 +172,7 @@ struct VpiObject {
 
   // §38.13: the object's time unit, as a base-ten exponent of one second (e.g.
   // -9 for 1 ns, -12 for 1 ps). vpi_get_time() scales a scaled-real result to
-  // this unit - the "timescale of the object". Zero leaves the scaled value
+  // this unit, the object's own timescale. Zero leaves the scaled value
   // expressed in the simulation time unit (no scaling).
   int time_unit = 0;
 
@@ -843,7 +843,7 @@ struct VpiObject {
 
   // §38.3: whether the underlying simulation object this handle denotes exists
   // at the time it is queried. vpi_compare_objects() compares objects only
-  // "provided that the simulation object exists", so a handle whose object is
+  // while the simulation object exists, so a handle whose object is
   // absent (for instance a class handle that is still null) never compares
   // equal. True by default - most objects exist for the whole simulation.
   bool object_exists = true;

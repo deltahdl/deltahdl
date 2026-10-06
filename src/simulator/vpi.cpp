@@ -25,10 +25,10 @@
 
 namespace {
 
-// The error status of one VPI routine call, from end to end. §38.2 has "the
-// error status ... reset by any VPI routine call except vpi_chk_error()", which
-// is what the constructor does, and §36.10.1 has "callbacks can be set up for
-// when an error occurs as well", which is what the destructor delivers: an
+// The error status of one VPI routine call, from end to end. §38.2 has every
+// VPI routine but vpi_chk_error() reset the error status, which is what the
+// constructor does, and §36.10.1 lets callbacks be placed on an error
+// occurring, which is what the destructor delivers: an
 // error this routine recorded is the occurrence those callbacks are registered
 // for, and it has occurred by the time the routine is done recording it.
 //
@@ -417,15 +417,15 @@ int VpiContext::Flush() {
   return 0;
 }
 
-// §38.27: channel 32, the MSB, "is reserved to represent a file descriptor (fd)
-// returned from the SystemVerilog $fopen system function", and such a value "is
-// not compatible with the mcd descriptor returned by vpi_mcd_open()". The bit
+// §38.27: channel 32, the MSB, is reserved to mark a file descriptor (fd) that
+// $fopen returned, and such a value cannot be used as the mcd vpi_mcd_open()
+// returns. The bit
 // is what tells the two apart in the file namespace they share.
 constexpr PLI_UINT32 kVpiFdDescriptorChannel = PLI_UINT32{1} << 31;
 
-// §38.27: "The channel descriptor 1 (LSB) is reserved for representing the
-// output channel of the tool that invoked the PLI application and the log file
-// (if one is currently open)."
+// §38.27: channel descriptor 1, the LSB, is reserved for the output channel of
+// the tool that invoked the PLI application, together with the log file when
+// one is open.
 constexpr PLI_UINT32 kVpiToolOutputChannel = 1;
 
 void VpiContext::WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
@@ -455,10 +455,10 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   //
   // An entry with that bit set is not that: it records a file $fopen opened in
   // its fd form, and an fd is one value rather than a set of channels, which is
-  // what "not compatible" amounts to. Such a file gets a channel of its own
-  // here. The fd was handed straight back, as though the two were one kind of
-  // descriptor, so every mcd routine given it worked on whichever channels the
-  // fd's own numbering happened to set bits for.
+  // what the two being incompatible amounts to. Such a file gets a channel of
+  // its own here. The fd was handed straight back, as though the two were one
+  // kind of descriptor, so every mcd routine given it worked on whichever
+  // channels the fd's own numbering happened to set bits for.
   auto existing = channels_.mcd_open_files.find(filename);
   const bool kOpenAsMcd = existing != channels_.mcd_open_files.end() &&
                           (existing->second & kVpiFdDescriptorChannel) == 0;
@@ -562,7 +562,7 @@ bool FlushMcdChannel(VpiChannelState& channels, PLI_UINT32 channel) {
 // §38.24: close the file an fd from $fopen names. An fd is one value rather
 // than a set of channels, so it names one file and there is no channel to
 // release. Returns 0 when the file was open and the fd itself when it was not,
-// which is what "the mcd of the unclosed channels" comes to for a descriptor
+// which is what returning the channels left unclosed comes to for a descriptor
 // that is not a set of them.
 PLI_UINT32 CloseMcdFd(PLI_UINT32 fd,
                       std::unordered_map<std::string, PLI_UINT32>& open_files) {
@@ -578,8 +578,8 @@ PLI_UINT32 CloseMcdFd(PLI_UINT32 fd,
 }  // namespace
 
 PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
-  // §38.24: "This routine can also be used to close file descriptors that were
-  // opened using the system function $fopen", and §38.27 reserves channel 32 -
+  // §38.24: the routine closes file descriptors $fopen opened as well, and
+  // §38.27 reserves channel 32 -
   // the MSB - to stand for such an fd. An fd is one value rather than a set of
   // channels, so a descriptor carrying that bit names one file and is closed as
   // one. The walk below read an fd's own numbering as channels instead: it
@@ -637,7 +637,7 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
   // §38.26: a descriptor of 0 names no file, so it takes the error return.
   if (cd == 0) return nullptr;
 
-  // §38.26: cd is "a single-channel descriptor" - one mcd channel, or an fd
+  // §38.26: cd is a descriptor of one channel - one mcd channel, or an fd
   // from $fopen, which its MSB marks and whose remaining bits are its own
   // numbering rather than channels. A descriptor naming several channels names
   // several files and so no one name, which is the error return. Only an exact
@@ -669,8 +669,8 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
 }
 
 PLI_INT32 VpiContext::McdPrintf(PLI_UINT32 mcd, std::string_view text) {
-  // §38.28: the routine "shall not write to a file represented by an fd file
-  // descriptor returned from $fopen (indicated by the MSB being set)". The MSB
+  // §38.28: the routine does not write to a file named by an fd $fopen
+  // returned, which the MSB being set marks. The MSB
   // is what §38.27 reserves to say a descriptor is a file descriptor rather
   // than an mcd, and an fd is one whole value rather than a set of discrete
   // channel bits, so a descriptor carrying that bit names no channel at all -

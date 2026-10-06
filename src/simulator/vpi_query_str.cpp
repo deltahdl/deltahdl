@@ -579,12 +579,11 @@ PLI_BYTE8* VpiContext::GetStr(int property, VpiHandle obj) {
 
 const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   if (!obj) {
-    // §38.31: "an application can get the path to the implementation's
-    // save/restart location by calling vpi_get_str(vpiSaveRestartLocation,
-    // NULL) from an application callback routine that has been called for
-    // reason cbStartOfSave or cbEndOfSave", and §38.9 says the same of the two
-    // restart reasons. It is the one string property drawn on no object, and a
-    // null handle stopped here before reaching any property at all.
+    // §38.31: a callback routine called for cbStartOfSave or cbEndOfSave can
+    // read the path to the save/restart location with
+    // vpi_get_str(vpiSaveRestartLocation, NULL), and §38.9 says the same of the
+    // two restart reasons. It is the one string property drawn on no object,
+    // and a null handle stopped here before reaching any property at all.
     if (property == vpiSaveRestartLocation &&
         VpiSaveRestartReasonAllowsLocation(current_callback_reason_) &&
         !save_restart_location_.empty()) {

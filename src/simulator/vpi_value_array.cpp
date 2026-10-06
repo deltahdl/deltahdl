@@ -352,13 +352,13 @@ Variable* PutValueArrayElement(VpiObject* element,
 
 // §38.16: whether the requested format suits the data type of the array's
 // elements. The clause names the element kinds three of the formats are
-// appropriate for - vpiShortIntVal "only for arrays of vpiShortIntVar or
-// vpiByteVar elements", vpiLongIntVal "for arrays of vpiLongIntVar,
-// vpiShortIntVar or vpiByteVar elements", and vpiShortRealVal "only for arrays
-// of vpiShortRealVar elements". Every other format it lists is one it allows of
+// appropriate for - vpiShortIntVal for elements that are vpiShortIntVar or
+// vpiByteVar alone, vpiLongIntVal for vpiLongIntVar, vpiShortIntVar or
+// vpiByteVar elements, and vpiShortRealVal for vpiShortRealVar elements alone.
+// Every other format it lists is one it allows of
 // any element type: the raw and vector formats are drawn for 4-state arrays and
-// "can also be requested of a 2-state array type", and the reverse, which is
-// the "except where explicitly allowed" the error rule carves out.
+// may be asked of a 2-state array as well, and the reverse, which is the
+// explicit allowance the error rule carves out.
 bool VpiArrayFormatSuitsElementType(int fmt, int elem_type) {
   switch (fmt) {
     case kVpiShortIntVal:
@@ -406,12 +406,12 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
     return false;
   }
 
-  // §38.16: "formats requested that are inconsistent with the data type of the
-  // array elements (except where explicitly allowed) shall be considered an
-  // error". The data type in question is the elements' own, so it is read off
-  // them; an array holding none has no data type for a format to disagree with.
-  // Only the format's being one the routine knows was checked, so a request for
-  // shorts of an array of anything at all was answered with shorts.
+  // §38.16: a format that does not fit the data type of the array's elements,
+  // where the clause does not expressly allow it, is an error. The data type in
+  // question is the elements' own, so it is read off them; an array holding
+  // none has no data type for a format to disagree with. Only the format's
+  // being one the routine knows was checked, so a request for shorts of an
+  // array of anything at all was answered with shorts.
   const VpiObject* first = FirstElement(*obj);
   if (first != nullptr &&
       !VpiArrayFormatSuitsElementType(static_cast<int>(arrayvalue_p->format),
@@ -649,8 +649,9 @@ void VpiContext::PutValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   // update event before the array reads correctly during active simulation. So
   // the notification is the default and the flag is what withholds it, rather
   // than the other way about. Notifying once the whole section is written is
-  // what "one or more values have changed" describes: what fans out of the
-  // array sees the section the call was asked for and not a partial fill of it.
+  // what a notice that one or more values have changed describes: what fans out
+  // of the array sees the section the call was asked for and not a partial fill
+  // of it.
   if ((arrayvalue_p->flags & kVpiPropagateOff) == 0) {
     for (Variable* var : written) var->NotifyWatchers();
   }

@@ -1,8 +1,7 @@
 // §38.37.2 ("Initializing VPI system task or system function callbacks"): the
-// file this tool supplies containing the vlog_startup_routines array. "A tool
-// vendor shall supply a file that contains the vlog_startup_routines array. The
-// names of the PLI application register functions shall be added to this
-// vendor-supplied file."
+// file this tool supplies containing the vlog_startup_routines array. The
+// clause has the tool vendor supply that file, and the names of the PLI
+// applications' register functions are added to it.
 //
 // §38.37.2 leaves two things to the tool vendor to define, and this is where
 // they are defined for deltahdl.
@@ -19,14 +18,14 @@
 
 #include "simulator/vpi_globals.h"
 
-// §38.37.2: "A C function using the array definition shall be provided as
-// follows: void (*vlog_startup_routines[]) ();" - a null-terminated static
+// §38.37.2: the array is provided as a C definition,
+// void (*vlog_startup_routines[]) (); - a null-terminated static
 // array of functions taking no arguments and returning nothing, which is what
 // §36.9.1's VlogStartupRoutine names. The array is declared extern "C" so that
 // a PLI application, whose register functions are C functions, links against
 // the name the standard fixes rather than against a mangled one.
 //
-// §38.37.2: "Entries in the array shall be added by the user." The tool ships
+// §38.37.2: the user adds the array's entries. The tool ships
 // the array holding nothing but its terminator, so every routine that runs at
 // startup is one somebody added here.
 extern "C" {

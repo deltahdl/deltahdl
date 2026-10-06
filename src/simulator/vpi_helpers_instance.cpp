@@ -257,8 +257,8 @@ void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
 // ===========================================================================
 
 void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
-  // §38.10: "the VPI routine vpi_get_delays() shall retrieve the delays or
-  // pulse limits of an object". A module path is one of the four kinds of
+  // §38.10: vpi_get_delays() retrieves an object's delays or pulse limits. A
+  // module path is one of the four kinds of
   // object the clause gives legal no_of_delays values for, and it is the one
   // whose twelve transition delays the clause takes without interpreting them
   // -- the 12-value row of Table 38-2 is the path's own array. No object a run
@@ -282,9 +282,9 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     obj->type = vpiModPath;
     obj->parent = module;
     module->children.push_back(obj);
-    // §38.10: "the application-allocated s_vpi_delay array shall contain delays
-    // in the same order in which they occur in the SystemVerilog description",
-    // which for a module path is the order of its transition slots, and the
+    // §38.10: the s_vpi_delay array the application allocated holds the delays
+    // in the order the SystemVerilog description writes them, which for a
+    // module path is the order of its transition slots, and the
     // pulse limits §30.7 gives each of them travel with each delay.
     obj->delays.reserve(path.delay_count);
     for (uint8_t i = 0; i < path.delay_count; ++i) {

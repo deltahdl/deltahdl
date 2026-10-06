@@ -87,15 +87,14 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
            "in a protected portion of the code";
   }
 
-  // §38.36.1.2: "Every possible object within the stmt class qualifies for
-  // having a cbStmt callback placed on it. Each possible object is listed in
-  // Table 38-6" - and the table is what §38.36.1.1 points the obj field at for
-  // "the allowable objects". A handle to an object of any other kind names no
-  // statement this callback could be called before, so the registration is
-  // refused rather than answered with a callback nothing could ever fire. The
-  // one handle in the field that is not a statement is a module instance, which
-  // §38.36.1.3 defines as placing the callback on every statement the instance
-  // holds rather than on the module itself.
+  // §38.36.1.2: a cbStmt callback can be placed on any object of the stmt
+  // class, and Table 38-6 lists them - the table §38.36.1.1 points the obj
+  // field at for the objects it allows. A handle to an object of any other kind
+  // names no statement this callback could be called before, so the
+  // registration is refused rather than answered with a callback nothing could
+  // ever fire. The one handle in the field that is not a statement is a module
+  // instance, which §38.36.1.3 defines as placing the callback on every
+  // statement the instance holds rather than on the module itself.
   if (data.reason == cbStmt && data.obj &&
       VpiObjectOf(data.obj)->type != kVpiModule &&
       !VpiIsScopeBodyStmtType(VpiObjectOf(data.obj)->type)) {
@@ -494,9 +493,9 @@ namespace {
 // registered with a vpiSuppressTime time type, no time is passed to the routine
 // and the time pointer is set to NULL. A non-cbStmt callback is left untouched.
 //
-// Otherwise the routine is passed a time structure "which will contain the
-// current simulation time, of the type ... indicated in the call to
-// vpi_register_cb()". At registration "only the type is used", so the structure
+// Otherwise the routine is passed a time structure holding the current
+// simulation time in the form vpi_register_cb() asked for. At registration only
+// the form is read from it, so the structure
 // the application supplied there says which form to deliver and nothing about
 // when: the time itself is read here, as the statement is about to execute. It
 // goes into storage the dispatch owns, because the structure the routine sees
@@ -548,13 +547,11 @@ void VpiNormalizeSimEventCbData(s_cb_data& data) {
   }
 }
 
-// §38.36.2: shape the s_cb_data a simulation-time callback delivers. "When a
-// simulation time callback occurs, the application callback routine shall be
-// passed a single argument, which is a pointer to an s_cb_data structure [this
-// is not a pointer to the same structure that was passed to
-// vpi_register_cb()]. The time structure shall contain the current simulation
-// time", and "the value fields are ignored for all reasons with simulation
-// time callbacks".
+// §38.36.2: shape the s_cb_data a simulation-time callback delivers. The
+// routine is passed one argument, a pointer to an s_cb_data structure that is
+// not the one given to vpi_register_cb(); its time structure holds the current
+// simulation time, and its value fields mean nothing for any simulation-time
+// reason.
 //
 // The routine was passed the time the registration asked the callback to fire
 // at, which is the delay or the requested moment rather than the time the
@@ -564,7 +561,7 @@ void VpiNormalizeSimEventCbData(s_cb_data& data) {
 // the pointer the registration supplied would overwrite the request. The
 // requested form is kept, vpiSimTime delivering the raw count and
 // vpiScaledRealTime a real scaled to the timescale of the obj field, which
-// §38.36.2 names as "the object for determining the time scaling".
+// §38.36.2 names as the object the time is scaled by.
 void VpiNormalizeSimTimeCbData(s_cb_data& data, s_vpi_time& delivered,
                                VpiContext& ctx) {
   if (!VpiIsSimulationTimeCallbackReason(data.reason)) return;
@@ -889,9 +886,9 @@ void VpiContext::NoteErrorRecorded() {
   if (dispatching_error_callbacks_) return;
 
   dispatching_error_callbacks_ = true;
-  // §38.36.3: "cbPLIError -- simulation run-time error occurred in a PLI
-  // function call", against cbError's "simulation run-time error occurred". The
-  // state §38.2 gives the error is what separates them.
+  // §38.36.3: cbPLIError is a run-time error that arose in a PLI function call,
+  // where cbError is any run-time error. The state §38.2 gives the error is
+  // what separates them.
   DispatchCallbacks(last_error_.state == kVpiPLI ? kCbPLIError : kCbError);
   dispatching_error_callbacks_ = false;
 }

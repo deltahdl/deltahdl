@@ -110,7 +110,7 @@ bool VpiStartupCallbackReasonAllowed(int reason);
 // placement vpi_register_cb() constrains through the s_cb_data time structure.
 bool VpiIsSimulationTimeCallbackReason(int reason);
 
-// §38.19: whether an object type carries the "access by index" property - the
+// §38.19: whether an object type can be accessed by index - the
 // property the reference object of vpi_handle_by_index() must have. An object
 // has it when one of its relationships selects a sub-object by an index number:
 // a module indexes its ports, a net or reg indexes its bits, and an array or

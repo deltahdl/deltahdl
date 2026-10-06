@@ -30,16 +30,16 @@ namespace delta {
 VpiHandle VpiContext::RegisterSystf(s_vpi_systf_data* data) {
   if (!data) return nullptr;
 
-  // §38.37.1: "The type field shall be an integer constant of vpiSysTask or
-  // vpiSysFunc." A record carrying anything else registers the application as
+  // §38.37.1: the type field is the integer constant vpiSysTask or vpiSysFunc.
+  // A record carrying anything else registers the application as
   // neither, and there is no third thing for it to be: every later reading of
   // the field asks only whether it is vpiSysFunc, so such a record would stand
   // in the registry as a system task the application never asked for.
   //
   // §38.37.3 is where the field's zero says something of its own. A static
-  // array of s_vpi_systf_data structures may set "the final element in the
-  // array ... to 0", and then "the calls to vpi_register_systf() can be placed
-  // in a loop that terminates when it reaches the 0": the zero marks the end of
+  // array of s_vpi_systf_data structures may end with an element set to 0, so
+  // that a loop of vpi_register_systf() calls stops on reaching it: the zero
+  // marks the end of
   // the list rather than a registration, so a loop that runs one element too
   // far has to be refused rather than answered with a handle.
   if (data->type != kVpiSysTask && data->type != kVpiSysFunc) {
@@ -65,16 +65,16 @@ VpiHandle VpiContext::RegisterSystf(s_vpi_systf_data* data) {
     return nullptr;
   }
 
-  // §38.37.1: of the tfname a registration carries, "the maximum name length
-  // shall be the same as for SystemVerilog identifiers", which §5.6 caps at the
+  // §38.37.1: the tfname a registration carries has the same maximum length as
+  // a SystemVerilog identifier, which §5.6 caps at the
   // implementation's own limit and requires an error to be reported for. That
   // limit is kMaxIdentifierLength, the one the lexer measures an identifier
   // against, so the two are the same by construction rather than by agreement
   // between two literals.
   //
-  // §36.3's "the name can be any size" governs the name a SystemVerilog source
-  // file writes and not this one: that is the token LexSystemIdentifier reads,
-  // and this is the string a PLI application hands the registration.
+  // §36.3's allowance of a name of any size governs the name a SystemVerilog
+  // source file writes and not this one: that is the token LexSystemIdentifier
+  // reads, and this is the string a PLI application hands the registration.
   if (std::string_view(data->tfname).size() > kMaxIdentifierLength) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
@@ -722,7 +722,8 @@ void* VpiContext::GetUserData(VpiHandle obj) {
 
   // §38.14: return whatever vpi_put_userdata() (§38.33) last associated with
   // the call instance. When nothing was ever associated the field is null,
-  // which is exactly the NULL the routine must return for "no user data". A
+  // which is exactly the NULL the routine must return when there is no user
+  // data. A
   // restart or a reset clears the field (§38.33), so a read here returns null
   // afterwards until the application sets it again.
   return obj->user_data;

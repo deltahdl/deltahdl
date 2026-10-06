@@ -917,8 +917,8 @@ VpiHandle VpiContext::Scan(VpiHandle iterator) {
   // handing back the next one on each call so the traversal advances one object
   // at a time. A null handle has nothing to traverse.
   if (!iterator) return nullptr;
-  // §38.40 Arguments: the one handle this routine takes is a "handle to an
-  // iterator object returned from vpi_iterate()", and §38.23 makes that handle
+  // §38.40 Arguments: the one handle this routine takes is one to an iterator
+  // object vpi_iterate() returned, and §38.23 makes that handle
   // an object of type vpiIterator. Any other object directs no traversal, so
   // walking its children hands an application objects out of a call the clause
   // gives no meaning to -- and retiring it at the end of that walk destroys an

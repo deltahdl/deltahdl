@@ -159,10 +159,10 @@ void Scheduler::ReleaseSlot(TimeSlot& slot) {
 }
 
 void Scheduler::Run() {
-  // §38.36.3: "cbStartOfSimulation -- start of simulation (beginning of time
-  // zero simulation cycle)". It is one of the action reasons, which the clause
-  // separates from the feature reasons by saying that "actions shall occur in
-  // all VPI-compliant tools", and this is where simulation starts: the design
+  // §38.36.3: cbStartOfSimulation marks the start of simulation, the beginning
+  // of the time zero cycle. It is one of the action reasons, which the clause
+  // separates from the feature reasons by requiring every VPI-compliant tool to
+  // raise them, and this is where simulation starts: the design
   // is built and no event has run.
   GetGlobalVpiContext().DispatchCallbacks(kCbStartOfSimulation);
 
@@ -206,9 +206,8 @@ void Scheduler::Run() {
   if (ctx_) ctx_->SetCurrentProcess(nullptr);
   if (ProgramsEnded()) ctx_->RequestStop();
 
-  // §38.36.3: "cbEndOfSimulation -- end of simulation (simulation ended because
-  // no more events remain in the event queue or a $finish system task
-  // executed)". Both are how the loop above ends.
+  // §38.36.3: cbEndOfSimulation marks the end of simulation, whether the event
+  // queue ran empty or a $finish executed. Both are how the loop above ends.
   GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
 }
 

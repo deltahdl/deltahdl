@@ -194,11 +194,11 @@ constexpr int kVpiInternal = vpiInternal;
 // what the routine was doing; kVpiCompile and kVpiRun name the other two
 // activities an error can arise in.
 // §38.9: the save/restart location this run keeps its saved data in, as
-// vpi_get(vpiSaveRestartID, NULL) hands it back -- "a save/restart ID returned
-// from vpi_get(vpiSaveRestartID, NULL)" is where the clause has an application
-// get the id it then passes to vpi_put_data() and vpi_get_data(). A run has one
-// such location, so it has one id, and the value is nonzero because zero is
-// what vpi_get() answers for a property it does not have.
+// vpi_get(vpiSaveRestartID, NULL) hands it back -- the call the clause has an
+// application make for the id it then passes to vpi_put_data() and
+// vpi_get_data(). A run has one such location, so it has one id, and the value
+// is nonzero because zero is what vpi_get() answers for a property it does not
+// have.
 constexpr int kVpiRunSaveRestartId = 1;
 
 constexpr int kVpiCompile = vpiCompile;

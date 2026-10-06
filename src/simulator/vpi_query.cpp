@@ -827,9 +827,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
 // provides the shared full-width access path and the error behaviour those
 // properties rely on.
 PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
-  // §38.6 gives a null handle a meaning of its own for two properties - "For
-  // object property vpiTimeUnit or vpiTimePrecision, if the object is NULL,
-  // then the simulation time unit shall be returned" - and §38.9 gives it
+  // §38.6 gives a null handle a meaning of its own for two properties -
+  // vpiTimeUnit and vpiTimePrecision of a NULL object answer the simulation
+  // time unit - and §38.9 gives it
   // another for the save/restart id. Those are answers about the run rather
   // than about an object, so they do not change with the width of the reader
   // asking; this returned a zero of its own instead, and the same query put to

@@ -216,9 +216,8 @@ namespace {
 
 // §38.17: the option this tool passes a file of options with. The driver reads
 // it in src/driver/cli_options.cpp, and the clause says what
-// vpi_get_vlog_info() reports of such a file: "the argument strings returned by
-// vpi_get_vlog_info() shall contain the vendor option string name followed by a
-// pointer to a NULL-terminated array of pointers to characters".
+// vpi_get_vlog_info() reports of such a file: the vendor's option string,
+// followed by a pointer to a NULL-terminated array of character pointers.
 constexpr std::string_view kVpiVendorOptionsFileFlag = "-f";
 
 // The driver caps how deep options files may nest; this walk caps it the same
@@ -273,9 +272,8 @@ int VpiBuildArgvArray(const std::vector<std::string>& words, int depth,
                             i + 1 < words.size() &&
                             depth < kVpiMaxOptionsFileDepth;
     if (!kNamesFile) continue;
-    // §38.17: "The value in entry zero shall contain the name of the file. The
-    // remaining entries shall contain pointers to NULL-terminated character
-    // arrays containing the different options in the file."
+    // §38.17: entry zero holds the file's name, and each later entry points to
+    // a NULL-terminated string holding one of the file's options.
     std::vector<std::string> nested = {words[i + 1]};
     for (std::string& word : VpiOptionsFileWords(words[i + 1])) {
       nested.push_back(std::move(word));
@@ -310,8 +308,8 @@ void VpiPlaceArgvArrays(std::vector<std::string>& pool,
   }
 }
 
-// §38.17: "the vendor option string name followed by a pointer to a
-// NULL-terminated array of pointers to characters" - the pointer is written
+// §38.17: the vendor's option string is followed by a pointer to a
+// NULL-terminated array of character pointers - the pointer is written
 // here, once the array it reaches has a place of its own in the report.
 void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
                        std::vector<PLI_BYTE8*>* argv) {
@@ -377,13 +375,13 @@ bool IsChildOf(VpiHandle ref, const VpiObject* obj) {
   return false;
 }
 
-// §38.22 Synopsis: "Obtain a handle for an object in a many-to-one
-// relationship." The one object is the one of kind `type` that every reference
+// §38.22 Synopsis: the routine answers a handle to the object of a many-to-one
+// relationship. The one object is the one of kind `type` that every reference
 // object reaches: an object only one of them reaches stands in a relationship
 // with that one alone, which is the one-to-one relationship vpi_handle() is
-// for. §37.37 detail 1 is this rule read for an intermodule path -- "To get to
-// an intermodule path, vpi_handle_multi(vpiInterModPath, port1, port2) can be
-// used" -- whose one object is the path running between the two named ports.
+// for. §37.37 detail 1 is this rule read for an intermodule path, which
+// vpi_handle_multi(vpiInterModPath, port1, port2) reaches, and whose one object
+// is the path running between the two named ports.
 VpiObject* ObjectSharedBy(VpiHandle ref1, VpiHandle ref2, int type) {
   if (!ref1 || !ref2) return nullptr;
   for (auto* child : ref1->children) {
@@ -396,7 +394,7 @@ VpiObject* ObjectSharedBy(VpiHandle ref1, VpiHandle ref2, int type) {
 
 }  // namespace
 
-// §38.22 Returns: "vpiHandle -- Handle to an object." What comes back is the
+// §38.22 Returns: a vpiHandle to an object. What comes back is the
 // object of the many-to-one relationship rather than anything holding it, which
 // is what the Related routines row separates this routine from its neighbours
 // by: vpi_iterate() and vpi_scan() walk a one-to-many relationship and
@@ -436,8 +434,8 @@ int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
   VpiObject* a = ResolveSameObject(obj1);
   VpiObject* b = ResolveSameObject(obj2);
 
-  // §38.3: the comparison holds only "provided that the simulation object
-  // exists". A handle whose underlying object is absent (e.g. a class handle
+  // §38.3: the comparison holds only while the simulation object exists. A
+  // handle whose underlying object is absent (e.g. a class handle
   // that is still null) is never equal to anything, even to itself.
   if (!a->object_exists || !b->object_exists) return 0;
 
@@ -447,8 +445,8 @@ int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
   // equivalence cannot be settled by a C "==" of the handles.
   if (a == b) return 1;
 
-  // §38.3 asks whether the handles "refer to the same underlying simulation
-  // object", and for a variable or a net that object is the storage the run
+  // §38.3 asks whether the handles name one underlying simulation object, and
+  // for a variable or a net that object is the storage the run
   // keeps for it - which two objects of the model can name at once, a net and
   // the variable its resolution writes among them. Only the representatives
   // were compared, so two handles on one piece of the run's storage answered
@@ -855,7 +853,7 @@ bool VpiSystfNameIsValid(const char* tfname) {
   // §38.37.1: the name shall begin with a dollar sign and shall be followed by
   // one or more characters legal in a SystemVerilog simple identifier. A null
   // pointer, an empty string, or a bare "$" with nothing after it fails the
-  // "one or more" requirement.
+  // requirement of at least one such character.
   if (tfname == nullptr || tfname[0] != '$' || tfname[1] == '\0') return false;
   for (const char* p = tfname + 1; *p != '\0'; ++p) {
     char c = *p;

@@ -869,13 +869,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // event.
   CallBuildPeriodSystfRoutines(design, ctx_, arena_);
 
-  // §38.36.3: "cbEndOfCompile -- end of simulation data structure compilation
-  // or build", which is here: the structure is built and the build period's
-  // routines have run. §36.10.2 puts it in the same place and says what it
-  // opens -- "after the sizetf routines are called, the routines registered for
-  // reason cbEndOfCompile are called. At this point, and continuing until the
-  // tool has finished execution, all functionality is available" -- so the
-  // phase moves with it.
+  // §38.36.3: cbEndOfCompile marks the end of compiling or building the
+  // simulation data structure, which is here: the structure is built and the
+  // build period's routines have run. §36.10.2 puts it in the same place, after
+  // the sizetf routines, and has every function available from then until the
+  // tool finishes, so the phase moves with it.
   VpiContext& vpi = GetGlobalVpiContext();
   vpi.DispatchCallbacks(kCbEndOfCompile);
   vpi.SetToolPhase(VpiToolPhase::kFull);
