@@ -8,10 +8,10 @@ class Arena;
 class SimContext;
 
 // §13.3.1 (printed page 339) and §13.4.2 (printed 344): a subroutine defined
-// in a module, interface, program or package is static by default, "with all
-// declared items being statically allocated", and §13.3.2 (printed 339) has
-// its variables, "including input, output, and inout type arguments", "retain
-// their values between invocations". A static subroutine's frame is pushed
+// in a module, interface, program or package is static by default, every item
+// it declares allocated statically, and §13.3.2 (printed 339) has its
+// variables, its arguments of every direction among them, keep their values
+// from one call to the next. A static subroutine's frame is pushed
 // with the variables it held when the last call returned
 // (SimContext::PushStaticScope), but a queue, an associative array and a
 // fixed-size array's shape stand in the frame's own maps, which start empty,

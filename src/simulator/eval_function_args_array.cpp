@@ -131,11 +131,10 @@ static std::optional<ArrayInfo> FixedFormalShape(const FunctionArg& formal,
   return info;
 }
 
-// §13.5.1: "This argument passing mechanism works by copying each argument into
-// the subroutine area ... If the arguments are changed within the subroutine,
-// the changes are not visible outside the subroutine", and §13.5.2 draws the
-// contrast this and the three binds below erased -- "Arguments passed by
-// reference are not copied into the subroutine area". A map assignment
+// §13.5.1: an argument passed by value is copied into the subroutine's own
+// storage, so a change the subroutine makes to it is not seen outside, and
+// §13.5.2 draws the contrast this and the three binds below erased: an argument
+// passed by reference is not copied at all. A map assignment
 // copy-constructs every entry, and a Logic4Vec copy carries its words pointer
 // rather than the words (src/common/types.h), so the formal's entries were the
 // actual's: an in-place write to either -- DepositBitField writes through the

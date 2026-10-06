@@ -177,14 +177,13 @@ bool RefPropertyTarget(const Expr* actual, SimContext& ctx, Arena& arena,
 Logic4Vec OutputFormalDefault(const DataType& type, uint32_t width,
                               const SimContext& ctx, Arena& arena);
 
-// §13.3.2 (printed page 339): the formals of a static subroutine `func`,
-// "including input, output, and inout type arguments", "retain their values
-// between invocations". An array formal TryBindArrayArg bound is kept as the
-// subroutine's static storage (RetainStaticAggregate), its element variables
-// in the static frame; an output formal, into which the call copies nothing,
-// refers to what the last call left instead of the default it was bound at.
-// Nothing for an automatic subroutine. Defined in
-// eval_function_args_array.cpp.
+// §13.3.2 (printed page 339): the formals of a static subroutine `func`, of
+// every direction, keep their values from one call to the next. An array
+// formal TryBindArrayArg bound is kept as the subroutine's static storage
+// (RetainStaticAggregate), its element variables in the static frame; an
+// output formal, into which the call copies nothing, refers to what the last
+// call left instead of the default it was bound at. Nothing for an automatic
+// subroutine. Defined in eval_function_args_array.cpp.
 void KeepStaticArrayFormal(const ModuleItem* func, const FunctionArg& formal,
                            SimContext& ctx, Arena& arena);
 

@@ -584,17 +584,16 @@ static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
 }
 
 // Carries out a `return <expr>;`. §13.4.1: the function definition implicitly
-// declares a variable internal to the function, and "this variable has the same
-// type as the function return value", so a return is an assignment to a typed
-// object rather than a replacement of it. §10.7 then decides the value: the
-// expression is extended or truncated to the declared width, extending by the
-// expression's own signedness, and the object keeps the signedness its
-// declaration gave it. The other form §13.4.1 offers -- assigning to the
-// function's name -- goes through the ordinary assignment executor and has
-// always done this; a `return` that took the expression's vector whole handed
-// the caller a `logic [7:0]` function's result 32 bits wide, and let a 1-bit
-// comparison's signedness stand in for an `int`'s.
-// §13.4.1 with §10.4: `return X` of a function whose return type is an
+// declares a variable internal to the function, of the function's return type,
+// so a return is an assignment to a typed object rather than a replacement of
+// it. §10.7 then decides the value: the expression is extended or truncated to
+// the declared width, extending by the expression's own signedness, and the
+// object keeps the signedness its declaration gave it. The other form §13.4.1
+// offers -- assigning to the function's name -- goes through the ordinary
+// assignment executor and has always done this; a `return` that took the
+// expression's vector whole handed the caller a `logic [7:0]` function's result
+// 32 bits wide, and let a 1-bit comparison's signedness stand in for an
+// `int`'s. §13.4.1 with §10.4: `return X` of a function whose return type is an
 // unpacked array assigns X to the implicit variable, as `fn = X` would --
 // an array variable's elements copied, an assignment pattern distributed over
 // them, a queue rebuilt -- and the body's completion hands that variable's
