@@ -225,8 +225,8 @@ static GateBit LowGateBit(const Logic4Vec& v) {
 }
 
 // §28.6 Table 28-5: a three-state gate whose control is x or z drives L or H --
-// "The symbol L shall represent a result that has a value 0 or z. The symbol H
-// shall represent a result that has a value 1 or z" -- where an unknown control
+// L standing for an outcome that is 0 or z and H for one that is 1 or z --
+// where an unknown control
 // with an unknown or high-impedance data value drives a plain x. §28.12.2 draws
 // L and H as a range on one side of the strength scale, from the gate's own
 // drive level down to high impedance (Figure 28-6 through Figure 28-8), and a

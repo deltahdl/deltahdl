@@ -14,11 +14,11 @@ namespace {
 
 // One state a bit can stand in: a value at a strength level, or high
 // impedance at level 0. The value is 0 or 1, or x where two opposite values
-// meet at one level (§28.12.2's "two signals of equal strength and opposite
-// value"), which stands on both sides of the scale at that level. An x a
-// driver drives at one level on both sides is `exact`: §28.12.2's "signals
-// with a value x ... have strength levels consisting of subdivisions of both
-// the strength1 and the strength0 parts of the scale", and its level is known.
+// meet at one level (§28.12.2's pair of opposite values at equal strength),
+// which stands on both sides of the scale at that level. An x a driver drives
+// at one level on both sides is `exact`: §28.12.2 gives a signal whose value is
+// x levels from both the strength1 and the strength0 halves of the scale, and
+// its level is known.
 struct BitState {
   uint8_t val = 3;
   uint8_t lvl = 0;

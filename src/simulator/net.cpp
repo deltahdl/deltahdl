@@ -110,7 +110,8 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
-// §28.12.3's "signal of known value and unambiguous strength": one driver's
+// §28.12.3's signal whose value is known and whose strength is unambiguous: one
+// driver's
 // value and the strength level it drives at, in the vocabulary
 // CombineAmbigWithUnambig names them by.
 struct UnambigSignal {
@@ -216,17 +217,17 @@ static void CombineWeakerUnambigInto(
   }
 }
 
-// §28.12.2 classifies "signals with a value x" as having "strength levels
-// consisting of subdivisions of both the strength1 and the strength0 parts of
-// the scale of strengths", so a driver whose value is x stands on both sides of
+// §28.12.2 gives a signal whose value is x strength levels drawn from both the
+// strength1 and the strength0 halves of the strength scale, so a driver whose
+// value is x stands on both sides of
 // the scale, each at the level its own declaration drives that side at: it is
 // the value that is unknown, not the strength. That is the case §21.2.1.4
-// renders with a mnemonic -- "for the unknown value, a mnemonic is used when
-// both the 0 and 1 strength components are at the same strength level".
+// renders with a mnemonic -- an unknown value whose 0 and 1 components sit at
+// one strength level gets one.
 //
 // §28.6 Table 28-5 is the other shape, and it is spelt in the driver's own
-// strength. A three-state gate with a control of x or z drives L or H -- "a
-// result that has a value 0 or z" and "a value 1 or z" -- which §28.12.2's
+// strength. A three-state gate with a control of x or z drives L or H -- an
+// outcome that is 0 or z, or one that is 1 or z -- which §28.12.2's
 // Figure 28-7 and Figure 28-8 draw as a range on one side of the scale running
 // from the driving level down to high impedance, and nothing at all on the
 // other. Such a driver spells x with the side it does not drive at the
@@ -251,9 +252,8 @@ static NetStrength UnknownDriverSignal(DriverStrength ds) {
   return one;
 }
 
-// §28.12.2: "The combination of two signals of ambiguous strength shall result
-// in a signal of ambiguous strength. The resulting signal shall have a range of
-// strength levels that includes the strength levels in its component signals."
+// §28.12.2: two signals of ambiguous strength combine into another, whose range
+// of strength levels covers every level either of them held.
 // Figure 28-9 combines the PuH and the WeL two three-state gates with unknown
 // controls drive and Figure 28-10 draws the result as one range from We0 across
 // high impedance to Pu1, which §21.2.1.4 renders 35X. Every such driver joins
@@ -292,8 +292,8 @@ static void ComputeSingleBitStrength(
     // strength, so every weaker driver is combined in turn. None of them moves
     // a bound here, and the reason is worth stating rather than discovering:
     // the range above runs from the conflict level down to high impedance on
-    // both sides -- §28.12.2 gives such a conflict "the strength levels of both
-    // signals and all the smaller strength levels" -- and §28.12.3's rule c
+    // both sides -- §28.12.2 gives such a conflict the levels of both signals
+    // and every weaker level below them -- and §28.12.3's rule c
     // returns every level rule b takes out of it, the gap between the surviving
     // sides crossing high impedance (Figure 28-23). The combination is made
     // because the clause has it made, and it decides the one-sided range a
@@ -386,7 +386,7 @@ static void DecayKnownBitsToX(Logic4Vec& val) {
 static void RecordTriregChargeStrengths(Net& net);
 
 // §28.16.2.1 (printed page 858): when the charge decay time elapses the net
-// "makes a transition from 1 or 0 to x", and the strength §21.2.1.4 reports for
+// moves from 1 or 0 to x, and the strength §21.2.1.4 reports for
 // it is that of the charge it now stores, an x at the charge's size. The value
 // alone was turned to x, and `%v` went on reporting the decayed 1 as `La1`.
 static void ScheduleDecay(Net& net, Scheduler* sched) {
@@ -479,13 +479,13 @@ static void WidenNetStrengthOverBit(NetStrength& net, const NetStrength& bit) {
 }
 
 // §28.15.2: the charge one bit of a trireg holds, as the strength of a drive.
-// The trireg's charge strength is declared once for the net -- "one of these
-// three strengths: large, medium, or small" -- while the value it retains in
+// The trireg's charge strength is declared once for the net -- large, medium
+// or small -- while the value it retains in
 // the capacitive state is a value per bit (§6.6.4), so which side of the scale
 // the charge appears on is what the bit decides. A bit holding 0 is charged
 // low, one holding 1 is charged high, and one holding neither is charged on
-// both sides, the same way §28.12.2 puts a signal of value x on "subdivisions
-// of both the strength1 and the strength0 parts of the scale".
+// both sides, the same way §28.12.2 puts a signal of value x on levels from
+// both the strength1 and the strength0 halves of the scale.
 static NetStrength TriregBitCharge(const Logic4Vec& value, uint32_t bit,
                                    Strength charge) {
   NetStrength out;
@@ -528,12 +528,12 @@ static void RecordTriregChargeStrengths(Net& net) {
 static void ResolveTriregCharge(Net& net, Scheduler* sched) {
   if (net.was_driven) net.holds_charge = true;
   RecordTriregChargeStrengths(net);
-  // §28.16.2.1: the decay process ends when "the delay specified by charge
-  // decay time elapses, and the trireg net makes a transition from 1 or 0 to
-  // x", so a charge decay time of zero schedules that transition at the current
-  // time rather than never. Reading the count alone left a `trireg #(0, 0, 0)`
-  // holding its charge for the whole run, which is what §28.16.2.2 gives a
-  // declaration writing no third delay instead.
+  // §28.16.2.1: the decay process ends once the charge decay time has run out
+  // and the trireg net has moved from 1 or 0 to x, so a charge decay time of
+  // zero schedules that transition at the current time rather than never.
+  // Reading the count alone left a `trireg #(0, 0, 0)` holding its charge for
+  // the whole run, which is what §28.16.2.2 gives a declaration writing no
+  // third delay instead.
   if (net.decays && sched != nullptr) {
     ScheduleDecay(net, sched);
   }

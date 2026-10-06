@@ -191,22 +191,19 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
 // §28.12.3 combines a signal of known value and unambiguous strength with each
 // component of a signal of ambiguous strength, under three rules:
 //
-//   a) "The strength levels of the ambiguous strength signal that are greater
-//      than the strength level of the unambiguous signal shall remain in the
-//      result."
-//   b) "The strength levels of the ambiguous strength signal that are smaller
-//      than or equal to the strength level of the unambiguous signal shall
-//      disappear from the result, subject to rule c)."
-//   c) "If the operation of rule a) and rule b) results in a gap in strength
-//      levels because the signals are of opposite value, the signals in the gap
-//      shall be part of the result."
+//   a) Levels of the ambiguous signal stronger than the unambiguous signal's
+//      level stay in the result.
+//   b) Levels of the ambiguous signal at or below the unambiguous signal's
+//      level drop out of the result, except as rule c) puts them back.
+//   c) Where rules a) and b) leave a gap in the levels because the two signals
+//      have opposite values, the levels in that gap join the result.
 //
 // What rule c's gap runs to is what the clause's words leave open and its
 // figures settle. Figure 28-23 combines an ambiguous signal occupying the
 // strength1 side with an unambiguous Pu0 and draws the result as one range
-// running Pu0 through high impedance to St1, which its prose states as "a range
-// defined by the greatest strength in the range of the ambiguous strength
-// signal and by the strength level of the unambiguous strength signal". The gap
+// running Pu0 through high impedance to St1, which its prose describes as a
+// range bounded by the ambiguous signal's strongest level at one end and the
+// unambiguous signal's level at the other. The gap
 // is therefore bounded by the two surviving pieces rather than by the
 // unambiguous level, and since those pieces sit on opposite sides of Figure
 // 28-2's scale, filling it takes both sides down to high impedance.
@@ -223,8 +220,8 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
 //
 // The consequence for the resolver is worth stating where it is read rather
 // than where it is called: §28.12.2 gives an equal-strength opposite-value
-// conflict "the strength levels of both signals and all the smaller strength
-// levels", so every ambiguous signal Net::Resolve builds runs down to high
+// conflict the levels of both signals and every weaker level below them, so
+// every ambiguous signal Net::Resolve builds runs down to high
 // impedance on both sides, and combining one with any weaker driver returns it
 // unchanged. The function earns its keep on the one-sided ambiguous signal
 // Figure 28-23 draws, which is what a three-state gate with an unknown control

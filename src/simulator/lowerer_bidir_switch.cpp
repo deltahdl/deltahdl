@@ -76,12 +76,10 @@ static uint8_t TargetState(const BidirSwitchRun& run, SimContext& ctx,
   return BidirSwitchStateFor(run.sw->kind, low);
 }
 
-// §28.8: "If the specification contains two delays, the first delay shall
-// determine the control input turn-on delay and the second delay shall
-// determine the control input turn-off delay. For bidirectional switches
-// connecting built-in net types, the smaller of the two delays shall apply to
-// control input transitions to x and z. If only one delay is specified, it
-// shall specify both the turn-on and the turn-off delays." A switch joining
+// §28.8: of two delays, the first is the turn-on delay of the control input
+// and the second its turn-off delay; a bidirectional switch between built-in
+// net types takes the lesser of them for a control moving to x or z; and a
+// single delay serves as both turn-on and turn-off delay. A switch joining
 // nets of user-defined net types is off for an x or z control, so it turns
 // off after the turn-off delay.
 static uint64_t TransitionDelay(const BidirSwitchRun& run, uint8_t target,

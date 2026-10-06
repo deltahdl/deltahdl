@@ -73,7 +73,7 @@ struct Net {
   bool decays = false;
   uint64_t decay_generation = 0;
   // §28.15.2 (printed page 855): whether this trireg is in the charge storage
-  // state -- "a driver charged the net and then went to high impedance" -- and
+  // state -- a driver charged the net and then let go to high impedance -- and
   // so drives with its charge strength, and whether a driver has charged it
   // since the run began. The x a trireg starts with is no charge a driver left.
   bool holds_charge = false;
