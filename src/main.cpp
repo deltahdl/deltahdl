@@ -17,6 +17,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -605,14 +606,18 @@ void* RunSimulationJob(void* arg) {
 // thread of its own with a stack of 1 GiB, address space reserved and paged
 // in only as far as the run goes, the main thread waiting for its status; a
 // system that refuses the thread gets the run on the main thread as before.
+//
+// The attributes are set up unchecked. POSIX lets pthread_attr_init fail only
+// for want of memory, which glibc and macOS never report, and
+// pthread_attr_setstacksize only for a size below PTHREAD_STACK_MIN or, on
+// macOS, one that is not a multiple of the page size; the constant 1 GiB is
+// neither, so neither call has a failure this run could take.
 int RunOnDeepStack(const std::function<int()>& run) {
   SimulationJob job{run};
   constexpr std::size_t kStackBytes = std::size_t{1} << 30;
   pthread_attr_t attr;
-  if (pthread_attr_init(&attr) != 0 ||
-      pthread_attr_setstacksize(&attr, kStackBytes) != 0) {
-    return run();
-  }
+  pthread_attr_init(&attr);
+  pthread_attr_setstacksize(&attr, kStackBytes);
   pthread_t thread{};
   int created = pthread_create(&thread, &attr, RunSimulationJob, &job);
   pthread_attr_destroy(&attr);
@@ -735,11 +740,17 @@ namespace {
 // Nothing told the run what they were, so every invocation reported an empty
 // command line. Recording it before anything else runs means the answer is
 // there for whatever asks, including a PLI application loaded early.
+//
+// C lets a process start with argc of zero, argv[0] then being the null pointer
+// that ends the list. No platform deltahdl runs on starts one that way -- Linux
+// gives such a process an empty argv[0] -- but a command line with no entry
+// zero is still answered with the tool's own name there, by padding the words
+// to one rather than by reading argv[0].
 void RecordInvocationCommandLine(int argc, char* argv[]) {
-  const char* tool_name = argc > 0 ? argv[0] : "deltahdl";
-  std::vector<std::string> options;
-  for (int i = 1; i < argc; ++i) options.emplace_back(argv[i]);
-  delta::GetGlobalVpiContext().SetInvocationArguments(tool_name, options);
+  std::vector<std::string> words(argv, argv + argc);
+  words.resize(std::max<std::size_t>(words.size(), 1), "deltahdl");
+  delta::GetGlobalVpiContext().SetInvocationArguments(
+      words.front(), {std::next(words.begin()), words.end()});
 }
 
 }  // namespace
