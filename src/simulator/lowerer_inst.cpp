@@ -150,8 +150,8 @@ static std::string_view PortStorageName(const RtlirPortBinding& binding) {
   return binding.port_name;
 }
 
-// §25.5 (printed page 787): "the modport name is hierarchical from the
-// interface instance" in a connection, `P pi(s.tb)`, which restricts the port
+// §25.5 (printed page 787): a connection names the modport through the
+// interface instance's hierarchy, `P pi(s.tb)`, which restricts the port
 // to the modport's list without naming another instance, so the port shares
 // the members of `s`. Returns the identifier naming the connected interface
 // instance, or null where the connection names none.
