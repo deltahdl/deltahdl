@@ -65,8 +65,8 @@ std::string SpecifyTerminalName(const SpecifyTerminal& t) {
   return name;
 }
 
-// §22.7 (printed page 716): "The time unit is the unit of measurement for time
-// values such as the simulation time and delay values", so a path delay is a
+// §22.7 (printed page 716): the time unit is what time values, simulation time
+// and delays among them, are measured in, so a path delay is a
 // count of the declaring module's time unit, and a real one, `specparam tr =
 // 2.5`, keeps what of its fraction the module's precision holds (§3.14.1). The
 // path's slots are counted in ticks of the design's global precision, which
