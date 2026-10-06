@@ -173,7 +173,142 @@ TEST(Preprocessor, UsageInsideATripleQuotedStringIsNotJoined) {
       "2)\"\"\";\n"
       "int y;\n",
       f);
+  EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("`PAIR(1,\n2)\"\"\";\nint y;\n"), std::string::npos);
+}
+
+// §22.5.1 forbids substitution inside a string literal, and a line that begins
+// inside a triple_quoted_string opened on an earlier line (A.8.8) is that
+// string's text: a usage there stays as written, and a directive at its start
+// is string text that defines nothing.
+TEST(Preprocessor, LinesInsideAnOpenTripleQuotedStringPassThroughAsWritten) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "string s = \"\"\"first\n"
+      "`M second\n"
+      "`define X 1\n"
+      "\"\"\";\n"
+      "`ifdef X\n"
+      "int defined_x;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"first\n`M second\n`define X 1\n\"\"\";\n"),
+            std::string::npos);
+  EXPECT_EQ(result.find("EXPANDED"), std::string::npos);
+  EXPECT_EQ(result.find("defined_x"), std::string::npos);
+}
+
+// The `"""` closing a triple_quoted_string (A.8.8) ends the string on the line
+// it closes on, so a usage after it on that line is source and is expanded.
+TEST(Preprocessor, UsageAfterATripleQuotedStringClosesOnItsLastLineExpands) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "string s = \"\"\"first\n"
+      "second\"\"\"; int x = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("second\"\"\"; int x = EXPANDED;\n"),
+            std::string::npos);
+}
+
+// §22.2 lets a directive follow a language element on its line, and the
+// triple_quoted_string ending on a line is such an element: a directive after
+// its closing `"""` acts.
+TEST(Preprocessor, DirectiveAfterATripleQuotedStringClosesOnItsLastLineActs) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "string s = \"\"\"first\n"
+      "second\"\"\"; `define Y 2\n"
+      "int y = `Y;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int y = 2;"), std::string::npos);
+  EXPECT_EQ(result.find("`define"), std::string::npos);
+}
+
+// A.8.8 makes a lone '"' an item of a triple_quoted_string rather than its
+// end, so a usage after one is still inside the string and is not substituted
+// (§22.5.1).
+TEST(Preprocessor, UsageAfterALoneQuoteInATripleQuotedStringIsNotExpanded) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "string s = \"\"\"a\"b `M\"\"\";\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"a\"b `M\"\"\";"), std::string::npos);
+  EXPECT_EQ(result.find("EXPANDED"), std::string::npos);
+}
+
+// Only a `"""` closes a triple_quoted_string (A.8.8), so one holding a lone
+// '"' ends at its closing `"""` and a usage after it is source.
+TEST(Preprocessor, UsageAfterATripleQuotedStringHoldingALoneQuoteExpands) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "string s = \"\"\"a\"b\"\"\"; int x = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = EXPANDED;"), std::string::npos);
+}
+
+// A '\' inside a string literal opens a string_escape_seq (A.8.8), so the
+// second '\' of "\\" is the sequence's and the '"' after it closes the string:
+// a usage after it is source.
+TEST(Preprocessor, UsageAfterAStringEndingInAnEscapedBackslashExpands) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "string s = \"a\\\\\"; int x = `M;\n"
+      "string t = \"\"\"b\\\\\"\"\"; int y = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = EXPANDED;"), std::string::npos);
+  EXPECT_NE(result.find("int y = EXPANDED;"), std::string::npos);
+}
+
+// §5.6.1 makes every printable character after an escaped identifier's '\'
+// part of the identifier, so a '"' standing there opens no string literal and
+// a usage after it is source.
+TEST(Preprocessor, QuoteOpeningAnEscapedIdentifierOpensNoString) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "logic \\\"q ; assign \\\"q = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("assign \\\"q = EXPANDED;"), std::string::npos);
+}
+
+// A directive written inside a triple_quoted_string after a lone '"' is still
+// string text (A.8.8), so the line is not split at it and nothing is defined.
+TEST(Preprocessor, DirectiveAfterALoneQuoteInATripleQuotedStringIsText) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "string s = \"\"\"a\"b `define X 1\"\"\";\n"
+      "`ifdef X\n"
+      "int defined_x;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"a\"b `define X 1\"\"\";"), std::string::npos);
+  EXPECT_EQ(result.find("defined_x"), std::string::npos);
+}
+
+// An `ifdef ... `endif written inside a triple_quoted_string after a lone '"'
+// is string text (A.8.8), so no inline conditional is resolved there and the
+// string keeps both directives.
+TEST(Preprocessor,
+     InlineConditionalAfterALoneQuoteInATripleQuotedStringIsText) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("string s = \"\"\"a\"b `ifdef X 1 `endif\"\"\";\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"\"\"a\"b `ifdef X 1 `endif\"\"\";"),
+            std::string::npos);
 }
 
 // §22.13's `__LINE__ stands for a value where it is written, so one among the

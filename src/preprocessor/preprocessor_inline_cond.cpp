@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/preprocessor_internal.h"
 
 namespace delta {
 
@@ -43,15 +44,12 @@ static bool HasMatchingEndif(std::string_view line, size_t search_start) {
 }
 
 static size_t FindInlineConditional(std::string_view line) {
-  bool in_string = false;
-  for (size_t i = 0; i < line.size(); ++i) {
+  auto state = StringLiteralState::kOutside;
+  for (size_t i = 0; i < line.size();
+       i = StepOverStringSyntax(line, i, state)) {
     // A directive sequence sitting inside a string literal is hidden and must
     // not start an inline conditional expansion (22.6).
-    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
-      in_string = !in_string;
-      continue;
-    }
-    if (in_string || line[i] != '`') continue;
+    if (state != StringLiteralState::kOutside || line[i] != '`') continue;
     auto rest = line.substr(i);
     bool is_ifdef = MatchesDirective(rest, "ifdef");
     bool is_ifndef = MatchesDirective(rest, "ifndef");

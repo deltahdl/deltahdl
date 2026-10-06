@@ -12,6 +12,7 @@
 #include "common/source_loc.h"
 #include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/preprocessor_internal.h"
 
 namespace delta {
 
@@ -230,21 +231,46 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
-// Whether the character at `i` opens or closes a string literal, given whether
-// one is open before it. §22.5.1's `" is a macro-quote rather than a string's
-// quote: macro usages between `" and `" are expanded, so outside a string it
-// leaves the state alone.
-static bool TogglesString(std::string_view line, size_t i, bool in_string) {
-  if (line[i] != '"' || i == 0) return line[i] == '"';
-  if (line[i - 1] == '\\') return false;
-  return in_string || line[i - 1] != '`';
+// Steps a scan standing outside every string over the character at `i`, or
+// over the '"' or `"""` opening a string there. §22.5.1's `" is a macro-quote
+// rather than a string's quote, macro usages between `" and `" being expanded,
+// and a '"' after a '\' is a character of a §5.6.1 escaped identifier; neither
+// opens a string.
+static size_t StepOutsideString(std::string_view line, size_t i,
+                                StringLiteralState& state) {
+  if (line[i] != '"' || (i > 0 && (line[i - 1] == '\\' || line[i - 1] == '`')))
+    return i + 1;
+  if (!AtTripleQuote(line, i)) {
+    state = StringLiteralState::kQuoted;
+    return i + 1;
+  }
+  state = StringLiteralState::kTripleQuoted;
+  return i + 3;
+}
+
+// A.8.8 closes a quoted_string at its next '"' and a triple_quoted_string only
+// at its next `"""`, a lone '"' being an item of it; inside either a '\' opens
+// a string_escape_seq, so the character after it closes nothing.
+size_t StepOverStringSyntax(std::string_view line, size_t i,
+                            StringLiteralState& state) {
+  if (state == StringLiteralState::kOutside) {
+    return StepOutsideString(line, i, state);
+  }
+  if (line[i] == '\\') return i + 2;
+  if (state == StringLiteralState::kQuoted) {
+    if (line[i] == '"') state = StringLiteralState::kOutside;
+    return i + 1;
+  }
+  if (!AtTripleQuote(line, i)) return i + 1;
+  state = StringLiteralState::kOutside;
+  return i + 3;
 }
 
 static size_t FindNextBacktick(std::string_view line, size_t pos,
-                               bool& in_string) {
-  for (size_t i = pos; i < line.size(); ++i) {
-    if (TogglesString(line, i, in_string)) in_string = !in_string;
-    if (!in_string && line[i] == '`') return i;
+                               StringLiteralState& state) {
+  while (pos < line.size()) {
+    if (state == StringLiteralState::kOutside && line[pos] == '`') return pos;
+    pos = StepOverStringSyntax(line, pos, state);
   }
   return std::string_view::npos;
 }
@@ -290,8 +316,8 @@ static bool OpensArgumentList(std::string_view after_name) {
 }
 
 MacroUsageEnd Preprocessor::EndOfMacroUsage(std::string_view text) const {
-  bool in_string = false;
-  size_t pos = FindNextBacktick(text, 0, in_string);
+  auto state = StringLiteralState::kOutside;
+  size_t pos = FindNextBacktick(text, 0, state);
   while (pos != std::string_view::npos) {
     size_t name_start = pos + 1;
     size_t name_end = ParseInlineMacroName(text, name_start);
@@ -310,7 +336,7 @@ MacroUsageEnd Preprocessor::EndOfMacroUsage(std::string_view text) const {
       pos = name_end + static_cast<size_t>(balanced.data() + balanced.size() -
                                            after_name.data());
     }
-    pos = FindNextBacktick(text, pos, in_string);
+    pos = FindNextBacktick(text, pos, state);
   }
   return MacroUsageEnd::kComplete;
 }
@@ -431,28 +457,23 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
 std::string Preprocessor::ExpandInlineMacros(std::string_view line,
                                              uint32_t file_id,
                                              uint32_t line_num) {
-  bool in_string = false;
-  size_t first = FindNextBacktick(line, 0, in_string);
-  if (first == std::string_view::npos) return std::string(line);
+  auto state = StringLiteralState::kOutside;
+  size_t bt = FindNextBacktick(line, 0, state);
+  if (bt == std::string_view::npos) return std::string(line);
 
   std::string result;
   result.reserve(line.size());
   size_t copied = 0;
 
-  while (true) {
-    // Recalculate in_string based on quote characters from the start of the
-    // line to the current copied position. This ensures we correctly track
-    // whether we are inside a string literal before searching for the next
-    // backtick.
-    in_string = false;
-    for (size_t i = 0; i < copied; ++i) {
-      if (TogglesString(line, i, in_string)) in_string = !in_string;
-    }
-
-    size_t bt = FindNextBacktick(line, copied, in_string);
-    if (bt == std::string_view::npos) break;
+  while (bt != std::string_view::npos) {
     result.append(line.substr(copied, bt - copied));
     copied = ExpandSingleInlineMacro(line, bt, file_id, line_num, result);
+    // The usage's own text, the string literals among its arguments included,
+    // is stepped over, so that the search resumes knowing whether a string is
+    // open where the usage ends.
+    size_t scan = bt;
+    while (scan < copied) scan = StepOverStringSyntax(line, scan, state);
+    bt = FindNextBacktick(line, scan, state);
   }
   result.append(line.substr(copied));
   return result;

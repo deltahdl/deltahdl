@@ -9,6 +9,7 @@
 #include "common/source_loc.h"
 #include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/preprocessor_internal.h"
 
 namespace delta {
 
@@ -173,12 +174,6 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   resolved_views.reserve(resolved.size());
   for (const auto& s : resolved) resolved_views.emplace_back(s);
   return SubstituteParams(macro.body, macro.params, resolved_views);
-}
-
-// Whether the three characters at `i` are a triple quote, which opens or
-// closes A.8.8's triple_quoted_string.
-static bool AtTripleQuote(std::string_view text, size_t i) {
-  return text.substr(i, 3) == "\"\"\"";
 }
 
 // The index after the escaped identifier (5.6.1) opening at text[i], which

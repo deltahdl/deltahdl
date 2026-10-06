@@ -206,9 +206,8 @@ static bool MayOpenList(std::string_view line) {
 // alone whose next line opens no list, which the expander then rejects as a
 // usage written without its parentheses.
 //
-// The strip state starts clear because an open block comment takes another
-// path, and `end_of_macro_usage` answers kComplete without reading the text
-// while a triple_quoted_string is open.
+// The strip state starts clear because an open block comment and a line that
+// begins inside a triple_quoted_string each take another path.
 uint32_t JoinMacroUsage(
     LineCursor& cursor,
     const std::function<MacroUsageEnd(std::string_view)>& end_of_macro_usage,

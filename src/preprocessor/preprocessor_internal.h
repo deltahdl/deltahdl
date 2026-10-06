@@ -66,6 +66,28 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
 void RestoreComments(std::string& text, size_t from,
                      const std::vector<std::string>& comments);
 
+// Whether the three characters at `i` are the `"""` that opens or closes
+// A.8.8's triple_quoted_string. Defined in src/preprocessor/preprocessor.cpp
+// beside the comment stripper, and read by every scan that follows the string
+// literals of a line or a macro's text.
+bool AtTripleQuote(std::string_view line, size_t i);
+
+// Where a scan along one line stands among A.8.8's string literals: outside
+// every one, inside a quoted_string, or inside a triple_quoted_string.
+enum class StringLiteralState : std::uint8_t {
+  kOutside,
+  kQuoted,
+  kTripleQuoted
+};
+
+// Steps a scan at `i` over the `"""` or string_escape_seq beginning there, or
+// else over the one character, updating `state`, and answers where the scan
+// goes on. Defined in src/preprocessor/preprocessor_inline.cpp and shared by
+// the scans that look for a backtick outside every string: the inline macro
+// expander, the mid-line directive finder and the inline conditional finder.
+size_t StepOverStringSyntax(std::string_view line, size_t i,
+                            StringLiteralState& state);
+
 // The two ways a construct runs onto the physical lines after the one it opens
 // on, both in src/preprocessor/preprocessor_join.cpp: a `define body continued
 // by a backslash, an open block comment or an open triple_quoted_string

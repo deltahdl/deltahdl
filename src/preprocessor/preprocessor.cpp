@@ -381,9 +381,7 @@ static bool StripNormalChar(std::string_view line, size_t& i,
   return false;
 }
 
-// Whether the three characters at `i` are the `"""` that opens or closes
-// A.8.8's triple_quoted_string.
-static bool AtTripleQuote(std::string_view line, size_t i) {
+bool AtTripleQuote(std::string_view line, size_t i) {
   return line.substr(i, 3) == "\"\"\"";
 }
 
@@ -405,6 +403,22 @@ static void CopyTripleQuotedChar(std::string_view line, size_t& i,
   if (i < line.size()) result += line[i++];
 }
 
+// A line that begins inside a triple_quoted_string opened on an earlier line
+// (A.8.8) holds that string's text up to the `"""` closing it, and §22.5.1
+// substitutes nothing in a string, so that text is copied to `output` as
+// written and `line` is narrowed to what follows the close. Answers whether the
+// line began inside such a string.
+static bool CopyOpenTripleString(std::string_view& line, std::string& output,
+                                 bool& in_triple_string) {
+  bool was_open = in_triple_string;
+  size_t i = 0;
+  while (in_triple_string && i < line.size()) {
+    CopyTripleQuotedChar(line, i, output, in_triple_string);
+  }
+  line.remove_prefix(i);
+  return was_open;
+}
+
 // Blanks the body of every A.9.2 comment on `line`, keeping the delimiters,
 // and leaves what a string literal holds alone. A block comment and a
 // triple_quoted_string each may span lines, so each is carried from one line
@@ -413,7 +427,9 @@ static void CopyTripleQuotedChar(std::string_view line, size_t& i,
 // Copies the `"""` that opens a triple_quoted_string, the unescaped '"' that
 // opens or closes a quoted_string, or one character inside an open
 // quoted_string, and answers whether it copied one; answers false at a
-// character outside every string, which is the comment stripper's to read.
+// character outside every string, which is the comment stripper's to read. A
+// '\' inside a quoted_string opens a string_escape_seq (A.8.8), which is copied
+// whole, so the character after the '\' closes nothing.
 static bool CopyStringLiteralChar(std::string_view line, size_t& i,
                                   std::string& result, bool& in_string,
                                   bool& in_triple_string) {
@@ -423,7 +439,12 @@ static bool CopyStringLiteralChar(std::string_view line, size_t& i,
     in_triple_string = true;
     return true;
   }
-  if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+  if (in_string && line[i] == '\\') {
+    result += line.substr(i, 2);
+    i += 2;
+    return true;
+  }
+  if (line[i] == '"' && (in_string || i == 0 || line[i - 1] != '\\')) {
     in_string = !in_string;
     result += line[i++];
     return true;
@@ -548,18 +569,14 @@ static bool BacktickIntroducesDirective(std::string_view s, size_t i) {
 }
 
 static size_t FindMidLineDirective(std::string_view s) {
-  bool in_string = false;
-  for (size_t i = 0; i < s.size(); ++i) {
-    char c = s[i];
-    if (c == '"' && (i == 0 || s[i - 1] != '\\') &&
-        (i == 0 || s[i - 1] != '`')) {
-      in_string = !in_string;
-      continue;
-    }
-    if (in_string) continue;
-    if (c == '`' && BacktickIntroducesDirective(s, i)) {
+  auto state = StringLiteralState::kOutside;
+  size_t i = 0;
+  while (i < s.size()) {
+    if (state == StringLiteralState::kOutside && s[i] == '`' &&
+        BacktickIntroducesDirective(s, i)) {
       return i;
     }
+    i = StepOverStringSyntax(s, i, state);
   }
   return std::string_view::npos;
 }
@@ -660,6 +677,9 @@ struct PreprocLoopOps {
   // What a function-like macro usage on the text leaves unfinished at its end
   // (22.5.1), which is what JoinMacroUsage reads lines ahead to finish.
   std::function<MacroUsageEnd(std::string_view)> end_of_macro_usage;
+  // Copies the text an open triple_quoted_string still holds at the start of
+  // the line and narrows the line to the rest, answering whether one was open.
+  std::function<bool(std::string_view&)> copy_open_string;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
   // Taken before a source line is written, and handed back once the newline
@@ -678,10 +698,19 @@ struct PreprocLoopOps {
 // counter. A usage is joined only where its expansion will be emitted: inside
 // an ignored block the lines are not read, and a line an ignored block ends on
 // is a directive the join would otherwise swallow.
+//
+// An active line that begins inside a triple_quoted_string is that string's
+// text up to its closing `"""`, which no directive, join or usage reads; what
+// follows the close is active text standing after a language element, which
+// §22.2 lets a directive follow.
 static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
                                     const PreprocLoopOps& ops) {
   std::string joined;
   uint32_t usage_lines = 0;
+  if (ops.is_active() && ops.copy_open_string(line)) {
+    ops.emit_active_line(line);
+    return usage_lines;
+  }
   if (DefineSpansMultipleLines(line)) {
     // The `define is run as the directive on the line it opens on, which is
     // where a report about it belongs; the lines it was joined from are the
@@ -845,12 +874,11 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   PreprocLoopOps ops;
   ops.in_block_comment = [&] { return in_block_comment_; };
   ops.is_active = [&] { return IsActive(); };
-  // A line inside a triple_quoted_string opened on an earlier line is the
-  // string's content, and no usage starts in it, so the join is stopped before
-  // it begins: the text it was handed was stripped as if the line stood outside
-  // the string, and answering without reading it is what makes that harmless.
   ops.end_of_macro_usage = [&](std::string_view text) {
-    return in_triple_string_ ? MacroUsageEnd::kComplete : EndOfMacroUsage(text);
+    return EndOfMacroUsage(text);
+  };
+  ops.copy_open_string = [&](std::string_view& line) {
+    return CopyOpenTripleString(line, output, in_triple_string_);
   };
   // An open block comment (22.6) emits or skips its text and handles its own
   // trailing newline; a directive may still follow the comment close.

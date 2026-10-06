@@ -184,6 +184,23 @@ TEST(CommentPreprocessing, LineMarkerInsideTripleQuotedStringWithLoneQuote) {
   EXPECT_TRUE(Contains(out, "\"\"\"a\"b // c\"\"\";"));
 }
 
+// A '\' inside a quoted_string opens a string_escape_seq (A.8.8), so the
+// second '\' of "\\" is the sequence's and the '"' after it closes the
+// string: a "/*" after it opens a block_comment, and the directive the
+// comment's next line holds is comment text that defines nothing.
+TEST(CommentPreprocessing, BlockCommentAfterAStringEndingInAnEscapedBackslash) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "string s = \"a\\\\\"; /* open\n"
+      "`define X 1 */\n"
+      "`ifdef X\n"
+      "int defined_x;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_FALSE(Contains(out, "defined_x"));
+}
+
 // The same for "/*": inside a triple_quoted_string it opens no block_comment,
 // and the "*/" behind it closes none, so the text between them stands and the
 // line after the string is read as code.
