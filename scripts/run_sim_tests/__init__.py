@@ -17,6 +17,8 @@ BEFORE_SUFFIX = ".before"
 
 FILES_SUFFIX = ".files"
 
+NO_SOURCE_SUFFIX = ".nosource"
+
 LIBRARY_SOURCE_SUFFIX = ".c"
 
 ARTIFACT_SUFFIX = ".artifact"
@@ -35,6 +37,11 @@ def case_arguments(sv_path: Path) -> list[str]:
     if not args_path.exists():
         return []
     return [line for line in args_path.read_text().splitlines() if line]
+
+
+def command_line(sv_path: Path) -> list[str]:
+    source = [] if sv_path.with_suffix(NO_SOURCE_SUFFIX).exists() else [str(sv_path)]
+    return [str(BINARY), *source, *case_arguments(sv_path)]
 
 
 def before_arguments(sv_path: Path) -> list[str] | None:
@@ -219,7 +226,7 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
                 return False, detail
         try:
             result = subprocess.run(
-                [str(BINARY), str(sv_path), *case_arguments(sv_path)],
+                command_line(sv_path),
                 capture_output=True,
                 text=True,
                 timeout=30,

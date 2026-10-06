@@ -181,6 +181,23 @@ def test_a_case_without_an_args_file_runs_the_source_path_alone(
     assert cmd == [str(rst.BINARY), str(tmp_path / "plain.sv")]
 
 
+def test_a_case_marked_nosource_runs_its_arguments_without_the_source_path(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    (tmp_path / "bare.nosource").write_text("")
+    (tmp_path / "bare.args").write_text("--lint-only\n")
+    cmd, _ = _run_over_case(rst, tmp_path, "bare", 0)
+    assert cmd == [str(rst.BINARY), "--lint-only"]
+
+
+def test_a_case_marked_nosource_without_arguments_runs_the_binary_alone(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    (tmp_path / "empty.nosource").write_text("")
+    cmd, _ = _run_over_case(rst, tmp_path, "empty", 1)
+    assert cmd == [str(rst.BINARY)]
+
+
 def test_a_matching_status_passes_the_case(rst: ModuleType, tmp_path: Path) -> None:
     (tmp_path / "refused.exit").write_text("2\n")
     _, outcome = _run_over_case(rst, tmp_path, "refused", 2)
