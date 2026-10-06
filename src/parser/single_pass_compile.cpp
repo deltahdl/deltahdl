@@ -82,12 +82,12 @@ void WriteCellsOfKind(const std::vector<Decl*>& decls, bool is_module,
   }
 }
 
-// §3.14.2.2: "There shall be at most one time unit and one time precision for
-// any module, program, package, or interface definition or in any
-// compilation-unit scope... The timeunit and timeprecision declarations can be
-// repeated as later items, but shall match the previous declaration within the
-// current time scope." §3.12.1 case a) rules that "all files on a given
-// compilation command line make a single compilation unit", which is the use
+// §3.14.2.2: a module, program, package or interface definition, and a
+// compilation-unit scope likewise, each has no more than one time unit and one
+// time precision, and a timeunit or timeprecision declaration written again as
+// a later item has to agree with the one before it in the same time scope.
+// §3.12.1 case a) makes every file of one compilation command line a single
+// compilation unit, which is the use
 // model this compiler implements, so a compilation-unit timeunit in a second
 // file of one command line is such a repeat and has to match the first file's.
 //
@@ -171,12 +171,12 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   Lexer lexer(mgr_.FileContent(fid), fid, diag_);
   Parser parser(lexer, arena_, diag_);
   // The compilation-unit scope the descriptions before this one on the command
-  // line built up, because §3.12.1 case a) makes their declarations "accessible
-  // following normal visibility rules throughout the entire set of files" and
-  // the names have to be known while the file is parsed rather than after it.
-  // `byte_t b;` parses as an instantiation of a module called byte_t until the
-  // parser is told byte_t is a type, and `import p::*;` puts back nothing at
-  // all until the parser has heard of p.
+  // line built up, because §3.12.1 case a) has every file see their
+  // declarations under the ordinary visibility rules, and the names have to be
+  // known while the file is parsed rather than after it. `byte_t b;` parses as
+  // an instantiation of a module called byte_t until the parser is told byte_t
+  // is a type, and `import p::*;` puts back nothing at all until the parser has
+  // heard of p.
   parser.AdoptCompilationUnitScope(cu_scope_);
   // Errors already on the engine belong to descriptions compiled earlier in
   // the run, so it is the errors this parse adds that decide its outcome.
@@ -199,9 +199,9 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // named collection of cells" and that "a cell is a design element (see 3.2),
   // such as a module, primitive, interface, program, package, or
   // configuration"; its six are introduced by "such as", and §3.2 names seven:
-  // "a SystemVerilog module (see Clause 23), program (see Clause 24), interface
-  // (see Clause 25), checker (see Clause 17), package (see Clause 26),
-  // primitive (see Clause 28) or configuration (see Clause 33)". The two lists
+  // the module of Clause 23, the program of Clause 24, the interface of Clause
+  // 25, the checker of Clause 17, the package of Clause 26, the primitive of
+  // Clause 28 and the configuration of Clause 33. The two lists
   // read the same way down the page because they answer the same question, and
   // the checker went missing from this one while the other had it.
   WriteCellsOfKind(parsed->modules, /*is_module=*/true, sink);
@@ -213,14 +213,13 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   WriteCellsOfKind(parsed->configs, /*is_module=*/false, sink);
 
   // The cells and the compilation-unit scope both, because this compiler is
-  // §3.12.1 case a): "all files on a given compilation command line make a
-  // single compilation unit (in which case the declarations within those files
-  // are accessible following normal visibility rules throughout the entire set
-  // of files)". A typedef, class, bind or out-of-block constraint this
-  // description wrote outside every design element is such a declaration, and
-  // dropping it would hide it from the rest of the command line and from this
-  // description itself, since the unit built here is the only one elaboration
-  // reads.
+  // §3.12.1 case a): every file of one compilation command line forms a single
+  // compilation unit, whose declarations each file then sees under the
+  // ordinary visibility rules. A typedef, class, bind or out-of-block
+  // constraint this description wrote outside every design element is such a
+  // declaration, and dropping it would hide it from the rest of the command
+  // line and from this description itself, since the unit built here is the
+  // only one elaboration reads.
   AppendCellDeclarations(unit, *parsed);
   ReportCuTimescaleConflict(diag_, unit, *parsed);
   AppendCompilationUnitDeclarations(unit, *parsed);

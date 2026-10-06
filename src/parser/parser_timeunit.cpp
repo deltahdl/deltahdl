@@ -42,8 +42,8 @@ struct TimeScopeTargets {
 // (§3.14.2): whether it is a timeunit (vs timeprecision) declaration, whether
 // the unit token was the literal 'step', the parsed unit value, and where the
 // declaration's leading keyword stands. The position is carried because
-// §3.14.2.2 requires a repeat to "match the previous declaration within the
-// current time scope" and a report about a repeat has to stand at it; the
+// §3.14.2.2 requires a repeat to agree with the declaration made before it in
+// the same time scope and a report about a repeat has to stand at it; the
 // compilation-unit scope keeps it, since that scope outlives the parse that
 // wrote it.
 struct TimeunitDecl {
@@ -104,8 +104,8 @@ static void ApplyTimeUnit(const TimeScopeTargets& targets,
 }
 
 // The precision named after the slash of "timeunit <unit> / <precision>"
-// (§3.14.2.2: "The time precision may also be declared using an optional second
-// argument to the timeunit keyword using the slash separator"). `decl` is the
+// (§3.14.2.2: the timeunit keyword can declare the time precision too, as an
+// optional second argument after a slash). `decl` is the
 // declaration the slash belongs to, read for its position alone: the precision
 // is declared by the same statement as the unit, so a report about it stands
 // where CheckCuTimeunitConsistency in src/parser/parser.cpp stands, at the
@@ -192,9 +192,9 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
                   TimeunitDecl{is_unit, unit_is_step, tu, mag, kw_tok.loc});
   }
   // A.1.2 gives the slash to `timeunit time_literal [ / time_literal ]` alone,
-  // and §3.14.2.2 says whose the second argument is: "The time precision may
-  // also be declared using an optional second argument to the timeunit keyword
-  // using the slash separator." After `timeprecision` the slash and the
+  // and §3.14.2.2 says whose the second argument is: the timeunit keyword can
+  // declare the time precision too, as an optional second argument after a
+  // slash. After `timeprecision` the slash and the
   // literal behind it are read so that the declaration still ends at its
   // semicolon, and they set nothing.
   auto slash_loc = CurrentLoc();

@@ -45,16 +45,15 @@ class Parser {
   CompilationUnit* Parse();
   CompilationUnit* ParseLibraryText();
 
-  // §3.12.1 case a) has "all files on a given compilation command line make a
-  // single compilation unit (in which case the declarations within those files
-  // are accessible following normal visibility rules throughout the entire set
-  // of files)", and one parser reads one file. These two are how a caller
-  // building that single compilation unit out of several files hands the
-  // compilation-unit scope from one file's parse to the next: without them a
-  // later file reads `byte_t b;` as an instantiation of a module called byte_t,
-  // because whether an identifier names a type decides how the declaration
-  // after it parses, and `import p::*;` puts nothing back because the parse has
-  // never heard of p.
+  // §3.12.1 case a) makes every file of one compilation command line a single
+  // compilation unit, whose declarations each file then sees under the
+  // ordinary visibility rules, and one parser reads one file. These two are how
+  // a caller building that single compilation unit out of several files hands
+  // the compilation-unit scope from one file's parse to the next: without them
+  // a later file reads `byte_t b;` as an instantiation of a module called
+  // byte_t, because whether an identifier names a type decides how the
+  // declaration after it parses, and `import p::*;` puts nothing back because
+  // the parse has never heard of p.
   //
   // Call AdoptCompilationUnitScope before Parse and read CompilationUnitScope
   // after it. What the second answers with is the compilation-unit scope and

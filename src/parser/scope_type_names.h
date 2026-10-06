@@ -42,10 +42,9 @@ struct ScopeTypeNames {
 };
 
 // Everything one file's parse leaves the files after it on the same command
-// line, which §3.12.1 case a) makes one compilation unit with it: "all files on
-// a given compilation command line make a single compilation unit (in which
-// case the declarations within those files are accessible following normal
-// visibility rules throughout the entire set of files)".
+// line, which §3.12.1 case a) makes one compilation unit with it: every file of
+// one compilation command line forms a single compilation unit, whose
+// declarations each file then sees under the ordinary visibility rules.
 //
 // `own` is what the compilation-unit scope itself declared, and it decides how
 // a later file parses on its own: `byte_t b;` reads as an instantiation of a

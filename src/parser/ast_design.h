@@ -163,8 +163,8 @@ struct CompilationUnit {
   // Where each of the two was declared, written by ApplyCuTimeUnit in
   // src/parser/parser_timeunit.cpp at the same moment as the flag above it and
   // holding the position of the declaration's leading timeunit/timeprecision
-  // keyword. §3.14.2.2 rules that a repeat "shall match the previous
-  // declaration within the current time scope", so a report about a repeat that
+  // keyword. §3.14.2.2 rules that a repeat has to agree with the declaration
+  // made before it in the same time scope, so a report about a repeat that
   // does not match stands at the repeat. Within one file
   // CheckCuTimeunitConsistency in src/parser/parser.cpp is handed that position
   // by its caller, because it runs while the declaration is being parsed.
@@ -293,17 +293,17 @@ inline void ApplyModuleDirectives(
 // §33.2.1 rules that "a library is a named collection of cells" and that "a
 // cell is a design element (see 3.2), such as a module, primitive, interface,
 // program, package, or configuration". Its six are introduced by "such as", and
-// the definition it defers to is §3.2's, which names seven: "a SystemVerilog
-// module (see Clause 23), program (see Clause 24), interface (see Clause 25),
-// checker (see Clause 17), package (see Clause 26), primitive (see Clause 28)
-// or configuration (see Clause 33)". Reading §33.2.1's examples as the whole
+// the definition it defers to is §3.2's, which names seven: the module of
+// Clause 23, the program of Clause 24, the interface of Clause 25, the checker
+// of Clause 17, the package of Clause 26, the primitive of Clause 28 and the
+// configuration of Clause 33. Reading §33.2.1's examples as the whole
 // set is what left the checker out of this function.
 //
 // The lists CompilationUnit holds that are not moved are left behind on
 // purpose, for two different reasons. `classes`, `cu_items`, `bind_directives`
 // and `external_constraints` hold what a source declared outside every design
-// element, and §3.12.1 rules that "items defined in the compilation-unit scope
-// cannot be accessed by name from outside the compilation unit", so they stay
+// element, and §3.12.1 rules that no name declared in the compilation-unit
+// scope can be reached from outside that compilation unit, so they stay
 // with the unit that parsed them. That is the answer §3.12.1 case b) wants, so
 // a caller assembling one unit out of several source descriptions on one
 // command line -- case a) -- calls AppendCompilationUnitDeclarations below as
@@ -330,9 +330,9 @@ inline void AppendCellDeclarations(CompilationUnit& target,
 }
 
 // Everything a source description declared outside every design element, which
-// §3.12.1 puts in the compilation-unit scope: "although the compilation-unit
-// scope is not a package, it can contain any item that can be defined within a
-// package (see 26.2) and bind constructs as well (see 23.11)". The parser
+// §3.12.1 puts in the compilation-unit scope, which, while no package itself,
+// may hold whatever a package may (§26.2) as well as bind constructs (§23.11).
+// The parser
 // leaves those in `cu_items`, `classes`, `bind_directives` and
 // `external_constraints`, and leaves the time unit and precision the scope
 // declared in `cu_time_unit`, `cu_time_prec`, their two magnitudes and the two
@@ -341,31 +341,30 @@ inline void AppendCellDeclarations(CompilationUnit& target,
 // stay in the arena that parsed them.
 //
 // The time unit travels with the compilation-unit declarations rather than with
-// the cells because §3.14.2.2 is what puts it in this scope: "There shall be at
-// most one time unit and one time precision for any module, program, package,
-// or interface definition or in any compilation-unit scope."
+// the cells because §3.14.2.2 is what puts it in this scope: a module,
+// program, package or interface definition, and a compilation-unit scope
+// likewise, each has no more than one time unit and one time precision.
 //
 // This exists beside AppendCellDeclarations because §3.12.1 states two use
 // models a tool has to offer and they want opposite answers about these four
-// lists and about the time unit. Case a) is "all files on a given compilation
-// command line make a single compilation unit (in which case the declarations
-// within those files are accessible following normal visibility rules
-// throughout the entire set of files)", so a caller merging a command line
+// lists and about the time unit. Case a) makes every file of one compilation
+// command line a single compilation unit, whose declarations each file then
+// sees under the ordinary visibility rules, so a caller merging a command line
 // calls both functions and the time unit one file declared is the merged unit's
-// too. Case b) is "each file is a separate compilation unit (in which case the
-// declarations in each compilation-unit scope are accessible only within its
-// corresponding file)", so a caller reading a separately compiled source
-// description back calls AppendCellDeclarations alone and this not at all,
-// which is what leaves that file's time unit behind with its declarations.
+// too. Case b) makes each file a compilation unit of its own, whose
+// compilation-unit declarations no other file can see, so a caller reading a
+// separately compiled source description back calls AppendCellDeclarations
+// alone and this not at all, which is what leaves that file's time unit behind
+// with its declarations.
 //
 // A `target` that already declares a time unit keeps it, and the precision is
 // decided the same way and separately: the file that declared it first is the
 // one the merged unit reports, which is the rule MergeCompilationUnitScope in
 // src/parser/scope_type_names.h states for the names of the same scope.
 // §3.14.2.2 makes the choice unobservable in conforming source, because a
-// repeat "shall match the previous declaration within the current time scope"
-// and so gives the same answer whichever declaration is kept. A repeat that
-// does not match is an error, and CheckCuTimeunitConsistency in
+// repeat has to agree with the declaration made before it in the same time
+// scope, and so gives the same answer whichever declaration is kept. A repeat
+// that does not match is an error, and CheckCuTimeunitConsistency in
 // src/parser/parser.cpp reports it within one file, by comparing the members
 // against a snapshot taken before the declaration was parsed. It cannot report
 // it across two, because each file is parsed by its own Parser into its own
