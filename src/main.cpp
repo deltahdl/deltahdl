@@ -139,6 +139,11 @@ void PrintHelp() {
 
 struct PreprocResult {
   std::string source;
+  // Whether a source file named on the command line could not be opened. Such
+  // a file fails the run wherever it stands in the list, and empty text cannot
+  // say so: a source of no bytes preprocesses to empty text too, and the text
+  // gathered before a later file failed is not empty.
+  bool unreadable = false;
   // The source each line of `source` was written on, which §22.12 requires a
   // compiler to maintain and which `source` does not carry: it splices in the
   // lines of every `include and joins a `define body that spanned continuation
@@ -183,6 +188,7 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   for (const auto& path : opts.source_files) {
     std::optional<std::string> content = delta::ReadSource(path);
     if (!content) {
+      result.unreadable = true;
       return result;
     }
     auto file_id = src_mgr.AddFile(path, std::move(*content));
@@ -407,11 +413,20 @@ bool InstallLibrarySearchOrder(const delta::CliOptions& opts,
   return true;
 }
 
-const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
-                                          const delta::LibraryMap& lib_map,
-                                          delta::CompilationUnit* cu,
-                                          delta::DiagEngine& diag,
-                                          delta::Arena& arena) {
+// What ElaborateDesign answers. A run that stopped on an error it reported has
+// failed, whatever the source declares. A run that did not, and still has no
+// design, came from a source that declares nothing -- a file of compiler
+// directives, of comments alone or of no bytes at all, which Annex A.1.2 makes
+// valid source text -- and has nothing to run.
+struct Elaboration {
+  const delta::RtlirDesign* design = nullptr;
+  bool failed = false;
+};
+
+Elaboration ElaborateDesign(const delta::CliOptions& opts,
+                            const delta::LibraryMap& lib_map,
+                            delta::CompilationUnit* cu, delta::DiagEngine& diag,
+                            delta::Arena& arena) {
   // §11.11's three values are chosen among while a constant expression is
   // folded, and elaboration is where that folding happens, so the guard is
   // constructed here rather than in main: ElaborateDesign is the whole of the
@@ -421,7 +436,9 @@ const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
   delta::Elaborator elaborator(arena, diag, cu);
   elaborator.SetMaxGenerateIterations(opts.max_generate_iterations);
 
-  if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) return nullptr;
+  if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) {
+    return {.failed = true};
+  }
   // §33.5.4: a configuration whose source description was named on the command
   // line settles the design, so the top-level cell named here is what a command
   // line that put no configuration in force is elaborated from.
@@ -436,24 +453,23 @@ const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
   // elaborated one of those alone and ran nothing.
   const auto* design = delta::ElaborateCommandLine(
       elaborator, *cu, opts.top_module, opts.config, diag);
-  if (diag.HasErrors() || design == nullptr) return nullptr;
+  if (diag.HasErrors()) return {.failed = true};
+  if (design == nullptr) return {.failed = !cu->DeclaresNothing()};
   if (opts.dump_ir) DumpIr(design);
-  return design;
+  return {.design = design};
 }
 
 // --synth lowers the design's first top-level module. A design with none, which
 // is what a source declaring nothing or only packages, types or classes
 // elaborates to, leaves nothing to lower, and the run says so rather than
-// failing without a word. A null design from a source that declares something
-// came from a stop ElaborateDesign has already reported, so that one adds
-// nothing. This is a limit of what synthesis can produce, not a rule of IEEE
-// 1800-2023, so the report cites no subclause.
+// failing without a word. A run ElaborateDesign stopped on an error it
+// reported adds nothing to that report. This is a limit of what synthesis can
+// produce, not a rule of IEEE 1800-2023, so the report cites no subclause.
 int RunSynthesis(const delta::CliOptions& opts,
                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
                  delta::DiagEngine& diag, delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
-  if (diag.HasErrors()) return 1;
-  if (design == nullptr && !cu->DeclaresNothing()) return 1;
+  auto [design, failed] = ElaborateDesign(opts, lib_map, cu, diag, arena);
+  if (failed) return 1;
   if (design == nullptr || design->top_modules.empty()) {
     std::cerr << "error: design has no top-level module to synthesize\n";
     return 1;
@@ -483,19 +499,17 @@ int RunSynthesis(const delta::CliOptions& opts,
 
 // --lint-only, "Parse and elaborate only": the design is elaborated as it is
 // ahead of a simulation, so every rule the elaborator enforces is applied and
-// reported, and nothing is run. The status is 1 on any report, and 1 when no
-// design came back from a source that declares something -- a library search
-// order naming no library, say, which ElaborateDesign reports on its own. A
-// source that declares nothing, which is what a file of compiler directives or
-// of comments alone is, has nothing to elaborate and nothing to report, and
-// passes. Until this the option returned 0 as soon as the source had parsed,
-// so a source only the elaborator could reject was reported clean.
+// reported, and nothing is run. The status is 1 on any report, including one
+// ElaborateDesign writes on its own, such as an -L entry that is not a library
+// name. A source that declares nothing, which is what a file of compiler
+// directives, of comments alone or of no bytes at all is, has nothing to
+// elaborate and nothing to report, and passes. Until this the option returned 0
+// as soon as the source had parsed, so a source only the elaborator could
+// reject was reported clean.
 int RunLint(const delta::CliOptions& opts, const delta::LibraryMap& lib_map,
             delta::CompilationUnit* cu, delta::DiagEngine& diag,
             delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
-  if (diag.HasErrors()) return 1;
-  if (design == nullptr && !cu->DeclaresNothing()) return 1;
+  if (ElaborateDesign(opts, lib_map, cu, diag, arena).failed) return 1;
   std::cout << "lint pass: no errors\n";
   return 0;
 }
@@ -555,11 +569,17 @@ int SimulateDesign(const delta::CliOptions& opts,
   return diag.HasErrors() || sim_ctx.HasRuntimeErrors() ? 1 : 0;
 }
 
+// A source that declares nothing, which is what a file of compiler directives,
+// of comments alone or of no bytes at all is, is valid source text under Annex
+// A.1.2 and elaborates to no design: there is nothing to run, and the run
+// passes, as one of a package alone does. A run ElaborateDesign stopped on an
+// error it reported fails, whatever the source declares.
 int RunSimulation(const delta::CliOptions& opts,
                   const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag, delta::Arena& arena) {
-  const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
-  if (!design) return 1;
+  auto [design, failed] = ElaborateDesign(opts, lib_map, cu, diag, arena);
+  if (failed) return 1;
+  if (design == nullptr) return 0;
   return SimulateDesign(opts, design, diag, arena);
 }
 
@@ -887,7 +907,7 @@ int main(int argc, char* argv[]) {
   // main returns.
   delta::ProtectLicenseLibraries licenses;
   auto pp = PreprocessSources(opts, src_mgr, diag, licenses);
-  if (pp.source.empty() || diag.HasErrors()) {
+  if (pp.unreadable || diag.HasErrors()) {
     return 1;
   }
 
