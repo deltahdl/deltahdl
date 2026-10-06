@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <fstream>
-#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -37,11 +35,4 @@ inline void SetupMem(SimFixture& f, const char* name, int lo, int size,
 inline Variable* Cell(SimFixture& f, const char* name, int addr) {
   std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
   return f.ctx.FindVariable(nm);
-}
-
-// Reads and returns the entire contents of the file at `path`.
-inline std::string ReadFile(const std::string& path) {
-  std::ifstream ifs(path);
-  return std::string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>());
 }
