@@ -739,8 +739,8 @@ void* DpiRuntime::PackedArgRef(std::string_view sv_name,
       func->packed_arg_passing != DpiPackedArgPassing::kSv31aReference) {
     return nullptr;
   }
-  // The actual is handed over as it stands. §H.14: "An implementation need not
-  // do any conversion or marshalling of data into the canonical format."
+  // The actual is handed over as it stands. §H.14 lets an implementation pass
+  // such data without converting or marshalling it into the canonical form.
   return actual_data;
 }
 

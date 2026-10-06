@@ -35,8 +35,8 @@ struct DpiScope {
 // representation §H.10.1.2 defines. Accellera SystemVerilog 3.1a passes it by
 // the opaque handle types svBitPackedArrRef and svLogicPackedArrRef instead —
 // a reference to the simulator's own representation — and an implementation
-// doing so "need not do any conversion or marshalling of data into the
-// canonical format". §H.14 deprecates the SV3.1a semantics and lets a simulator
+// doing so leaves the data unconverted, with no marshalling into the canonical
+// form. §H.14 deprecates the SV3.1a semantics and lets a simulator
 // decline them, so an import is passed its packed data in the canonical
 // representation unless its declaration selects the other.
 enum class DpiPackedArgPassing : uint8_t {
@@ -212,7 +212,8 @@ bool DpiCurrentDisableAcknowledged();
 //
 // DpiRegisterScope is idempotent by name: registering the same name twice
 // returns the same stable handle. DpiScopeFromName returns nullptr for a name
-// that was never registered (the standard's "unrecognized scope name" → NULL).
+// that was never registered, the standard answering NULL for a scope name it
+// does not recognize.
 // DpiNameFromScope returns the fully qualified name of a handle that originated
 // here, or "" for a null or unrecognized handle (it never dereferences a
 // pointer it did not create).

@@ -197,10 +197,9 @@ bool DpiUserKeyGenerationIsSafe(DpiUserKeyOrigin origin);
 bool DpiUserDataStorageIsSharedAcrossContexts();
 uint32_t DpiPutUserDataCallsSharingAnAreaAcross(uint32_t context_count);
 
-// §H.9.3: svSetScope shall be called before calling an export function,
-// unless the export is called while executing an import, in which case the
-// export inherits the scope of the surrounding import, known as the "default
-// scope".
+// §H.9.3: an export function is called after svSetScope has named its scope,
+// except when an import that is running calls it; the export then runs in that
+// import's scope, which the annex calls the default scope.
 bool DpiSvSetScopeIsRequiredBeforeExportCall(
     bool export_called_while_executing_import);
 

@@ -282,10 +282,10 @@ void* ElemBase(svOpenArrayHandle h, const int* idx, int n_idx, size_t word_size,
 // representation stride recorded when the handle was built. Returns nullptr
 // when the handle or its storage is unusable, when the index count does not
 // match the unpacked dimensionality, or when any index is outside its original
-// range — the listing's "null if index outside the range or null pointer"
-// contract. A zero elem_size signals that an element's representation differs
-// from that of an individual value of the same type, for which H.12.4 also
-// requires nullptr.
+// range, which is the listing's contract: null for an index outside the range
+// or for a null pointer. A zero elem_size signals that an element's
+// representation differs from that of an individual value of the same type, for
+// which H.12.4 also requires nullptr.
 void* ElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   if (h == nullptr) return nullptr;
   const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
