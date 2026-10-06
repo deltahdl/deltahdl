@@ -174,8 +174,8 @@ struct ContAssignDriver {
   uint32_t lo = 0;
   uint32_t width = 0;
   // §11.5.1's second answer for a select that is only partly in range: a
-  // partially out-of-range part-select "shall, when written, only affect the
-  // bits that are in range", which names both the bits of the net that are
+  // partially out-of-range part-select, when written, changes only the bits
+  // that are in range, which names both the bits of the net that are
   // written -- `lo` and `width` -- and the bits of the value those bits take.
   // `src_lo` is where in the value they begin: it counts the select's own low
   // bits that fall below the net, so it is zero for a select wholly inside the

@@ -282,8 +282,8 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
   auto target = PartSelectTargetIndices(
       SelectBoundValue(idx_val), SelectBoundValue(end_val),
       sel->is_part_select_plus, sel->is_part_select_minus);
-  // §11.5.1 requires an indexed part-select's width to "be a positive
-  // constant", so a zero one names no bit and the select is no bits wide. This
+  // §11.5.1 requires an indexed part-select's width to be a positive
+  // constant, so a zero one names no bit and the select is no bits wide. This
   // and SelectStorageBits answer one question off one struct, and only that one
   // read its third field: the pair below is the two ends of a width the select
   // does not have -- 3 and 2 for `a[3 +: 0]` -- so `{a[3 +: 0], b}` claimed two
@@ -350,8 +350,8 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
 
 // §11.5.1: whether the concatenation lvalue element `e`, having resolved to
 // `var`, addresses any bit of it. A select whose address lies wholly outside
-// the declared bounds or carries x or z addresses none, that write having "no
-// effect on the data stored"; every other element shape names the whole of the
+// the declared bounds or carries x or z addresses none, that write leaving the
+// stored data untouched; every other element shape names the whole of the
 // variable it resolved to.
 //
 // This is the second of the two questions ConcatLhsElemWidth used to answer as
@@ -397,8 +397,8 @@ static void WriteConcatLhsElement(const Expr* el, const Logic4Vec& slice,
   // variable standing; writing the variable whole gave `{a[3:0], b}` all of
   // `a`. WriteBitSelect resolves the window §11.5.1 gives the indices.
   if (el->kind == ExprKind::kSelect && el->base != nullptr) {
-    // §11.5.1: a select addressing no bit of its object "shall have no effect
-    // on the data stored when written", so this element writes nothing and
+    // §11.5.1: a write through a select addressing no bit of its object leaves
+    // the stored data untouched, so this element writes nothing and
     // wakes nobody -- WriteBitSelect declines the write and, since #3522, the
     // notification with it, §9.4.2 detecting a change rather than an attempt at
     // one. The check stays ahead of the writer all the same: a concatenation
@@ -423,8 +423,8 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     const Expr* el = *it;
     uint32_t w = ConcatLhsElemWidth(el, ctx, arena);
     if (w == 0) {
-      // §11.5.1 requires an indexed part-select's width to "be a positive
-      // constant", so an element written with a width of zero is illegal
+      // §11.5.1 requires an indexed part-select's width to be a positive
+      // constant, so an element written with a width of zero is illegal
       // rather than merely empty and is reported before being passed over.
       // The report gates itself on the select carrying such a width, so the
       // other causes of a zero here -- an element this cannot size at all, a
@@ -450,8 +450,8 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-// §11.4.12: "The concatenation is treated as a packed vector of bits. It can be
-// used on the left-hand side of an assignment", and §10.9 gives a typed or bare
+// §11.4.12: a concatenation is handled as a packed vector of bits and may stand
+// on the left-hand side of an assignment, and §10.9 gives a typed or bare
 // assignment pattern the same use, so both distribute the value across their
 // elements rather than naming one object to receive it. Answers whether the
 // left-hand side was one of those, so that a caller with its own statement

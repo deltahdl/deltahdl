@@ -402,13 +402,12 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
 // assignment too, performing the same reverse (unpack) operation. The source
 // is sampled now; defer the per-target writes to the NBA region so the
 // streaming semantics match the blocking form.
-// §11.4.12: "The concatenation is treated as a packed vector of bits. It can be
-// used on the left-hand side of an assignment", and §10.9 gives an assignment
-// pattern the same use. §10.4.2 gives the nonblocking form the same
-// variable_lvalue the blocking form takes -- "variable_lvalue is a data type
-// that is valid for a procedural assignment statement" -- so a concatenation is
-// a nonblocking target exactly as it is a blocking one, and `{a, b} <= x` has
-// to distribute where `{a, b} = x` does.
+// §11.4.12: a concatenation is handled as a packed vector of bits and may stand
+// on the left-hand side of an assignment, and §10.9 gives an assignment pattern
+// the same use. §10.4.2 gives the nonblocking form the same variable_lvalue the
+// blocking form takes, any data type a procedural assignment accepts, so a
+// concatenation is a nonblocking target exactly as it is a blocking one, and
+// `{a, b} <= x` has to distribute where `{a, b} = x` does.
 //
 // The distribution is the blocking one, deferred rather than restated: one
 // event carries the sampled right-hand value and runs TryUnpackConcatLhs in the
@@ -481,7 +480,7 @@ static void SetupPartSelectNbaCallback(const NbaWrite& write,
 // false, having installed no callback, when the select addresses no bit of the
 // object and the assignment is therefore dropped: §11.5.1 has a write through
 // an index carrying x or z, and one through an address wholly outside the
-// declared bounds, "have no effect on the data stored", which is a zero width
+// declared bounds, leave the stored data untouched, which is a zero width
 // from SelectStorageBits.
 //
 // One installer answers both select forms because SelectStorageBits answers
@@ -823,7 +822,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
     NbaWrite write{event, var, rhs_val, arena};
     // §11.5.1 makes a select that addresses no bit of its object -- one whose
     // index carries x or z, and one whose address lies wholly outside the
-    // declared bounds -- "have no effect on the data stored when written", so
+    // declared bounds -- leave the stored data untouched when written, so
     // declining the write is the clause rather than an error, and only the
     // bookkeeping was wrong. The event is taken from the pool before the window
     // is resolved because NbaWrite carries the Event* the installer writes its

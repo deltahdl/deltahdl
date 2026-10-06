@@ -66,10 +66,11 @@ bool VpiExpressionHasSideEffects(const VpiObject* obj) {
   return obj && obj->has_side_effects;
 }
 
-// §11.4.1 lists the assignment operators as the simple "=" together with "the C
-// assignment operators and special bitwise assignment operators: +=, -=, *=,
-// /=, %=, &=, |=, ^=, <<=, >>=, <<<=, and >>>=". Each of them stores into its
-// left-hand side, which is the state change §37.3.5 calls a side effect.
+// §11.4.1 lists the assignment operators as the simple `=` together with C's
+// compound assignments and the bitwise and shift ones: `+=`, `-=`, `*=`, `/=`,
+// `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`, `<<<=` and `>>>=`. Each of them stores
+// into its left-hand side, which is the state change §37.3.5 calls a side
+// effect.
 static bool IsAssignmentOperator(TokenKind op) {
   switch (op) {
     case TokenKind::kEq:

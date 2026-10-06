@@ -1,10 +1,10 @@
 // The read-modify-write assignment expressions: §11.4.1's assignment operators
 // (`+=`, `<<=` and the rest) and §11.4.2's increment and decrement. Both read a
 // target, compute a new value from it and write it back in one expression, and
-// §11.4.1 states them as blocking assignments -- "An assignment operator is
-// semantically equivalent to a blocking assignment, with the exception that any
-// left-hand index expression is only evaluated once" -- which is why they share
-// the writers a statement uses and the snapshot that exception needs.
+// §11.4.1 states them as blocking assignments -- an assignment operator means
+// what a blocking assignment means, except that an index on its left-hand side
+// is evaluated once only -- which is why they share the writers a statement
+// uses and the snapshot that exception needs.
 //
 // src/simulator/eval_expr.cpp holds the rest of the expression evaluator, which
 // reads rather than writes.
@@ -43,9 +43,9 @@ struct IncDecResult {
   Logic4Vec new_val;
 };
 
-// §11.4.2: "These increment and decrement assignment operators behave as
-// blocking assignments", so §10.4's list of left-hand sides governs them and
-// §11.4.1's once-only left-hand index rule comes with it. This wrote a plain
+// §11.4.2: the increment and decrement operators act as blocking assignments,
+// so §10.4's list of left-hand sides governs them and §11.4.1's once-only
+// left-hand index rule comes with it. This wrote a plain
 // identifier and handed a select to TryAssocIndexedWrite, which answers only
 // for an associative element, so an unpacked array element, a queue element, a
 // bit-select, a part-select, a compound a[i][j] and the byte a string's index
@@ -60,21 +60,19 @@ struct IncDecResult {
 // Stores an operator's result in the whole variable it named. §6.11.2 gives a
 // 2-state type no x and no z, so an unknown result is coerced before it is
 // stored, as WriteVar and EvalCompoundAssign coerce theirs. §10.6.2: a force
-// "shall override a procedural assignment ... until a release procedural
-// statement is executed on the variable". Only the write is overridden: the
-// operator still yields the value it computed, which is what the enclosing
-// expression reads.
+// overrides procedural assignments to the variable until a release is executed
+// on it. Only the write is overridden: the operator still yields the value it
+// computed, which is what the enclosing expression reads.
 //
-// §9.4.2: "A non-edge implicit event shall be detected on any change in the
-// value of the expression", and a value "referenced by a method or function"
-// that changes "shall cause the event expression to be reevaluated". The
-// clause exempts no writer, so an increment is a change exactly as an `=` is.
-// This stored and said nothing, and NotifyWatchers is the only route by which
-// a parked process is resumed, so the wake-up ended rather than waiting. It
-// sits inside the gate, where WriteVar and ExecFuncIdentifierAssign put
-// theirs, because a write that did not land is no change to detect. It is
-// otherwise unconditional: whether a change counts is the awaiter's own test,
-// which ChangeGatePasses and CheckEdge already make.
+// §9.4.2: an implicit event with no edge is detected on any change in the
+// expression's value, and a change to a value a method or function reads makes
+// the event expression be evaluated again. The clause exempts no writer, so an
+// increment is a change exactly as an `=` is. This stored and said nothing, and
+// NotifyWatchers is the only route by which a parked process is resumed, so the
+// wake-up ended rather than waiting. It sits inside the gate, where WriteVar
+// and ExecFuncIdentifierAssign put theirs, because a write that did not land is
+// no change to detect. It is otherwise unconditional: whether a change counts
+// is the awaiter's own test, which ChangeGatePasses and CheckEdge already make.
 static void StoreOperatorResult(Variable* var, Logic4Vec& result) {
   if (!var->is_4state) CoerceTo2State(result);
   if (!var->is_forced) {
@@ -143,10 +141,9 @@ static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
     // one arithmetic result and are computed by one arithmetic. That is
     // EvalBinaryOp, which EvalCompoundAssign below already reaches, rather than
     // a uint64_t. ToUint64 projects `aval & ~bval`, which reads an x or a z as
-    // a 0 and hands back a value every bit of which is known, so §11.4.3's
-    // "if any operand bit value is the unknown value x or the high-impedance
-    // value z, then the entire result value shall be x" was not applied to an
-    // increment at all: `integer i = 'x; i++;` left i at 1.
+    // a 0 and hands back a value every bit of which is known, so §11.4.3's rule
+    // that an x or z in any operand bit makes the whole result x was not
+    // applied to an increment at all: `integer i = 'x; i++;` left i at 1.
     //
     // The 1 is built at the operand's own width because EvalBinaryArith sizes
     // its result at the wider operand: a 32-bit literal would widen a
@@ -175,11 +172,11 @@ Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   return EvalIncDec(expr, ctx, arena).old_val;
 }
 
-// §11.4.1 lists the assignment operators as the simple `=` plus "the C
-// assignment operators and special bitwise assignment operators: +=, -=, *=,
-// /=, %=, &=, |=, ^=, <<=, >>=, <<<=, and >>>=". This gives the binary operator
-// each of those assigns the result of, and answers kEof for a token that is not
-// one of them, which is what IsCompoundAssignOp reads.
+// §11.4.1 lists the assignment operators as the simple `=` plus C's compound
+// assignments and the bitwise and shift ones: `+=`, `-=`, `*=`, `/=`, `%=`,
+// `&=`, `|=`, `^=`, `<<=`, `>>=`, `<<<=` and `>>>=`. This gives the binary
+// operator each of those assigns the result of, and answers kEof for a token
+// that is not one of them, which is what IsCompoundAssignOp reads.
 TokenKind CompoundAssignBaseOp(TokenKind op) {
   switch (op) {
     case TokenKind::kPlusEq:
@@ -215,23 +212,22 @@ bool IsCompoundAssignOp(TokenKind op) {
   return CompoundAssignBaseOp(op) != TokenKind::kEof;
 }
 
-// §11.4.1: "An assignment operator is semantically equivalent to a blocking
-// assignment, with the exception that any left-hand index expression is only
-// evaluated once", and writes `a[i]+=2;` as the same statement as
-// `a[i] = a[i] +2;`. So §11.6.1 sizes the operation by the target and §10.7
-// truncates the result into it, neither of which happened: the operation was
-// evaluated with no context and the result written over the target, so
-// `logic [3:0] v; v += 8'hFF;` left v eight bits wide.
+// §11.4.1: an assignment operator means what a blocking assignment means,
+// except that an index on its left-hand side is evaluated once only, and the
+// clause writes `a[i]+=2;` as the same statement as `a[i] = a[i] +2;`. So
+// §11.6.1 sizes the operation by the target and §10.7 truncates the result into
+// it, neither of which happened: the operation was evaluated with no context
+// and the result written over the target, so `logic [3:0] v; v += 8'hFF;` left
+// v eight bits wide.
 //
 // §11.3.6 settles the value the expression yields as well as the one it stores.
-// An assignment expression "evaluates the right-hand side, casts the right-hand
-// side to the left-hand data type, stacks it, updates the left-hand side, and
-// returns the stacked value", and "the data type of the value that is returned
-// is the data type of the left-hand side" -- so the coerced value is what is
-// returned, which is what `b = (a += 1)`, the clause's own example, reads.
+// An assignment expression evaluates its right-hand side, casts that to the
+// left-hand side's type, keeps it aside, updates the left-hand side and returns
+// what it kept, typed as the left-hand side is -- so the coerced value is what
+// is returned, which is what `b = (a += 1)`, the clause's own example, reads.
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // §11.4.1's one exception to this being an ordinary blocking assignment:
-  // "any left-hand index expression is only evaluated once". The allocation,
+  // §11.4.1's one exception to this being an ordinary blocking assignment: an
+  // index on the left-hand side is evaluated once only. The allocation,
   // the read and the write below each re-derive the target from expr->lhs and
   // would call a side-effecting index once apiece, so the indices are evaluated
   // here and stashed for those to find. This runs before the allocation, which
@@ -297,10 +293,9 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     WriteStructField(expr->lhs, result, ctx, &yield_width);
   }
   ClearSelectIndices(expr->lhs, ctx);
-  // §11.3.6: an assignment expression "evaluates the right-hand side, casts the
-  // right-hand side to the left-hand data type, stacks it, updates the
-  // left-hand side, and returns the stacked value. The data type of the value
-  // that is returned is the data type of the left-hand side." The write itself
+  // §11.3.6: an assignment expression evaluates its right-hand side, casts that
+  // to the left-hand side's type, keeps it aside, updates the left-hand side
+  // and returns what it kept, typed as the left-hand side is. The write itself
   // was already right -- each writer sizes the value by what it is writing into
   // -- and it is the value the surrounding expression reads that carried the
   // operation's width instead of the target's. Zero means no width was found

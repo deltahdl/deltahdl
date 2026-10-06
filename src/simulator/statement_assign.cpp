@@ -867,12 +867,11 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 }
 
 // The declared width of the storage a resolved field target names, which
-// §11.3.6 makes the data type of the value an assignment expression returns:
-// "The data type of the value that is returned is the data type of the
-// left-hand side." Zero where the target names storage of no declared width --
-// a property the collector could not size, a string, an array the path fell
-// back to a flattened key on -- which a caller reads as "no answer" and leaves
-// the value it has.
+// §11.3.6 makes the data type of the value an assignment expression returns,
+// that value being typed as the left-hand side is. Zero where the target names
+// storage of no declared width -- a property the collector could not size, a
+// string, an array the path fell back to a flattened key on -- which a caller
+// reads as "no answer" and leaves the value it has.
 static uint32_t FieldTargetWidth(const FieldTarget& target) {
   switch (target.kind) {
     case FieldTarget::Kind::kBits:

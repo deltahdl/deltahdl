@@ -346,12 +346,11 @@ size_t SelectDepthWithin(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena);
 
 // §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
-// against the declaration, since "the actual bit that is accessed by an address
-// is, in part, determined by the declaration". A width of zero is the select
-// that addresses no bit of the object -- an index carrying x or z, which
-// §11.5.1 has "return x" when read and have "no effect on the data stored when
-// written", and an index or a range wholly outside the declared bounds, which
-// the same sentence covers.
+// against the declaration, since which bit an address reaches depends in part
+// on the declaration. A width of zero is the select that addresses no bit of
+// the object -- an index carrying x or z, which §11.5.1 has read as x and leave
+// the stored data untouched when written, and an index or a range wholly
+// outside the declared bounds, which the same sentence covers.
 //
 // One index of a packed multidimensional array addresses an element rather than
 // a bit (§7.4.1), and the window is that element's; a further index or range on

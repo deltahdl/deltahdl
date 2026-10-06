@@ -28,8 +28,8 @@ namespace delta {
 // window of storage already found.
 
 // Deposits `rhs_val` in the window of `var` that `bits` names. §11.5.1 has a
-// part-select that is partly out of range "when written, only affect the bits
-// that are in range", and which bits of the value the affected ones receive is
+// write through a part-select that is partly out of range change only its
+// in-range bits, and which bits of the value the affected ones receive is
 // bits.src_lo: a select running off the low end of its object has its own low
 // bits land nowhere, so `a[1 -: 4] = 4'b1101` on a `logic [7:0] a` -- which the
 // clause reads as `a[1:-2]` -- gives `a[1:0]` the value's bits [3:2] and must
@@ -38,7 +38,7 @@ namespace delta {
 // end, where the bits that land are the value's least significant ones.
 //
 // The window is deposited rather than computed in a machine word, because
-// "only affect the bits that are in range" is a statement about every bit of
+// changing only the in-range bits is a statement about every bit of
 // the target the select did not name and not only about the ones beside it.
 // Reading the target through Logic4Vec::ToUint64 and rebuilding it with
 // MakeLogic4VecVal moved three sets of them. ToUint64 returns words[0] alone
@@ -47,10 +47,9 @@ namespace delta {
 // `logic [99:0] w` must leave 96 ones and left 60, w[99:64] being neither named
 // by the select nor the value's to touch. ToUint64 returns `aval & ~bval` and
 // MakeLogic4VecVal sets no bval, so the x and z that §6.3.1 lets every bit of a
-// 4-state vector hold -- "All bits of 4-state vectors can be independently set
-// to one of the four basic values", and §6.11.2 makes `logic` one of those
-// types, whose values "have additional bits, which encode the x and z states"
-// -- were read as 0 on the way in and stored as 0 on the way out:
+// 4-state vector hold -- each bit takes any of the four values on its own, and
+// §6.11.2 makes `logic` one of those types, carrying extra bits that encode x
+// and z -- were read as 0 on the way in and stored as 0 on the way out:
 // `a = 8'hxx; a[1:0] = 2'b11;` must read 8'bxxxxxx11 and read 8'b00000011, and
 // `a = 8'h00; a[1:0] = 2'b1x;` must read 8'b0000001x and read 8'b00000010. And
 // `mask << bits.lo` was undefined once the window began at bit 64 or above, the
@@ -69,8 +68,8 @@ namespace delta {
 // whole from another object shares that object's storage and an in-place
 // deposit would write these bits into whatever else is holding it.
 //
-// §6.11.2 makes `bit` and `int` 2-state types that "do not have unknown
-// values", so a 2-state target is coerced here explicitly. MakeLogic4VecVal
+// §6.11.2 makes `bit` and `int` 2-state types, which have no unknown values,
+// so a 2-state target is coerced here explicitly. MakeLogic4VecVal
 // gave that for free by never setting a bval; now that the deposit carries x
 // and z, an x reaching such a target would otherwise survive.
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
@@ -142,7 +141,7 @@ static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
                                         sel->is_part_select_plus,
                                         sel->is_part_select_minus);
   // §11.5.1 spells an indexed part-select's width out separately and requires
-  // that it "shall be a positive constant", so a width of zero names no bit of
+  // it to be a positive constant, so a width of zero names no bit of
   // the object -- which is what a zero width from this function already means.
   // The pair PartSelectTargetIndices answers cannot say so on its own: it is
   // the two ends of a width the select does not have, and for `a[3 +: 0]` it is
@@ -246,8 +245,8 @@ static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
 // window for it, and returns the same empty window for an unknown index, an
 // out-of-range index and a select landing on no bit of the object, all of which
 // the clause leaves silent. The width belongs to the select as written rather
-// than to the object it addresses -- §11.5.1 requires it to "be a positive
-// constant" -- so it is read on its own, from a base of zero, which is the
+// than to the object it addresses -- §11.5.1 requires it to be a positive
+// constant -- so it is read on its own, from a base of zero, which is the
 // declared width PartSelectTargetIndices gives either indexed form whatever the
 // base is. Only those two forms carry a width, so `a[7:0]` reads nothing twice.
 void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
@@ -262,18 +261,18 @@ void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
 }
 
 // The write itself, which §11.5.1 states as two questions this file now answers
-// once each. "The actual bit that is accessed by an address is, in part,
-// determined by the declaration" is the resolution, and SelectStorageBits
-// answers it; a part-select partly out of range "shall, when written, only
-// affect the bits that are in range" is the deposit, and WritePartSelect
-// answers that. This function walked the same four arms a second time with the
-// write attached -- the shape a correction lands on one of and not the other,
-// as #3532 records on the nonblocking path, and one copy-paste-test cannot see,
-// the two walks being an early-returning writer against a value-returning
-// resolver rather than duplicated text. The bit-select goes with them, being
-// the one-bit case of that window rather than a write of its own: computed in a
-// machine word instead, `uint64_t{1} << off` was undefined for a bit at 64 or
-// above, and `enable[64] = 1'b1;` on a `logic [64:0] enable` set enable[0].
+// once each. Which bit an address reaches depending in part on the declaration
+// is the resolution, and SelectStorageBits answers it; a write through a
+// part-select partly out of range changing only its in-range bits is the
+// deposit, and WritePartSelect answers that. This function walked the same four
+// arms a second time with the write attached -- the shape a correction lands on
+// one of and not the other, as #3532 records on the nonblocking path, and one
+// copy-paste-test cannot see, the two walks being an early-returning writer
+// against a value-returning resolver rather than duplicated text. The
+// bit-select goes with them, being the one-bit case of that window rather than
+// a write of its own: computed in a machine word instead, `uint64_t{1} << off`
+// was undefined for a bit at 64 or above, and `enable[64] = 1'b1;` on a
+// `logic [64:0] enable` set enable[0].
 //
 // The packed arm's write carried one test the resolver has no counterpart for,
 // `off < var->value.width`, and it is dropped rather than moved into
@@ -282,7 +281,7 @@ void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
 // so an index that range contains has its element wholly inside the value, and
 // where the two disagree there is no declared range at all, only the implicit
 // [width-1:0] one. DepositBitField answers both, breaking at the first bit at
-// or past dst.width -- that same "only affect the bits that are in range" -- so
+// or past dst.width -- that same limit to the in-range bits -- so
 // an element past the value deposits none of itself. Only a read needs the test
 // (TryPackedElementSelect, eval_select.cpp), owing a value where a write that
 // lands nowhere owes nothing.

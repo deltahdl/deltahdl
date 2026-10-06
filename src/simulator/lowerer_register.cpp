@@ -350,10 +350,10 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // §6.16: a port of type string holds a string, read and written as a
   // string variable declared in the body is.
   if (port.type_kind == DataTypeKind::kString) ctx.RegisterStringVariable(name);
-  // §11.5.1: "The actual bit that is accessed by an address is, in part,
-  // determined by the declaration" -- port.width says how many bits the port
-  // has rather than which bit an index names, because `[8:1]` and `[1:8]` are
-  // both eight bits wide and index 3 reaches a different bit of each.
+  // §11.5.1: which bit an address reaches depends in part on the declaration
+  // -- port.width says how many bits the port has rather than which bit an
+  // index names, because `[8:1]` and `[1:8]` are both eight bits wide and index
+  // 3 reaches a different bit of each.
   RecordPackedRange(port.dtype, v, ctx, arena);
   // §7.2.1 with §23.2.2.3: a port the clause makes a net may be a net of a
   // packed structure (§6.7.1), and a member select of it names a run of the

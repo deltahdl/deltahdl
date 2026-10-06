@@ -444,8 +444,8 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §11.5.1: "Part-selects that are partially out of range shall, when read,
-// return x for the bits that are out of range." `lo_off` is the storage offset
+// §11.5.1: a part-select that is partly out of range reads x for each bit that
+// falls outside it. `lo_off` is the storage offset
 // the result's least significant bit was read from; it is negative when the
 // select runs off the low end of the value, and `lo_off + width` exceeds the
 // value's width when it runs off the high end.
@@ -559,8 +559,8 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
 }
 
 // §11.5.1: the range a select's indices are resolved against. When the select
-// names a vector it is that vector's declared range, since "the actual bit that
-// is accessed by an address is, in part, determined by the declaration", and
+// names a vector it is that vector's declared range, since which bit an address
+// reaches depends in part on the declaration, and
 // when it names a subfield of a packed multidimensional array the range of
 // the dimension that subfield is indexed by (§7.4.4); for anything else -- a
 // concatenation, a function result, a struct member -- the value carries no
@@ -625,7 +625,7 @@ static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
 }
 
 // §11.5.1: how wide a non-indexed part-select is when one of its two bounds is
-// x or z. "The width of a part-select is always constant", and with one bound
+// x or z. A part-select always has a constant width, and with one bound
 // unknown the span is not a number the expression states, so what bounds it is
 // the declaration: the pair runs from the more significant index to the less
 // significant one, and the widest such select the object admits runs from the
@@ -649,23 +649,22 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                                       Arena& arena) {
   auto end = EvalExpr(expr->index_end, ctx, arena);
   auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
-  // §11.5.1: "a part-select that is x or z shall yield the value x when read",
-  // and the clause makes both bounds of `vect[msb_expr:lsb_expr]` addresses --
-  // "Both msb_expr and lsb_expr shall be constant integer expressions" -- so an
-  // unknown second bound is as much an unknown address as an unknown first one.
-  // Only the first was asked about, on the way in to this function, and the
-  // second reached SelectBoundValue, whose Logic4Vec::ToUint64 is the
-  // "4-state -> integer projection" its own comment in src/common/types.cpp
-  // calls it: x and z both arrived as the index 0, and the select silently
-  // became a different, well-formed one. On a `logic [7:0] a = 8'hA5`,
-  // `a[3 : 1'bx]` was read as `a[3:0]` and answered 4'b0101. SelectStorageBits
-  // (statement_assign.cpp), which every writer of a select now goes through,
-  // has asked this of both bounds all along, so the read was the one direction
-  // where the two bounds were not alike. The second expression of an indexed
-  // part-select is its width rather than an address, and an unknown one is no
-  // more a width than an unknown bound is an address -- §11.5.1 has it "shall
-  // be a positive constant integer expression" -- so it takes the same route,
-  // as it does at the writers.
+  // §11.5.1: a part-select whose bound is x or z reads as x, and the clause
+  // makes both bounds of `vect[msb_expr:lsb_expr]` addresses, each a constant
+  // integer expression, so an unknown second bound is as much an unknown
+  // address as an unknown first one. Only the first was asked about, on the way
+  // in to this function, and the second reached SelectBoundValue, whose
+  // Logic4Vec::ToUint64 is the "4-state -> integer projection" its own comment
+  // in src/common/types.cpp calls it: x and z both arrived as the index 0, and
+  // the select silently became a different, well-formed one. On a
+  // `logic [7:0] a = 8'hA5`, `a[3 : 1'bx]` was read as `a[3:0]` and answered
+  // 4'b0101. SelectStorageBits (statement_assign.cpp), which every writer of a
+  // select now goes through, has asked this of both bounds all along, so the
+  // read was the one direction where the two bounds were not alike. The second
+  // expression of an indexed part-select is its width rather than an address,
+  // and an unknown one is no more a width than an unknown bound is an address
+  // -- §11.5.1 requires a positive constant integer expression there -- so it
+  // takes the same route, as it does at the writers.
   if (HasUnknownBits(end)) {
     return MakeAllX(arena, UnknownBoundPartSelectWidth(
                                range, idx,
@@ -692,21 +691,21 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
 // §11.5.1: how wide a part-select is whose first index is x or z. The clause
 // gives the second expression two meanings and the part-select flags are the
 // whole of what says which one this select carries: for `[base +: width]` and
-// `[base -: width]` it is the width, which "shall be a positive constant
-// integer expression", and for `[msb_expr:lsb_expr]` it is the second index,
+// `[base -: width]` it is the width, which has to be a positive constant
+// integer expression, and for `[msb_expr:lsb_expr]` it is the second index,
 // with the width being the span the two indices name. Reading it as a width for
 // both is what let `a[1'bx : -2]` ask for a vector of 4294967294 bits, since
 // SelectBoundValue's -2 was a width of 4294967294 to a uint32_t cast.
 //
 // The first index is x, so the span is not a number the expression states, and
-// §11.5.1 nonetheless makes it constant: "The width of a part-select is always
-// constant." What bounds it is the declaration. The clause's first index is the
+// §11.5.1 nonetheless holds a part-select's width constant. What bounds it is
+// the declaration. The clause's first index is the
 // more significant end of the pair, so the widest such select the object admits
 // runs from the known second index -- brought inside the range, since a bound
 // outside it addresses no bit of the object -- up to the most significant index
 // there is. A second index at or past that end leaves the one bit the minimum
-// below keeps, which is the same answer §11.5.1 gives a select "completely out
-// of the address bounds": the value x.
+// below keeps, which is the same answer §11.5.1 gives a select wholly outside
+// the address bounds: the value x.
 //
 // A base with no declaration of its own is left at the implicit empty range
 // rather than evaluated for its width, since this arm runs before the base is

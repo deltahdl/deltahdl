@@ -67,9 +67,8 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 
 // Defined in statement_assign_compound.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §11.4.1 states a compound
-// assignment as one blocking assignment -- "an assignment operator is
-// semantically equivalent to a blocking assignment, with the exception that any
-// left-hand index expression is only evaluated once" -- and this performs that
+// assignment as one blocking assignment, but for an index on its left-hand
+// side, which is evaluated once only, and this performs that
 // one read-modify-write for whichever of the identifier, select, member-access
 // and scalar-fallback forms the target takes. A caller that reaches it has had
 // its statement written for it and must not go on to write the target again
@@ -101,8 +100,8 @@ void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena);
 
 // Defined in statement_assign_compound.cpp; also used by EvalCompoundAssign in
 // eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
-// ordinary blocking assignment -- "any left-hand index expression is only
-// evaluated once" -- and the helpers that resolve, read and write a select
+// ordinary blocking assignment -- an index on the left-hand side is evaluated
+// once only -- and the helpers that resolve, read and write a select
 // target each re-derive it from lhs->index, which would call a side-effecting
 // index several times. Snapshot evaluates each index node once and stashes the
 // result for those later reads to find; Clear undoes it, and has to run on
@@ -259,11 +258,11 @@ void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
 // index of a packed multidimensional array (§7.4.1), and the span of the
 // indices for a part-select, indexed or not. An address outside the declared
 // bounds changes none of those: §11.5.1 gives the invalid reference a value
-// rather than an absence, "x for 4-state and 0 for 2-state values", and says
-// separately that such a write "shall have no effect on the data stored". Zero
+// rather than an absence, x for a 4-state type and 0 for a 2-state one, and
+// says separately that such a write leaves the stored data untouched. Zero
 // only where the select names no bits, which is a part-select whose bounds or
 // width expression carry x or z and an indexed one whose width is zero,
-// §11.5.1 requiring that width to "be a positive constant".
+// §11.5.1 requiring that width to be a positive constant.
 //
 // This is the width the select names and not the window of its object it may
 // write; the second question is SelectStorageBits'. The two differ wherever a
@@ -305,8 +304,8 @@ bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
 // in statement_assign_concat.cpp and by the §10.6.1 and §10.6.2 procedural
 // continuous assignments in statement_assign_decl.cpp, each of which sizes a
 // concatenation element itself and so never reaches that writer with one this
-// concerns. §11.5.1 requires an indexed part-select's width to "be a positive
-// constant", which makes a zero-width one illegal rather than merely empty,
+// concerns. §11.5.1 requires an indexed part-select's width to be a positive
+// constant, which makes a zero-width one illegal rather than merely empty,
 // and this raises that error for the select `sel`. It asks the question of the
 // select as written: it returns silently unless `sel` has an index_end, is a
 // plus or minus indexed part-select, and reads a declared width of zero, so a
@@ -328,8 +327,8 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
 // Defined in statement_assign_concat.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp, the §11.4.1 compound
 // assignment in eval_expr_assign_ops.cpp and the §10.6 procedural continuous
-// assignments in statement_assign_decl.cpp. §10.7: "The size of the left-hand
-// side of an assignment forms the context for the right-hand expression", and
+// assignments in statement_assign_decl.cpp. §10.7: the left-hand side's size is
+// the context the right-hand expression is sized in, and
 // §11.6.1 makes that context part of what sizes the expression. The width of
 // the object the lhs names, the bits §11.5.1 gives a select's indices, or the
 // sum of a concatenation's or assignment pattern's element widths -- the same
@@ -512,8 +511,8 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // Defined in statement_assign_select.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp, whose deferred update deposits the
-// window its own left-hand side named. §11.5.1 has a part-select that is only
-// partly in range "when written, only affect the bits that are in range", and
+// window its own left-hand side named. §11.5.1 has a write through a
+// part-select that is only partly in range change the in-range bits alone, and
 // this writes `rhs_val` into exactly the window `bits` names: `bits.lo` and
 // `bits.width` are the bits of `var` that are affected, and `bits.src_lo` is
 // where in the value the bits they receive begin. `bits` is what
@@ -528,12 +527,11 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
 // wrong answers that says.
 //
 // A forced target is the caller's to decline, because the two callers ask at
-// different moments. §10.6.2 has a force override a procedural assignment
-// "until a release procedural statement is executed on the variable"; the
-// blocking caller WriteBitSelect asks before it evaluates the indices, while
-// the nonblocking one has to ask inside its update callback, the flag that
-// governs the write being the one standing when the update region runs rather
-// than when the event was queued.
+// different moments. §10.6.2 has a force override procedural assignments until
+// a release is executed on the variable; the blocking caller WriteBitSelect
+// asks before it evaluates the indices, while the nonblocking one has to ask
+// inside its update callback, the flag that governs the write being the one
+// standing when the update region runs rather than when the event was queued.
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
                      const Logic4Vec& rhs_val, Arena& arena);
 

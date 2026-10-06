@@ -27,9 +27,9 @@ struct WideArithSpec {
 
 // Computes `op` over every word of two known operands. The caller has already
 // answered §11.8.4's unknown-operand question, so neither operand carries an x
-// or a z here. Division and modulus by zero answer with all x, as §11.4.3's
-// "the result shall be x" requires, and every other result is masked to
-// `width` so nothing above the declared width reads as set.
+// or a z here. Division and modulus by zero answer with all x, as §11.4.3
+// requires, and every other result is masked to `width` so nothing above the
+// declared width reads as set.
 Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
                         const Logic4Vec& rhs, const WideArithSpec& spec,
                         Arena& arena);

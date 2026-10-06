@@ -78,7 +78,7 @@ Logic4Vec FromLimbs(const Limbs& v, uint32_t width, Arena& arena) {
   return out;
 }
 
-// The ripple carry §11.4.3's "a plus b" asks for, across limbs rather than
+// The ripple carry §11.4.3's addition asks for, across limbs rather than
 // within one.
 void AddInto(Limbs& a, const Limbs& b) {
   uint64_t carry = 0;
@@ -213,8 +213,8 @@ DivResult DivMod(const Limbs& dividend, const Limbs& divisor, uint32_t width) {
   return out;
 }
 
-// §11.4.3: "The result of the power operator is the base raised to the power of
-// the exponent", taken here by squaring so the number of multiplications
+// §11.4.3: the power operator raises the base to the exponent's power, taken
+// here by squaring so the number of multiplications
 // follows the exponent's bit count rather than its value. Every product is
 // already truncated to the result width by Multiply.
 Limbs Power(const Limbs& base, const Limbs& exp, uint32_t width) {
@@ -298,8 +298,8 @@ Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
       break;
     case TokenKind::kSlash:
     case TokenKind::kPercent:
-      // §11.4.3: "Division or modulus by zero shall produce a result with all
-      // bits set to x."
+      // §11.4.3: a division or modulus by zero yields a result whose every bit
+      // is x.
       if (IsZero(b)) return MakeAllX(arena, spec.width);
       result = ApplySign(
           DivideMagnitudes(a, b, spec, op == TokenKind::kPercent), spec.width);

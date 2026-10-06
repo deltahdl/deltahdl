@@ -456,8 +456,8 @@ struct ArrayInfo {
   // row-major order and to resolve an @-address against the highest dimension.
   std::vector<uint32_t> dim_los = {};
   std::vector<uint32_t> dim_sizes = {};
-  // §11.5.2 addresses a dimension from "the address bounds given in the
-  // declaration", which is its smaller bound whichever way round the two were
+  // §11.5.2 addresses a dimension from the address bounds its declaration
+  // gives, which is its smaller bound whichever way round the two were
   // written, while §10.9.1 counts an assignment pattern's positional items from
   // the dimension's left bound; the two are the same bound only for an
   // ascending dimension. dim_los/dim_sizes above record the address extent and

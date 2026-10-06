@@ -322,7 +322,7 @@ struct RhsWatcherSpec {
   // recomputed forced value re-resolves it; null when the target is a variable,
   // which carries no strength.
   Net* net = nullptr;
-  // §11.4.12 treats a concatenation as "a packed vector of bits", so an element
+  // §11.4.12 treats a concatenation as a packed vector of bits, so an element
   // of one owns a window of the right-hand value and a window of its own
   // storage. Those five numbers are what Variable records beside an assign's
   // right-hand side, so they are the struct Variable records rather than five
@@ -455,7 +455,7 @@ static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
 
 // One element of a concatenation left-hand side, the window of the right-hand
 // value it owns and the width that value is evaluated at. §11.4.12 makes the
-// concatenation "a packed vector of bits", so the rightmost element takes the
+// concatenation a packed vector of bits, so the rightmost element takes the
 // least significant bits and each element to its left begins where the previous
 // one ended: `src_lo` is where this one begins and `width` is what
 // ConcatLhsElemWidth gave it.
@@ -477,13 +477,13 @@ struct ConcatElemSlot {
 // The window of the right-hand value `slot` owns and the window of its own
 // storage that receives it. A whole-variable element takes its bits into the
 // whole of itself; a select element takes them into the bits §11.5.1 says its
-// indices address, "determined by the declaration".
+// indices address, as the declaration determines them.
 //
 // The two windows are two answers and not one: the element is as wide as
 // ConcatLhsElemWidth makes it whether or not its address is in bounds, and it
 // writes only the bits SelectStorageBits leaves it. They differ for a
-// part-select that is partly out of range, which §11.5.1 has "when written,
-// only affect the bits that are in range" -- `a[9:6]` on `logic [7:0] a` is
+// part-select that is partly out of range, which §11.5.1 has change only its
+// in-range bits when written -- `a[9:6]` on `logic [7:0] a` is
 // four bits of the concatenation landing on the two of them that exist. Which
 // two of the four land is a third answer, and not always the low ones: `a[9:6]`
 // runs off the high end and lands its bits [1:0], while `a[1 -: 4]` runs off
@@ -508,7 +508,7 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
   RhsWatcherSpec spec;
   spec.net = net;
   spec.window.rhs_width = slot.rhs_width;
-  // §11.5.1's "only affect the bits that are in range" is itself two answers:
+  // §11.5.1's limit of such a write to the in-range bits is two answers:
   // dst.lo and dst.width are the bits of the object that are written, and
   // dst.src_lo is where among the element's own bits the ones that land begin.
   // The element's window of the right-hand value starts at slot.src_lo, so the
@@ -591,7 +591,7 @@ static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
 // install a procedural continuous assignment, and the two that end one.
 //
 // An element addressing no bit of its target is routed nowhere. §11.5.1 gives
-// such a write "no effect on the data stored", and for these four statements
+// such a write no effect on the stored data, and for these four statements
 // that has to mean the target is left exactly as it was found: is_forced is one
 // flag on the whole Variable, so setting it for an element owning none of its
 // bits would suppress every driver of every bit of it, and the watchers
@@ -635,8 +635,8 @@ static uint32_t WalkConcatLhsElements(const Expr* lhs, const Stmt* stmt,
     const Expr* el = *it;
     uint32_t w = ConcatLhsElemWidth(el, ctx, arena);
     if (w == 0) {
-      // §11.5.1 requires an indexed part-select's width to "be a positive
-      // constant", so an element written with a width of zero is illegal
+      // §11.5.1 requires an indexed part-select's width to be a positive
+      // constant, so an element written with a width of zero is illegal
       // rather than merely empty and is reported before being passed over,
       // the same way the blocking unpack reports it. The report gates itself
       // on the select carrying such a width, so the other causes of a zero

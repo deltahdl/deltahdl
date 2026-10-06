@@ -193,9 +193,8 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
 // Run the blocking-assignment handlers that do not need the generic
 // right-hand-side value: the three `new` forms and a queue target. Returns
 // true when one of them fully handled the assignment.
-// §11.4.1 states a compound assignment as one blocking assignment: "an
-// assignment operator is semantically equivalent to a blocking assignment, with
-// the exception that any left-hand index expression is only evaluated once".
+// §11.4.1 states a compound assignment as one blocking assignment, but for an
+// index on its left-hand side, which is evaluated once only.
 //
 // The parser gives `x += 1;` a kBlockingAssign whose lhs is x and whose rhs is
 // the compound operator over that same lhs node, so evaluating that rhs reaches
