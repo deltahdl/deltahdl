@@ -64,11 +64,18 @@ TEST(SvDpi, ScopeSetToNullClearsActiveScopeAndReturnsPrior) {
   svSetScope(original);
 }
 
+// The user data these cases store lives as long as the process, so each case's
+// scope and key are static objects of its own, whose addresses no other case
+// can repeat; §H.9.3 likewise suggests the address of a static symbol as a key.
+// Stack locals would be laid out at the same addresses by cases run one after
+// another in one process, and a case's never-stored key would find what an
+// earlier case stored.
+
 // §H.9.3: a pointer stored under a (scope, key) pair is returned by a later
 // svGetUserData with the same scope and key.
 TEST(SvDpi, UserDataStoreRoundTrip) {
-  int scope_obj = 0;
-  int key_obj = 0;
+  static int scope_obj = 0;
+  static int key_obj = 0;
   int payload = 99;
   auto scope = reinterpret_cast<svScope>(&scope_obj);
 
@@ -79,10 +86,10 @@ TEST(SvDpi, UserDataStoreRoundTrip) {
 // §H.9.3: the key together with the scope identifies an entry, so different
 // keys (and different scopes) address independent storage.
 TEST(SvDpi, UserDataKeyedByScopeAndKey) {
-  int scope_a = 0;
-  int scope_b = 0;
-  int key1 = 0;
-  int key2 = 0;
+  static int scope_a = 0;
+  static int scope_b = 0;
+  static int key1 = 0;
+  static int key2 = 0;
   int data1 = 1;
   int data2 = 2;
   int data3 = 3;
@@ -100,8 +107,8 @@ TEST(SvDpi, UserDataKeyedByScopeAndKey) {
 
 // §H.9.3: a lookup for a (scope, key) that was never stored returns null.
 TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
-  int scope_obj = 0;
-  int key_obj = 0;
+  static int scope_obj = 0;
+  static int key_obj = 0;
   auto scope = reinterpret_cast<svScope>(&scope_obj);
 
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
@@ -110,8 +117,8 @@ TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
 // §H.9.3 error cases: a null scope or null payload makes svPutUserData fail
 // with -1 and stores nothing; svGetUserData with a null scope returns null.
 TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
-  int scope_obj = 0;
-  int key_obj = 0;
+  static int scope_obj = 0;
+  static int key_obj = 0;
   int payload = 5;
   auto scope = reinterpret_cast<svScope>(&scope_obj);
 
