@@ -122,7 +122,7 @@ static Logic4Vec EvalTestPlusargs(const Expr* expr, SimContext& ctx,
 // $display-style specifier. Splits off the matching prefix and returns the
 // conversion letter folded to lowercase ('\0' when no specifier is present).
 // Leading-zero and width digits after '%' are accepted but not otherwise acted
-// on, matching the "leading 0 forms are valid" allowance.
+// on, as the clause allows a specifier written with a leading 0.
 static char SplitUserString(const std::string& user, std::string& prefix_out) {
   auto pct = user.find('%');
   if (pct == std::string::npos) {

@@ -307,11 +307,11 @@ void SimContext::EnsureStdioDescriptors() {
   mcd_channels_[0] = stdout;
 }
 
-// §21.3.1 (printed page 667): a file that cannot be opened gives a zero
-// mcd or fd, and "applications can call $ferror to determine the cause of
-// the most recent error" (§21.3.7, printed page 675). The failed open is the
-// most recent operation on the descriptor it answered, 0, so the host's cause
-// is recorded there for $ferror(0, str) to report.
+// §21.3.1 (printed page 667): a file that cannot be opened gives a zero mcd or
+// fd, and $ferror is how an application learns the cause of the most recent
+// error (§21.3.7, printed page 675). The failed open is the most recent
+// operation on the descriptor it answered, 0, so the host's cause is recorded
+// there for $ferror(0, str) to report.
 static void RecordFailedOpen(SimContext& ctx) {
   int code = errno != 0 ? errno : ENOENT;
   ctx.SetFileIoError(0, code, std::strerror(code));
@@ -369,11 +369,11 @@ static bool WritesThroughClosed(uint32_t writer, uint32_t closed) {
 
 void SimContext::CloseFile(uint32_t descriptor) {
   EnsureStdioDescriptors();
-  // §21.3.1 (printed page 666): "Active $fmonitor and/or $fstrobe operations
-  // on a file descriptor or multichannel descriptor are implicitly cancelled
-  // by an $fclose operation". A file descriptor's monitors are the ones on
-  // that descriptor; a multichannel descriptor's are those selecting any
-  // channel it closes, which a later $fopen may hand to another file.
+  // §21.3.1 (printed page 666): an $fclose cancels, without being asked to,
+  // every $fmonitor and $fstrobe still active on the file descriptor or
+  // multichannel descriptor it closes. A file descriptor's monitors are the
+  // ones on that descriptor; a multichannel descriptor's are those selecting
+  // any channel it closes, which a later $fopen may hand to another file.
   bool is_fd = (descriptor & kFdMsb) != 0;
   for (auto& monitor : file_monitors_) {
     if (WritesThroughClosed(monitor->descriptor, descriptor)) {

@@ -249,12 +249,12 @@ static std::vector<FILE*> ResolveOutputTargets(uint32_t descriptor,
   return ctx.GetMcdFiles(descriptor);
 }
 
-// §21.3.2: render the text one file-output task writes. The tasks "accept the
-// same type of arguments as the tasks upon which they are based" once the
-// descriptor is taken off the front, so the rest of the list is rendered as
-// $display renders its own: each string literal a template the arguments after
-// it fill, %p and %v included, each other expression under the radix the
-// task-name suffix picks (decimal without one), an omitted argument a space.
+// §21.3.2: render the text one file-output task writes. Each task takes the
+// arguments of the display task it is modelled on once the descriptor is taken
+// off the front, so the rest of the list is rendered as $display renders its
+// own: each string literal a template the arguments after it fill, %p and %v
+// included, each other expression under the radix the task-name suffix picks
+// (decimal without one), an omitted argument a space.
 static std::string RenderFileOutputText(const Expr* expr, SimContext& ctx,
                                         Arena& arena, char suffix) {
   return RenderDisplayArgList(expr, 1, suffix == '\0' ? 'd' : suffix, ctx,

@@ -377,15 +377,13 @@ std::string FormatStrength(const NetStrength& ns) {
   // only the Z logic value, and its level is always the Hi mnemonic.
   if (!drives0 && !drives1) return "HiZ";
 
-  // Both sides drive, so the resolved logic value is unknown (X). §21.2.1.4:
-  // "For the unknown value, a mnemonic is used when both the 0 and 1 strength
-  // components are at the same strength level. Otherwise, the unknown value X
-  // is preceded by two decimal digits, which indicate the 0 and 1 strength
-  // levels, respectively." Those two components are the highest level of each
-  // side: §28.12.2 says of the 35X in Figure 28-9 that "The first is the digit
-  // 3, which corresponds to the highest strength0 level for the result. The
-  // second digit, 5, corresponds to the highest strength1 level for the
-  // result." Neither form renders the low end of either side, so s0_lo and
+  // Both sides drive, so the resolved logic value is unknown (X). §21.2.1.4
+  // renders an unknown value with a mnemonic when its 0 and its 1 strength
+  // components share one level, and otherwise writes two decimal digits, the
+  // 0 level and then the 1 level, ahead of the X. Those two components are the
+  // highest level of each side: §28.12.2 reads the 35X of Figure 28-9 as the
+  // result's highest strength0 level, 3, followed by its highest strength1
+  // level, 5. Neither form renders the low end of either side, so s0_lo and
   // s1_lo do not appear here. Figure 28-4 combines We1 with We0 and prints
   // WeX, and Figure 28-5 draws that result's range running down through high
   // impedance on both sides, so a low bound below the mnemonic's level is what
@@ -409,21 +407,21 @@ std::string FormatStrength(const NetStrength& ns) {
     return std::string(StrengthMnemonic(hi)) + ambiguous;
   }
 
-  // §21.2.1.4: "For the logic values 0 and 1, a mnemonic is used when there is
-  // no range of strengths in the signal. Otherwise, the logic value is preceded
-  // by two decimal digits, which indicate the maximum and minimum strength
-  // levels." Table 21-5 reads 520 as "An 0 value with a range of possible
-  // strength from pull driving to medium capacitor".
+  // §21.2.1.4: a 0 or a 1 is rendered with a mnemonic when the signal holds a
+  // single strength, and otherwise written after two decimal digits giving the
+  // greatest and the least strength level. Table 21-5 reads 520 as a 0 whose
+  // strength may lie anywhere from pull drive down to medium capacitor.
   if (hi == lo) return std::string(StrengthMnemonic(hi)) + known;
   return std::string(1, static_cast<char>('0' + hi)) +
          static_cast<char>('0' + lo) + known;
 }
 
-// §21.2.1.2: the minimal-width ("significant figures") rendering of a value for
-// a given radix, before any explicit field width is applied. The decimal,
-// string, and character forms already carry no leading fill, so they defer to
-// the auto-sized rendering; the hex/octal/binary radices, whose auto rendering
-// pads out to the full bit width with leading zeros, drop those zeros here.
+// §21.2.1.2: the minimal-width rendering of a value for a given radix, the one
+// with no leading digit to spare, before any explicit field width is applied.
+// The decimal, string, and character forms already carry no leading fill, so
+// they defer to the auto-sized rendering; the hex/octal/binary radices, whose
+// auto rendering pads out to the full bit width with leading zeros, drop those
+// zeros here.
 static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
   uint64_t v = val.ToUint64();
   char buf[64];
@@ -431,7 +429,7 @@ static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
     case 'h':
     case 'x':
       // §21.2.1.3 status characters carry meaning that cannot be stripped down
-      // to a "significant digit", so a value bearing x/z keeps its full digit
+      // to significant digits, so a value bearing x/z keeps its full digit
       // string; only purely known values get the minimal rendering.
       if (!val.IsKnown()) return FormatRadixXZ(val, 4);
       std::snprintf(buf, sizeof(buf), "%llx",
@@ -622,8 +620,8 @@ static bool RecordCFlag(char c, FormatFieldSpec& flags) {
   }
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
-// formatting capabilities available in the C language", its flags among them.
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers format with all
+// of C's formatting abilities, its flags among them.
 // From fmt[start], the character after the '%', record the run of `-`, `+`,
 // space and `#` and advance past it when the conversion it opens ends in a
 // real specifier; any other specifier takes no flag, and the run is left for
@@ -678,12 +676,13 @@ static const char* NonScalarPercentVReport(char nonscalar) {
          "it consumed is a net declared with a range";
 }
 
-// §21.2.1.4: "a corresponding scalar reference shall follow the string literal
-// in the argument list". The three-character group the clause defines is "the
-// strength of a scalar net", so it stands for one scalar and not for however
-// many bits a vector holds: a reference to a net that is not a scalar is
-// reported and nothing rendered for it. The rendering itself is precomputed by
-// the calling task, which holds the net reference, and is substituted verbatim.
+// §21.2.1.4: each %v in a string literal is matched by a scalar reference
+// among the arguments that follow it, and the three-character group the
+// clause defines gives the strength of a scalar net, so it stands for one
+// scalar and not for however many bits a vector holds: a reference to a net
+// that is not a scalar is reported and nothing rendered for it. The rendering
+// itself is precomputed by the calling task, which holds the net reference,
+// and is substituted verbatim.
 static void AppendStrengthArg(FormatArgs& args, std::string& out) {
   char nonscalar =
       args.vi < args.nonscalar_nets.size() ? args.nonscalar_nets[args.vi] : 0;

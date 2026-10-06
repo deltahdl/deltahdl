@@ -13,12 +13,12 @@ struct Expr;
 struct Process;
 struct Variable;
 
-// §21.3.2 (printed page 667): one $fmonitor task. It works "just like" $monitor
-// (§21.2.3), writing its list when it is called and again at the end of any
-// time step in which one of its arguments changed, except that it writes to
-// the file or files its descriptor selects -- and, "unlike $monitor, any
-// number of $fmonitor tasks can be set up to be simultaneously active", so
-// each call is a monitor of its own rather than a replacement of the last.
+// §21.3.2 (printed page 667): one $fmonitor task. It works as $monitor
+// (§21.2.3) does, writing its list when it is called and again at the end of
+// any time step in which one of its arguments changed, except that it writes
+// to the file or files its descriptor selects -- and, where only one $monitor
+// is active at a time, any number of $fmonitor tasks can be active together,
+// so each call is a monitor of its own rather than a replacement of the last.
 // An $fclose of its descriptor cancels it (§21.3.1). An $fstrobe is the same
 // write made once, at the end of the step it was called in.
 struct FileMonitor {

@@ -98,10 +98,10 @@ static bool IsScalarNet(const Variable& var) {
 
 // What §21.2.1.4 makes of one argument a display task rendered a %v for.
 //
-// The clause asks a %v for "a corresponding scalar reference" and reports "the
-// strength of a scalar net", so an argument is one of three things: a reference
-// to a scalar of a net, whose strength there is to render; a reference to a net
-// that is not a scalar, which the clause admits no rendering for and which is
+// The clause gives each %v a scalar reference of its own and reports a scalar
+// net's strength, so an argument is one of three things: a reference to a
+// scalar of a net, whose strength there is to render; a reference to a net that
+// is not a scalar, which the clause admits no rendering for and which is
 // reported; or neither, which carries no strength model and so has nothing to
 // render and nothing to report against. The second of those is two kinds rather
 // than one so that a report can name which shape it was.
@@ -229,16 +229,15 @@ static std::string BuildFormatV(const PercentVArg& v) {
   return FormatStrength(v.net->BitStrength(v.bit));
 }
 
-// §21.2.1.4: "For each %v specification that appears in a string literal, a
-// corresponding scalar reference shall follow the string literal in the
-// argument list". Whether this argument breaks that is settled here, where the
-// net is in reach, and reported by the formatter, where it is known whether a
-// %v is what consumed the argument: the renderings are built for every
-// argument a template takes, so reporting here would report a vector net
-// passed to %h. The two shapes that break it are told apart so that each is
-// named by what it is: a net reference naming the whole net, or a select of it
-// that still names more than one bit. Zero is every argument that does not
-// break it.
+// §21.2.1.4: each %v in a string literal is matched by a scalar reference
+// among the arguments that follow the literal. Whether this argument breaks
+// that is settled here, where the net is in reach, and reported by the
+// formatter, where it is known whether a %v is what consumed the argument:
+// the renderings are built for every argument a template takes, so reporting
+// here would report a vector net passed to %h. The two shapes that break it
+// are told apart so that each is named by what it is: a net reference naming
+// the whole net, or a select of it that still names more than one bit. Zero
+// is every argument that does not break it.
 static char NonScalarNetArgFlag(const PercentVArg& v) {
   if (v.kind == PercentVArgKind::kVectorNet) return 1;
   if (v.kind == PercentVArgKind::kNetMultibitSelect) return 2;

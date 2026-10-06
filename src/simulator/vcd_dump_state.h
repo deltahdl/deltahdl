@@ -11,16 +11,15 @@
 
 namespace delta {
 
-// §21.7 defines two dump files and no more: "a) 4-state: to represent variable
-// changes in 0, 1, x, and z with no strength information. b) Extended: to
-// represent variable changes in all states and strength information." The
-// 4-state file is written by $dumpfile, $dumpvars and the control tasks
-// §21.7.1.3 through §21.7.1.6 give them; the extended file by $dumpports and
-// the control tasks §21.7.3.2 through §21.7.3.5 give it. §21.7.3.1 lets one
-// source ask for both -- "The $dumpports task can be used in source code that
-// also contains the $dumpvars task" -- so a run holds one dump of each, each
-// with its own writer, file name and default name, and a task reaches the dump
-// its own clause names.
+// §21.7 defines two dump files and no more: a 4-state file, recording changes
+// among 0, 1, x and z without strength, and an extended file, recording
+// changes in every state along with strength. The 4-state file is written by
+// $dumpfile, $dumpvars and the control tasks §21.7.1.3 through §21.7.1.6 give
+// them; the extended file by $dumpports and the control tasks §21.7.3.2
+// through §21.7.3.5 give it. §21.7.3.1 lets one source ask for both, a source
+// calling $dumpports being free to call $dumpvars too, so a run holds one dump
+// of each, each with its own writer, file name and default name, and a task
+// reaches the dump its own clause names.
 //
 // Everything a run holds of both files lives here rather than on SimContext.
 // The two files are one feature with one clause behind them, and SimContext is
@@ -52,16 +51,15 @@ struct VcdDumpState {
   // type, or into no file at all.
   VcdWriter* GetDumpportsWriter() { return extended.writer; }
 
-  // §21.7.1.1: the name $dumpfile gives the 4-state file, which "is optional
-  // and defaults to the string literal \"dump.vcd\" if not specified".
+  // §21.7.1.1: the name $dumpfile gives the 4-state file. The name may be left
+  // out, and is "dump.vcd" then.
   void SetDumpFileName(std::string name);
   const std::string& GetDumpFileName() const;
 
-  // §21.7.3.1: the name $dumpports gives the extended file -- "If no filename
-  // is provided, the file shall be written to the current working directory
-  // with the name dumpports.vcd". Held apart from the 4-state name because the
-  // two files are two files: the defaults differ, and a source calling both
-  // tasks names both.
+  // §21.7.3.1: the name $dumpports gives the extended file, which without one
+  // is dumpports.vcd in the current working directory. Held apart from the
+  // 4-state name because the two files are two files: the defaults differ, and
+  // a source calling both tasks names both.
   void SetDumpportsFileName(std::string name);
   const std::string& GetDumpportsFileName() const;
 

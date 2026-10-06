@@ -330,14 +330,13 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
     uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
-    // §21.2.1.4: "The high-impedance strength cannot have a known logic value;
-    // the only logic value allowed for this level is z." A driver at that level
-    // therefore drives nothing whatever value it carries, and is passed over
-    // the same way a driver already spelling z is. Folding it in instead made
-    // it conflict with the nothing that had been seen so far -- MaxTracker::val
-    // starts at 3, and a lone such driver matched the equal-strength test
-    // against it, so a net one driver was holding at high impedance resolved to
-    // x.
+    // §21.2.1.4: no known logic value goes with the high-impedance strength,
+    // whose one permitted value is z. A driver at that level therefore drives
+    // nothing whatever value it carries, and is passed over the same way a
+    // driver already spelling z is. Folding it in instead made it conflict with
+    // the nothing that had been seen so far -- MaxTracker::val starts at 3, and
+    // a lone such driver matched the equal-strength test against it, so a net
+    // one driver was holding at high impedance resolved to x.
     if (str == 0) continue;
     FoldDriverIntoMax(val, str, net_type, m);
   }

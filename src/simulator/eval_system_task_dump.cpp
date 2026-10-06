@@ -215,12 +215,11 @@ static FileMonitor* AddFileMonitor(const Expr* expr, uint32_t descriptor,
   return monitor;
 }
 
-// §21.3.2 with §21.2.2 (printed page 664): $fstrobe works "just like"
-// $strobe, whose arguments are displayed "at the end of the current time
-// step" -- after every blocking assignment of the step has landed -- rather
-// than at the call, so a value the calling process changes after the call is
-// written as it ends up. §21.3.1: an $fclose of its descriptor before then
-// cancels it.
+// §21.3.2 with §21.2.2 (printed page 664): $fstrobe works as $strobe does,
+// and $strobe displays its arguments when the current time step ends -- after
+// every blocking assignment of the step has landed -- rather than at the call,
+// so a value the calling process changes after the call is written as it ends
+// up. §21.3.1: an $fclose of its descriptor before then cancels it.
 Logic4Vec EvalFstrobe(const Expr* expr, uint32_t descriptor,
                       std::string_view name, SimContext& ctx, Arena& arena) {
   FileMonitor* strobe = AddFileMonitor(expr, descriptor, name, ctx);
@@ -466,9 +465,8 @@ static std::string DumpvarsScopePath(const Expr* arg) {
 // does not apply to scope arguments that name an individual variable.
 static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
                          VcdWriter* vcd) {
-  // §21.7.1.2: $dumpvars "can be invoked as often as desired throughout the
-  // model (for example, within various blocks), but the execution of all the
-  // $dumpvars tasks shall be at the same simulation time."
+  // §21.7.1.2: $dumpvars may be called any number of times, from anywhere in
+  // the model, but every one of those calls has to run at one simulation time.
   if (!ctx.Vcd().RegisterDumpvarsTime(ctx.CurrentTime().ticks)) {
     ctx.GetDiag().Error(
         expr->range.start,
@@ -594,7 +592,7 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   CheckDumpportsFileWritable(ctx.Vcd().GetDumpportsFileName(), ctx,
                              expr->range.start);
   // §21.7.3.1: a file name spelled out in the call may not be reused by a
-  // later $dumpports call. A defaulted name is not "specified", so repeated
+  // later $dumpports call. A defaulted name was not spelled out, so repeated
   // default calls are allowed.
   if (last_is_file &&
       !ctx.Vcd().RegisterDumpportsFile(ctx.Vcd().GetDumpportsFileName())) {
@@ -615,7 +613,7 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena) {
   // $vcdclose keyword command (§21.7.3.6.1). Marking the writer here as well
   // as at the open covers a dump this call found already open, whose node
   // information is on disk in whatever form opened it: §21.7.3.6.1 records the
-  // final simulation time "at the time the extended VCD file is closed", which
+  // final simulation time as of the moment the extended VCD file closes, which
   // is still writable then, while the definitions above it are not.
   vcd->SetExtended();
   size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
@@ -769,8 +767,8 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
 }
 
 // §21.7.3.6.1: terminate the extended VCD file, recording the final simulation
-// time. The keyword command states the time "at the time the extended VCD file
-// is closed", so the task closes the dump as well as stamping it: closing here
+// time. The keyword command states the time at which the extended VCD file is
+// closed, so the task closes the dump as well as stamping it: closing here
 // is what stops the per-timestep recording, which would otherwise write value
 // changes after the command that terminates the file. The time written is the
 // simulation time the task executes at, which is that closing moment.
@@ -823,10 +821,10 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // is the 4-state file's subclause, so that is the type $dumpfile creates.
     ctx.OpenVcdDumpFromTask(VcdFileType::kFourState);
   } else if (name == "$dumpvars") {
-    // §21.7.1.2: $dumpvars lists the variables to dump "into the file
-    // specified by $dumpfile", which §21.7.1.1 defaults to "dump.vcd" when the
-    // source named none. Either way the file exists from this call on, so a
-    // source that reaches $dumpvars without a $dumpfile still gets a dump.
+    // §21.7.1.2: $dumpvars lists the variables to dump into the file named by
+    // $dumpfile, which §21.7.1.1 defaults to "dump.vcd" when the source named
+    // none. Either way the file exists from this call on, so a source that
+    // reaches $dumpvars without a $dumpfile still gets a dump.
     ExecDumpvars(expr, ctx, arena,
                  ctx.OpenVcdDumpFromTask(VcdFileType::kFourState));
   } else if (name == "$dumplimit") {

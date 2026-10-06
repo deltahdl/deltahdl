@@ -87,10 +87,9 @@ bool VcdDumpState::RegisterDumpportsTime(uint64_t time) {
   return time == dumpports_time_;
 }
 
-// §21.7.1.2: $dumpvars "can be invoked as often as desired throughout the model
-// (for example, within various blocks), but the execution of all the $dumpvars
-// tasks shall be at the same simulation time". The first call records its time;
-// a later call passes only when it matches.
+// §21.7.1.2: $dumpvars may be called any number of times, from anywhere in the
+// model, but every one of those calls has to run at one simulation time. The
+// first call records its time; a later call passes only when it matches.
 bool VcdDumpState::RegisterDumpvarsTime(uint64_t time) {
   if (!have_dumpvars_time_) {
     have_dumpvars_time_ = true;

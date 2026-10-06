@@ -41,12 +41,10 @@ enum class VcdDataType : uint8_t {
   kEnum,      // -> integer, size 32 (default for an untyped enum)
   kReal,      // -> real (also shortreal)
   // The members below masquerade as nothing. Each names a type §21.7.2.1
-  // (Syntax 21-20) already lists among the var_type keywords -- "event |
-  // integer | parameter | real | realtime | reg | supply0 | supply1 | time |
-  // tri | triand | trior | trireg | tri0 | tri1 | wand | wire | wor" -- so the
-  // dumped object is declared as what it is rather than as the 1364-2005 type
-  // Table 21-11 would lend it. What §21.7.2.3 gives them is the size, "how
-  // many bits are in the variable", which Table 6-8 fixes for two of the three
+  // (Syntax 21-20) already lists among the var_type keywords, so the dumped
+  // object is declared as what it is rather than as the 1364-2005 type that
+  // Table 21-11 would lend it. What §21.7.2.3 gives them is the size, the
+  // number of bits in the variable, which Table 6-8 fixes for two of the three
   // below and leaves to the declaration for the third.
   kReg,      // -> reg, size = declared packed width (Table 6-8: user-defined)
   kInteger,  // -> integer, size 32 (Table 6-8: 32-bit signed)
@@ -96,27 +94,25 @@ enum class VcdScopeKind : uint8_t {
   kFork,
 };
 
-// §21.7: "The following two types of VCD files exist: a) 4-state: to represent
-// variable changes in 0, 1, x, and z with no strength information.
-// b) Extended: to represent variable changes in all states and strength
-// information." Which of the two a file is decides the form of everything
-// written into it -- the node information (§21.7.4.2 declares a port where
-// §21.7.2.1 declares a 4-state variable), the checkpoint keywords (§21.7.3)
-// and the value changes (§21.7.4.3 prefixes each with p) -- so it is settled
-// when the file is opened, before the first declaration goes out. §21.7.1
-// gives the 4-state file to $dumpfile and $dumpvars, §21.7.3.1 the extended
-// file to $dumpports.
+// §21.7: a VCD file is either a 4-state file, recording changes among 0, 1, x
+// and z without strength, or an extended file, recording changes in every
+// state along with strength. Which of the two a file is decides the form of
+// everything written into it -- the node information (§21.7.4.2 declares a
+// port where §21.7.2.1 declares a 4-state variable), the checkpoint keywords
+// (§21.7.3) and the value changes (§21.7.4.3 prefixes each with p) -- so it is
+// settled when the file is opened, before the first declaration goes out.
+// §21.7.1 gives the 4-state file to $dumpfile and $dumpvars, §21.7.3.1 the
+// extended file to $dumpports.
 enum class VcdFileType : uint8_t {
   kFourState,
   kExtended,
 };
 
-// §21.7.1.2: which of the registered objects the dump covers. $dumpvars "shall
-// be used to list which variables to dump into the file specified by
-// $dumpfile", and it "can be invoked as often as desired throughout the model",
-// each call adding to what is dumped rather than replacing it -- so a call
-// naming a scope list never takes back what a call with no arguments already
-// selected.
+// §21.7.1.2: which of the registered objects the dump covers. $dumpvars chooses
+// the variables written to the dump file, and may be called any number of
+// times, each call adding to what is dumped rather than replacing it -- so a
+// call naming a scope list never takes back what a call with no arguments
+// already selected.
 enum class VcdVarSelection : uint8_t {
   // No $dumpvars has narrowed the set. A writer driven without the task at all
   // records every registered object, which is what a dump opened by something
@@ -177,8 +173,8 @@ struct VcdSignal {
   bool dump_selected = false;
   std::string prev_digits;
   bool has_prev_digits = false;
-  // §21.7.2.1: "Only the variables that change value during a time increment
-  // are listed", so the end-of-increment scan compares each object against the
+  // §21.7.2.1: a time increment lists only the variables whose value changed
+  // during it, so the end-of-increment scan compares each object against the
   // value it last put in the file. That value is kept here, and only the
   // writer writes it. Variable::prev_value is not it: that field belongs to
   // the §9.4.2 event controls, whose awaiters resync it to the current value

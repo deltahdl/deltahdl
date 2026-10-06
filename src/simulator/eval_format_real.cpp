@@ -10,12 +10,11 @@
 
 namespace delta {
 
-// §21.2.1.1 (printed page 658): Table 21-2's specifiers "are used with real
-// numbers", so an integral operand is read for its value, converted as §6.12.1
-// (printed 110) converts an expression assigned to a real -- "Individual bits
-// that are x or z ... shall be treated as zero" -- and signed where the
-// operand is. Read as a real's bit pattern, `$display("%f", 5)` printed
-// 0.000000.
+// §21.2.1.1 (printed page 658): Table 21-2's specifiers are the ones for real
+// numbers, so an integral operand is read for its value, converted as §6.12.1
+// (printed 110) converts an expression assigned to a real -- each x or z bit
+// counting as a zero -- and signed where the operand is. Read as a real's bit
+// pattern, `$display("%f", 5)` printed 0.000000.
 static double OperandAsReal(const Logic4Vec& val) {
   if (val.is_real) return RealVecToDouble(val);
   if (val.nwords == 0 || val.width == 0) return 0.0;
@@ -83,14 +82,13 @@ static void CaseAndSignDigits(std::string& text, const FormatFieldSpec& field) {
   }
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
-// formatting capabilities available in the C language" -- "%10.3g" is a
-// minimum field width of 10 with 3 fractional digits, and C's flags apply as
-// C applies them: `-` left-justifies in the field, `+` signs a non-negative
-// value and a space puts a blank where its sign would be, `#` keeps the
-// decimal point, and a field width written with a leading 0 pads with zeros
-// after the sign; %E, %F and %G write their letters uppercase. A precision not
-// written is C's default of 6.
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers format with all
+// of C's formatting abilities -- "%10.3g" is a minimum field width of 10 with
+// 3 fractional digits, and C's flags apply as C applies them: `-`
+// left-justifies in the field, `+` signs a non-negative value and a space puts
+// a blank where its sign would be, `#` keeps the decimal point, and a field
+// width written with a leading 0 pads with zeros after the sign; %E, %F and %G
+// write their letters uppercase. A precision not written is C's default of 6.
 std::string FormatRealFormatted(const Logic4Vec& val, char spec,
                                 const FormatFieldSpec& field) {
   double d = OperandAsReal(val);

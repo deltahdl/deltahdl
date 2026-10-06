@@ -137,11 +137,11 @@ void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
     auto* svar = ctx_.CreateVariable(full, chars.width);
     svar->value = chars;
     ctx_.RegisterStringVariable(full);
-    // §21.7.5: Table 21-11 gives string no row, and §21.7.2.3 rules that a
-    // $var's size "specifies how many bits are in the variable", which no
-    // size states for a value whose length §6.16 lets vary. SimContext
-    // decides that by the declared kind, so without this the parameter is
-    // dumped with a $var size that follows its character count.
+    // §21.7.5: Table 21-11 gives string no row, and §21.7.2.3 has a $var's
+    // size give the variable's number of bits, which no size states for a
+    // value whose length §6.16 lets vary. SimContext decides that by the
+    // declared kind, so without this the parameter is dumped with a $var size
+    // that follows its character count.
     ctx_.Vcd().SetVcdVarKind(full, DataTypeKind::kString);
     return;
   }

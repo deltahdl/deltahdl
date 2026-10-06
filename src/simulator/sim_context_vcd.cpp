@@ -160,13 +160,12 @@ void SimContext::RegisterVcdSignalsOf(VcdWriter& vcd, bool packages) {
       continue;
     // §21.7.5: Table 21-11 gives string no row and the subclause defines no
     // mapping outside it, so a string has no 1364-2005 type to masquerade as.
-    // §21.7.2.3 rules that a $var's size "specifies how many bits are in the
-    // variable", and no size states that for a string, whose length §6.16
-    // varies during simulation. Skipping it here rather than mapping it drops
-    // the $var declaration and every checkpoint value change together, since
-    // VcdWriter writes only what was registered. The declared kind decides it
-    // because a string port reaches SetVcdVarKind but not
-    // RegisterStringVariable.
+    // §21.7.2.3 has a $var's size give the variable's number of bits, and no
+    // size states that for a string, whose length §6.16 varies during
+    // simulation. Skipping it here rather than mapping it drops the $var
+    // declaration and every checkpoint value change together, since VcdWriter
+    // writes only what was registered. The declared kind decides it because a
+    // string port reaches SetVcdVarKind but not RegisterStringVariable.
     if (vcd_.GetVcdVarKind(name) == DataTypeKind::kString) continue;
     std::string_view ref_name = EnterVcdInstanceScope(vcd, open_scopes, name);
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
@@ -205,15 +204,14 @@ void SimContext::RegisterVcdSignalsOf(VcdWriter& vcd, bool packages) {
   for (; !open_scopes.empty(); open_scopes.pop_back()) vcd.EndScope();
 }
 
-// §21.7.1 lists two steps for creating a 4-state VCD file: insert the VCD
-// system tasks in the SystemVerilog source file "to define the dump file name
-// and to specify the variables to be dumped", then run the simulation. Opening
-// the file is part of running the source, so this is where it happens.
-// Everything §21.7.2.1 orders ahead of the value changes goes out in one go --
-// the header sections, the $scope holding the dumped objects, their $var
-// declarations and $enddefinitions -- because a task that opens the file
-// part-way through a run is already past the point where a header could still
-// be written.
+// §21.7.1 lists two steps for creating a 4-state VCD file: add VCD system tasks
+// to the source to name the dump file and choose the variables it dumps, then
+// run the simulation. Opening the file is part of running the source, so this
+// is where it happens. Everything §21.7.2.1 orders ahead of the value changes
+// goes out in one go -- the header sections, the $scope holding the dumped
+// objects, their $var declarations and $enddefinitions -- because a task that
+// opens the file part-way through a run is already past the point where a
+// header could still be written.
 //
 // An empty top_scope leaves the definitions at the top level rather than
 // inside a $scope.
@@ -231,16 +229,16 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   if (dump.writer != nullptr) return dump.writer;
   auto vcd = std::make_unique<VcdWriter>(dump.file_name);
   if (!vcd->IsOpen()) return nullptr;
-  // §21.7.1.2: $dumpvars lists "which variables to dump", may run "as often as
-  // desired" so long as every call runs at one simulation time, and §21.7.2.3
-  // declares in $var only "the variables being dumped". The file opens before
+  // §21.7.1.2: $dumpvars names the variables to dump, may run any number of
+  // times so long as every call runs at one simulation time, and §21.7.2.3
+  // declares in $var only the variables that are dumped. The file opens before
   // any of those calls runs, so its declarations -- and the checkpoints the
   // calls write behind them -- are held until that time unit has played out,
   // when the whole selection is known and the declarations can be narrowed
   // to it.
   if (wait_for_dumpvars) vcd->BufferDeclarations();
-  // §21.7 b): an extended file represents "variable changes in all states and
-  // strength information", which is a different form for the node information
+  // §21.7 b): an extended file records variable changes in every state along
+  // with strength, which is a different form for the node information
   // (§21.7.4.2 declares each object as $var port with an integer identifier
   // code), for the checkpoint keywords (§21.7.4.1 gives the extended file
   // $dumpports, $dumpportsoff, $dumpportson and $dumpportsall as its
@@ -299,9 +297,8 @@ VcdWriter* SimContext::OpenVcdDump(std::string_view top_scope,
   RegisterVcdPackageSignals(*vcd);
   vcd->EndDefinitions();
   if (wait_for_dumpvars) {
-    // §21.7.1.3: "Executing the $dumpvars task causes the value change dumping
-    // to start at the end of the current simulation time unit", so nothing is
-    // recorded until that task runs.
+    // §21.7.1.3: value change dumping begins at the end of the time unit in
+    // which $dumpvars runs, so nothing is recorded until that task runs.
     vcd->ArmDumpvarsStart();
   } else {
     // A dump opened by something other than a VCD system task has no $dumpvars
@@ -349,19 +346,18 @@ void SimContext::RecordVcdTimestep(VcdWriter* writer) {
 // such keyword command, so the same step closes either form.
 void SimContext::CloseOneVcdDump(VcdDump& dump) {
   if (dump.writer == nullptr) return;
-  // §21.7: a VCD file "contains information about value changes on selected
-  // variables in the design", and a change the design made while the dump was
+  // §21.7: a VCD file holds the value changes of the design's selected
+  // variables, and a change the design made while the dump was
   // open is that information. The recording runs at the end of a time unit
   // while a close runs at the moment it is asked for, which is inside one, so
   // the unit in hand is recorded before the file is terminated -- without this
   // the last thing a design does before closing its own waveform is the thing
   // the waveform does not show (#3361).
   //
-  // §21.7.3.6.1 does not say otherwise. It has the keyword record "the final
-  // simulation time at the time the extended VCD file is closed ... regardless
-  // of the state of signal changes", which insulates the time stamp from
-  // whether anything changed at it; it does not make the changes themselves
-  // something the file leaves out.
+  // §21.7.3.6.1 does not say otherwise. It has the keyword record the final
+  // simulation time as the extended VCD file closes, whatever the signals did,
+  // which insulates the time stamp from whether anything changed at it; it does
+  // not make the changes themselves something the file leaves out.
   RecordVcdTimestep(dump.writer);
   dump.writer->WriteVcdClose(CurrentTime().ticks);
   dump.owned.reset();

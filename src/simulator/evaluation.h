@@ -575,11 +575,11 @@ struct DisplayFormatOpts {
   // reference to a net the clause does not admit -- 1 for a net that is not a
   // scalar, 2 for a select of one that still names more than one bit, and 0 for
   // everything else, which is every argument the clause does admit and every
-  // one that names no net at all. The clause asks a %v for "a corresponding
-  // scalar reference", and the caller is who can see the net while the
-  // formatter is who knows which specifier consumed the argument, so the caller
-  // classifies and the formatter reports. A null pointer means the caller
-  // classified nothing.
+  // one that names no net at all. The clause gives each %v a scalar reference
+  // of its own, and the caller is who can see the net while the formatter is
+  // who knows which specifier consumed the argument, so the caller classifies
+  // and the formatter reports. A null pointer means the caller classified
+  // nothing.
   const std::vector<char>* arg_nonscalar_net = nullptr;
   SimContext* ctx = nullptr;
   // §21.2.1.1 / §21.2.1.7: one flag per positional value argument classifying

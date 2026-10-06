@@ -47,7 +47,7 @@ static char VcdUnresolvedStrengthDigit(bool driven) {
 // Each component is a single digit while §28.12 lets a resolved strength be
 // ambiguous -- a range of levels rather than one level. §21.7.4.3.2 does not
 // say what one digit reports for a range. The one rule it does give that
-// reduces two strengths to one takes "the stronger of the two", so the stronger
+// reduces two strengths to one keeps whichever is stronger, so the stronger
 // bound of the range is what is written here.
 static void WritePortStrengthComponents(std::ofstream& ofs,
                                         const VcdSignal& sig, bool driven) {
@@ -92,11 +92,11 @@ static std::string_view VcdPortStateList(Direction direction) {
 
 // §21.7.4.3.1: the state character a port record reports one bit with. Syntax
 // 21-29 is the grammar the record is parsed by and its port_value admits only
-// these three lists; §21.7.4.1's sentence that port values are "specified in
-// binary format by 0, 1, x, or z values" describes the file in general terms,
-// and following it would write x and z, which no list carries, and would make
-// every record read as direction-unknown. Where the two disagree the grammar
-// is what a reader parses by, so the grammar wins.
+// these three lists; §21.7.4.1's sentence giving port values in binary as 0,
+// 1, x or z describes the file in general terms, and following it would write
+// x and z, which no list carries, and would make every record read as
+// direction-unknown. Where the two disagree the grammar is what a reader
+// parses by, so the grammar wins.
 static char VcdPortStateChar(char four_state, Direction direction) {
   std::string_view list = VcdPortStateList(direction);
   switch (four_state) {

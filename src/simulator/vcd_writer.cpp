@@ -177,13 +177,13 @@ void VcdWriter::HoldDecl(size_t begin, HeldDeclKind kind, size_t signal) {
       {begin, static_cast<size_t>(decl_buf_.tellp()), kind, signal});
 }
 
-// §21.7.1.2: $dumpvars lists "which variables to dump", and §21.7.2.3's $var
-// section "prints the names and identifier codes of the variables being
-// dumped", so a variable no call listed is not declared. A $scope section
-// declares the scope holding dumped variables; one left holding none -- the
-// sub-instance of `$dumpvars(1, t)`, or t itself when only `t.u.deep` is
-// listed and t has no variable of its own dumped -- goes with them. A dump
-// that no scope list narrowed declares everything it registered.
+// §21.7.1.2: $dumpvars names the variables to dump, and §21.7.2.3's $var
+// section gives the name and identifier code of each variable dumped, so a
+// variable no call listed is not declared. A $scope section declares the scope
+// holding dumped variables; one left holding none -- the sub-instance of
+// `$dumpvars(1, t)`, or t itself when only `t.u.deep` is listed and t has no
+// variable of its own dumped -- goes with them. A dump that no scope list
+// narrowed declares everything it registered.
 std::vector<bool> VcdWriter::KeptHeldDecls() const {
   std::vector<bool> keep(held_decls_.size(), true);
   // The open $scope sections, innermost last, each with whether a $var kept
@@ -234,7 +234,7 @@ static const char* VcdVarTypeKeyword(const VcdSignal& sig) {
 
 // §21.7.5 (Table 21-11): map a SystemVerilog data type to the 1364-2005
 // var_type keyword and the size it is dumped with. bit and logic keep the full
-// packed width passed in (Table 21-11: "total size of packed dimension"), which
+// packed width passed in, Table 21-11 sizing them by every packed bit, which
 // also covers a packed array or structure collapsed to a single reg vector. The
 // fixed-width integer types and the default enum carry the size fixed by the
 // table regardless of the declared width. A net (kNet) keeps the §21.7.2.3
@@ -254,7 +254,7 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
     case VcdDataType::kInt:
     case VcdDataType::kEnum:
     // Syntax 21-20's own keyword rather than the one Table 21-11 lends int.
-    // §21.7.2.3's example declares one: "$var integer 32 (2 index $end".
+    // §21.7.2.3's example declares one: `$var integer 32 (2 index $end`.
     case VcdDataType::kInteger:
       return "integer";
     case VcdDataType::kTime:
@@ -291,7 +291,7 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
       return 64;
     case VcdDataType::kByte:
       return 8;
-    // §21.7.2.3: "The size specifies how many bits are in the variable", and
+    // §21.7.2.3: the size is the variable's number of bits, and
     // §6.17 gives an event no bits. The size is stated here rather than left
     // to the registered width so it stays 0 if the storage an event is kept
     // in ever gains one.
@@ -660,9 +660,9 @@ void VcdWriter::DumpAllValues() {
   // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
   // the end of this time unit onward, per-timestep changes are recorded.
   dump_started_ = true;
-  // §21.7.1.2: "When invoked with no arguments, $dumpvars dumps all the
-  // variables in the model to the VCD file", so the dump covers everything
-  // from here on however it was narrowed before.
+  // §21.7.1.2: a $dumpvars with no arguments dumps every variable in the
+  // model, so the dump covers everything from here on however it was narrowed
+  // before.
   var_selection_ = VcdVarSelection::kEveryObjectByTask;
   Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
@@ -736,9 +736,9 @@ static std::string_view StripTopScope(std::string_view scope,
 static bool OneScopeSelectsSignal(std::string_view sig_name,
                                   std::string_view scope, uint64_t level) {
   // The empty scope is the top module itself, which every registered signal
-  // lies below. §21.7.1.2 Example 2: "$dumpvars (0, top)" dumps all variables
-  // in module top and in all module instances below it, and Example 1's
-  // "$dumpvars (1, top)" stops at top's own.
+  // lies below. §21.7.1.2 Example 2's `$dumpvars (0, top)` dumps top's own
+  // variables and those of every instance beneath it, and Example 1's
+  // `$dumpvars (1, top)` stops at top's own.
   if (scope.empty()) return level == 0 || SignalDepth(sig_name) <= level;
   if (sig_name == scope) return true;
   if (sig_name.size() <= scope.size() + 1 ||
@@ -815,9 +815,9 @@ void VcdWriter::DumpOn(uint64_t time) {
 void VcdWriter::DumpAll() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  // §21.7.1.4: the checkpoint "shows the current value of all selected
-  // variables" -- present value regardless of whether it changed during the
-  // current time step, and no value at all for an object no $dumpvars listed.
+  // §21.7.1.4: the checkpoint writes the present value of every selected
+  // variable, whether or not it changed during the current time step, and no
+  // value at all for an object no $dumpvars listed.
   Out() << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
   for (auto& sig : signals_) {
     if (!DumpsObject(sig)) continue;
@@ -832,7 +832,7 @@ void VcdWriter::DumpOff() {
   // that no value changes are recorded until $dumpon is executed.
   Out() << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
   for (auto& sig : signals_) {
-    // §21.7.1.3: "every selected variable is dumped as an x value".
+    // §21.7.1.3: each selected variable is written with the value x.
     if (!DumpsObject(sig)) continue;
     WriteSignalAllX(sig);
   }
@@ -930,9 +930,9 @@ void VcdWriter::DumpChangedValues(uint64_t) {
                                          port_scopes_.end());
   for (auto& sig : signals_) {
     if (!sig.var) continue;
-    // §21.7.1.2: $dumpvars "shall be used to list which variables to dump into
-    // the file specified by $dumpfile", so an object no call listed has no
-    // value change recorded for it either.
+    // §21.7.1.2: $dumpvars is what chooses the variables written to the dump
+    // file, so an object no call listed has no value change recorded for it
+    // either.
     if (!DumpsObject(sig)) continue;
     // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
     // module scopes -- including those of instantiations below a listed
