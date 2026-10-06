@@ -636,15 +636,14 @@ void DpiRuntime::LeaveImportCall() {
   const DpiScope* entry_scope = call_chain_.back().entry_scope;
   bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
   call_chain_.pop_back();
-  // §35.9: "An imported subroutine is said to be in the disabled state when a
-  // disable statement somewhere in the design targets either it or a parent for
-  // disabling." Popping the last frame ends the chain the disable was
-  // propagating through, so no imported subroutine is in the disabled state
-  // after it and the episode is over. Leaving the flag set would have
-  // svIsDisabledState() report 1 to foreign code running outside any import
-  // call, and would have the next call's output and inout arguments dropped
-  // under a §35.9 licence to drop them that applies only while a disable is in
-  // effect.
+  // §35.9: an imported subroutine is in the disabled state while some disable
+  // statement in the design is aimed at it or at one of its parents. Popping
+  // the last frame ends the chain the disable was propagating through, so no
+  // imported subroutine is in the disabled state after it and the episode is
+  // over. Leaving the flag set would have svIsDisabledState() report 1 to
+  // foreign code running outside any import call, and would have the next
+  // call's output and inout arguments dropped under a §35.9 licence to drop
+  // them that applies only while a disable is in effect.
   if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
   if (had_context) {
     // The context frame pushed the import declaration's instantiated scope on
@@ -799,8 +798,8 @@ bool DpiRuntime::VerifyImportReturnUnderDisable(int task_return_value) {
 }
 
 void DpiRuntime::IssueDisableProtocolFatalError(const std::string& message) {
-  // §35.9: "If any protocol item is not correctly followed, a fatal simulation
-  // error is issued." The first violation is the error that ends the run, so it
+  // §35.9: breaking any item of the disable protocol is a fatal simulation
+  // error. The first violation is the error that ends the run, so it
   // is the one recorded and reported; a later violation is reached only because
   // this runtime cannot halt the caller itself, and adds nothing.
   if (disable_protocol_fatal_) return;

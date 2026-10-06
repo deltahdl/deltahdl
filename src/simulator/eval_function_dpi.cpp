@@ -89,12 +89,12 @@ bool IsRealKind(DataTypeKind kind) {
          kind == DataTypeKind::kRealtime;
 }
 
-// §35.2.2.1: "The implementation (representation and layout) of 4-state values
-// ... is irrelevant for SystemVerilog semantics and can only impact the foreign
-// side of the interface." A four-state scalar crosses in the sv_0/sv_1/sv_z/
-// sv_x encoding svdpi.h names, which is what the aval/bval pair of bit 0 says:
-// a clear bval selects 0 or 1, a set one selects z or x. Carried as one word
-// per bit instead, a design's x came back 1 and its z came back 0.
+// §35.2.2.1: how a four-state value is laid out matters only to the foreign
+// side and leaves SystemVerilog's semantics untouched. A four-state scalar
+// crosses in the sv_0/sv_1/sv_z/ sv_x encoding svdpi.h names, which is what the
+// aval/bval pair of bit 0 says: a clear bval selects 0 or 1, a set one selects
+// z or x. Carried as one word per bit instead, a design's x came back 1 and its
+// z came back 0.
 SvLogic SvLogicOfWord(Logic4Word w) {
   bool one = (w.aval & 1U) != 0;
   if ((w.bval & 1U) == 0) {
@@ -116,7 +116,7 @@ Logic4Word WordOfSvLogic(SvLogic v) {
   }
 }
 
-// §35.2.2: a chandle is "capable of holding a pointer value", and a design
+// §35.2.2: a chandle can hold a pointer, and a design
 // holds that pointer as the bits of its variable. The pointer is rebuilt out of
 // those bits rather than cast into being, so the handle the foreign side handed
 // out is the handle it gets back when the design passes it in again.
@@ -186,12 +186,11 @@ DpiArgValue DpiArgValueOfType(DataTypeKind kind, uint32_t declared_width,
                                           kind);
   }
   Logic4Word word = v.nwords == 0 ? Logic4Word{} : v.words[0];
-  // §35.6.1 has the temporary "initialized with the value of the actual
-  // argument with the appropriate coercion", and has "the assignments between a
-  // temporary and the actual argument follow general SystemVerilog rules for
-  // assignments and automatic coercion". §6.11.2 is what those rules say where
-  // the type on the other side holds no unknown bit: the assignment converts
-  // "any unknown or high-impedance bits in the value ... to zeros". Every
+  // §35.6.1 has the temporary start out as the actual's value, coerced as
+  // needed, and has the copies between temporary and actual obey the ordinary
+  // SystemVerilog rules of assignment and implicit coercion. §6.11.2 is what
+  // those rules say where the type on the other side holds no unknown bit: the
+  // assignment turns each x or z bit of the value into a 0. Every
   // branch below but the four-state ones reads the aval alone and so has no
   // bval to put an x in, and read raw that aval says an x is a one. This is the
   // aval those branches read instead, which is the projection
@@ -563,15 +562,14 @@ std::vector<DpiArgValue> BindDpiCallActuals(const DpiRtFunction* import,
   return BindDpiActualsPositional(b);
 }
 
-// §35.6.2: "the value propagation (i.e., value change events) happens as if an
-// actual argument was assigned a formal argument immediately after control
-// returns", so what raises an event is that assignment leaving the actual
-// holding something else. DpiRuntime answers a narrower question -- whether the
-// foreign function moved the formal -- and the two agree only where the
-// assignment loses nothing. Where it loses something they part: an `int` formal
-// the callee leaves at 21, assigned to a `bit [3:0]` actual holding 5, leaves
-// the 5 it found, which is no value change of the actual however far the formal
-// moved.
+// §35.6.2: value changes propagate as though the formal's value were stored
+// into the actual just as control comes back, so what raises an event is that
+// assignment leaving the actual holding something else. DpiRuntime answers a
+// narrower question -- whether the foreign function moved the formal -- and the
+// two agree only where the assignment loses nothing. Where it loses something
+// they part: an `int` formal the callee leaves at 21, assigned to a `bit [3:0]`
+// actual holding 5, leaves the 5 it found, which is no value change of the
+// actual however far the formal moved.
 //
 // This is that assignment asked ahead of itself, by the conversions the store
 // makes and no others: §6.12.1's real boundary and §10.7's width through
@@ -831,8 +829,8 @@ bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            ctx, arena};
   call.args = BindDpiCallActuals(call.import, binding);
 
-  // §35.5.3: "A DPI call chain is a call chain ... that begins when
-  // SystemVerilog code calls an imported subroutine." This call site is that
+  // §35.5.3: a DPI call chain starts where SystemVerilog code calls an
+  // imported subroutine. This call site is that
   // beginning, and the frame's context property is the one the import's own
   // declaration carries (§35.5.1.3). The frame's scope is the instance the
   // call is made in, by its fully qualified name (§H.9.3), which is the scope
@@ -845,8 +843,8 @@ bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 void CallDpiImport(DpiImportCall& call) {
   if (call.import->is_pure) {
-    // §35.5.2: a pure function's call "can be ... replaced with the value
-    // previously computed for the same values of the input arguments", and a
+    // §35.5.2: a call of a pure function may be swapped for the result an
+    // earlier call with equal inputs computed, and a
     // pure function has no output or inout formals for a copy-back to carry.
     call.result = call.dpi->CallImportReusingPureResult(call.callee, call.args);
   } else {

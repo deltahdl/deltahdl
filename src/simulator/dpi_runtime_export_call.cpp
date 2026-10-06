@@ -12,15 +12,15 @@ namespace delta {
 
 namespace {
 
-// §35.2.2: "SystemVerilog data types are the sole data types that can cross the
-// boundary between SystemVerilog and a foreign language in either direction",
-// and the direction named second is foreign code calling an exported
-// SystemVerilog function. The actuals such a call supplies are therefore the
-// SystemVerilog types the export's formals declare, whatever the foreign side
-// built them as, exactly as DpiRuntime::CallImportWithArgs makes an import's
-// actuals the types its formals declare on the way in. A position the export
-// does not describe is left as it stands, which is what every export got
-// before one could describe any.
+// §35.2.2: only SystemVerilog data types may pass between SystemVerilog and a
+// foreign language, whichever way they travel, and one of those ways is
+// foreign code calling an exported SystemVerilog function. The actuals such
+// a call supplies are therefore the SystemVerilog types the export's formals
+// declare, whatever the foreign side built them as, exactly as
+// DpiRuntime::CallImportWithArgs makes an import's actuals the types its
+// formals declare on the way in. A position the export does not describe is
+// left as it stands, which is what every export got before one could describe
+// any.
 std::vector<DpiArgValue> ActualsAsDeclaredTypes(
     const DpiRtExport& exp, const std::vector<DpiArgValue>& args) {
   std::vector<DpiArgValue> coerced = args;
@@ -143,9 +143,9 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   chain_starts_.pop_back();
   current_scope_ = saved_scope;
   if (exp != nullptr && exp->is_task) {
-    // §35.8: "SystemVerilog tasks do not have return value types. The return
-    // value of an exported task is an int value that indicates if a disable is
-    // active or not on the current execution thread." The foreign caller gets
+    // §35.8: a SystemVerilog task has no return type, so an exported task
+    // returns an int telling whether a disable is in effect on the thread now
+    // executing. The foreign caller gets
     // that indication, not what the body handed back, which stands for no
     // result the clause gives a task. ReturnFromExportUnderDisable sets the
     // thread state read here.

@@ -85,8 +85,8 @@ struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
   uint32_t elem_width = 0;
-  // §35.6.1.1: "The unsized ranges of open arrays are determined at a call
-  // site", so this is the range the formal's unsized dimension took on there
+  // §35.6.1.1: an open array's unsized ranges are settled at the call site, so
+  // this is the range the formal's unsized dimension took on there
   // rather than anything the import declaration could have said. SvLow and
   // SvHigh report it.
   int32_t low = 0;
@@ -104,8 +104,8 @@ struct DpiArg {
   // §35.6: the default value expression the declaration gave this formal,
   // supplied where the call site omits the argument.
   const Expr* default_value = nullptr;
-  // §35.5.6 admits "Packed arrays, structs, and unions composed of types bit
-  // and logic" as formal types and names no width limit, so `bit [127:0]` is a
+  // §35.5.6 admits as a formal type any packed array, struct or union built
+  // from bit and logic, and names no width limit, so `bit [127:0]` is a
   // formal a declaration may write and the kind alone cannot say how wide it
   // is. This is the width the declaration gave it; 0 leaves the width to the
   // kind, which is what every formal whose type carries its own width has.
@@ -162,10 +162,10 @@ struct DpiArgValue {
     SvBit bit_val;
     SvLogic logic_val;
     // §35.2.2.1: the aval/bval pair a four-state integral value crosses as.
-    // "The implementation (representation and layout) of 4-state values ... is
-    // irrelevant for SystemVerilog semantics and can only impact the foreign
-    // side of the interface", so an x or a z has to survive the crossing; a
-    // single word says a bit is 0 or 1 and cannot say it is x or z.
+    // How a four-state value is laid out matters only to the foreign side and
+    // leaves SystemVerilog's semantics untouched, so an x or a z has to survive
+    // the crossing; a single word says a bit is 0 or 1 and cannot say it is x
+    // or z.
     SvLogicVecVal logic_vec_val;
   } data = {};
   std::string string_val;

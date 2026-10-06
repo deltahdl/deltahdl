@@ -8,7 +8,7 @@
 
 namespace delta {
 
-// §35.6.1.1: "The unsized ranges of open arrays are determined at a call site",
+// §35.6.1.1: an open array's unsized ranges are settled at the call site,
 // so the range is settled by whichever of the two factories below the call site
 // went through and these only report what the handle already carries.
 int32_t DpiRuntime::SvLow(const SvOpenArrayHandle& h) { return h.low; }

@@ -585,8 +585,8 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
     if (dpi->HasImport(item->name)) continue;
     DpiRtFunction func;
     func.sv_name = item->name;
-    // §35.4: "If a global name is not explicitly given, it shall be the same as
-    // the SystemVerilog subroutine name", which is the rule
+    // §35.4: a declaration that gives no global name takes the SystemVerilog
+    // name of the subroutine as its global name, which is the rule
     // DpiLinkageName states for the elaborator's own reading of the same
     // declaration.
     func.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;

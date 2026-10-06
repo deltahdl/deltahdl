@@ -153,9 +153,9 @@ struct DpiRtExport {
 
 // §35.4: the name in the global name space that a declaration resolves to.
 // Every imported subroutine resolves to a global symbol and every exported one
-// defines a global symbol, named by the declaration's linkage name. "If a
-// global name is not explicitly given, it shall be the same as the
-// SystemVerilog subroutine name."
+// defines a global symbol, named by the declaration's linkage name. A
+// declaration that gives no global name takes the SystemVerilog name of the
+// subroutine as its global name.
 std::string_view DpiGlobalName(const DpiRtFunction& func);
 std::string_view DpiGlobalName(const DpiRtExport& exp);
 
@@ -260,8 +260,8 @@ class DpiRuntime {
   uint32_t ExportCount() const;
 
   // §35.4: the declaration resolving to the global symbol `global_name`, or
-  // nullptr where none does. DPI subroutines "have their own global name space
-  // of linkage names, different from compilation-unit scope name space", so a
+  // nullptr where none does. Linkage names of DPI subroutines live in a global
+  // name space of their own, apart from the compilation-unit scope's, so a
   // SystemVerilog subroutine name is not a global name: a declaration giving a
   // linkage name is reachable here under that name and under no other.
   // FindImport and FindExport answer the other name space, keyed by the name
@@ -276,9 +276,9 @@ class DpiRuntime {
   bool HasGlobalName(std::string_view global_name) const;
 
   // §35.4: how many distinct global symbols the declarations registered here
-  // resolve to. "The same global subroutine can be referred to in multiple
-  // import declarations in different scopes or/and with different SystemVerilog
-  // names", so this falls below ImportCount() plus ExportCount() wherever
+  // resolve to. Several import declarations, in different scopes or under
+  // different SystemVerilog names, may all name one global subroutine, so this
+  // falls below ImportCount() plus ExportCount() wherever
   // declarations share a linkage name.
   uint32_t GlobalNameCount() const;
 
@@ -316,8 +316,8 @@ class DpiRuntime {
   // (§35.5.1.2/§35.6.1) and completes before any event is raised, so detection
   // and handling happen strictly after the imported function returns and never
   // during the call. A value-change event is appended only for an actual the
-  // call truly altered, modeling "the actual was assigned the formal
-  // immediately after control returns" — an unchanged actual raises none. When
+  // call truly altered, modeling the formal's value being stored into the
+  // actual just as control comes back — an unchanged actual raises none. When
   // there is more than one argument the events are appended in declaration
   // order, the order general SystemVerilog rules impose on the assignments and
   // their value-change propagation. `changes` receives the ordered events; the
@@ -488,8 +488,8 @@ class DpiRuntime {
 
   // §35.9: whether a fatal simulation error has been issued for a violation of
   // the disable protocol, and the text it carried. §35.9 leaves no discretion
-  // here — "if any protocol item is not correctly followed, a fatal simulation
-  // error is issued" — so a caller driving this runtime halts the run once this
+  // here, since breaking any item of the protocol is a fatal simulation error,
+  // so a caller driving this runtime halts the run once this
   // reports true.
   bool DisableProtocolFatalErrorIssued() const;
   const std::string& DisableProtocolFatalError() const;
@@ -506,9 +506,9 @@ class DpiRuntime {
   // the rest of the type information (the element width) stays as specified at
   // the import declaration either way.
 
-  // §35.6.1.1: "A solitary, unsized, packed dimension assumes the linearized,
-  // normalized range of the actual's packed dimensions (see H.7.6)."
-  // Linearizing "an arbitrary number of sized dimensions" (§35.5.6.1) leaves a
+  // §35.6.1.1: a formal whose only packed dimension is unsized takes the
+  // actual's packed dimensions linearized and normalized (see §H.7.6).
+  // Linearizing any number of sized dimensions (§35.5.6.1) leaves a
   // count of elements rather than any one declared range, so `actual_bits` is
   // that count and the range the formal takes on is the normalized 0 to
   // actual_bits-1 whatever ranges the actual's own dimensions ran over.
@@ -530,8 +530,8 @@ class DpiRuntime {
       void* actual_data, const std::vector<SvActualDimension>& packed_dims,
       uint32_t elem_width);
 
-  // §35.6.1.1: "A formal's unsized, unpacked dimensions take on the ranges of
-  // the corresponding actual dimension." No normalization here: the formal
+  // §35.6.1.1: each unsized unpacked dimension of a formal gets the range of
+  // the matching dimension of the actual. No normalization here: the formal
   // reports the actual dimension's own bounds, so §35.5.6.1's `MyType a_10x5
   // [11:20][6:2]` bound to `MyType i [][]` gives the first formal dimension the
   // range 11 to 20 rather than 0 to 9. The size follows from those bounds,
@@ -626,9 +626,9 @@ class DpiRuntime {
   std::string disable_protocol_fatal_message_;
 };
 
-// §35.5.3: "the current scope" decides which instance of an exported subroutine
-// a call reaches, so the C layer and the run have to answer that question the
-// same way. The run's registry is installed here -- by
+// §35.5.3: the scope current at the call decides which instance of an exported
+// subroutine a call reaches, so the C layer and the run have to answer that
+// question the same way. The run's registry is installed here -- by
 // SimContext::AcquireDpiRuntime and SimContext::SetDpiRuntime -- and the §H.9.3
 // entry points svGetScope() and svSetScope() read and write its scope through
 // it rather than a second copy of the state.

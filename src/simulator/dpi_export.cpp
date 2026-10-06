@@ -65,8 +65,8 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
     DpiRuntime& dpi = ctx.AcquireDpiRuntime();
     DpiRtExport exp;
     exp.sv_name = item->name;
-    // §35.4: "If a global name is not explicitly given, it shall be the same
-    // as the SystemVerilog subroutine name."
+    // §35.4: a declaration that gives no global name takes the SystemVerilog
+    // name of the subroutine as its global name.
     exp.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
     exp.scope_name = DpiInstanceScopeName(prefix, ctx);
     exp.is_task = item->dpi_is_task;
