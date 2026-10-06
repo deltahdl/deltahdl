@@ -392,13 +392,13 @@ std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
 // PathDelay::inst_prefix carries (dividers as `.`, a trailing `.`, empty for
 // the top), of the instance an SDF cell's path `instance` names, read from the
 // region the annotation runs at -- `region_prefix`, in the same spelling -- or
-// nullopt where that instance lies outside the region. "The SDF annotator uses
-// the hierarchy level of the specified instance for running the annotation",
-// so a path is read from the region down, `(INSTANCE inner)` under the region
-// m2 being m2.inner, and one written from the top, its first level the top
-// module's own name `design_root`, names the instance that path reaches from
-// there. An SDF path divides its levels with `/` where a SystemVerilog name
-// divides with `.`, and either is read.
+// nullopt where that instance lies outside the region. The annotation runs at
+// the hierarchy level of the instance the call names, so a path is read from
+// the region down, `(INSTANCE inner)` under the region m2 being m2.inner, and
+// one written from the top, its first level the top module's own name
+// `design_root`, names the instance that path reaches from there. An SDF path
+// divides its levels with `/` where a SystemVerilog name divides with `.`, and
+// either is read.
 //
 // An empty `design_root` answers empty for every cell: with no root the
 // annotator cannot tell a path from the top from one below the region, and

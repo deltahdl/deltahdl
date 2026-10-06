@@ -555,8 +555,8 @@ std::string SdfAnnotateStringArg(const Expr* call, std::size_t index,
 
 }  // namespace
 
-// §32.9's Table 32-5 gives TOOL_CONTROL, the default mtm_spec, the description
-// "Annotates the value as selected by the simulator". What this simulator
+// §32.9's Table 32-5 has TOOL_CONTROL, the default mtm_spec, annotate whichever
+// value the simulator picks. What this simulator
 // selects is what --mintypmax established, so a $sdf_annotate call that names
 // no mtm_spec annotates the same member of the min/typ/max triple that the
 // source-level min:typ:max expressions of §11.11 are evaluated at.
@@ -599,8 +599,8 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
 
   // §32.9: module_instance names a level of the design hierarchy rather than a
   // readable value, so it is taken as the name it writes, and the region is
-  // the instance it names. Left out, "the SDF annotator uses the module
-  // containing the call", which is the instance of that module running it --
+  // the instance it names. Left out, the annotator works in the module the
+  // call sits in, which is the instance of that module running it --
   // one of the two instances of a module instantiated twice, each call its
   // own.
   if (call->args.size() > 1 && call->args[1] != nullptr) {

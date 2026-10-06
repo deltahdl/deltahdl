@@ -786,7 +786,8 @@ static uint64_t InterconnectDelayTicks(const InterconnectDelayQuery& q) {
       old_val, driven, d, ContAssignTransitionWidth(q.drv, q.params.width));
 }
 
-// §32.4.4: "the load takes the delayed value" -- an annotated interconnect
+// §32.4.4: the load sees the value only once the delay has passed -- an
+// annotated interconnect
 // delay is the time the source's value takes to arrive at the port, so the
 // value is evaluated when the source changed and driven onto the port that much
 // later. An assignment with nothing annotated between its two names commits at
