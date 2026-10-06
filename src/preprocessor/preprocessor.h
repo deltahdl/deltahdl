@@ -135,6 +135,10 @@ struct OutputMark {
 // white space, so the list may open on the line after the name.
 enum class MacroUsageEnd : std::uint8_t { kComplete, kListOpen, kNameAlone };
 
+// The callbacks ProcessSource hands the emitting of one active line, defined in
+// src/preprocessor/preprocessor.cpp beside the loop that supplies them.
+struct ActiveLineEmit;
+
 class Preprocessor {
  public:
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
@@ -221,6 +225,10 @@ class Preprocessor {
                                  int depth, std::string& output);
   // True when an inline `ifdef…`endif resolves entirely on this line (22.6).
   bool HasInlineConditional(std::string_view line) const;
+  // Emits one active source line (22.2) through `emit`, each comment it holds
+  // going out with the text it was written with.
+  void EmitCommentedActiveLine(std::string_view line,
+                               const ActiveLineEmit& emit, std::string& output);
   // What `text` leaves unfinished of a function-like macro usage (22.5.1),
   // which is what the line loop in src/preprocessor/preprocessor.cpp asks
   // before joining the next physical line onto it.

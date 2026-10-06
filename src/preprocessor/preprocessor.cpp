@@ -789,6 +789,21 @@ static void EmitStrippedActiveLine(const std::string& stripped,
   EmitActiveLine(stripped, emit, output);
 }
 
+// §40.4's FSM pragmas are read by the lexer from a comment's text, so each
+// comment the line holds goes out with the text it was written with, put back
+// once the rest of the line has been expanded around its mark.
+void Preprocessor::EmitCommentedActiveLine(std::string_view line,
+                                           const ActiveLineEmit& emit,
+                                           std::string& output) {
+  std::vector<std::string> comments;
+  auto stripped = StripComments(std::string(line), in_block_comment_,
+                                in_triple_string_, &comments);
+  size_t from = output.size();
+  EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
+                         output);
+  RestoreComments(output, from, comments);
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -851,17 +866,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     }
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
-  // §40.4's FSM pragmas are read by the lexer from a comment's text, so each
-  // comment the line holds goes out with the text it was written with, put
-  // back once the rest of the line has been expanded around its mark.
   ops.emit_active_line = [&](std::string_view line) {
-    std::vector<std::string> comments;
-    auto stripped = StripComments(std::string(line), in_block_comment_,
-                                  in_triple_string_, &comments);
-    size_t from = output.size();
-    EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
-                           output);
-    RestoreComments(output, from, comments);
+    EmitCommentedActiveLine(line, emit, output);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).
