@@ -202,8 +202,9 @@ void Parser::ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state) {
          !AtEnd()) {
     ParseCrossBodyItem(cross, state);
   }
+  // A.2.11's cross_body ends at its '}', so a ';' after it is left for the
+  // covergroup's item loop, which reports it as no coverage_spec_or_option.
   Expect(TokenKind::kRBrace, Subclause("A.2.11"));
-  Match(TokenKind::kSemicolon);
 }
 
 // A.2.11 cross_body_item, positioned on its first token: a

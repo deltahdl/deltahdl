@@ -182,7 +182,19 @@ Expr* Parser::ParseParenExpr() {
     return cast;
   }
   lhs->is_parenthesized = true;
-  return lhs;
+  return ParseParenMethodTail(lhs);
+}
+
+// A.8.2 makes a method_call's root a primary and A.8.4 counts a parenthesized
+// mintypmax_expression among the primaries, so a method is called on the handle
+// a parenthesized expression yields (§8.4), `(sel ? x : y).f()`. The call
+// takes the tail a cast's does, and a randomize_call or array_manipulation_call
+// the with clause a name's call takes.
+Expr* Parser::ParseParenMethodTail(Expr* paren) {
+  if (!Check(TokenKind::kDot)) return paren;
+  Expr* result = ParseWithClause(ParseCastMethodTail(paren));
+  if (result->with_expr == nullptr) return result;
+  return ParseWithClauseTail(result);
 }
 
 // §6.20 / Syntax 8-2: a parameter_value_assignment may be ordered (a bare

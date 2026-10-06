@@ -359,6 +359,57 @@ TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.8.2 makes a method_call's root a primary, and A.8.4 counts a parenthesized
+// mintypmax_expression among the primaries, so a method is called on the
+// handle a parenthesized expression yields (§8.4): the call's receiver is the
+// conditional expression inside the parentheses.
+TEST(SubroutineCallExprParsing, MethodCallOnAParenthesizedExpression) {
+  auto r = Parse(
+      "class D;\n"
+      "  function int f(); return 1; endfunction\n"
+      "endclass\n"
+      "module m(input logic sel);\n"
+      "  D x = new;\n"
+      "  D y = new;\n"
+      "  int i;\n"
+      "  initial i = (sel ? x : y).f();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+  ASSERT_EQ(stmt->rhs->lhs->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(stmt->rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->lhs->kind, ExprKind::kTernary);
+  ASSERT_NE(stmt->rhs->lhs->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->rhs->text, "f");
+}
+
+// A randomize_call (A.8.2) is a built_in_method_call, so it too takes a
+// parenthesized receiver, with its inline constraint block after it.
+TEST(SubroutineCallExprParsing, RandomizeWithOnAParenthesizedExpression) {
+  auto r = Parse(
+      "class D;\n"
+      "  rand int v;\n"
+      "endclass\n"
+      "module m(input logic sel);\n"
+      "  D x = new;\n"
+      "  D y = new;\n"
+      "  int ok;\n"
+      "  initial ok = (sel ? x : y).randomize() with { v < 10; };\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_NE(stmt->rhs->inline_constraint, nullptr);
+}
+
 TEST(SubroutineCallExprParsing, SuperMethodCall) {
   auto r = Parse(
       "module m;\n"

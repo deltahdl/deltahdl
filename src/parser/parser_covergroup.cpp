@@ -609,8 +609,9 @@ void Parser::ParseCoverPoint(CovergroupBodyState& state, std::string_view label,
     BinsOrOptions bins;
     if (ParseBinsOrOptions(bins, state)) cp->bins.push_back(bins);
   }
+  // A.2.11's bins_or_empty ends at its '}', so a ';' after it is left for the
+  // covergroup's item loop, which reports it as no coverage_spec_or_option.
   Expect(TokenKind::kRBrace, Subclause("A.2.11"));
-  Match(TokenKind::kSemicolon);
 }
 
 // True where the token the parse stands on opens an item of a coverpoint or

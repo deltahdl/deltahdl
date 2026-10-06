@@ -751,6 +751,29 @@ TEST(CovergroupDeclParsing, CovergroupItem_OtherThanSpecOrOptionIsRejected) {
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
+// bins_or_empty and cross_body each end at their '}', so a ';' written after
+// either is an item of the covergroup of its own, and an empty ';' is none of
+// coverage_spec_or_option's alternatives. A body closed without one is fine.
+TEST(CovergroupDeclParsing, SemicolonAfterACoverpointOrCrossBodyIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b;\n"
+      "  covergroup cg;\n"
+      "    cp_a : coverpoint a { bins one = {1}; };\n"
+      "    cp_b : coverpoint b { bins two = {2}; }\n"
+      "    x : cross cp_a, cp_b { bins s = binsof(cp_a); };\n"
+      "  endgroup\n"
+      "endmodule\n");
+  for (int line : {4, 6}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "a covergroup item is a coverpoint, a cross or a coverage "
+        "option",
+        line, "A.2.11"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
 // bins_or_empty holds `{ attribute_instance } { bins_or_options ; }`: an
 // empty ';', a 'wildcard' with no bins_keyword and a bare expression are not
 // bins_or_options.
