@@ -448,5 +448,11 @@ TEST_F(VpiGetDelaysInARun, TheRetrievedDelayIsTheOneTheSourceDeclared) {
   EXPECT_EQ(g_largest_delay, g_smallest_delay * 3);
 }
 
+// §38.10 with §37.47 and §10.3.3: vpi_get_delays reads a continuous
+// assignment's delays, its rise and fall delays as two (#5108).
+TEST_F(ContAssignDelaysOfARun, AContinuousAssignmentsDelaysAreRead) {
+  EXPECT_EQ(ContAssignDelaysRead(), (std::vector<uint32_t>{3, 4}));
+}
+
 }  // namespace
 }  // namespace delta

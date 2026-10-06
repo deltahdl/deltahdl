@@ -20,6 +20,9 @@
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -810,6 +813,11 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   // the name ResolveLhsVariable above resolved through.
   spec.net = ForceTargetNet(stmt->lhs, ctx);
   InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, spec);
+  // §38.36.1: a cbForce callback is called after the force.
+  if (stmt->kind == StmtKind::kForce) {
+    GetGlobalVpiContext().NoteForce(cbForce, var, stmt,
+                                    ctx.ActiveInstancePrefix());
+  }
 
   return StmtResult::kDone;
 }
@@ -847,26 +855,38 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
+  if (stmt->kind == StmtKind::kDeassign) {
+    var->is_forced = false;
+    var->forced_window = {};
+    var->proc_cont_rhs = nullptr;
+    var->assign_cont_rhs = nullptr;
+    var->assign_cont_window = {};
+    return StmtResult::kDone;
+  }
+  // §10.6.2: "When released, the net shall immediately be assigned the value
+  // determined by the drivers of the net", which is as true of the bits a
+  // select named as of a whole net. The lookup followed the identifier form
+  // alone, so `release bus[3];` cleared the flag and left the net holding the
+  // forced value until some driver happened to notify.
+  ReleaseForcedTarget(var, ForceTargetNet(stmt->lhs, ctx), ctx, arena);
+  // §38.36.1: a cbRelease callback is called after the release.
+  GetGlobalVpiContext().NoteForce(cbRelease, var, stmt,
+                                  ctx.ActiveInstancePrefix());
+  return StmtResult::kDone;
+}
+
+void ReleaseForcedTarget(Variable* var, Net* net, SimContext& ctx,
+                         Arena& arena) {
   bool was_forced = var->is_forced;
   ProcContAssignWindow released = var->forced_window;
   var->is_forced = false;
   var->forced_window = {};
   var->proc_cont_rhs = nullptr;
-
-  if (stmt->kind == StmtKind::kDeassign) {
-    var->assign_cont_rhs = nullptr;
-    var->assign_cont_window = {};
-  } else if (auto* net = ForceTargetNet(stmt->lhs, ctx)) {
-    // §10.6.2: "When released, the net shall immediately be assigned the value
-    // determined by the drivers of the net", which is as true of the bits a
-    // select named as of a whole net. The lookup followed the identifier form
-    // alone, so `release bus[3];` cleared the flag and left the net holding the
-    // forced value until some driver happened to notify.
+  if (net != nullptr) {
     if (was_forced) ReleaseUndrivenBits(*net, released);
     net->Resolve(arena);
   }
-
-  if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
+  if (var->assign_cont_rhs) {
     // The window the assignment was installed with, which for an assign through
     // a concatenation is this variable's slice of it and not the whole value.
     RhsWatcherSpec reestablished;
@@ -874,8 +894,6 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
     ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
                                     reestablished);
   }
-
-  return StmtResult::kDone;
 }
 
 }  // namespace delta

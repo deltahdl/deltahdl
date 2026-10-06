@@ -277,11 +277,25 @@ void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
   }
 }
 
+// §37.17: whether `child` of an array object is one of its elements, rather
+// than a range of its dimensions or its typespec, which the array reaches too.
+bool IsArrayElement(const VpiObject& child) {
+  return child.type != vpiRange && !VpiIsTypespecType(child.type);
+}
+
+// The first element of the array `obj`, null where it holds none.
+const VpiObject* FirstElement(const VpiObject& obj) {
+  for (const VpiObject* child : obj.children) {
+    if (IsArrayElement(*child)) return child;
+  }
+  return nullptr;
+}
+
 // §38.35: find the element child of obj whose flat ordinal equals the target,
 // or nullptr if no such element exists.
 VpiObject* FindElementByOrdinal(VpiHandle obj, long long ordinal) {
   for (auto* child : obj->children) {
-    if (child->index == ordinal) {
+    if (IsArrayElement(*child) && child->index == ordinal) {
       return child;
     }
   }
@@ -376,9 +390,10 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   // them; an array holding none has no data type for a format to disagree with.
   // Only the format's being one the routine knows was checked, so a request for
   // shorts of an array of anything at all was answered with shorts.
-  if (!obj->children.empty() &&
+  const VpiObject* first = FirstElement(*obj);
+  if (first != nullptr &&
       !VpiArrayFormatSuitsElementType(static_cast<int>(arrayvalue_p->format),
-                                      obj->children.front()->type)) {
+                                      first->type)) {
     *out_err_msg =
         "vpi_get_value_array() was given a format the array's element data "
         "type does not support";
@@ -413,6 +428,7 @@ void CollectGetValueArraySection(VpiHandle obj, long long start_ordinal,
                                  unsigned int num,
                                  std::vector<VpiObject*>* section) {
   for (auto* child : obj->children) {
+    if (!IsArrayElement(*child)) continue;
     long long rel = static_cast<long long>(child->index) - start_ordinal;
     if (rel >= 0 && rel < static_cast<long long>(num)) {
       (*section)[static_cast<size_t>(rel)] = child;
@@ -576,6 +592,16 @@ void EncodeGetElementValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
 void VpiContext::PutValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                                int* index_p, unsigned int num) {
   if (!obj || !arrayvalue_p) return;
+  // §38.36.2 with §4.4.2.9: no value is written while a cbReadOnlySynch
+  // routine runs.
+  if (at_read_only_synch_time_) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message = VpiText(
+        "vpi_put_value_array(): no value may be written from a "
+        "cbReadOnlySynch callback");
+    return;
+  }
 
   long long start_ordinal = 0;
   if (!ValidatePutValueArrayRequest(obj, arrayvalue_p, index_p, &start_ordinal,

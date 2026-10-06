@@ -1,11 +1,18 @@
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/net.h"
+#include "simulator/scheduler.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -17,6 +24,7 @@
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -26,6 +34,12 @@ namespace {
 // §36.10.2 / §37.43 / §38.36.1 / §38.36.1.1: the placement rules that do not
 // depend on simulator timing state. Each returns the rejection message for the
 // first rule the registration violates, or an empty string when none apply.
+// §38.36.1 with §37.17 detail 13: whether `obj` is a bit-select of a
+// variable, a var bit among them; a net's bits are net bits.
+bool IsVariableBitSelect(const VpiObject& obj) {
+  return obj.type == vpiBitSelect || obj.type == vpiVarBit;
+}
+
 const char* VpiCheckCallbackPlacement(const s_cb_data& data,
                                       VpiToolPhase tool_phase) {
   // §36.10.2: while VPI functionality is restricted - the startup phase, and
@@ -54,7 +68,7 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
   // never fire correctly.
   if ((data.reason == cbForce || data.reason == cbRelease ||
        data.reason == cbDisable) &&
-      data.obj && VpiObjectOf(data.obj)->type == vpiBitSelect) {
+      data.obj && IsVariableBitSelect(*VpiObjectOf(data.obj))) {
     return "vpi_register_cb(): a cbForce, cbRelease, or cbDisable callback may "
            "not "
            "be placed on a variable bit-select";
@@ -192,6 +206,121 @@ void VpiCollectCallbackObjects(VpiHandle ref,
   }
 }
 
+namespace {
+
+// §38.36.1: whether a `reason` registration placed on `obj` is still live
+// among `callbacks`.
+bool IsPlacedOn(const std::vector<s_cb_data>& callbacks, int reason,
+                const VpiObject* obj) {
+  return std::ranges::any_of(callbacks, [reason, obj](const s_cb_data& cb) {
+    return cb.reason == reason && cb.obj != nullptr &&
+           VpiObjectOf(cb.obj) == obj;
+  });
+}
+
+// Whether any `reason` registration is still live among `callbacks`.
+bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason) {
+  return std::ranges::any_of(
+      callbacks, [reason](const s_cb_data& cb) { return cb.reason == reason; });
+}
+
+// The aval and bval words of the bits `obj` stands for: its variable's, or,
+// for a bit or a select of one, those of its parent's it spans.
+std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
+  const Logic4Vec& whole = obj.var->value;
+  std::vector<uint64_t> bits;
+  if (obj.bit_offset < 0) {
+    for (uint32_t i = 0; i < whole.nwords; ++i) {
+      bits.push_back(whole.words[i].aval);
+      bits.push_back(whole.words[i].bval);
+    }
+    return bits;
+  }
+  for (int k = 0; k < std::max(obj.size, 1); ++k) {
+    const auto kBit = static_cast<uint32_t>(obj.bit_offset + k);
+    if (kBit / 64 >= whole.nwords) break;
+    bits.push_back((whole.words[kBit / 64].aval >> (kBit % 64)) & 1);
+    bits.push_back((whole.words[kBit / 64].bval >> (kBit % 64)) & 1);
+  }
+  return bits;
+}
+
+// §38.36.1 with §37.17 detail 14: watch the storage of `obj` and, as it is
+// written, call back the cbSizeChange registrations placed on it where its
+// size changed, then the cbValueChange ones where its value did, a write of
+// what it holds being no change, until none of either is left.
+void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
+  if (obj == nullptr || obj->var == nullptr || obj->value_change_watched) {
+    return;
+  }
+  obj->value_change_watched = true;
+  obj->var->AddWatcher([&vpi, obj, held = ObjectBits(*obj),
+                        size = vpi.Get(vpiSize, obj)]() mutable {
+    const auto& callbacks = vpi.RegisteredCallbacks();
+    const bool kSizes = IsPlacedOn(callbacks, cbSizeChange, obj);
+    const bool kValues = IsPlacedOn(callbacks, cbValueChange, obj);
+    if (!kSizes && !kValues) {
+      obj->value_change_watched = false;
+      return true;
+    }
+    const int kSize = vpi.Get(vpiSize, obj);
+    if (kSize != size) {
+      size = kSize;
+      if (kSizes) vpi.DispatchCallbacks(cbSizeChange, obj);
+    }
+    std::vector<uint64_t> now = ObjectBits(*obj);
+    if (now == held) return false;
+    held = std::move(now);
+    if (kValues) vpi.DispatchCallbacks(cbValueChange, obj);
+    return false;
+  });
+}
+
+// The model's object for the statement `stmt` run in the instance `prefix`
+// names, among `stmts`: one a run names with a dot after it and the model
+// without, and found under any instance writing it where the model keyed it
+// under another name; null where the model holds none.
+VpiObject* StmtObjectFor(const VpiStmtObjects& stmts, const Stmt* stmt,
+                         std::string prefix) {
+  if (stmt == nullptr) return nullptr;
+  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  auto found = stmts.find({stmt, prefix});
+  if (found == stmts.end()) found = stmts.lower_bound({stmt, std::string()});
+  if (found == stmts.end() || found->first.first != stmt) return nullptr;
+  return found->second;
+}
+
+// §38.36.2: the delay a simulation-time callback's time gives, in ticks of
+// the simulation time unit `sim_unit`: a vpiScaledRealTime one in the time
+// unit of the callback's object, or the simulation time unit without one.
+uint64_t CallbackDelayTicks(const s_cb_data& data, int sim_unit) {
+  if (data.time == nullptr) return 0;
+  if (data.time->type == kVpiScaledRealTime && data.obj == nullptr) {
+    return static_cast<uint64_t>(std::llround(data.time->real));
+  }
+  if (data.time->type == kVpiScaledRealTime) {
+    return VpiPutDelayTicks(*VpiObjectOf(data.obj), *data.time, sim_unit);
+  }
+  return (uint64_t{data.time->high} << 32) | data.time->low;
+}
+
+// §38.36.2 with §4.4.3: schedule the simulation-time callback `cb`, of the
+// registration `data`, in the run `scheduler` holds: an event at its time, in
+// the PLI region its reason runs in, that calls it once. A cbNextSimTime is
+// called from the run loop instead, before the first slot after this one.
+void ScheduleTimeCallback(VpiContext& vpi, Scheduler& scheduler, VpiObject* cb,
+                          const s_cb_data& data) {
+  cb->event_time = scheduler.CurrentTime().ticks;
+  if (data.reason == cbNextSimTime) return;
+  Event* queued = scheduler.GetEventPool().Acquire();
+  queued->callback = [&vpi, cb]() { vpi.DeliverCallback(cb); };
+  scheduler.ScheduleEvent(
+      SimTime{cb->event_time + CallbackDelayTicks(data, vpi.SimTimeUnit())},
+      RegionForPliCallback(data.reason), queued);
+}
+
+}  // namespace
+
 VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
   if (!data) return nullptr;
 
@@ -231,6 +360,15 @@ VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
       VpiIsCallbackHostType(VpiObjectOf(data->obj)->type) &&
       VpiObjectOf(data->obj)->callback == nullptr) {
     VpiObjectOf(data->obj)->callback = cb_obj;
+  }
+  if ((data->reason == cbValueChange || data->reason == cbSizeChange) &&
+      data->obj != nullptr) {
+    WatchObjectChanges(*this, VpiObjectOf(data->obj));
+  }
+  if (data->reason == cbStmt) stmt_callbacks_registered_ = true;
+  if (scheduler_ != nullptr &&
+      VpiIsSimulationTimeCallbackReason(data->reason)) {
+    ScheduleTimeCallback(*this, *scheduler_, cb_obj, *data);
   }
   return cb_obj;
 }
@@ -464,6 +602,94 @@ bool VpiCbStmtIsPlacedOn(const s_cb_data& reg, VpiHandle stmt) {
   return false;
 }
 
+// The name of the class whose typespec the class obj `obj` reaches; empty
+// where it reaches none.
+std::string_view ClassNameOf(const VpiObject& obj) {
+  for (const VpiObject* child : obj.children) {
+    if (child != nullptr && child->type == vpiClassTypespec) return child->name;
+  }
+  return {};
+}
+
+// §38.36.1: whether the registration `reg` placed no callback on `obj`, the
+// object a delivery for `reason` is about: a cbStmt placed on another
+// statement or another module's, or a cbValueChange placed on another object.
+bool PlacedElsewhere(const s_cb_data& reg, int reason, VpiHandle obj) {
+  if (obj == nullptr) return false;
+  if (reason == cbStmt) return !VpiCbStmtIsPlacedOn(reg, obj);
+  if (reg.obj == nullptr) return false;
+  if (reason == cbValueChange || reason == cbSizeChange ||
+      reason == cbDisable) {
+    return VpiObjectOf(reg.obj) != obj;
+  }
+  if (reason == cbCreateObj) {
+    return VpiObjectOf(reg.obj)->name != ClassNameOf(*obj);
+  }
+  return false;
+}
+
+// §38.36.1: the simulation-event reasons whose routine is given the time
+// they occurred at.
+bool IsTimedEventReason(int reason) {
+  switch (reason) {
+    case cbValueChange:
+    case cbForce:
+    case cbRelease:
+    case cbSizeChange:
+    case cbDisable:
+    case cbCreateObj:
+    case cbStartOfThread:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §38.36.1: the value a simulation-event callback's routine is given, in
+// storage the dispatch owns: an object's new value for cbValueChange and its
+// new size for cbSizeChange, in the format the registration asked for unless
+// it asked for none; the forced object's value, which their dispatch reads,
+// for cbForce and cbRelease; and none for a reason that carries no value.
+void FillEventValue(s_cb_data& data, s_vpi_value& value, VpiContext& ctx,
+                    VpiObject* obj) {
+  if (data.reason == cbForce || data.reason == cbRelease) return;
+  if (data.reason != cbValueChange && data.reason != cbSizeChange) {
+    data.value = nullptr;
+    return;
+  }
+  if (data.value == nullptr || data.value->format == vpiSuppressVal ||
+      obj == nullptr) {
+    return;
+  }
+  value.format = data.value->format;
+  if (data.reason == cbSizeChange) {
+    value.format = vpiIntVal;
+    value.value.integer = ctx.Get(vpiSize, obj);
+  } else {
+    ctx.GetValue(obj, &value);
+  }
+  data.value = &value;
+}
+
+// §38.36.1: the routine of a simulation-event callback is given the current
+// time in the type the registration asked for, unless it asked for none, the
+// value FillEventValue gives, and, for a change of an array member, the
+// member's index. Each goes into storage the dispatch owns.
+void VpiFillSimEventCbData(s_cb_data& data, s_vpi_time& time,
+                           s_vpi_value& value, VpiContext& ctx) {
+  if (!IsTimedEventReason(data.reason)) return;
+  VpiObject* obj = VpiObjectOf(data.obj);
+  if (data.time != nullptr && data.time->type != vpiSuppressTime) {
+    time.type = data.time->type;
+    ctx.GetTime(time.type == kVpiScaledRealTime ? obj : nullptr, &time);
+    data.time = &time;
+  }
+  FillEventValue(data, value, ctx, obj);
+  if (data.reason == cbValueChange && obj != nullptr) {
+    data.index = VpiVariableIsArrayMember(obj) ? obj->index : 0;
+  }
+}
+
 // §38.36.3: the routine is passed a pointer to an s_cb_data structure that is
 // not the one supplied at registration. The simulator fills in the obj and
 // user_data fields where the dispatch has them for this reason, and leaves
@@ -476,6 +702,114 @@ void VpiApplyDispatchOverrides(s_cb_data& data, VpiHandle obj,
 
 }  // namespace
 
+// Deliver one invocation of a callback routine. `data` already carries the obj
+// the routine should see. This applies the cbStmt field guarantees
+// (§38.36.1.1) and the current-reason bookkeeping (§38.9).
+void VpiContext::Deliver(s_cb_data data) {
+  // §38.36.1.1: apply the fixed s_cb_data field contents a cbStmt callback
+  // requires before the routine sees them, and the current simulation time it
+  // is passed in the form the registration asked for.
+  s_vpi_time delivered_stmt_time{};
+  VpiNormalizeCbStmtData(data, delivered_stmt_time, *this);
+  // §38.36.1: a callback about an object's value is passed the time, the new
+  // value and an array member's index.
+  s_vpi_time delivered_event_time{};
+  s_vpi_value delivered_value{};
+  VpiFillSimEventCbData(data, delivered_event_time, delivered_value, *this);
+  // §38.36.1: a cbReclaimObj or cbEndOfObject callback is passed no time, so
+  // clear the time pointer before the routine runs.
+  VpiNormalizeSimEventCbData(data);
+  // §38.36.2: a simulation-time callback is passed the current simulation
+  // time and no value.
+  s_vpi_time delivered_time{};
+  VpiNormalizeSimTimeCbData(data, delivered_time, *this);
+  // §38.9: record the reason of the routine about to run so that a routine
+  // gated on its callback reason (e.g. vpi_get_data, legal only under
+  // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
+  // afterward to keep nested dispatches honest.
+  int saved_reason = current_callback_reason_;
+  current_callback_reason_ = data.reason;
+  data.cb_rtn(&data);
+  current_callback_reason_ = saved_reason;
+}
+
+void VpiContext::DispatchStmtCallbacks(const Stmt* stmt, std::string prefix) {
+  if (!stmt_callbacks_registered_) return;
+  VpiObject* obj = StmtObjectFor(stmt_objects_, stmt, std::move(prefix));
+  if (obj != nullptr) DispatchCallbacks(cbStmt, obj);
+}
+
+void VpiContext::NoteThreadCreated(Process* proc) {
+  // §38.36.1: a thread's object is made, and cbStartOfThread called for it
+  // (ThreadObjectFor), as the run creates it.
+  if (sim_ctx_ != nullptr && HasCallbackFor(callbacks_, cbStartOfThread)) {
+    ThreadObjectFor(proc);
+  }
+}
+
+void VpiContext::NoteObjectCreated(ClassObject& obj) {
+  if (sim_ctx_ == nullptr || !HasCallbackFor(callbacks_, cbCreateObj)) return;
+  DispatchCallbacks(cbCreateObj, MadeClassObject(obj));
+}
+
+void VpiContext::NoteForce(int reason, const Variable* var, const Stmt* stmt,
+                           std::string prefix) {
+  if (!HasCallbackFor(callbacks_, reason)) return;
+  VpiObject* stmt_obj = StmtObjectFor(stmt_objects_, stmt, std::move(prefix));
+  const size_t kCount = callbacks_.size();
+  for (size_t i = 0; i < kCount; ++i) {
+    if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
+      continue;
+    }
+    // §38.36.1: a callback placed on an object is called for a force or
+    // release of that object, one placed on none for every one, its obj the
+    // statement and its value the forced object's after the statement.
+    VpiObject* placed = VpiObjectOf(callbacks_[i].obj);
+    if (placed != nullptr && placed->var != var) continue;
+    s_cb_data data = callbacks_[i];
+    s_vpi_value value{};
+    if (placed != nullptr && data.value != nullptr &&
+        data.value->format != vpiSuppressVal) {
+      value.format = data.value->format;
+      GetValue(placed, &value);
+      data.value = &value;
+    }
+    data.obj = VpiHandleOf(stmt_obj);
+    Deliver(data);
+  }
+}
+
+void VpiContext::NoteDisabled(std::string_view label, std::string prefix) {
+  if (!HasCallbackFor(callbacks_, cbDisable)) return;
+  // §38.36.1: the named begin or fork the disable names, among the blocks of
+  // the instance it ran in.
+  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  const std::string_view kLeaf = label.substr(label.rfind('.') + 1);
+  for (const auto& [key, obj] : stmt_objects_) {
+    if (key.second == prefix && obj->name == kLeaf &&
+        (obj->type == vpiNamedBegin || obj->type == vpiNamedFork)) {
+      DispatchCallbacks(cbDisable, obj);
+      return;
+    }
+  }
+}
+
+int VpiContext::DeliverCallback(VpiHandle cb_handle) {
+  if (cb_handle == nullptr || cb_handle->type != kVpiCallback) return 0;
+  const int kIndex = cb_handle->index;
+  if (kIndex < 0 || kIndex >= static_cast<int>(callbacks_.size())) return 0;
+  const s_cb_data kData = callbacks_[kIndex];
+  if (kData.reason < 0 || kData.cb_rtn == nullptr) return 0;
+  // §38.36.2: a simulation-time callback is called once, and a value may not
+  // be written while a cbReadOnlySynch routine runs.
+  if (IsOneShotPliCallback(kData.reason)) callbacks_[kIndex].reason = -1;
+  const bool kSavedReadOnly = at_read_only_synch_time_;
+  if (kData.reason == cbReadOnlySynch) at_read_only_synch_time_ = true;
+  Deliver(kData);
+  at_read_only_synch_time_ = kSavedReadOnly;
+  return 1;
+}
+
 int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   int fired = 0;
   // §38.36.3: only callbacks still registered for this reason are delivered.
@@ -483,34 +817,6 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   // never matches a real reason here. Snapshot the count so callbacks
   // registered from within a routine are not delivered during this same pass.
   size_t count = callbacks_.size();
-
-  // Deliver one invocation of a callback routine. `data` already carries the
-  // obj the routine should see. This applies the cbStmt field guarantees
-  // (§38.36.1.1) and the current-reason bookkeeping (§38.9), then counts the
-  // firing.
-  auto deliver = [&](s_cb_data data) {
-    // §38.36.1.1: apply the fixed s_cb_data field contents a cbStmt callback
-    // requires before the routine sees them, and the current simulation time it
-    // is passed in the form the registration asked for.
-    s_vpi_time delivered_stmt_time{};
-    VpiNormalizeCbStmtData(data, delivered_stmt_time, *this);
-    // §38.36.1: a cbReclaimObj or cbEndOfObject callback is passed no time, so
-    // clear the time pointer before the routine runs.
-    VpiNormalizeSimEventCbData(data);
-    // §38.36.2: a simulation-time callback is passed the current simulation
-    // time and no value.
-    s_vpi_time delivered_time{};
-    VpiNormalizeSimTimeCbData(data, delivered_time, *this);
-    // §38.9: record the reason of the routine about to run so that a routine
-    // gated on its callback reason (e.g. vpi_get_data, legal only under
-    // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
-    // afterward to keep nested dispatches honest.
-    int saved_reason = current_callback_reason_;
-    current_callback_reason_ = data.reason;
-    data.cb_rtn(&data);
-    current_callback_reason_ = saved_reason;
-    ++fired;
-  };
 
   for (size_t i = 0; i < count; ++i) {
     if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
@@ -520,14 +826,13 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     // where the dispatch names the statement that is about to execute, only
     // the registrations that placed a callback on that statement are delivered
     // for it.
-    if (reason == cbStmt && obj != nullptr &&
-        !VpiCbStmtIsPlacedOn(callbacks_[i], obj)) {
-      continue;
-    }
+    if (PlacedElsewhere(callbacks_[i], reason, obj)) continue;
+    if (NextSimTimeNotDue(callbacks_, cb_handles_, i, scheduler_)) continue;
     // §38.36.3: the routine is passed a pointer to an s_cb_data structure that
     // is not the one supplied at registration. Work from a copy and let the
     // simulator fill obj/user_data when it has them for this reason.
     s_cb_data data = callbacks_[i];
+    data.reason = reason;
     VpiApplyDispatchOverrides(data, obj, user_data);
     // §38.36.1.3: a handle to a module instance in the obj field places a
     // cbStmt callback on every statement in the module that can have one. The
@@ -541,11 +846,13 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
       for (VpiObject* stmt : stmts) {
         s_cb_data per = data;
         per.obj = VpiHandleOf(stmt);
-        deliver(per);
+        Deliver(per);
+        ++fired;
       }
       continue;
     }
-    deliver(data);
+    Deliver(data);
+    ++fired;
   }
   return fired;
 }

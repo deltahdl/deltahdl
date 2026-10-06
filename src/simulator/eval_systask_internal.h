@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 #include <string_view>
 
@@ -157,6 +158,12 @@ Logic4Vec EvalTypenameOfExpression(const Expr* expr, SimContext& ctx,
 // represents by its full path; empty for any other argument.
 // Defined in eval_systask_query.cpp.
 std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena);
+
+// §20.2, Table 20-1: the banner $finish or $stop, `task`, prints before
+// halting at the diagnostic level `level`: nothing at 0, the current time at
+// 1, and resource statistics as well at 2. Defined in eval_system_func.cpp.
+void EmitFinishDiagnostic(SimContext& ctx, std::string_view task, int64_t level,
+                          std::ostream& os);
 
 // §20.6.2: $bits, the number of bits its argument holds as a bit stream, or
 // the width of the type it names, found without evaluating it. Defined in

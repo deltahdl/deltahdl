@@ -4,9 +4,11 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -194,6 +196,71 @@ TEST_F(VpiGetTimeSim, NullDestinationIsSafe) {
   AdvanceTo(3);
   vpi_get_time(nullptr, nullptr);
   SUCCEED();
+}
+
+// What the calltf of `$probe` read at its call: the time in the simulation
+// time unit, and the time scaled to `top` and to its instance `top.s`.
+struct ProbedTimes {
+  uint32_t sim_low = 0;
+  uint32_t sim_high = 0;
+  double top_scaled = 0.0;
+  double sub_scaled = 0.0;
+};
+
+ProbedTimes& ProbedTimesOfTheCall() {
+  static ProbedTimes times;
+  return times;
+}
+
+PLI_INT32 ReadTimesCalltf(PLI_BYTE8* /*user_data*/) {
+  ProbedTimes& times = ProbedTimesOfTheCall();
+  s_vpi_time t = {};
+  t.type = vpiSimTime;
+  vpi_get_time(nullptr, &t);
+  times.sim_low = t.low;
+  times.sim_high = t.high;
+  t.type = vpiScaledRealTime;
+  vpi_get_time(vpi_handle_by_name(VpiText("top"), nullptr), &t);
+  times.top_scaled = t.real;
+  vpi_get_time(vpi_handle_by_name(VpiText("top.s"), nullptr), &t);
+  times.sub_scaled = t.real;
+  return 0;
+}
+
+// A design whose precision is 1 ps, with `top` in 1 ns units and its
+// instance `s` in 1 ps units, calling `$probe` at 7 ns.
+class TimesOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    ProbedTimesOfTheCall() = ProbedTimes{};
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = &ReadTimesCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    Run("`timescale 1ns/1ps\n"
+        "module sub; timeunit 1ps; timeprecision 1ps; endmodule\n"
+        "module top;\n"
+        "  sub s();\n"
+        "  initial #7 $probe;\n"
+        "endmodule\n");
+  }
+};
+
+// §38.13: with a NULL object, vpi_get_time gives the current simulation time
+// in the simulation time unit, the design's 1 ps precision: 7000 at 7 ns
+// (#5103).
+TEST_F(TimesOfARun, ANullObjectReadsTheRunsTimeInTheSimulationUnit) {
+  EXPECT_EQ(ProbedTimesOfTheCall().sim_low, 7000u);
+  EXPECT_EQ(ProbedTimesOfTheCall().sim_high, 0u);
+}
+
+// §38.13: with an object, vpiScaledRealTime gives the time in that object's
+// own time unit, scaled from the simulation time unit (#5104).
+TEST_F(TimesOfARun, AnObjectReadsTheRunsTimeInItsOwnUnit) {
+  EXPECT_DOUBLE_EQ(ProbedTimesOfTheCall().top_scaled, 7.0);
+  EXPECT_DOUBLE_EQ(ProbedTimesOfTheCall().sub_scaled, 7000.0);
 }
 
 }  // namespace

@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
@@ -611,28 +612,6 @@ void VpiContext::AttachDesignInterModPaths(const RtlirDesign* design) {
   }
 }
 
-void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
-  // §38.11's example is what a definition name is for: vpi_handle_by_name
-  // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
-  // instance of -- "Module top.mod1 is an instance of %s". The instance's own
-  // name is vpiName and is the answer to a different question, so a module
-  // reporting it here said that top.mod1 is an instance of mod1.
-  //
-  // The run has the answer already: the lowerer records each instance's module
-  // type against the instance path, which is the same string the module object
-  // carries as its vpiFullName.
-  for (auto* obj : all_objects_) {
-    // Every kind of instance names its definition (§37.10), a package aside,
-    // which is no instantiation of anything.
-    if (!VpiIsInstanceType(obj->type) || obj->type == vpiPackage ||
-        obj->full_name.empty()) {
-      continue;
-    }
-    std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
-    if (!type.empty()) obj->def_name = std::string(type);
-  }
-}
-
 VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
                                                 const RtlirNet& net) {
   // §37.3.4: the vpiDelay expression "shall be either an expression that
@@ -938,6 +917,11 @@ void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx) {
   if (vpi.RegisteredSystfs().empty() && vpi.RegisteredCallbacks().empty()) {
     return;
   }
+  // §38.13: the time vpi_get_time reads is the run's, counted in the
+  // simulation time unit, the design's global precision, which the
+  // scheduler's ticks are.
+  vpi.SetScheduler(&ctx.GetScheduler());
+  vpi.SetSimTimeUnit(static_cast<int>(ctx.GlobalPrecision()));
   vpi.Attach(ctx, design);
   vpi.AttachDesignPorts(design);
   // §37.37: the paths run between the port objects the line above made, so they

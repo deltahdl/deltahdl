@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -418,6 +424,240 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
 
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_delivered_value, &requested);
+}
+
+// One delivery of a simulation-event callback as its routine saw it: the
+// reason, the name of the object in its obj field, the value and the time it
+// was given, and its index.
+struct EventDelivery {
+  int reason = 0;
+  std::string obj;
+  int value = 0;
+  uint32_t time = 0;
+  int index = 0;
+  bool operator==(const EventDelivery&) const = default;
+};
+
+std::vector<EventDelivery>& EventDeliveries() {
+  static std::vector<EventDelivery> deliveries;
+  return deliveries;
+}
+
+// What `$arm` does when the design calls it.
+std::function<void()>& Armer() {
+  static std::function<void()> armer;
+  return armer;
+}
+
+PLI_INT32 RecordEventDelivery(p_cb_data cb) {
+  EventDelivery d;
+  d.reason = cb->reason;
+  const char* name =
+      cb->obj != nullptr ? vpi_get_str(vpiName, cb->obj) : nullptr;
+  d.obj = name == nullptr ? "" : name;
+  d.value = cb->value != nullptr ? cb->value->value.integer : 0;
+  d.time = cb->time != nullptr ? cb->time->low : 0;
+  d.index = cb->index;
+  EventDeliveries().push_back(d);
+  return 0;
+}
+
+// Places a `reason` callback on `obj`, asking for the time as vpiSimTime
+// and the value as vpiIntVal.
+vpiHandle PlaceEventCallback(int reason, vpiHandle obj) {
+  static s_vpi_time time;
+  static s_vpi_value value;
+  time.type = vpiSimTime;
+  value.format = vpiIntVal;
+  s_cb_data data = {};
+  data.reason = reason;
+  data.cb_rtn = &RecordEventDelivery;
+  data.obj = obj;
+  data.time = &time;
+  data.value = &value;
+  return vpi_register_cb(&data);
+}
+
+// A run whose design calls `$arm`, which places the case's callbacks once
+// the model exists, its deliveries recorded.
+class EventCallbacksOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    EventDeliveries().clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$arm");
+    data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
+      Armer()();
+      return 0;
+    };
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+constexpr const char* kValueChanges =
+    "`timescale 1ns/1ns\n"
+    "module top; int x; int arr[4];\n"
+    "  initial begin\n"
+    "    $arm;\n"
+    "    #1 x = 5;\n"
+    "    #1 arr[2] = 8;\n"
+    "    #1 x = 5;\n"
+    "    #1 x = 6;\n"
+    "  end\n"
+    "endmodule\n";
+
+void ArmValueChanges() {
+  PlaceEventCallback(cbValueChange,
+                     vpi_handle_by_name(VpiText("top.x"), nullptr));
+  PlaceEventCallback(
+      cbValueChange,
+      vpi_handle_by_index(vpi_handle_by_name(VpiText("top.arr"), nullptr), 2));
+}
+
+// §38.36.1: a cbValueChange routine is called after each change of the value
+// of the object it was placed on, a write of the value it holds being no
+// change (#5106).
+TEST_F(EventCallbacksOfARun, AValueChangeCallbackFiresOnEachChange) {
+  Armer() = &ArmValueChanges;
+  Run(kValueChanges);
+  ASSERT_EQ(EventDeliveries().size(), 3u);
+  EXPECT_EQ(EventDeliveries()[0].obj, "x");
+  EXPECT_EQ(EventDeliveries()[1].obj, "arr[2]");
+  EXPECT_EQ(EventDeliveries()[2].obj, "x");
+}
+
+// §38.36.1: the routine is given the current time and the object's new value
+// in the forms the registration asked for, and, for an array member, the
+// index of the member that changed (#5107).
+TEST_F(EventCallbacksOfARun, AValueChangeCallbackIsGivenTheTimeValueAndIndex) {
+  Armer() = &ArmValueChanges;
+  Run(kValueChanges);
+  ASSERT_EQ(EventDeliveries().size(), 3u);
+  EXPECT_EQ(EventDeliveries()[0].value, 5);
+  EXPECT_EQ(EventDeliveries()[0].time, 1u);
+  EXPECT_EQ(EventDeliveries()[1].value, 8);
+  EXPECT_EQ(EventDeliveries()[1].time, 2u);
+  EXPECT_EQ(EventDeliveries()[1].index, 2);
+  EXPECT_EQ(EventDeliveries()[2].value, 6);
+  EXPECT_EQ(EventDeliveries()[2].time, 4u);
+}
+
+// The deliveries recorded for `reason`, in order.
+std::vector<EventDelivery> DeliveriesOf(int reason) {
+  std::vector<EventDelivery> of;
+  for (const EventDelivery& d : EventDeliveries()) {
+    if (d.reason == reason) of.push_back(d);
+  }
+  return of;
+}
+
+vpiHandle TopObject(const char* name) {
+  return vpi_handle_by_name(VpiText(name), nullptr);
+}
+
+// §38.36.1 with §37.17 detail 14: a cbSizeChange routine is called after a
+// queue is resized, with its new size as its value (#5121).
+TEST_F(EventCallbacksOfARun, ASizeChangeCallbackFiresOnEachResize) {
+  Armer() = [] { PlaceEventCallback(cbSizeChange, TopObject("top.q")); };
+  Run("`timescale 1ns/1ns\n"
+      "module top; int q[$];\n"
+      "  initial begin $arm;\n"
+      "    #1 q.push_back(7); q.push_back(8); #1 void'(q.pop_front());\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kSizes = DeliveriesOf(cbSizeChange);
+  ASSERT_EQ(kSizes.size(), 3u);
+  EXPECT_EQ(kSizes[0].value, 1);
+  EXPECT_EQ(kSizes[1].value, 2);
+  EXPECT_EQ(kSizes[2].value, 1);
+  EXPECT_EQ(kSizes[2].time, 2u);
+}
+
+// §38.36.1: cbStartOfThread is called whenever a thread is created, each
+// branch of a fork among them (#5122).
+TEST_F(EventCallbacksOfARun, AStartOfThreadCallbackFiresForEachForkBranch) {
+  Armer() = [] { PlaceEventCallback(cbStartOfThread, nullptr); };
+  Run("module top;\n"
+      "  initial begin $arm; fork #1; #1; join end\n"
+      "endmodule\n");
+  EXPECT_EQ(DeliveriesOf(cbStartOfThread).size(), 2u);
+}
+
+// §38.36.1: a cbCreateObj placed on a class typespec is called once each
+// constructor of an object of that type completes (#5123).
+TEST_F(EventCallbacksOfARun, ACreateObjCallbackFiresForEachNew) {
+  Armer() = [] {
+    PlaceEventCallback(cbCreateObj,
+                       vpi_handle(vpiTypespec, TopObject("top.c")));
+  };
+  Run("module top; class C; endclass C c;\n"
+      "  initial begin $arm; c = new; c = new; c = new; end\n"
+      "endmodule\n");
+  EXPECT_EQ(DeliveriesOf(cbCreateObj).size(), 3u);
+}
+
+bool& BitPlacementRefused() {
+  static bool refused = false;
+  return refused;
+}
+
+// §38.36.1 with §37.17 detail 13: a cbForce, cbRelease or cbDisable may not
+// be placed on a bit-select of a variable, which a var bit is (#5124).
+TEST_F(EventCallbacksOfARun, AForceCallbackOnAVarBitIsRefused) {
+  BitPlacementRefused() = false;
+  Armer() = [] {
+    vpiHandle bit = vpi_handle_by_index(TopObject("top.v"), 0);
+    BitPlacementRefused() = PlaceEventCallback(cbForce, bit) == nullptr &&
+                            vpi_chk_error(nullptr) != 0;
+  };
+  Run("module top; logic [3:0] v; initial $arm; endmodule\n");
+  EXPECT_TRUE(BitPlacementRefused());
+}
+
+constexpr const char* kForceRelease =
+    "`timescale 1ns/1ns\n"
+    "module top; int x;\n"
+    "  initial begin $arm; #1 force x = 5; #1 release x; end\n"
+    "endmodule\n";
+
+// §38.36.1: a cbForce routine is called after a force of the object it was
+// placed on, given the forced value (#5125).
+TEST_F(EventCallbacksOfARun, AForceCallbackFiresAfterAForce) {
+  Armer() = [] { PlaceEventCallback(cbForce, TopObject("top.x")); };
+  Run(kForceRelease);
+  const std::vector<EventDelivery> kForces = DeliveriesOf(cbForce);
+  ASSERT_EQ(kForces.size(), 1u);
+  EXPECT_EQ(kForces[0].value, 5);
+  EXPECT_EQ(kForces[0].time, 1u);
+}
+
+// §38.36.1: a cbRelease routine is called after a release of the object it
+// was placed on, given its value after the release (#5126).
+TEST_F(EventCallbacksOfARun, AReleaseCallbackFiresAfterARelease) {
+  Armer() = [] { PlaceEventCallback(cbRelease, TopObject("top.x")); };
+  Run(kForceRelease);
+  const std::vector<EventDelivery> kReleases = DeliveriesOf(cbRelease);
+  ASSERT_EQ(kReleases.size(), 1u);
+  EXPECT_EQ(kReleases[0].value, 5);
+  EXPECT_EQ(kReleases[0].time, 2u);
+}
+
+// §38.36.1: a cbDisable routine is called after the named block it was
+// placed on is disabled (#5127).
+TEST_F(EventCallbacksOfARun, ADisableCallbackFiresWhenItsBlockIsDisabled) {
+  Armer() = [] { PlaceEventCallback(cbDisable, TopObject("top.blk")); };
+  Run("`timescale 1ns/1ns\n"
+      "module top;\n"
+      "  initial $arm;\n"
+      "  initial begin : blk #10 $noop; end\n"
+      "  initial #3 disable blk;\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kDisables = DeliveriesOf(cbDisable);
+  ASSERT_EQ(kDisables.size(), 1u);
+  EXPECT_EQ(kDisables[0].obj, "blk");
+  EXPECT_EQ(kDisables[0].time, 3u);
 }
 
 }  // namespace

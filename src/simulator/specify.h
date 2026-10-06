@@ -195,6 +195,13 @@ class SpecifyManager {
   const PrimitiveDriver* FindAnnotatedPrimitiveDriver(
       std::string_view inst_prefix, std::string_view output) const;
 
+  // §38.32: give the continuous assignment driving `output` of the instance
+  // `inst_prefix` names the rise, fall and turn-off delays vpi_put_delays put,
+  // which replace its own at run time as a DEVICE entry's do.
+  void AnnotateDriverDelays(std::string_view inst_prefix,
+                            std::string_view output,
+                            const uint64_t (&delays)[3]);
+
   const std::vector<PrimitiveDriver>& GetPrimitiveDrivers() const {
     return primitive_drivers_;
   }

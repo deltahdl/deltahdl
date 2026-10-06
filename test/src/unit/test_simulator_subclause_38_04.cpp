@@ -5,10 +5,12 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -100,6 +102,50 @@ TEST_F(VpiSimControlSim, ControlUnknownOpIsInert) {
   EXPECT_FALSE(vpi_ctx_.FinishRequested());
   EXPECT_FALSE(vpi_ctx_.ResetRequested());
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
+}
+
+PLI_INT32 FinishCalltf(PLI_BYTE8* /*user_data*/) {
+  vpi_control(vpiFinish, 0);
+  return 0;
+}
+
+PLI_INT32 StopCalltf(PLI_BYTE8* /*user_data*/) {
+  vpi_control(vpiStop, 0);
+  return 0;
+}
+
+class FinishOfARun : public VpiDesignRun {
+ protected:
+  // Runs a design whose `$probe` at time 5 calls `calltf` and which writes
+  // `top.after` at time 10; answers what `top.after` holds once it ends.
+  int AfterOnceProbedBy(PLI_INT32 (*calltf)(PLI_BYTE8*)) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = calltf;
+    EXPECT_NE(vpi_register_systf(&data), nullptr);
+    Run("module top; int after = 0;\n"
+        "  initial begin #5 $probe; #5 after = 1; end\n"
+        "endmodule\n");
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(By("top.after"), &value);
+    return value.value.integer;
+  }
+};
+
+// §38.4: vpi_control(vpiFinish) ends the run as $finish does once the
+// application routine returns, so an event the design scheduled for later
+// never runs (#5105).
+TEST_F(FinishOfARun, AFinishFromACalltfEndsTheRun) {
+  EXPECT_EQ(AfterOnceProbedBy(&FinishCalltf), 0);
+}
+
+// §38.4: vpi_control(vpiStop) suspends the run as $stop does once the
+// application routine returns, a run with no interactive phase to resume
+// ending there (#5134).
+TEST_F(FinishOfARun, AStopFromACalltfStopsTheRun) {
+  EXPECT_EQ(AfterOnceProbedBy(&StopCalltf), 0);
 }
 
 }  // namespace

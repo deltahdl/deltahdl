@@ -1,0 +1,5 @@
+value change 5 at 1
+value change 6 at 2
+info reason=cbValueChange obj=x user_data=ud
+remove=1 fired-so-far=2
+fired total=2

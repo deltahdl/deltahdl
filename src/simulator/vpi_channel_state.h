@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <iosfwd>
 #include <string>
 #include <unordered_map>
@@ -27,6 +28,9 @@ struct VpiChannelState {
   // written straight there from then on, and waits in the buffers above until
   // then.
   std::ostream* run_output = nullptr;
+  // §38.27: in a run, the file each channel vpi_mcd_open opened, which the
+  // channel's text is written to.
+  std::unordered_map<PLI_UINT32, FILE*> mcd_files;
   // Test hook that drives vpi_flush() down its failure return.
   bool flush_should_fail = false;
 

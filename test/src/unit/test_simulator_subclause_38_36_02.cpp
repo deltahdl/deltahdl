@@ -1,16 +1,20 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -417,6 +421,130 @@ TEST_F(VpiSimTimeCallbacks, ANonSimTimeReasonKeepsTheTimeItWasRegisteredWith) {
   ASSERT_TRUE(g_delivered.had_time);
   EXPECT_EQ(g_delivered.time_low, 900u);
   EXPECT_TRUE(g_delivered.had_value);
+}
+
+// What a simulation-time callback's routine saw: the label it was registered
+// with, the time it was given and the value of `top.<watched>` then.
+struct TimeDelivery {
+  std::string label;
+  uint32_t time = 0;
+  int value = 0;
+  bool operator==(const TimeDelivery&) const = default;
+};
+
+std::vector<TimeDelivery>& TimeDeliveries() {
+  static std::vector<TimeDelivery> deliveries;
+  return deliveries;
+}
+
+int IntOfTop(const char* name) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(vpi_handle_by_name(VpiText(name), nullptr), &value);
+  return value.value.integer;
+}
+
+PLI_INT32 RecordTimeDelivery(p_cb_data cb) {
+  TimeDeliveries().push_back({cb->user_data,
+                              cb->time != nullptr ? cb->time->low : 0,
+                              IntOfTop("top.q")});
+  return 0;
+}
+
+// Registers a `reason` callback `delay` ticks from now, labelled `label`.
+void PlaceTimeCallback(int reason, uint32_t delay, const char* label,
+                       PLI_INT32 (*rtn)(p_cb_data) = &RecordTimeDelivery) {
+  static s_vpi_time time;
+  time.type = vpiSimTime;
+  time.high = 0;
+  time.low = delay;
+  s_cb_data data = {};
+  data.reason = reason;
+  data.cb_rtn = rtn;
+  data.time = &time;
+  data.user_data = VpiText(label);
+  vpi_register_cb(&data);
+}
+
+// A run whose cbStartOfSimulation routine is `arm`.
+class TimeCallbacksOfARun : public VpiDesignRun {
+ protected:
+  void RunArmedBy(PLI_INT32 (*arm)(p_cb_data), const char* src) {
+    TimeDeliveries().clear();
+    s_cb_data data = {};
+    data.reason = cbStartOfSimulation;
+    data.cb_rtn = arm;
+    ASSERT_NE(vpi_register_cb(&data), nullptr);
+    Run(src);
+  }
+};
+
+PLI_INT32 ArmEveryTimeReason(p_cb_data /*cb*/) {
+  PlaceTimeCallback(cbAtStartOfSimTime, 5, "start-of-5");
+  PlaceTimeCallback(cbNBASynch, 5, "nba-synch-5");
+  PlaceTimeCallback(cbAtEndOfSimTime, 5, "end-of-5");
+  PlaceTimeCallback(cbReadOnlySynch, 5, "read-only-5");
+  PlaceTimeCallback(cbAfterDelay, 7, "after-delay-7");
+  PlaceTimeCallback(cbNextSimTime, 0, "next-sim-time");
+  return 0;
+}
+
+// §38.36.2 with §4.4.3: each simulation-time callback is called once at its
+// point of the time slot its time gives: cbNextSimTime before the slot after
+// the one it was registered in, cbAtStartOfSimTime before the slot's active
+// events, cbNBASynch before its nonblocking updates, cbAtEndOfSimTime and
+// cbReadOnlySynch after them, and cbAfterDelay after its delay, though no
+// event of the design stands at that time (#5117).
+TEST_F(TimeCallbacksOfARun, EachTimeReasonIsCalledAtItsPointOfTheSlot) {
+  RunArmedBy(&ArmEveryTimeReason,
+             "`timescale 1ns/1ns\n"
+             "module top; int q;\n"
+             "  initial begin #5; q <= 1; #5; end\n"
+             "endmodule\n");
+  EXPECT_EQ(TimeDeliveries(), (std::vector<TimeDelivery>{
+                                  {"next-sim-time", 5, 0},
+                                  {"start-of-5", 5, 0},
+                                  {"nba-synch-5", 5, 0},
+                                  {"end-of-5", 5, 1},
+                                  {"read-only-5", 5, 1},
+                                  {"after-delay-7", 7, 1},
+                              }));
+}
+
+// Whether each put the case made from a callback was refused, in order.
+std::vector<bool>& PutRefusals() {
+  static std::vector<bool> refusals;
+  return refusals;
+}
+
+PLI_INT32 PutIntoQ(p_cb_data cb) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = cb->reason == cbReadWriteSynch ? 3 : 4;
+  vpi_put_value(vpi_handle_by_name(VpiText("top.q"), nullptr), &value, nullptr,
+                vpiNoDelay);
+  PutRefusals().push_back(vpi_chk_error(nullptr) != 0);
+  return 0;
+}
+
+PLI_INT32 ArmSynchWrites(p_cb_data /*cb*/) {
+  PlaceTimeCallback(cbReadWriteSynch, 2, "rw", &PutIntoQ);
+  PlaceTimeCallback(cbReadOnlySynch, 2, "ro", &PutIntoQ);
+  return 0;
+}
+
+// §38.36.2: a value may be written from a cbReadWriteSynch routine, but not
+// from a cbReadOnlySynch one, whose put is refused with an error and leaves
+// the object as it was (#5118).
+TEST_F(TimeCallbacksOfARun, APutFromReadOnlySynchIsRefused) {
+  PutRefusals().clear();
+  RunArmedBy(&ArmSynchWrites,
+             "`timescale 1ns/1ns\n"
+             "module top; int q;\n"
+             "  initial #3;\n"
+             "endmodule\n");
+  EXPECT_EQ(PutRefusals(), (std::vector<bool>{false, true}));
+  EXPECT_EQ(IntOfTop("top.q"), 3);
 }
 
 }  // namespace

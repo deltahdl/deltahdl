@@ -1,0 +1,7 @@
+end of compile
+start of simulation
+unresolved $nobody_registered_this
+end of simulation
+test/src/e2e/vpi_acceptance_26_cb_action_unresolved_plierror.sv:10:5: error: $nobody_registered_this is not a system task or system function this tool implements (§20.1)
+      $nobody_registered_this;
+      ^

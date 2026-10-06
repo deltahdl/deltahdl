@@ -14,6 +14,8 @@
 // part of the public VPI surface declared in vpi_user.h.
 namespace delta {
 
+class Scheduler;
+
 // Annex K types the text members of its structures, s_vpi_error_info's message
 // and s_vpi_value's str among them, as PLI_BYTE8 *, a char * with no const, as
 // the C of the interface writes a pointer to text the callee does not modify.
@@ -147,6 +149,29 @@ int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode);
 // gives no bits. Defined in vpi_put_value_bits.cpp, used by vpi_value.cpp.
 bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
                      std::vector<Logic4Word>& words);
+
+// §38.34: the number of bits a put to `obj` writes: those of its variable, or
+// those a bit or select of one spans. Defined in vpi_put_value_bits.cpp.
+uint32_t VpiPutWidth(const VpiObject& obj);
+
+// §38.34: write `bits`, `width` of them, to the bits `obj` stands for.
+// Defined in vpi_put_value_bits.cpp.
+void VpiWriteDecodedBits(VpiObject& obj, const std::vector<Logic4Word>& bits,
+                         uint32_t width);
+
+// §38.34: schedule the put of `value` to `obj`, `delay` ticks from now under
+// the delay mode `mode`, as an event that writes it and notifies the object's
+// watchers when it takes place, `event` becoming the vpiSchedEvent standing
+// for it; the events already pending on `obj` that the mode removes are
+// removed first. Defined in vpi_put_value_bits.cpp.
+void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, uint64_t delay,
+                    int mode, Scheduler& scheduler, VpiObject& event);
+
+// §38.34 with §38.13: the delay `time` gives, in ticks of the simulation time
+// unit `sim_unit`, a vpiScaledRealTime one read in the time unit of `obj`.
+// Defined in vpi_put_value_bits.cpp.
+uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
+                          int sim_unit);
 
 // Defined in vpi_systf.cpp, used by vpi_handle.cpp.
 std::vector<std::string_view> VpiNamePathComponents(std::string_view name);

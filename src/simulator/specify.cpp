@@ -787,6 +787,27 @@ const PrimitiveDriver* SpecifyManager::FindAnnotatedPrimitiveDriver(
   return nullptr;
 }
 
+void SpecifyManager::AnnotateDriverDelays(std::string_view inst_prefix,
+                                          std::string_view output,
+                                          const uint64_t (&delays)[3]) {
+  PrimitiveDriver* driver = nullptr;
+  for (auto& candidate : primitive_drivers_) {
+    if (candidate.inst_prefix == inst_prefix &&
+        candidate.output_port == output) {
+      driver = &candidate;
+      break;
+    }
+  }
+  if (driver == nullptr) {
+    driver = &primitive_drivers_.emplace_back();
+    driver->inst_prefix = std::string(inst_prefix);
+    driver->output_port = std::string(output);
+  }
+  driver->delay_count = 3;
+  for (int i = 0; i < 3; ++i) driver->delays[i] = delays[i];
+  driver->sdf_annotated = true;
+}
+
 bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
                                             std::string_view inst_prefix) {
   // An entry with no operand is the whole-module row: it reaches every specify

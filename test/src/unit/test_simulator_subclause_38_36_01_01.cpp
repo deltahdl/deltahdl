@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -216,6 +218,46 @@ TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   EXPECT_EQ(g_stmt_time_seen.high, 0u);
   EXPECT_NE(g_stmt_time, &t);
   EXPECT_EQ(t.low, 5u);
+}
+
+// The vpiType of the statement each cbStmt delivery named, in order.
+std::vector<int>& StmtsCalledBack() {
+  static std::vector<int> kinds;
+  return kinds;
+}
+
+PLI_INT32 RecordStmt(p_cb_data cb) {
+  StmtsCalledBack().push_back(vpi_get(vpiType, cb->obj));
+  return 0;
+}
+
+PLI_INT32 PlaceModuleWideCbStmt(p_cb_data /*cb*/) {
+  s_cb_data data = {};
+  data.reason = cbStmt;
+  data.cb_rtn = &RecordStmt;
+  data.obj = vpi_handle_by_name(VpiText("top"), nullptr);
+  vpi_register_cb(&data);
+  return 0;
+}
+
+class StmtCallbacksOfARun : public VpiDesignRun {};
+
+// §38.36.1.1 with Table 38-6 and §38.36.1.3: a cbStmt placed on a module is
+// called just before each statement in it executes, with obj that statement:
+// a begin block once before its statements, each assignment, and a delay
+// control when it is reached, before the statement it delays (#5119).
+TEST_F(StmtCallbacksOfARun, ACbStmtIsCalledBeforeEachStatementOfItsModule) {
+  StmtsCalledBack().clear();
+  s_cb_data data = {};
+  data.reason = cbStartOfSimulation;
+  data.cb_rtn = &PlaceModuleWideCbStmt;
+  ASSERT_NE(vpi_register_cb(&data), nullptr);
+  Run("module top; int a, b, c;\n"
+      "  initial begin a = 1; b = 2; #1 c = 3; end\n"
+      "endmodule\n");
+  EXPECT_EQ(StmtsCalledBack(),
+            (std::vector<int>{vpiBegin, vpiAssignment, vpiAssignment,
+                              vpiDelayControl, vpiAssignment}));
 }
 
 }  // namespace

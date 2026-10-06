@@ -190,6 +190,9 @@ void Scheduler::Run() {
       continue;
     }
     current_time_ = it->first;
+    // §38.36.2: a cbNextSimTime callback is called before the events of the
+    // next time slot, the first after the one it was registered in.
+    GetGlobalVpiContext().DispatchCallbacks(kCbNextSimTime);
     ExecuteTimeSlot(it->second);
     ReleaseSlot(it->second);
     event_calendar_.erase(it);

@@ -24,8 +24,10 @@
 namespace delta {
 
 struct Expr;
+struct Process;
 struct RtlirDesign;
 struct RtlirNet;
+struct Variable;
 
 class VpiContext {
  public:
@@ -45,35 +47,16 @@ class VpiContext {
 
   VpiHandle RegisterSystf(s_vpi_systf_data* data);
 
-  // §38.37.1: "Callbacks to the application pointed to by the calltf routine
-  // shall occur each time the system task or system function is invoked during
-  // simulation execution." This is that call: it runs the application a
-  // registration associated with `name` and reports whether one did.
-  //
-  // §36.3.2 decides where the evaluator asks. "If a user-provided PLI
-  // application is associated with the same name as a built-in system task or
-  // system function (using the PLI mechanism), the user-provided C application
-  // shall override the built-in system task or system function, replacing its
-  // functionality", and the clause's own example is a PLI application
-  // registered as $random. So the registry is asked ahead of what the tool
-  // implements itself, and a name no registration claims falls through to the
-  // built-ins.
-  //
-  // `result` is what a system function's application wrote back through
-  // vpi_put_value on the handle §37.42 gives it, which it reaches with
-  // vpi_handle(vpiSysTfCall, NULL). It is a 32-bit zero where the application
-  // wrote nothing: §38.37.1 gives a sized function with no sizetf 32 bits, and
-  // a system task's result is a value the caller discards.
-  //
-  // §38.37.1's compiletf and sizetf are not called here. They "shall occur when
-  // the simulation data structure is compiled or built", which is a different
-  // moment from this one and a separate reading of the clause;
-  // VpiSystfCallbackFiresAtBuild (src/simulator/vpi_control.cpp) already models
-  // which of the three that is.
-  //
-  // §36.4 decides what the application is handed, and `call_site` is what the
-  // arguments are read off; the clause's own words on both are written where
-  // MakeSystfCallObject builds the call.
+  // §38.37.1: run the calltf of the application a registration associated
+  // with `name`, as each invocation of the system task or function during
+  // simulation calls for, and answer whether one did. §36.3.2 has a PLI
+  // application override a built-in of the same name, so the registry is
+  // asked ahead of what the tool implements. `result` is what a system
+  // function's application wrote back through vpi_put_value on the call
+  // (§37.42), a 32-bit zero where it wrote nothing. compiletf and sizetf run
+  // when the design is built (VpiSystfCallbackFiresAtBuild, vpi_control.cpp),
+  // not here. `call_site` is what the arguments are read off (§36.4,
+  // MakeSystfCallObject).
   bool CallRegisteredSystf(const char* name, const Expr* call_site,
                            SimContext& ctx, Logic4Vec& result, Arena& arena);
 
@@ -256,6 +239,22 @@ class VpiContext {
   // cbUnresolvedSystf). Returns how many callbacks were delivered.
   int DispatchCallbacks(int reason, VpiHandle obj = nullptr,
                         void* user_data = nullptr);
+  // §38.36: deliver the one registration `cb_handle` names, once for a
+  // simulation-time reason; answers 1 where it was delivered.
+  int DeliverCallback(VpiHandle cb_handle);
+  // §38.36.1.1: call back the cbStmt callbacks placed on the model's object
+  // for `stmt`, run in the instance `prefix` names, as it is about to execute.
+  void DispatchStmtCallbacks(const Stmt* stmt, std::string prefix);
+  // §38.36.1: what the run tells the simulation-event callbacks of, each
+  // costing nothing where none of its reason is registered: a process it
+  // created (cbStartOfThread), an object constructed (cbCreateObj), a
+  // variable `stmt` in the instance `prefix` forced or released (cbForce,
+  // cbRelease), and the named block `label` there disabled (cbDisable).
+  void NoteThreadCreated(Process* proc);
+  void NoteObjectCreated(ClassObject& obj);
+  void NoteForce(int reason, const Variable* var, const Stmt* stmt,
+                 std::string prefix);
+  void NoteDisabled(std::string_view label, std::string prefix);
 
   // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
   // cbEndOfReset once it has completed. This is the single path used whether
@@ -850,6 +849,10 @@ class VpiContext {
   // §37.42 detail 3: the model's call statements, which an invocation of a
   // registered system task stands as where it was made from one of them.
   VpiCallSiteObjects call_site_objects_;
+  // §38.36.1.1: the model's statements, keyed as the call statements are, and
+  // whether a cbStmt has been registered, before which none is looked up.
+  VpiStmtObjects stmt_objects_;
+  bool stmt_callbacks_registered_ = false;
 
   // §37.82: the $timeformat() call that set the active time format, returned by
   // vpi_handle(vpiActiveTimeFormat, NULL). Null until $timeformat() is called.
@@ -873,6 +876,8 @@ class VpiContext {
   // to enforce that it is only called from a cbStartOfRestart/cbEndOfRestart
   // routine; DispatchCallbacks sets and restores it around each cb_rtn call.
   int current_callback_reason_ = -1;
+  void Deliver(s_cb_data data);
+  VpiHandle MadeClassObject(ClassObject& obj);
 
   // §38.36.2: simulation-time-callback placement state, driven by the scheduler
   // as simulation advances. The first is set once execution has progressed into

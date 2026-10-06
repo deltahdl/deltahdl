@@ -19,6 +19,7 @@
 #include "parser/ast_module.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
@@ -593,6 +594,28 @@ void HangOn(VpiObject* assign, const std::vector<std::string_view>& found,
 
 // §37.47: the continuous assignment `ca` stands for, in `scope`, with its two
 // sides; and §37.46: a driver of what it writes and a load of what it reads.
+// §37.47 with §37.3.4 and §10.3.3: the delays the assignment `ca` was
+// written with, in ticks, as vpi_get_delays reads them off `obj`: a rise, a
+// fall that is the rise where none was written, and a turn-off that is the
+// smaller of the two where none was.
+void FillContAssignDelays(VpiObject* obj, const RtlirContAssign& ca,
+                          SimContext& sim) {
+  Arena& arena = sim.GetArena();
+  const auto kTicks = [&sim, &arena](const Expr* delay) {
+    return static_cast<double>(
+        DelayValueToTicks(EvalExpr(delay, sim, arena), sim));
+  };
+  const double kRise = kTicks(ca.delay);
+  const double kFall = ca.delay_fall != nullptr ? kTicks(ca.delay_fall) : kRise;
+  const double kOff = ca.delay_decay != nullptr ? kTicks(ca.delay_decay)
+                                                : std::min(kRise, kFall);
+  for (const double kDelay : {kRise, kFall, kOff}) {
+    VpiDelayInfo info;
+    info.delay = kDelay;
+    obj->delays.push_back(info);
+  }
+}
+
 void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
                               const AssignBuild& build) {
   const ModuleItem* item = ca.source_item;
@@ -613,8 +636,19 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = ExpressionObject(rhs, build);
 
+  if (ca.delay != nullptr && build.sim != nullptr) {
+    FillContAssignDelays(obj, ca, *build.sim);
+  }
+
   std::vector<std::string_view> names;
   CollectTargets(lhs, names);
+  // §38.32: what the run keys the assignment's delays under, the instance and
+  // the net it drives, which a vpi_put_delays gives it new ones under.
+  if (!names.empty()) {
+    const std::string& kPrefix = build.names.prefix;
+    obj->run_key =
+        (kPrefix.empty() ? "" : kPrefix + ".") + std::string(names[0]);
+  }
   HangOn(obj, names, build.names);
   names.clear();
   CollectReads(rhs, names);

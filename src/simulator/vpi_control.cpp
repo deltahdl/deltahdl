@@ -12,6 +12,7 @@
 
 #include "common/types.h"
 #include "simulator/coverage_control.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_coverage.h"
@@ -37,11 +38,23 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
   if (operation == kVpiFinish) {
     finish_requested_ = true;
     finish_diag_level_ = arg0;
+    // §20.2: the run ends as $finish ends it, at that level, the scheduler
+    // stopping once the application routine has returned.
+    if (sim_ctx_ != nullptr) {
+      EmitFinishDiagnostic(*sim_ctx_, "$finish", arg0, sim_ctx_->Out());
+      sim_ctx_->RequestFinish();
+    }
     return 1;
   }
   if (operation == kVpiStop) {
     stop_requested_ = true;
     stop_diag_level_ = arg0;
+    // §20.2: the run is suspended as $stop suspends it, which a run with no
+    // interactive phase ends.
+    if (sim_ctx_ != nullptr) {
+      EmitFinishDiagnostic(*sim_ctx_, "$stop", arg0, sim_ctx_->Out());
+      sim_ctx_->RequestFinish();
+    }
     return 1;
   }
   // §38.4: vpiReset requests $reset and is passed three additional integer
@@ -905,6 +918,9 @@ int VpiSystfResultSizeBits(const s_vpi_systf_data& data) {
   if (VpiSystfSizetfIsCalled(data) && data.sizetf != nullptr) {
     return VpiSystfInvoke(data.sizetf, data.user_data);
   }
+  // §38.37.1 with Annex K.2 and §6.11: a vpiTimeFunc returns time, a 64-bit
+  // type.
+  if (data.type == kVpiSysFunc && data.sysfunctype == vpiTimeFunc) return 64;
   return kVpiDefaultSizedFuncBits;
 }
 

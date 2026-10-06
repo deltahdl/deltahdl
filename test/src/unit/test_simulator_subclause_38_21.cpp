@@ -136,5 +136,18 @@ TEST_F(NamesOfARun, ACompilationUnitItemIsNotFoundThroughItsScope) {
   EXPECT_EQ(By("$unit::g"), nullptr);
 }
 
+// §38.21 with §23.6 and §5.6.1: a component written as an escaped identifier
+// names the identifier without its backslash, the white space ending it
+// standing before the next separator (#5131).
+TEST_F(NamesOfARun, AnEscapedComponentIsFoundByItsIdentifier) {
+  Run("module top; int \\my-var = 3; endmodule\n");
+  vpiHandle var = By("top.\\my-var ");
+  ASSERT_NE(var, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(var, &value);
+  EXPECT_EQ(value.value.integer, 3);
+}
+
 }  // namespace
 }  // namespace delta

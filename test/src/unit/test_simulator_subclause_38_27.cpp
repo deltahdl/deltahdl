@@ -1,14 +1,19 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -152,6 +157,41 @@ TEST_F(VpiMcdOpenSim, AnFdFromFopenIsNotADescriptorThisRoutineHandsBack) {
   // The file now stands in the mcd namespace, so opening it again is the
   // already-open case and reports the same channel rather than taking another.
   EXPECT_EQ(vpi_mcd_open(name), mcd);
+}
+
+// The file the case's application writes through a multichannel descriptor.
+std::string& McdFilePath() {
+  static std::string path;
+  return path;
+}
+
+PLI_INT32 WriteThroughAnMcd(PLI_BYTE8* /*user_data*/) {
+  PLI_UINT32 mcd = vpi_mcd_open(VpiText(McdFilePath().c_str()));
+  vpi_mcd_printf(mcd, VpiText("line %d\n"), 1);
+  vpi_mcd_printf(mcd, VpiText("line %d\n"), 2);
+  vpi_mcd_close(mcd);
+  return 0;
+}
+
+class McdFilesOfARun : public VpiDesignRun {};
+
+// §38.27 with §38.28 and §38.24: vpi_mcd_open opens a file for writing,
+// vpi_mcd_printf writes to the file its descriptor names, and vpi_mcd_close
+// closes it, the text then in the file (#5132).
+TEST_F(McdFilesOfARun, TextPrintedOnAnMcdReachesItsFile) {
+  McdFilePath() = ::testing::TempDir() + "mcd_files_of_a_run.txt";
+  std::remove(McdFilePath().c_str());
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$write_mcd");
+  data.calltf = &WriteThroughAnMcd;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top; initial $write_mcd; endmodule\n");
+  std::ifstream file(McdFilePath());
+  std::stringstream text;
+  text << file.rdbuf();
+  EXPECT_EQ(text.str(), "line 1\nline 2\n");
+  std::remove(McdFilePath().c_str());
 }
 
 }  // namespace

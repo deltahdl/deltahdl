@@ -104,6 +104,7 @@ VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
   obj->process = walk.process;
   if (!stmt.label.empty()) obj->name = walk.build.keep(std::string(stmt.label));
   VpiRecordWrittenLocation(obj, stmt.range.start, walk.calls.ctx);
+  walk.calls.stmts[{&stmt, walk.prefix}] = obj;
   parent.scope->children.push_back(obj);
   return obj;
 }
@@ -758,6 +759,7 @@ VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
   std::string path;
   VpiObject* block = MakeScopeObject(kind, stmt.label, parent, walk, path);
   VpiRecordWrittenLocation(block, stmt.range.start, walk.calls.ctx);
+  walk.calls.stmts[{&stmt, walk.prefix}] = block;
   if (stmt.kind == StmtKind::kFork) {
     block->join_type = JoinTypeOf(stmt.join_kind);
   }

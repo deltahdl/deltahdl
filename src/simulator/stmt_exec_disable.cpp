@@ -20,6 +20,8 @@
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -126,6 +128,8 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
 
   bool named_a_procedure_scope =
       FlushDeferredQueueOfOutermostScope(target, current, ctx);
+  // §38.36.1: a cbDisable callback is called after the block is disabled.
+  GetGlobalVpiContext().NoteDisabled(target, ctx.ActiveInstancePrefix());
 
   if (self_disable) {
     ctx.SetDisableTarget(target);

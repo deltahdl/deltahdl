@@ -14,11 +14,13 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_format_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -663,23 +665,10 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
 // `size` bits it spans, from the least significant up. A format that gives no
 // bits writes nothing.
 static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
-  Logic4Vec& whole = obj->var->value;
-  const bool kSelect = obj->bit_offset >= 0;
-  const uint32_t kWidth = kSelect
-                              ? static_cast<uint32_t>(std::max(obj->size, 1))
-                              : std::max(whole.width, uint32_t{1});
+  const uint32_t kWidth = VpiPutWidth(*obj);
   std::vector<Logic4Word> bits;
-  if (!VpiPutValueBits(*value, kWidth, bits)) return;
-  const uint64_t kBase = kSelect ? static_cast<uint64_t>(obj->bit_offset) : 0;
-  for (uint32_t k = 0; k < kWidth; ++k) {
-    const uint64_t kBit = kBase + k;
-    if (kBit / 64 >= whole.nwords) return;
-    const uint64_t kMask = uint64_t{1} << (kBit % 64);
-    const bool kA = ((bits[k / 64].aval >> (k % 64)) & 1) != 0;
-    const bool kB = ((bits[k / 64].bval >> (k % 64)) & 1) != 0;
-    Logic4Word& word = whole.words[kBit / 64];
-    word.aval = (word.aval & ~kMask) | (kA ? kMask : 0);
-    word.bval = (word.bval & ~kMask) | (kB ? kMask : 0);
+  if (VpiPutValueBits(*value, kWidth, bits)) {
+    VpiWriteDecodedBits(*obj, bits, kWidth);
   }
 }
 
@@ -713,6 +702,9 @@ static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
   if (scheduler) scheduler->NoteWriteAttempt();
 
   PutValueWriteBits(obj, value);
+  // §4.3: the write is an update event of the object, which resumes what
+  // waits on it (§9.4.2), as vpi_put_value_array's writes do.
+  obj->var->NotifyWatchers();
 
   // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
   // value takes effect now and is held as the forced value.
@@ -796,8 +788,25 @@ static VpiHandle PutValueTargetOf(VpiHandle obj,
 
 // §38.34: a vpiCancelEvent put, which leaves a scheduled event no longer
 // scheduled and hands back no handle.
+// §9.4.3 with §37.33: a put into a class property is a write of it, which
+// resumes what waits on the owning object's properties, or, for a static
+// property, on the class's.
+static void NotifyPropertyWrite(const VpiObject& obj, SimContext& ctx) {
+  const ClassObject& owner = *obj.property_of;
+  const ClassTypeInfo* declarer =
+      owner.type != nullptr ? owner.type->StaticPropertyDeclarer(obj.name)
+                            : nullptr;
+  if (declarer != nullptr) {
+    declarer->NotifyStaticWatchers();
+    return;
+  }
+  ctx.NotifyClassHandleWatchers(owner.handle);
+}
+
 static VpiHandle CancelScheduledEvent(VpiHandle obj) {
-  if (obj->type == vpiSchedEvent) obj->scheduled = false;
+  if (obj->type != vpiSchedEvent) return nullptr;
+  if (obj->scheduled && obj->put_superseded) *obj->put_superseded = true;
+  obj->scheduled = false;
   return nullptr;
 }
 
@@ -808,6 +817,15 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
 
   if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;
 
+  // §38.36.2 with §4.4.2.9: no value is written, and no event scheduled,
+  // while a cbReadOnlySynch routine runs; a cancel writes none.
+  if (at_read_only_synch_time_ && (flags & ~vpiReturnEvent) != vpiCancelEvent) {
+    RecordVpiError(last_error_,
+                   "vpi_put_value(): no value may be written from a "
+                   "cbReadOnlySynch callback");
+    return nullptr;
+  }
+
   // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
   // delay-mode selector that lives in the low bits of the flags word.
   bool return_event = (flags & vpiReturnEvent) != 0;
@@ -817,8 +835,12 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   // must be a vpiSchedEvent handle, and value_p and time_p are not needed. It
   // is not an error to cancel an event that has already occurred, so a handle
   // that is no longer scheduled is simply left alone. Cancelling removes the
-  // event from the queue; the handle itself remains for the caller to free.
-  if (mode == vpiCancelEvent) return CancelScheduledEvent(obj);
+  // event from the queue and frees the handle to it.
+  if (mode == vpiCancelEvent) {
+    CancelScheduledEvent(obj);
+    if (obj->type == vpiSchedEvent) ReleaseHandle(obj);
+    return nullptr;
+  }
 
   obj = PutValueTargetOf(obj, [this] { return AllocObject(); });
   if (obj == nullptr) return nullptr;
@@ -840,13 +862,29 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
   // procedural release of §10.6.2, and writes the object's post-release value
   // back through value_p so the caller can observe what the object settled to.
   if (mode == vpiReleaseFlag) {
-    obj->var->is_forced = false;
+    if (sim_ctx_ != nullptr) {
+      ReleaseForcedTarget(obj->var, obj->net, *sim_ctx_, sim_ctx_->GetArena());
+    } else {
+      obj->var->is_forced = false;
+    }
     GetValue(obj, value);
     return nullptr;
   }
 
+  // §38.34: a put with a delay mode and a delay is an event in the queue,
+  // which a run's scheduler holds.
+  if (has_delay && scheduler_ != nullptr) {
+    VpiObject* event = AllocObject();
+    VpiSchedulePut(*obj, *value, VpiPutDelayTicks(*obj, *time, sim_time_unit_),
+                   mode, *scheduler_, *event);
+    return return_event ? event : nullptr;
+  }
+
   PutValueApplyWriteAndForce(obj, value, mode, scheduler_);
   if (!has_delay) VpiStoreElementCopy(*obj);
+  if (obj->property_of != nullptr && sim_ctx_ != nullptr) {
+    NotifyPropertyWrite(*obj, *sim_ctx_);
+  }
 
   // §38.34: a handle to the scheduled event is returned only when
   // vpiReturnEvent was requested and a delay actually scheduled an event; in

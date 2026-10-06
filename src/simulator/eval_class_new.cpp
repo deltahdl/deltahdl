@@ -30,6 +30,8 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -695,6 +697,9 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   Construction construction{obj, new_expr, ctx, arena, OwnTypeBindings(obj)};
   ConstructLevel(info, {new_expr, true}, construction);
   ctx.PopThis();
+  // §38.36.1: a cbCreateObj callback is called once the constructor has
+  // completed.
+  GetGlobalVpiContext().NoteObjectCreated(*obj);
   return MakeLogic4VecVal(arena, 64, handle);
 }
 

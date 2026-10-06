@@ -24,6 +24,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 
@@ -224,6 +225,12 @@ static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
         Subclause("D.1"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  // §38.36.3: an application that registered for cbUnresolvedSystf is told of
+  // a system task or function no one provides as the call is encountered,
+  // user_data pointing at its name.
+  std::string unresolved(name);
+  GetGlobalVpiContext().DispatchCallbacks(kCbUnresolvedSystf, nullptr,
+                                          unresolved.data());
   ctx.GetDiag().Error(expr->range.start,
                       std::string(name) +
                           " is not a system task or system function this tool "
@@ -295,8 +302,8 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
 // halting, at the reporting level given by their first argument. Level 0 emits
 // nothing, level 1 reports the current time, and level 2 additionally reports
 // resource statistics.
-static void EmitFinishDiagnostic(SimContext& ctx, std::string_view task,
-                                 int64_t level, std::ostream& os) {
+void EmitFinishDiagnostic(SimContext& ctx, std::string_view task, int64_t level,
+                          std::ostream& os) {
   if (level <= 0) return;
   os << task << " at time " << ctx.CurrentTime().ticks << "\n";
   if (level >= 2) {

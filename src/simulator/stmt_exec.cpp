@@ -32,7 +32,9 @@
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -304,6 +306,8 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
   // from the thread that creates it, so each child's seed is the parent's
   // alone and settled in fork order rather than execution order.
   p->rng_seed = ctx.DrawSeedForChild();
+  // §38.36.1: cbStartOfThread is called as a fork creates each branch.
+  GetGlobalVpiContext().NoteThreadCreated(p);
   return p;
 }
 
@@ -919,19 +923,13 @@ static ExecTask ExecLabeledStmt(const Stmt* stmt, SimContext& ctx,
   co_return result;
 }
 
-bool CurrentProcessEnded(const SimContext& ctx) {
-  const Process* cur = ctx.CurrentProcess();
-  return cur != nullptr && !cur->active;
-}
-
-bool ProcessGoesOn(const SimContext& ctx) {
-  return !ctx.StopRequested() && !CurrentProcessEnded(ctx);
-}
-
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt || CurrentProcessEnded(ctx)) {
     return ExecTask::Immediate(StmtResult::kDone);
   }
+  // §38.36.1.1: a cbStmt placed on the statement is called just before it
+  // executes.
+  GetGlobalVpiContext().DispatchStmtCallbacks(stmt, ctx.ActiveInstancePrefix());
   // Named begin/end and fork blocks push their own label scope (ExecBlock /
   // ExecFork); every other labeled statement gets the scope wrapper here.
   if (!stmt->label.empty() && stmt->kind != StmtKind::kBlock &&
@@ -939,10 +937,6 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return ExecLabeledStmt(stmt, ctx, arena);
   }
   return ExecStmtDispatch(stmt, ctx, arena);
-}
-
-bool IsTimeControlStatement(StmtKind kind) {
-  return kind == StmtKind::kDelay || kind == StmtKind::kEventControl;
 }
 
 }  // namespace delta

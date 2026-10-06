@@ -413,6 +413,11 @@ struct VpiRegisteredSystf {
 using VpiCallSiteObjects =
     std::map<std::pair<const Expr*, std::string>, VpiObject*>;
 
+// §38.36.1.1: the model's object for each statement of a run, keyed by the
+// statement and the flat name of the instance it runs in.
+using VpiStmtObjects =
+    std::map<std::pair<const Stmt*, std::string>, VpiObject*>;
+
 // What the procedure walk builds a call statement with: the run, which an
 // argument's value is read through; the registration a system call's name
 // resolves to; the record of the call statements made, which a run's
@@ -423,6 +428,9 @@ struct VpiCallBuild {
   SimContext& ctx;
   std::function<VpiRegisteredSystf(std::string_view)> systf;
   VpiCallSiteObjects& sites;
+  // §38.36.1.1: the record of the statements made, which a cbStmt callback
+  // is delivered about as each executes.
+  VpiStmtObjects& stmts;
   const VpiClassDefnObjects& classes;
   const VpiSubroutineObjects& subroutines;
   // §37.25: the typespecs the compilation unit's typedefs declare, by name.

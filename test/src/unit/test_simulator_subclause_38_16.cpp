@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_value_array.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -369,6 +371,50 @@ TEST_F(VpiGetValueArraySim, TheRawAndVectorFormatsSuitEveryElementType) {
       EXPECT_NE(av.value.rawvals, nullptr) << "format " << format;
     }
   }
+}
+
+// What the case's calltf read out of `top.arr` with vpi_get_value_array.
+std::vector<PLI_INT32>& ArrayRead() {
+  static std::vector<PLI_INT32> read;
+  return read;
+}
+
+PLI_INT32 ReadThenWriteArray(PLI_BYTE8* /*user_data*/) {
+  vpiHandle arr = vpi_handle_by_name(VpiText("top.arr"), nullptr);
+  PLI_INT32 buf[4] = {0, 0, 0, 0};
+  PLI_INT32 index = 0;
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.flags = vpiUserAllocFlag;
+  av.value.integers = buf;
+  vpi_get_value_array(arr, &av, &index, 4);
+  ArrayRead().assign(buf, buf + 4);
+  for (int i = 0; i < 4; ++i) buf[i] = 50 + i;
+  av.flags = 0;
+  vpi_put_value_array(arr, &av, &index, 4);
+  return 0;
+}
+
+class ValueArraysOfARun : public VpiDesignRun {};
+
+// §38.16 and §38.35: vpi_get_value_array reads the elements of a run's
+// static unpacked array into the application's buffer, and
+// vpi_put_value_array writes them, the design then reading what was written
+// (#5133).
+TEST_F(ValueArraysOfARun, ARunsArrayIsReadAndWrittenWhole) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$array_io");
+  data.calltf = &ReadThenWriteArray;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top; int arr[4] = '{1, 2, 3, 4}; int seen;\n"
+      "  initial begin #1 $array_io; seen = arr[2]; end\n"
+      "endmodule\n");
+  EXPECT_EQ(ArrayRead(), (std::vector<PLI_INT32>{1, 2, 3, 4}));
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(By("top.seen"), &value);
+  EXPECT_EQ(value.value.integer, 52);
 }
 
 }  // namespace

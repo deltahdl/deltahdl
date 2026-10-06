@@ -14,6 +14,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -232,6 +233,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                                 return found;
                               },
                               call_site_objects_,
+                              stmt_objects_,
                               kClasses,
                               subroutines,
                               kUnitTypespecs};
@@ -283,6 +285,28 @@ void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
                       if (obj != nullptr)
                         RecordInstanceDefinition(obj, mod, sources);
                     });
+}
+
+void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
+  // §38.11's example is what a definition name is for: vpi_handle_by_name
+  // reaches an instance and vpi_get_str(vpiDefName, mod) says what it is an
+  // instance of -- "Module top.mod1 is an instance of %s". The instance's own
+  // name is vpiName and is the answer to a different question, so a module
+  // reporting it here said that top.mod1 is an instance of mod1.
+  //
+  // The run has the answer already: the lowerer records each instance's module
+  // type against the instance path, which is the same string the module object
+  // carries as its vpiFullName.
+  for (auto* obj : all_objects_) {
+    // Every kind of instance names its definition (§37.10), a package aside,
+    // which is no instantiation of anything.
+    if (!VpiIsInstanceType(obj->type) || obj->type == vpiPackage ||
+        obj->full_name.empty()) {
+      continue;
+    }
+    std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
+    if (!type.empty()) obj->def_name = std::string(type);
+  }
 }
 
 }  // namespace delta

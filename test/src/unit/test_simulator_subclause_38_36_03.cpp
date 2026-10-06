@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -12,6 +13,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -405,6 +407,37 @@ TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
   // and the case above is the first of them. This is the second.
   ASSERT_FALSE(g_action_order.empty());
   EXPECT_EQ(g_action_order.back(), cbEndOfSimulation);
+}
+
+// The names cbUnresolvedSystf routines were given, in order.
+std::vector<std::string>& UnresolvedNames() {
+  static std::vector<std::string> names;
+  return names;
+}
+
+PLI_INT32 RecordUnresolvedName(p_cb_data cb) {
+  UnresolvedNames().emplace_back(cb->user_data);
+  return 0;
+}
+
+// §38.36.3: a cbUnresolvedSystf routine is called when a system task or
+// function no application registered and the tool does not provide is
+// encountered, its user_data pointing at the name (#5120).
+TEST(UnresolvedSystfOfARun, AnUnknownSystemTaskIsReportedToTheApplication) {
+  UnresolvedNames().clear();
+  VpiContext vpi;
+  SetGlobalVpiContext(&vpi);
+  s_cb_data data = {};
+  data.reason = cbUnresolvedSystf;
+  data.cb_rtn = &RecordUnresolvedName;
+  ASSERT_NE(vpi_register_cb(&data), nullptr);
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top; initial $nobody_registered_this; endmodule\n", f);
+  if (design != nullptr) LowerAndRun(design, f);
+  SetGlobalVpiContext(nullptr);
+  EXPECT_EQ(UnresolvedNames(),
+            (std::vector<std::string>{"$nobody_registered_this"}));
 }
 
 }  // namespace

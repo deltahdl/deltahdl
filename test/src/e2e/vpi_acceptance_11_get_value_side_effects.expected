@@ -1,0 +1,4 @@
+arg type=vpiFuncCall value=21
+count 1
+arg type=vpiOperation value=42
+count 1

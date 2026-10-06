@@ -1,13 +1,20 @@
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/scheduler.h"
+#include "simulator/variable.h"
+#include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -171,6 +178,22 @@ bool PointedBits(const s_vpi_value& value, uint32_t width,
   }
 }
 
+// §38.34: take out of the event queue the delayed puts pending on `target`
+// that a put taking place at `at` under `mode` removes: every one for
+// vpiInertialDelay, those later than it for vpiTransportDelay, and none for
+// vpiPureTransportDelay.
+void RemovePendingPuts(VpiObject& target, int mode, uint64_t at) {
+  if (mode == vpiPureTransportDelay) return;
+  for (VpiObject* event : target.scheduled_puts) {
+    if (!event->scheduled) continue;
+    if (mode == vpiTransportDelay && event->event_time <= at) continue;
+    *event->put_superseded = true;
+    event->scheduled = false;
+  }
+  std::erase_if(target.scheduled_puts,
+                [](const VpiObject* event) { return !event->scheduled; });
+}
+
 }  // namespace
 
 bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
@@ -215,6 +238,61 @@ bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
     words.back().bval &= kMask;
   }
   return true;
+}
+
+uint32_t VpiPutWidth(const VpiObject& obj) {
+  return obj.bit_offset >= 0 ? static_cast<uint32_t>(std::max(obj.size, 1))
+                             : std::max(obj.var->value.width, uint32_t{1});
+}
+
+void VpiWriteDecodedBits(VpiObject& obj, const std::vector<Logic4Word>& bits,
+                         uint32_t width) {
+  Logic4Vec& whole = obj.var->value;
+  const uint64_t kBase =
+      obj.bit_offset >= 0 ? static_cast<uint64_t>(obj.bit_offset) : 0;
+  for (uint32_t k = 0; k < width; ++k) {
+    const uint64_t kBit = kBase + k;
+    if (kBit / 64 >= whole.nwords) return;
+    const uint64_t kMask = uint64_t{1} << (kBit % 64);
+    const bool kA = ((bits[k / 64].aval >> (k % 64)) & 1) != 0;
+    const bool kB = ((bits[k / 64].bval >> (k % 64)) & 1) != 0;
+    Logic4Word& word = whole.words[kBit / 64];
+    word.aval = (word.aval & ~kMask) | (kA ? kMask : 0);
+    word.bval = (word.bval & ~kMask) | (kB ? kMask : 0);
+  }
+}
+
+void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, uint64_t delay,
+                    int mode, Scheduler& scheduler, VpiObject& event) {
+  const uint32_t kWidth = VpiPutWidth(obj);
+  std::vector<Logic4Word> bits;
+  if (!VpiPutValueBits(value, kWidth, bits)) return;
+  const uint64_t kAt = scheduler.CurrentTime().ticks + delay;
+  RemovePendingPuts(obj, mode, kAt);
+  event.type = vpiSchedEvent;
+  event.scheduled = true;
+  event.event_time = kAt;
+  event.put_superseded = std::make_shared<bool>(false);
+  obj.scheduled_puts.push_back(&event);
+  Event* queued = scheduler.GetEventPool().Acquire();
+  queued->superseded = event.put_superseded;
+  queued->callback = [target = &obj, sched = &event, bits = std::move(bits),
+                      kWidth]() {
+    sched->scheduled = false;
+    VpiWriteDecodedBits(*target, bits, kWidth);
+    target->var->NotifyWatchers();
+    VpiStoreElementCopy(*target);
+  };
+  scheduler.ScheduleEvent(SimTime{kAt}, Region::kActive, queued);
+}
+
+uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
+                          int sim_unit) {
+  if (time.type != kVpiScaledRealTime) {
+    return (uint64_t{time.high} << 32) | time.low;
+  }
+  const double kScale = std::pow(10.0, obj.time_unit - sim_unit);
+  return static_cast<uint64_t>(std::llround(time.real * kScale));
 }
 
 }  // namespace delta

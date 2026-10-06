@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdarg>
@@ -14,6 +15,7 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -151,6 +153,11 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   SetCurrentSystfCall(outer_call);
 
   result = call->var->value;
+  // §38.37.1 with Annex K.2: sysfunctype gives the type of the value returned,
+  // an integer or a sized signed value being signed.
+  result.is_signed =
+      data->type == kVpiSysFunc && (data->sysfunctype == vpiSizedSignedFunc ||
+                                    data->sysfunctype == vpiIntFunc);
   return true;
 }
 
@@ -327,6 +334,9 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
   if (type == vpiModPath)
     return n == 1 || n == 2 || n == 3 || n == 6 || n == 12;
   if (type == vpiInterModPath) return n == 2 || n == 3;
+  // §37.47 with §10.3.3: a continuous assignment's delays are a gate's, a
+  // rise, a fall and a turn-off.
+  if (type == vpiContAssign) return n == 2 || n == 3;
   if (type == vpiTchk) return n == static_cast<int>(available);
   return false;
 }
@@ -498,6 +508,25 @@ void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   }
 }
 
+// §38.32: file the delays of the continuous assignment `obj` with the run
+// `sim`, under the instance and net its run key names, where a transition
+// of the net reads them in place of the assignment's own; a turn-off delay
+// not given is the smaller of the rise and fall.
+static void AnnotateContAssignDelays(const VpiObject& obj, SimContext& sim) {
+  const std::size_t kDot = obj.run_key.rfind('.');
+  const std::string kPrefix =
+      kDot == std::string::npos ? "" : obj.run_key.substr(0, kDot + 1);
+  const std::string_view kNet =
+      std::string_view(obj.run_key)
+          .substr(kDot == std::string::npos ? 0 : kDot + 1);
+  uint64_t delays[3] = {};
+  for (std::size_t i = 0; i < 3 && i < obj.delays.size(); ++i) {
+    delays[i] = static_cast<uint64_t>(std::llround(obj.delays[i].delay));
+  }
+  if (obj.delays.size() == 2) delays[2] = std::min(delays[0], delays[1]);
+  sim.AcquireSpecifyManager().AnnotateDriverDelays(kPrefix, kNet, delays);
+}
+
 void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.32 / §38.1: the structure and its da array are application-allocated.
   // With no source values or no target object there is nothing to set; the
@@ -549,6 +578,12 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
     VpiDelayInfo& d = obj->delays[i];
     VpiReadDelayRun(cur, kMtm, kPulsere, d);
+  }
+  // §38.32 with §37.3.4: a continuous assignment's new delays are those its
+  // next transitions take.
+  if (obj->type == vpiContAssign && sim_ctx_ != nullptr &&
+      !obj->run_key.empty()) {
+    AnnotateContAssignDelays(*obj, *sim_ctx_);
   }
 }
 
@@ -720,15 +755,48 @@ std::vector<std::string_view> VpiNamePathComponents(std::string_view name) {
   return parts;
 }
 
+namespace {
+
+constexpr std::string_view kWhiteSpace = " \t\n\r\f\v";
+
+// The length of the separator of a hierarchical name at `i` of `name`: 1 for
+// `.`, 2 for `::`, and 0 at the end or before anything else.
+std::size_t SeparatorLength(std::string_view name, std::size_t i) {
+  if (i >= name.size()) return 0;
+  if (name[i] == '.') return 1;
+  return name.substr(i, 2) == "::" ? 2 : 0;
+}
+
+// Where the component of `name` starting at `i` ends: an escaped identifier
+// at the white space ending it, any other at the first `.` or `::` after it.
+std::size_t ComponentEnd(std::string_view name, std::size_t i) {
+  if (name[i] == '\\') {
+    return std::min(name.find_first_of(kWhiteSpace, i), name.size());
+  }
+  std::size_t end = i;
+  while (end < name.size() && SeparatorLength(name, end) == 0) ++end;
+  return end;
+}
+
+}  // namespace
+
 std::vector<std::string_view> VpiHandleNameComponents(std::string_view name) {
   std::vector<std::string_view> parts;
-  for (std::string_view part : VpiNamePathComponents(name)) {
-    for (std::size_t colons = part.find("::"); colons != std::string_view::npos;
-         colons = part.find("::")) {
-      parts.push_back(part.substr(0, colons));
-      part.remove_prefix(colons + 2);
+  std::size_t i = 0;
+  while (i < name.size()) {
+    const std::size_t kEnd = ComponentEnd(name, i);
+    // §5.6.1 with §23.6: an escaped identifier is the characters after its
+    // backslash, the white space ending it standing before the separator.
+    const bool kEscaped = name[i] == '\\';
+    parts.push_back(kEscaped ? name.substr(i + 1, kEnd - i - 1)
+                             : name.substr(i, kEnd - i));
+    std::size_t next = kEnd;
+    if (kEscaped) {
+      next = std::min(name.find_first_not_of(kWhiteSpace, kEnd), name.size());
     }
-    parts.push_back(part);
+    const std::size_t kSeparator = SeparatorLength(name, next);
+    if (kSeparator == 0) break;
+    i = next + kSeparator;
   }
   return parts;
 }

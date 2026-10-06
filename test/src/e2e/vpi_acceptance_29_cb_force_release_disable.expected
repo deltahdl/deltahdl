@@ -1,0 +1,4 @@
+cbForce on bit-select: null err=1
+force value=5 at 1
+release value=5 at 2
+disabled blk at 3

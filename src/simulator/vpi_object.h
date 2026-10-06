@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -32,6 +33,9 @@ struct VpiObject {
   // only when the block runs, the key it makes it under; `var` is bound to it
   // when first read or written once it exists. Empty for any other object.
   std::string run_key;
+  // §38.36.1: whether a watcher calls back the cbValueChange registrations
+  // placed on this object when its value changes.
+  bool value_change_watched = false;
   Net* net = nullptr;
   VpiObject* parent = nullptr;
   int direction = 0;
@@ -140,6 +144,14 @@ struct VpiObject {
   // marked scheduled; vpi_get(vpiScheduled) reports this flag, and
   // vpi_put_value() with vpiCancelEvent clears it when the event is removed.
   bool scheduled = false;
+  // §38.34: for a vpiSchedEvent, the time its put takes place at, and for a
+  // simulation-time callback the time it was registered at (§38.36.2); for a
+  // vpiSchedEvent too, the flag that, once set, makes its queued event do
+  // nothing; and for a put's target, the events its delayed puts scheduled,
+  // which a later inertial or transport put removes.
+  uint64_t event_time = 0;
+  std::shared_ptr<bool> put_superseded;
+  std::vector<VpiObject*> scheduled_puts;
 
   // §37.10 detail 6: items that vpi_handle_by_name() must not be able to reach.
   // An imported item is brought into scope by an import declaration; a

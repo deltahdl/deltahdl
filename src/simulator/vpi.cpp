@@ -10,6 +10,7 @@
 
 #include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_assertion_control.h"
+#include "simulator/vpi_channel_state.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
@@ -438,6 +439,12 @@ void VpiContext::WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
     WriteLogFile(text);
     return;
   }
+  // §38.28: in a run the text is written to the file the channel names.
+  auto file = channels_.mcd_files.find(channel);
+  if (file != channels_.mcd_files.end()) {
+    std::fwrite(text.data(), 1, text.size(), file->second);
+    return;
+  }
   channels_.mcd_channel_buffers[channel].append(text);
 }
 
@@ -470,6 +477,13 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
     if ((channels_.mcd_allocated_channels & channel) != 0) continue;
     // §38.27: open the file for writing and hand back its multichannel
     // descriptor, recording it so a later open of the same file finds it.
+    // §38.27: in a run the file itself is opened, an open the host refuses
+    // failing as one with no free channel does.
+    if (sim_ctx_ != nullptr) {
+      FILE* file = std::fopen(filename.c_str(), "w");
+      if (file == nullptr) return 0;
+      channels_.mcd_files[channel] = file;
+    }
     channels_.mcd_allocated_channels |= channel;
     // A file recorded under an fd is now recorded under the channel this
     // namespace opened for it; the fd remains $fopen's own to close.
@@ -506,9 +520,8 @@ void CloseMcdChannelFiles(
 // §38.24: close a single channel bit of an mcd. Returns true when the channel
 // could not be closed and must be reported back to the caller, false when it
 // was closed (or was not requested) and needs no report.
-bool CloseMcdChannelBit(
-    int bit, PLI_UINT32 mcd, PLI_UINT32& allocated_channels,
-    std::unordered_map<std::string, PLI_UINT32>& open_files) {
+bool CloseMcdChannelBit(int bit, PLI_UINT32 mcd, VpiChannelState& channels) {
+  PLI_UINT32& allocated_channels = channels.mcd_allocated_channels;
   PLI_UINT32 channel = PLI_UINT32{1} << bit;
   if ((mcd & channel) == 0) return false;
 
@@ -522,9 +535,14 @@ bool CloseMcdChannelBit(
   if ((allocated_channels & channel) == 0) return true;
 
   // §38.24: close the channel - free it in the shared namespace and drop any
-  // file that named it.
+  // file that named it, closing the file a run opened on it.
   allocated_channels &= ~channel;
-  CloseMcdChannelFiles(open_files, channel);
+  CloseMcdChannelFiles(channels.mcd_open_files, channel);
+  auto file = channels.mcd_files.find(channel);
+  if (file != channels.mcd_files.end()) {
+    std::fclose(file->second);
+    channels.mcd_files.erase(file);
+  }
   return false;
 }
 
@@ -564,8 +582,7 @@ PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
   // is gathered into the error result and reported back to the caller.
   PLI_UINT32 unclosed = 0;
   for (int bit = 0; bit < 32; ++bit) {
-    if (CloseMcdChannelBit(bit, mcd, channels_.mcd_allocated_channels,
-                           channels_.mcd_open_files)) {
+    if (CloseMcdChannelBit(bit, mcd, channels_)) {
       unclosed |= PLI_UINT32{1} << bit;
     }
   }
@@ -594,6 +611,11 @@ PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
     // found none and flushed nothing.
     if (channel == kVpiToolOutputChannel) {
       if (Flush() != 0) return 1;
+      continue;
+    }
+    auto file = channels_.mcd_files.find(channel);
+    if (file != channels_.mcd_files.end()) {
+      if (std::fflush(file->second) != 0) return 1;
       continue;
     }
     auto it = channels_.mcd_channel_buffers.find(channel);

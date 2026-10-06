@@ -763,4 +763,17 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+bool CurrentProcessEnded(const SimContext& ctx) {
+  const Process* cur = ctx.CurrentProcess();
+  return cur != nullptr && !cur->active;
+}
+
+bool ProcessGoesOn(const SimContext& ctx) {
+  return !ctx.StopRequested() && !CurrentProcessEnded(ctx);
+}
+
+bool IsTimeControlStatement(StmtKind kind) {
+  return kind == StmtKind::kDelay || kind == StmtKind::kEventControl;
+}
+
 }  // namespace delta

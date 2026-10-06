@@ -152,18 +152,22 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   VpiRefreshElementCopy(class_var);
   ClassObject* obj = sim_ctx_->GetClassObject(class_var.var->value.ToUint64());
   if (obj == nullptr) return nullptr;
+  return MadeClassObject(*obj);
+}
+
+VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
   // §37.33 detail 1: an identifier may be reused once its object is
   // reclaimed, so an object made for one that has since gone is made afresh.
-  VpiObject*& made = run_objects_[obj];
-  if (made == nullptr || made->obj_id != static_cast<int64_t>(obj->handle)) {
-    made = VpiMakeClassObject(
-        *obj, ClassDefnOf(*obj, object_map_, run_objects_), *sim_ctx_,
-        {[this] { return AllocObject(); },
-         [this](std::string name) {
-           name_pool_.push_back(std::move(name));
-           return std::string_view(name_pool_.back());
-         },
-         sim_ctx_->GetArena()});
+  VpiObject*& made = run_objects_[&obj];
+  if (made == nullptr || made->obj_id != static_cast<int64_t>(obj.handle)) {
+    made = VpiMakeClassObject(obj, ClassDefnOf(obj, object_map_, run_objects_),
+                              *sim_ctx_,
+                              {[this] { return AllocObject(); },
+                               [this](std::string name) {
+                                 name_pool_.push_back(std::move(name));
+                                 return std::string_view(name_pool_.back());
+                               },
+                               sim_ctx_->GetArena()});
   }
   return made;
 }

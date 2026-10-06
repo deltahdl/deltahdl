@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "common/lexical_limits.h"
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
@@ -302,6 +303,76 @@ TEST(VpiSystfCallbacksSim, CallbackFiringTimes) {
   EXPECT_TRUE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kSizetf));
   // calltf fires each time the task/function is invoked during execution.
   EXPECT_FALSE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCalltf));
+}
+
+PLI_INT32 PutHighOneLowFive(PLI_BYTE8* /*user_data*/) {
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.high = 1;
+  time.low = 5;
+  s_vpi_value value = {};
+  value.format = vpiTimeVal;
+  value.value.time = &time;
+  vpi_put_value(vpi_handle(vpiSysTfCall, nullptr), &value, nullptr, vpiNoDelay);
+  return 0;
+}
+
+PLI_INT32 PutAllOnes(PLI_BYTE8* /*user_data*/) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = -1;
+  vpi_put_value(vpi_handle(vpiSysTfCall, nullptr), &value, nullptr, vpiNoDelay);
+  return 0;
+}
+
+PLI_INT32 EightBits(PLI_BYTE8* /*user_data*/) { return 8; }
+
+class SystemFunctionResultsOfARun : public VpiDesignRun {
+ protected:
+  void RegisterFunction(const char* name, int functype,
+                        PLI_INT32 (*calltf)(PLI_BYTE8*),
+                        PLI_INT32 (*sizetf)(PLI_BYTE8*) = nullptr) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysFunc;
+    data.sysfunctype = functype;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    data.sizetf = sizetf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  static s_vpi_vecval VectorOf(const char* name) {
+    s_vpi_value value = {};
+    value.format = vpiVectorVal;
+    vpi_get_value(By(name), &value);
+    return value.value.vector != nullptr ? value.value.vector[0]
+                                         : s_vpi_vecval{};
+  }
+};
+
+// §38.37.1 with Annex K.2 and §6.11: a vpiTimeFunc returns a time, 64 bits
+// wide, so the high word its calltf puts reaches the design (#5129).
+TEST_F(SystemFunctionResultsOfARun, ATimeFunctionReturnsSixtyFourBits) {
+  RegisterFunction("$user_time", vpiTimeFunc, &PutHighOneLowFive);
+  Run("module top; time t; initial t = $user_time(); endmodule\n");
+  s_vpi_value value = {};
+  value.format = vpiTimeVal;
+  vpi_get_value(By("top.t"), &value);
+  ASSERT_NE(value.value.time, nullptr);
+  EXPECT_EQ(value.value.time->high, 1u);
+  EXPECT_EQ(value.value.time->low, 5u);
+}
+
+// §38.37.1 with Annex K.2: a vpiSizedSignedFunc returns a signed value, so
+// eight 1 bits are -1 to the design where a vpiSizedFunc's are 255 (#5130).
+TEST_F(SystemFunctionResultsOfARun, ASizedSignedFunctionReturnsASignedValue) {
+  RegisterFunction("$user_s8", vpiSizedSignedFunc, &PutAllOnes, &EightBits);
+  RegisterFunction("$user_u8", vpiSizedFunc, &PutAllOnes, &EightBits);
+  Run("module top; int s, u;\n"
+      "  initial begin s = $user_s8(); u = $user_u8(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(VectorOf("top.s").aval, 0xFFFFFFFFu);
+  EXPECT_EQ(VectorOf("top.u").aval, 0xFFu);
 }
 
 }  // namespace

@@ -18,6 +18,7 @@ struct Expr;
 struct Stmt;
 struct StructTypeInfo;
 struct Variable;
+struct Net;
 struct ClassObject;
 struct ClassTypeInfo;
 struct QueueObject;
@@ -57,6 +58,12 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena);
 StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
+// §10.6.2: release the forced `var`, which is the resolved value of the net
+// `net` where it stands for one: a net at once takes the value its drivers
+// give, and a variable a procedural continuous assignment drives takes that
+// assignment's value again.
+void ReleaseForcedTarget(Variable* var, Net* net, SimContext& ctx,
+                         Arena& arena);
 
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena);

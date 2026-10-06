@@ -431,5 +431,17 @@ TEST_F(VpiPutDelaysInARun, TheExampleReplacesTheDelaysOfADesignsModulePath) {
   EXPECT_DOUBLE_EQ(g_fall_read_back, 22.0);
 }
 
+// §38.32 with §37.3.4: the delays vpi_put_delays gives a continuous
+// assignment are those its next transitions take, 5 for the rise at 10 and 6
+// for the fall at 20 (#5109).
+TEST_F(ContAssignDelaysOfARun, PutDelaysAreTheOnesTheAssignmentTakes) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(By("top.rose"), &value);
+  EXPECT_EQ(value.value.integer, 15);
+  vpi_get_value(By("top.fell"), &value);
+  EXPECT_EQ(value.value.integer, 26);
+}
+
 }  // namespace
 }  // namespace delta

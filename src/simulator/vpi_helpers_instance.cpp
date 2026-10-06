@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <deque>
 #include <string>
 #include <string_view>
@@ -31,6 +32,9 @@ VpiContext::~VpiContext() {
   for (auto* obj : all_objects_) {
     delete obj;
   }
+  // §38.27: a file vpi_mcd_open opened and nothing closed is closed with the
+  // tool, its text written out.
+  for (auto& entry : channels_.mcd_files) std::fclose(entry.second);
 }
 
 VpiHandle VpiContext::AllocObject() {
