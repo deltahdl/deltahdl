@@ -71,4 +71,88 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmaSurvivesThePreprocessor) {
   EXPECT_EQ(pragmas[0].enum_name, "my_fsm");
 }
 
+// A macro usage whose argument list runs onto the next line is read with that
+// line joined to it (§22.5.1), and a pragma written on the line read ahead
+// keeps its text: the enum-only pragma behind the usage is still recorded.
+TEST(FsmPragmaPreprocessing, PragmaOnALineReadAheadForAUsageSurvives) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W(a, b) a+b\n"
+      "module top;\n"
+      "  logic [`W(1,\n"
+      "           1)-1:0] /* tool enum fsm_e */ nxt;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("-1:0] /* tool enum fsm_e */ nxt;"), std::string::npos);
+  auto pragmas = CollectFsmPragmas(out);
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "enum_only");
+  EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
+}
+
+// A one-line comment ending a line of a usage that runs onto the next line
+// keeps its text, and the line joined after it is still read as source rather
+// than swallowed into the comment.
+TEST(FsmPragmaPreprocessing, OneLineCommentPragmaInAJoinedUsageSurvives) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W(a, b) a+b\n"
+      "module top;\n"
+      "  logic [`W(1, // tool state_vector cs enum my_fsm\n"
+      "           1)-1:0] cs;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("-1:0] cs;"), std::string::npos);
+  auto pragmas = CollectFsmPragmas(out);
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "state_vector");
+  EXPECT_EQ(pragmas[0].signal, "cs");
+  EXPECT_EQ(pragmas[0].enum_name, "my_fsm");
+}
+
+// The same holds for a one-line comment on a line read ahead, between the line
+// the usage opens on and the one it closes on.
+TEST(FsmPragmaPreprocessing, OneLineCommentPragmaOnALineReadAheadSurvives) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W(a, b) a+b\n"
+      "module top;\n"
+      "  logic [`W(1,\n"
+      "           1 // tool enum fsm_e\n"
+      "           )-1:0] nxt;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("-1:0] nxt;"), std::string::npos);
+  auto pragmas = CollectFsmPragmas(out);
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "enum_only");
+  EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
+}
+
+// Each one-line comment of a usage that runs onto later lines keeps its text
+// and stays a comment of its own, so two pragmas written on two of its lines
+// are both recorded.
+TEST(FsmPragmaPreprocessing, OneLineCommentPragmasOnTwoLinesOfAUsageSurvive) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W(a, b) a+b\n"
+      "module top;\n"
+      "  logic [`W(1, // tool enum fsm_e\n"
+      "           1)-1:0] st; // tool state_vector st enum fsm_e\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("-1:0] st;"), std::string::npos);
+  auto pragmas = CollectFsmPragmas(out);
+  ASSERT_EQ(pragmas.size(), 2u);
+  EXPECT_EQ(pragmas[0].form, "enum_only");
+  EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
+  EXPECT_EQ(pragmas[1].form, "state_vector");
+  EXPECT_EQ(pragmas[1].signal, "st");
+  EXPECT_EQ(pragmas[1].enum_name, "fsm_e");
+}
+
 }  // namespace

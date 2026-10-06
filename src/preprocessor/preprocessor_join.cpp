@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
@@ -153,15 +154,40 @@ bool DefineSpansMultipleLines(std::string_view line) {
          HasOpenBlockComment(body_start);
 }
 
-// One physical line of a macro usage, comment-stripped as the loop strips a
-// line it emits, so the parentheses counted are the ones in code and never
-// one a comment holds. The marker of a blanked one-line comment goes as well:
-// the join puts another line after this one, and a marker left standing would
-// blank that line when the joined text is stripped again at emission.
-static void AppendUsageLine(std::string_view line, bool& in_block_comment,
-                            bool& in_triple_string, std::string& joined) {
-  auto stripped = StripComments(line, in_block_comment, in_triple_string);
-  joined += StripTrailingLineComment(stripped);
+namespace {
+// The join carries from one line to the next the strip state of a block
+// comment and a triple_quoted_string, the text joined so far, the bodies put
+// aside and the one-line comments moved.
+struct UsageJoin {
+  bool in_block_comment = false;
+  bool in_triple_string = false;
+  std::string text;
+  std::vector<std::string> comments;
+  std::string line_comments;
+};
+}  // namespace
+
+// One physical line of a macro usage, each comment's body put aside behind the
+// mark StripComments writes for it as the loop does on a line it emits, so the
+// parentheses counted are the ones in code and never one a comment holds; the
+// join puts the bodies back once the usage is whole, and §40.4's FSM pragmas
+// reach the lexer from their text. A one-line comment ends its line, which the
+// join puts another line after, so the comment is moved to `line_comments`,
+// for the join to write after the whole usage on a line of its own: left in
+// place it would swallow the line joined after it, and as a block comment it
+// would stand between a name ending its line and the list opening the next.
+static void AppendUsageLine(std::string_view line, UsageJoin& join) {
+  auto marked = StripComments(line, join.in_block_comment,
+                              join.in_triple_string, &join.comments);
+  if (join.in_block_comment || marked.empty() ||
+      marked.back() != kCommentMark) {
+    join.text += marked;
+    return;
+  }
+  size_t comment = marked.rfind(kCommentMark, marked.size() - 2) - 2;
+  join.text.append(marked, 0, comment);
+  join.line_comments += '\n';
+  join.line_comments.append(marked, comment);
 }
 
 // Whether the line's first token is a directive other than a value one. A join
@@ -207,7 +233,9 @@ static bool MayOpenList(std::string_view line) {
 // usage written without its parentheses.
 //
 // The strip state starts clear because an open block comment and a line that
-// begins inside a triple_quoted_string each take another path.
+// begins inside a triple_quoted_string each take another path. The joined line
+// holds each comment with its text, for the emission to strip and put back as
+// it does on a line of its own, its one-line comments after it.
 uint32_t JoinMacroUsage(
     LineCursor& cursor,
     const std::function<MacroUsageEnd(std::string_view)>& end_of_macro_usage,
@@ -215,11 +243,9 @@ uint32_t JoinMacroUsage(
   std::string_view src = cursor.src;
   std::string_view first_line = src.substr(cursor.pos, cursor.eol - cursor.pos);
   if (first_line.find('`') == std::string_view::npos) return 0;
-  bool in_block_comment = false;
-  bool in_triple_string = false;
-  std::string acc;
-  AppendUsageLine(first_line, in_block_comment, in_triple_string, acc);
-  MacroUsageEnd end = end_of_macro_usage(acc);
+  UsageJoin join;
+  AppendUsageLine(first_line, join);
+  MacroUsageEnd end = end_of_macro_usage(join.text);
   if (end == MacroUsageEnd::kComplete) return 0;
 
   size_t eol = cursor.eol;
@@ -232,12 +258,14 @@ uint32_t JoinMacroUsage(
     if (LeadsWithDirective(next_line)) return 0;
     if (end == MacroUsageEnd::kNameAlone && !MayOpenList(next_line)) return 0;
     ++lines_added;
-    acc += ' ';
-    AppendUsageLine(next_line, in_block_comment, in_triple_string, acc);
-    end = end_of_macro_usage(acc);
+    join.text += ' ';
+    AppendUsageLine(next_line, join);
+    end = end_of_macro_usage(join.text);
     if (end == MacroUsageEnd::kComplete) {
       cursor.eol = eol;
-      joined = std::move(acc);
+      join.text += join.line_comments;
+      RestoreComments(join.text, 0, join.comments);
+      joined = std::move(join.text);
       return lines_added;
     }
   }

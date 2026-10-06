@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "lexer/keywords.h"
 #include "preprocessor/preprocessor.h"
 
 namespace delta {
@@ -47,6 +48,12 @@ struct LineCursor {
   size_t& eol;
   uint32_t& line_num;
 };
+
+// The byte that opens and closes the mark standing in for a comment's body
+// while its line is expanded. It is kKeywordMarker's byte, which a source file
+// cannot hold: ProcessSource reports and blanks every one it reads, so each
+// such byte in the text being expanded is one the Preprocessor wrote.
+inline constexpr char kCommentMark = kKeywordMarker;
 
 // Blanks the body of every A.9.2 comment on `line`, keeping the delimiters,
 // and leaves what a string literal holds alone; the two flags carry a block

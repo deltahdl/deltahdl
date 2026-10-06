@@ -326,12 +326,6 @@ std::pair<std::string_view, std::string_view> SplitQuotedArg(
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
-// The byte that opens and closes the mark standing in for a comment's body
-// while its line is expanded. It is kKeywordMarker's byte, which a source file
-// cannot hold: ProcessSource reports and blanks every one it reads, so each
-// such byte in the text being expanded is one the Preprocessor wrote.
-constexpr char kCommentMark = kKeywordMarker;
-
 // Writes the text of a comment's body in place of `body`: as blanks of its
 // length, or, when `comments` is given, as kCommentMark, the index under which
 // the body is appended to `comments`, and kCommentMark again, for
