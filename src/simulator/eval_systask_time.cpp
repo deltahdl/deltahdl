@@ -182,8 +182,8 @@ static std::string TimeOrderToUnitString(int order) {
 // registered path carries.
 //
 // §3.14.2.3 (printed page 60) makes the compilation-unit scope a time scope of
-// its own, whose unit "can only be set by a timeunit declaration, not a
-// `timescale directive", so a subroutine it declares -- a method of a class it
+// its own, whose unit a timeunit declaration sets and a `timescale directive
+// cannot, so a subroutine it declares -- a method of a class it
 // declares among them -- runs in that unit whichever instance calls it.
 const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
   if (const Scope* frame = ctx.PackageFrame()) {

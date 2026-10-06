@@ -521,7 +521,8 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
 
   // Write back any supplied output arguments per Table D.1, in declared order.
   // Table D.1's net_is_forced is asked of the bit the net argument names, and
-  // §10.6.2 lets a force name "a constant bit-select of a vector net": a force
+  // §10.6.2 lets a force name one bit of a vector net by a constant select: a
+  // force
   // on bus[3] holds bit 3 and no other, so bus[7] reports 0 for it. Reading the
   // flag alone answered 1 for every bit of the net.
   const bool kForced = net->resolved->BitIsForced(bit);
@@ -537,8 +538,8 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
 }
 
-// Optional $getpattern function (Annex D.3): "reads stimulus patterns that
-// have been loaded into a memory", one word per call, which the continuous
+// Optional $getpattern function (Annex D.3): it reads stimulus patterns from a
+// memory they were loaded into, one word per call, which the continuous
 // assignment it stands in drives onto its concatenation of scalar nets a bit
 // at a time. The word is the value of the memory element the argument names;
 // the elaborator holds the call to the placements D.3 allows, so the argument
@@ -569,8 +570,8 @@ static Logic4Vec EvalAnnexDReset(const Expr* expr, SimContext& ctx,
 // the complete hierarchical name of a module, task, function, or named block;
 // record that name as the new interactive scope.
 //
-// D.11 has the argument "shall be the complete hierarchical name of a module,
-// task, function, or named block", and the lowerer registered every such name
+// D.11 requires the argument to be the full hierarchical name of a module, a
+// task, a function or a named block, and the lowerer registered every such name
 // of the design: an argument naming none of them is reported under D.11 and
 // the scope stays where it was, where any text was recorded as the scope.
 static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
@@ -594,8 +595,8 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
 // Optional $list system task (Annex D.6). It produces a listing of a module,
 // task, function, or named block. With no argument the object listed is the
 // current scope setting (the interactive scope established by $scope); with
-// an argument, the argument "shall refer to a specific module, task,
-// function, or named block", one of the complete hierarchical names the
+// an argument, the argument has to name one particular module, task, function
+// or named block, one of the complete hierarchical names the
 // lowerer registered, and an argument naming none of them is reported under
 // D.6 and lists nothing. Resolve which scope is selected and record it.
 static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
