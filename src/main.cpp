@@ -441,11 +441,23 @@ const delta::RtlirDesign* ElaborateDesign(const delta::CliOptions& opts,
   return design;
 }
 
+// --synth lowers the design's first top-level module. A design with none, which
+// is what a source declaring nothing or only packages, types or classes
+// elaborates to, leaves nothing to lower, and the run says so rather than
+// failing without a word. A null design from a source that declares something
+// came from a stop ElaborateDesign has already reported, so that one adds
+// nothing. This is a limit of what synthesis can produce, not a rule of IEEE
+// 1800-2023, so the report cites no subclause.
 int RunSynthesis(const delta::CliOptions& opts,
                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
                  delta::DiagEngine& diag, delta::Arena& arena) {
   const auto* design = ElaborateDesign(opts, lib_map, cu, diag, arena);
-  if (!design || design->top_modules.empty()) return 1;
+  if (diag.HasErrors()) return 1;
+  if (design == nullptr && !cu->DeclaresNothing()) return 1;
+  if (design == nullptr || design->top_modules.empty()) {
+    std::cerr << "error: design has no top-level module to synthesize\n";
+    return 1;
+  }
 
   delta::SynthLower synth(arena, diag);
   auto* aig = synth.Lower(design->top_modules[0]);
