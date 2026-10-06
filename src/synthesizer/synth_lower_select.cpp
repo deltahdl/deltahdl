@@ -52,8 +52,8 @@ static const Expr* SelectRootName(const Expr* expr) {
 bool SynthLower::RecordArrayShape(std::string_view name, uint32_t elem_width,
                                   uint32_t num_dims,
                                   const std::vector<RtlirUnpackedDim>& dims) {
-  // §11.5.2 resolves an address against "the address bounds given in the
-  // declaration", so an array this can address is one every dimension of which
+  // §11.5.2 resolves an address against the bounds the array was declared
+  // with, so an array this can address is one every dimension of which
   // reached RTLIR with its bounds. A declaration that wrote more dimensions
   // than it recorded is one whose addresses cannot all be resolved -- a queue,
   // a dynamic dimension, or a bound that did not fold -- and it records
@@ -107,11 +107,10 @@ SynthLower::SelectStorage SynthLower::ResolveArraySelect(const Expr* sel) {
   const ArrayShape* shape = ArrayShapeOf(name);
   if (shape == nullptr || nodes.size() != shape->dims.size()) return {};
 
-  // §11.5.2 rules that "the desired word shall first be selected by supplying
-  // an address for each dimension", so one address per dimension names an
-  // element and the element is at the offset those addresses give, counted
-  // from the innermost dimension outward. A range written where an address
-  // belongs names no element.
+  // §11.5.2 has a word selected by giving one address per dimension, so one
+  // address per dimension names an element and the element is at the offset
+  // those addresses give, counted from the innermost dimension outward. A range
+  // written where an address belongs names no element.
   int64_t element = 0;
   bool out_of_bounds = false;
   for (size_t d = 0; d < shape->dims.size(); ++d) {
@@ -124,11 +123,11 @@ SynthLower::SelectStorage SynthLower::ResolveArraySelect(const Expr* sel) {
     }
     element = element * static_cast<int64_t>(shape->dims[d].count) + offset;
   }
-  // §11.5.2 sends an address that "is out of bounds" to §7.4.5, and a 2-state
-  // value reads 0 there where a 4-state one reads x. Naming a run past the
-  // whole storage is that answer: SynthLower::GetSignalBit reads constant false
-  // above a signal's width and SynthLower::SetSignalBit ignores a write there.
-  // The run has to be past the whole array rather than at the offset the
+  // §11.5.2 sends an address outside the declared bounds to §7.4.5, and a
+  // 2-state value reads 0 there where a 4-state one reads x. Naming a run past
+  // the whole storage is that answer: SynthLower::GetSignalBit reads constant
+  // false above a signal's width and SynthLower::SetSignalBit ignores a write
+  // there. The run has to be past the whole array rather than at the offset the
   // arithmetic gave, because an address out of one dimension's bounds lands
   // inside another dimension's elements.
   if (out_of_bounds) element = shape->Count();
@@ -161,9 +160,9 @@ SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
       break;
   }
 
-  // §11.5.2 rules that once the element is selected, "bit-selects and
-  // part-selects shall be addressed in the same manner as net and variable
-  // bit-selects and part-selects (see 11.5.1)", so a select over a select
+  // §11.5.2 rules that once the element is selected, a bit-select or
+  // part-select of it is addressed as one of a net or variable is under
+  // §11.5.1, so a select over a select
   // applies §11.5.1 inside the run the inner one addresses.
   SelectStorage base_run;
   if (sel->base->kind == ExprKind::kSelect) {
@@ -192,8 +191,8 @@ SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
     second = indices.second;
   }
 
-  // §11.5.1: "The actual bit that is accessed by an address is, in part,
-  // determined by the declaration", so each end is resolved against the range
+  // §11.5.1: which bit an address reaches depends in part on how the base was
+  // declared, so each end is resolved against the range
   // the base was declared with rather than counted from the bottom of its
   // storage. The two ends give a run of contiguous offsets whichever way that
   // declaration runs, and the lower of the two is where the run starts.
@@ -224,8 +223,8 @@ uint32_t SynthLower::LowerArraySelectBit(const Expr* expr, AigGraph& aig,
   }
   if (bit >= shape->elem_width) return AigGraph::kConstFalse;
 
-  // §11.5.2 rules that "The addr_expr can be any integer expression", so an
-  // address that did not fold chooses among the elements and the netlist owes a
+  // §11.5.2 lets the address be any integer expression, so an address that did
+  // not fold chooses among the elements and the netlist owes a
   // multiplexer over the addresses the declaration admits. An address matching
   // none of them leaves constant false, which is what §7.4.5 gives a 2-state
   // value for an address that is out of bounds.
@@ -282,8 +281,8 @@ uint32_t SynthLower::ExprEqualsValue(const Expr* expr, AigGraph& aig,
 }
 
 int64_t SynthLower::VariableSelectWidth(const Expr* expr) {
-  // §11.5.1 rules that the width of an indexed part-select "shall be a
-  // positive constant integer expression", so a width that does not fold is
+  // §11.5.1 requires the width of an indexed part-select to be a constant
+  // integer expression with a positive value, so a width that does not fold is
   // not a select this builds anything for. A non-indexed part-select is
   // written with two constant expressions and reaches this function only when
   // one of them did not fold, which is the same case.
@@ -392,8 +391,8 @@ uint32_t SynthLower::LowerSelectBit(const Expr* expr, AigGraph& aig,
   if (storage.count == 0) return LowerVariableSelectBit(expr, aig, bit);
   if (bit >= storage.count) return AigGraph::kConstFalse;
 
-  // §11.5.1: a part-select "partially out of range shall, when read, return x
-  // for the bits that are out of range", and a 2-state value reads 0 where a
+  // §11.5.1: reading a part-select that is partly out of range gives x for
+  // the bits outside it, and a 2-state value reads 0 where a
   // 4-state one reads x. An AIG node holds two values, so constant false is
   // that answer, and SynthLower::GetSignalBit already gives it above the
   // signal's width.
@@ -416,7 +415,8 @@ uint32_t SynthLower::LowerExprSelectBit(const Expr* expr, AigGraph& aig,
     first = indices.first;
     second = indices.second;
   }
-  // §11.5.1 addresses "a contiguous sequence of bits", and an expression's bits
+  // §11.5.1 has a part-select address a run of adjacent bits, and an
+  // expression's bits
   // run [width-1:0] with no declaration to renumber them, so an index of one is
   // an offset into it. Bit `bit` of `e[msb:lsb]` is therefore bit `lsb + bit`
   // of `e`, and a bit the select does not name reads constant false, which is

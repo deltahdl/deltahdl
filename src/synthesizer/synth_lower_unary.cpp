@@ -11,10 +11,9 @@ namespace delta {
 
 // The operator §11.4.9 folds across the bits of the operand, and whether the
 // fold is inverted afterwards. §11.4.9 defines the six reduction operators as
-// three folds and their complements: "For reduction NAND, reduction NOR, and
-// reduction XNOR operators, the result shall be computed by inverting the
-// result of the reduction AND, reduction OR, and reduction XOR operation,
-// respectively". `folded` is kEof for an operator that is not one of the six.
+// three folds and their complements: reduction NAND, NOR and XNOR invert what
+// reduction AND, OR and XOR give. `folded` is kEof for an operator that is not
+// one of the six.
 struct ReductionRule {
   TokenKind folded = TokenKind::kEof;
   bool invert = false;
@@ -54,8 +53,8 @@ static uint32_t ReductionStep(AigGraph& aig, TokenKind folded, uint32_t left,
 
 uint32_t SynthLower::LowerReductionBit(const Expr* expr, AigGraph& aig,
                                        uint32_t bit) {
-  // §11.4.9: the reduction operators "perform a bitwise operation on a single
-  // operand to produce a single-bit result", so the result stands at bit 0 and
+  // §11.4.9: a reduction operator folds the bits of its one operand into a
+  // one-bit result, so the result stands at bit 0 and
   // every bit above it is zero.
   if (bit > 0) return AigGraph::kConstFalse;
 
@@ -73,10 +72,8 @@ uint32_t SynthLower::LowerReductionBit(const Expr* expr, AigGraph& aig,
     return AigGraph::kConstFalse;
   }
 
-  // §11.4.9: "the first step of the operation shall apply the operator between
-  // the first bit of the operand and the second", and "The second and
-  // subsequent steps shall apply the operator between the 1-bit result of the
-  // prior step and the next bit of the operand".
+  // §11.4.9: the operator is applied first to the operand's first two bits,
+  // and then to each step's one-bit result and the operand's next bit.
   ReductionRule rule = ReductionRuleFor(expr->op);
   uint32_t result = LowerExprBit(expr->lhs, aig, 0);
   for (uint32_t b = 1; b < *width; ++b) {
@@ -119,8 +116,8 @@ uint32_t SynthLower::LowerTruthValue(const Expr* expr, AigGraph& aig,
 
 uint32_t SynthLower::LowerNegateBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
-  // Table 11-6 of §11.4.3 gives `-m` as "Unary minus m", and §11.4.3.1 rules
-  // that a signed value "shall use a two's-complement representation", which
+  // Table 11-6 of §11.4.3 gives `-m` as the negation of m, and §11.4.3.1 has
+  // a signed value represented in two's complement, which
   // makes the negation the complement of the operand plus one. Bit `bit` of
   // that sum depends on every bit of the operand below it, so the chain is
   // rippled from bit 0 up rather than the operand read at `bit` alone.
@@ -151,7 +148,7 @@ uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
     return aig.AddNot(LowerTruthValue(expr->lhs, aig, Subclause("11.4.7")));
   }
   if (expr->op == TokenKind::kPlus) {
-    // Table 11-6 of §11.4.3: "Unary plus m (same as m)", the operand extended
+    // Table 11-6 of §11.4.3: `+m` is m itself, the operand extended
     // as §11.6.1 Table 11-21 makes it context-determined.
     return LowerContextOperandBit(expr->lhs, aig, bit);
   }

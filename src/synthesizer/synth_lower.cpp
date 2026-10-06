@@ -76,12 +76,11 @@ NonSynthRule NonSynthExprRule(ExprKind kind) {
           "5.6.3"};
     // ExprKind::kMemberAccess has no entry here, and
     // SynthLower::DottedNameRule in synth_lower_dotted_name.cpp answers for
-    // it instead. §23.7 states that a hierarchical name and a
-    // member select "share the same syntactic form of a sequence of name
-    // components separated by periods", and that which one a dotted name is
-    // depends on what its first component names -- a scope, or a data object.
-    // That question is about the module the name was written in, which this
-    // free function cannot read.
+    // it instead. §23.7 states that a hierarchical name and a member select are
+    // written alike, as name components joined by periods, and that which one a
+    // dotted name is depends on what its first component names -- a scope, or a
+    // data object. That question is about the module the name was written in,
+    // which this free function cannot read.
     case ExprKind::kCall:
       return {"a function call has no lowering in the synthesizer", "13.4"};
     case ExprKind::kAssignmentPattern:
@@ -328,9 +327,9 @@ bool IsLogicalOp(TokenKind op) {
 bool SynthLower::IsSignedExpr(const Expr* expr) {
   // §11.8.1 rules the type of an expression off its operands, so an operator
   // that carries a type out is answered from the operands it counts. §11.8.1
-  // also rules that "The sign and size of any self-determined operand are
-  // determined by the operand itself and independent of the remainder of the
-  // expression", so a self-determined operand is not one of them.
+  // also has a self-determined operand take its sign and size from itself
+  // alone, whatever the rest of the expression is, so a self-determined operand
+  // is not one of them.
   if (!expr) return false;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
@@ -342,13 +341,12 @@ bool SynthLower::IsSignedExpr(const Expr* expr) {
       return IsSignedExpr(expr->lhs);
     case ExprKind::kBinary:
       if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return false;
-      // §11.4.10 rules that a shift's right operand "has no effect on the
-      // signedness of the result", and §11.6.1 Table 11-21 marks that operand
+      // §11.4.10 rules that a shift's right operand leaves the signedness of
+      // the result alone, and §11.6.1 Table 11-21 marks that operand
       // self-determined, so the left operand alone answers for a shift.
       if (IsShiftOp(expr->op)) return IsSignedExpr(expr->lhs);
-      // §11.8.1: "If all operands are signed, the result will be signed,
-      // regardless of operator", and "If any operand is unsigned, the result
-      // is unsigned, regardless of the operator".
+      // §11.8.1: whatever the operator, the result is signed when every
+      // operand is signed and unsigned when any operand is unsigned.
       return IsSignedExpr(expr->lhs) && IsSignedExpr(expr->rhs);
     case ExprKind::kTernary:
       // §11.6.1 Table 11-21 marks the condition of `i ? j : k`
@@ -395,8 +393,8 @@ const PatternBits& SynthLower::LiteralBits(const Expr* expr) {
 }
 
 uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
-  // §5.7.1 sizes an integer literal by its size constant, "in terms of its
-  // exact number of bits", which admits a literal wider than the 64 bits
+  // §5.7.1 sizes an integer literal by its size constant, the literal's width
+  // in bits, which admits a literal wider than the 64 bits
   // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64 and
   // `80'd1208925819614629174706177` (2^80 + 1) bit 80, and
   // Parser::ParseIntText folds the digits modulo 2^64, so int_val holds the
@@ -405,8 +403,8 @@ uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
   // one by ParsePatternLiteral's multiply-and-add fold.
   const PatternBits& bits = LiteralBits(expr);
   if (bits.has_digits) {
-    // §5.7.1 pads the number "to the left with zeros" above the positions its
-    // digits reached.
+    // §5.7.1 fills the positions above those the number's digits reached with
+    // zeros.
     return PatternBitValue(bits, bit) ? AigGraph::kConstTrue
                                       : AigGraph::kConstFalse;
   }
@@ -531,9 +529,9 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
       return LowerLiteralBit(expr, bit);
     case ExprKind::kUnbasedUnsizedLiteral:
       // §5.7.1 rules that the unsized unsigned single-bit values `'0`, `'1`,
-      // `'x` and `'z` set "all bits of the unsized value" to the bit specified,
-      // so which position is asked for does not change the answer.
-      // Parser::MakeLiteral records `'1` as every bit of Expr::int_val set.
+      // `'x` and `'z` set every bit of the value to the one written, so which
+      // position is asked for does not change the answer. Parser::MakeLiteral
+      // records `'1` as every bit of Expr::int_val set.
       return expr->int_val != 0 ? AigGraph::kConstTrue : AigGraph::kConstFalse;
     case ExprKind::kUnary:
       return LowerUnaryBit(expr, aig, bit);
@@ -601,8 +599,8 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   // condition of an if statement, is left self-determined.
   propagated_width_ = width;
   // §11.8.2 propagates the type of the expression down with its size. §11.8.1
-  // rules that the type "does not depend on the left-hand side (if any)", so
-  // this reads the right-hand side rather than the target.
+  // rules that an expression's type is not affected by any left-hand side it
+  // is assigned to, so this reads the right-hand side rather than the target.
   propagated_signed_ = IsSignedExpr(assign.rhs);
   for (uint32_t b = 0; b < width; ++b) {
     SetSignalBit(name, b, LowerAssignRhsBit(assign.rhs, aig, b));
@@ -664,8 +662,9 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   }
   auto result_bits = signal_bits_;
 
-  // §12.5.4 rules that "the inside operator uses asymmetric wildcard matching
-  // (see 11.4.6)" and that each case_item_expression is its right operand.
+  // §12.5.4 has case inside match each case_item_expression as the right
+  // operand of the inside operator, whose wildcard matching §11.4.6 makes
+  // asymmetric.
   // §11.4.6 makes both the x and the z of that operand wildcards, which is the
   // pair TokenKind::kKwCasex asks BuildPatternMatch to read out of an item's
   // own digits. The asymmetry needs nothing further: the digits are read from

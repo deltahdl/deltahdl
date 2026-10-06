@@ -105,8 +105,8 @@ uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {
   // ordered wherever they are not.
   //
   // SynthLower::ExprWidth answers a signal from its declaration and a literal
-  // from its size constant, which §5.7.1 gives "in terms of its exact number of
-  // bits". A literal wider than either signal is what makes the two operands
+  // from its size constant, which §5.7.1 has state the literal's width in
+  // bits. A literal wider than either signal is what makes the two operands
   // unequal in length, and comparing over the wider of them is what the
   // extension above asks for. An operand this cannot answer for contributes
   // nothing above the floor kLiteralBits sets.
@@ -116,8 +116,8 @@ uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {
 
 uint32_t SynthLower::LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                              uint32_t bit, bool sign_extend) {
-  // §11.8.2 rules that an operand the propagated size extends "shall be
-  // sign-extended only if the propagated type is signed", so `sign_extend` is
+  // §11.8.2 sign-extends an operand the propagated size widens only when the
+  // propagated type is signed, so `sign_extend` is
   // what decides the positions above the operand's own width. They carry zero
   // otherwise.
   //

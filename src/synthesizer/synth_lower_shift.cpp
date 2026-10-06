@@ -104,8 +104,8 @@ uint32_t SynthLower::LowerShiftBit(const Expr* expr, AigGraph& aig,
   uint32_t width = ShiftWidth(expr->lhs);
   if (bit >= width) return AigGraph::kConstFalse;
 
-  // §11.4.10 rules that "The result signedness is determined by the left-hand
-  // operand and the remainder of the expression, as outlined in 11.8.1", so the
+  // §11.4.10 has the left operand and the rest of the expression decide the
+  // result's signedness, by the rules of §11.8.1, so the
   // type of the whole expression the shift stands in decides the fill and the
   // shift's own left operand does not: `(a >>> 1) | b` over an unsigned `b` is
   // unsigned however `a` was declared. §11.8.2 propagates that type back down
@@ -118,8 +118,8 @@ uint32_t SynthLower::LowerShiftBit(const Expr* expr, AigGraph& aig,
   // case expression and its items (§12.5).
   bool result_signed = propagated_signed_;
 
-  // §11.8.2 rules that an operand the propagated size extends "shall be
-  // sign-extended only if the propagated type is signed", which is the rule
+  // §11.8.2 sign-extends an operand the propagated size widens only when the
+  // propagated type is signed, which is the rule
   // SynthLower::LowerExtendedOperandBit carries.
   std::vector<uint32_t> bits(width);
   for (uint32_t b = 0; b < width; ++b) {

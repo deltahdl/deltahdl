@@ -184,7 +184,7 @@ bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt,
 //
 // The declared type is answered before the initializer, because it is what the
 // design wrote. §9.7 makes `process` a built-in class and process::self() a
-// static method returning "a handle to the current process", and no hardware
+// static method answering the process that calls it, and no hardware
 // holds one, whatever expression the initializer turns out to be.
 bool SynthLower::CheckDeclSynthesizable(const Stmt* stmt) {
   if (stmt->var_decl_type.kind == DataTypeKind::kNamed &&

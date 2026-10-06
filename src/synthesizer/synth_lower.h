@@ -36,9 +36,9 @@ bool IsCompareOp(TokenKind op);
 bool IsShiftOp(TokenKind op);
 
 // True for the unary operators §11.8.1 rules unsigned whatever their operand
-// is. The subclause names the six §11.4.9 reduction operators itself:
-// "Comparison and reduction operator results are unsigned, regardless of the
-// operands". §11.4.7 states the result of the logical negation `!` as `1'b0` or
+// is. The subclause names the six §11.4.9 reduction operators itself, ruling
+// the result of a comparison or a reduction unsigned whatever its operands
+// are. §11.4.7 states the result of the logical negation `!` as `1'b0` or
 // `1'b1`, and §11.8.1 rules a based number unsigned. §11.6.1 Table 11-21 makes
 // each of them one bit long.
 bool IsUnsignedResultUnaryOp(TokenKind op);
@@ -228,11 +228,11 @@ class SynthLower {
   // §11.8.2: lower one bit of an operand the expression around it has
   // propagated a wider size to. The positions above the width
   // SynthLower::ExtendedOperandWidth answers for the operand are extension
-  // positions, and the standard rules that an operand
-  // "shall be sign-extended only if the propagated type is signed", which is
-  // what `sign_extend` carries. §11.4.4 and §11.4.5 extend both operands of a
-  // comparison to the width it is carried out over, and §11.4.10 extends a
-  // shift's left operand to the width the shift moves it within.
+  // positions, and the standard sign-extends an operand into them only when
+  // the type propagated to it is signed, which is what `sign_extend` carries.
+  // §11.4.4 and §11.4.5 extend both operands of a comparison to the width it is
+  // carried out over, and §11.4.10 extends a shift's left operand to the width
+  // the shift moves it within.
   uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit, bool sign_extend);
 
@@ -326,15 +326,15 @@ class SynthLower {
   // §11.5.2: the shape of an unpacked array. `elem_width` is how many bits one
   // element holds, `lo` is the lowest address its declaration admits and
   // `count` is how many elements it holds, so element `addr` occupies the
-  // `elem_width` bits at `(addr - lo) * elem_width`. §11.5.2 rules that "the
-  // address bounds given in the declaration of the memory determine the effect
-  // of the address expression", and an address names its element whichever way
-  // §7.4.2 let the dimension be written, so the direction decides which
-  // addresses are admitted rather than which element each reaches.
-  // §11.5.2: one dimension of an unpacked array as its declaration admits
-  // addressing it. `lo` is the smallest address the dimension admits and
-  // `count` is how many elements it holds, so an address `a` of this dimension
-  // selects the element at `a - lo` and every other address is out of bounds.
+  // `elem_width` bits at `(addr - lo) * elem_width`. §11.5.2 has the bounds the
+  // memory was declared with decide what an address selects, and an address
+  // names its element whichever way §7.4.2 let the dimension be written, so the
+  // direction decides which addresses are admitted rather than which element
+  // each reaches. §11.5.2: one dimension of an unpacked array as its
+  // declaration admits addressing it. `lo` is the smallest address the
+  // dimension admits and `count` is how many elements it holds, so an address
+  // `a` of this dimension selects the element at `a - lo` and every other
+  // address is out of bounds.
   struct ArrayDim {
     int64_t lo = 0;
     uint32_t count = 0;
@@ -342,10 +342,9 @@ class SynthLower {
 
   struct ArrayShape {
     uint32_t elem_width = 0;
-    // One entry per unpacked dimension, outermost first, because §11.5.2 rules
-    // that "the desired word shall first be selected by supplying an address
-    // for each dimension". Element `[a0][a1]` of a two-dimensional array
-    // occupies the `elem_width` bits at
+    // One entry per unpacked dimension, outermost first, because §11.5.2 has a
+    // word selected by giving one address per dimension. Element `[a0][a1]` of
+    // a two-dimensional array occupies the `elem_width` bits at
     // `((a0 - lo0) * count1 + (a1 - lo1)) * elem_width`.
     std::vector<ArrayDim> dims;
 
@@ -378,11 +377,10 @@ class SynthLower {
   uint32_t ArrayStorageWidth(std::string_view name, uint32_t elem_width);
 
   // What a chain of selects names against the array its base was declared as.
-  // §11.5.2 rules that "the desired word shall first be selected by supplying
-  // an address for each dimension", so a chain carrying exactly that many
-  // addresses names an element, a shorter one names a slice of the array, and a
-  // longer one names a §11.5.1 select within the element the leading addresses
-  // reach.
+  // §11.5.2 has a word selected by giving one address per dimension, so a chain
+  // carrying exactly that many addresses names an element, a shorter one names
+  // a slice of the array, and a longer one names a §11.5.1 select within the
+  // element the leading addresses reach.
   enum class ArraySelectKind : uint8_t {
     kNotArray,
     kSlice,
@@ -397,8 +395,8 @@ class SynthLower {
   SelectStorage ResolveArraySelect(const Expr* sel);
 
   // §11.5.2: lower one bit of an array select whose address did not fold,
-  // which the subclause admits by ruling that "The addr_expr can be any integer
-  // expression". Such a select chooses among the elements, so it is a
+  // which the subclause admits by letting the address be any integer
+  // expression. Such a select chooses among the elements, so it is a
   // multiplexer over the addresses the declaration admits.
   uint32_t LowerArraySelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
@@ -462,8 +460,8 @@ class SynthLower {
   PackedRange BaseRange(const Expr* base);
 
   // Drive the storage a select target addresses from `rhs`, and leave the other
-  // bits of the signal as they stand. §11.5.1 rules that a part-select written
-  // to "shall ... only affect the bits that are in range", so the bits outside
+  // bits of the signal as they stand. §11.5.1 has a write to a part-select
+  // change only the bits of it that are in range, so the bits outside
   // the select keep what drove them.
   void LowerSelectTarget(const Expr* lhs, const Expr* rhs, AigGraph& aig);
 
@@ -609,8 +607,9 @@ class SynthLower {
 
   // §11.8.2: the type the assignment being lowered propagates back down to the
   // context-determined operands of its right-hand side, which the same step
-  // propagates the size in propagated_width_ down with. §11.8.1 rules that the
-  // type of an expression "does not depend on the left-hand side (if any)", so
+  // propagates the size in propagated_width_ down with. §11.8.1 rules that an
+  // expression's type is not affected by any left-hand side it is assigned to,
+  // so
   // this is the type of the right-hand side and not the type the target was
   // declared with. Whatever sets propagated_width_ sets this beside it: a
   // comparison, a truth value or a case statement (§12.5) propagates the type

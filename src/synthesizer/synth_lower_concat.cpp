@@ -93,8 +93,8 @@ std::optional<uint32_t> SynthLower::OperatorWidth(const Expr* expr) {
 }
 
 std::optional<uint32_t> SynthLower::ElementsWidth(const Expr* expr) {
-  // §11.4.12: "the size of each operand in the concatenation is needed to
-  // calculate the complete size of the concatenation", so one operand whose
+  // §11.4.12: a concatenation's size is the sum of its operands' sizes, which
+  // makes every one of them needed, so one operand whose
   // width is unknown leaves the whole unknown.
   uint32_t total = 0;
   for (const auto* element : expr->elements) {
@@ -106,9 +106,9 @@ std::optional<uint32_t> SynthLower::ElementsWidth(const Expr* expr) {
 }
 
 std::optional<uint32_t> SynthLower::ReplicateWidth(const Expr* expr) {
-  // §11.4.12.1: the multiplier is a "non-negative, non-x, and non-z constant
-  // expression", and the replication is that many copies of the concatenation
-  // it multiplies.
+  // §11.4.12.1: the multiplier is a constant expression that is not negative
+  // and holds no x or z, and the replication is that many copies of the
+  // concatenation it multiplies.
   std::optional<int64_t> count = ConstEvalInt(expr->repeat_count, scope_);
   if (!count || *count < 0) return std::nullopt;
   std::optional<uint32_t> inner = ElementsWidth(expr);
@@ -204,7 +204,7 @@ uint32_t SynthLower::LowerReplicateBit(const Expr* expr, AigGraph& aig,
   // §11.4.12.1: the copies are identical, so the bit of the replication at
   // `bit` is the bit of the concatenation being replicated at `bit` modulo its
   // width. A multiplier of zero gives a width of zero, which the subclause
-  // rules "is considered to have a size of zero and is ignored", and every bit
+  // treats as a replication of size zero that is left out, and every bit
   // is answered above.
   uint32_t inner = ElementsWidth(expr).value_or(0);
   if (inner == 0) return AigGraph::kConstFalse;
