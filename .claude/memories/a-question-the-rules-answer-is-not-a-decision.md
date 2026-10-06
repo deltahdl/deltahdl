@@ -52,5 +52,11 @@ are not the whole clause: read every numbered detail through to the end,
 examples included. The vpiParent and prefix details often name the object
 outright. §37.17 detail 26 and §37.16 detail 31 make a partly indexed packed
 select a vpiLogicVar or vpiLogicNet vector, which the object list alone
-seemed to leave unnamed. Once the answer stands,
+seemed to leave unnamed. A closed set of values that lacks an exact
+match for a construct does not leave the value open: the construct takes the
+one defined value whose meaning holds for it, and a value outside the
+normative header is never an option. Annex M gives vpiQualifier no unique0
+bit, yet §12.4.2 makes unique0 assert the same no-overlap check as unique,
+so it reports vpiUniqueQualifier; vpiNoQualifier would deny a check it makes.
+Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
