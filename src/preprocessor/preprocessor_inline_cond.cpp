@@ -49,7 +49,7 @@ static size_t FindInlineConditional(std::string_view line) {
        i = StepOverStringSyntax(line, i, state)) {
     // A directive sequence sitting inside a string literal is hidden and must
     // not start an inline conditional expansion (22.6).
-    if (state != StringLiteralState::kOutside || line[i] != '`') continue;
+    if (!OutsideEveryString(state) || line[i] != '`') continue;
     auto rest = line.substr(i);
     bool is_ifdef = MatchesDirective(rest, "ifdef");
     bool is_ifndef = MatchesDirective(rest, "ifndef");

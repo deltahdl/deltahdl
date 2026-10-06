@@ -75,22 +75,32 @@ bool AtTripleQuote(std::string_view line, size_t i);
 // The index after the §5.6.1 escaped identifier whose '\' stands at `i`: the
 // identifier runs to the next white space, and every character before that is
 // its own, '"' included. Defined in src/preprocessor/preprocessor_macros.cpp
-// for the tracker of a usage's actual arguments, and read as well by the scans
-// that follow the string literals of a line, which a '"' inside the identifier
-// opens none of.
+// for the tracker of a usage's actual arguments, and read as well by the
+// comment stripper in src/preprocessor/preprocessor.cpp, a '"' inside the
+// identifier opening no string for either.
 size_t EndOfEscapedIdentifier(std::string_view text, size_t i);
 
 // Where a scan along one line stands among A.8.8's string literals: outside
-// every one, inside a quoted_string, or inside a triple_quoted_string.
+// every one, inside a quoted_string, inside a triple_quoted_string, or outside
+// every one but inside a §5.6.1 escaped identifier, where a '"' opens none.
 enum class StringLiteralState : std::uint8_t {
   kOutside,
   kQuoted,
-  kTripleQuoted
+  kTripleQuoted,
+  kEscapedIdentifier
 };
 
-// Steps a scan at `i` over the `"""`, string_escape_seq or escaped identifier
-// beginning there, or else over the one character, updating `state`, and
-// answers where the scan goes on. Defined in
+// Whether a scan in `state` stands outside every string literal, where a
+// backtick opens a macro usage or a directive: inside an escaped identifier it
+// does, the identifier being no string.
+inline bool OutsideEveryString(StringLiteralState state) {
+  return state == StringLiteralState::kOutside ||
+         state == StringLiteralState::kEscapedIdentifier;
+}
+
+// Steps a scan at `i` over the `"""` or string_escape_seq beginning there, into
+// or out of an escaped identifier there, or else over the one character,
+// updating `state`, and answers where the scan goes on. Defined in
 // src/preprocessor/preprocessor_inline.cpp and shared by the scans that look
 // for a backtick outside every string: the inline macro expander, the mid-line
 // directive finder and the inline conditional finder.

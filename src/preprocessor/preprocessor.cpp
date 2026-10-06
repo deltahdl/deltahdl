@@ -574,7 +574,7 @@ static size_t FindMidLineDirective(std::string_view s) {
   auto state = StringLiteralState::kOutside;
   size_t i = 0;
   while (i < s.size()) {
-    if (state == StringLiteralState::kOutside && s[i] == '`' &&
+    if (OutsideEveryString(state) && s[i] == '`' &&
         BacktickIntroducesDirective(s, i)) {
       return i;
     }

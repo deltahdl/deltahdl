@@ -231,17 +231,15 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
-// Steps a scan standing outside every string over the character at `i`, over
+// Steps a scan standing outside every string over the character at `i`, into
 // the escaped identifier a '\' opens there, or over the '"' or `"""` opening a
 // string there. §22.5.1's `" is a macro-quote rather than a string's quote,
-// macro usages between `" and `" being expanded, and a '"' inside a §5.6.1
-// escaped identifier is one of its characters; neither opens a string. The
-// step over an escaped identifier ends at a backtick inside it, so that the
-// scans looking for a backtick still read a macro usage written there.
+// macro usages between `" and `" being expanded, so it opens no string.
 static size_t StepOutsideString(std::string_view line, size_t i,
                                 StringLiteralState& state) {
   if (line[i] == '\\') {
-    return std::min(EndOfEscapedIdentifier(line, i), line.find('`', i + 1));
+    state = StringLiteralState::kEscapedIdentifier;
+    return i + 1;
   }
   if (line[i] != '"' || (i > 0 && line[i - 1] == '`')) return i + 1;
   if (!AtTripleQuote(line, i)) {
@@ -254,11 +252,21 @@ static size_t StepOutsideString(std::string_view line, size_t i,
 
 // A.8.8 closes a quoted_string at its next '"' and a triple_quoted_string only
 // at its next `"""`, a lone '"' being an item of it; inside either a '\' opens
-// a string_escape_seq, so the character after it closes nothing.
+// a string_escape_seq, so the character after it closes nothing. A §5.6.1
+// escaped identifier ends only at white space, every character before that,
+// '"' included, being one of its own; a macro usage written inside it is still
+// found, the identifier being no string, and the scan stays inside the
+// identifier after the usage.
 size_t StepOverStringSyntax(std::string_view line, size_t i,
                             StringLiteralState& state) {
   if (state == StringLiteralState::kOutside) {
     return StepOutsideString(line, i, state);
+  }
+  if (state == StringLiteralState::kEscapedIdentifier) {
+    if (std::isspace(static_cast<unsigned char>(line[i]))) {
+      state = StringLiteralState::kOutside;
+    }
+    return i + 1;
   }
   if (line[i] == '\\') return i + 2;
   if (state == StringLiteralState::kQuoted) {
@@ -273,7 +281,7 @@ size_t StepOverStringSyntax(std::string_view line, size_t i,
 static size_t FindNextBacktick(std::string_view line, size_t pos,
                                StringLiteralState& state) {
   while (pos < line.size()) {
-    if (state == StringLiteralState::kOutside && line[pos] == '`') return pos;
+    if (OutsideEveryString(state) && line[pos] == '`') return pos;
     pos = StepOverStringSyntax(line, pos, state);
   }
   return std::string_view::npos;
