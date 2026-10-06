@@ -90,6 +90,7 @@ size_t AigGraph::ReachableNodeCount() const {
   reached[0] = true;
   for (uint32_t id : inputs) reached[id] = true;
   std::vector<uint32_t> pending;
+  pending.reserve(outputs.size() + latches.size());
   for (uint32_t lit : outputs) pending.push_back(AigVar(lit));
   for (const auto& latch : latches) pending.push_back(AigVar(latch.second));
   while (!pending.empty()) {
