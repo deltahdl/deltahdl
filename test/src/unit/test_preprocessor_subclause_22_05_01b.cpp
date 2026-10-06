@@ -283,6 +283,46 @@ TEST(Preprocessor, QuoteOpeningAnEscapedIdentifierOpensNoString) {
   EXPECT_NE(result.find("assign \\\"q = EXPANDED;"), std::string::npos);
 }
 
+// The same holds for a '"' past an escaped identifier's first character: the
+// identifier runs to the white space ending it (§5.6.1), so a usage after it is
+// source. The line holds one '"' only, so no later '"' could close a string
+// the scan wrongly opened there.
+TEST(Preprocessor, UsageAfterAQuoteInsideAnEscapedIdentifierExpands) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M EXPANDED\n"
+      "assign \\a\"b = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("assign \\a\"b = EXPANDED;"), std::string::npos);
+}
+
+// A directive after an escaped identifier holding a '"' stands after a
+// language element on its line (§22.2), so it acts.
+TEST(Preprocessor, DirectiveAfterAQuoteInsideAnEscapedIdentifierActs) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "assign \\a\"b = 1; `define X 1\n"
+      "`ifdef X\n"
+      "int defined_x;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int defined_x;"), std::string::npos);
+}
+
+// An `ifdef ... `else ... `endif after an escaped identifier holding a '"' is
+// source, so it is resolved: X is undefined and the `else group is kept.
+TEST(Preprocessor, InlineConditionalAfterAQuoteInsideAnEscapedIdentifier) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("assign \\a\"b = `ifdef X one `else two `endif ;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("`ifdef"), std::string::npos);
+  EXPECT_EQ(result.find("one"), std::string::npos);
+  EXPECT_NE(result.find("two"), std::string::npos);
+}
+
 // A directive written inside a triple_quoted_string after a lone '"' is still
 // string text (A.8.8), so the line is not split at it and nothing is defined.
 TEST(Preprocessor, DirectiveAfterALoneQuoteInATripleQuotedStringIsText) {

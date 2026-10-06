@@ -72,6 +72,15 @@ void RestoreComments(std::string& text, size_t from,
 // literals of a line or a macro's text.
 bool AtTripleQuote(std::string_view line, size_t i);
 
+// Where the §5.6.1 escaped identifier whose '\' stands at `i` ends: at the
+// white space ending it, every character before that being the identifier's,
+// '"' included. A backtick ends it here too, so that the macro scans still
+// read a macro usage written there. Defined in
+// src/preprocessor/preprocessor_inline.cpp, and read by the scans that follow
+// the string literals of a line, which a '"' inside the identifier opens none
+// of.
+size_t EndOfEscapedIdentifier(std::string_view line, size_t i);
+
 // Where a scan along one line stands among A.8.8's string literals: outside
 // every one, inside a quoted_string, or inside a triple_quoted_string.
 enum class StringLiteralState : std::uint8_t {
@@ -80,11 +89,12 @@ enum class StringLiteralState : std::uint8_t {
   kTripleQuoted
 };
 
-// Steps a scan at `i` over the `"""` or string_escape_seq beginning there, or
-// else over the one character, updating `state`, and answers where the scan
-// goes on. Defined in src/preprocessor/preprocessor_inline.cpp and shared by
-// the scans that look for a backtick outside every string: the inline macro
-// expander, the mid-line directive finder and the inline conditional finder.
+// Steps a scan at `i` over the `"""`, string_escape_seq or escaped identifier
+// beginning there, or else over the one character, updating `state`, and
+// answers where the scan goes on. Defined in
+// src/preprocessor/preprocessor_inline.cpp and shared by the scans that look
+// for a backtick outside every string: the inline macro expander, the mid-line
+// directive finder and the inline conditional finder.
 size_t StepOverStringSyntax(std::string_view line, size_t i,
                             StringLiteralState& state);
 

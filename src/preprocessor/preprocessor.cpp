@@ -424,12 +424,13 @@ static bool CopyOpenTripleString(std::string_view& line, std::string& output,
 // triple_quoted_string each may span lines, so each is carried from one line
 // to the next by its flag; a quoted_string cannot, A.8.8's quoted_string_item
 // excluding the newline, so its state is the line's own.
-// Copies the `"""` that opens a triple_quoted_string, the unescaped '"' that
-// opens or closes a quoted_string, or one character inside an open
-// quoted_string, and answers whether it copied one; answers false at a
-// character outside every string, which is the comment stripper's to read. A
-// '\' inside a quoted_string opens a string_escape_seq (A.8.8), which is copied
-// whole, so the character after the '\' closes nothing.
+// Copies the `"""` that opens a triple_quoted_string, the '"' that opens or
+// closes a quoted_string, one character inside an open quoted_string, or a
+// §5.6.1 escaped identifier, and answers whether it copied any; answers false
+// at another character outside every string, which is the comment stripper's
+// to read. A '\' inside a quoted_string opens a string_escape_seq (A.8.8), and
+// one outside every string opens an escaped identifier; each is copied whole,
+// so no '"' inside it opens or closes a string.
 static bool CopyStringLiteralChar(std::string_view line, size_t& i,
                                   std::string& result, bool& in_string,
                                   bool& in_triple_string) {
@@ -439,12 +440,13 @@ static bool CopyStringLiteralChar(std::string_view line, size_t& i,
     in_triple_string = true;
     return true;
   }
-  if (in_string && line[i] == '\\') {
-    result += line.substr(i, 2);
-    i += 2;
+  if (line[i] == '\\') {
+    size_t end = in_string ? i + 2 : EndOfEscapedIdentifier(line, i);
+    result += line.substr(i, end - i);
+    i = end;
     return true;
   }
-  if (line[i] == '"' && (in_string || i == 0 || line[i - 1] != '\\')) {
+  if (line[i] == '"') {
     in_string = !in_string;
     result += line[i++];
     return true;

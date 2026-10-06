@@ -201,6 +201,23 @@ TEST(CommentPreprocessing, BlockCommentAfterAStringEndingInAnEscapedBackslash) {
   EXPECT_FALSE(Contains(out, "defined_x"));
 }
 
+// §5.6.1 makes every printable character of an escaped identifier, up to the
+// white space ending it, part of the identifier, so a '"' inside one opens no
+// string: a "/*" after it opens a block_comment, and the directive the
+// comment's next line holds is comment text that defines nothing.
+TEST(CommentPreprocessing, BlockCommentAfterAQuoteInsideAnEscapedIdentifier) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "assign \\a\"b = 1; /* open\n"
+      "`define X 1 */\n"
+      "`ifdef X\n"
+      "int defined_x;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_FALSE(Contains(out, "defined_x"));
+}
+
 // The same for "/*": inside a triple_quoted_string it opens no block_comment,
 // and the "*/" behind it closes none, so the text between them stands and the
 // line after the string is read as code.
