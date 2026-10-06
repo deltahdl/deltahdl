@@ -16,21 +16,20 @@
 #include "simulator/vpi_user.h"
 
 // §36.10: how a pass that has something to say about an elaborated design finds
-// the objects the run built for it. "VPI routines provide access to objects in
-// an instantiated SystemVerilog design. An instantiated design is one where
-// each instance of an object is uniquely accessible", and the simulator makes
-// each one uniquely accessible by keying it on the flat path of the instance it
-// belongs to. These four are what a walk of the design turns that path into an
-// object with. They live in a header of their own because more than one file
-// carries such a pass: the passes that build the objects are in
-// vpi_design_attach.cpp and the ones that describe an already-built object are
-// in vpi_helpers_instance.cpp, and a copy in each would be two answers to one
-// question.
+// the objects the run built for it. VPI routines reach the objects of an
+// instantiated design, one in which every instance of an object can be reached
+// on its own, and the simulator makes each one reachable on its own by keying
+// it on the flat path of the instance it belongs to. These four are what a walk
+// of the design turns that path into an object with. They live in a header of
+// their own because more than one file carries such a pass: the passes that
+// build the objects are in vpi_design_attach.cpp and the ones that describe an
+// already-built object are in vpi_helpers_instance.cpp, and a copy in each
+// would be two answers to one question.
 
 namespace delta {
 
 // The child of `parent` carrying this name, or null where it has none. §36.10
-// makes each instance's objects "uniquely accessible", so one component of a
+// has each instance's objects reachable on their own, so one component of a
 // flat name is matched against the children of the scope reached so far rather
 // than against every object of the design.
 //

@@ -164,7 +164,7 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
 void VpiContext::CallCompiletfForSourceCall(const s_vpi_systf_data& data,
                                             const Expr* call_site,
                                             SimContext& ctx, Arena& arena) {
-  // §36.8.2: "Providing a compiletf routine is optional." A registration that
+  // §36.8.2: a registration need not provide a compiletf routine. One that
   // supplied none has nothing to call and nothing to call it for, so no call
   // object is stood up either.
   if (data.compiletf == nullptr) return;

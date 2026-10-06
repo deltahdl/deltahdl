@@ -222,8 +222,8 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
 }
 
 std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
-  // §36.10.3: "Expressions with multiple operands will result in a handle of
-  // type vpiOperation", and the routine the clause prints for walking one
+  // §36.10.3: an expression of more than one operand is reached as a handle of
+  // type vpiOperation, and the routine the clause prints for walking one
   // reaches those operands with vpi_iterate(vpiOperand, expr). An operand is
   // itself an expression - the example recurses into each - so the operands are
   // the operation's expression children, in the order it was written.

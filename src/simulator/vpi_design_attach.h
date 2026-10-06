@@ -7,11 +7,10 @@ struct RtlirDesign;
 struct VpiObject;
 
 // §36.6: put the design the run has just built within reach of the PLI
-// applications linked into this tool, so that "the library of PLI C functions"
+// applications linked into this tool, so that the PLI library of C functions
 // they call has something to answer with. The clause is what those applications
-// are: "C language functions that utilize the library of PLI C functions to
-// access and interact dynamically with SystemVerilog software implementations
-// as the SystemVerilog source code is executed". The library is there whatever
+// are: C functions that use that library to reach the design and act on it
+// while its source code executes. The library is there whatever
 // this does -- vpi_handle_by_name and vpi_get_value are compiled into the tool
 // -- and what is not there without it is the design they name, so an
 // application calling vpi_handle_by_name from inside its calltf resolves the

@@ -893,14 +893,14 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
     delete iter;
     return nullptr;
   }
-  // §36.12.3: "If the design contains unsupported constructs, the behavior of
-  // the VPI implementation is undefined. The extent of checking for consistency
-  // between constructs and mode is left to the discretion of the VPI
-  // implementation." This is the extent of it: an application running under a
-  // compatibility mode that reaches a construct its standard has no notion of
-  // is told so through §38.2's error, rather than left with a behavior nobody
-  // defined. What it reached still comes back, because §36.12.2 rules out
-  // emulating a construct that has no older behavior to emulate.
+  // §36.12.3: a design holding a construct the mode does not support leaves the
+  // VPI implementation's behavior undefined, and how far the implementation
+  // checks that the constructs suit the mode is its own choice. This is the
+  // extent of it: an application running under a compatibility mode that
+  // reaches a construct its standard has no notion of is told so through
+  // §38.2's error, rather than left with a behavior nobody defined. What it
+  // reached still comes back, because §36.12.2 rules out emulating a construct
+  // that has no older behavior to emulate.
   const char* unsupported =
       VpiCompatibilityUnsupportedConstruct(compatibility_mode, iter->children);
   if (unsupported != nullptr) {

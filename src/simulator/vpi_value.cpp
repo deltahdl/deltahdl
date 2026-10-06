@@ -589,11 +589,11 @@ static bool PutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
     return true;
   }
 
-  // §36.5: a user-defined system function "returns a value" and a user-defined
-  // system task "does not return any value", so a write through the call handle
+  // §36.5: a user-defined system function yields a value and a user-defined
+  // system task yields none, so a write through the call handle
   // §37.42 gives the application -- which is how a system function's result is
   // delivered -- has nowhere to land on a task call. §38.34 lists the objects
-  // this routine "can be applied to" and names system function calls among
+  // this routine applies to and names system function calls among
   // them, with no system task call beside it. The put is rejected, an error is
   // recorded, and the run reads no value out of the task.
   if (obj->type == vpiSysTaskCall) {

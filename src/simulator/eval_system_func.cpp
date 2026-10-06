@@ -801,12 +801,12 @@ static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
 // halves through `out` so that the evaluator below asks the registry once,
 // where it asked once before §36.5's report was owed as well.
 //
-// §36.5: a user-defined system task "can be used in the same places a
-// SystemVerilog void function can be used", and §13.4.1 has exactly one such
-// place -- "function calls may be used as expressions unless of type void,
-// which are statements". The caller is the other position, so a task named
-// there is a task standing where a value is wanted, and the clause's own
-// reason is what is reported: a task "does not return any value". The
+// §36.5: a user-defined system task may stand wherever a void function may,
+// and §13.4.1 gives a void function call exactly one such place, a statement,
+// since only a call of a non-void function may serve as an expression. The
+// caller is the other position, so a task named there is a task standing where
+// a value is wanted, and the clause's own reason is what is reported: a task
+// yields no value. The
 // statement executor calls the application instead (TryExecSystemCallTask),
 // which is why nothing reaching here is the task's one legal position.
 static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
@@ -825,9 +825,8 @@ static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
 
   // §36.4: `expr` is the call site, so the task/function arguments it wrote are
   // what the application reads through §37.42's vpiArgument iteration. They are
-  // not handed to the application as C arguments -- "the task/function
-  // arguments are not passed to the PLI application" -- and the calltf's own
-  // parameter stays its registered user_data.
+  // not handed to the application as C arguments, which the clause rules out,
+  // and the calltf's own parameter stays its registered user_data.
   return GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(),
                                                    expr, ctx, out, arena);
 }
@@ -855,20 +854,19 @@ static bool TryEvalAnnexDFunction(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
-  // §36.3.2: "If a user-provided PLI application is associated with the same
-  // name as a built-in system task or system function (using the PLI
-  // mechanism), the user-provided C application shall override the built-in
-  // system task or system function, replacing its functionality", the clause's
-  // own example being an application registered as $random. The registry is
-  // therefore asked ahead of everything below rather than after it, and
-  // §38.37.1 has the application's calltf called "each time the system task or
-  // system function is invoked during simulation execution", which is here.
+  // §36.3.2: an application registered through the PLI under the name of a
+  // built-in system task or system function takes the built-in's place and
+  // replaces what it does, the clause's own example being an application
+  // registered as $random. The registry is therefore asked ahead of everything
+  // below rather than after it, and §38.37.1 has the application's calltf
+  // called on every invocation of the system task or system function while the
+  // simulation runs, which is here.
   //
   // A name no registration claims falls through to the built-ins, and past them
   // to §20.1's report. §36.3.2's one exception needs nothing of this dispatch:
-  // "SystemVerilog timing checks, such as $setup, are not system tasks and
-  // cannot be overridden", and a timing check reaches the specify machinery
-  // rather than this evaluator.
+  // a timing check such as $setup is not a system task and no application can
+  // replace it, and a timing check reaches the specify machinery rather than
+  // this evaluator.
   Logic4Vec systf_result;
   if (TryEvalRegisteredSystf(expr, ctx, arena, name, systf_result)) {
     return systf_result;

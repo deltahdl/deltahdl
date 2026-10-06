@@ -1,7 +1,7 @@
-// §36.12.2: "In order to ease the transition to the latest VPI standard for
-// older applications, capability shall be provided to emulate the incompatible
-// VPI behaviors where they conflict with the current standard. This allows
-// older VPI applications dependent on these behaviors to be run unmodified."
+// §36.12.2: so that older applications can move to the current VPI standard
+// gradually, a tool is required to be able to emulate each older VPI behavior
+// that conflicts with the current one, which lets an application relying on
+// such a behavior run without changes.
 // §36.12.2.1's mechanism binds an application to one of those behaviors at
 // compile time: selecting a version symbol retargets every standard entry point
 // to that version's variant, and simulator/vpi_compatibility.h performs the
@@ -36,10 +36,9 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args);
 
 namespace {
 
-// §36.12.1 Table 36-10 row 5: "vpiVariables iterations include vpiReg and
-// vpiRegArray" is Y in the IEEE 1800 standards and N in the IEEE 1364 ones, in
-// which "vpiReg and vpiRegArray objects were excluded from vpiVariables
-// iterations".
+// §36.12.1 Table 36-10 row 5: whether a vpiVariables iteration reaches vpiReg
+// and vpiRegArray objects is Y in the IEEE 1800 standards and N in the IEEE
+// 1364 ones, whose vpiVariables iterations left those objects out.
 bool Vpi1364VariablesKeeps(int obj_type) {
   return obj_type != vpiReg && obj_type != vpiRegArray;
 }
@@ -65,9 +64,9 @@ bool VpiModeIs1364(int mode) {
 }
 
 // §36.12.1 Table 36-10 rows 1 and 2 with Annex C.4.3 items 1 and 2: vpiMemory
-// and vpiMemoryWord are object types "under certain backwards compatibility
-// modes", present in IEEE Std 1364-1995 and, deprecated, in IEEE Std 1364-2001
-// (Y and D), and "no longer present" from IEEE Std 1364-2005 on, where a memory
+// and vpiMemoryWord are object types only some of the older compatibility
+// modes have, present in IEEE Std 1364-1995 and, deprecated, in IEEE Std
+// 1364-2001 (Y and D), and gone from IEEE Std 1364-2005 on, where a memory
 // is a vpiRegArray and its word a vpiReg as in this standard.
 bool VpiModeHasMemoryObjects(int mode) {
   return mode == vpiMode1364v1995 || mode == vpiMode1364v2001;
@@ -128,14 +127,14 @@ namespace delta {
 
 const char* VpiCompatibilityUnsupportedConstruct(
     int mode, const std::vector<VpiObject*>& objects) {
-  // §36.12.3 leaves "the extent of checking for consistency between constructs
-  // and mode ... to the discretion of the VPI implementation", and this is the
-  // extent of it. Annex K reserves the object-type values 1 through 299 for
-  // vpi_user.h and Annex M reserves 600 through 999 for the SystemVerilog
-  // extensions, so a kind numbered in Annex M's range is a construct the IEEE
-  // 1364 standards have no notion of. An application running under one of their
-  // modes that reaches such an object is applied to a design §36.12.2 says the
-  // mechanism does not cover, and it is told so.
+  // §36.12.3 leaves it to each VPI implementation how far it checks that the
+  // constructs of a design suit the mode, and this is the extent of it. Annex K
+  // reserves the object-type values 1 through 299 for vpi_user.h and Annex M
+  // reserves 600 through 999 for the SystemVerilog extensions, so a kind
+  // numbered in Annex M's range is a construct the IEEE 1364 standards have no
+  // notion of. An application running under one of their modes that reaches
+  // such an object is applied to a design §36.12.2 says the mechanism does not
+  // cover, and it is told so.
   if (!VpiModeIs1364(mode)) return nullptr;
   for (const auto* object : objects) {
     if (object->type >= 600 && object->type <= 999) {

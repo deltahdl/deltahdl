@@ -63,21 +63,21 @@ int RunTimeConstType(const Expr& actual) {
 // §36.4: one task/function argument as the application reaches it. An actual
 // that names a variable is carried by that variable itself, so a write through
 // vpi_put_value lands where the design will read it and a read sees whatever
-// the design last wrote -- the clause asks for both, "PLI routines are provided
-// that allow the PLI applications to read and write to the task/function
-// arguments". Anything else is an expression rather than a name: its value goes
-// into a holder of its own, which reads correctly and which a write cannot
-// carry back to a call site with nowhere to put it.
+// the design last wrote -- the clause asks for both, giving applications PLI
+// routines that read and write the task/function arguments. Anything else is an
+// expression rather than a name: its value goes into a holder of its own, which
+// reads correctly and which a write cannot carry back to a call site with
+// nowhere to put it.
 //
 // §37.42 detail 8 spells an omitted argument, which a call site writes as an
 // empty position, and VpiMakeEmptyArgument is what sets that shape.
 //
 // `evaluate` is what separates the two periods a call object is built in.
-// §36.8.3 has the calltf called "each time the associated user-defined system
-// task or system function is executed", so an actual that is an expression has
+// §36.8.3 has the calltf called on every execution of its user-defined system
+// task or system function, so an actual that is an expression has
 // a value there and the holder is filled with it. §36.8.2 has the compiletf
-// called "when the user-defined system task or system function name is
-// encountered during parsing or compiling", where the design has not run: there
+// called when the parse or compile meets the user-defined system task or
+// system function's name, where the design has not run: there
 // is no value to read, and reading one would mean running the source's own
 // functions once per call site before the simulation started, so the holder is
 // left empty and the argument stands for what the source wrote rather than for
@@ -327,12 +327,12 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   // of its own for the application to write and for this routine's caller to
   // read back.
   auto* value_holder = arena.Create<Variable>();
-  // §36.8.1: "The value returned by the sizetf routine shall be the number of
-  // bits that the calltf routine shall provide as the return value for the
-  // system function", so the holder the application writes through is that
-  // wide. §38.37.1's default is what SystfResultSizeBits answers where no
-  // sizetf is provided: "a user-defined system function of type vpiSizedFunc or
-  // vpiSizedSignedFunc shall return 32 bits". A sizetf answering with no bits
+  // §36.8.1: a sizetf routine answers with the width in bits of the value the
+  // calltf routine returns for the system function, so the holder the
+  // application writes through is that wide. §38.37.1's default is what
+  // SystfResultSizeBits answers where no sizetf is provided: a user-defined
+  // system function of type vpiSizedFunc or vpiSizedSignedFunc then returns 32
+  // bits. A sizetf answering with no bits
   // at all describes no value, so the default stands rather than a width
   // nothing can hold.
   int result_bits = SystfResultSizeBits(data);

@@ -62,9 +62,9 @@ class VpiContext {
 
   // §36.8.2: run the compiletf of one system task or system function call the
   // source description wrote, with that call standing where the application
-  // looks for it. The clause has the routine "check the correctness of any
-  // arguments passed to the user-defined system task or system function in the
-  // SystemVerilog source code", and §36.4 leaves an application no other way of
+  // looks for it. The clause has the routine verify the arguments the source
+  // code passes to the user-defined system task or system function, and §36.4
+  // leaves an application no other way of
   // reaching those arguments -- a compiletf is handed its own user_data and
   // nothing else -- so a compiletf called with no current call is one that can
   // check nothing. `call_site` is the expression the source wrote, and its
@@ -620,10 +620,10 @@ class VpiContext {
     return systfs_;
   }
 
-  // §36.8.1: the number of bits "that the calltf routine shall provide as the
-  // return value for the system function". VpiSystfResultSizeBits computes it,
-  // and this is where the clause's other sentence about the routine lands:
-  // "Each sizetf routine shall be called at most once." The first ask of a
+  // §36.8.1: the width in bits of the value the calltf routine returns for the
+  // system function. VpiSystfResultSizeBits computes it, and this is where the
+  // clause's other rule about the routine lands: no sizetf routine may be
+  // called more than once. The first ask of a
   // registration runs it; every later ask answers with what that run returned,
   // so a system function a design calls a thousand times is sized once.
   //
@@ -649,13 +649,11 @@ class VpiContext {
   VpiToolPhase ToolPhase() const { return tool_phase_; }
 
   // §36.10.2: whether `routine` is refused because the tool has not reached the
-  // phase that makes it available. "When the routines within the
-  // vlog_startup_routines[] array are executed, there is very little
-  // functionality available. Only the following two routines can be called at
-  // this time" -- vpi_register_systf() and vpi_register_cb() -- and the sizetf
-  // phase that follows adds none, "no additional access" being permitted there.
-  // All functionality arrives with the cbEndOfCompile callbacks and stands
-  // "until the tool has finished execution".
+  // phase that makes it available. While the vlog_startup_routines[] array
+  // runs, almost nothing is available and only two routines may be called --
+  // vpi_register_systf() and vpi_register_cb() -- and the sizetf phase that
+  // follows permits nothing further. All functionality arrives with the
+  // cbEndOfCompile callbacks and lasts until the tool's execution is over.
   //
   // A refused call records §36.10.1's error, which is what vpi_chk_error
   // reports, and the entry point yields nothing rather than answering out of a
@@ -746,8 +744,8 @@ class VpiContext {
   VpiHandle ActivateFrame(const void*& thread);
   void RestoreActiveFrame(VpiHandle previous, const void* thread);
 
-  // §36.10.1: "Callbacks can be set up for when an error occurs as well." This
-  // is that occurrence, delivered on the way out of the VPI routine that
+  // §36.10.1: a callback may also be registered for the occurrence of an error.
+  // This is that occurrence, delivered on the way out of the VPI routine that
   // recorded the error. Which reason it goes to is written where it is defined.
   void NoteErrorRecorded();
 

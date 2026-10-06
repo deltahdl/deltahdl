@@ -858,9 +858,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   // §36.6: the design is put within reach of the PLI applications here, ahead
   // of the build period below and of every event after it, because a routine
-  // called in either period is one of the "C language functions that utilize
-  // the library of PLI C functions to access and interact dynamically with
-  // SystemVerilog software implementations".
+  // called in either period is one of the C functions the clause defines a PLI
+  // application as, which reach the running design through the PLI library and
+  // act on it as it executes.
   AttachDesignToPliApplications(design, ctx_);
 
   // §36.8: the simulation data structure is built by the time this returns, so

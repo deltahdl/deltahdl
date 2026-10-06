@@ -680,11 +680,11 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // this -- so what is kept is the run itself.
   sim_ctx_ = &sim_ctx;
 
-  // §36.10: "VPI routines provide access to objects in an instantiated
-  // SystemVerilog design. An instantiated design is one where each instance of
-  // an object is uniquely accessible. For instance, if a module m contains wire
-  // w and is instantiated twice as m1 and m2, then m1.w and m2.w are two
-  // distinct objects, each with its own set of related objects and properties."
+  // §36.10: VPI routines reach the objects of an instantiated design, one in
+  // which every instance of an object can be reached on its own. The clause's
+  // example is a module m declaring wire w and instantiated as m1 and m2, where
+  // m1.w and m2.w are separate objects, each with its own related objects and
+  // properties.
   //
   // The simulator has that already: it keys each instance's object on a flat
   // string carrying the instance prefix, so m1.w and m2.w are two entries over

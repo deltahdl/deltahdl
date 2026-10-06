@@ -147,9 +147,9 @@ vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
           delta::VpiRoutine::kIterate)) {
     return nullptr;
   }
-  // §36.12.2.2: the default mode the run was given "shall determine the
-  // compatibility mode VPI behavior for all applications not using the
-  // compile-based scheme detailed in Mechanism 1", and an application reaching
+  // §36.12.2.2: the default mode the run was given is what sets the VPI
+  // compatibility behavior of every application that does not use Mechanism 1's
+  // compile-time scheme, and an application reaching
   // this entry point is one of those - the compile-based scheme renames its
   // calls to the variants in vpi_compatibility.cpp instead. The mode was
   // recorded and read by nothing, so it determined no behavior at all.
