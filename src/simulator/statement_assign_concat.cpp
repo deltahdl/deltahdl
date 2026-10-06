@@ -274,8 +274,8 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
   auto end_val = EvalExpr(sel->index_end, ctx, arena);
   if (HasUnknownBits(end_val)) return 0;
   if (!is_indexed && HasUnknownBits(idx_val)) return 0;
-  // §5.7.1 makes a bare decimal a signed integer and §11.5.1 asks for "constant
-  // integer expressions" as the bounds, so a negative one is read through
+  // §5.7.1 makes a bare decimal a signed integer and §11.5.1 asks for constant
+  // integer expressions as the bounds, so a negative one is read through
   // SelectBoundValue rather than cast from ToUint64. The window this width is
   // paired with reads it the same way, and the two have to agree: sized here
   // from an unsigned 4294967294 and written from a signed -2, an element would
