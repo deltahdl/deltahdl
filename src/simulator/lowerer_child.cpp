@@ -507,13 +507,12 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   // specparam and this instance's specparam variables are created below.
   RecordSpecifyScope(child.resolved);
   // §26.3: an import makes a package's names visible in the scope that writes
-  // the import. A module
-  // writes its own imports whether it is the top or an instance, so the
-  // instance's are lowered here, and before its variables as LowerModule orders
-  // the top's: §6.8 sets a variable's initial value as part of its declaration,
-  // a reference the declaring scope makes with the imported names already
-  // visible. A name the instance declares itself is left to the declaration
-  // by LowerImports (§26.5).
+  // the import. A module writes its own imports whether it is the top or an
+  // instance, so the instance's are lowered here, and before its variables as
+  // LowerModule orders the top's: §6.8 sets a variable's initial value as part
+  // of its declaration, a reference the declaring scope makes with the
+  // imported names already visible. A name the instance declares itself is
+  // left to the declaration by LowerImports (§26.5).
   LowerImports(child.resolved);
   // §6.19 with §23.3: an enumeration the instance's module declares is a type
   // of that module wherever it is instantiated, registered as LowerModule
