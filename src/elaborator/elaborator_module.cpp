@@ -152,6 +152,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->name = decl->name;
   mod->loc = decl->range.start;
   mod->library = decl->library;
+  mod->fsms = decl->fsms;
   mod->has_param_port_list = decl->has_param_port_list;
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   InitInterfaceHeader(mod, decl);

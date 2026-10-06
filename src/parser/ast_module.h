@@ -12,6 +12,7 @@
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_fsm.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -483,6 +484,9 @@ struct ModuleItem {
   // introduces once -- an inline enumeration's named constants, say -- is not
   // taken to be introduced again by each name in the list.
   bool first_in_decl_list = true;
+  // §40.4.1 and §40.4.6: the enumeration name of the FSM pragma written in
+  // this item's declaration, before its first name; empty for none.
+  std::string_view fsm_enum;
 
   // §27.4: set on the declaration produced by `genvar i;`. A genvar is parsed
   // as a variable declaration because that is its shape, but it "is used as an
@@ -864,6 +868,8 @@ struct ModuleDecl {
   bool has_param_port_list = false;
   std::vector<ModportDecl*> modports;
   std::vector<BindDirective*> bind_directives;
+  // §40.4: the FSMs the pragmas written in this definition identify.
+  std::vector<FsmDecl> fsms;
 
   bool is_cell = false;
 

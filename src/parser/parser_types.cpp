@@ -1,10 +1,12 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -716,11 +718,15 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
     // Parser::ParseNetStrength read the legal position, back in ParseDataType.
     ReportDriveStrengthAfterDelay(nd1);
   }
+  // §40.4.1 and §40.4.4: a pragma right after the bit range gives the signals
+  // declared here the enumeration name of the FSM they hold the state of.
+  const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
   bool first = true;
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = actual_dtype.is_net ? ModuleItemKind::kNetDecl
                                      : ModuleItemKind::kVarDecl;
+    item->fsm_enum = kFsmEnum;
     item->first_in_decl_list = first;
     first = false;
     item->loc = CurrentLoc();
@@ -827,11 +833,15 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   }
   DataType dtype = ParseDataType();
   ParseImplicitParamRange(dtype);
+  // §40.4.6: a pragma right after the keyword or the bit width makes the
+  // parameters declared here the legal states of the FSM it names.
+  const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
 
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
     item->is_localparam = localparam;
+    item->fsm_enum = kFsmEnum;
     item->loc = loc;
     item->data_type = dtype;
     item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.1")).text;

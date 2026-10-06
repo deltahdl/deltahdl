@@ -68,6 +68,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_dpi_validate.cpp
     parser/parser_aggregate_types.cpp
     parser/parser_declaration.cpp
+    parser/parser_fsm.cpp
     parser/parser_types.cpp
     parser/parser_generate.cpp
     parser/parser_class.cpp
@@ -341,6 +342,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_pattern.cpp
     simulator/statement_assign_nonblocking.cpp
     simulator/assertion_read_names.cpp
+    simulator/fsm_coverage.cpp
     simulator/lowerer.cpp
     simulator/lowerer_params.cpp
     simulator/lowerer_always_comb.cpp

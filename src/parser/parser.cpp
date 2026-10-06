@@ -16,6 +16,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
+#include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
 
@@ -269,6 +270,7 @@ CompilationUnit* Parser::Parse() {
   DefaultLibraryToWork(unit->packages);
   DefaultLibraryToWork(unit->configs);
   unit->triggered_names = std::move(triggered_names_);
+  BindFsmPragmas(lexer_, *unit);
   return unit;
 }
 

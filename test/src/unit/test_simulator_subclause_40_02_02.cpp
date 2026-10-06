@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_fsm_pragma_lexing.h"
 #include "simulator/vpi_coverage.h"
 
@@ -73,6 +76,71 @@ TEST(CoverageNomenclature, FsmExtractionIsForcedByThePragma) {
   EXPECT_EQ(pragmas[0].signal, "cur_state");
   EXPECT_TRUE(pragmas[0].has_enum);
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
+}
+
+// §40.2.2 with §40.4 and §40.3.2.2/§40.3.2.3: an FSM its pragmas declare is
+// counted in the run, its maximum the legal states the parameters tagged with
+// its enumeration name and its current count the distinct ones of those the
+// state signal has held. A state held twice counts once, and a value that is
+// no legal state counts not at all. The §40.3.1 constants are written as
+// their values, `SV_COV_FSM_STATE 21 and `SV_COV_HIER 11 (#3603).
+TEST(CoverageNomenclature, AnFsmCountsTheLegalStatesItsSignalReached) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1, DONE = 2;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  initial begin\n"
+      "    st = IDLE; #1 st = RUN; #1 st = IDLE; #1 st = 3; #1\n"
+      "    $display(\"%0d %0d\", $coverage_get_max(21, 11, \"top\"),\n"
+      "             $coverage_get(21, 11, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "3 2\n");
+}
+
+// §40.4.2: an FSM whose state a part-select holds reaches a state when the
+// selected bits take its value, whatever the rest of the vector holds.
+TEST(CoverageNomenclature, APartSelectFsmReadsOnlyItsSelectedBits) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum sel_e */ A = 0, B = 3;\n"
+      "  /* tool state_vector bus[5:4] sel_fsm enum sel_e */\n"
+      "  logic [7:0] bus;\n"
+      "  initial begin\n"
+      "    bus = 8'b1011_0101; #1\n"
+      "    $display(\"%0d %0d\", $coverage_get_max(21, 11, \"top\"),\n"
+      "             $coverage_get(21, 11, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "2 1\n");
+}
+
+// §40.3.2.1: `SV_COV_STOP (1) stops collection over the scope, so a state the
+// FSM reaches after it is not counted.
+TEST(CoverageNomenclature, AStoppedScopeCountsNoFurtherStates) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    st = IDLE; #1 r = $coverage_control(1, 21, 11, \"top\");\n"
+      "    st = RUN; #1\n"
+      "    $display(\"%0d\", $coverage_get(21, 11, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1\n");
 }
 
 // §40.2.2, statement coverage: executed at least once is what covered means, so

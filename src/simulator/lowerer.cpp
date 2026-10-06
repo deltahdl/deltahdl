@@ -23,11 +23,13 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/coverage_control.h"
 #include "simulator/dpi_export.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/fsm_coverage.h"
 #include "simulator/lowerer_always_comb.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
@@ -177,12 +179,27 @@ void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
   }
 }
 
+std::string CoverageScopeOfInstanceKey(const std::string& key,
+                                       const SimContext& ctx) {
+  const std::string_view kTop = ctx.FirstTopModule();
+  const std::string_view kHead = std::string_view(key).substr(0, key.find('.'));
+  if (kTop.empty() || ctx.IsParallelTop(kHead)) return key;
+  return key.empty() ? std::string(kTop) : std::string(kTop) + "." + key;
+}
+
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
                                 std::string_view library, std::string_view name,
                                 SimContext& ctx) {
   std::string key = inst_prefix;
   if (!key.empty() && key.back() == '.') key.pop_back();
   ctx.RegisterInstanceType(key, name);
+  // §40.3.2.1 Table 40-2: the coverage system functions name an instance by
+  // its hierarchical path and every instance of a module by the module's
+  // name, so each instance is a scope of the run's coverage-control state,
+  // which knows it as an instance of its definition; one the state was never
+  // told of reads as a nonexisting module, `SV_COV_ERROR.
+  ctx.GetCoverageControlState().SetModuleDefinition(
+      CoverageScopeOfInstanceKey(key, ctx), std::string(name));
   // §33.7: record this instance's resolved library.cell so the %l/%L display
   // specifier can report its binding. The cell is the module's design-element
   // name; the library is the one it was compiled into.
@@ -818,6 +835,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterClassTypeAliases(design, ctx_, arena_);
 
   AttachDesignClocking();
+  // §40.2.2 with §40.4: the FSMs the design's pragmas identify are counted
+  // from here, every module and its variables lowered.
+  AttachFsmCoverage(design, ctx_);
   LinkCheckerInstantiations();
 
   RegisterDesignAssertionSampling();

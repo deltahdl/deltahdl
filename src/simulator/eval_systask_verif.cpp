@@ -287,6 +287,17 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
+// Builds the integer result of the §40.3.2 coverage functions, which is one of
+// the §40.3.1 status values or a positive count. §40.3.2.2 and §40.3.2.3 give
+// `SV_COV_OVERFLOW (-2) and `SV_COV_ERROR (-1) as negative results, so the
+// value is a signed 32-bit integer, as an int would be: an unsigned one
+// printed -1 as 4294967295 and was never below zero.
+static Logic4Vec CoverageIntResult(Arena& arena, int value) {
+  Logic4Vec result = MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
+  result.is_signed = true;
+  return result;
+}
+
 // §40.3.2.1 Table 40-2: the scope_def argument beside the scope says how far
 // the call reaches - `SV_COV_HIER over "the named instance and any hierarchy
 // below it", `SV_COV_MODULE over that instance alone, "excluding any hierarchy
@@ -319,9 +330,8 @@ static bool CoverageScopeDefIncludesBelow(const Expr* expr, SimContext& ctx,
 // values. The action is applied to the simulation's coverage-control state.
 static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
                                      Arena& arena) {
-  auto status_vec = [&](CoverageStatus status) {
-    return MakeLogic4VecVal(arena, 32,
-                            static_cast<uint32_t>(static_cast<int>(status)));
+  auto status_vec = [&arena](CoverageStatus status) {
+    return CoverageIntResult(arena, static_cast<int>(status));
   };
   // A control constant outside the §40.3.1 set (or a missing one) is a bad
   // argument, reported as `SV_COV_ERROR.
@@ -349,13 +359,6 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   }
   return status_vec(
       ctx.GetCoverageControlState().Control(control, scope, include_below));
-}
-
-// Builds the 32-bit integer coverage result shared by the §40.3.2 query
-// functions ($coverage_get_max/$coverage_get/$coverage_merge/$coverage_save),
-// whose result is always one of the §40.3.1 status values or a positive count.
-static Logic4Vec CoverageIntResult(Arena& arena, int value) {
-  return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
 }
 
 // Extracts the optional string literal argument (scope name or coverage

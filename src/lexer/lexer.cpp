@@ -339,6 +339,25 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
   fsm_state_pragmas_.push_back(pragma);
 }
 
+// Whether `a` stands before `b` in the one text they are both in.
+static bool LocBefore(SourceLoc a, SourceLoc b) {
+  return a.file_id == b.file_id &&
+         (a.line < b.line || (a.line == b.line && a.column < b.column));
+}
+
+std::string_view Lexer::ClaimFsmEnumPragma(SourceLoc before) {
+  std::string_view claimed;
+  while (fsm_pragmas_claimed_ < fsm_state_pragmas_.size()) {
+    const FsmStatePragma& pragma = fsm_state_pragmas_[fsm_pragmas_claimed_];
+    if (!LocBefore(pragma.loc, before)) break;
+    if (pragma.form == FsmStatePragma::Form::kEnumOnly) {
+      claimed = pragma.enum_name;
+    }
+    ++fsm_pragmas_claimed_;
+  }
+  return claimed;
+}
+
 void Lexer::TryRecognizeFsmPartSelectPragma(
     const std::vector<std::string_view>& words, SourceLoc loc) {
   // The caller has already matched the leading `tool state_vector`. §40.4.2's
@@ -779,8 +798,8 @@ std::vector<Token> Lexer::LexAll() {
 }
 
 Lexer::SavedPos Lexer::SavePos() const {
-  return {pos_,          line_,   column_,         has_peeked_,
-          in_attribute_, peeked_, keyword_version_};
+  return {pos_,          line_,   column_,          has_peeked_,
+          in_attribute_, peeked_, keyword_version_, fsm_pragmas_claimed_};
 }
 
 void Lexer::RestorePos(const SavedPos& saved) {
@@ -791,6 +810,7 @@ void Lexer::RestorePos(const SavedPos& saved) {
   in_attribute_ = saved.in_attribute;
   peeked_ = saved.peeked;
   keyword_version_ = saved.keyword_version;
+  fsm_pragmas_claimed_ = saved.fsm_pragmas_claimed;
 }
 
 }  // namespace delta

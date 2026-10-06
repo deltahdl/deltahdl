@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "cstddef"
 #include "lexer/keywords.h"
 #include "lexer/token.h"
 
@@ -90,6 +92,14 @@ class Lexer {
     return fsm_concat_pragmas_;
   }
 
+  // §40.4.1 and §40.4.6: the enumeration name of the last enum-only pragma,
+  // of those no declaration has claimed yet, that stands before `before`,
+  // where a declaration's first name stands: the pragma written right after
+  // the `parameter` keyword or the bit range of that declaration. It and every
+  // pragma before it are claimed, so a later declaration does not take them.
+  // Empty where no such pragma stands there.
+  std::string_view ClaimFsmEnumPragma(SourceLoc before);
+
   struct SavedPos {
     uint32_t pos;
     uint32_t line;
@@ -98,6 +108,9 @@ class Lexer {
     bool in_attribute;
     Token peeked;
     KeywordVersion keyword_version;
+    // A declaration parsed and backed out of gives back the pragmas it
+    // claimed, for the declaration parsed in its place.
+    std::size_t fsm_pragmas_claimed;
   };
   SavedPos SavePos() const;
   void RestorePos(const SavedPos& saved);
@@ -202,6 +215,8 @@ class Lexer {
   // TryRecognizeFsmStatePragma, so a comment read again after RestorePos is
   // recognized once.
   uint32_t first_unseen_comment_ = 0;
+  // How many of fsm_state_pragmas_ ClaimFsmEnumPragma has claimed.
+  std::size_t fsm_pragmas_claimed_ = 0;
 };
 
 }  // namespace delta

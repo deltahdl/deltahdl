@@ -17,6 +17,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_fsm.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -696,10 +697,9 @@ struct RtlirModule {
   // without the preprocessor, the compilation unit's.
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
 
-  // Annex E.2 and E.3: the default decay time and charge strength for this
-  // module's trireg nets that declare none, the directives in force where the
-  // module was declared or, for a module parsed without the preprocessor, the
-  // compilation unit's.
+  // Annex E.2 and E.3: the default decay time and charge strength of this
+  // module's trireg nets that declare none, the directives in force where it
+  // was declared or, parsed without the preprocessor, the compilation unit's.
   uint64_t default_decay_time = 0;
   bool default_decay_time_infinite = true;
   uint32_t default_trireg_strength = 0;
@@ -726,11 +726,11 @@ struct RtlirModule {
   std::vector<RtlirProcess> processes;
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;
-  // §14.3's clocking blocks declared in this module, in source order. The item
-  // is carried rather than resolved because §14.3 puts the clock, the skews and
-  // the direction of each signal in it and the simulator's ClockingManager
-  // wants all three; elaboration validates them (Elaborator::
-  // ValidateClockingBlock) and this is what lets the run have them at all.
+  // §40.4: the FSMs the module definition's pragmas identify.
+  std::vector<FsmDecl> fsms;
+  // §14.3's clocking blocks declared in this module, in source order, carried
+  // whole for the clock, skews and signal directions the ClockingManager needs
+  // once Elaborator::ValidateClockingBlock has validated them.
   std::vector<ModuleItem*> clocking_blocks;
   // §16.14 and §16.4: the assertions written as items of the module, the
   // concurrent ones and the deferred immediate ones, in source order; §37.12:

@@ -21,10 +21,12 @@
 
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <string_view>
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 
@@ -204,6 +206,69 @@ TEST(CoverageGetMax, AMissingScopeNamesNothingAndIsABadArgument) {
       {MkInt(f.arena, static_cast<uint64_t>(kToggle)), MkInt(f.arena, kHier)});
   EXPECT_EQ(static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()),
             kError);
+}
+
+// -1 (`SV_COV_ERROR) is a signed result: printed directly it reads -1, and
+// a test of it against zero finds it below, as the negative status values of
+// §40.3.1 are meant to be found. The query names an instance the design lacks,
+// for each of the three functions that take a scope (#4668).
+TEST(CoverageGetMax, AFailedQueryIsANegativeInteger) {
+  SimFixture f;
+  const std::string kOut = PreprocessAndCapture(
+      "module top;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", $coverage_get_max(`SV_COV_STATEMENT,"
+      " `SV_COV_MODULE, \"nosuch\"));\n"
+      "    $display(\"%0d\", $coverage_get(`SV_COV_STATEMENT, `SV_COV_MODULE,"
+      " \"nosuch\"));\n"
+      "    $display(\"%0d\", $coverage_control(`SV_COV_CHECK,"
+      " `SV_COV_STATEMENT, `SV_COV_MODULE, \"nosuch\"));\n"
+      "    $display(\"%0d\", $coverage_get_max(`SV_COV_STATEMENT,"
+      " `SV_COV_MODULE, \"nosuch\") < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "-1\n-1\n-1\n1\n");
+}
+
+// §40.3.2.1 with §40.3.2.2: an instance the design elaborates is a scope the
+// queries take by name, offering no coverage until a type is counted for it,
+// while a name the design lacks is still a bad argument (#4662).
+TEST(CoverageGetMax, AnInstanceOfTheDesignIsAScopeTheQueriesName) {
+  SimFixture f;
+  const std::string kOut = PreprocessAndCapture(
+      "module top;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    r1 = $coverage_get_max(`SV_COV_STATEMENT, `SV_COV_HIER, \"top\");\n"
+      "    r2 = $coverage_get_max(`SV_COV_STATEMENT, `SV_COV_MODULE,"
+      " \"nosuch\");\n"
+      "    r3 = $coverage_control(`SV_COV_CHECK, `SV_COV_STATEMENT,"
+      " `SV_COV_HIER, \"top\");\n"
+      "    $display(\"%0d %0d %0d\", r1, r2, r3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "0 -1 0\n");
+}
+
+// §40.3.2.1 Table 40-2: a module definition name reaches every instance of
+// that module the design holds, so a query naming the child's definition
+// finds a scope where no instance is called by that name (#4662).
+TEST(CoverageGetMax, ADefinitionNameOfTheDesignReachesItsInstances) {
+  SimFixture f;
+  const std::string kOut = PreprocessAndCapture(
+      "module leaf; endmodule\n"
+      "module top;\n"
+      "  leaf u1(); leaf u2();\n"
+      "  initial $display(\"%0d\", $coverage_get_max(`SV_COV_STATEMENT,"
+      " `SV_COV_MODULE, \"leaf\"));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "0\n");
 }
 
 }  // namespace
