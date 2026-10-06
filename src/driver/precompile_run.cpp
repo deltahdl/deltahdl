@@ -159,9 +159,8 @@ bool ParsesWithReports(const PreprocessedSource& source, SourceManager& src_mgr,
   return diag.ErrorCount() == errors;
 }
 
-// §33.3.1 (printed page 937): "In the case where multiple modules with the
-// same name are mapped to the same library in a single invocation of the
-// compiler, then a warning shall be issued." The last is the one the library
+// §33.3.1 (printed page 937): one compiler invocation that maps two modules of
+// one name into one library warns of it. The last is the one the library
 // keeps (PrecompiledLibrary::Load); a cell written by an earlier invocation
 // is recompiled rather than duplicated, and draws none.
 void WarnRecompiledInThisInvocation(const PreprocessedSource& source,

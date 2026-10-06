@@ -300,15 +300,12 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->preproc_global_precision = pp.global_precision;
 }
 
-// §33.3.1 (printed pages 935-936): "When parsing a source description file
-// (or files), the parser shall first read the library mapping information from
-// a predefined file prior to reading any source files", and "all compliant
-// tools shall provide a mechanism to specify one or more library map files to
-// be used for a particular invocation of the tool. If multiple map files are
-// specified, then they shall be read in the order in which they are
-// specified." The predefined file is lib.map in the working directory, read
-// where the command line names no map file of its own. False where a map file
-// could not be read or parsed.
+// §33.3.1 (printed pages 935-936): the library mapping is read from a
+// predefined file before any source description is, and a tool lets an
+// invocation name library map files of its own, which are then read in the
+// order they were named. The predefined file is lib.map in the working
+// directory, read where the command line names no map file of its own. False
+// where a map file could not be read or parsed.
 bool LoadLibraryMaps(const delta::CliOptions& opts,
                      delta::SourceManager& src_mgr,
                      delta::LibraryMap& lib_map) {
@@ -340,9 +337,9 @@ std::string_view SourceFileHoldingLine(const PreprocResult& pp, uint32_t line) {
   return path;
 }
 
-// §33.3.1 (printed page 936): "Any file encountered by the compiler that does
-// not match any library's file_path_spec shall by default be compiled into a
-// library named work", and a file that does match compiles into the library
+// §33.3.1 (printed page 936): a file that no library's file_path_spec matches
+// is compiled into the default library, work, and a file that does match
+// compiles into the library
 // whose specification claims it, so every design element carries the library
 // of the command-line file it was written in. A file several libraries claim
 // equally belongs to none of them, which §33.3.1.1 makes an error.
@@ -444,14 +441,13 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   // line settles the design, so the top-level cell named here is what a command
   // line that put no configuration in force is elaborated from.
   //
-  // §23.3.1 (printed page 740): "Top-level modules are modules that are
-  // included in the SystemVerilog source text, but do not appear in any module
-  // instantiation statement", so with no --top the design is rooted at every
-  // such module, which ElaborateCommandLine collects for an empty name. The
-  // last module in the source was taken for the top instead, and a design whose
-  // top came before the modules it instantiates -- the standard's own §23.5
-  // example, `module top` followed by `module m (.*)` and `module a (.*)` --
-  // elaborated one of those alone and ran nothing.
+  // §23.3.1 (printed page 740): a top-level module is one the source text
+  // holds that no module instantiation statement names, so with no --top the
+  // design is rooted at every such module, which ElaborateCommandLine collects
+  // for an empty name. The last module in the source was taken for the top
+  // instead, and a design whose top came before the modules it instantiates --
+  // the standard's own §23.5 example, `module top` followed by `module m (.*)`
+  // and `module a (.*)` -- elaborated one of those alone and ran nothing.
   const auto* design = delta::ElaborateCommandLine(
       elaborator, *cu, opts.top_module, opts.config, diag);
   if (diag.HasErrors()) return {.failed = true};
@@ -652,10 +648,10 @@ int RunEnvelopeEncryption(const delta::CliOptions& opts,
   return diag.HasErrors() ? 1 : 0;
 }
 
-// §33.5.4's binding invocation: "the tool that actually does the binding only
-// needs to be given the lib.cell specification for the top-level cell(s) and/or
-// the config to be used. In this strategy, the config itself shall also be
-// precompiled."
+// §33.5.4's binding invocation: the tool that binds a design from precompiled
+// libraries is told only the lib.cell of each top-level cell, or the
+// configuration to use, or both, and under that strategy the configuration is
+// precompiled as well.
 //
 // So the cells come from the libraries --load-lib names and from nowhere else,
 // and what roots the design is either --config or the top-level cells --top
@@ -735,8 +731,8 @@ bool RanStandaloneMode(const delta::CliOptions& opts,
 
 namespace {
 
-// §38.17: vpi_get_vlog_info() reports "the number of invocation options (argc)"
-// and "invocation option values (argv)", entry zero being the tool's name.
+// §38.17: vpi_get_vlog_info() reports how many invocation options there were
+// and what each one was, as argc and argv, entry zero being the tool's name.
 // Nothing told the run what they were, so every invocation reported an empty
 // command line. Recording it before anything else runs means the answer is
 // there for whatever asks, including a PLI application loaded early.
@@ -855,9 +851,9 @@ int RunParsedUnit(const delta::CliOptions& opts,
 
 // --version and --help are answered with no design read, and so is an
 // invocation that names nothing to read, whose help ends in a failing status.
-// §33.5.4: a bind from precompiled libraries is given "the lib.cell
-// specification for the top-level cell(s) and/or the config to be used" and no
-// source description, so --load-lib stands in for a source file.
+// §33.5.4: a bind from precompiled libraries is told the top-level cells, the
+// configuration, or both, and is given no source description, so --load-lib
+// stands in for a source file.
 bool AnsweredWithoutADesign(const delta::CliOptions& opts, int& status) {
   if (opts.show_version) {
     PrintVersion();
@@ -876,10 +872,10 @@ bool AnsweredWithoutADesign(const delta::CliOptions& opts, int& status) {
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
-  // §38.37.2: the routines placed in the vlog_startup_routines[] array are the
-  // means of "initializing system task and system function callbacks and
-  // performing any other desired task just after the simulator is invoked", so
-  // the array the tool supplies is walked here, before the run decides what it
+  // §38.37.2: the routines placed in the vlog_startup_routines[] array are how
+  // an application registers its system task and system function callbacks,
+  // and does whatever else it needs, as soon as the simulator starts, so the
+  // array the tool supplies is walked here, before the run decides what it
   // is doing with its arguments. A system task a PLI application registers from
   // one of these routines is then registered ahead of the compilation that
   // resolves references to it.
