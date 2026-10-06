@@ -24,8 +24,8 @@ inline void BindGenBlockConstVars(const GenBlockConsts& consts, SimContext& ctx,
 }
 
 // §27.4: the implicit localparam of each loop generate block enclosing a
-// declaration, "an integer parameter that has the same name and type as the
-// loop index" whose value in each instance is the index that instance was
+// declaration, an integer parameter sharing the loop index's name and type,
+// whose value in each instance is the index that instance was
 // elaborated with, bound in a frame of its own while the declaration's
 // initializer is evaluated, as a process of the block has it
 // (Lowerer::InstallGenBlockConsts). Read without it, `logic [7:0] e = i + 20`

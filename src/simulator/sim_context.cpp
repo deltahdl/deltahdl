@@ -194,10 +194,10 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
 // when there is no enclosing generate block or none of them declares such a
 // name, leaving the caller to carry on with the enclosing scopes.
 //
-// The blocks are tried innermost first because §23.9 rules that "If it is
-// declared locally, then the local item shall be used; if not, the search shall
-// continue upward until an item by that name is found or until a module,
-// interface, program, or checker boundary is encountered", the order
+// The blocks are tried innermost first because §23.9 takes a local declaration
+// first and otherwise searches outward until a declaration of the name turns up
+// or a module, interface, program or checker boundary stops the search, the
+// order
 // GenerateBlockKeys (sim_context_name_tables.cpp) spells the keys in.
 Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
                                           std::string_view name) {

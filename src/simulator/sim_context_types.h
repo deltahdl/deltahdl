@@ -38,8 +38,8 @@ struct EnumMemberInfo {
 
 // §27.4 with §13.4 and §23.6: the scope a subroutine declared in a generate
 // block instance runs in when it is called by its hierarchical name from
-// outside the block, `blk[1].triple(10)`. A generate block "comprises a
-// separate scope and a new level of hierarchy", so the body reads the
+// outside the block, `blk[1].triple(10)`. A generate block is a scope of its
+// own and a fresh level of the hierarchy, so the body reads the
 // block's own declarations and the implicit localparam of each loop generate
 // block around it by their simple names, which a process of the block
 // resolves through Process::gen_prefixes and the constants
