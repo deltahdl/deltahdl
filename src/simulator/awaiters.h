@@ -154,9 +154,9 @@ struct SequenceEventAwaiter {
 // Drops from `names` every name that designates no object, leaving a process's
 // watch list holding only the names a watcher can be armed on.
 //
-// §9.2.2.2.1 builds an implicit sensitivity list out of "the expansions of the
-// longest static prefix of each net or variable identifier or select expression
-// that is read", and an expansion is an object of the design, so a name that
+// §9.2.2.2.1 builds an implicit sensitivity list by expanding the longest
+// static prefix of every net or variable identifier or select expression the
+// block reads, and an expansion is an object of the design, so a name that
 // resolves to none of them is not on the list at all. Both awaiters below
 // already read it that way when they arm, by skipping such a name; this is
 // where the list itself comes to agree, which is what lets the `read_vars`
@@ -249,8 +249,8 @@ struct AnyChangeAwaiter {
   };
 
   // Whether the observable state of the object `name` designates lives in the
-  // `value` of the variable it resolves to. §9.4.2 reserves the event for "any
-  // change in the value of the expression", and for the objects below that
+  // `value` of the variable it resolves to. §9.4.2 reserves the event for a
+  // change in the expression's value, and for the objects below that
   // value is held somewhere else entirely, so a comparison of `value` cannot
   // answer the clause's question for them: it would answer "no change" to every
   // notification about them. Those keep the unconditional resume the watcher
@@ -372,16 +372,15 @@ struct AnyChangeAwaiter {
   // path from a writer to an always_comb did: a store depositing what the
   // variable already held notified the watchers, and the watchers resumed the
   // process. §9.4.2 (printed page 232, last line of the clause) says what that
-  // notification is worth: "A non-edge implicit event shall be detected on any
-  // change in the value of the expression. However, an edge event shall be
-  // detected only on the LSB of the expression. A change of value in any
-  // operand of the expression without a change in the result of the expression
-  // shall not be detected as an event." §9.2.2.2 (printed page 222) makes it
-  // observable, an always_comb having "an inferred sensitivity list that
-  // includes the expressions defined in 9.2.2.2.1" and §9.4.2 governing what
-  // such a list detects: `always_comb begin b = a; runs = runs + 1; end` ran a
-  // third time for `a = 8'd5;` on a variable already holding 8'd5. The same
-  // design written `always @(a)` ran twice, because that path consults
+  // notification is worth: an implicit event with no edge is detected on any
+  // change in the expression's value, an edge event on its LSB alone, and a
+  // change in an operand that leaves the expression's result unchanged is no
+  // event at all. §9.2.2.2 (printed page 222) makes it observable, an
+  // always_comb inferring its sensitivity list from the expressions §9.2.2.2.1
+  // names and §9.4.2 governing what such a list detects:
+  // `always_comb begin b = a; runs = runs + 1; end` ran a third time for
+  // `a = 8'd5;` on a variable already holding 8'd5. The same design written
+  // `always @(a)` ran twice, because that path consults
   // EventAwaiter::CheckEdge. One clause was getting two answers from two
   // awaiters in one simulator; the gate below is the answer CheckEdge gives, so
   // now they agree.

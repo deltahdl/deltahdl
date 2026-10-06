@@ -98,8 +98,8 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
   }
   var->value = value;
-  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-  // value of the expression", and the clause names no writer whose change is
+  // §9.4.2: an implicit event with no edge is detected on any change in the
+  // expression's value, and the clause names no writer whose change is
   // exempt. A system task that writes one of its arguments has written a user
   // variable, and Variable::NotifyWatchers is the only route by which a
   // process parked on it resumes.

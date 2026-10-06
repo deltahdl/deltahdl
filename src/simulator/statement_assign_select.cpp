@@ -229,7 +229,7 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
 // for a non-edge event (awaiters_event_control.h) and the one the VCD writer
 // makes to decide a transition (eval_system_task_dump.cpp), written out again
 // here rather than shared with either, so that this file's own answer to
-// §9.4.2's "change in the result of the expression" needs nothing from theirs.
+// whether §9.4.2's expression result changed needs nothing from theirs.
 static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
   if (a.nwords != b.nwords) return true;
   for (uint32_t i = 0; i < a.nwords; ++i) {
@@ -305,15 +305,14 @@ static void WriteBitSelectBits(Variable* var, const Expr* lhs,
 // #3521 is the record of one forgetting the notification entirely, and #3522
 // the record of the four that remembered it remembering it in a form too
 // coarse -- an unconditional NotifyWatchers() after a call that returns having
-// written nothing down six separate paths. §9.4.2 closes with "A change of
-// value in any operand of the expression without a change in the result of the
-// expression shall not be detected as an event", so a statement that stored no
-// bit owes no event at all: §11.5.1 gives an out-of-range write "no effect on
-// the data stored when written", yet `a[9] = 1'b1;` on a `logic [7:0] a` ran an
-// `always_comb` block reading `a` a third time.
+// written nothing down six separate paths. §9.4.2 closes by ruling that an
+// operand changing while the expression's result does not is no event, so a
+// statement that stored no bit owes no event at all: §11.5.1 has an
+// out-of-range write leave the stored data untouched, yet `a[9] = 1'b1;` on a
+// `logic [7:0] a` ran an `always_comb` block reading `a` a third time.
 //
 // This function is the only one holding both the value before the write and the
-// value after it, and "a change in the result" can only be measured between
+// value after it, and a change in the result can only be measured between
 // those two. The baseline is a Logic4Snapshot rather than a Logic4Vec copy
 // because a Logic4Vec copied from `value` shares `value`'s words -- the copy
 // takes the `words` pointer (common/types.h) -- so the deposit below would

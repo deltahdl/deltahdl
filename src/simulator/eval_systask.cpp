@@ -373,9 +373,9 @@ static void StorePlusargConverted(const PlusargDest& dest, char conv,
 }
 
 // The conversion above reaches eleven stores into the destination across four
-// functions, and every one of them is a write to a user variable. §9.4.2: "A
-// non-edge implicit event shall be detected on any change in the value of the
-// expression", and the clause names no writer whose change is exempt, so the
+// functions, and every one of them is a write to a user variable. §9.4.2: an
+// implicit event with no edge is detected on any change in the expression's
+// value, and the clause names no writer whose change is exempt, so the
 // notification is made once here where the destination is known rather than
 // eleven times inside the conversion. Whether a given change counts is the
 // awaiter's own test -- AnyChangeAwaiter::ChangeGatePasses and

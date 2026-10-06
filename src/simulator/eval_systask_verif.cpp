@@ -64,8 +64,8 @@ static void WriteQueueStatus(const Expr* status_arg, uint64_t status,
                              SimContext& ctx, Arena& arena) {
   if (!status_arg || status_arg->kind != ExprKind::kIdentifier) return;
   auto* var = ctx.FindVariable(status_arg->text);
-  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-  // value of the expression", and the clause names no writer whose change is
+  // §9.4.2: an implicit event with no edge is detected on any change in the
+  // expression's value, and the clause names no writer whose change is
   // exempt -- a queue task's output argument is a user variable, and
   // Variable::NotifyWatchers is the only route by which a process parked on it
   // resumes.

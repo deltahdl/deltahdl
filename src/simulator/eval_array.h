@@ -16,9 +16,9 @@ class SimContext;
 class Arena;
 
 // The notification a write to an aggregate's contents owes §9.4.2, which puts
-// the duty on the writer: "Changing the value of object data members, aggregate
-// elements, or the size of a dynamically sized array referenced by a method or
-// function shall cause the event expression to be reevaluated". A queue, a
+// the duty on the writer: a change to an object's data members, an aggregate's
+// elements or a dynamically sized array's size that a method or function reads
+// has the event expression evaluated again. A queue, a
 // dynamic array and an associative array all keep their elements outside the
 // Variable registered under the aggregate's name, so a write that changes one
 // leaves that variable's `value` standing still while the watchers armed on the

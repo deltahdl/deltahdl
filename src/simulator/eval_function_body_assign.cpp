@@ -75,8 +75,8 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
   } else {
     self->SetProperty(std::string(name), stored);
   }
-  // §9.4.2: "Changing the value of object data members ... referenced by a
-  // method or function shall cause the event expression to be reevaluated".
+  // §9.4.2: a change to an object's data members that a method or function
+  // reads has the event expression evaluated again.
   // This is the write a method makes to its own object, by `this.f` or by the
   // property's bare name, and it has no variable in hand: the watchers are on
   // whatever variables designate the object, which the handle finds.

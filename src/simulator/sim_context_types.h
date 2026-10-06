@@ -320,10 +320,9 @@ struct QueueObject {
 // The name the aggregate was declared under, carried on both ref bindings
 // below. A queue's and an associative array's elements are bare Logic4Vecs
 // rather than Variables, so a ref formal bound to one is copied out at the end
-// of the call rather than aliased -- and §9.4.2 has that write announce itself
-// ("Changing the value of object data members, aggregate elements, or the size
-// of a dynamically sized array referenced by a method or function shall cause
-// the event expression to be reevaluated"), which means telling the watchers
+// of the call rather than aliased -- and §9.4.2 has that write announce itself,
+// a change to an aggregate's elements that a method or function reads having
+// the event expression evaluated again, which means telling the watchers
 // armed on the aggregate's own Variable. Nothing else on either binding names
 // it: the QueueObject and the AssocArrayObject are reached by pointer and the
 // local variable carries the formal's name. The view is the call argument's

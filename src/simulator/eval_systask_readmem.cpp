@@ -429,8 +429,8 @@ static bool HandleMultiDimWord(const ReadmemEnv& env, const MultiDimGeom& g,
     return false;
   }
   std::string elem = MultiDimElementName(g, cursor);
-  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-  // value of the expression", and the clause names no writer whose change is
+  // §9.4.2: an implicit event with no edge is detected on any change in the
+  // expression's value, and the clause names no writer whose change is
   // exempt -- a §21.4 load writes the design's own memory elements, which is
   // what a testbench most often waits on, and Variable::NotifyWatchers is the
   // only route by which such a process resumes.

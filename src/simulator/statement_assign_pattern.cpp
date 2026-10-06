@@ -509,11 +509,11 @@ static Logic4Vec SizedAssocElementValue(const Expr* base,
 }
 
 // §9.4.2: the element that changed is an aggregate element, which the clause
-// names among the changes that "shall cause the event expression to be
-// reevaluated", and it lives outside the variable registered under the
+// names among the changes that have the event expression evaluated again, and
+// it lives outside the variable registered under the
 // array's name -- the one an `@(aa[3])` and an `always_comb` reading `aa[3]`
 // both arm on. One statement wrote one entry, so it is announced once. An
-// element of an object's property is a change to "object data members",
+// element of an object's property is a change to an object's data members,
 // which the same clause names, and the watchers that can see it sit on the
 // variables designating the object, which the handle finds.
 static void AnnounceAssocElementWrite(const Expr* base, ClassObject* owner,
@@ -606,8 +606,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   // aggregate element and the size of a dynamically sized array. Neither is
   // visible in the queue variable's own `value`, so each store tells the
   // watchers armed on the name, which is what every mutating queue method does
-  // and what §7.10.1 requires of this spelling too: "Queues shall support the
-  // same operations that can be performed on fixed-size unpacked arrays", and
+  // and what §7.10.1 requires of this spelling too, a queue supporting every
+  // operation a fixed-size unpacked array does, and
   // the fixed-array element write notifies through WriteVar. The append
   // notifies once for the element and the size together, a watcher
   // re-evaluating its expression rather than reading a delta.

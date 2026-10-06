@@ -89,8 +89,8 @@ void StoreRealField(Variable* var, Arena& arena, double d) {
   auto vec = MakeLogic4VecVal(arena, width, bits);
   vec.is_real = true;
   var->value = vec;
-  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-  // value of the expression", and the clause names no writer whose change is
+  // §9.4.2: an implicit event with no edge is detected on any change in the
+  // expression's value, and the clause names no writer whose change is
   // exempt -- a scanned field is a write to a user variable, and
   // Variable::NotifyWatchers is the only route by which a process parked on
   // that variable resumes. Every store below owes the same.

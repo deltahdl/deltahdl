@@ -672,13 +672,13 @@ class SimContext : public DeclaredNameTables,
   uint64_t CurrentThisHandle() const;
 
   // §9.4.2: notifies the watchers armed on every variable that designates the
-  // object `handle` names. A write to a class property is a change to "object
-  // data members", which the clause has re-evaluate an event expression, and
-  // the watchers that can see it sit on the variables rather than on the
-  // object: a class handle's own bits never move, so the notification is the
-  // whole of what a process waiting on `obj.f` has to go on (StateLivesInValue
-  // in src/simulator/awaiters.h answers false for a class-typed name for
-  // exactly that reason).
+  // object `handle` names. A write to a class property is a change to an
+  // object's data members, which the clause has re-evaluate an event
+  // expression, and the watchers that can see it sit on the variables rather
+  // than on the object: a class handle's own bits never move, so the
+  // notification is the whole of what a process waiting on `obj.f` has to go on
+  // (StateLivesInValue in src/simulator/awaiters.h answers false for a
+  // class-typed name for exactly that reason).
   //
   // The object is reached by handle rather than by name because the three
   // writers inside a method -- an unqualified property name, `this.f` and

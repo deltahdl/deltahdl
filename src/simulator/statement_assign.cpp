@@ -758,7 +758,7 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
       return;
     case FieldTarget::Kind::kProperty:
       SetClassField(target.obj, target.type, target.field, rhs_val, arena);
-      // §9.4.2 has a change to "object data members" re-evaluate the event
+      // §9.4.2 has a change to an object's data members re-evaluate the event
       // expression, and it says nothing about which syntax named the object.
       // The watchers sit on the variables that designate it, so the object is
       // announced by handle: a path read out of a variable notifies the
