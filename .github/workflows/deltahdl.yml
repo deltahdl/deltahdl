@@ -2029,7 +2029,9 @@ jobs:
       # /test/ rather than on any directory the sources happen to sit in today.
       # Only the dot is escaped: nothing else a path holds here means anything
       # to the regular expression engine, and $ anchors the match at the end so
-      # no longer path can carry a slice member as a prefix.
+      # no longer path can carry a slice member as a prefix. A slice awk leaves
+      # empty would make the pattern (), which matches every path, so such a
+      # shard stops before run-clang-tidy instead of linting the whole tree.
       - name: >-
           Run clang-tidy (src, shard ${{ matrix.shard }}/${{
           strategy.job-total }})
@@ -2043,6 +2045,10 @@ jobs:
             | sed 's/\./\\./g' \
             | sed 's/$/$/' \
             | paste -sd'|')
+          if [ -z "$regex" ]; then
+            echo "Shard ${{ matrix.shard }} has no source files to lint."
+            exit 0
+          fi
           run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
@@ -2107,7 +2113,10 @@ jobs:
       # sharing a test file's basename out of a configuration written for the
       # tests. Only the dot is escaped: nothing else a path holds here means
       # anything to the regular expression engine, and $ anchors the match at
-      # the end so no longer path can carry a slice member as a prefix.
+      # the end so no longer path can carry a slice member as a prefix. A slice
+      # awk leaves empty would make the pattern (), which matches every path,
+      # so such a shard stops before run-clang-tidy rather than linting the
+      # sources as well with a configuration written for the tests.
       - name: >-
           Run clang-tidy (test, shard ${{ matrix.shard }}/${{
           strategy.job-total }})
@@ -2120,6 +2129,10 @@ jobs:
             | sed 's/\./\\./g' \
             | sed 's/$/$/' \
             | paste -sd'|')
+          if [ -z "$regex" ]; then
+            echo "Shard ${{ matrix.shard }} has no unit test files to lint."
+            exit 0
+          fi
           run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
