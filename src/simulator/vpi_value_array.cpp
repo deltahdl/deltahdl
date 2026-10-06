@@ -277,41 +277,63 @@ void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
   }
 }
 
-// §37.17: whether `child` of an array object is one of its elements, rather
-// than a range of its dimensions or its typespec, which the array reaches too.
+// §37.17: whether `child` of an array object is one of its members, rather
+// than a range of its dimensions, its typespec or an index selecting it out of
+// an enclosing array, which the array reaches too.
 bool IsArrayElement(const VpiObject& child) {
-  return child.type != vpiRange && !VpiIsTypespecType(child.type);
+  return child.type != vpiRange && child.type != vpiConstant &&
+         !VpiIsTypespecType(child.type);
+}
+
+// §38.16 and §38.35: append to `out` the elements of the array `obj` in
+// fastest-varying order, the order consecutive flat ordinals name them in:
+// its members in the order of its declared indices, a subarray, which a
+// multidimensional array's every dimension but the innermost is made of
+// (§37.17 detail 26), standing for its own elements in turn.
+void AppendElementsInOrder(const VpiObject& obj, std::vector<VpiObject*>& out) {
+  for (VpiObject* child : obj.children) {
+    if (!IsArrayElement(*child)) continue;
+    if (child->array_member && VpiIsArrayVarType(child->type)) {
+      AppendElementsInOrder(*child, out);
+    } else {
+      out.push_back(child);
+    }
+  }
+}
+
+// The elements of the array `obj`, the one at flat ordinal k at position k.
+std::vector<VpiObject*> ElementsInOrder(const VpiObject& obj) {
+  std::vector<VpiObject*> elements;
+  AppendElementsInOrder(obj, elements);
+  return elements;
 }
 
 // The first element of the array `obj`, null where it holds none.
 const VpiObject* FirstElement(const VpiObject& obj) {
-  for (const VpiObject* child : obj.children) {
-    if (IsArrayElement(*child)) return child;
-  }
-  return nullptr;
+  const std::vector<VpiObject*> kElements = ElementsInOrder(obj);
+  return kElements.empty() ? nullptr : kElements.front();
 }
 
-// §38.35: find the element child of obj whose flat ordinal equals the target,
-// or nullptr if no such element exists.
-VpiObject* FindElementByOrdinal(VpiHandle obj, long long ordinal) {
-  for (auto* child : obj->children) {
-    if (IsArrayElement(*child) && child->index == ordinal) {
-      return child;
-    }
+// §38.35: the element at flat ordinal `ordinal` among `elements`, or nullptr
+// where the section runs past the array's end.
+VpiObject* ElementAtOrdinal(const std::vector<VpiObject*>& elements,
+                            long long ordinal) {
+  if (ordinal < 0 || ordinal >= static_cast<long long>(elements.size())) {
+    return nullptr;
   }
-  return nullptr;
+  return elements[static_cast<std::size_t>(ordinal)];
 }
 
-// §38.35: write one supplied source value (at source position src) into the
-// element at the given flat ordinal of obj. A missing element or one without a
-// backing variable is skipped silently, exactly as the consecutive fill loop
-// requires. The decoded aval/bval are masked to the element's width before they
-// replace word 0 of its value. The variable written is handed back so the
-// caller can notify what fans out of it, or nullptr where nothing was written.
-Variable* PutValueArrayElement(VpiHandle obj,
+// §38.35: write one supplied source value (at source position src) into
+// `element`, the array's at the flat ordinal being filled. A missing element or
+// one without a backing variable is skipped silently, exactly as the
+// consecutive fill loop requires. The decoded aval/bval are masked to the
+// element's width before they replace word 0 of its value. The variable written
+// is handed back so the caller can notify what fans out of it, or nullptr where
+// nothing was written.
+Variable* PutValueArrayElement(VpiObject* element,
                                const s_vpi_arrayvalue* arrayvalue_p,
-                               long long ordinal, unsigned int src) {
-  VpiObject* element = FindElementByOrdinal(obj, ordinal);
+                               unsigned int src) {
   if (!element || !element->var) return nullptr;
 
   Logic4Vec& ev = element->var->value;
@@ -427,12 +449,9 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
 void CollectGetValueArraySection(VpiHandle obj, long long start_ordinal,
                                  unsigned int num,
                                  std::vector<VpiObject*>* section) {
-  for (auto* child : obj->children) {
-    if (!IsArrayElement(*child)) continue;
-    long long rel = static_cast<long long>(child->index) - start_ordinal;
-    if (rel >= 0 && rel < static_cast<long long>(num)) {
-      (*section)[static_cast<size_t>(rel)] = child;
-    }
+  const std::vector<VpiObject*> kElements = ElementsInOrder(*obj);
+  for (unsigned int rel = 0; rel < num; ++rel) {
+    (*section)[rel] = ElementAtOrdinal(kElements, start_ordinal + rel);
   }
 }
 
@@ -614,11 +633,13 @@ void VpiContext::PutValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   // vpiOneValue the single supplied element value is applied to the whole
   // section, so the source position stays pinned at 0.
   bool one_value = (arrayvalue_p->flags & kVpiOneValue) != 0;
+  const std::vector<VpiObject*> kElements = ElementsInOrder(*obj);
   std::vector<Variable*> written;
   for (unsigned int k = 0; k < num; ++k) {
     long long ordinal = start_ordinal + static_cast<long long>(k);
     unsigned int src = one_value ? 0u : k;
-    Variable* var = PutValueArrayElement(obj, arrayvalue_p, ordinal, src);
+    Variable* var = PutValueArrayElement(ElementAtOrdinal(kElements, ordinal),
+                                         arrayvalue_p, src);
     if (var) written.push_back(var);
   }
 

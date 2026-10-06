@@ -16,8 +16,11 @@ static PLI_INT32 calltf(PLI_BYTE8* ud) {
   char buf[64] = {0};
   FILE* f;
   vpi_printf("mcd nonzero=%d not-stdout=%d one-bit=%d\n", mcd != 0, mcd != 1, (mcd & (mcd - 1)) == 0);
-  vpi_printf("printf=%d vprintf=%d name-matches=%d flush=%d\n", vpi_mcd_printf(mcd, "line %d\n", 1),
-             vsay(mcd, "line %d\n", 2), !strcmp((const char*)vpi_mcd_name(mcd), path), vpi_mcd_flush(mcd));
+  int printed = vpi_mcd_printf(mcd, "line %d\n", 1);
+  int vprinted = vsay(mcd, "line %d\n", 2);
+  int named = !strcmp((const char*)vpi_mcd_name(mcd), path);
+  int flushed = vpi_mcd_flush(mcd);
+  vpi_printf("printf=%d vprintf=%d name-matches=%d flush=%d\n", printed, vprinted, named, flushed);
   vpi_printf("close=%d\n", vpi_mcd_close(mcd));
   f = fopen(path, "r");
   if (f) { size_t n = fread(buf, 1, 63, f); buf[n] = 0; fclose(f); }

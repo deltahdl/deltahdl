@@ -88,6 +88,20 @@ void AttachLevel(const ArrayLevel& level, std::size_t depth,
   }
 }
 
+// §38.16 and §38.35: the indices each unpacked dimension of `array` declares,
+// left first, from which vpi_get_value_array and vpi_put_value_array find
+// the flat ordinal of the element a coordinate names.
+void RecordDimensionIndices(VpiObject& array,
+                            const std::vector<RtlirUnpackedDim>& dims) {
+  array.array_dim_indices.clear();
+  for (const RtlirUnpackedDim& dim : dims) {
+    std::vector<int>& indices = array.array_dim_indices.emplace_back();
+    for (int64_t index : IndicesOf(dim)) {
+      indices.push_back(static_cast<int>(index));
+    }
+  }
+}
+
 // Whether `var` is an array var whose every unpacked dimension is fixed, the
 // arrays whose elements the run keys under the array's name.
 bool HasFixedElements(const RtlirVariable& var) {
@@ -113,6 +127,7 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
           if (array == nullptr) continue;
           const ArrayAttach kAttach{var.unpacked_dims, *array, objects, build};
           AttachLevel({array, kKey, {}}, 0, kAttach);
+          RecordDimensionIndices(*array, var.unpacked_dims);
         }
       });
 }

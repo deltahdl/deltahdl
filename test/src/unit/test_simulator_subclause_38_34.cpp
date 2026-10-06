@@ -695,8 +695,7 @@ TEST_F(PutsOfARun, APutIntoAClassPropertyWakesATaskWaitingOnIt) {
 }
 
 constexpr const char* kDelayedPut =
-    "`timescale 1ns/1ns\n"
-    "module top; int v, v_at3, v_at5;\n"
+    "module top; timeunit 1ns; timeprecision 1ns; int v, v_at3, v_at5;\n"
     "  initial begin #1 $put; #2 v_at3 = v; #2 v_at5 = v; end\n"
     "endmodule\n";
 

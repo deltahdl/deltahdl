@@ -82,8 +82,8 @@ class ContAssignDelaysOfARun : public VpiDesignRun {
     data.tfname = VpiText("$delays");
     data.calltf = &ReadAndPutContAssignDelays;
     ASSERT_NE(vpi_register_systf(&data), nullptr);
-    Run("`timescale 1ns/1ns\n"
-        "module top; logic a = 0; wire y; int rose, fell;\n"
+    Run("module top; timeunit 1ns; timeprecision 1ns; logic a = 0; wire y; int "
+        "rose, fell;\n"
         "  assign #(3, 4) y = a;\n"
         "  always @(y) if (y === 1'b1) rose = $time; else fell = $time;\n"
         "  initial begin #1 $delays; #9 a = 1; #10 a = 0; #10; end\n"

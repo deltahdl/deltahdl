@@ -10,8 +10,9 @@ static PLI_INT32 calltf(PLI_BYTE8* ud) {
   val.value.integer = 9;
   while ((v = vpi_scan(it)))
     if (!strcmp(str_of(vpiName, v), "val")) {
+      vpi_printf("put val=9 at %u\n", (unsigned)now_low());
       vpi_put_value(v, &val, 0, vpiNoDelay);
-      vpi_printf("put val=9 at %u err=%d\n", (unsigned)now_low(), vpi_chk_error(0) > 0);
+      if (vpi_chk_error(0)) vpi_printf("put failed\n");
     }
   return 0;
 }

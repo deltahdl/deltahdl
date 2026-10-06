@@ -321,11 +321,14 @@ TEST_F(VpiSimTimeCallbacks, RoutineIsPassedTheCurrentTimeAndItsOwnStructure) {
 
 // §38.36.2: "The value fields are ignored for all reasons with simulation time
 // callbacks", so a routine sees no value however the registration was written,
-// and this holds for each of the seven reasons.
+// and this holds for each reason due in the slot it was registered in, which
+// is every one but cbNextSimTime (NextSimTimeIgnoresTheTimeItWasRegisteredWith
+// covers that one).
 TEST_F(VpiSimTimeCallbacks, EveryReasonDeliversTheCurrentTimeAndNoValue) {
   AdvanceTo(12);
 
   for (int reason : kSimTimeReasons) {
+    if (reason == cbNextSimTime) continue;
     g_delivered = DeliveredCbData{};
 
     s_vpi_value value = {};
@@ -377,11 +380,14 @@ TEST_F(VpiSimTimeCallbacks, ScaledRealTimeIsScaledToTheObjFieldsTimeUnit) {
 // §38.36.2: "For reason cbNextSimTime, the time field in the time structure is
 // ignored." The type is still required - it selects the form the routine is
 // given - but the requested time itself decides nothing, so a registration
-// carrying any value at all is accepted and the routine is handed the current
-// time like every other simulation-time reason.
+// carrying any value at all is accepted and the routine is handed, before the
+// next time slot's events, that slot's time and no value, like every other
+// simulation-time reason.
 TEST_F(VpiSimTimeCallbacks, NextSimTimeIgnoresTheTimeItWasRegisteredWith) {
   AdvanceTo(8);
 
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
   s_vpi_time requested = {};
   requested.type = vpiSimTime;
   requested.low = 0xFFFFFFFFu;
@@ -389,13 +395,17 @@ TEST_F(VpiSimTimeCallbacks, NextSimTimeIgnoresTheTimeItWasRegisteredWith) {
   s_cb_data cb = {};
   cb.reason = cbNextSimTime;
   cb.time = &requested;
+  cb.value = &value;
   cb.cb_rtn = RecordDelivery;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
+  ASSERT_FALSE(g_delivered.had_time);
 
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbNextSimTime), 1);
+  AdvanceTo(9);
+
   ASSERT_TRUE(g_delivered.had_time);
-  EXPECT_EQ(g_delivered.time_low, 8u);
+  EXPECT_EQ(g_delivered.time_low, 9u);
   EXPECT_EQ(g_delivered.time_high, 0u);
+  EXPECT_FALSE(g_delivered.had_value);
 }
 
 // The delivery rule is scoped to the simulation-time reasons: a callback
@@ -497,8 +507,7 @@ PLI_INT32 ArmEveryTimeReason(p_cb_data /*cb*/) {
 // event of the design stands at that time (#5117).
 TEST_F(TimeCallbacksOfARun, EachTimeReasonIsCalledAtItsPointOfTheSlot) {
   RunArmedBy(&ArmEveryTimeReason,
-             "`timescale 1ns/1ns\n"
-             "module top; int q;\n"
+             "module top; timeunit 1ns; timeprecision 1ns; int q;\n"
              "  initial begin #5; q <= 1; #5; end\n"
              "endmodule\n");
   EXPECT_EQ(TimeDeliveries(), (std::vector<TimeDelivery>{
@@ -539,8 +548,7 @@ PLI_INT32 ArmSynchWrites(p_cb_data /*cb*/) {
 TEST_F(TimeCallbacksOfARun, APutFromReadOnlySynchIsRefused) {
   PutRefusals().clear();
   RunArmedBy(&ArmSynchWrites,
-             "`timescale 1ns/1ns\n"
-             "module top; int q;\n"
+             "module top; timeunit 1ns; timeprecision 1ns; int q;\n"
              "  initial #3;\n"
              "endmodule\n");
   EXPECT_EQ(PutRefusals(), (std::vector<bool>{false, true}));

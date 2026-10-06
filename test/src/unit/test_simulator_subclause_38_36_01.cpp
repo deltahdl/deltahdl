@@ -220,8 +220,9 @@ TEST_F(VpiSimEventCbDelivery, EndOfObjectCallbackDeliveredWithoutTime) {
 }
 
 // §38.36.1 (negative form of the time-drop rule): the rule names only
-// cbReclaimObj and cbEndOfObject. A different simulation-event reason keeps the
-// time structure the application requested, so the routine still sees it.
+// cbReclaimObj and cbEndOfObject. A different simulation-event reason that
+// asked for a time is given one, in a structure that belongs to the simulator
+// (§38.36) rather than the one the application registered.
 TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
   s_vpi_time requested = {};
   requested.type = vpiSimTime;
@@ -235,7 +236,8 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
   int fired = vpi_ctx_.DispatchCallbacks(cbValueChange);
 
   EXPECT_EQ(fired, 1);
-  EXPECT_EQ(g_delivered_time, &requested);
+  EXPECT_NE(g_delivered_time, nullptr);
+  EXPECT_NE(g_delivered_time, &requested);
 }
 
 // §38.36.1: when a simulation-event callback occurs the routine is passed a
@@ -405,8 +407,8 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
 
 // §38.36.1 (negative form of the value-is-NULL rule): the NULL-value delivery
 // is specific to valueless/opaque objects. A cbValueChange callback on an
-// ordinary declared variable keeps the value structure the application
-// requested, so the routine still sees it.
+// ordinary declared variable that asked for a value is given one, in a
+// structure that belongs to the simulator (§38.36).
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   sim_ctx_.CreateVariable("ord", 1);
   vpi_ctx_.Attach(sim_ctx_);
@@ -423,7 +425,8 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   int fired = vpi_ctx_.DispatchCallbacks(cbValueChange, VpiObjectOf(var));
 
   EXPECT_EQ(fired, 1);
-  EXPECT_EQ(g_delivered_value, &requested);
+  EXPECT_NE(g_delivered_value, nullptr);
+  EXPECT_NE(g_delivered_value, &requested);
 }
 
 // One delivery of a simulation-event callback as its routine saw it: the
@@ -497,8 +500,7 @@ class EventCallbacksOfARun : public VpiDesignRun {
 };
 
 constexpr const char* kValueChanges =
-    "`timescale 1ns/1ns\n"
-    "module top; int x; int arr[4];\n"
+    "module top; timeunit 1ns; timeprecision 1ns; int x; int arr[4];\n"
     "  initial begin\n"
     "    $arm;\n"
     "    #1 x = 5;\n"
@@ -561,8 +563,7 @@ vpiHandle TopObject(const char* name) {
 // queue is resized, with its new size as its value (#5121).
 TEST_F(EventCallbacksOfARun, ASizeChangeCallbackFiresOnEachResize) {
   Armer() = [] { PlaceEventCallback(cbSizeChange, TopObject("top.q")); };
-  Run("`timescale 1ns/1ns\n"
-      "module top; int q[$];\n"
+  Run("module top; timeunit 1ns; timeprecision 1ns; int q[$];\n"
       "  initial begin $arm;\n"
       "    #1 q.push_back(7); q.push_back(8); #1 void'(q.pop_front());\n"
       "  end\n"
@@ -617,8 +618,7 @@ TEST_F(EventCallbacksOfARun, AForceCallbackOnAVarBitIsRefused) {
 }
 
 constexpr const char* kForceRelease =
-    "`timescale 1ns/1ns\n"
-    "module top; int x;\n"
+    "module top; timeunit 1ns; timeprecision 1ns; int x;\n"
     "  initial begin $arm; #1 force x = 5; #1 release x; end\n"
     "endmodule\n";
 
@@ -648,8 +648,7 @@ TEST_F(EventCallbacksOfARun, AReleaseCallbackFiresAfterARelease) {
 // placed on is disabled (#5127).
 TEST_F(EventCallbacksOfARun, ADisableCallbackFiresWhenItsBlockIsDisabled) {
   Armer() = [] { PlaceEventCallback(cbDisable, TopObject("top.blk")); };
-  Run("`timescale 1ns/1ns\n"
-      "module top;\n"
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  initial $arm;\n"
       "  initial begin : blk #10 $noop; end\n"
       "  initial #3 disable blk;\n"

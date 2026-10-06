@@ -239,9 +239,8 @@ class TimesOfARun : public VpiDesignRun {
     data.tfname = VpiText("$probe");
     data.calltf = &ReadTimesCalltf;
     ASSERT_NE(vpi_register_systf(&data), nullptr);
-    Run("`timescale 1ns/1ps\n"
-        "module sub; timeunit 1ps; timeprecision 1ps; endmodule\n"
-        "module top;\n"
+    Run("module sub; timeunit 1ps; timeprecision 1ps; endmodule\n"
+        "module top; timeunit 1ns; timeprecision 1ps;\n"
         "  sub s();\n"
         "  initial #7 $probe;\n"
         "endmodule\n");
