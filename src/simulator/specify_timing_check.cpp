@@ -151,8 +151,8 @@ int64_t EvalTimingCheckTime(Expr* limit, SimContext& ctx, Arena& arena) {
 
 // §31.5: the edge_descriptor list a run reads, from the one the parser
 // collected. Syntax 31-15 writes z_or_x as any of `x`, `X`, `z` and `Z`, and
-// the clause has "edge transitions involving z ... treated the same way as edge
-// transitions involving x", so all four fold to 'x' here and the run has three
+// the clause handles a transition to or from z exactly as one to or from x, so
+// all four fold to 'x' here and the run has three
 // levels to compare rather than five spellings. `0` and `1` are carried
 // through as written.
 std::vector<std::pair<char, char>> RunTimeEdgeDescriptors(
@@ -257,11 +257,10 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   // §31.4.6's Syntax 31-14 writes $nochange's two trailing operands as
   // start_edge_offset and end_edge_offset, which are not timing_check_limits
   // and are not read as any. The clause moves an end of the window by each:
-  // "(beginning of time window) = (leading reference edge time) -
-  // start_edge_offset" and "(end of time window) = (trailing reference edge
-  // time) + end_edge_offset". Both are signed and each is kept as written,
-  // §31.4.6 giving a negative offset its own meaning, which is to shrink the
-  // region from that end. Parser::ParseTimingCheckTrailingArgs
+  // the window opens start_edge_offset before the leading reference edge and
+  // closes end_edge_offset after the trailing one. Both are signed and each is
+  // kept as written, §31.4.6 giving a negative offset its own meaning, which is
+  // to shrink the region from that end. Parser::ParseTimingCheckTrailingArgs
   // (parser/parser_specify.cpp) collects every trailing operand into
   // TimingCheckDecl::limits by position, so the kind is what says which
   // position holds what.
@@ -273,11 +272,11 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
 
   // §31.4.4's Syntax 31-12 writes $width's second trailing operand as a
   // threshold, which is not a second limit either: the clause reports a
-  // violation for "threshold < (timecheck time) - (timestamp time) < limit" and
-  // says that "no violation is reported for glitches smaller than the
-  // threshold". A $width written without one carries the zero §31.4.4 makes its
-  // default, which is what an empty limits list already gives. limit2 stays
-  // zero, nothing of §31.4.4 reading a second limit.
+  // violation only for a pulse wider than the threshold and narrower than the
+  // limit, and passes over a glitch narrower than the threshold. A $width
+  // written without one carries the zero §31.4.4 makes its default, which is
+  // what an empty limits list already gives. limit2 stays zero, nothing of
+  // §31.4.4 reading a second limit.
   const bool kIsWidth = decl.check_kind == TimingCheckKind::kWidth;
   const int64_t kSecondLimit = kIsWidth ? 0 : kSecond;
 

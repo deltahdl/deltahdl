@@ -10,20 +10,17 @@
 // signal's transition inside a window the other bounds, so the two events are
 // fixed: the reference event of a $setup always closes the window and the data
 // event of a $hold always does. §31.4 measures how far apart two signals move
-// instead. §31.4.3 goes further and settles the two roles at run time: "The
-// reference event is the timestamp event, and the data event is the timecheck
-// event when the reference event precedes the data event. The data event is the
-// timestamp event, and the reference event is the timecheck event when the data
-// event precedes the reference event." Which limit applies follows from that --
-// §31.4.3 sets "limit to limit1 when the reference event transitions first and
-// set to limit2 when the data event transitions first" -- so a $fullskew window
+// instead. §31.4.3 goes further and settles the two roles at run time: of the
+// reference and data events, whichever comes first is the timestamp event and
+// the other the timecheck event. Which limit applies follows from that --
+// §31.4.3 uses limit1 when the reference event moves first and limit2 when the
+// data event does -- so a $fullskew window
 // carries the role its opening transition assigned.
 //
-// §31.4 also splits the three by *when* a violation is detected: "The skew
-// checks have two different violation detection mechanisms, event-based and
-// timer-based. Event-based skew checking is performed only when a signal
-// transitions, while timer-based skew checking takes place as soon as the
-// simulation time equal to the skew limit has elapsed." §31.4.1 makes $skew
+// §31.4 also splits the three by *when* a violation is detected. A skew check
+// detects a violation in one of two ways: event-based, checking only when a
+// signal transitions, or timer-based, checking the moment the skew limit has
+// run out. §31.4.1 makes $skew
 // event-based outright. §31.4.2 and §31.4.3 are timer-based by default and are
 // switched to event-based by an event_based_flag argument, which
 // TimingCheckEntry::event_based_flag (simulator/specify_timing_check.h) carries
@@ -42,9 +39,9 @@
 // mechanism rather than a predicate: ArmTimeout below schedules the report at
 // the moment the limit expires and cancels it if the timecheck event arrives
 // first. It is scheduled into Region::kPrePostponed because §31.4.2 and §31.4.3
-// both rule that the check "shall also not report a violation if a new
-// timestamp event occurs exactly at the expiration of the time limit", and
-// §31.4.3 rules the same for a timecheck event "within the time limit".
+// both rule out a violation when a fresh timestamp event lands exactly as the
+// limit runs out, and §31.4.3 rules the same for a timecheck event inside the
+// limit.
 // Scheduler::ExecuteTimeSlot (simulator/scheduler.cpp) reaches kPrePostponed
 // only once the active and reactive region sets of the slot are drained, so
 // every transition committed at the expiration time has already been seen when
@@ -132,9 +129,9 @@ struct SkewWindow {
   std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
-// §31.4.3: "The first limit is the maximum time by which the data event should
-// follow the reference event. The second limit is the maximum time by which the
-// reference event should follow the data event." §31.4.1 and §31.4.2 write one
+// §31.4.3: the first limit bounds how long after the reference event the data
+// event may come, and the second how long after the data event the reference
+// event may come. §31.4.1 and §31.4.2 write one
 // limit and always make the reference event the timestamp event, so the first
 // is the only one their windows reach.
 uint64_t WindowLimit(const TimingCheckEntry& check, bool ref_is_timestamp) {
@@ -198,18 +195,17 @@ void CancelTimeout(SkewWindow& window) {
   window.timeout_cancelled = nullptr;
 }
 
-// Turns the check dormant: §31.4.2's "the check shall become dormant and report
-// no more violations (even in response to data events) until after the next
-// reference event", and §31.4.3's identical rule for a timecheck event arriving
-// within the limit.
+// Turns the check dormant: §31.4.2 has a dormant check report nothing, data
+// events included, until the next reference event has passed, and §31.4.3
+// gives the same rule for a timecheck event arriving within the limit.
 void CloseWindow(SkewWindow& window) {
   window.open = false;
   CancelTimeout(window);
 }
 
-// Schedules the timer-based report of §31.4.2 and §31.4.3: "A violation shall
-// be reported immediately upon an elapse of time after the reference event
-// equal to the limit", after which the check is dormant. Only the open window
+// Schedules the timer-based report of §31.4.2 and §31.4.3: a violation is
+// reported the moment the limit has run out after the reference event, after
+// which the check is dormant. Only the open window
 // is reported on, so a timeout that outlives its window does nothing; the guard
 // is checked as well because Scheduler::DrainQueue runs a superseded event's
 // callback and reads the flag only to decide whether the event was worth
@@ -231,16 +227,16 @@ void ArmTimeout(const std::shared_ptr<SkewWindow>& window, SimContext& ctx) {
 }
 
 // A timestamp event has arrived, on the reference signal when `ref_moved` is
-// set and on the data signal otherwise. §31.4.1: "A second consecutive
-// reference event shall cancel the old wait for the data event and begin a new
-// one", and §31.4.3 says the same of a second timestamp event, which "starts a
-// new timing window that replaces the first one". §31.4.3 adds that a timestamp
+// set and on the data signal otherwise. §31.4.1: a reference event following
+// another drops the wait for a data event the first began and starts a fresh
+// one, and §31.4.3 says the same of a second timestamp event, whose new window
+// takes the place of the first. §31.4.3 adds that a timestamp
 // event reaching a dormant check activates it, which is what setting `open`
 // unconditionally does.
 //
 // A timer is armed for every kind but $skew, §31.4.1 making that one
-// event-based: it "is evaluated only after a data event", and "if there is
-// never a data event ... no timing violation shall ever be reported".
+// event-based: it is evaluated only once a data event arrives, and with no
+// data event at all it never reports a violation.
 void OnTimestampEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
                       SimContext& ctx) {
   CancelTimeout(*window);
@@ -257,18 +253,16 @@ void OnTimestampEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
   ArmTimeout(window, ctx);
 }
 
-// §31.4.1: the data event is $skew's timecheck event, and the check "reports a
-// violation in the following case: (timecheck time) - (timestamp time) >
-// limit". The subtraction is guarded by the clause's own rule that
-// "simultaneous transitions on the reference and data signals shall not cause
-// $skew to report a timing violation, even when the skew limit value is zero",
-// so a data event at or before the timestamp is no violation whatever the
-// limit.
+// §31.4.1: the data event is $skew's timecheck event, and the check reports a
+// violation when timecheck time less timestamp time exceeds the limit. The
+// subtraction is guarded by the clause's own rule that reference and data
+// signals moving at the same time are never a $skew violation, a zero limit
+// included, so a data event at or before the timestamp is no violation whatever
+// the limit.
 //
-// The window stays open: §31.4.1 rules that "after a reference event, the $skew
-// timing check shall never stop checking data events for a timing violation"
-// and "shall report timing violations for all data events occurring beyond the
-// limit after a reference event".
+// The window stays open: §31.4.1 rules that once a reference event has
+// occurred, $skew keeps checking every later data event and reports each one
+// that lands beyond the limit.
 bool OnSkewDataEvent(SkewWindow& window, SimContext& ctx) {
   if (!window.open) return false;
   const uint64_t kNow = ctx.CurrentTime().ticks;
@@ -281,19 +275,17 @@ bool OnSkewDataEvent(SkewWindow& window, SimContext& ctx) {
 
 // §31.4.2's data event, which its two modes answer differently.
 //
-// Timer-based, the default: "if a data event occurs within the limit, then a
-// violation shall not be reported, and the check shall become dormant
-// immediately". A data event that reaches an open window is necessarily within
-// the limit, because the timeout at reference+limit would have closed the
-// window otherwise, so there is nothing to compare and nothing to report.
+// Timer-based, the default: a data event inside the limit reports nothing and
+// sends the check dormant at once. A data event that reaches an open window is
+// necessarily within the limit, because the timeout at reference+limit would
+// have closed the window otherwise, so there is nothing to compare and nothing
+// to report.
 //
-// Event-based: the check "behaves like the $skew check when only the
-// event_based_flag is set, except that it becomes dormant after reporting the
-// first violation", and "behaves like the $skew check when both the
-// event_based_flag and the remain_active_flag are set". So the $skew verdict is
-// what decides, and the two flags together decide only whether the window
-// survives a violation -- §31.4.1 ruling that a $skew "shall never stop
-// checking data events for a timing violation".
+// Event-based: the check acts as a $skew does, going dormant after its first
+// violation when only event_based_flag is set and staying active when
+// remain_active_flag is set as well. So the $skew verdict is what decides, and
+// the two flags together decide only whether the window survives a violation
+// -- §31.4.1 having a $skew keep checking data events without end.
 void OnTimeskewDataEvent(SkewWindow& window, SimContext& ctx) {
   const TimingCheckEntry& check = window.armed.Entry();
   if (!check.event_based_flag) {
@@ -305,12 +297,11 @@ void OnTimeskewDataEvent(SkewWindow& window, SimContext& ctx) {
   }
 }
 
-// §31.4.3: "A reference event or data event is a timestamp event and starts a
-// new timing window, unless it is a timecheck event occurring within the time
-// limit after a preceding timestamp event, in which case it turns the timing
-// check dormant." The timecheck event is the transition of whichever signal did
-// not open the window, and reaching an open window is what makes it fall within
-// the limit.
+// §31.4.3: a reference or data event opens a new window as its timestamp
+// event, except where it is the timecheck event of a window still inside its
+// limit, which sends the check dormant instead. The timecheck event is the
+// transition of whichever signal did not open the window, and reaching an open
+// window is what makes it fall within the limit.
 void OnFullskewEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
                      SimContext& ctx) {
   const bool kIsTimecheck =
@@ -324,13 +315,10 @@ void OnFullskewEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
     CloseWindow(*window);
     return;
   }
-  // §31.4.3, event-based: "a violation is reported not upon elapse of the time
-  // limit after the timestamp event (as in timer-based mode), but rather if a
-  // timecheck event occurs after the time limit. Such an event ends the first
-  // timing window and immediately begins a new timing window, where it acts as
-  // the timestamp event of the new window. A timecheck event within the time
-  // limit ends the timing window and turns the timing check dormant, and no
-  // violation is reported."
+  // §31.4.3, event-based: no timer reports the violation; a timecheck event
+  // that arrives after the limit does, and it then closes that window and
+  // opens the next as its timestamp event. A timecheck event inside the limit
+  // closes the window and sends the check dormant with nothing reported.
   const uint64_t kNow = ctx.CurrentTime().ticks;
   const uint64_t kLimit = WindowLimit(check, window->ref_is_timestamp);
   const bool kAfterLimit =
@@ -345,12 +333,11 @@ void OnFullskewEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
 
 // A reference event of a §31.4.2 or §31.4.3 check whose `&&&` condition is
 // false. Both clauses give such an event an effect of its own rather than none,
-// and §31.4.3 states it in the same words for each of its two modes: "If the
-// flag is set, then the second timestamp event is simply ignored. If the flag
-// is not set and if the timing check is active, then the timing check turns
-// dormant." §31.4.2 says it of its own check in one sentence -- "This check
-// shall also become dormant if it detects a conditioned reference event when
-// its condition is false and the remain_active_flag is not set."
+// and §31.4.3 states it the same way for each of its two modes: with the flag
+// set that second timestamp event is passed over, and with it clear an active
+// check goes dormant. §31.4.2 says it of its own check in one sentence: a
+// reference event whose condition is false sends the check dormant unless
+// remain_active_flag is set.
 //
 // So a set remain_active_flag leaves any open window standing, which is what
 // returning without doing anything gives, and a clear one closes it.
@@ -358,8 +345,8 @@ void OnFullskewEvent(const std::shared_ptr<SkewWindow>& window, bool ref_moved,
 // same rule as a verdict and names its three outcomes.
 //
 // No timer is cancelled here. The eager cancellation in the watchers below is
-// for §31.4.2's and §31.4.3's rule about "a new timestamp event" arriving at
-// the expiration of the limit, and a reference event the condition ruled out is
+// for §31.4.2's and §31.4.3's rule about a fresh timestamp event arriving as
+// the limit runs out, and a reference event the condition ruled out is
 // not a timestamp event; a window left standing keeps the timer it was armed
 // with, and CloseWindow cancels the timer of one that is closed.
 void OnSuppressedRefEdge(const std::shared_ptr<SkewWindow>& window) {
@@ -399,14 +386,13 @@ void OnDataEdge(const std::shared_ptr<SkewWindow>& window, SimContext& ctx) {
 // Applies the events the check saw in the slot whose active and reactive region
 // sets have just drained, the reference event before the data event.
 //
-// All three clauses state the answer for a reference event and a data event at
-// one time, in the same words: "simultaneous transitions on the reference and
-// data signals shall not cause $skew to report a timing violation, even when
-// the skew limit value is zero" in §31.4.1, and the same sentence naming
-// $timeskew in §31.4.2 and $fullskew in §31.4.3. Applying the reference event
-// first is what reaches it. §31.4.1 says why that is the right order and not
-// merely a chosen one: "A new reference event shall cancel the old wait for the
-// data event and begin a new one", so a reference event standing at the same
+// All three clauses give one answer for a reference event and a data event at
+// one time: §31.4.1 rules that moving together is never a $skew violation, a
+// zero limit included, and §31.4.2 and §31.4.3 rule the same of $timeskew and
+// $fullskew. Applying the reference event first is what reaches it. §31.4.1
+// says why that is the right order and not merely a chosen one: a new reference
+// event drops the wait for a data event and starts a fresh one, so a reference
+// event standing at the same
 // time as a data event has already cancelled the wait the data event would
 // otherwise be judged against.
 //
@@ -467,12 +453,11 @@ void ArmSkewWindow(const SpecifyManager& mgr, std::size_t index,
   // due in this slot already stands in the slot's Region::kPrePostponed queue,
   // which the deferred pass joins behind, so a timeout left armed would report
   // before the pass could apply the event that stops it. §31.4.2 and §31.4.3
-  // both rule that the check "shall also not report a violation if a new
-  // timestamp event occurs exactly at the expiration of the time limit", and
-  // cancelling while the watcher runs is what keeps that. Every path
-  // ApplySlotEvents takes either arms a fresh timer through OnTimestampEvent or
-  // closes the window, so nothing that should have stayed armed is left
-  // cancelled, and a $skew arms no timer at all.
+  // both rule out a violation when a fresh timestamp event lands exactly as the
+  // limit runs out, and cancelling while the watcher runs is what keeps that.
+  // Every path ApplySlotEvents takes either arms a fresh timer through
+  // OnTimestampEvent or closes the window, so nothing that should have stayed
+  // armed is left cancelled, and a $skew arms no timer at all.
   //
   // §31.4.1 gives a $skew's suppressed reference event no effect at all, so
   // only the other two kinds hand ArmTimingCheckEvents an action for one.

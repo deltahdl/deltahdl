@@ -47,20 +47,20 @@
 namespace delta {
 namespace {
 
-// §31.3.1: "(beginning of time window) = (timecheck time) - limit" and "(end of
-// time window) = (timecheck time)", and the check "reports a timing violation"
-// when "(beginning of time window) < (timestamp time) < (end of time window)".
-// The end points are not part of the violation region, which is also what makes
-// a zero limit never issue a violation, as the clause states outright.
+// §31.3.1: the window runs from limit before the timecheck time up to the
+// timecheck time, and the check reports a violation when the timestamp time
+// lies strictly between those two ends. The end points are not part of the
+// violation region, which is also what makes a zero limit never issue a
+// violation, as the clause states outright.
 bool SetupWindowViolated(uint64_t limit, uint64_t timestamp_ticks,
                          uint64_t timecheck_ticks) {
   return timestamp_ticks < timecheck_ticks &&
          timecheck_ticks - timestamp_ticks < limit;
 }
 
-// §31.3.2: "(beginning of time window) = (timestamp time)" and "(end of time
-// window) = (timestamp time) + limit", and the violation case is "(beginning of
-// time window) <= (timecheck time) < (end of time window)". The window includes
+// §31.3.2: the window runs from the timestamp time to limit after it, and the
+// check reports a violation when the timecheck time is at or after the
+// beginning and before the end. The window includes
 // the end point it opens on and excludes the one it closes at, so a timecheck
 // event at the timestamp time violates any nonzero limit.
 bool HoldWindowViolated(uint64_t limit, uint64_t timestamp_ticks,

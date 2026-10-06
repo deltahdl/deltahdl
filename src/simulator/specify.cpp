@@ -611,7 +611,7 @@ void SpecifyManager::IncrementInterconnectDelay(
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
-  // §31.2 has "every timing check" carry its own limits and notifier, and
+  // §31.2 has each timing check carry its own limits and notifier, and
   // nothing in Clause 31 merges two checks on the same signals, so an entry
   // built from a declaration replaces only the one built from that same
   // declaration in that same instance -- the rebuild

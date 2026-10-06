@@ -5,8 +5,8 @@
 // the variables the entry names and arms the watchers that measure the check.
 //
 // The three belong together because the reference signal bounds the window at
-// both ends. §31.4.4 derives the data event as "reference event signal with
-// opposite edge" and §31.4.5 as "reference event signal with the same edge", so
+// both ends. §31.4.4 takes the data event to be the reference signal's opposite
+// edge and §31.4.5 takes it to be the reference signal's same edge again, so
 // each names one signal and measures between two edges of it, and the state a
 // watcher carries is the time of the previous matching edge. §31.4.6 names a
 // data signal as well, and takes the leading edge of the reference event for
@@ -59,8 +59,8 @@ bool AllTimingChecksOff(const ArmedCheck& armed) {
   return armed.mgr->GetTimingCheckInvocationOptions().all_timing_checks_off;
 }
 
-// The edge §31.4.4 derives its data event with: "data event = reference event
-// signal with opposite edge".
+// The edge §31.4.4 derives its data event with: the reference signal's edge in
+// the other direction.
 //
 // An edge_control_specifier written in §31.5's general form is inverted
 // edge_descriptor by edge_descriptor, the two characters of each one reversed,
@@ -70,7 +70,7 @@ bool AllTimingChecksOff(const ArmedCheck& armed) {
 // a rule the clause states. §31.5 makes posedge the shorthand for edge[01, 0x,
 // x1] and negedge the shorthand for edge[10, x0, 1x], and reversing every
 // edge_descriptor of the first list yields exactly the second, so reversing
-// each edge_descriptor is the reading of "opposite edge" that agrees with the
+// each edge_descriptor is the reading of the opposite edge that agrees with the
 // two shorthands §31.4.4 and §31.4.6 were written over.
 //
 // Where no edge_descriptor list was written, posedge and negedge are each
@@ -97,21 +97,22 @@ TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
   return edge;
 }
 
-// §31.4.4: "threshold < (timecheck time) - (timestamp time) < limit". Both end
-// points are excluded, so a pulse exactly as wide as the limit satisfies the
-// check -- the clause has the width "greater than or equal to limit in order to
-// avoid a timing violation" -- and a pulse no wider than the threshold is
-// passed over, the clause stating that "no violation is reported for glitches
-// smaller than the threshold". A check declared without the optional threshold
+// §31.4.4: a violation is a pulse, timecheck time less timestamp time, wider
+// than the threshold and narrower than the limit. Both end points are excluded,
+// so a pulse exactly as wide as the limit satisfies the check -- the clause
+// asks for a width of at least the limit -- and a pulse no wider than the
+// threshold is passed over, the clause reporting nothing for a glitch below
+// the threshold. A check declared without the optional threshold
 // argument carries the zero §31.4.4 makes its default, which excludes nothing
 // but a pulse of no width at all.
 bool WidthPulseViolated(const TimingCheckEntry& check, uint64_t elapsed) {
   return elapsed > check.threshold && elapsed < check.limit;
 }
 
-// §31.4.5: "(timecheck time) - (timestamp time) < limit", the two times being
-// consecutive edges of one signal in the same direction, since §31.4.5 derives
-// the data event as "reference event signal with the same edge". A zero limit
+// §31.4.5: a violation is timecheck time less timestamp time falling below the
+// limit, the two times being consecutive edges of one signal in the same
+// direction, since §31.4.5 takes the data event to be the reference signal's
+// same edge again. A zero limit
 // therefore issues no violation, no elapsed time being below it.
 bool PeriodViolated(const TimingCheckEntry& check, uint64_t elapsed) {
   return elapsed < check.limit;
@@ -161,11 +162,10 @@ void ReportPulseViolation(const TimingCheckEntry& check,
 //
 // Nothing is reported before an opening edge has been seen, there being no
 // window to measure yet, and nothing is reported for a closing edge at or
-// before the opening one. §31.4.4 states that the two "shall never occur at the
-// same simulation time because these events are triggered by opposite
-// transitions", and SpecifyManager::CheckWidthViolation and
-// SpecifyManager::CheckPeriodViolation both skip a check whose data time is not
-// past its reference time.
+// before the opening one. §31.4.4 notes that the two cannot fall at one
+// simulation time, since opposite transitions trigger them, and
+// SpecifyManager::CheckWidthViolation and SpecifyManager::CheckPeriodViolation
+// both skip a check whose data time is not past its reference time.
 void EvaluatePulseWindow(const PulseWindow& window, uint64_t timecheck_ticks,
                          SimContext& ctx) {
   if (!window.has_timestamp) return;
@@ -213,9 +213,9 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
   // §31.7: a transition whose `&&&` condition does not hold is not an
   // occurrence of the check, so both watchers go through WatchConditionedEdge
   // (src/simulator/timing_check_driver_internal.h) rather than WatchEdge. A
-  // $width names one signal and one timing_check_event -- §31.4.4 derives the
-  // data event as "reference event signal with opposite edge" rather than
-  // taking one written for it -- so there is a single condition to read
+  // $width names one signal and one timing_check_event -- §31.4.4 takes the
+  // data event to be the reference signal's opposite edge rather than one
+  // written for it -- so there is a single condition to read
   // whichever edge arrived, and both events set ConditionedEvent::is_data_event
   // false to read TimingCheckEntry::ref_condition_expr.
   ConditionedEvent ref_event{window->armed, false};
@@ -272,8 +272,8 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
 // bound the window, and the data transitions seen while the window was still
 // open.
 //
-// §31.4.6 puts the end of the window at "(trailing reference edge time) +
-// end_edge_offset", so a data transition inside an open window can only be
+// §31.4.6 puts the end of the window end_edge_offset after the trailing
+// reference edge, so a data transition inside an open window can only be
 // answered once that end is known to lie past it. With a positive
 // end_edge_offset it does from the start -- the trailing edge is still to come,
 // at the transition's time or later -- and the transition is answered when it
@@ -282,9 +282,9 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
 // held in `pending` and answered at the Inactive region of its time step if the
 // window is still open then. A negative end_edge_offset shortens the region and
 // can leave the transition outside it, so it is held and answered at the
-// trailing edge, the first moment both end points are known. "A violation
-// results if the data event occurs anytime within the time window", so each
-// transition is its own violation and toggles the notifier at its own time.
+// trailing edge, the first moment both end points are known. Any data event
+// inside the window is a violation, so each transition is its own violation and
+// toggles the notifier at its own time.
 struct NochangeWindow {
   ArmedCheck armed;
   std::string ref_signal;
@@ -296,10 +296,9 @@ struct NochangeWindow {
   std::vector<uint64_t> pending;
 };
 
-// §31.4.6: "(beginning of time window) = (leading reference edge time) -
-// start_edge_offset", "(end of time window) = (trailing reference edge time) +
-// end_edge_offset", and the violation case is "(beginning of time window) <
-// (data event time) < (end of time window)". The end points are not included,
+// §31.4.6: the window opens start_edge_offset before the leading reference edge
+// and closes end_edge_offset after the trailing one, and a data event strictly
+// between those two ends is a violation. The end points are not included,
 // which is what makes the clause's own example -- `$nochange(posedge clk, data,
 // 0, 0)` -- report nothing when the posedge and the data transition happen at
 // the same simulation time.
@@ -361,9 +360,9 @@ void CloseNochangeWindow(NochangeWindow& window, uint64_t trailing_ticks,
 }
 
 // Drops the data transitions held for a window beginning `start_edge_offset`
-// before `reference_ticks`. §31.4.6 puts "(beginning of time window) = (leading
-// reference edge time) - start_edge_offset" and reports a violation only for
-// "(beginning of time window) < (data event time)", so a transition at or
+// before `reference_ticks`. §31.4.6 opens the window start_edge_offset before
+// the leading reference edge and reports a violation only for a data event
+// after that beginning, so a transition at or
 // before that beginning falls outside and is discarded.
 //
 // It is called from two places for two reasons. At a leading reference edge it
@@ -436,8 +435,8 @@ bool AnswerInOpenWindow(const std::shared_ptr<NochangeWindow>& shared,
 // lasts.
 //
 // It is held either way, because the next leading reference edge may open a
-// window that reaches back past it: §31.4.6 begins a window at "(leading
-// reference edge time) - start_edge_offset", so a positive offset puts the
+// window that reaches back past it: §31.4.6 begins a window start_edge_offset
+// before the leading reference edge, so a positive offset puts the
 // beginning before the edge that opens it. Issue #3424 was that such a
 // transition was dropped, first by an early return while no leading edge had
 // been seen and then by the leading edge clearing everything held, which made
@@ -466,10 +465,10 @@ void RecordNochangeData(const std::shared_ptr<NochangeWindow>& shared,
   window.pending.push_back(data_ticks);
 }
 
-// Arms the three watchers a §31.4.6 check needs. §31.4.6 says so outright:
-// "Unlike other timing checks, $nochange involves three, rather than two,
-// transitions" -- the leading reference edge, the trailing one, and the data
-// transition measured against them.
+// Arms the three watchers a §31.4.6 check needs. §31.4.6 says so outright: a
+// $nochange, unlike the other checks, involves three transitions -- the leading
+// reference edge, the trailing one, and the data transition measured against
+// them.
 //
 // The leading edge is the one the check was written with, which §31.4.6
 // restricts to posedge or negedge, and the trailing edge is its opposite. A

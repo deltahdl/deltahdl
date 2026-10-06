@@ -120,8 +120,8 @@ SidedLimits SidedLimitsOf(const TimingCheckEntry& check,
                      check.signed_limit2};
 }
 
-// §31.9.1 requirement (a): "A timing violation shall be triggered if the signal
-// changes in the violation window, exclusive of the end points." A negative
+// §31.9.1 requirement (a): a change of the signal strictly inside the violation
+// window, its end points excluded, triggers a timing violation. A negative
 // limit moves an end point across the reference time rather than bounding one
 // side of it, so the window is the one open interval the two signed limits mark
 // out around that time and neither side is answered on its own.
@@ -331,8 +331,8 @@ Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   // 1, which Table 31-13's third row takes to 0.
   if (kPreA && !kPreB) return Logic4Word{0u, 0u};
 
-  // 0, which Table 31-13's second row takes to 1, and x, whose row gives
-  // "Either 0 or 1". That row is a licence rather than a value, so 0 and 1 both
+  // 0, which Table 31-13's second row takes to 1, and x, whose row allows
+  // either 0 or 1. That row is a licence rather than a value, so 0 and 1 both
   // conform and 1 is the answer chosen here; §31.6 prefers neither. The two
   // rows share this return because they were given the same answer and not
   // because the table joins them.

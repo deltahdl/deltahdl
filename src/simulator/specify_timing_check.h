@@ -63,8 +63,8 @@ struct TimingCheckEntry {
   // arrived at.
   //
   // Only '0', '1' and 'x' are stored. Syntax 31-15 also admits 'X', 'z' and
-  // 'Z', and §31.5 has "edge transitions involving z ... treated the same way
-  // as edge transitions involving x", so BuildTimingCheckUnderOptions
+  // 'Z', and §31.5 handles a transition to or from z exactly as one to or from
+  // x, so BuildTimingCheckUnderOptions
   // (simulator/specify_timing_check.cpp) folds the four spellings into 'x' as
   // it copies the list off TimingCheckDecl::ref_edge_descriptors
   // (parser/ast_specify.h). The parser keeps the spelling the source used,
@@ -103,12 +103,11 @@ struct TimingCheckEntry {
   // an optional event_based_flag and an optional remain_active_flag, each a
   // constant expression, and both decide what the check does rather than what
   // it measures. event_based_flag switches the check off its default
-  // timer-based detection: §31.4.2 has it "behave like the $skew check when
-  // both the event_based_flag and the remain_active_flag are set".
-  // remain_active_flag decides what a reference event whose `&&&` condition is
-  // false does, which §31.4.3 states for both modes: "If the flag is set, then
-  // the second timestamp event is simply ignored. If the flag is not set and if
-  // the timing check is active, then the timing check turns dormant."
+  // timer-based detection: §31.4.2 has it act as a $skew does once both
+  // event_based_flag and remain_active_flag are set. remain_active_flag decides
+  // what a reference event whose `&&&` condition is false does, which §31.4.3
+  // states for both modes: with the flag set that second timestamp event is
+  // passed over, and with it clear an active check goes dormant.
   //
   // A flag written by no declaration is clear, which is the default each clause
   // describes. Neither is read by any check but those two.
@@ -294,7 +293,7 @@ FullskewWindowAction FullskewSecondTimestampAction(
     bool timestamp_condition_holds, bool remain_active_flag);
 
 // §31.6's Table 31-13, which states the whole of what a violation does to a
-// notifier: 0 becomes 1, 1 becomes 0, z stays z, and x becomes "Either 0 or 1".
+// notifier: 0 becomes 1, 1 becomes 0, z stays z, and x may become 0 or 1.
 // The x row is a licence rather than a value, and 1 is what this returns for
 // it; §31.6 prefers neither, so a reader should not take 1 for the only
 // conforming answer.
@@ -345,8 +344,8 @@ TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition);
 // expression as a whole. Syntax 31-16 writes a scalar_timing_check_condition as
 // a bare `expression`, as `~ expression`, or as `expression <op>
 // scalar_constant`, and in all six forms the conditioning signal is that
-// `expression`: §31.7 states the rule over "an x value on the conditioning
-// signal" and TimingCheckConditionEnables takes the signal's least significant
+// `expression`: §31.7 states the rule in terms of an x on the conditioning
+// signal, and TimingCheckConditionEnables takes the signal's least significant
 // bit, applying the `~` or the comparison itself. Evaluating the whole
 // condition and passing that instead would apply the operator twice. Null for a
 // null condition, which is an unconditioned event.

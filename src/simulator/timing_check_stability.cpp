@@ -13,20 +13,21 @@
 // reference edge. Table 31-5 makes $recovery's reference_event the timestamp
 // event and its data_event the timecheck event, so a $recovery window begins at
 // it. Table 31-3 and Table 31-6 give $setuphold and $recrem no fixed answer at
-// all: "either the reference event or the data event can be the timecheck
-// event. It shall depend upon which occurs first in the simulation". Each of
+// all: whichever of the reference and data events the simulation sees first
+// decides which is the timecheck event. Each of
 // those two therefore bounds a window on both sides of the reference edge and
 // carries one limit for each side.
 //
 // §31.3.3 and §31.3.6 state the two-sided pair as an equivalence, and that is
-// what decides which limit bounds which side. §31.3.3 makes "$setuphold(
-// posedge clk, data, tSU, tHLD )" equivalent in functionality to "$setup( data,
-// posedge clk, tSU )" with "$hold( posedge clk, data, tHLD )", so the setup
+// what decides which limit bounds which side. §31.3.3 has
+// `$setuphold(posedge clk, data, tSU, tHLD)` do what
+// `$setup(data, posedge clk, tSU)` and `$hold(posedge clk, data, tHLD)` do
+// together, so the setup
 // limit -- TimingCheckEntry::limit, the declaration's first -- bounds the side
 // before the reference edge and the hold limit TimingCheckEntry::limit2 the
-// side after it. §31.3.6 makes "$recrem( posedge clear, posedge clk, tREC, tREM
-// )" equivalent in functionality to "$removal( posedge clear, posedge clk, tREM
-// )" with "$recovery( posedge clear, posedge clk, tREC )", so for $recrem the
+// side after it. §31.3.6 has `$recrem(posedge clear, posedge clk, tREC, tREM)`
+// do what `$removal(posedge clear, posedge clk, tREM)` and
+// `$recovery(posedge clear, posedge clk, tREC)` do together, so for $recrem the
 // two are the other way round: the removal limit TimingCheckEntry::limit2
 // bounds the side before the reference edge and the recovery limit
 // TimingCheckEntry::limit the side after it. Table 31-6 says the same thing in
@@ -111,18 +112,16 @@ TwoSidedLimits LimitsOf(const TimingCheckEntry& check) {
                         check.signed_limit2};
 }
 
-// §31.3.3, with both limits positive and the data event occurring first:
-// "(beginning of time window) = (timecheck time) - limit", "(end of time
-// window) = (timecheck time)", and a violation is reported when "(beginning of
-// time window) < (timestamp time) <= (end of time window)". With the data event
-// occurring second: "(beginning of time window) = (timestamp time)", "(end of
-// time window) = (timestamp time) + limit", and a violation is reported when
-// "(beginning of time window) <= (timecheck time) < (end of time window)".
-// §31.3.6 states both cases in the same words for $recrem.
+// §31.3.3, with both limits positive and the data event occurring first: the
+// window runs from limit before the timecheck time to the timecheck time, and a
+// timestamp time after its beginning and at or before its end is a violation.
+// With the data event occurring second: the window runs from the timestamp time
+// to limit after it, and a timecheck time at or after its beginning and before
+// its end is a violation. §31.3.6 states both cases alike for $recrem.
 //
 // Either way the reference edge is the end point that is inside the violation
-// region, which is what makes both clauses' "shall report a timing violation
-// when the reference and data events occur simultaneously" hold. A simultaneous
+// region, which is what makes both clauses' rule hold that reference and data
+// events at the same time are a violation. A simultaneous
 // pair is read against the before-side limit, which is where
 // SpecifyManager::CheckSetupholdViolation reads it. Both clauses state that a
 // check whose two limits are zero shall never issue a violation.
@@ -133,10 +132,10 @@ bool TwoSidedWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
   return data_ticks - ref_ticks < limits.after;
 }
 
-// §31.9.1 requirement (a): "A timing violation shall be triggered if the signal
-// changes in the violation window, exclusive of the end points. Violation
-// windows smaller than two units of simulation precision cannot yield timing
-// violations." A negative limit moves an end point across the reference edge
+// §31.9.1 requirement (a): a change of the signal strictly inside the violation
+// window, its end points excluded, triggers a timing violation, and a window
+// narrower than two units of simulation precision can trigger none. A negative
+// limit moves an end point across the reference edge
 // rather than bounding one side of it, so the window is the one open interval
 // the two signed limits mark out around the reference time and neither side is
 // answered on its own.
@@ -153,10 +152,9 @@ bool NegativeWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
          kDataTicks < kRefTicks + limits.signed_after;
 }
 
-// §31.3.4: "(beginning of time window) = (timecheck time) - limit", "(end of
-// time window) = (timecheck time)", a violation is reported when "(beginning of
-// time window) < (timestamp time) < (end of time window)", and "the end points
-// of the time window are not part of the violation region". Table 31-4 makes
+// §31.3.4: the window runs from limit before the timecheck time to the
+// timecheck time, a timestamp time strictly between those ends is a violation,
+// and neither end belongs to the violation region. Table 31-4 makes
 // the reference event the timecheck event and the data event the timestamp
 // event, so the window ends at the reference edge and the data transition is
 // what is placed inside it. When the limit is zero the check never issues a
@@ -166,10 +164,9 @@ bool RemovalWindowViolated(uint64_t limit, uint64_t ref_ticks,
   return data_ticks < ref_ticks && ref_ticks - data_ticks < limit;
 }
 
-// §31.3.5: "(beginning of time window) = (timestamp time)", "(end of time
-// window) = (timestamp time) + limit", a violation is reported when "(beginning
-// of time window) <= (timecheck time) < (end of time window)", and "only the
-// end of the time window is not part of the violation region". Table 31-5 makes
+// §31.3.5: the window runs from the timestamp time to limit after it, a
+// timecheck time at or after its beginning and before its end is a violation,
+// and the end alone is left out of the violation region. Table 31-5 makes
 // the reference event the timestamp event and the data event the timecheck
 // event, so the window begins at the reference edge. When the limit is zero the
 // check never issues a violation, which the excluded end is what gives.
@@ -234,7 +231,7 @@ StabilitySide ViolatedSide(const SpecifyManager& mgr,
 // §31.3 evaluates a check at. Table 31-4 makes $removal's reference event the
 // timecheck event and Table 31-5 makes $recovery's data event the timecheck
 // event; Table 31-3 and Table 31-6 leave $setuphold's and $recrem's to
-// whichever of the two "occurs first in the simulation", so for those two
+// whichever of the two the simulation sees first, so for those two
 // either event closes a window.
 //
 // This is asked once per watcher when the check is armed, rather than of each
@@ -375,9 +372,9 @@ void ReportViolation(TimingCheckKind kind, StabilitySide side,
       "31.3.5", pair.armed.Entry().loc, ctx);
 }
 
-// §31.9.2 (printed page 922): "timestamp_condition is associated with the
-// delayed signal that transitions first, while timecheck_condition is
-// associated with the delayed signal that transitions second". A violation
+// §31.9.2 (printed page 922): timestamp_condition goes with whichever delayed
+// signal moves first and timecheck_condition with the one that moves second.
+// A violation
 // before the reference edge has the data transition first and one after it the
 // reference transition first, so the side says which transition answers to
 // which condition; `$setuphold(clk, data, tsetup, thold, ntfr, , cond1)` is
@@ -428,8 +425,8 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
   // §31.5's edge_control_specifier and §31.7's `&&&` condition its own event
   // was written with. Both events need that gate here, and not just the one a
   // check is evaluated at, because §31.3.3's Table 31-3 and §31.3.6's Table
-  // 31-6 leave the timecheck event to whichever of the two "occurs first in the
-  // simulation". A transition recorded in StabilityPair::ref_ticks or
+  // 31-6 leave the timecheck event to whichever of the two the simulation sees
+  // first. A transition recorded in StabilityPair::ref_ticks or
   // StabilityPair::data_ticks under a false condition would otherwise stand as
   // the other side of every window the surviving event closes.
   //

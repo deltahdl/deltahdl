@@ -1,20 +1,18 @@
-// §31.9.1 (printed pages 920-922) and §31.9.4 (printed page 923): "delayed
-// copies of the data and reference signals are generated in the timing checks",
-// and "Delayed data and reference signals can be declared within the timing
-// check so they can be used in the model's functional implementation". The
-// elaborator declares each named one as a net of the module
+// §31.9.1 (printed pages 920-922) and §31.9.4 (printed page 923): the timing
+// checks produce delayed copies of their data and reference signals, and a
+// check may declare those copies by name so that the model's functional code
+// can read them. The elaborator declares each named one as a net of the module
 // (elaborator_delayed_signals.cpp); what drives it is here.
 //
-// Without the option enabling negative timing checks "the delayed reference and
-// data signals become copies of the original reference and data signals", so a
-// copy follows at once. With it they are "only actually delayed when negative
-// limit values are present": §31.9.1's example has "The setup time of -7 (the
-// larger in absolute value) creates a delay of 7 for dCLK", so a reference is
-// delayed by the largest negative setup (or removal) limit of the checks it is
-// the reference of, and a data signal by the largest negative hold (or
-// recovery) limit. "If a given signal has a delayed signal in some timing
-// checks but not in others, the delayed signal shall be used in both cases",
-// so the delay belongs to the original signal, whichever check names the copy.
+// Without the option enabling negative timing checks the delayed signals are
+// plain copies of the originals, so a copy follows at once. With it they lag
+// only where some limit is negative: in §31.9.1's example the setup limit of
+// -7, the larger magnitude of the two, gives dCLK a delay of 7, so a reference
+// is delayed by the largest negative setup (or removal) limit of the checks it
+// is the reference of, and a data signal by the largest negative hold (or
+// recovery) limit. A signal given a delayed copy in some checks and not in
+// others uses that delayed copy in all of them, so the delay belongs to the
+// original signal, whichever check names the copy.
 //
 // Each transition of the original reaches the copy the same delay later,
 // however close the next one follows: a delayed copy carries the signal, not a

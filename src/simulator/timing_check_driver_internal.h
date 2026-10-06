@@ -41,8 +41,8 @@ namespace delta {
 // watcher already knows which entry it was armed for.
 
 // The values §31.5's edge_descriptors are written over -- 0, 1 and the x that
-// "edge transitions involving z are treated the same way as" -- plus the answer
-// for a value that states no bit at all.
+// a transition involving z is handled as -- plus the answer for a value that
+// states no bit at all.
 enum class EdgeLevel : uint8_t {
   kAbsent,
   kZero,
@@ -52,9 +52,9 @@ enum class EdgeLevel : uint8_t {
 
 // The level of one bit of a signal's value. A bit at or beyond the words the
 // value holds states no level at all, which kAbsent is the answer for. x is
-// (aval 1, bval 1) and z is (aval 0, bval 1), and §31.5 has "edge transitions
-// involving z ... treated the same way as edge transitions involving x", so the
-// bval bit alone decides kUnknown.
+// (aval 1, bval 1) and z is (aval 0, bval 1), and §31.5 handles a transition to
+// or from z exactly as one to or from x, so the bval bit alone decides
+// kUnknown.
 inline EdgeLevel LevelOfBit(const Logic4Vec& v, uint32_t bit) {
   uint32_t word = bit / 64U;
   if (word >= v.nwords) return EdgeLevel::kAbsent;
@@ -65,8 +65,8 @@ inline EdgeLevel LevelOfBit(const Logic4Vec& v, uint32_t bit) {
 
 // The level of every bit of a value, indexed by bit position. §31.8 reads a
 // timing check's signal across all of its bits rather than at one of them --
-// "the transition of one or more bits of a vector is considered a single
-// transition of that vector" -- so a watcher compares bit against bit and needs
+// any number of its bits moving together counts as one transition of the
+// vector -- so a watcher compares bit against bit and needs
 // them all. A scalar has one bit and reads the same way.
 inline std::vector<EdgeLevel> LevelsOfBits(const Logic4Vec& v) {
   std::vector<EdgeLevel> levels;
@@ -157,16 +157,15 @@ inline bool TimingCheckEdgeMatches(const TimingCheckEdge& edge, EdgeLevel from,
 }
 
 // §31.8: whether the change from `before` to `after` is a transition of the
-// signal that `edge` names. "Either or both signals in a timing check can be a
-// vector. This shall be interpreted as a single timing check where the
-// transition of one or more bits of a vector is considered a single transition
-// of that vector", so one bit making the transition is the whole signal making
-// it, and the check is evaluated once however many bits did. §31.8's own
-// example is a $setup whose data signal changes in six bits at once, and it
-// "shall still only report a single timing violation".
+// signal that `edge` names. Either signal of a check may be a vector, and the
+// check stays a single one in which any number of a vector's bits moving
+// together counts as one transition of it, so one bit making the transition is
+// the whole signal making it, and the check is evaluated once however many bits
+// did. §31.8's own example is a $setup whose data signal changes in six bits at
+// once, and it reports one timing violation and no more.
 //
-// §31.8 also lets a simulator "provide an option causing vectors in timing
-// checks to result in the creation of multiple single-bit timing checks", which
+// §31.8 also lets a simulator offer an option that splits a check on vectors
+// into many single-bit checks, which
 // yields N checks for a $width or a $period and M*N for a check naming two
 // signals. That option is not one deltahdl offers, so no check registered here
 // is ever a per-bit one. TimingCheckExpandedCount and
@@ -267,8 +266,8 @@ struct ArmedCheck {
 };
 
 // §31.7: whether a timing_check_event that just happened enables the check it
-// belongs to. A conditioned event "ties the occurrence of timing checks to the
-// value of a conditioning signal", so an event whose condition does not hold is
+// belongs to. A conditioned event makes whether the check occurs depend on the
+// value of a conditioning signal, so an event whose condition does not hold is
 // not an occurrence of the check at all and neither opens a window nor closes
 // one. `condition` is the expression the event was declared with, null for an
 // unconditioned event, which always enables.
@@ -276,9 +275,9 @@ struct ArmedCheck {
 // Three rules of §31.7 are applied, and each is applied where it is stated:
 // TimingCheckConditioningSignal picks out the operand the clause calls the
 // conditioning signal, the least significant word of its value is what
-// TimingCheckConditionEnables is handed because "if a vector net or an
-// expression resulting in a multibit value is used, then the LSB ... is used",
-// and TimingCheckConditionEnables settles the six forms of Syntax 31-16
+// TimingCheckConditionEnables is handed because a vector net or a multibit
+// expression is read at its least significant bit alone, and
+// TimingCheckConditionEnables settles the six forms of Syntax 31-16
 // together with the x rule -- deterministic comparisons are disabled by an x on
 // the conditioning signal, nondeterministic ones enabled by it. A value with no
 // words states no bit, and states no true condition either;
@@ -409,8 +408,8 @@ inline ArmedTimingCheckEvents ArmTimingCheckEvents(
 //
 // §31.3 decides a check from two events, and which of them is the timecheck
 // event follows the times they happened at. Table 31-3 and Table 31-6 say so
-// outright, leaving it to whichever of the two "occurs first in the
-// simulation", and §31.3.2's window includes the endpoint it opens on so that a
+// outright, leaving it to whichever of the two the simulation sees first, and
+// §31.3.2's window includes the endpoint it opens on so that a
 // $hold whose events fall together is a violation. A watcher runs as part of
 // the commit that woke it, so a check evaluated inside a watcher sees only the
 // events committed before it, and two events falling in one time slot would be
@@ -457,19 +456,18 @@ inline void ReportTimingViolation(std::string_view message,
                         Subclause(std::string(subclause)));
 }
 
-// §31.6: "Whenever a timing violation occurs, the timing check updates the
-// value of the notifier", and Table 31-13 gives the value it updates to.
-// ToggleNotifierOnViolation (src/simulator/specify_timing_check.h) is that
-// table. §31.6 has the notifier "declared in the module where timing check
-// tasks are invoked", which is the module whose specify block declared the
-// check, so it is looked up under the same instance prefix the check's signals
-// are.
+// §31.6: each timing violation makes the check change its notifier's value,
+// and Table 31-13 gives the value it changes to. ToggleNotifierOnViolation
+// (src/simulator/specify_timing_check.h) is that table. §31.6 has the notifier
+// declared in the module that invokes the timing check, which is the module
+// whose specify block declared the check, so it is looked up under the same
+// instance prefix the check's signals are.
 //
 // Only the least significant bit is written and the rest of the variable is
 // left as it stands, Table 31-13 stating one value and §31.6's notifier being a
 // scalar. The write goes through Variable::NotifyWatchers because §31.6 has a
-// model "use the notifier to make behavior a function of timing check
-// violations", and an `always @(notifier)` sees the new value only once the
+// model read the notifier to make its behavior depend on timing violations,
+// and an `always @(notifier)` sees the new value only once the
 // watchers have been notified.
 inline void ToggleNotifier(const TimingCheckEntry& check, SimContext& ctx) {
   if (check.notifier.empty()) return;
