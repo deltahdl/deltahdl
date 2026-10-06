@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "common/types.h"
-// §17.7.2 says a checker instance "may be static or procedural (see 17.3)", so
+// §17.7.2 lets a checker instance be static or procedural, as §17.3 has it, so
 // the kind it reasons about is the one §17.3 defines and this header takes it
 // from there rather than restating it. The two declared it separately until
 // assert-no-duplicate-type-definitions reported them: a translation unit

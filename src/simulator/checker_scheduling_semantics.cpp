@@ -10,7 +10,7 @@ Region HomeRegionForCheckerStatement(CheckerStatementKind kind) {
     case CheckerStatementKind::kChangeSensitive:
     case CheckerStatementKind::kBlocking:
       // §17.7.3: change-sensitive constructs and blocking statements are
-      // scheduled "similarly to programs" (§24.3.1). Reuse the very same
+      // scheduled the way a program's are (§24.3.1). Reuse the very same
       // scheduler placement the program-reactive path applies to a blocking
       // assignment rather than restating the region, so the two stay in lock
       // step: both land in the Reactive region.
