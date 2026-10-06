@@ -2319,6 +2319,23 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
+      # RunOnDeepStack in src/main.cpp runs the simulation on a thread with a
+      # 1 GiB stack, and on the main thread when pthread_create refuses that
+      # thread. An address space limited to 768 MiB leaves the binary room to
+      # load and run hello.sv but none for the stack, so this run takes the
+      # fallback and must still print what hello.expected records. It is a step
+      # of this job rather than an e2e case because a sanitizer runtime reserves
+      # its shadow memory against the same limit and could not start under it,
+      # and this job is the one that runs the unsanitized coverage binary whose
+      # profile assert-coverage merges.
+      - name: E2E test with no room for the simulation thread's stack
+        run: |
+          expected=$(cat test/src/e2e/hello.expected)
+          actual=$(ulimit -v 786432 && build/src/deltahdl test/src/e2e/hello.sv 2>&1)
+          if [ "$actual" != "$expected" ]; then
+            printf 'expected:\n%s\ngot:\n%s\n' "$expected" "$actual"
+            exit 1
+          fi
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
