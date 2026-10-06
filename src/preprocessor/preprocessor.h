@@ -755,9 +755,10 @@ class Preprocessor {
   // as long as it stands and dropped where it ends.
   std::vector<ProtectViewport> protect_viewports_;
   // §34.2 lets an envelope contain another, and §34.5.32.2 gives a viewport to
-  // "the current protected envelope", so the enclosing envelopes' viewports are
-  // held here while an inner one is open and taken back when it closes.
-  // protect_viewports_ above is the current envelope's alone.
+  // the protected envelope in force where it is written, so the enclosing
+  // envelopes' viewports are held here while an inner one is open and taken
+  // back when it closes. protect_viewports_ above is the current envelope's
+  // alone.
   struct EnclosingViewports {
     std::vector<ProtectViewport> viewports;
     uint32_t envelope_source = 0;
@@ -829,7 +830,7 @@ class Preprocessor {
   // And for §34.5.15's, which says a data block begins on the line after it.
   bool data_block_value_next_ = false;
   // Which of those three blocks is being gathered, and what has been gathered
-  // for it. §34.5.15.2 has a data block "begin on the next line in the file"
+  // for it. §34.5.15.2 starts a data block on the line after its keyword
   // and says nothing about where it ends, and §34.5.22.2 and §34.5.27.2 word
   // the digest block and the key block the same way, so a block is the run of
   // lines after its keyword rather than the one line beneath it. The lines are

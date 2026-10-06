@@ -74,8 +74,8 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext,
 //
 // `line_length` breaks the written block so that no line of it runs past that
 // many characters, and zero asks for no break. §34.5.9.2 defines the subkeyword
-// as "the maximum number of characters (after any encoding) in a single line of
-// the data_block", naming that block and no other, so it is the data block's
+// as the longest a line of the data_block may run once encoded, naming that
+// block and no other, so it is the data block's
 // caller that passes one: a key block and a digest block are written on the one
 // line §34.5.27.2 and §34.5.22.2 begin them on. §34.5.15.2 says a data block
 // begins on the line beneath its keyword and says nothing about where it ends,

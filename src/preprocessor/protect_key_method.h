@@ -24,8 +24,8 @@ inline constexpr std::string_view kKeyMethodKeyword = "key_method";
 
 // The one identifier of that table §34.5.11.2 marks required, so it is the one
 // cipher a tool may be handed a block under without having been told anything
-// about the tool that wrote it: "the required methods are standard in every
-// implementation". The cipher behind it is FIPS 46-3's, in
+// about the tool that wrote it, every implementation having to provide each
+// method the table marks required. The cipher behind it is FIPS 46-3's, in
 // preprocessor/protect_des.h.
 inline constexpr std::string_view kDesCbcMethod = "des-cbc";
 

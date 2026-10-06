@@ -35,8 +35,8 @@ namespace delta {
 // nothing to report about the name then, and it stands.
 //
 // Nor is a name a key block carried. §34.5.14.2 (printed page 959) has the
-// decrypting tool "decrypt the key_block to find the data_decrypt_key and
-// data_method that in turn can be used to decrypt the data_block", so the key
+// decrypting tool decrypt the key_block for the data_decrypt_key and the
+// data_method, and open the data_block with those, so the key
 // comes out of the block beside the name, and a reader holding only the key
 // the block is under -- the one reader the block is written for -- holds that
 // key from then on. Checked against its list, the name stopped that reader at

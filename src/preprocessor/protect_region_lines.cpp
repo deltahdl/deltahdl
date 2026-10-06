@@ -74,8 +74,8 @@ namespace {
 // and a line writing none of them leaves the earlier ones as they were.
 void TakeMethodKeywords(std::string_view line, uint32_t line_num,
                         RegionKeyReader* reader) {
-  // §34.5.11.2 has this identifier name "the encryption algorithm that shall be
-  // used to encrypt subsequent begin-end blocks", so the value standing where a
+  // §34.5.11.2 has this identifier name the cipher the begin-end blocks after
+  // it are to be encrypted with, so the value standing where a
   // region ends is the one that region was to be encrypted under. §34.5.11.1
   // spells the expression with a string, so a parenthesized pragma_value names
   // no algorithm and the identifier stated earlier stands.

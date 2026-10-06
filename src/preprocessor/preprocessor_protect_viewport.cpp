@@ -15,8 +15,8 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                                  SourceLoc loc) {
   // §34.5.32.2 has a viewport describe objects within the current protected
   // envelope, so the ones an envelope was described by belong to that envelope
-  // and to no other. §34.2 permits the nesting -- "Decryption envelopes may
-  // contain other envelopes within their enclosed data block" -- so which
+  // and to no other. §34.2 permits the nesting -- the data block a decryption
+  // envelope encloses may itself hold further envelopes -- so which
   // envelope is current changes as one opens and closes inside another, and
   // the outer envelope is current again when the inner one has closed, still
   // described by what it wrote.

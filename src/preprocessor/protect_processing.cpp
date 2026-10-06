@@ -37,8 +37,8 @@ namespace {
 // The report a region asking to be encrypted under a cipher this implementation
 // does not provide is owed.
 //
-// §34.5.11.2 has the identifier name "the encryption algorithm that shall be
-// used to encrypt subsequent begin-end blocks", so a region naming one has
+// §34.5.11.2 has the identifier name the cipher the begin-end blocks after it
+// are to be encrypted with, so a region naming one has
 // stated what its blocks are to be produced with. This implementation provides
 // two: §34.5.11.2's required des-cbc, whose cipher is in
 // preprocessor/protect_des.h, and its own, named kDataMethod in
@@ -237,8 +237,8 @@ ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names,
 // The report a region asking for a digest under an algorithm this
 // implementation does not provide is owed.
 //
-// §34.5.22.2 has the encrypting tool generate the message digest "using the
-// algorithm specified by the digest_method pragma expression", so a region
+// §34.5.22.2 has the encrypting tool compute the message digest with the
+// algorithm the digest_method pragma expression names, so a region
 // asking for a digest under an identifier is asking for that algorithm's value
 // and no other. ProtectDigestBlockDirectives
 // (preprocessor/protect_digest_block.cpp) writes nothing where it cannot
@@ -448,11 +448,11 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
   // on the collection rather than on a designation.
   requests.UseKeyMethod(
       ProvidedCipher(ProtectPragmaValueBody(in_effect.key_method)));
-  // §34.5.25.2 (printed page 964): "When a key_keyname is provided in the
-  // input, it indicates the key that shall be used for encrypting the data
-  // encryption keys." A region that named the key its data are under and a
-  // key for its key blocks has that data key carried in the blocks, rather
-  // than a key made for it; one naming no held data key has one made.
+  // §34.5.25.2 (printed page 964): a key_keyname written in the input names
+  // the key the keys of the data are to be encrypted under. A region that named
+  // the key its data are under and a key for its key blocks has that data key
+  // carried in the blocks, rather than a key made for it; one naming no held
+  // data key has one made.
   how.key_blocks = ProtectKeyBlocksFor(
       requests, ProtectKeyBlockRegion{region.body, named}, keys,
       EnvelopeEncodings(region.written_inside.encoding), how.digest);
@@ -526,9 +526,9 @@ std::string ClosedRegionText(const ReadRegion& region,
   // region's as one written inside it, and an envelope stating it is stating
   // what was in effect where it was written.
   //
-  // §34.5.1.2 asks for exactly this: "protected envelopes should be completely
-  // self-contained to avoid any undesired interaction when multiple encrypted
-  // models exist in the decryption input stream". An envelope left to what its
+  // §34.5.1.2 asks for exactly this: each protected envelope is to stand on its
+  // own, so that several encrypted models in one decryption input do not act on
+  // one another. An envelope left to what its
   // region restated relies on text standing ahead of it, and §34.5.31 has the
   // reset every envelope ends with put the keywords back to their defaults, so
   // the second envelope of a text stating a value once would be read under

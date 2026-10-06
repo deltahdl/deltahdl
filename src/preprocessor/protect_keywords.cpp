@@ -534,9 +534,9 @@ std::string ProtectEnvelopeDescriptionDirectives(
     AppendKeywordDirective(text, kEncryptAgentInfoKeyword,
                            description.encrypt_agent_info);
   }
-  // §34.5.11.2 has the cipher a region's data are under "unchanged in the
-  // output file, except where a digital signature is used, in which case it is
-  // encrypted with the key_method and placed in a key_block". An empty value is
+  // §34.5.11.2 has the cipher a region's data are under copied into the output
+  // as written, save that a digital signature moves it, encrypted under the
+  // key_method, into a key_block. An empty value is
   // that exception in force: the caller passes none where the envelope carries
   // key blocks, ProtectKeyBlockContent (preprocessor/protect_key_block.cpp)
   // having written the cipher into them, and an envelope stating it twice would

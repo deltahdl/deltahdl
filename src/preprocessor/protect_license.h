@@ -63,9 +63,9 @@ struct ProtectLicense {
   // `has_match` says whether the text wrote the number. Neither Syntax
   // subclause, neither Description, nor Table 34-1 states a default for it, and
   // the NOTE closing both subclauses has a user defeat the check with a library
-  // "that returns a 0", which avoids it only where 0 is the answer a licence
-  // asks for. So a licence that writes no number is held to 0, the value
-  // `match` holds when `has_match` is false.
+  // whose function answers 0, which avoids it only where 0 is the answer a
+  // licence asks for. So a licence that writes no number is held to 0, the
+  // value `match` holds when `has_match` is false.
   uint64_t match = 0;
   bool has_match = false;
   // Whether the value read was written in the spelling the Syntax subclauses

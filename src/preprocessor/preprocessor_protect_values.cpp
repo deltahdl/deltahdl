@@ -405,8 +405,8 @@ void Preprocessor::SpendEncodedValueSize() {
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the
 // cleartext of the region it stands for back in its place, for the compilation
-// step that follows. §34.5.15.2 has the data_block expression indicate "that a
-// data block begins on the next line in the file", so the line carrying that
+// step that follows. §34.5.15.2 has the data_block expression announce a data
+// block starting on the line after it, so the line carrying that
 // region is the one acted on here, and the cleartext is emitted where the
 // envelope was written: the text that leaves the preprocessor is the design.
 //

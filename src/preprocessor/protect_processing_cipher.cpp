@@ -138,8 +138,8 @@ std::string EncryptedRegionBytes(std::string_view cleartext,
   if (!UsesDesCbc(method)) return CombineWithKey(blob, key);
   std::string iv = FreshInitializationVector(key, blob);
   std::string ciphertext = DesCbcEncrypt(blob, DesKeyOf(key), iv);
-  // §34.5.15.2: "the IV cipher-block shall be prepended to the encrypted data
-  // before encoding is performed", so it travels ahead of the ciphertext rather
+  // §34.5.15.2: the IV cipher-block goes in front of the encrypted data, and
+  // the encoding is applied after, so it travels ahead of the ciphertext rather
   // than beside it in the envelope's description.
   return iv + ciphertext;
 }
@@ -153,9 +153,8 @@ bool RecoverRegionBytes(std::string_view block, std::string_view key,
     recovered->assign(CombineWithKey(block, key));
     return true;
   }
-  // §34.5.15.2: "the first cipher-block of the decoded data_block shall be
-  // removed for use as the IV. The remainder of the data_block shall be
-  // internally decrypted."
+  // §34.5.15.2: once the data_block is decoded, its first cipher-block is taken
+  // off to serve as the IV, and what follows it is what gets decrypted.
   if (block.size() <= kDesBlockBytes) return false;
   return DesCbcDecrypt(block.substr(kDesBlockBytes), DesKeyOf(key),
                        block.substr(0, kDesBlockBytes), recovered);

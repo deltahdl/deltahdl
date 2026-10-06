@@ -114,28 +114,27 @@ void AppendClearDataNames(const EncryptionEnvelope& envelope,
 void AppendClearDigestNames(const EncryptionEnvelope& envelope,
                             const ProtectEncoding& one_line_encoding,
                             bool signed_envelope, std::string* text) {
-  // §34.5.16.2 has the entity whose key a region's digest is under unchanged in
-  // the output file, except where a digital signature is used, in which case it
-  // is encrypted with the digest_key_method and placed in a digest_key_block.
+  // §34.5.16.2 has the entity whose key a region's digest is under copied into
+  // the output as written, save that a digital signature moves it, encrypted
+  // under the digest_key_method, into a digest_key_block.
   //
   // The name is written here whether the envelope carries key blocks or not,
-  // because the standard defines no digest_key_block. §34.4 states that "this
-  // standard defines the pragma keyword names listed in Table 34-1 for use with
-  // the protect pragma", Table 34-1 lists key_block and no digest_key_block,
-  // and §34.5 runs from §34.5.1 to §34.5.32 without a subclause for one, so the
-  // construct has neither a syntax nor a description. §34.5.1.2 enumerates the
-  // blocks an envelope holds as "the data_block and key_block pragma
-  // expressions" and names no third. A tool writing a digest_key_block would be
+  // because the standard defines no digest_key_block. §34.4 gives Table 34-1 as
+  // the keyword names the protect pragma takes, Table 34-1 lists key_block and
+  // no digest_key_block, and §34.5 runs from §34.5.1 to §34.5.32 without a
+  // subclause for one, so the construct has neither a syntax nor a description.
+  // §34.5.1.2 enumerates the blocks an envelope holds as a data_block and a
+  // key_block, and names no third. A tool writing a digest_key_block would be
   // writing a directive whose keyword §34.4 does not admit, and no reader could
   // be required to open it, so the sentence's exception has no destination and
   // its main clause is the whole of what a conforming tool can act on.
   //
   // The neighbouring subclauses send their values into the key_block instead,
   // which is why this one stands alone: §34.5.17.2 has the digest_key_method
-  // "encrypted with the key_method algorithm" and using "the key found in the
-  // key_block", and §34.5.18.2 has the digest_keyname "encoded in the
-  // key_block". §34.5.16.2 is the only one naming a digest_key_method cipher
-  // and a digest_key_block destination. Issue #3429 settled this reading.
+  // encrypted under the key_method's cipher with the key the key_block holds,
+  // and §34.5.18.2 has the digest_keyname written inside the key_block.
+  // §34.5.16.2 is the only one naming a digest_key_method cipher and a
+  // digest_key_block destination. Issue #3429 settled this reading.
   //
   // It stands ahead of the designations read against it, the way each entity
   // does, since a name read against the wrong list picks out a key of somebody
@@ -299,8 +298,8 @@ ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
   if (ProtectEncodingFitsOneLine(requested.enctype)) {
     encoding.enctype = requested.enctype;
   }
-  // §34.5.9.2 gives the length one block: "the maximum number of characters
-  // (after any encoding) in a single line of the data_block". So it is carried
+  // §34.5.9.2 gives the length one block: it bounds how long an encoded line
+  // of the data_block may run. So it is carried
   // across whatever scheme the envelope settles on, and the data block is the
   // only place it is spent.
   encoding.line_length = requested.line_length;
@@ -350,8 +349,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // where a digital signature is used, which is what an envelope carrying key
   // blocks is. The description then states no cipher and
   // ProtectEnvelopeDescriptionDirectives writes none.
-  // §34.5.11.2 has the identifier name "the encryption algorithm that shall be
-  // used to encrypt subsequent begin-end blocks", so the cipher the region
+  // §34.5.11.2 has the identifier name the cipher the begin-end blocks after
+  // it are to be encrypted with, so the cipher the region
   // named is the one its block is written under and the one the envelope
   // states -- where this implementation has it. Only Table 34-3's required
   // des-cbc is that; a region naming none, or naming a cipher this
@@ -388,8 +387,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   text.append(ProtectEncodedValueDirective(
       encodings.blocks, ProtectedRegionBlockSize(envelope.body, block_method)));
   // §34.5.15.1 spells the expression as the keyword standing alone, and
-  // §34.5.15.2 has it indicate "that a data block begins on the next line in
-  // the file". The block is therefore written beneath the keyword rather than
+  // §34.5.15.2 has it announce a data block starting on the line after it.
+  // The block is therefore written beneath the keyword rather than
   // against it, which is where §34.5.22.1 and §34.5.27.1 already put the digest
   // block and the key block: ProtectDigestBlockDirectives
   // (preprocessor/protect_digest_block.cpp) and ProtectKeyBlockDirective

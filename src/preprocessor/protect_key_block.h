@@ -315,7 +315,7 @@ struct ProtectKeyBlockRegion {
 //
 // `region.data_key` is the key the region's data are under where the region
 // named one the tool holds, which the blocks then carry (§34.5.25.2: the key a
-// key_keyname names "shall be used for encrypting the data encryption keys");
+// key_keyname names is the one the keys of the data are encrypted under);
 // where it is empty the region's key is made here.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      const ProtectKeyBlockRegion& region,
