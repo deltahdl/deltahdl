@@ -56,7 +56,7 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return false;
 }
 
-// §8.13: a subclass "inherits the members of the base class", and §8.6 makes a
+// §8.13: a subclass inherits its base class's members, and §8.6 makes a
 // method one of those members. A call written with no receiver inside a class
 // method therefore names a method of the enclosing class or of any class it
 // inherits from, invoked on the object the enclosing method is already running

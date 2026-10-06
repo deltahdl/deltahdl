@@ -45,8 +45,8 @@ static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
 // runs as part of a chain populates the inherited slot, not just the unscoped
 // alias. With no enclosing-class context active, the plain unscoped write is
 // preserved, leaving non-method writes unchanged.
-// §10.4 puts procedural assignments "within procedures such as always, initial,
-// task, and function", so an assignment to a property from a method is one, and
+// §10.4 puts procedural assignments inside always and initial blocks, tasks and
+// functions, so an assignment to a property from a method is one, and
 // §10.7 truncates or extends it into the property while §6.11.2 converts the
 // unknowns reaching a 2-state one. A Logic4Vec carries its own width, so
 // writing the value straight in put the expression's width in the declaration's
@@ -152,8 +152,8 @@ static bool TryStaticClassNewAssign(const Stmt* stmt,
   return true;
 }
 
-// §8.7: `new` has no type of its own -- "the left-hand side of the assignment
-// determines the return type" -- so a bare `new` reaches evaluation with
+// §8.7: `new` has no type of its own -- the assignment's left-hand side decides
+// what it returns -- so a bare `new` reaches evaluation with
 // nothing to say what to construct, and evaluating it as an ordinary expression
 // yields a null handle. Inside a method the left-hand side may be a property of
 // the enclosing class rather than a variable, named without a `this.` prefix
@@ -297,8 +297,8 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // true when the target was one of those and the value was stored.
 //
 // Everything else is left to the store the module path performs. §10.4 puts
-// procedural assignments "within procedures such as always, initial, task, and
-// function" and names one set of left-hand sides for all of them, so a
+// procedural assignments inside always and initial blocks, tasks and functions
+// and names one set of left-hand sides for all of them, so a
 // concatenation target, a streaming target, a select, a whole array and the
 // scalar write are the same statements here as there -- and listing them again
 // is what left an array assignment, a streaming target and the rest of them

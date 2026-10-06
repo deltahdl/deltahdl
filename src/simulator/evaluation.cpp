@@ -151,12 +151,12 @@ static Logic4Vec EvalMemberAccessOrCall(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  // §8.11: "The this keyword denotes a predefined object handle that refers to
-  // the object that was used to invoke the subroutine that this is used
-  // within." A bare `this` arrives as an ExprKind::kIdentifier node whose text
-  // is the keyword, Parser::ParseMemberAccessChain in
-  // src/parser/expr_parser.cpp building one for it, so it is answered here and
-  // reaches every reader of an expression rather than one site.
+  // §8.11: the keyword `this` is a predefined object handle naming the object
+  // the enclosing subroutine was invoked on. A bare `this` arrives as an
+  // ExprKind::kIdentifier node whose text is the keyword,
+  // Parser::ParseMemberAccessChain in src/parser/expr_parser.cpp building one
+  // for it, so it is answered here and reaches every reader of an expression
+  // rather than one site.
   //
   // It is answered before SimContext::FindVariable, which no source can reach
   // first because `this` is a keyword and names no variable. Left to fall

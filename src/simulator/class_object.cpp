@@ -267,9 +267,9 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
   copy->instance = instance;
-  // §8.12 (shallow copy, step 2): "All class properties ... are copied to
-  // the new object." A class property is a variable, and §6.8 has a variable
-  // "store a value from one assignment to the next", so the copy's properties
+  // §8.12 (shallow copy, step 2): every class property is copied into the new
+  // object. A class property is a variable, and §6.8 has a variable keep its
+  // value from one assignment to the next, so the copy's properties
   // are storage of their own: the two objects hold two values that happen to
   // start out equal. A map assignment copy-constructs each Logic4Vec, and a
   // Logic4Vec copy carries the words pointer rather than the words

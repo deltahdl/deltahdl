@@ -668,7 +668,7 @@ class SimContext : public DeclaredNameTables,
   void CopyCarriedStacksTo(Process& child) const;
   // The handle of the object CurrentThis returns, or kNullClassHandle when no
   // object is in scope. This is what a bare `this` evaluates to, §8.11 making
-  // the keyword "a predefined object handle".
+  // the keyword a predefined object handle.
   uint64_t CurrentThisHandle() const;
 
   // §9.4.2: notifies the watchers armed on every variable that designates the
