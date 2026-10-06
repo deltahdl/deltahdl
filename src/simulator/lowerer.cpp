@@ -609,12 +609,13 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
 // frame's fall-through to the instance's names, 12 for "modulestring", and
 // its `s = "x"` wrote the top's s for the unit's.
 //
-// §23.8.1 (printed page 760): a subroutine name is looked up "in the complete
-// compilation unit of the reference" before the search proceeds past the
-// scope it is written in, so a bare call in a unit subroutine's body names the
-// unit's subroutine ahead of the caller's: in the standard's `task t; ... x =
-// f(1); endtask` followed by the unit's `function int f(int y)`, t's f is that
-// function whatever module or generate block enables t. Each is registered
+// §23.8.1 (printed page 760): a subroutine name is looked up through the whole
+// compilation unit the reference stands in before the search proceeds past
+// the scope it is written in, so a bare call in a unit subroutine's body names
+// the unit's subroutine ahead of the caller's. In the standard's example,
+// `task t; ... x = f(1); endtask` followed by the unit's
+// `function int f(int y)`, t's f is that function whatever module or generate
+// block enables t. Each is registered
 // under "$unit::name" as well, the key FindFunctionInPackageScope asks while
 // such a frame is in force; registered under its bare name alone, a top's own
 // f, or a generate block's the caller stood in, answered t's call.
