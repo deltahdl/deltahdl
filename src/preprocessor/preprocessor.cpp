@@ -356,23 +356,25 @@ static bool StripBlockCommentContent(std::string_view line, size_t& i,
   return true;
 }
 
-static bool StripNormalChar(std::string_view line, size_t& i,
+// A.9.2 ends a one-line comment at the newline, which a text joined from
+// several lines holds; the newline itself is the next character's to copy.
+static void StripNormalChar(std::string_view line, size_t& i,
                             std::string& result, bool& in_block_comment,
                             std::vector<std::string>* comments) {
   if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
     result += "//";
-    PutCommentBody(line.substr(i + 2), result, comments);
-    i = line.size();
-    return true;
+    size_t end = std::min(line.find('\n', i + 2), line.size());
+    PutCommentBody(line.substr(i + 2, end - i - 2), result, comments);
+    i = end;
+    return;
   }
   if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*') {
     result += "/*";
     i += 2;
     in_block_comment = true;
-    return false;
+    return;
   }
   result += line[i++];
-  return false;
 }
 
 bool AtTripleQuote(std::string_view line, size_t i) {
@@ -472,9 +474,7 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
     if (CopyStringLiteralChar(line, i, result, in_string, in_triple_string)) {
       continue;
     }
-    if (StripNormalChar(line, i, result, in_block_comment, comments)) {
-      return result;
-    }
+    StripNormalChar(line, i, result, in_block_comment, comments);
   }
   return result;
 }

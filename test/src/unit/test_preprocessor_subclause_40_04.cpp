@@ -155,4 +155,30 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmasOnTwoLinesOfAUsageSurvive) {
   EXPECT_EQ(pragmas[1].enum_name, "fsm_e");
 }
 
+// A block comment the usage's last line opens and leaves open runs on past the
+// usage (A.9.2), so a one-line comment moved out of the usage is written ahead
+// of it rather than inside it: the pragma is recorded, and the block comment
+// still hides the directive on the line it runs onto.
+TEST(FsmPragmaPreprocessing, OneLineCommentPragmaBeforeAnOpenBlockComment) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define W(a, b) a+b\n"
+      "module top;\n"
+      "  logic [`W(1, // tool enum fsm_e\n"
+      "           1)-1:0] nxt; /* a block comment\n"
+      "           `define X 1 */\n"
+      "`ifdef X\n"
+      "  int defined_x;\n"
+      "`endif\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("-1:0] nxt;"), std::string::npos);
+  EXPECT_EQ(out.find("defined_x"), std::string::npos);
+  auto pragmas = CollectFsmPragmas(out);
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "enum_only");
+  EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
+}
+
 }  // namespace

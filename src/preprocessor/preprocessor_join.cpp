@@ -167,6 +167,12 @@ struct UsageJoin {
 };
 }  // namespace
 
+// The index of the `//` or `/*` that opens the comment whose body's mark ends
+// `marked`, a text StripComments wrote with a comments vector.
+static size_t StartOfEndingComment(const std::string& marked) {
+  return marked.rfind(kCommentMark, marked.size() - 2) - 2;
+}
+
 // One physical line of a macro usage, each comment's body put aside behind the
 // mark StripComments writes for it as the loop does on a line it emits, so the
 // parentheses counted are the ones in code and never one a comment holds; the
@@ -184,10 +190,24 @@ static void AppendUsageLine(std::string_view line, UsageJoin& join) {
     join.text += marked;
     return;
   }
-  size_t comment = marked.rfind(kCommentMark, marked.size() - 2) - 2;
+  size_t comment = StartOfEndingComment(marked);
   join.text.append(marked, 0, comment);
   join.line_comments += '\n';
   join.line_comments.append(marked, comment);
+}
+
+// Writes the one-line comments moved out of a whole usage after it, each on a
+// line of its own. A block comment the usage's last line opens and leaves open
+// runs on past the usage onto the lines after it (A.9.2), and a one-line
+// comment written behind its `/*` would be part of its text, so they go ahead
+// of it and it follows them on a line of its own.
+static void PlaceLineComments(UsageJoin& join) {
+  if (!join.in_block_comment) {
+    join.text += join.line_comments;
+  } else if (!join.line_comments.empty()) {
+    join.text.insert(StartOfEndingComment(join.text),
+                     join.line_comments + '\n');
+  }
 }
 
 // Whether the line's first token is a directive other than a value one. A join
@@ -263,7 +283,7 @@ uint32_t JoinMacroUsage(
     end = end_of_macro_usage(join.text);
     if (end == MacroUsageEnd::kComplete) {
       cursor.eol = eol;
-      join.text += join.line_comments;
+      PlaceLineComments(join);
       RestoreComments(join.text, 0, join.comments);
       joined = std::move(join.text);
       return lines_added;
