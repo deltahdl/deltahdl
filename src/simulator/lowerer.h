@@ -142,7 +142,7 @@ class Lowerer {
   // instance's output terminal from the state table §29.3.4 defines.
   // `from_program` says the instance sits in a program, whose drives are
   // reactive (§24.3.1); LowerContAssign takes it for the same reason, since
-  // §29.8 instantiates a UDP "in the same manner as gates". Defined in
+  // §29.8 instantiates a UDP just as a gate is. Defined in
   // src/simulator/lowerer_udp.cpp.
   void LowerUdpInst(const RtlirUdpInst& inst, bool from_program);
   // §16.13.6 and §16.9.11: the monitor processes of a module's named

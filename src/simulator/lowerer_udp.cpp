@@ -1,8 +1,8 @@
 // §29.8: lowering a user-defined primitive instance into the process that
 // drives its output terminal.
 //
-// "Instances of UDPs are specified inside modules in the same manner as gates
-// (see 28.3)", and a gate reaches the simulator as a driver on the net its
+// A module instantiates a UDP just as it instantiates a gate (see §28.3), and a
+// gate reaches the simulator as a driver on the net its
 // output terminal names, so a primitive does too. What it drives is what the
 // state table §29.3.4 defines says, and UdpEvalState in
 // src/simulator/udp_eval.h is what answers that table. This file is the join
@@ -13,7 +13,7 @@
 // The process is created here and started by ScheduleProcess, which
 // src/simulator/lowerer.h declares and src/simulator/lowerer.cpp defines. That
 // is how §10.3's continuous assignments are started too, which is what §29.8's
-// "in the same manner as gates" comes to at run time.
+// likening of a UDP instance to a gate instance comes to at run time.
 
 #include <algorithm>
 #include <cstddef>
@@ -64,8 +64,8 @@ static Strength UdpDriveStrength(uint8_t code) {
 
 // The one bit a primitive drives, in the 4-state encoding a net holds:
 // (aval, bval) is (0,0) for 0, (1,0) for 1, (1,1) for x and (0,1) for z.
-// UdpEvalState answers '0', '1' or 'x' and never 'z', because §29.3.4 rules
-// that "The z state is explicitly excluded from consideration in UDPs" and
+// UdpEvalState answers '0', '1' or 'x' and never 'z', because §29.3.4 leaves
+// the z state out of UDPs altogether and
 // §29.3.5 treats a z passed to an input terminal the same as an x. So z reaches
 // the net only through a highz drive strength, which §28.11 makes a driver that
 // is off for the value it names.
@@ -83,8 +83,8 @@ static Logic4Vec UdpDrivenBit(char out, DriverStrength ds, Arena& arena) {
 }
 
 // The value one input terminal contributes to the state table, as the character
-// UdpEvalState matches a row against. §29.3.1 rules that "All ports of a UDP
-// shall be scalar; vector ports are not permitted", so a terminal is one bit:
+// UdpEvalState matches a row against. §29.3.1 requires every UDP port to be a
+// scalar and forbids vector ports, so a terminal is one bit:
 // the expression is evaluated in a one-bit context and its least significant
 // bit is what the table sees. Logic4Vec::ToString spells a vector most
 // significant bit first, so that bit is the last character of the spelling.
@@ -112,14 +112,13 @@ static char UdpInitialOutput(const UdpDecl& decl, SimContext& ctx,
 }
 
 // The input terminals of one instance, in the order the state table indexes
-// them. §29.3.4 rules that "The order of the input state fields of each row of
-// the state table is taken directly from the port list in the UDP definition
-// header", and §29.8 rules that "The terminal connection order is as specified
-// in the UDP definition", so position i of this vector is position i of every
-// row. §29.3.5 (printed page 863): "The z values passed to UDP inputs shall be
-// treated the same as x values", so a z is read as the x it is taken for, and
-// an input moving between the two makes no transition: an undriven net left at
-// z from the start leaves a sequential primitive's initial state standing.
+// them. §29.3.4 orders the input fields of each state table row as the UDP
+// definition header's port list orders the ports, and §29.8 connects the
+// terminals in the order the UDP definition gives, so position i of this vector
+// is position i of every row. §29.3.5 (printed page 863): a z reaching a UDP
+// input is handled exactly as an x, so a z is read as the x it is taken for,
+// and an input moving between the two makes no transition: an undriven net left
+// at z from the start leaves a sequential primitive's initial state standing.
 static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
                                        SimContext& ctx, Arena& arena) {
   std::vector<char> inputs;
@@ -132,7 +131,7 @@ static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
 }
 
 // The driver a primitive instance holds on the net its output terminal names.
-// §29.8 instantiates a UDP "in the same manner as gates", so the instance is
+// §29.8 instantiates a UDP just as a gate is, so the instance is
 // one driver of that net and §28.11's resolution decides what the net settles
 // at. The slot is appended by the first commit and overwritten by every later
 // one, which is what `first` distinguishes; `strength` is the instance's
@@ -160,8 +159,8 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
   Logic4Vec val = UdpDrivenBit(out, drv->strength, arena);
   if (drv->net == nullptr) {
     // A terminal that is not a whole net -- a select, which §29.8 admits by
-    // keeping "the terminal connection rules ... the same as outlined in
-    // 28.3.6" -- has no driver slot of its own, so it is written through the
+    // connecting UDP terminals under the gate rules of §28.3.6 -- has no driver
+    // slot of its own, so it is written through the
     // procedural lvalue writer, which decomposes the lvalue and notifies each
     // affected variable's watchers (§11.4.1).
     PerformBlockingAssign(terminal, val, ctx, arena);
@@ -183,13 +182,12 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
 }
 
 // How long a transition to `out` waits before it reaches the output terminal.
-// §29.8 admits a delay2 on a primitive instance and rules that "Only two delays
-// may be specified because z is not supported for UDPs", so this is the one-bit
+// §29.8 admits a delay2 on a primitive instance and allows no more than two
+// delays, a UDP having no z to turn off to, so this is the one-bit
 // case of Table 28-9 in §28.16 with the third, turn-off delay of that table
 // absent: a transition to 1 waits the rise delay, one to 0 the fall delay, and
 // one to x the lesser of the two. Where the source wrote a single delay, §28.16
-// rules that "this value shall be used for all propagation delays associated
-// with the gate or the net".
+// applies that one value to every propagation delay of the gate or net.
 static uint64_t SelectUdpDelay(const RtlirUdpInst& inst, char out,
                                SimContext& ctx, Arena& arena) {
   if (inst.delay == nullptr) return 0;
@@ -233,11 +231,11 @@ static void DriveUdpOutput(const RtlirUdpInst& inst, UdpOutputDriver* drv,
 
 // Runs the state table once for every input terminal that moved since the
 // previous snapshot, and answers the output the last of those runs left. §29.6
-// rules that "Each table entry can have a transition specification on at most
-// one input", so a row is matched against one transition: two terminals moving
-// between one evaluation and the next are two runs of the table rather than
-// one, taken in terminal order. Where no terminal moved there is no transition
-// to trigger a change of the output (§29.6), so the output stands.
+// lets a table entry give a transition for one input at most, so a row is
+// matched against one transition: two terminals moving between one evaluation
+// and the next are two runs of the table rather than one, taken in terminal
+// order. Where no terminal moved there is no transition to trigger a change of
+// the output (§29.6), so the output stands.
 static char EvaluateSequentialUdp(UdpEvalState& state,
                                   const std::vector<char>& prev,
                                   const std::vector<char>& now) {
@@ -254,10 +252,10 @@ static char EvaluateSequentialUdp(UdpEvalState& state,
 // The output the primitive shows for the values now on its input terminals.
 //
 // A sequential primitive is matched against the transitions that brought its
-// terminals here, because §29.6 rules that "changes in the output are triggered
-// by specific transitions of the inputs. This makes the state table a
-// transition table", and because §29.5 makes the current state field "the same
-// as the internal state" the previous run left. A combinational primitive has
+// terminals here, because §29.6 has particular input transitions trigger the
+// output's changes, which turns its state table into a transition table, and
+// because §29.5 has the current state field hold the internal state the
+// previous run left. A combinational primitive has
 // no current state field, so §29.4's form matches the input levels alone.
 static char UdpPassOutput(UdpEvalState& state, bool is_sequential,
                           const std::vector<char>& prev,
@@ -293,13 +291,12 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // rather than against the state the previous evaluation left.
   UdpEvalState state(*inst->decl, UdpInitialOutput(*inst->decl, ctx, arena));
 
-  // §29.7: "When simulation starts, this value is the current state in the
-  // state table", and "a delay specification on an instantiated UDP does not
-  // delay the simulation time of the assignment of this initial value to the
-  // output". So a sequential primitive drives what its initial statement gave
+  // §29.7: that value is the state table's current state as simulation
+  // begins, and a delay on the instance does not put off assigning it to the
+  // output. So a sequential primitive drives what its initial statement gave
   // before any table is consulted, whatever delay the instance carries. A
-  // combinational primitive has no such value, since §29.3.2 rules that
-  // "Combinational UDPs cannot contain a reg declaration" and §29.3.3's initial
+  // combinational primitive has no such value, since §29.3.2 forbids a reg
+  // declaration in a combinational UDP and §29.3.3's initial
   // statement assigns to that reg.
   // LowerUdpInst has already driven it where the terminal is a whole net.
   if (inst->decl->is_sequential && drv->first) {
@@ -329,7 +326,7 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
 
 void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   auto* p = arena_.Create<Process>();
-  // §29.8 instantiates a UDP "in the same manner as gates", and a gate drives
+  // §29.8 instantiates a UDP just as a gate is, and a gate drives
   // its output net continuously rather than as a procedure §9.2 declares. That
   // is what ProcessKind::kContAssign says, and it is what makes this process an
   // invalid target for the process control of §9.7.
@@ -349,8 +346,8 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   UdpOutputDriver* drv = nullptr;
   if (inst.decl != nullptr && inst.output != nullptr) {
     drv = arena_.Create<UdpOutputDriver>(MakeUdpOutputDriver(inst, ctx_));
-    // §29.7 (printed page 867): under `initial q = 1'b1` "The output q has an
-    // initial value of 1 at the start of the simulation", so a sequential
+    // §29.7 (printed page 867): under `initial q = 1'b1` the output q holds 1
+    // as simulation begins, so a sequential
     // primitive driving a whole net drives it before time 0, and a procedure
     // reading the net at time 0 sees it whichever process runs first.
     if (inst.decl->is_sequential && drv->net != nullptr) {
