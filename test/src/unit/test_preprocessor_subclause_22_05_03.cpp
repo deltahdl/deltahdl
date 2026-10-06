@@ -306,8 +306,9 @@ TEST(UndefineAllPreprocessing, UndefineAllDoesNotConsumeParenthesizedList) {
 }
 
 // A comment is the third thing that can share the line. With no argument to
-// take, the directive leaves it to ordinary comment handling — it is stripped
-// rather than mistaken for an operand, and the removal still happens.
+// take, the directive leaves it to ordinary comment handling — it passes on to
+// the lexer as a comment rather than being mistaken for an operand, and the
+// removal still happens.
 TEST(UndefineAllPreprocessing, UndefineAllFollowedByCommentOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -318,7 +319,7 @@ TEST(UndefineAllPreprocessing, UndefineAllFollowedByCommentOnSameLine) {
       "`endif\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("a note about the wipe"), std::string::npos);
+  EXPECT_NE(result.find("// a note about the wipe\n"), std::string::npos);
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "preprocessor/preprocessor.h"
 
@@ -49,12 +50,21 @@ struct LineCursor {
 
 // Blanks the body of every A.9.2 comment on `line`, keeping the delimiters,
 // and leaves what a string literal holds alone; the two flags carry a block
-// comment and a triple_quoted_string from one line to the next. Defined in
-// src/preprocessor/preprocessor.cpp beside the loop that strips each line it
-// emits, and read by src/preprocessor/preprocessor_join.cpp, which strips the
-// lines it reads ahead the same way.
+// comment and a triple_quoted_string from one line to the next. Given
+// `comments`, it writes a mark in place of each body instead and appends the
+// body there, for RestoreComments to put back once the line is expanded.
+// Defined in src/preprocessor/preprocessor.cpp beside the loop that strips each
+// line it emits, and read by src/preprocessor/preprocessor_join.cpp, which
+// strips the lines it reads ahead the same way.
 std::string StripComments(std::string_view line, bool& in_block_comment,
-                          bool& in_triple_string);
+                          bool& in_triple_string,
+                          std::vector<std::string>* comments = nullptr);
+
+// Puts back, in `text` from `from` on, the body of each comment whose mark
+// StripComments wrote in place of it, so that a comment reaches the lexer with
+// the text it was written with: §40.4's FSM pragmas are read from that text.
+void RestoreComments(std::string& text, size_t from,
+                     const std::vector<std::string>& comments);
 
 // The two ways a construct runs onto the physical lines after the one it opens
 // on, both in src/preprocessor/preprocessor_join.cpp: a `define body continued

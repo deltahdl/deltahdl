@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -325,27 +326,49 @@ std::pair<std::string_view, std::string_view> SplitQuotedArg(
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
-static bool StripBlockCommentContent(std::string_view line, size_t& i,
-                                     std::string& result) {
-  if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/') {
-    result += "*/";
-    i += 2;
-    return true;
+// The byte that opens and closes the mark standing in for a comment's body
+// while its line is expanded. It is kKeywordMarker's byte, which a source file
+// cannot hold: ProcessSource reports and blanks every one it reads, so each
+// such byte in the text being expanded is one the Preprocessor wrote.
+constexpr char kCommentMark = kKeywordMarker;
+
+// Writes the text of a comment's body in place of `body`: as blanks of its
+// length, or, when `comments` is given, as kCommentMark, the index under which
+// the body is appended to `comments`, and kCommentMark again, for
+// RestoreComments to put the text back once the line is expanded. The body
+// becomes no text a macro usage or a directive could be read from either way.
+static void PutCommentBody(std::string_view body, std::string& result,
+                           std::vector<std::string>* comments) {
+  if (comments == nullptr) {
+    result.append(body.size(), ' ');
+    return;
   }
-  result += ' ';
-  ++i;
-  return false;
+  result += kCommentMark;
+  result += std::to_string(comments->size());
+  result += kCommentMark;
+  comments->emplace_back(body);
+}
+
+static bool StripBlockCommentContent(std::string_view line, size_t& i,
+                                     std::string& result,
+                                     std::vector<std::string>* comments) {
+  auto close = line.find("*/", i);
+  size_t end = close == std::string_view::npos ? line.size() : close;
+  PutCommentBody(line.substr(i, end - i), result, comments);
+  i = end;
+  if (close == std::string_view::npos) return false;
+  result += "*/";
+  i += 2;
+  return true;
 }
 
 static bool StripNormalChar(std::string_view line, size_t& i,
-                            std::string& result, bool& in_block_comment) {
+                            std::string& result, bool& in_block_comment,
+                            std::vector<std::string>* comments) {
   if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
     result += "//";
-    i += 2;
-    while (i < line.size()) {
-      result += ' ';
-      ++i;
-    }
+    PutCommentBody(line.substr(i + 2), result, comments);
+    i = line.size();
     return true;
   }
   if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*') {
@@ -411,7 +434,8 @@ static bool CopyStringLiteralChar(std::string_view line, size_t& i,
 }
 
 std::string StripComments(std::string_view line, bool& in_block_comment,
-                          bool& in_triple_string) {
+                          bool& in_triple_string,
+                          std::vector<std::string>* comments) {
   std::string result;
   result.reserve(line.size());
   bool in_string = false;
@@ -419,7 +443,9 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
 
   while (i < line.size()) {
     if (in_block_comment) {
-      if (StripBlockCommentContent(line, i, result)) in_block_comment = false;
+      if (StripBlockCommentContent(line, i, result, comments)) {
+        in_block_comment = false;
+      }
       continue;
     }
     if (in_triple_string) {
@@ -429,19 +455,54 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
     if (CopyStringLiteralChar(line, i, result, in_string, in_triple_string)) {
       continue;
     }
-    if (StripNormalChar(line, i, result, in_block_comment)) return result;
+    if (StripNormalChar(line, i, result, in_block_comment, comments)) {
+      return result;
+    }
   }
   return result;
 }
 
+// Whether the kCommentMark at `i` opens a mark PutCommentBody wrote, which
+// holds an index: a kKeywordMarker, the same byte, is followed by its version
+// byte instead, never by a digit.
+static bool OpensCommentMark(const std::string& text, size_t i) {
+  return text[i] == kCommentMark &&
+         std::isdigit(static_cast<unsigned char>(text[i + 1]));
+}
+
+void RestoreComments(std::string& text, size_t from,
+                     const std::vector<std::string>& comments) {
+  if (comments.empty()) return;
+  std::string restored;
+  restored.reserve(text.size() - from);
+  size_t i = from;
+  while (i < text.size()) {
+    if (!OpensCommentMark(text, i)) {
+      restored += text[i++];
+      continue;
+    }
+    size_t index = 0;
+    for (++i; std::isdigit(static_cast<unsigned char>(text[i])); ++i) {
+      index = index * 10 + static_cast<size_t>(text[i] - '0');
+    }
+    restored += comments[index];
+    ++i;  // The kCommentMark that closes the mark.
+  }
+  text.replace(from, std::string::npos, restored);
+}
+
 void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
                                        uint32_t line_num, std::string& output) {
-  auto stripped = StripComments(line, in_block_comment_, in_triple_string_);
+  std::vector<std::string> comments;
+  auto stripped =
+      StripComments(line, in_block_comment_, in_triple_string_, &comments);
   auto conditioned =
       ExpandInlineConditionals(stripped, SourceLoc{file_id, line_num, 1});
   auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
   TrackDesignElement(Trim(expanded));
+  size_t from = output.size();
   output.append(expanded);
+  RestoreComments(output, from, comments);
 }
 
 static size_t FindDirectiveInStripped(std::string_view stripped) {
@@ -790,11 +851,17 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     }
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
+  // §40.4's FSM pragmas are read by the lexer from a comment's text, so each
+  // comment the line holds goes out with the text it was written with, put
+  // back once the rest of the line has been expanded around its mark.
   ops.emit_active_line = [&](std::string_view line) {
-    auto stripped =
-        StripComments(std::string(line), in_block_comment_, in_triple_string_);
+    std::vector<std::string> comments;
+    auto stripped = StripComments(std::string(line), in_block_comment_,
+                                  in_triple_string_, &comments);
+    size_t from = output.size();
     EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
                            output);
+    RestoreComments(output, from, comments);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).
@@ -819,18 +886,26 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
                               uint32_t line_num, std::string& output) {
   if (Trim(text).empty()) return;
-  auto stripped = StripComments(text, in_block_comment_, in_triple_string_);
+  std::vector<std::string> comments;
+  auto stripped =
+      StripComments(text, in_block_comment_, in_triple_string_, &comments);
   auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
   TrackDesignElement(Trim(expanded));
+  size_t from = output.size();
   output.append(expanded);
+  RestoreComments(output, from, comments);
 }
 
 void Preprocessor::OutputPreExpanded(std::string_view text,
                                      std::string& output) {
   if (Trim(text).empty()) return;
-  auto stripped = StripComments(text, in_block_comment_, in_triple_string_);
+  std::vector<std::string> comments;
+  auto stripped =
+      StripComments(text, in_block_comment_, in_triple_string_, &comments);
   TrackDesignElement(Trim(std::string_view(stripped)));
+  size_t from = output.size();
   output.append(stripped);
+  RestoreComments(output, from, comments);
 }
 
 }  // namespace delta

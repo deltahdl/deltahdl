@@ -808,4 +808,21 @@ TEST(KeywordVersionPreprocessing, VersionDoesNotChangeOtherTokens) {
   EXPECT_EQ(kinds(with_region), kinds(without_region));
 }
 
+// A comment may stand ahead of the directive on its line. The comment keeps
+// its text in the output, and the marker the directive writes behind it keeps
+// its version byte: the preprocessor puts a comment's text back by reading
+// marks of the same byte as the keyword marker, and it reads none in a marker.
+TEST(KeywordVersionPreprocessing, CommentAheadOfTheDirectiveKeepsItsText) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "/* region */ `begin_keywords \"1800-2023\"\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  std::string marked = "/* region */ ";
+  marked += kKeywordMarker;
+  marked += static_cast<char>(KeywordVersion::kVer18002023);
+  EXPECT_NE(out.find(marked), std::string::npos);
+}
+
 }  // namespace
