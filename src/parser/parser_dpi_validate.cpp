@@ -164,11 +164,11 @@ void ValidateDpiImportOpenArrayPackedDims(DiagEngine& diag,
   for (const auto& arg : item->func_args) {
     const DataType& type = arg.data_type;
     if (!type.has_unsized_packed_dim) continue;
-    // §H.2: "Actual arguments' packed dimensions shall collectively match a
-    // solitary, unsized formal packed dimension." Every packed dimension of an
-    // actual is collapsed into the one dimension the formal leaves
-    // unspecified, so a sized dimension written beside it would have nothing
-    // left to match against.
+    // §H.2: an unsized formal packed dimension has to stand alone, and all the
+    // packed dimensions of the actual argument together answer to it. Every
+    // packed dimension of an actual is collapsed into the one dimension the
+    // formal leaves unspecified, so a sized dimension written beside it would
+    // have nothing left to match against.
     if (type.packed_dim_left == nullptr && type.extra_packed_dims.empty()) {
       continue;
     }
