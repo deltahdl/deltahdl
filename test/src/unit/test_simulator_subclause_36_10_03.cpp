@@ -12,13 +12,13 @@ namespace delta {
 namespace {
 
 // §36.10.3 (Traversing expressions) says how an application walks an expression
-// the source wrote: "Expressions with multiple operands will result in a handle
-// of type vpiOperation. To determine how many operands, access the property
-// vpiOpType. This operation will be evaluated after its subexpressions.
-// Therefore, it has the least precedence in the expression." It then prints the
-// routine that does the walking - traverseExpr(), which switches on
-// vpi_get(vpiType, expr), and for a vpiOperation iterates vpiOperand and
-// recurses into each operand vpi_scan() hands back.
+// the source wrote: an expression of several operands comes back as a
+// vpiOperation handle, vpiOpType tells how many operands it has, and the
+// operation is evaluated after its subexpressions, so it binds least tightly of
+// anything in the expression. It then prints the routine that does the walking
+// - traverseExpr(), which switches on vpi_get(vpiType, expr), and for a
+// vpiOperation iterates vpiOperand and recurses into each operand vpi_scan()
+// hands back.
 //
 // Nothing served vpiOperand. It is a relation tag and no object's type is one,
 // so the generic traversal - which looks for a child whose own type is the type
@@ -105,7 +105,7 @@ TEST_F(TraversingExpressions, TheClausesRoutineArrivesAtEveryLeaf) {
   EXPECT_EQ(VpiObjectOf(leaves_[2]), &c);
 }
 
-// §36.10.3: "To determine how many operands, access the property vpiOpType." A
+// §36.10.3: vpiOpType is the property that tells how many operands there are. A
 // null operation takes none, which is the case the clause's routine comments on
 // where the iteration yields no iterator.
 TEST_F(TraversingExpressions, ANullOperationTakesNoOperands) {

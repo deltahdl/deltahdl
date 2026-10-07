@@ -165,10 +165,10 @@ TEST_F(VpiFunctionAvailability, StartupWalkEstablishesAndRestoresPhase) {
 }
 
 // §36.10.2 (C2) as the interface applies it, rather than as a predicate answers
-// it: "Only the following two routines can be called at this time", so a call
-// to any other from a startup routine is refused. vpi_iterate is one of the
-// three VpiRoutine names for the bulk of the interface that waits, and a
-// refusal reports through §36.10.1's vpi_chk_error.
+// it: at this point only the two routines it lists may be called, so a call to
+// any other from a startup routine is refused. vpi_iterate is one of the three
+// VpiRoutine names for the bulk of the interface that waits, and a refusal
+// reports through §36.10.1's vpi_chk_error.
 TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
 
@@ -182,9 +182,9 @@ TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
                "before then");
 }
 
-// §36.10.2 (C4): "The next earliest phase is when the sizetf routines are
-// called ... At this phase, no additional access is permitted." So the sizetf
-// phase refuses what the startup phase refused, rather than opening anything.
+// §36.10.2 (C4): the phase after that is the one in which the sizetf routines
+// run, and it opens no further access. So the sizetf phase refuses what the
+// startup phase refused, rather than opening anything.
 TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringTheSizetfPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kSizetf);
 
@@ -192,9 +192,8 @@ TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringTheSizetfPhase) {
   EXPECT_NE(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.2 (C6): "After the sizetf routines are called, the routines registered
-// for reason cbEndOfCompile are called. At this point, and continuing until the
-// tool has finished execution, all functionality is available." So the full
+// §36.10.2 (C6): the cbEndOfCompile routines run once the sizetf routines have,
+// and from then until the tool finishes, everything is available. So the full
 // phase refuses none of the three the model names -- and the two registration
 // routines were never refused in any phase, which is what makes the restriction
 // a restriction on the rest rather than on everything.

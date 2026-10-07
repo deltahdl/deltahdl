@@ -95,10 +95,10 @@ TEST_F(VpiErrorHandling, ErrorCallbackCanBeRegistered) {
   EXPECT_NE(vpi_register_cb(&pli_err), nullptr);
 }
 
-// §36.10.1: "Callbacks can be set up for when an error occurs as well."
-// Registering one is half of that sentence and the case above is that half.
-// The other half is the occurrence, and no error a VPI routine recorded reached
-// a callback at all: they could be set up, and then nothing ever happened to
+// §36.10.1: a callback can also be placed for the moment an error happens.
+// Registering one is half of that sentence and the case above is that half. The
+// other half is the occurrence, and no error a VPI routine recorded reached a
+// callback at all: they could be set up, and then nothing ever happened to
 // them.
 
 // What the applications below recorded. A callback routine is a plain C
@@ -149,8 +149,7 @@ TEST_F(VpiErrorHandling, TheErrorCallbackOccursWhenTheErrorDoes) {
   EXPECT_EQ(g_pli_error_calls, 1);
   EXPECT_EQ(g_error_calls, 0);
   // And the callback could ask what the error was, which is §36.10.1's other
-  // sentence: "the vpi_chk_error() routine can provide detailed information
-  // about the error."
+  // sentence: vpi_chk_error() can report the error in detail.
   EXPECT_EQ(g_level_seen_in_callback, vpiError);
 }
 

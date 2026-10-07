@@ -9,21 +9,19 @@
 namespace delta {
 namespace {
 
-// §36.12.3 (Limitations of VPI compatibility mechanisms): "When a VPI
-// application uses the compatibility mode mechanism, the application user and
-// application provider should verify that the design or design partition to
-// which the application is applied is consistent with the mode, and does not
-// include constructs that are only supported in other modes. If the design
-// contains unsupported constructs, the behavior of the VPI implementation is
-// undefined. The extent of checking for consistency between constructs and mode
-// is left to the discretion of the VPI implementation."
+// §36.12.3 (Limitations of VPI compatibility mechanisms): whoever uses or
+// supplies an application under a compatibility mode is advised to check that
+// the design, or the part of it the application works on, fits the mode and
+// holds no construct only another mode supports. A design that holds one leaves
+// the VPI's behavior undefined, and how far an implementation checks constructs
+// against the mode is up to it.
 //
 // The discretion is exercised rather than declined. An application running
 // under one of the IEEE 1364 modes that reaches a construct those standards
 // have no notion of is told so through §38.2's error, instead of being left
 // with a behavior nobody defined - and what it reached still comes back,
-// §36.12.2 ruling out emulation of "older behaviors for newer design
-// constructs" that have none.
+// §36.12.2 ruling out the emulation of an older behavior for a newer construct
+// that never had one.
 //
 // Which constructs those are is the annexes' own division: Annex K reserves the
 // object-type values 1 through 299 for vpi_user.h and Annex M reserves 600

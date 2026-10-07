@@ -9,10 +9,9 @@
 namespace delta {
 namespace {
 
-// §36.6 -- User-supplied PLI applications. "User-supplied PLI applications are
-// C language functions that utilize the library of PLI C functions to access
-// and interact dynamically with SystemVerilog software implementations as the
-// SystemVerilog source code is executed."
+// §36.6 -- User-supplied PLI applications. Such an application is a C function
+// that uses the library of PLI C functions to reach and work with a
+// SystemVerilog implementation while the source is running.
 //
 // What the applications here do is what the clause says one is: each is a plain
 // C function that reaches the running design through the library and through
@@ -45,8 +44,8 @@ PLI_INT32 ReadRCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// The other direction of "interact dynamically": the application writes into
-// the design's `r`, and the design reads the write back afterwards.
+// The other direction of that live interaction: the application writes into the
+// design's `r`, and the design reads the write back afterwards.
 PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
@@ -57,9 +56,9 @@ PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
 }
 
 // Registers `calltf` as $probe. The registration is a system task rather than a
-// system function because §36.5 makes a task the type that "can read and modify
-// the arguments of the task, but does not return any value", and a value the
-// call site would take is not what any case here is about.
+// system function because §36.5 makes a task the type that may read and change
+// its arguments but returns no value, and a value the call site would take is
+// not what any case here is about.
 void RegisterProbe(PLI_INT32 (*calltf)(PLI_BYTE8*)) {
   g_seen = 0;
   s_vpi_systf_data data = {};
@@ -77,10 +76,10 @@ class PliApplicationDesignAccess : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.6: the application accesses the implementation "as the SystemVerilog
-// source code is executed", so what it reads is the value the design holds at
-// the moment it runs. `r` is declared without an initializer and assigned 7 by
-// the statement before the call, so 7 is a value only the live storage carries.
+// §36.6: the application reaches the implementation while the source is
+// running, so what it reads is the value the design holds at the moment it
+// runs. `r` is declared without an initializer and assigned 7 by the statement
+// before the call, so 7 is a value only the live storage carries.
 TEST_F(PliApplicationDesignAccess, TheApplicationReadsTheDesignAsItRuns) {
   RegisterProbe(&ReadRCalltf);
 
@@ -100,11 +99,11 @@ TEST_F(PliApplicationDesignAccess, TheApplicationReadsTheDesignAsItRuns) {
   EXPECT_EQ(g_seen, 7);
 }
 
-// §36.6: "interact dynamically" is both directions, so a value the application
-// writes through the library is a value the design goes on to read. The design
-// copies `r` into `after` once the call has returned, and 42 arriving there is
-// the write having landed in the storage the design reads rather than in a copy
-// of it.
+// §36.6: the applications' live interaction with the design runs both ways, so
+// a value the application writes through the library is a value the design goes
+// on to read. The design copies `r` into `after` once the call has returned,
+// and 42 arriving there is the write having landed in the storage the design
+// reads rather than in a copy of it.
 TEST_F(PliApplicationDesignAccess, TheApplicationWritesWhereTheDesignReads) {
   RegisterProbe(&WriteRCalltf);
 
@@ -128,11 +127,11 @@ TEST_F(PliApplicationDesignAccess, TheApplicationWritesWhereTheDesignReads) {
   EXPECT_EQ(after->value.ToUint64(), 42u);
 }
 
-// §36.6: the applications the clause describes are the ones "linked into a tool
-// and become part of the tool", and a run holding none of them has nothing to
-// reach the design through this library. §36.9 gives an application two ways of
-// becoming part of the tool and this run has taken neither, so the design is
-// left where it was and the name resolves to nothing.
+// §36.6: the applications the clause describes are linked into a tool and so
+// become part of it, and a run holding none of them has nothing to reach the
+// design through this library. §36.9 gives an application two ways of becoming
+// part of the tool and this run has taken neither, so the design is left where
+// it was and the name resolves to nothing.
 TEST_F(PliApplicationDesignAccess, ARunWithNoApplicationAttachesNothing) {
   SimFixture f;
   auto* design = ElaborateSrc(

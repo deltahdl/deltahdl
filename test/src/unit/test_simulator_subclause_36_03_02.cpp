@@ -158,9 +158,8 @@ TEST_F(OverrideBuiltinSystf, NullNameResolvesToNothing) {
 }
 
 // §36.3.2: the override applies to a built-in system task as well as a system
-// function - the rule speaks of "system task or system function". A user
-// application registered as a task under a built-in name is the override that
-// resolves for that name.
+// function - the rule covers both kinds of name. A user application registered
+// as a task under a built-in name is the override that resolves for that name.
 TEST_F(OverrideBuiltinSystf, UserTaskApplicationOverridesBuiltinName) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
@@ -198,11 +197,11 @@ PLI_INT32 SetupCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.3.2's one exception to the override rule: "SystemVerilog timing checks,
-// such as $setup, are not system tasks and cannot be overridden." The
-// registration itself is accepted -- §36.9.1 takes any name beginning with $,
-// and nothing there knows which names clause 31 spends -- so what carries the
-// exception is that the $setup a specify block writes never becomes a call:
+// §36.3.2's one exception to the override rule: a timing check such as $setup
+// is not a system task, so no registration overrides it. The registration
+// itself is accepted -- §36.9.1 takes any name beginning with $, and nothing
+// there knows which names clause 31 spends -- so what carries the exception is
+// that the $setup a specify block writes never becomes a call:
 // Parser::ParseTimingCheck reads it into a TimingCheckEntry, which reaches
 // SpecifyManager rather than the evaluator's dispatch.
 //

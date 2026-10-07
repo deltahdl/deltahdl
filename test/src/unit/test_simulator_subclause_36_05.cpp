@@ -13,21 +13,20 @@ namespace delta {
 namespace {
 
 // §36.5 — User-defined system task and system function types. The clause's
-// first sentence is the whole of it: "The type of a user-defined system task or
-// system function determines how a PLI application is called from the
-// SystemVerilog source code." What the two types then differ in is the position
-// the call may stand in. A task "can be used in the same places a SystemVerilog
-// void function can be used (see 13.4)", and §13.4.1 has one such place --
-// "function calls may be used as expressions unless of type void, which are
-// statements" -- while a function "can be used in the same places a
-// SystemVerilog function can be used" and "returns a value".
+// first sentence is the whole of it: a user-defined system task or system
+// function's type decides how the source calls its PLI application. What the
+// two types then differ in is the position the call may stand in. A task may
+// stand wherever a void function may (see §13.4), and §13.4.1 has one such
+// place -- "function calls may be used as expressions unless of type void,
+// which are statements" -- while a function may stand wherever a SystemVerilog
+// function may, and returns a value.
 //
 // So every case here registers one application twice, under the two types, and
 // holds the design source still. The type is the only thing that moves, which
 // is what the clause says decides the outcome.
 //
 // The other two halves of the clause are stated elsewhere and are not restated
-// here: that both types "can read and modify the arguments" is §36.4's file,
+// here: that both types may read and change their arguments is §36.4's file,
 // and that a function's vector width comes from the sizetf is §36.8.1's.
 class SystfTypes : public ::testing::Test {
  protected:
@@ -90,11 +89,10 @@ TEST_F(SystfTypes, ATaskTypedRegistrationIsRefusedWhereAValueIsWanted) {
                             3, "36.5"));
 }
 
-// The same application, the same source, the type alone changed: a function
-// "can be used in the same places a SystemVerilog function can be used", so the
-// operand position is one of its own and the application is reached. Without
-// this case a dispatch that refused every registered name in an expression
-// would pass the case above.
+// The same application, the same source, the type alone changed: a function may
+// stand wherever a SystemVerilog function may, so the operand position is one
+// of its own and the application is reached. Without this case a dispatch that
+// refused every registered name in an expression would pass the case above.
 TEST_F(SystfTypes, AFunctionTypedRegistrationIsCalledWhereAValueIsWanted) {
   g_dual_calls = 0;
   SimFixture f;
@@ -137,11 +135,11 @@ PLI_INT32 PutThroughTheCallCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.5: a task "does not return any value", so the call it is running under
-// has no return value for a write to land in, and §38.34's list of what
-// vpi_put_value() may write to names system function calls with no system task
-// call beside them. The write is refused and the error is recorded, which
-// vpi_chk_error() reports to the application that made it.
+// §36.5: a task returns no value, so the call it is running under has no return
+// value for a write to land in, and §38.34's list of what vpi_put_value() may
+// write to names system function calls with no system task call beside them.
+// The write is refused and the error is recorded, which vpi_chk_error() reports
+// to the application that made it.
 //
 // The function form of the same write is asserted in §36.8.1's file, where a
 // design reads back the value a calltf put through its call: a put refused

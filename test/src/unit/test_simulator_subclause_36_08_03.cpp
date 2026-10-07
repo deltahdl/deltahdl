@@ -44,12 +44,11 @@ class CalltfApplicationRoutine : public ::testing::Test {
 };
 
 // -----------------------------------------------------------------------------
-// §36.8.3: "A calltf VPI application routine shall be called each time the
-// associated user-defined system task or system function is executed within the
-// SystemVerilog source code." Unlike compiletf and sizetf, which run while the
-// simulation data structure is compiled or built, calltf is an execution-time
-// routine - it fires during simulation, not at build. That classification is
-// the timing this subclause fixes for calltf.
+// §36.8.3: a calltf routine runs every time the source executes its
+// user-defined system task or system function. Unlike compiletf and sizetf,
+// which run while the simulation data structure is compiled or built, calltf is
+// an execution-time routine - it fires during simulation, not at build. That
+// classification is the timing this subclause fixes for calltf.
 // -----------------------------------------------------------------------------
 
 TEST_F(CalltfApplicationRoutine, RunsAtExecutionTimeNotAtBuild) {
@@ -57,11 +56,11 @@ TEST_F(CalltfApplicationRoutine, RunsAtExecutionTimeNotAtBuild) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.3: the routine is called "each time" the system task or function is
-// executed. The subclause's worked example loops over $get_vector 1024 times
-// and states the calltf routine is called that many times - i.e. once per
-// execution, repeatedly. Driving the routine once for each execution of the
-// loop reproduces that one-call-per-execution behavior.
+// §36.8.3: the routine runs on every execution of the system task or function.
+// The subclause's worked example loops over $get_vector 1024 times and states
+// the calltf routine is called that many times - i.e. once per execution,
+// repeatedly. Driving the routine once for each execution of the loop
+// reproduces that one-call-per-execution behavior.
 // -----------------------------------------------------------------------------
 
 TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
@@ -86,8 +85,8 @@ TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.3: the rule covers "the associated user-defined system task or system
-// function" - both kinds. The same calltf application runs whether the
+// §36.8.3: the rule covers the user-defined system task and the user-defined
+// system function alike. The same calltf application runs whether the
 // registration is a system task or a system function.
 // -----------------------------------------------------------------------------
 
@@ -146,13 +145,11 @@ TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.3: "A calltf VPI application routine shall be called each time the
-// associated user-defined system task or system function is executed within the
-// SystemVerilog source code", and the clause's example is one call site inside
-// a loop: "the following SystemVerilog loop would call the calltf routine that
-// is associated with the $get_vector user-defined system task name 1024 times".
-// So what the rule counts is executions, and not the one call the source
-// description wrote -- which is the count §36.8.2's compiletf answers with.
+// §36.8.3: a calltf routine runs every time the source executes its
+// user-defined system task or system function, and the clause's example is one
+// call site inside a loop that runs $get_vector's calltf 1024 times. So what
+// the rule counts is executions, and not the one call the source description
+// wrote -- which is the count §36.8.2's compiletf answers with.
 //
 // Every case above drives the routine by hand, which says nothing about what a
 // running design does with it. These run one.

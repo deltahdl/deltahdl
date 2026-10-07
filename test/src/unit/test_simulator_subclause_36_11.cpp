@@ -7,10 +7,10 @@
 namespace {
 
 // §36.11 (List of VPI routines by functional category) divides the VPI routines
-// into nine groups "based on primary functionality" and names every routine of
-// each in Table 36-1 through Table 36-9. What the clause asks of a tool is that
-// it provide them: the categories are of routines an application calls, and a
-// routine the tool does not supply is a category it does not answer for.
+// into nine groups by what each routine is chiefly for and names every routine
+// of each in Table 36-1 through Table 36-9. What the clause asks of a tool is
+// that it provide them: the categories are of routines an application calls,
+// and a routine the tool does not supply is a category it does not answer for.
 //
 // Taking a routine's address odr-uses it, so a non-null pointer for each is the
 // trace that the simulator supplies the interface and that it resolves at link

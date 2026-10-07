@@ -37,13 +37,12 @@ class VpiCompatibility : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Row 6 (Y): "vpiReg iterations on vpiRegArray include other objects." The
-// detail says why - the array object represents an unpacked array of any
-// variable, so "vpiReg iterations on these array objects can retrieve array
-// elements that are of type vpiIntegerVar or vpiTimeVar for example, which is
-// not expected in IEEE Std 1364-2001 and IEEE Std 1364-2005." The iteration
-// matched a child's own type against vpiReg, so it retrieved the reg elements
-// and walked past every element of another kind.
+// Row 6 (Y): a vpiReg iteration on a vpiRegArray reaches objects of other kinds
+// too. The detail says why - the array object stands for an unpacked array of
+// any variable, so a vpiReg iteration on it can hand back elements such as
+// vpiIntegerVar or vpiTimeVar ones, which IEEE Std 1364-2001 and 1364-2005 did
+// not provide for. The iteration matched a child's own type against vpiReg, so
+// it retrieved the reg elements and walked past every element of another kind.
 TEST_F(VpiCompatibility, ARegIterationOnAnArrayRetrievesElementsOfEveryKind) {
   VpiObject reg_word;
   reg_word.type = vpiReg;
@@ -83,9 +82,9 @@ TEST_F(VpiCompatibility, ARegIterationOnAScopeIsUnaffected) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &reg);
 }
 
-// Row 5 (Y): "vpiVariables iterations include vpiReg and vpiRegArray." In the
-// IEEE 1364 standards both were excluded from that iteration; here they are
-// among what it reaches.
+// Row 5 (Y): a vpiVariables iteration reaches vpiReg and vpiRegArray objects.
+// In the IEEE 1364 standards both were excluded from that iteration; here they
+// are among what it reaches.
 TEST_F(VpiCompatibility, AVariablesIterationIncludesRegsAndRegArrays) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -103,10 +102,10 @@ TEST_F(VpiCompatibility, AVariablesIterationIncludesRegsAndRegArrays) {
   EXPECT_EQ(VpiObjectOf(seen[1]), &array);
 }
 
-// Row 7 (Y): "vpiRegArray iterations include variable array objects." The
-// detail names the kinds - "this iteration includes arrays of vpiIntegerVar,
-// vpiTimeVar, and vpiRealVar" - which are all vpiRegArray objects here, so one
-// iteration reaches every array a scope declares whatever its elements are.
+// Row 7 (Y): a vpiRegArray iteration reaches variable array objects. The detail
+// names the kinds - arrays of vpiIntegerVar, vpiTimeVar and vpiRealVar - which
+// are all vpiRegArray objects here, so one iteration reaches every array a
+// scope declares whatever its elements are.
 TEST_F(VpiCompatibility, ARegArrayIterationIncludesArraysOfEveryVariable) {
   VpiObject int_word;
   int_word.type = vpiIntegerVar;

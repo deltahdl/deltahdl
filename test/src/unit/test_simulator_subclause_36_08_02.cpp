@@ -43,15 +43,14 @@ class CompiletfApplicationRoutine : public ::testing::Test {
 };
 
 // -----------------------------------------------------------------------------
-// §36.8.2: "A compiletf VPI application routine shall be called when the
-// user-defined system task or system function name is encountered during
-// parsing or compiling the SystemVerilog source code." and "shall be called one
-// time for each instance ... in the source description." The when of that call
-// is delegated to §36.10.2 and §38.37.1; what §36.8.2 itself fixes is that
-// compiletf runs while the design is being compiled/built - in contrast to
-// calltf, which runs on every invocation during simulation. That
-// compile-time-per-instance classification is what distinguishes compiletf from
-// the execution-time routine.
+// §36.8.2: a compiletf routine runs when parsing or compiling the source meets
+// the user-defined system task or system function name, once for every place
+// the source description writes it. The when of that call is delegated to
+// §36.10.2 and §38.37.1; what §36.8.2 itself fixes is that compiletf runs while
+// the design is being compiled/built - in contrast to calltf, which runs on
+// every invocation during simulation. That compile-time-per-instance
+// classification is what distinguishes compiletf from the execution-time
+// routine.
 // -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, IsACompileTimeRoutineUnlikeCalltf) {
@@ -63,8 +62,8 @@ TEST_F(CompiletfApplicationRoutine, IsACompileTimeRoutineUnlikeCalltf) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.2: the routine is called when "the user-defined system task or system
-// function name is encountered". Unlike sizetf (functions only, §36.8.1),
+// §36.8.2: the routine runs when the source's use of the user-defined system
+// task or system function name is met. Unlike sizetf (functions only, §36.8.1),
 // compiletf applies to both kinds, so the same compiletf application runs
 // whether the registration is a system task or a system function.
 // -----------------------------------------------------------------------------
@@ -96,8 +95,8 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.2: "Providing a compiletf routine is optional." A registration that
-// supplies no compiletf application is accepted and reads back with no
+// §36.8.2: a registration need not supply a compiletf routine. A registration
+// that supplies no compiletf application is accepted and reads back with no
 // compiletf, and asking the runtime to run the absent routine is a harmless
 // no-op.
 // -----------------------------------------------------------------------------
@@ -151,15 +150,14 @@ TEST_F(CompiletfApplicationRoutine,
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.2: "This routine is typically used to check the correctness of any
-// arguments passed to the user-defined system task or system function in the
-// SystemVerilog source code." §36.4 leaves an application no way to those
-// arguments other than the call handle vpi_handle(vpiSysTfCall, NULL) answers
-// with -- "the task/function arguments are not passed to the PLI application"
-// and §38.37.1 makes user_data the one argument the compiletf, sizetf and
-// calltf routines receive -- so a compiletf run with no call standing is a
-// compiletf that can check nothing at all. The cases below run a real design
-// and let the application look.
+// §36.8.2: the routine's usual job is checking the arguments the source passes
+// to the user-defined system task or system function. §36.4 leaves an
+// application no way to those arguments other than the call handle
+// vpi_handle(vpiSysTfCall, NULL) answers with -- the PLI application is not
+// handed the task/function arguments -- and §38.37.1 makes user_data the one
+// argument the compiletf, sizetf and calltf routines receive -- so a compiletf
+// run with no call standing is a compiletf that can check nothing at all. The
+// cases below run a real design and let the application look.
 // -----------------------------------------------------------------------------
 
 // What the compiletf below found, left at file scope because a compiletf is a
@@ -234,10 +232,10 @@ TEST_F(CompiletfApplicationRoutine, ReachesTheCallTheSourceWroteItFor) {
 }
 
 TEST_F(CompiletfApplicationRoutine, ReachesASystemFunctionCallTheSameWay) {
-  // §36.8.2 applies to both kinds -- the routine is called "when the
-  // user-defined system task or system function name is encountered" -- and
-  // §37.42 gives a function call its own object type, so the application can
-  // tell which kind it is checking the arguments of.
+  // §36.8.2 applies to both kinds -- the routine runs when the source's use of
+  // the user-defined task or function name is met -- and §37.42 gives a
+  // function call its own object type, so the application can tell which kind
+  // it is checking the arguments of.
   RegisterInspectingProbe(vpiSysFunc);
 
   SimFixture f;

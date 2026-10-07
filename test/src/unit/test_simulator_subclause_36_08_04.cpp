@@ -54,10 +54,10 @@ class SystfApplicationRoutineArguments : public ::testing::Test {
 };
 
 // -----------------------------------------------------------------------------
-// §36.8.4: "The sizetf, compiletf, and calltf routines all take one argument."
-// Each routine's type carries exactly one parameter; invoking any of them
-// supplies precisely that single value and nothing more. The three routines
-// share the one-argument shape uniformly.
+// §36.8.4: the sizetf, compiletf and calltf routines each take a single
+// argument. Each routine's type carries exactly one parameter; invoking any of
+// them supplies precisely that single value and nothing more. The three
+// routines share the one-argument shape uniformly.
 // -----------------------------------------------------------------------------
 
 TEST_F(SystfApplicationRoutineArguments,
@@ -86,9 +86,8 @@ TEST_F(SystfApplicationRoutineArguments,
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.4: the value passed is "the value supplied in the s_vpi_systf_data
-// structure's user_data field when the user-defined system task or system
-// function was registered." Registering the record and reading it back, then
+// §36.8.4: the value passed is what the s_vpi_systf_data structure's user_data
+// field held at registration. Registering the record and reading it back, then
 // driving each stored routine, shows every routine receives that registered
 // user_data - the field travels through the registry intact.
 // -----------------------------------------------------------------------------
@@ -182,9 +181,9 @@ TEST_F(SystfApplicationRoutineArguments, NullUserDataIsPassedThroughUnchanged) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.4: "When the tool calls these routines, it will pass to them the value
-// supplied in the s_vpi_systf_data structure's user_data field when the
-// user-defined system task or system function was registered."
+// §36.8.4: the tool calls each of these routines with the value the
+// s_vpi_systf_data structure's user_data field held when the user-defined
+// system task or system function was registered.
 //
 // The tool's own calls are the subject, and every case above supplies the
 // argument itself -- VpiSystfInvoke(read_back.sizetf, read_back.user_data)
@@ -289,11 +288,10 @@ TEST_F(SystfApplicationRoutineArguments,
 
 TEST_F(SystfApplicationRoutineArguments,
        TheValueIsTheOneThatStoodAtRegistration) {
-  // §36.8.4 dates the value: it is the one supplied "when the user-defined
-  // system task or system function was registered", so the application's own
-  // structure is not where the tool reads it from afterwards. Here that
-  // structure is written over between the registration and the run, and a tool
-  // reading through to it would hand the routines the later pointer.
+  // §36.8.4 dates the value: it is the one given at registration, so the
+  // application's own structure is not where the tool reads it from afterwards.
+  // Here that structure is written over between the registration and the run,
+  // and a tool reading through to it would hand the routines the later pointer.
   char later_user_data[] = "written-afterwards";
   ResetRunProbes();
   s_vpi_systf_data data = ProbeRegistration(g_registered_user_data);

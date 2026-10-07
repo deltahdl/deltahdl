@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
 
-// §36.7 -- PLI include files. "The libraries of PLI functions are defined in C
-// include files, which are a normative part of this standard. These files also
-// define constants, structures, and other data used by the library of PLI
-// routines and the interface mechanisms. These files are vpi_user.h (listed in
-// Annex K) and sv_vpi_user.h (listed in Annex M). PLI applications that use the
-// VPI routines shall include these files."
+// §36.7 -- PLI include files. The libraries of PLI functions are defined in C
+// include files that are themselves normative, and the same files define the
+// constants, structures and other data the library and the interface use. They
+// are vpi_user.h (Annex K) and sv_vpi_user.h (Annex M), and an application
+// calling the VPI routines must include both.
 //
 // What this file is written as is the application the clause describes: it
 // names the two include files and nothing else of the tool's, so every type,
@@ -34,7 +33,7 @@ constexpr bool kSvFileBroughtTheBaseFile = false;
 }  // namespace
 
 // The base file again, this time under the name §36.7 gives it. Naming it
-// directly is what an application including "these files" does, and naming it
+// directly is what an application including the two files does, and naming it
 // after the SV file has already pulled it in is the repeat a normative include
 // file has to survive: this translation unit compiling at all is the
 // observation for that, and the guard is read again below.
@@ -65,11 +64,10 @@ TEST(PliIncludeFiles, TheSvFileBringsTheBaseFileWithIt) {
 }
 
 TEST(PliIncludeFiles, TheBaseFileDefinesTheConstantsReservedToIt) {
-  // "These files also define constants ... used by the library of PLI
-  // routines". Annex K reserves the values 1 through 299 to the base file, so
-  // an object type, a value format and a callback reason drawn from it are all
-  // inside that range -- the range is what says which of the two files the
-  // constant came out of.
+  // The files also define the constants the PLI library uses. Annex K reserves
+  // the values 1 through 299 to the base file, so an object type, a value
+  // format and a callback reason drawn from it are all inside that range -- the
+  // range is what says which of the two files the constant came out of.
   EXPECT_GE(vpiModule, 1);
   EXPECT_LE(vpiModule, 299);
   EXPECT_GE(vpiIntVal, 1);
@@ -93,10 +91,10 @@ TEST(PliIncludeFiles, TheSvFileDefinesTheConstantsReservedToIt) {
 }
 
 TEST(PliIncludeFiles, TheFilesDefineTheStructuresTheRoutinesAreCalledWith) {
-  // "These files also define ... structures, and other data used by the
-  // library of PLI routines and the interface mechanisms." Each structure
-  // below is filled the way a routine's caller fills it, so the fields read
-  // back are the ones the include file laid out rather than a default.
+  // The files also define the structures and other data the PLI library and the
+  // interface use. Each structure below is filled the way a routine's caller
+  // fills it, so the fields read back are the ones the include file laid out
+  // rather than a default.
   s_vpi_value value = {};
   value.format = vpiIntVal;
   value.value.integer = 7;
@@ -134,8 +132,8 @@ class PliIncludeFileLibrary : public ::testing::Test {
 };
 
 TEST_F(PliIncludeFileLibrary, AnApplicationIncludingTheFilesReachesTheLibrary) {
-  // §36.7's files are what "the libraries of PLI functions are defined in", so
-  // a registration made through the declaration one of them carries is a
+  // §36.7's files are where the libraries of PLI functions are defined, so a
+  // registration made through the declaration one of them carries is a
   // registration the tool holds. Reading it back through a second routine is
   // what says the two ends met: the record vpi_get_systf_info fills is the
   // structure the include file laid out, filled from what the registry kept.

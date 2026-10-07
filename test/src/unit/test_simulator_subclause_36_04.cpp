@@ -14,16 +14,13 @@ namespace delta {
 namespace {
 
 // §36.4 — User-defined system task and system function arguments. A
-// user-defined system task or system function written in a source file "can
-// have arguments that can be used by the PLI applications associated with the
-// system task or system function", the clause's own example being
-// `$get_vector("test_vector.pat", input_bus);` with two of them. Those
-// arguments are the task/function arguments, and the rule about them is how
-// they reach the application: "When the PLI applications associated with a
-// user-defined system task or system function are called, the task/function
-// arguments are not passed to the PLI application. Instead, a number of PLI
-// routines are provided that allow the PLI applications to read and write to
-// the task/function arguments."
+// user-defined system task or system function written in a source file may take
+// arguments that the PLI applications tied to it can use, the clause's own
+// example being `$get_vector("test_vector.pat", input_bus);` with two of them.
+// Those arguments are the task/function arguments, and the rule about them is
+// how they reach the application: a called PLI application is not handed them,
+// and reads and writes them instead through PLI routines provided for the
+// purpose.
 //
 // Both halves are observable from a calltf. The application's own parameter
 // carries the user_data its registration gave it and never an argument list,
@@ -71,8 +68,8 @@ PLI_INT32 ReadArgsCalltf(PLI_BYTE8* user_data) {
   return 0;
 }
 
-// Writes through the second argument, which is what §36.4's "write to the
-// task/function arguments" names.
+// Writes through the second argument, the write to a task/function argument
+// that §36.4 names.
 PLI_INT32 WriteArgCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   if (call == nullptr) return 0;
@@ -126,10 +123,10 @@ TEST_F(SystfCallArguments, BothArgumentsOfTheCallSiteAreReachable) {
   EXPECT_EQ(g_args_seen, 2);
 }
 
-// §36.4: the routines "allow the PLI applications to read ... the
-// task/function arguments". The second argument is `input_bus`, which the
-// design set to 8'h5A before the call, so that is what the application reads
-// back through vpi_get_value.
+// §36.4: the routines let the PLI applications read the task/function
+// arguments. The second argument is `input_bus`, which the design set to 8'h5A
+// before the call, so that is what the application reads back through
+// vpi_get_value.
 TEST_F(SystfCallArguments, AnArgumentsValueIsReadThroughTheRoutines) {
   g_second_arg = 0;
   SimFixture f;
@@ -138,18 +135,18 @@ TEST_F(SystfCallArguments, AnArgumentsValueIsReadThroughTheRoutines) {
   EXPECT_EQ(g_second_arg, 0x5Au);
 }
 
-// §36.4: and to "write to the task/function arguments". The application puts
-// 8'h2D through the second argument, so the variable the call site named holds
-// it once the run is over rather than the 8'h5A it went in with.
+// §36.4: and let them write to the task/function arguments. The application
+// puts 8'h2D through the second argument, so the variable the call site named
+// holds it once the run is over rather than the 8'h5A it went in with.
 TEST_F(SystfCallArguments, AnArgumentIsWrittenThroughTheRoutines) {
   SimFixture f;
   EXPECT_EQ(RunGetVector(WriteArgCalltf, 0x5A, f), 0x2Du);
 }
 
-// §36.4: "the task/function arguments are not passed to the PLI application."
-// The one parameter a calltf takes is the user_data its registration carried,
-// which is what it is handed here -- not the first argument of the call, and
-// not a list of them.
+// §36.4: the PLI application is not handed the task/function arguments. The one
+// parameter a calltf takes is the user_data its registration carried, which is
+// what it is handed here -- not the first argument of the call, and not a list
+// of them.
 TEST_F(SystfCallArguments, TheApplicationsParameterIsItsOwnUserData) {
   g_user_data_seen = nullptr;
   g_user_data_was_read = false;

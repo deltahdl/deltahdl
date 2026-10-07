@@ -12,14 +12,14 @@ namespace delta {
 namespace {
 
 // §36.3.1 — Defining system task and system function names. Its whole rule is
-// one sentence: "User-defined system task and system function names are defined
-// using a system task and system function callback registry, which is part of
-// the PLI mechanism." What the registry does with a registration handed to it
-// is §36.9.1's, the clause saying so itself -- "Registering system tasks and
-// system functions is described in 36.9.1" -- and is covered in that
-// subclause's file. What is here is the other half: that registering a name is
-// what defines it, so a design naming it reaches the application, and a design
-// naming what no registration defines reaches nothing.
+// one sentence: a user-defined system task or system function gets its name
+// from a callback registry for system tasks and functions, a part of the PLI
+// mechanism. What the registry does with a registration handed to it is
+// §36.9.1's, the clause itself pointing there for how registration works -- and
+// is covered in that subclause's file. What is here is the other half: that
+// registering a name is what defines it, so a design naming it reaches the
+// application, and a design naming what no registration defines reaches
+// nothing.
 //
 // §36.3.2's file beside this one takes the case where the name being defined is
 // one a built-in already holds, which is a rule of its own. Every name here is
@@ -118,7 +118,7 @@ TEST_F(DefiningSystfNames, UnregisteredNameIsStillReported) {
       2, "20.1"));
 }
 
-// §36.3 has such a name "case sensitive", and §36.3.1 makes the registration
+// §36.3 makes such a name sensitive to case, and §36.3.1 makes the registration
 // what defines it, so what a registration defines is that spelling and not
 // another. `$My_Task` is registered and `$my_task` is what the design names:
 // two names, so the call reaches no application and §20.1's report stands. A

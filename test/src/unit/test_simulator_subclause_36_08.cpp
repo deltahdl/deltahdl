@@ -12,10 +12,9 @@
 namespace delta {
 namespace {
 
-// §36.8 -- VPI sizetf, compiletf, and calltf routines. "VPI-based system tasks
-// have sizetf, compiletf, and calltf routines, which perform specific actions
-// for the task or system function. The sizetf, compiletf, and calltf routines
-// are called during specific periods during processing."
+// §36.8 -- VPI sizetf, compiletf, and calltf routines. A VPI-based system task
+// carries the three routines, each doing its own part for the task or function,
+// and each is called at its own period of the processing.
 //
 // What each of the three does is §36.8.1 through §36.8.4's business and is
 // tested in their files. What is left to this one is the sentence those files
@@ -49,9 +48,9 @@ PLI_INT32 LoggingCalltf(PLI_BYTE8*) {
 }
 
 // Registers $probe with all three routines. It is a sized system function so
-// that §36.8.1's sizetf is one of the three: the sizetf "shall not be called
-// for user-defined system tasks", which would leave a task-typed registration
-// with only two periods to show.
+// that §36.8.1's sizetf is one of the three: no sizetf runs for a user-defined
+// system task, which would leave a task-typed registration with only two
+// periods to show.
 void RegisterProbe() {
   g_order.clear();
   s_vpi_systf_data data = {};
@@ -81,12 +80,12 @@ class SystfRoutinePeriods : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.8: the three routines are "called during specific periods during
-// processing", and this is the whole of that sentence in one run. The design
-// calls $probe twice, so the calltf's period -- §36.8.3's "each time the
-// associated user-defined system task or system function is executed" -- is
-// reached twice, while the two build-period routines run once each and both run
-// before the first execution.
+// §36.8: each of the three routines is called at its own period of the
+// processing, and this is the whole of that sentence in one run. The design
+// calls $probe twice, so the calltf's period -- §36.8.3's every execution of
+// the user-defined system task or system function -- is reached twice, while
+// the two build-period routines run once each and both run before the first
+// execution.
 //
 // The order is asserted as the whole sequence rather than as counts, because
 // counts alone are what a tool that reached all three from inside the call
@@ -115,9 +114,9 @@ TEST_F(SystfRoutinePeriods, TheBuildRoutinesRunOnceBeforeAnyExecution) {
 // §36.8: the periods belong to the design's processing, so a registration the
 // design never names reaches none of them. Without this case a build period
 // that ran every registration's routines rather than the ones the design uses
-// would pass the case above, and §36.8.1's "it shall be called if its
-// associated system function appears in the design" is the same reading applied
-// to one of the three.
+// would pass the case above, and §36.8.1's rule that the sizetf runs when its
+// system function appears in the design is the same reading applied to one of
+// the three.
 TEST_F(SystfRoutinePeriods, ARegistrationTheDesignNeverNamesReachesNoPeriod) {
   RegisterProbe();
 
@@ -138,11 +137,11 @@ TEST_F(SystfRoutinePeriods, ARegistrationTheDesignNeverNamesReachesNoPeriod) {
 // call happened to be written in. Here $probe stands in a child module
 // instantiated twice and in a function body no process ever calls.
 //
-// §36.8.2 counts "each instance of a system task or system function in the
-// source description", so the compiletf runs twice and not three times: the two
-// instances of `c` carry one call between them, elaborated once per instance
-// but written once in the source. §36.8.1's sizetf runs once whatever the
-// count, being called "at most once" per registration.
+// §36.8.2 counts every place the source description writes the system task or
+// function, so the compiletf runs twice and not three times: the two instances
+// of `c` carry one call between them, elaborated once per instance but written
+// once in the source. §36.8.1's sizetf runs once whatever the count, running no
+// more than once per registration.
 //
 // The calltf count is what says the two periods are not one walk: it is the two
 // instances of `c` and not the function nothing calls, while the compiletf

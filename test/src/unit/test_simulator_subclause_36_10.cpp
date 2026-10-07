@@ -11,12 +11,11 @@
 namespace delta {
 namespace {
 
-// §36.10 -- VPI access to SystemVerilog objects and simulation objects. "VPI
-// routines provide access to objects in an instantiated SystemVerilog design.
-// An instantiated design is one where each instance of an object is uniquely
-// accessible. For instance, if a module m contains wire w and is instantiated
-// twice as m1 and m2, then m1.w and m2.w are two distinct objects, each with
-// its own set of related objects and properties."
+// §36.10 -- VPI access to SystemVerilog objects and simulation objects. The VPI
+// routines reach the objects of an instantiated design, one in which every
+// instance of an object can be reached on its own: a module m holding a wire w
+// and instantiated as m1 and m2 gives two separate objects m1.w and m2.w, each
+// with related objects and properties of its own.
 //
 // The design below is the clause's own: one module holding a wire, instantiated
 // twice. What the cases ask of it is what the sentence says -- that the two
@@ -106,7 +105,7 @@ class InstantiatedDesignAccess : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.10: "each instance of an object is uniquely accessible", so the object
+// §36.10: every instance of an object can be reached on its own, so the object
 // inside m1 is reached under m1's name and the one inside m2 under m2's, and
 // the two names do not lead to one object. The design was reachable only by a
 // name with no instance in it before this: an object was entered under the one
@@ -126,10 +125,10 @@ TEST_F(InstantiatedDesignAccess, EachInstanceIsReachedUnderItsOwnName) {
   EXPECT_EQ(g_same_object, 0);
 }
 
-// §36.10: the two are "each with its own set of related objects and
-// properties", so what one instance holds is not what the other holds. A write
-// through m1's object lands in m1's storage and leaves m2's where it was --
-// which is also what says the two handles are not one object reached twice.
+// §36.10: each of the two has related objects and properties of its own, so
+// what one instance holds is not what the other holds. A write through m1's
+// object lands in m1's storage and leaves m2's where it was -- which is also
+// what says the two handles are not one object reached twice.
 TEST_F(InstantiatedDesignAccess, EachInstanceCarriesItsOwnValue) {
   RegisterProbe();
 

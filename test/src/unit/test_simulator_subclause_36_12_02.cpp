@@ -2,12 +2,10 @@
 
 #include "simulator/vpi_globals.h"
 
-// §36.12.2: "In order to ease the transition to the latest VPI standard for
-// older applications, capability shall be provided to emulate the incompatible
-// VPI behaviors where they conflict with the current standard. This allows
-// older VPI applications dependent on these behaviors to be run unmodified...
-// As described in 36.12.2.1 and 36.12.2.2, two mechanisms to support this shall
-// be provided, which can be used in combination."
+// §36.12.2: to ease older applications onto the current VPI, a tool must be
+// able to emulate the older behaviors that conflict with this standard, so that
+// an application relying on them runs unchanged, and it must provide the two
+// mechanisms of §36.12.2.1 and §36.12.2.2 for it, usable together.
 //
 // This translation unit is such an older application: it selects a
 // compatibility version before the VPI headers, exactly as §36.12.2.1's
@@ -41,10 +39,10 @@ class VpiCompatibilityEmulation : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// §36.12.1 Table 36-10 row 5 is N for IEEE Std 1364-2001: "In all IEEE Std 1364
-// standards, vpiReg and vpiRegArray objects were excluded from vpiVariables
-// iterations." An application built against that standard is handed the
-// iteration it expects, without the two kinds this standard added to it.
+// §36.12.1 Table 36-10 row 5 is N for IEEE Std 1364-2001: no IEEE Std 1364
+// edition let a vpiVariables iteration reach vpiReg or vpiRegArray objects. An
+// application built against that standard is handed the iteration it expects,
+// without the two kinds this standard added to it.
 TEST_F(VpiCompatibilityEmulation, AVariablesIterationExcludesRegsAndRegArrays) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -64,8 +62,8 @@ TEST_F(VpiCompatibilityEmulation, AVariablesIterationExcludesRegsAndRegArrays) {
 }
 
 // Row 6 is N for the same standard: a vpiReg iteration on an array retrieves
-// the reg elements and nothing else, the elements of other kinds "not expected
-// in IEEE Std 1364-2001".
+// the reg elements and nothing else, IEEE Std 1364-2001 not providing for
+// elements of other kinds.
 TEST_F(VpiCompatibilityEmulation, ARegIterationOnAnArrayRetrievesOnlyRegs) {
   VpiObject reg_word;
   reg_word.type = vpiReg;
@@ -82,9 +80,9 @@ TEST_F(VpiCompatibilityEmulation, ARegIterationOnAnArrayRetrievesOnlyRegs) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &reg_word);
 }
 
-// Row 7 is N for the same standard: "IEEE Std 1364-2001 and IEEE Std 1364-2005,
-// vpiRegArray iterations only included arrays of vpiReg objects", so an array
-// of some other variable is not among them.
+// Row 7 is N for the same standard: in IEEE Std 1364-2001 and 1364-2005 a
+// vpiRegArray iteration reached arrays of vpiReg objects alone, so an array of
+// some other variable is not among them.
 TEST_F(VpiCompatibilityEmulation, ARegArrayIterationReachesOnlyArraysOfRegs) {
   VpiObject reg_word;
   reg_word.type = vpiReg;

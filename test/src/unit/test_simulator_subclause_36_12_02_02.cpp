@@ -114,12 +114,11 @@ TEST_F(VpiDefaultCompatibilityMode, Mechanism1ApplicationKeepsItsOwnMode) {
 
 // -----------------------------------------------------------------------------
 // What the default determines. §36.12.2.2 does not stop at a means to set the
-// mode: it says the selection "shall determine the compatibility mode VPI
-// behavior for all applications not using the compile-based scheme detailed in
-// Mechanism 1". The mode was recorded, EffectiveCompatibilityMode answered
-// which one governed an application, and no routine asked either - so a run
-// given a default behaved exactly as a run without one and the mechanism
-// determined nothing.
+// mode: it says the selection sets the compatibility mode behavior of every
+// application that does not use Mechanism 1's compile-time scheme. The mode was
+// recorded, EffectiveCompatibilityMode answered which one governed an
+// application, and no routine asked either - so a run given a default behaved
+// exactly as a run without one and the mechanism determined nothing.
 // -----------------------------------------------------------------------------
 
 // §36.12.2.2 with §36.12.1 Table 36-10 row 5: an application that made no

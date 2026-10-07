@@ -420,15 +420,14 @@ TEST(VpiCompatibilityModeBinding, Version1800v2023Retargets) {
 #undef VPI_COMPATIBILITY_H
 
 // --- Section: the redefinition is performed by vpi_user.h ---
-// §36.12.2.1 puts the mechanism in the file the application includes: "one of
-// the following compiler symbols shall be defined prior to compilation of any
-// of the standard VPI include files", and "when a mode is selected by one of
-// the means above, C-preprocessor constructs in vpi_user.h cause the following
-// VPI functions to be redefined to mode-specific versions". So the clause's own
-// example - define the symbol, then include vpi_user.h - is what has to
-// perform the retargeting, and it is what this section does. The constructs
-// were reached only by including the header that holds them, which no
-// application the clause describes names.
+// §36.12.2.1 puts the mechanism in the file the application includes: one of
+// the listed compiler symbols is defined before any standard VPI include file
+// is compiled, and once a mode is chosen that way, preprocessor constructs in
+// vpi_user.h redefine the listed VPI functions to that mode's versions. So the
+// clause's own example - define the symbol, then include vpi_user.h - is what
+// has to perform the retargeting, and it is what this section does. The
+// constructs were reached only by including the header that holds them, which
+// no application the clause describes names.
 #define VPI_COMPATIBILITY_VERSION_1364v2005 1
 #include "simulator/vpi_user.h"
 

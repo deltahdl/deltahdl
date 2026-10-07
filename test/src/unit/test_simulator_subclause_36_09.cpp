@@ -13,17 +13,13 @@
 namespace delta {
 namespace {
 
-// §36.9 -- PLI mechanism. "The PLI mechanism provides a means to have PLI
-// applications called for various reasons when the associated system task and
-// system function $ name is encountered in the SystemVerilog source
-// description. For example, when a SystemVerilog simulator first compiles the
-// SystemVerilog source description, a specific compiletf PLI routine can be
-// called that performs syntax checking to verify the user-defined system task
-// or system function is being used correctly. Then, as simulation is executing,
-// a specific calltf PLI routine can be called to perform the operations
-// required by the PLI application. User-defined system tasks and system
-// functions, and their associated routines and data, are defined by registering
-// system task and system function callbacks."
+// §36.9 -- PLI mechanism. The mechanism has PLI applications called, for more
+// than one reason, wherever the source description writes the task's or
+// function's $ name. When the simulator first compiles the source, a compiletf
+// routine can check that the user-defined task or function is used correctly;
+// later, while the simulation runs, a calltf routine can do the application's
+// work. Registering system task and system function callbacks is what defines a
+// user-defined task or function, together with its routines and data.
 //
 // What the clause states is the mechanism rather than any one of its parts:
 // that a registration is what defines a name, its routines and its data, and
@@ -99,11 +95,10 @@ class PliMechanism : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.9: the applications are called "for various reasons", and the clause's
-// own example names two of them in order -- a compiletf "when a SystemVerilog
-// simulator first compiles the SystemVerilog source description", and "then, as
-// simulation is executing", a calltf. One name written once in the source is
-// what reaches both.
+// §36.9: the applications are called for more than one reason, and the clause's
+// own example names two of them in order -- a compiletf when the simulator
+// first compiles the source description, and a calltf afterwards, while the
+// simulation runs. One name written once in the source is what reaches both.
 TEST_F(PliMechanism,
        TheNameInTheSourceReachesApplicationsForMoreThanOneReason) {
   RegisterProbe();
@@ -124,12 +119,12 @@ TEST_F(PliMechanism,
             (std::vector<std::string>{"probe-compiletf", "probe-calltf"}));
 }
 
-// §36.9: "User-defined system tasks and system functions, and their associated
-// routines and data, are defined by registering system task and system function
-// callbacks." So which applications a name reaches is decided by the
-// registration that named it, and a second registration standing in the same
-// run is not what the source's name reaches. Its routines are distinct from
-// $probe's and would name themselves if they ran.
+// §36.9: registering system task and system function callbacks is what defines
+// a user-defined task or function, together with its routines and data. So
+// which applications a name reaches is decided by the registration that named
+// it, and a second registration standing in the same run is not what the
+// source's name reaches. Its routines are distinct from $probe's and would name
+// themselves if they ran.
 TEST_F(PliMechanism, TheRoutinesAndTheDataComeFromTheRegistrationOfThatName) {
   RegisterProbe();
   RegisterOther();
@@ -151,13 +146,12 @@ TEST_F(PliMechanism, TheRoutinesAndTheDataComeFromTheRegistrationOfThatName) {
   EXPECT_EQ(g_probe_user_data_seen, g_probe_user_data);
 }
 
-// §36.9: the applications are reached "when the associated system task and
-// system function $ name is encountered in the SystemVerilog source
-// description", which says where the name stands and not which construct holds
-// it. §6.8's declaration initializer is one of the places the source writes
-// one, and the build period walked processes and continuous assignments and no
-// declaration at all, so a name written here was encountered by the design and
-// by nothing that called an application for it.
+// §36.9: the applications are reached when the source description is found to
+// write the task's or function's $ name, which says where the name stands and
+// not which construct holds it. §6.8's declaration initializer is one of the
+// places the source writes one, and the build period walked processes and
+// continuous assignments and no declaration at all, so a name written here was
+// encountered by the design and by nothing that called an application for it.
 TEST_F(PliMechanism, ANameEncounteredInADeclarationReachesItsApplications) {
   RegisterProbe();
 
