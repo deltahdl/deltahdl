@@ -41,7 +41,7 @@ bool IsSymbolicConstantName(std::string_view n) { return n.starts_with("sv_"); }
 
 // §H.3 bullet 4: macro-definition names start with SV_ and are spelled in
 // all-uppercase words separated by underscores, e.g., SV_GET_UNSIGNED_BITS.
-// "All uppercase words" is checked by the absence of any lowercase letter.
+// The uppercase spelling is checked by the absence of any lowercase letter.
 bool IsMacroName(std::string_view n) {
   if (!n.starts_with("SV_")) return false;
   for (char c : n) {
@@ -139,11 +139,11 @@ TEST(SvdpiNamingConventions, MacroNamesUseSvUnderscoreUppercase) {
   EXPECT_FALSE(IsFunctionOrTypeName(SPELL(SV_GET_UNSIGNED_BITS)));
 }
 
-// §H.3 says "all names introduced by this interface", so the four checks
-// above are also run over the whole of what svdpi.h introduces. Each entry
-// below is referenced as it is spelled -- a function through the size of its
-// address, a type through its size, a constant through its value -- so the
-// list compiles only while svdpi.h declares every name on it; the gate
+// §H.3 applies its naming rules to every name the interface introduces, so the
+// four checks above are also run over the whole of what svdpi.h introduces.
+// Each entry below is referenced as it is spelled -- a function through the
+// size of its address, a type through its size, a constant through its value --
+// so the list compiles only while svdpi.h declares every name on it; the gate
 // assert-svdpi-naming in .github/workflows/deltahdl.yml reads the header
 // itself, so a name added to it that breaks the convention fails the run
 // whether or not it is added here.

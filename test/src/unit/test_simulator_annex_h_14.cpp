@@ -10,9 +10,8 @@ using namespace delta;
 namespace {
 
 // Annex H.14 describes the SV3.1a semantics for packed array arguments and
-// deprecates them: the functionality "need not be implemented by an IEEE Std
-// 1800 simulator". A declaration therefore has to ask for them, and this builds
-// one that does.
+// deprecates them: an IEEE Std 1800 simulator is free not to implement them. A
+// declaration therefore has to ask for them, and this builds one that does.
 DpiRtFunction Sv31aImport(const char* sv_name) {
   DpiRtFunction func;
   func.c_name = "c_packed";
@@ -21,9 +20,9 @@ DpiRtFunction Sv31aImport(const char* sv_name) {
   return func;
 }
 
-// §H.14: "in SV3.1a, packed data arguments are passed by opaque handle types
-// svLogicPackedArrRef and svBitPackedArrRef." The handle refers to the
-// simulator's own representation of the array, so what the foreign code
+// §H.14: SV3.1a hands a packed data argument over through one of two opaque
+// handle types, svLogicPackedArrRef and svBitPackedArrRef. The handle refers to
+// the simulator's own representation of the array, so what the foreign code
 // receives is the actual itself rather than anything derived from it.
 TEST(Sv31aPackedDataAccess, Sv31aImportIsHandedTheAddressOfTheActual) {
   DpiRuntime rt;
@@ -33,10 +32,10 @@ TEST(Sv31aPackedDataAccess, Sv31aImportIsHandedTheAddressOfTheActual) {
   EXPECT_EQ(rt.PackedArgRef("packed_31a", actual), actual);
 }
 
-// §H.14: an implementation passing packed data this way "need not do any
-// conversion or marshalling of data into the canonical format". Nothing is
-// copied in either direction, so a value the foreign code writes through the
-// handle is in the caller's array the moment it is written.
+// §H.14: an implementation passing packed data this way is not required to
+// convert or marshal it into the canonical format. Nothing is copied in either
+// direction, so a value the foreign code writes through the handle is in the
+// caller's array the moment it is written.
 TEST(Sv31aPackedDataAccess, AWriteThroughTheSv31aReferenceReachesTheActual) {
   DpiRuntime rt;
   rt.RegisterImport(Sv31aImport("packed_31a"));

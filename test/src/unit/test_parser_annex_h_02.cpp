@@ -8,10 +8,10 @@ using namespace delta;
 
 namespace {
 
-// §H.2: "A formal argument is an open array when a range of one or more of its
-// dimensions is unspecified (denoted in SystemVerilog by using empty square
-// brackets, [])." The packed part is one such dimension: the annex's own list
-// of formal-argument types opens with "bit[]". The pair carries no bounds, so
+// §H.2: a formal argument is an open array when at least one of its dimensions
+// leaves its range out, which SystemVerilog writes as an empty pair of square
+// brackets, []. The packed part is one such dimension: the annex's own list of
+// formal-argument types opens with `bit[]`. The pair carries no bounds, so
 // nothing lands in the sized packed slots and the type is marked instead.
 TEST_F(DpiParseTest, DpiImportFormalLeavesPackedRangeUnspecified) {
   auto* unit = Parse(
@@ -65,10 +65,11 @@ TEST_F(DpiParseTest, DpiImportFormalOpensBothPackedAndUnpackedParts) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §H.2: "Actual arguments' packed dimensions shall collectively match a
-// solitary, unsized formal packed dimension." The unspecified dimension takes
-// every packed dimension of the actual at once, so a sized dimension written
-// beside it has nothing left to match and the declaration is rejected.
+// §H.2: when the formal has a single packed dimension and leaves it unsized,
+// all of the actual's packed dimensions together must match it. The unspecified
+// dimension takes every packed dimension of the actual at once, so a sized
+// dimension written beside it has nothing left to match and the declaration is
+// rejected.
 TEST_F(DpiParseTest, DpiImportFormalRejectsSizedPackedDimBeforeUnspecifiedOne) {
   Parse(
       "module m;\n"
@@ -115,10 +116,10 @@ TEST_F(DpiParseTest, DpiImportFormalWithSizedPackedDimIsNotOpen) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §H.2: "Formal arguments in SystemVerilog can be specified as open arrays
-// solely in import declarations." Leaving a packed range unspecified is that
-// relaxation, so the same spelling in an ordinary variable declaration -- which
-// no import declaration governs -- is not admitted.
+// §H.2: only an import declaration may give a formal argument an open array
+// type. Leaving a packed range unspecified is that relaxation, so the same
+// spelling in an ordinary variable declaration -- which no import declaration
+// governs -- is not admitted.
 TEST_F(DpiParseTest, UnspecifiedPackedRangeIsRejectedOutsideAnImport) {
   Parse(
       "module m;\n"

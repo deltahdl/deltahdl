@@ -118,10 +118,11 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
   }
 }
 
-// Rule c "natural order ... lower indices go first": walking the SystemVerilog
-// indices from low to high yields C indices 0, 1, 2, ... contiguously, so the C
-// layout preserves the ascending element order independent of the declared
-// range orientation. Verified against a descending declaration [3:-2].
+// Rule c, that elements keep their natural order with the lower indices first:
+// walking the SystemVerilog indices from low to high yields C indices 0, 1, 2,
+// ... contiguously, so the C layout preserves the ascending element order
+// independent of the declared range orientation. Verified against a descending
+// declaration [3:-2].
 TEST(MappingSvRangesToCRanges, UnpackedLowerIndicesGoFirst) {
   const SvOpenArrayDimRange kRanges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
   SvOpenArrayDesc desc;
@@ -180,12 +181,13 @@ TEST(MappingSvRangesToCRanges, WorkedExampleNormalizedForm) {
   EXPECT_EQ(svHigh(h, 2) - svLow(h, 2), 31);
 }
 
-// "The above range mapping ... applies to calls made in both directions." The
-// same normalized index addresses the same bit whether C reads a value handed
-// in by SystemVerilog (the get path of an SV->C call) or writes a value that
-// SystemVerilog will read back (the put path of a C->SV call / copy-out).
-// Writing through the normalized indices of a packed [L:R] and reading them
-// back yields the identical mapping in both directions.
+// The range mapping holds for a call in either direction, from SystemVerilog to
+// C and from C to SystemVerilog. The same normalized index addresses the same
+// bit whether C reads a value handed in by SystemVerilog (the get path of an
+// SV->C call) or writes a value that SystemVerilog will read back (the put path
+// of a C->SV call / copy-out). Writing through the normalized indices of a
+// packed [L:R] and reading them back yields the identical mapping in both
+// directions.
 TEST(MappingSvRangesToCRanges, MappingAppliesInBothCallDirections) {
   const int kL = 11, kR = 4;           // packed [11:4].
   const int kMsb = std::abs(kL - kR);  // 7

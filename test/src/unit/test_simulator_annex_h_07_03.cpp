@@ -332,9 +332,9 @@ TEST(DataRepresentation, UnpackedSingleElementDimensionMapsToZero) {
   EXPECT_EQ(svHigh(h, 1) - svLow(h, 1), 0);  // sole element -> C index 0.
 }
 
-// Claim 7 "lower indices go first": walking the SystemVerilog indices of a
-// declared range from low to high yields contiguous C indices 0, 1, 2, ...,
-// independent of the declared orientation. Verified against a descending,
+// Claim 7, that the lower indices come first: walking the SystemVerilog indices
+// of a declared range from low to high yields contiguous C indices 0, 1, 2,
+// ..., independent of the declared orientation. Verified against a descending,
 // negative-spanning declaration [3:-2].
 TEST(DataRepresentation, UnpackedLowerIndicesGoFirst) {
   const SvOpenArrayDimRange kRanges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].

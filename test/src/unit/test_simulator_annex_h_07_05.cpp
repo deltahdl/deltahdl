@@ -68,11 +68,11 @@ TEST(NormalizedLinearizedRanges, LinearizedReferenceFollowsRowMajorFormula) {
   }
 }
 
-// N1/N6: "the one-dimensional array has the same layout as the corresponding
-// multidimensional array stored in row-major order." Iterating the dimensions
-// in nested row-major order yields linearized indices 0,1,2,... contiguously,
-// i.e., the linearized view and a plain one-dimensional array coincide bit for
-// bit.
+// N1/N6: the linearized one-dimensional array is laid out exactly as the
+// multidimensional array it stands for would be in row-major order. Iterating
+// the dimensions in nested row-major order yields linearized indices 0,1,2,...
+// contiguously, i.e., the linearized view and a plain one-dimensional array
+// coincide bit for bit.
 TEST(NormalizedLinearizedRanges, RowMajorIterationIsContiguousOneDimensional) {
   const int kI = 2, kJ = 3, kK = 4;
   auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };

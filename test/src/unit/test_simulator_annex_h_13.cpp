@@ -13,10 +13,10 @@
 
 // Annex H.13 functions under test. They belong to the DPI C layer (svdpi.cpp)
 // and are declared in svdpi.h, which this translation unit does not include:
-// its svScope is a pointer to non-const, and the scopes this test registers
-// are const. H.13 states that svTimeVal is "fully equivalent to s_vpi_time",
-// so the layout-identical s_vpi_time stands in for svTimeVal across the C
-// ABI; driving svGetTime through it also exercises that equivalence.
+// its svScope is a pointer to non-const, and the scopes this test registers are
+// const. H.13 makes svTimeVal the same structure as s_vpi_time in every
+// respect, so the layout-identical s_vpi_time stands in for svTimeVal across
+// the C ABI; driving svGetTime through it also exercises that equivalence.
 extern "C" {
 int svGetTime(const void* scope, s_vpi_time* time);
 int svGetTimeUnit(const void* scope, int32_t* time_unit);
