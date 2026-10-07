@@ -147,12 +147,10 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
 // `covergroup extends covergroup_identifier ;`, ends at the semicolon: the
 // optional `( tf_port_list )` and `coverage_event` belong to the first
 // alternative alone. §19.4.1 (printed page 581) says why the derived one needs
-// neither: "If the base covergroup has a list of arguments specified, the
-// derived covergroup implicitly has the same list of arguments", and "If the
-// base covergroup has a coverage event specified, the derived covergroup shall
-// use that coverage event." The token is left where it stands, so the shared
-// tail of Parser::ParseCovergroupDecl consumes it and one report covers the
-// whole declaration.
+// neither: it takes over the base's argument list, when the base has one, and
+// must sample on the base's coverage event, when the base names one. The token
+// is left where it stands, so the shared tail of Parser::ParseCovergroupDecl
+// consumes it and one report covers the whole declaration.
 void Parser::RejectDerivedCovergroupTail() {
   if (Check(TokenKind::kLParen) || Check(TokenKind::kAt) ||
       Check(TokenKind::kAtAt) || Check(TokenKind::kKwWith)) {
@@ -168,9 +166,9 @@ void Parser::RejectDerivedCovergroupTail() {
 // second carries `extends` and names nothing of its own; no alternative does
 // both, so a name followed by `extends` is a production the grammar does not
 // have. The base is read and discarded rather than recorded, because §19.4.1
-// (printed page 580) gives the derived covergroup the base's own name -- "a
-// derived covergroup with name covergroup_identifier is defined" -- and says
-// nothing about what a fresh one would mean.
+// (printed page 580) names the derived covergroup after the
+// covergroup_identifier the `extends` gives, and says nothing about what a
+// fresh name would mean.
 void Parser::RejectNamedCovergroupExtends() {
   if (!Check(TokenKind::kKwExtends)) return;
   diag_.Error(CurrentLoc(),
@@ -285,11 +283,11 @@ void Parser::ParseBlockEventExpression(std::vector<BlockEventTerm>& terms) {
 // hierarchical_block_identifier or `[ hierarchical_identifier . | class_scope
 // ] method_identifier`, where A.9.3 spells hierarchical_identifier `[ $root .
 // ] { identifier constant_bit_select . } identifier` and A.8.4 spells
-// class_scope `class_type ::`. §19.3 (printed page 577) says what the name
-// denotes, "a named block, task, function, or class method". The three forms
-// share their first identifier and differ in what separates the identifiers
-// after it, so the separators are read as they come, and each identifier is
-// recorded in `path`.
+// class_scope `class_type ::`. §19.3 (printed page 577) has the name denote a
+// block that carries a name, a task, a function or a method of a class. The
+// three forms share their first identifier and differ in what separates the
+// identifiers after it, so the separators are read as they come, and each
+// identifier is recorded in `path`.
 void Parser::ParseHierarchicalBtfIdentifier(
     std::vector<std::string_view>& path) {
   if (Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$root") {
@@ -540,8 +538,8 @@ bool Parser::BraceOpensCoverpointBody() {
 }
 
 // Reads the expression A.2.11's cover_point puts after the `coverpoint`
-// keyword. §19.3 (printed page 577) has "a coverage point can cover a variable
-// or an expression", and a coverpoint written with nothing to cover is
+// keyword. §19.3 (printed page 577) lets a coverage point cover either a
+// variable or an expression, so a coverpoint written with nothing to cover is
 // reported where its expression was due.
 Expr* Parser::ParseCoverpointHead() {
   if (Check(TokenKind::kSemicolon) || Check(TokenKind::kKwIff) ||
