@@ -19,9 +19,9 @@ namespace delta {
 // non_port_module_item, A.1.6's non_port_interface_item, A.1.7's
 // program_generate_item and A.1.8's checker_generate_item, so a region stands
 // directly in a module, an interface, a program or a checker and in nothing
-// else. §27.3 is narrower than the grammar here -- "Generate regions do not
-// nest, and they may only occur directly within a module" -- and the three
-// keywords beyond endmodule are what the grammar admits.
+// else. §27.3 is narrower than the grammar here -- it lets a generate region
+// stand only directly in a module, never inside another region -- and the
+// three keywords beyond endmodule are what the grammar admits.
 static bool ClosesGenerateRegionEnclosure(TokenKind tk) {
   return tk == TokenKind::kKwEndmodule || tk == TokenKind::kKwEndinterface ||
          tk == TokenKind::kKwEndprogram || tk == TokenKind::kKwEndchecker;

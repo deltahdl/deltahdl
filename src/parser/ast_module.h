@@ -256,8 +256,8 @@ struct GenerateCaseItem {
   bool is_default = false;
   std::vector<ModuleItem*> body;
 
-  // §27.6 gave this generate block its name -- "All unnamed generate blocks
-  // will be given the name genblk<n>" -- rather than the source writing one.
+  // §27.6 gave this generate block its name, the genblk<n> name it gives every
+  // unnamed generate block, rather than the source writing one.
   // §23.6 rules that objects declared in an unnamed generate block "can be
   // referenced by hierarchical names only from within the block and within any
   // hierarchy instantiated by the block", so a path written outside must not
@@ -272,10 +272,9 @@ struct GenerateCaseItem {
   // begin [ : generate_block_identifier ] { generate_item } end
   // [ : generate_block_identifier ]`, so the two forms are told apart only
   // while the block is being parsed. §27.5 needs the distinction afterwards:
-  // "If a generate block in a conditional generate construct consists of only
-  // one item that is itself a conditional generate construct and if that item
-  // is not surrounded by begin-end keywords, then this generate block is not
-  // treated as a separate scope."
+  // a generate block of a conditional generate construct whose one item is
+  // itself a conditional generate construct, written without begin and end
+  // around it, forms no scope of its own.
   bool has_begin_end = false;
 
   std::string_view label;
@@ -489,10 +488,10 @@ struct ModuleItem {
   std::string_view fsm_enum;
 
   // §27.4: set on the declaration produced by `genvar i;`. A genvar is parsed
-  // as a variable declaration because that is its shape, but it "is used as an
-  // integer during elaboration to evaluate the generate loop and create
-  // instances of the generate block, but it does not exist at simulation
-  // time", so the elaborator must be able to tell the two apart.
+  // as a variable declaration because that is its shape, but it is an integer
+  // that elaboration uses to run the generate loop and instantiate its generate
+  // block, and it is gone by simulation, so the elaborator must be able to
+  // tell the two apart.
   bool is_genvar = false;
 
   // §6.18: set where the declaration was written as two bare identifiers and a
@@ -583,17 +582,16 @@ struct ModuleItem {
   // [ generate_block_identifier : ] begin [ : generate_block_identifier ]
   // { generate_item } end [ : generate_block_identifier ]`, so the two forms
   // are told apart only while the block is being parsed. §27.5 needs the
-  // distinction afterwards: "If a generate block in a conditional generate
-  // construct consists of only one item that is itself a conditional generate
-  // construct and if that item is not surrounded by begin-end keywords, then
-  // this generate block is not treated as a separate scope." The else branch
-  // of an if_generate_construct is its own ModuleItem, reached through
-  // gen_else, and records its block on that item's field rather than on this
-  // one.
+  // distinction afterwards: a generate block of a conditional generate
+  // construct whose one item is itself a conditional generate construct,
+  // written without begin and end around it, forms no scope of its own. The
+  // else branch of an if_generate_construct is its own ModuleItem, reached
+  // through gen_else, and records its block on that item's field rather than
+  // on this one.
   bool gen_body_has_begin_end = false;
 
-  // §27.6 gave this generate block its name -- "All unnamed generate blocks
-  // will be given the name genblk<n>" -- rather than the source writing one.
+  // §27.6 gave this generate block its name, the genblk<n> name it gives every
+  // unnamed generate block, rather than the source writing one.
   // §23.6 rules that objects declared in an unnamed generate block "can be
   // referenced by hierarchical names only from within the block and within any
   // hierarchy instantiated by the block", so a path written outside must not
