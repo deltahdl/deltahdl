@@ -14,13 +14,12 @@ namespace delta {
 
 // The `[ ... ]` after an instance name. A.4.1.1's name_of_instance is
 // `instance_identifier { unpacked_dimension }`, and §28.3.5 gives the one
-// unpacked_dimension an array of instances takes: "the range shall be
-// specified by two constant expressions, left-hand index (lhi) and right-hand
-// index (rhi), separated by a colon and enclosed within a pair of square
-// brackets", and "one instance identifier shall be associated with only one
-// range". The first range is recorded; a size alone, A.2.5's `[
-// constant_expression ]`, is reported where its colon was due and the
-// instance is one, as it was; and every range after the first is reported
+// unpacked_dimension an array of instances takes: a range written in square
+// brackets as two constant expressions, the left-hand index (lhi) and the
+// right-hand index (rhi), with a colon between them, and no more than one such
+// range to an instance identifier. The first range is recorded; a size alone,
+// A.2.5's `[ constant_expression ]`, is reported where its colon was due and
+// the instance is one, as it was; and every range after the first is reported
 // and read past.
 void Parser::ParseInstanceRange(ModuleItem* item, bool first) {
   Expect(TokenKind::kLBracket, Subclause("28.3.5"));
@@ -449,8 +448,8 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
   // strength1 alone, `( strength0 , strength1 )`, `( strength1 , strength0 )`
   // and the one keyword the gate drives with, where A.2.2.2's drive_strength
   // adds the four forms that pair highz0 or highz1 with the other; §28.10 has
-  // the pull sources place "pull strength in the absence of a strength
-  // specification", and a highz strength is no strength a source can place.
+  // a pull source drive pull strength unless a strength is specified, and a
+  // highz strength is no strength a source can place.
   if (GateTypeOf(gate_kind) == GateType::kPullGate &&
       (str0 == kHighzStrength || str1 == kHighzStrength))
     diag.Error(loc,

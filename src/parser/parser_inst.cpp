@@ -390,8 +390,8 @@ static bool IsDriveStrengthToken(TokenKind k) {
 // strength in this position no meaning to record.
 //
 // §28.3.2 (printed page 831) states the same order for a gate instance -- the
-// strength "shall follow the gate type keyword and precede any delay
-// specification" -- so a gate's delay is followed by the same check, reported
+// strength comes after the gate type keyword and before any delay -- so a
+// gate's delay is followed by the same check, reported
 // under `subclause`, the rule the construct being parsed falls under.
 void Parser::ReportDriveStrengthAfterDelay(const Expr* delay,
                                            std::string_view subclause) {
