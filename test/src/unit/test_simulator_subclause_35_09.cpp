@@ -441,9 +441,10 @@ TEST(DpiDisableProtocol, ImportedTaskReturningOneUnderADisableIsNotFatal) {
   ResetDisableState();
 }
 
-// §35.9 item c): an imported function returning due to a disable shall call
-// svAckDisabledState() first. The return is the frame leaving the call chain,
-// so the check is made there and needs nothing from the caller.
+// §35.9 item c): before a disable ends an imported function, the function
+// acknowledges the disable through svAckDisabledState(). The return is the
+// frame leaving the call chain, so the check is made there and needs nothing
+// from the caller.
 TEST(DpiDisableProtocol, ImportedFunctionReturningUnacknowledgedIsFatal) {
   ResetDisableState();
   DpiRuntime rt;
@@ -608,10 +609,11 @@ struct AnImportDisabledInADesign {
   }
 };
 
-// §35.9 item c): an imported function returning while a disable is in force
-// must call svAckDisabledState() first, and breaking any item of the protocol
-// ends the simulation with a fatal error. The body returns without
-// acknowledging, and the design's call site is where the check has to happen.
+// §35.9 item c): before a disable ends an imported function, the function
+// acknowledges the disable through svAckDisabledState(), and breaking any item
+// of the protocol ends the simulation with a fatal error. The body returns
+// without acknowledging, and the design's call site is where the check has to
+// happen.
 TEST(DpiDisableInADesign,
      AnImportReturningWithoutAcknowledgingADisableIsFatal) {
   AnImportDisabledInADesign run(/*acknowledge=*/false);

@@ -864,9 +864,9 @@ Logic4Vec FinishDpiImportCall(DpiImportCall& call, SimContext& ctx,
     WritebackDpiChangedArgs(call.import, binding, call.args, call.changes);
   }
 
-  // §35.9 item c): an imported function returning while a disable is in effect
-  // shall have acknowledged it first, and a simulator checks that on the
-  // return. Leaving the frame is that return.
+  // §35.9 item c): before a disable ends an imported function, the function
+  // acknowledges the disable, and a simulator checks that on the return.
+  // Leaving the frame is that return.
   call.dpi->LeaveImportCall();
 
   // §35.6.1: the result crosses back through a temporary of the declared result

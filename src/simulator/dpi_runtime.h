@@ -546,9 +546,9 @@ class DpiRuntime {
   bool VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
                                           int task_return_value);
 
-  // §35.9 item c): an imported function returning due to a disable shall have
-  // called svAckDisabledState() first. Issues the fatal simulation error and
-  // returns false when it did not.
+  // §35.9 item c): before a disable ends an imported function, the function
+  // acknowledges the disable through svAckDisabledState(). Issues the fatal
+  // simulation error and returns false when it did not.
   bool VerifyImportFunctionReturnUnderDisable(std::string_view sv_name);
 
   // §35.9: report and record the fatal simulation error a disable-protocol

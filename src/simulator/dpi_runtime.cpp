@@ -622,11 +622,11 @@ void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
 
 void DpiRuntime::LeaveImportCall() {
   if (call_chain_.empty()) return;
-  // §35.9 item c): an imported function returning due to a disable shall have
-  // called svAckDisabledState() before returning. This frame popping is that
-  // return, and the acknowledgement is thread state the function has either set
-  // or not, so the check §35.9 requires of a simulator is made here rather than
-  // left to whatever drives the call. Item b) is checked by
+  // §35.9 item c): before a disable ends an imported function, the function
+  // acknowledges the disable through svAckDisabledState(). This frame popping
+  // is that return, and the acknowledgement is thread state the function has
+  // either set or not, so the check §35.9 requires of a simulator is made here
+  // rather than left to whatever drives the call. Item b) is checked by
   // VerifyImportReturnUnderDisable instead, because the int an imported task
   // returns is not something a frame carries.
   if (!call_chain_.back().is_task) {
@@ -754,8 +754,8 @@ bool DpiRuntime::CheckImportedSubroutineDisableReturn(
     // item b): once a disable ends an imported task, it gives back 1.
     return task_return_value == 1;
   }
-  // item c): an imported function returning due to a disable shall have
-  // acknowledged it by calling svAckDisabledState() first.
+  // item c): before a disable ends an imported function, the function
+  // acknowledges the disable through svAckDisabledState().
   return DpiCurrentDisableAcknowledged();
 }
 

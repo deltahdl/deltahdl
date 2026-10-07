@@ -733,9 +733,10 @@ int svGetCallerInfo(const char** file_name, int* line_number) {
 // calling import.
 int svIsDisabledState(void) { return delta::DpiCurrentDisabledState() ? 1 : 0; }
 
-// §35.9 item c): an imported function shall call this to acknowledge it is
-// returning due to a disable. It records the acknowledgement for the current
-// disable episode so the simulator's protocol check can confirm it occurred.
+// §35.9 item c): an imported function that a disable is ending tells the
+// simulator so by calling this before it returns. It records the
+// acknowledgement for the current disable episode so the simulator's protocol
+// check can confirm it occurred.
 void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
 
 // §H.13: retrieve the current simulation time. The caller sets time->type to
