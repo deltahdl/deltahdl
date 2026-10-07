@@ -102,10 +102,10 @@ TEST(OptionalListSim, MostRecentListingWins) {
   EXPECT_EQ(f.ctx.LastListedScope(), "t.blk");
 }
 
-// Annex D.6: an argument "shall refer to a specific module, task, function,
-// or named block", so one naming none of those, a scope the design has not
-// got or a variable of it, is reported under D.6 at the argument and lists
-// nothing: the scope last listed is the one the earlier call selected.
+// Annex D.6: the argument must name a particular module, task, function or
+// named block, so one naming none of those, a scope the design has not got or a
+// variable of it, is reported under D.6 at the argument and lists nothing: the
+// scope last listed is the one the earlier call selected.
 TEST(OptionalListSim, AnArgumentNamingNoScopeIsRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,8 +132,8 @@ TEST(OptionalListSim, AnArgumentNamingNoScopeIsRejected) {
   EXPECT_EQ(f.ctx.LastListedScope(), "t.blk");
 }
 
-// Annex D.6: the argument may name a task, a function, or an instance, each
-// of which is among the objects "it shall refer to".
+// Annex D.6: the argument may name a task, a function, or an instance, each of
+// which is among the objects it is allowed to name.
 TEST(OptionalListSim, ArgumentAcceptsAnInstanceATaskAndAFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(

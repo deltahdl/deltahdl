@@ -4,13 +4,12 @@
 
 #include "fixture_simulator.h"
 
-// Annex D.3: $getpattern "provides for fast processing of stimulus patterns
-// that have to be propagated to a large number of scalar inputs", reading a
-// pattern from a memory element and driving it, through the continuous
-// assignment it stands in, onto the concatenation of scalar nets. D.3's
-// example steps an index through the memory and has "a new pattern ... applied
-// to the circuit each time index changes value". The function was parsed and
-// evaluated by nothing, so the nets took a zero for every pattern.
+// Annex D.3: $getpattern exists to apply stimulus patterns quickly to many
+// scalar inputs at once, reading a pattern from a memory element and driving
+// it, through the continuous assignment it stands in, onto the concatenation of
+// scalar nets. D.3's example steps an index through the memory, and each change
+// of the index puts the next pattern on the circuit. The function was parsed
+// and evaluated by nothing, so the nets took a zero for every pattern.
 
 using namespace delta;
 

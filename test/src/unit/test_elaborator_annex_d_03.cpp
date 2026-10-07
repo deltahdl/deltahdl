@@ -7,15 +7,14 @@
 
 // Annex D.3: $getpattern.
 //
-// "Use of this function is limited, however, it may only be used in a
-// continuous assignment statement where the left-hand side is a concatenation
-// of scalar nets and the argument to the system function is a memory element
-// reference." The elaborator reports a call anywhere else under D.3: in a
-// procedural statement, inside an expression of a continuous assignment's
-// right-hand side, with a left-hand side that is no concatenation or holds an
-// element that is no scalar net, or with an argument that names no memory
-// element. The call in the placement the clause gives, D.3's own example
-// reduced, elaborates clean.
+// The function has one permitted placement: a continuous assignment whose
+// left-hand side concatenates scalar nets, called with a reference to an
+// element of a memory as its argument. The elaborator reports a call anywhere
+// else under D.3: in a procedural statement, inside an expression of a
+// continuous assignment's right-hand side, with a left-hand side that is no
+// concatenation or holds an element that is no scalar net, or with an argument
+// that names no memory element. The call in the placement the clause gives,
+// D.3's own example reduced, elaborates clean.
 
 namespace {
 

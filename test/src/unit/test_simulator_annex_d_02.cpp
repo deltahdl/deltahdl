@@ -113,8 +113,9 @@ TEST(OptionalCountDriversSim, BitSelectOfVectorNetCountsSelectedBit) {
   LowerRunAndCheck(f, design, {{"nb0", 1u}, {"nb1", 0u}});
 }
 
-// Annex D.2: "no more than one driver" includes the zero-driver case, so an
-// undriven net reports no contention (0) and every Table D.1 tally is zero.
+// Annex D.2: a net with at most one driver reports no contention, and that
+// includes a net with no driver at all, so an undriven net reports no
+// contention (0) and every Table D.1 tally is zero.
 TEST(OptionalCountDriversSim, NoDriversReportNoContention) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,10 +181,11 @@ TEST(OptionalCountDriversSim, NetIsForcedReportedAfterForce) {
             1u);
 }
 
-// Annex D.2: "The specified net shall be a scalar or a bit-select of a vector
-// net." A vector net named whole is neither, and the call is reported rather
-// than answered from the vector's bit 0 -- which, driven twice here, would
-// have flagged contention as if the argument were the bit-select it is not.
+// Annex D.2: the net the call names must be scalar, or one bit selected from a
+// vector net. A vector net named whole is neither, and the call is reported
+// rather than answered from the vector's bit 0 -- which, driven twice here,
+// would have flagged contention as if the argument were the bit-select it is
+// not.
 TEST(OptionalCountDriversSim, AVectorNetNamedWholeIsRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(

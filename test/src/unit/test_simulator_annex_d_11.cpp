@@ -69,10 +69,10 @@ TEST(OptionalScopeSim, LastScopeWins) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.blk");
 }
 
-// Annex D.11: the argument "shall be the complete hierarchical name of a
-// module, task, function, or named block". An instance under the top, a task
-// of the top and a function of the instance are each such a name, and the last
-// call's scope is the one that stands.
+// Annex D.11: the argument must give the full hierarchical name of a module, a
+// task, a function or a named block. An instance under the top, a task of the
+// top and a function of the instance are each such a name, and the last call's
+// scope is the one that stands.
 TEST(OptionalScopeSim, ScopeAcceptsAnInstanceATaskAndAFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
