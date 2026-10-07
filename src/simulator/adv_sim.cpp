@@ -1,7 +1,6 @@
 #include "simulator/adv_sim.h"
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include "common/types.h"
@@ -30,30 +29,5 @@ std::vector<CoalescedEntry> EventCoalescer::Drain() {
   pending_.clear();
   return result;
 }
-
-void DynArray::Push(uint64_t val) { data_.push_back(val); }
-
-uint64_t DynArray::At(uint32_t idx) const {
-  if (idx >= data_.size()) return 0;
-  return data_[idx];
-}
-
-void DynArray::Delete() { data_.clear(); }
-
-void AssocArray::Insert(const std::string& key, uint64_t val) {
-  data_[key] = val;
-}
-
-uint64_t AssocArray::Lookup(const std::string& key) const {
-  auto it = data_.find(key);
-  if (it == data_.end()) return 0;
-  return it->second;
-}
-
-bool AssocArray::Exists(const std::string& key) const {
-  return data_.count(key) != 0;
-}
-
-void AssocArray::Erase(const std::string& key) { data_.erase(key); }
 
 }  // namespace delta

@@ -28,29 +28,6 @@ class EventCoalescer {
   std::unordered_map<uint32_t, uint64_t> pending_;
 };
 
-class DynArray {
- public:
-  uint32_t Size() const { return static_cast<uint32_t>(data_.size()); }
-  void Push(uint64_t val);
-  uint64_t At(uint32_t idx) const;
-  void Delete();
-
- private:
-  std::vector<uint64_t> data_;
-};
-
-class AssocArray {
- public:
-  uint32_t Size() const { return static_cast<uint32_t>(data_.size()); }
-  void Insert(const std::string& key, uint64_t val);
-  uint64_t Lookup(const std::string& key) const;
-  bool Exists(const std::string& key) const;
-  void Erase(const std::string& key);
-
- private:
-  std::unordered_map<std::string, uint64_t> data_;
-};
-
 class SvString {
  public:
   uint32_t Len() const { return static_cast<uint32_t>(data_.size()); }
