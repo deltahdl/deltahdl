@@ -71,10 +71,11 @@ TEST(PlaAscendingOrder, DescendingInputTermsAreRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the input terms of a PLA modeling system task "
-                            "shall be specified in ascending order",
-                            5, "20.16.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
 }
 
 // §20.16.3: a descending output-terms vector violates the rule.
@@ -88,10 +89,11 @@ TEST(PlaAscendingOrder, DescendingOutputTermsAreRejected) {
       "  initial $sync$or$plane(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output terms of a PLA modeling system task "
-                            "shall be specified in ascending order",
-                            5, "20.16.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the output terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
 }
 
 // §20.16.3: an equal-bound (one-bit) range is its own ascending and descending
@@ -255,10 +257,11 @@ TEST(PlaAscendingOrder,
       "  initial assert (done) else $async$nor$plane(bmem, bterm, bout);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the input terms of a PLA modeling system task "
-                            "shall be specified in ascending order",
-                            6, "20.16.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -276,10 +279,11 @@ TEST(PlaAscendingOrder, DescendingOutputTermsInARandcaseItemIsRejected) {
       "  initial randcase 1: $sync$and$plane(cmem, cterm, cout); endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output terms of a PLA modeling system task "
-                            "shall be specified in ascending order",
-                            5, "20.16.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the output terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }

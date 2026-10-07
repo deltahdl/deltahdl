@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// §20.14.1: the seed argument of $random shall be an integral variable. An
+// §20.14.1 lets $random take its seed only from an integral variable. An
 // integer seed satisfies the rule and elaborates cleanly.
 TEST(RandomSeedType, IntegralSeedIsAccepted) {
   ElabFixture f;
@@ -73,7 +73,8 @@ TEST(RandomSeedType, RealSeedIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 4,
+      "20.14.1"));
 }
 
 // §20.14.1: a shortreal seed is a real (non-integral) type and is rejected.
@@ -88,7 +89,8 @@ TEST(RandomSeedType, ShortrealSeedIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 4,
+      "20.14.1"));
 }
 
 // §20.14.1: a realtime seed is also a real type, not integral, and is rejected.
@@ -103,7 +105,8 @@ TEST(RandomSeedType, RealtimeSeedIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 4,
+      "20.14.1"));
 }
 
 // §20.14.1: a string seed is likewise non-integral and rejected.
@@ -118,7 +121,8 @@ TEST(RandomSeedType, StringSeedIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 4,
+      "20.14.1"));
 }
 
 // §20.14.1: the seedless form takes no argument, so it never triggers the
@@ -156,7 +160,8 @@ TEST(RandomSeedType, RealSeedInAForStepIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 5,
+      "20.14.1"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -175,7 +180,8 @@ TEST(RandomSeedType, RealSeedInAnAssertionPassStatementIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 5,
+      "20.14.1"));
 }
 
 TEST(RandomSeedType, RealSeedInAnAssertionFailStatementIsRejected) {
@@ -190,7 +196,8 @@ TEST(RandomSeedType, RealSeedInAnAssertionFailStatementIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 5, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 5,
+      "20.14.1"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
@@ -207,7 +214,8 @@ TEST(RandomSeedType, RealSeedInARandcaseItemIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 4,
+      "20.14.1"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -229,7 +237,8 @@ TEST(RandomSeedType, RealSeedInARandsequenceCodeBlockIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 6, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 6,
+      "20.14.1"));
 }
 
 // §18.17.1 lets a weight specification be followed by a code block of its own,
@@ -253,7 +262,8 @@ TEST(RandomSeedType, RealSeedInARandsequenceWeightCodeBlockIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "seed argument of $random shall be an integral variable", 7, "20.14.1"));
+      "$random cannot take its seed from a variable that is not integral", 7,
+      "20.14.1"));
 }
 
 }  // namespace

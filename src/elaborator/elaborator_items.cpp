@@ -269,8 +269,8 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
   const auto* arg = init->args[0];
   if (arg->kind == ExprKind::kMemberAccess) {
     diag_.Error(arg->range.start,
-                "$typename argument in elaboration-time-constant context "
-                "shall not contain hierarchical references",
+                "$typename cannot serve as an elaboration-time constant when "
+                "its argument is a hierarchical reference",
                 Subclause("20.6.1"));
     return;
   }
@@ -279,8 +279,8 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
   if (it == var_array_info_.end()) return;
   if (!it->second.is_dynamic && !it->second.is_assoc) return;
   diag_.Error(arg->range.start,
-              "$typename argument in elaboration-time-constant context "
-              "shall not reference elements of dynamic objects",
+              "$typename cannot serve as an elaboration-time constant when its "
+              "argument selects an element of a dynamic object",
               Subclause("20.6.1"));
 }
 

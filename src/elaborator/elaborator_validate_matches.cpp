@@ -818,7 +818,7 @@ void Elaborator::ValidateArrayQueryOnDynamicType(const ModuleDecl* decl) {
 
 namespace {
 
-// §20.14.1: the seed argument to $random shall be an integral variable. A real
+// §20.14.1 lets $random take its seed only from an integral variable. A real
 // or string variable cannot hold the integral seed state, so a seed naming one
 // is rejected. Other clearly integral kinds (vectors, enums, packed structs)
 // are left alone to avoid false positives on legitimate seeds.
@@ -835,9 +835,10 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
     if (!name.empty()) {
       auto it = types.find(name);
       if (it != types.end() && IsNonIntegralSeedKind(it->second)) {
-        diag.Error(e->range.start,
-                   "seed argument of $random shall be an integral variable",
-                   Subclause("20.14.1"));
+        diag.Error(
+            e->range.start,
+            "$random cannot take its seed from a variable that is not integral",
+            Subclause("20.14.1"));
       }
     }
   }

@@ -28,8 +28,8 @@ void CheckIsunboundedExpr(const Expr* e, const ParamNames& params,
         (arg->kind == ExprKind::kMemberAccess && arg->is_scope_resolution);
     if (!names_param) {
       diag.Error(arg->range.start,
-                 "the argument of '$isunbounded' shall be the name of a "
-                 "parameter",
+                 "'$isunbounded' asks about a parameter, so its argument must "
+                 "name one",
                  Subclause("20.6.3"));
     }
   }

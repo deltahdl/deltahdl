@@ -65,8 +65,8 @@ void CheckPlaOutputOperand(
   auto base = LhsBaseName(e);
   if (!base.empty() && net_names.count(base) != 0) {
     diag.Error(loc,
-               "output terms of a PLA modeling system task shall be variables, "
-               "not nets",
+               "a PLA modeling system task writes its output terms, so each "
+               "must be a variable, not a net",
                Subclause("20.16"));
   }
 }
@@ -226,8 +226,8 @@ bool IsBitVectorFunction(std::string_view callee) {
          callee == "$onehot" || callee == "$onehot0" || callee == "$isunknown";
 }
 
-// §20.9: the expression argument to $countbits (and, by the same rule, to each
-// of the related functions) shall be of a bit-stream type. A real, event,
+// §20.9: $countbits, and each of the related functions by the same rule, works
+// on an expression argument whose type is a bit-stream type. A real, event,
 // chandle, or virtual-interface operand is not a bit-stream type; when the
 // leading argument names such a variable, reject it. The control_bit arguments
 // to $countbits (args[1..]) are 1-bit logic values, not the expression operand,
@@ -268,11 +268,12 @@ void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
   auto k = it->second;
   if (IsRealType(k) || k == DataTypeKind::kEvent ||
       k == DataTypeKind::kChandle || k == DataTypeKind::kVirtualInterface) {
-    diag.Error(call->range.start,
-               std::format("the expression argument to '{}' shall be of a "
-                           "bit-stream type",
-                           call->callee),
-               Subclause("20.9"));
+    diag.Error(
+        call->range.start,
+        std::format("'{}' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    call->callee),
+        Subclause("20.9"));
   }
 }
 
@@ -321,8 +322,8 @@ void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
 }  // namespace
 
 void Elaborator::ValidateBitVectorFunctionArgs(const ModuleDecl* decl) {
-  // §20.9: the expression argument to the bit-vector functions ($countbits,
-  // $countones, $onehot, $onehot0, $isunknown) shall be of a bit-stream type;
+  // §20.9: the bit-vector functions ($countbits, $countones, $onehot, $onehot0,
+  // $isunknown) work on an expression argument of a bit-stream type, so
   // reject a statically recognizable non-bit-stream operand (a real, event,
   // chandle, or virtual interface).
   for (const auto* item : decl->items) {
@@ -336,9 +337,9 @@ void Elaborator::ValidateBitVectorFunctionArgs(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
-  // §20.16: the output terms of a PLA modeling system task shall be variables,
-  // never nets. Input terms may be nets or variables, so only the output-terms
-  // argument is checked.
+  // §20.16 admits nothing but variables, and so no net, as a PLA modeling
+  // system task's output terms. Input terms may be nets or variables, so only
+  // the output-terms argument is checked.
   for (const auto* item : decl->items) {
     if (item->body) CheckPlaOutputTermsStmt(item->body, net_names_, diag_);
     for (auto* s : item->func_body_stmts)
@@ -410,17 +411,16 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
           "ascending order",
           diag);
     if (e->args.size() >= 2)
-      CheckPlaArgAscending(
-          e->args[1], ranges, /*check_unpacked=*/false,
-          "the input terms of a PLA modeling system task shall be specified in "
-          "ascending order",
-          diag);
-    if (e->args.size() >= 3)
-      CheckPlaArgAscending(e->args[2], ranges, /*check_unpacked=*/false,
-                           "the output terms of a PLA modeling system task "
-                           "shall be specified in "
-                           "ascending order",
+      CheckPlaArgAscending(e->args[1], ranges, /*check_unpacked=*/false,
+                           "the input terms of a PLA modeling system task have "
+                           "a descending range; give them an ascending one",
                            diag);
+    if (e->args.size() >= 3)
+      CheckPlaArgAscending(
+          e->args[2], ranges, /*check_unpacked=*/false,
+          "the output terms of a PLA modeling system task have a descending "
+          "range; give them an ascending one",
+          diag);
   }
   CheckPlaAscendingExpr(e->lhs, ranges, diag);
   CheckPlaAscendingExpr(e->rhs, ranges, diag);
@@ -482,8 +482,8 @@ PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item,
 }  // namespace
 
 void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
-  // §20.16.3: PLA input terms, output terms, and memory shall be specified in
-  // ascending order. Collect each signal's declared ranges first, then check
+  // §20.16.3 has a PLA call's input terms, output terms and memory run from
+  // the low index up. Collect each signal's declared ranges first, then check
   // every PLA call that names one as its memory or as a term.
   PlaRangeMap ranges;
   for (const auto* item : decl->items) {

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// §20.6.3: the argument of $isunbounded shall be the name of a parameter, so a
+// §20.6.3 has $isunbounded take a parameter's name as its argument, so a
 // variable, an expression or a literal is an error wherever the call stands.
 TEST(IsunboundedElab, AnArgumentThatNamesNoParameterIsRejected) {
   ElabFixture f;
@@ -24,7 +24,7 @@ TEST(IsunboundedElab, AnArgumentThatNamesNoParameterIsRejected) {
       "endmodule\n",
       f);
   const char* message =
-      "the argument of '$isunbounded' shall be the name of a parameter";
+      "'$isunbounded' asks about a parameter, so its argument must name one";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 4, "20.6.3"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 5, "20.6.3"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 8, "20.6.3"));

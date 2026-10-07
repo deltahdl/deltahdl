@@ -149,8 +149,8 @@ TEST(ConstEval, BitVectorFunctionsFoldWithLocalparamArgumentEndToEnd) {
   EXPECT_EQ(ResolvedParam(design, "UNK"), 0);
 }
 
-// §20.9 negative: the expression argument to a bit-vector function shall be of
-// a bit-stream type. A real is not a bit-stream type, so passing a real
+// §20.9 negative: a bit-vector function works on an expression whose type is a
+// bit-stream type. A real is not a bit-stream type, so passing a real
 // variable to $countones is rejected during elaboration. Built from real source
 // so the check consults the operand's declared type.
 TEST(BitVectorFunctionArgs, RejectsRealExpressionArgument) {
@@ -162,10 +162,11 @@ TEST(BitVectorFunctionArgs, RejectsRealExpressionArgument) {
       "  initial c = $countones(r);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$countones' shall be of a bit-stream type",
-      4, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$countones' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    4, "20.9"));
 }
 
 // The same rule governs $isunknown's expression argument (and the rest): a real
@@ -179,10 +180,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentToIsunknown) {
       "  initial u = $isunknown(r);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$isunknown' shall be of a bit-stream type",
-      4, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$isunknown' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    4, "20.9"));
 }
 
 // §20.9, Syntax 20-10 negative: list_of_control_bits is non-empty, so
@@ -241,10 +243,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInAForStep) {
       "      i = i + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$countones' shall be of a bit-stream type",
-      5, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$countones' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    5, "20.9"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -260,10 +263,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInAnAssertionPassStatement) {
       "  initial assert (ready) hot = $onehot(amp);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$onehot' shall be of a bit-stream type", 5,
-      "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$onehot' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    5, "20.9"));
 }
 
 // §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
@@ -277,10 +281,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInAnAssertionFailStatement) {
       "  initial assert (go) else clear = $onehot0(gain);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$onehot0' shall be of a bit-stream type", 5,
-      "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$onehot0' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    5, "20.9"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -296,10 +301,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInARandcaseItem) {
       "  initial randcase 2: unk = $isunknown(drift); endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$isunknown' shall be of a bit-stream type",
-      4, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$isunknown' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    4, "20.9"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -321,10 +327,11 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInARandsequenceCodeBlock) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "the expression argument to '$countbits' shall be of a bit-stream type",
-      6, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$countbits' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    6, "20.9"));
 }
 
 // §20.9's reject list is a property of the argument's own type -- the clause

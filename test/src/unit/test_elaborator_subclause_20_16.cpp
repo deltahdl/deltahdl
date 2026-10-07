@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// §20.16: the output terms of a PLA modeling system task shall only be
-// variables. A single variable output term elaborates cleanly.
+// §20.16 admits nothing but variables as a PLA modeling system task's output
+// terms. A single variable output term elaborates cleanly.
 TEST(PlaOutputTerms, VariableOutputIsAccepted) {
   ElabFixture f;
   Elaborate(
@@ -33,10 +33,10 @@ TEST(PlaOutputTerms, NetOutputIsRejected) {
       "  initial $async$and$array(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 5,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            5, "20.16"));
 }
 
 // §20.16: a concatenation of variable output terms is permitted.
@@ -66,10 +66,10 @@ TEST(PlaOutputTerms, ConcatenatedOutputWithNetIsRejected) {
       "  initial $async$nor$array(mem, a, {b1, b2});\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 6,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            6, "20.16"));
 }
 
 // §20.16: the restriction applies only to output terms. An input term may be a
@@ -147,10 +147,10 @@ TEST(PlaOutputTerms, BitSelectOfNetOutputIsRejected) {
       "  initial $async$and$array(mem, a, b[0]);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 5,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            5, "20.16"));
 }
 
 // §20.16, Syntax 20-16 (logic ::= and | or | nand | nor) and Table 20-12: the
@@ -168,10 +168,10 @@ TEST(PlaOutputTerms, OrLogicTaskRecognizedSoNetOutputRejected) {
       "  initial $async$or$array(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 5,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            5, "20.16"));
 }
 
 // §20.16, Syntax 20-16 (array_type ::= sync | async, logic ::= ... | nand,
@@ -190,10 +190,10 @@ TEST(PlaOutputTerms, SyncNandPlaneTaskRecognizedSoNetOutputRejected) {
       "  initial $sync$nand$plane(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 5,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            5, "20.16"));
 }
 
 // §20.16 states its rule over the arguments of a PLA modeling system task --
@@ -226,10 +226,10 @@ TEST(PlaOutputTerms, NetOutputInAnAssertionPassStatementIsRejected) {
       "  initial assert (ready) $sync$and$array(amem, ain, aout);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 6,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            6, "20.16"));
 }
 
 // §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
@@ -244,10 +244,10 @@ TEST(PlaOutputTerms, NetOutputInAnAssertionFailStatementIsRejected) {
       "  initial assert (done) else $async$nand$plane(fmem, fin, fout);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 6,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            6, "20.16"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -264,10 +264,10 @@ TEST(PlaOutputTerms, NetOutputInARandcaseItemIsRejected) {
       "  initial randcase 1: $sync$nor$array(nmem, nin, nout); endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 5,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            5, "20.16"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -288,10 +288,10 @@ TEST(PlaOutputTerms, NetOutputInARandsequenceCodeBlockIsRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "output terms of a PLA modeling system task shall be variables", 7,
-      "20.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a PLA modeling system task writes its output "
+                            "terms, so each must be a variable, not a net",
+                            7, "20.16"));
 }
 
 }  // namespace
