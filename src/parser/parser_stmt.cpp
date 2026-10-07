@@ -104,8 +104,8 @@ struct ParserStmtHelpers {
         // control variables, which is not allowed.
         p.diag_.Error(
             p.CurrentLoc(),
-            "for-loop initialization shall declare either all or none "
-            "of its control variables locally",
+            "this for-loop initialization mixes a locally declared control "
+            "variable with one declared outside the loop",
             Subclause("12.7.1"));
         p.Match(TokenKind::kKwVar);
         stmt->for_init_types.push_back(p.ParseDataType());

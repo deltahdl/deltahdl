@@ -104,10 +104,11 @@ TEST(LoopSyntaxParsing, ForMixedLocalAndNonLocalInitIsIllegal) {
       "      x = y;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "for-loop initialization shall declare either all "
-                            "or none of its control variables locally",
-                            4, "12.7.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags,
+                    "this for-loop initialization mixes a locally declared "
+                    "control variable with one declared outside the loop",
+                    4, "12.7.1"));
 }
 
 TEST(LoopSyntaxParsing, ForAllComponentsEmpty) {
