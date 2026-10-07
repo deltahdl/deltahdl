@@ -5,10 +5,10 @@
 
 namespace {
 
-// §33.2.1 (printed page 935): "The optional :config extension shall be used
-// explicitly to refer to a config in the case where a config has the same name
-// as a module/primitive", so a config and a module of one name are two cells
-// of one library, told apart by the suffix, and neither is defined twice.
+// §33.2.1 (printed page 935): where a config shares its name with a module or
+// primitive, the optional :config extension is what names the config, so a
+// config and a module of one name are two cells of one library, told apart by
+// the suffix, and neither is defined twice.
 TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesName) {
   ElabFixture f;
   ElabOk(
@@ -60,10 +60,10 @@ TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
              "endconfig\n"));
 }
 
-// §33.2: "the config is a design element, similar to a module, which exists in
-// the SystemVerilog name space", and the :config extension §33.2.1 provides
-// tells a config apart from a module or primitive only, so an interface of the
-// config's name collides, and the report carries §33.2.
+// §33.2: a config is a design element, like a module, living in the
+// SystemVerilog name space, and the :config extension §33.2.1 provides tells a
+// config apart from a module or primitive only, so an interface of the config's
+// name collides, and the report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   ElabFixture f;
   ElaborateSrc(

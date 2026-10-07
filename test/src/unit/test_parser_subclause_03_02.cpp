@@ -8,10 +8,10 @@ using namespace delta;
 namespace {
 
 // §3.2 decides what AppendCellDeclarations moves, because §33.2.1 makes a
-// library "a named collection of cells" and a cell "a design element (see
-// 3.2)". §3.2 names seven: "a SystemVerilog module (see Clause 23), program
-// (see Clause 24), interface (see Clause 25), checker (see Clause 17), package
-// (see Clause 26), primitive (see Clause 28) or configuration (see Clause 33)".
+// library a named set of cells and a cell a design element in §3.2's sense.
+// §3.2 names seven: "a SystemVerilog module (see Clause 23), program (see
+// Clause 24), interface (see Clause 25), checker (see Clause 17), package (see
+// Clause 26), primitive (see Clause 28) or configuration (see Clause 33)".
 //
 // All seven are declared in one source here rather than one kind per case, so a
 // merge that drops a kind is caught whichever kind it drops. The checker is the

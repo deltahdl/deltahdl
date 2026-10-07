@@ -417,9 +417,9 @@ TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
 
 // --- The three forms of use_clause each name something: a cell, a list of
 // named_parameter_assignment, or a cell with such a list, and §33.4.1.6 says
-// what the clause is for, "it specifies the exact library and cell to which a
-// selected cell or instance is bound". A `use` followed by nothing but its
-// terminator, or by the `: config` suffix alone, is none of the three. ---
+// what the clause is for: naming the very library and cell a selected cell or
+// instance is bound to. A `use` followed by nothing but its terminator, or by
+// the `: config` suffix alone, is none of the three. ---
 
 TEST(ConfigSourceText, UseClauseNamingNothingIsRejected) {
   auto r = Parse(

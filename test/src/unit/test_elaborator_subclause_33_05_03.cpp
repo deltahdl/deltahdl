@@ -499,10 +499,10 @@ TEST(SeparateCompilationBinding, LoadingAFileThatIsNoCompiledFormIsReported) {
       ReportedError(h.diag.Diagnostics(), "no cells read from library", 0, ""));
 }
 
-// §33.5.3: "The only restriction is that all cells in a design shall be
-// precompiled prior to binding the design." The report naming a cell no loaded
-// library holds carries that subclause, which lets a caller learn which rule
-// stopped the bind without matching the wording of the message.
+// §33.5.3: the one restriction is that every cell of a design is precompiled
+// before the design is bound. The report naming a cell no loaded library holds
+// carries that subclause, which lets a caller learn which rule stopped the bind
+// without matching the wording of the message.
 TEST(SeparateCompilationBinding, CellNotPrecompiledNames33_5_3) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";

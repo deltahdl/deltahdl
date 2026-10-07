@@ -134,8 +134,8 @@ TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
 // The permitted content of a lib.map is limited to library specifications,
 // include statements, and comments. A construct outside that set -- here an
 // ordinary module declaration -- is therefore not accepted and the load fails
-// with a diagnostic, confirming the "limited to" constraint is enforced rather
-// than silently tolerated.
+// with a diagnostic, confirming the restriction to those statements is enforced
+// rather than silently tolerated.
 TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
   ScratchDir tmp;
   auto top = tmp.Write("top.map", "module m; endmodule\n");

@@ -45,14 +45,14 @@
 // back was decided by the precedence between specifications; what a claim
 // reports is the resolution alone.
 //
-// A claim of the form "this specification resolves to these files" is a claim
+// A claim that a specification resolves to a given set of files is a claim
 // about a set, so the accepting and the rejecting side are read back together:
 // Reached() answers which of the four files the declared library holds, and a
 // file the specification does not reach is absent from that answer. Where the
-// closest rejected input is a file the subclause's own tree does not hold --
-// a longer file name for claim 6, a directory below rtl for claims 4 and 7 --
-// a test writes that file beside the tree and reads back that no library
-// claimed it.
+// closest rejected input is a file the subclause's own tree does not hold -- a
+// longer file name for claim 6, a directory below rtl for claims 4 and 7 -- a
+// test writes that file beside the tree and reads back that no library claimed
+// it.
 //
 // The subclause sorts its seven lines into a rooted group and a relative one,
 // and what makes the first group rooted is that the directory a specification

@@ -42,8 +42,8 @@ namespace {
 
 // Parses real SystemVerilog source into a CompilationUnit and keeps the backing
 // SourceManager/Arena/DiagEngine alive so the parsed cells can be tagged and
-// inspected. Stands in for the cells "encountered during parsing" that §33.3.3
-// maps to libraries.
+// inspected. Stands in for the cells parsing meets, which §33.3.3 maps to
+// libraries.
 struct ParsedSource {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -59,10 +59,10 @@ struct ParsedSource {
   }
 };
 
-// "For each cell definition encountered during parsing": every kind of design
-// element the parser can produce -- module, interface, program, checker,
-// primitive (UDP), package, and config -- is compared against the mapping and
-// tagged with the matching library, not just the module the example shows.
+// Every cell definition parsing meets: every kind of design element the parser
+// can produce -- module, interface, program, checker, primitive (UDP), package,
+// and config -- is compared against the mapping and tagged with the matching
+// library, not just the module the example shows.
 TEST(MapSourceFilesToLibraries, MapsEveryCellKindEncounteredDuringParsing) {
   ScratchDir tmp;
   auto map_file = tmp.Write("lib.map", "library L *.sv;\n");
@@ -101,10 +101,10 @@ TEST(MapSourceFilesToLibraries, MapsEveryCellKindEncounteredDuringParsing) {
   EXPECT_EQ(parsed.cu->configs[0]->library, "L");
 }
 
-// "...in all of the library map files being used": the comparison spans
-// declarations pulled in from an included map file, not only the root map. A
-// cell whose source matches a spec declared in the included file is mapped into
-// that included library.
+// Across every library map file in use: the comparison spans declarations
+// pulled in from an included map file, not only the root map. A cell whose
+// source matches a spec declared in the included file is mapped into that
+// included library.
 TEST(MapSourceFilesToLibraries, MapsCellUsingDeclarationFromIncludedMapFile) {
   ScratchDir tmp;
   tmp.Write("sub.map", "library subLib *.sv;\n");
@@ -124,13 +124,12 @@ TEST(MapSourceFilesToLibraries, MapsCellUsingDeclarationFromIncludedMapFile) {
   EXPECT_EQ(parsed.cu->modules[0]->library, "subLib");
 }
 
-// "...in all of the library map files being used": the map information may be
-// supplied as several independent files named for one invocation, read in turn,
-// rather than gathered through an include. Two lib.map files loaded in sequence
-// stand in for two files named at invocation; a cell whose source matches a
-// declaration contributed by the second file is mapped into that file's
-// library, confirming the comparison spans every loaded map file, not just the
-// first.
+// Across every library map file in use: the map information may be supplied as
+// several independent files named for one invocation, read in turn, rather than
+// gathered through an include. Two lib.map files loaded in sequence stand in
+// for two files named at invocation; a cell whose source matches a declaration
+// contributed by the second file is mapped into that file's library, confirming
+// the comparison spans every loaded map file, not just the first.
 TEST(MapSourceFilesToLibraries,
      MapsCellUsingDeclarationFromSeparatelyLoadedMapFile) {
   ScratchDir tmp;

@@ -1,12 +1,10 @@
 // §33.3.1 Specifying libraries -- the library map file: the command line's
 // half of the mechanism.
 //
-// "The name of this file and the mechanism for reading it shall be
-// tool-specific, but all compliant tools shall provide a mechanism to specify
-// one or more library map files to be used for a particular invocation of the
-// tool. If multiple map files are specified, then they shall be read in the
-// order in which they are specified." In this tool a command-line word ending
-// in .map names one, and every case here calls ParseArgs (driver/cli_options.h)
+// Each tool chooses the file's name and how it is read, but every compliant
+// tool lets an invocation name one or more library map files, and several are
+// read in the order they were named. In this tool a command-line word ending in
+// .map names one, and every case here calls ParseArgs (driver/cli_options.h)
 // and reads where such a word went. What the map then does to the design is
 // covered by the library_map_* cases in test/src/e2e, which run the whole
 // program over a map and the source files it maps.

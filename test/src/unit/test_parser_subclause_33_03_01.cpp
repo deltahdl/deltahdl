@@ -50,9 +50,9 @@ LibraryDecl MakeDecl(std::string_view name,
   return d;
 }
 
-// Scratch directory for exercising the "read mapping from a predefined file"
-// path of LibraryMap::LoadMapFile. Each instance owns a unique directory that
-// is removed on destruction.
+// Scratch directory for exercising the path that reads a mapping from a
+// predefined file, in LibraryMap::LoadMapFile. Each instance owns a unique
+// directory that is removed on destruction.
 struct ScratchMapDir {
   fs::path dir;
 
@@ -132,7 +132,7 @@ TEST(LibraryMapWildcards, HierarchicalDotsMatchZeroDirectories) {
 
 // §33.3.1 edge: the single-character wildcard stands for exactly one
 // character, so a name missing that position does not match (lower bound,
-// complementing the "no more than one" case above).
+// complementing the at-most-one case above).
 TEST(LibraryMapWildcards, QuestionDoesNotMatchMissingCharacter) {
   LibraryMap m;
   auto rtl = MakeDecl("rtlLib", {"a?.v"});

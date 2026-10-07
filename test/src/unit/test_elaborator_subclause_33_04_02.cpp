@@ -293,13 +293,12 @@ std::string BindingsBelow(const ConfigElaboration& run, std::string_view inst) {
   return {};
 }
 
-// §33.4.1.6: "If the lib.cell to which the use clause refers is a config that
-// has the same name as a module/primitive in the same library, then the
-// optional :config suffix can be added to the lib.cell to specify the config
-// explicitly." With module sub and config sub both in work, `use work.sub`
-// binds the module and `use work.sub:config` hands the instance to the config,
-// whose rule binding sub.f to m_gate then governs that instance's child alone
-// (§33.4.2).
+// §33.4.1.6: where the use clause's lib.cell is a config sharing its name with
+// a module or primitive of the same library, adding the optional :config suffix
+// to the lib.cell picks the config. With module sub and config sub both in
+// work, `use work.sub` binds the module and `use work.sub:config` hands the
+// instance to the config, whose rule binding sub.f to m_gate then governs that
+// instance's child alone (§33.4.2).
 TEST(ConfigHierarchicalRules, ConfigSuffixTellsAConfigFromTheModuleOfItsName) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -325,10 +324,10 @@ TEST(ConfigHierarchicalRules, ConfigSuffixTellsAConfigFromTheModuleOfItsName) {
   EXPECT_EQ(BindingsBelow(run, "a2"), "sub/m_gate");
 }
 
-// §33.4.2 (printed page 939): "the rules specified in the config shall
-// determine the configuration of all other subinstances" of the instance
-// handed to it. cfg5's instance rule names adder.f2 from cfg5's own top, so
-// under top.a2 it rebinds f2 alone and under top.a1 nothing.
+// §33.4.2 (printed page 939): the config's own rules decide how every other
+// subinstance of the instance handed to it is configured. cfg5's instance rule
+// names adder.f2 from cfg5's own top, so under top.a2 it rebinds f2 alone and
+// under top.a1 nothing.
 TEST(ConfigHierarchicalRules, DelegatedInstanceRuleRebindsOnlyItsSubtree) {
   ConfigElaboration run;
   ElaborateUnderConfig(

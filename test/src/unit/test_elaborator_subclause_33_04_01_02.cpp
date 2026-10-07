@@ -104,7 +104,7 @@ TEST(ConfigDefaultClause, MoreSpecificClauseOverridesDefault) {
 
 // §33.4.1.2: with no more-specific selection clause present, the default
 // selects every instance. Both `top.a` and `top.b` fall to the default
-// liblist (libA), exercising the "selects all instances" reach of the rule.
+// liblist (libA), exercising the rule's reach over every instance.
 TEST(ConfigDefaultClause, DefaultGovernsEveryInstanceAbsentSpecificClause) {
   const char* cfg =
       "config c;\n"
@@ -121,8 +121,8 @@ TEST(ConfigDefaultClause, DefaultGovernsEveryInstanceAbsentSpecificClause) {
   EXPECT_EQ(b->library, "libA");
 }
 
-// §33.4.1.2: a cell selection clause is "more specific" than the default, so
-// the default does not select the cell it names. `top` instantiates a `leaf`
+// §33.4.1.2: a cell selection clause outranks the default as the narrower one,
+// so the default does not select the cell it names. `top` instantiates a `leaf`
 // (named by a cell clause) and a `mid` (named by nothing). The cell clause
 // binds `leaf` to libB while the default reaches `mid`, binding it to libA.
 TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {

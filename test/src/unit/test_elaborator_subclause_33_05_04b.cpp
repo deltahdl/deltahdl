@@ -8,13 +8,12 @@
 // test_elaborator_subclause_33_05_04a.cpp beside it: every case there compiles
 // source descriptions and elaborates them, and none reads a command line.
 //
-// §33.5.4 is what gives these options meaning: "the tool that actually does
-// the binding only needs to be given the lib.cell specification for the
-// top-level cell(s) and/or the config to be used. In this strategy, the config
-// itself shall also be precompiled." --config names that config and --load-lib
-// names the compiled form the binding tool reads, which §33.5.3 requires to
-// have persisted: "it is essential that library cells persist, and the
-// compiled forms shall, therefore, exist somewhere in the filesystem".
+// §33.5.4 is what gives these options meaning: the binding tool needs only the
+// lib.cell of the top-level cell or cells, or of the config to use, or both,
+// and under this strategy the config is precompiled too. --config names that
+// config and --load-lib names the compiled form the binding tool reads, which
+// §33.5.3 requires to have persisted: library cells have to outlive the
+// compile, so their compiled forms are kept somewhere in the filesystem.
 // --precompile-into and --precompile-out are the other end of the same flow,
 // naming the library this invocation's cells go into and the file they are
 // written to.

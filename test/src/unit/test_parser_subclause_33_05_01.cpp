@@ -507,14 +507,15 @@ TEST(SinglePassPrecompile, MultiCellDescriptionRedoneWhenOneCellIsTaken) {
 // that description maps to, and §3.2 says which kinds those are.
 // ---------------------------------------------------------------------------
 
-// §33.2.1: "A library is a named collection of cells. A cell is a design
-// element (see 3.2), such as a module, primitive, interface, program, package,
-// or configuration." The six it names are introduced by "such as" and §3.2 is
-// what the definition defers to, which names seven: "A design element is a
-// SystemVerilog module (see Clause 23), program (see Clause 24), interface (see
-// Clause 25), checker (see Clause 17), package (see Clause 26), primitive (see
-// Clause 28) or configuration (see Clause 33)." The checker is the kind reading
-// §33.2.1's examples as the whole set leaves out, so it gets a case of its own.
+// §33.2.1: a library is a named set of cells, and a cell is a design element in
+// §3.2's sense, the subclause offering module, primitive, interface, program,
+// package and configuration as examples. The six it names are examples only,
+// and §3.2 is what the definition defers to, which names seven: "A design
+// element is a SystemVerilog module (see Clause 23), program (see Clause 24),
+// interface (see Clause 25), checker (see Clause 17), package (see Clause 26),
+// primitive (see Clause 28) or configuration (see Clause 33)." The checker is
+// the kind reading §33.2.1's examples as the whole set leaves out, so it gets a
+// case of its own.
 TEST(SinglePassPrecompile, CheckerIsWrittenIntoTheLibraryItsDescriptionMapsTo) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library chkLib checked/*.sv;\n");

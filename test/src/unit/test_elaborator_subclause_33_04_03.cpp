@@ -52,10 +52,10 @@ const Expr* OverrideExpr(const RtlirModule* m, std::string_view name) {
   return nullptr;
 }
 
-// §33.4.3: "A localparam declared in a configuration shall be assigned a value
-// and shall only be set to a literal value", so an override naming one hands
-// the instance that literal itself. A six-character string is 48 bits, which a
-// 32- or 64-bit folded value would cut to its last characters.
+// §33.4.3: a localparam a configuration declares must be given a value, and
+// that value must be a literal, so an override naming one hands the instance
+// that literal itself. A six-character string is 48 bits, which a 32- or 64-bit
+// folded value would cut to its last characters.
 TEST(ConfigLocalparamLiteral, StringLocalparamReachesTheInstanceWhole) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -119,10 +119,10 @@ TEST(ConfigParamOverride, TypeParameterOverrideBeatsTheInstantiation) {
   EXPECT_EQ(VariableWidth(child, "v"), 16u);
 }
 
-// §33.4.3 (printed page 940): "Parameters identifiers shall be resolved
-// starting in the parent scope of the instance", so `top.WIDTH` in the
-// override of top.a1 is top's WIDTH, whether top declares it in its
-// parameter port list or in its body.
+// §33.4.3 (printed page 940): a parameter identifier is looked up beginning in
+// the instance's parent scope, so `top.WIDTH` in the override of top.a1 is
+// top's WIDTH, whether top declares it in its parameter port list or in its
+// body.
 TEST(ConfigParamOverride, HierarchicalReferenceToTheParentsHeaderParameter) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -450,9 +450,9 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
                             4, "33.4.3"));
 }
 
-// "Hierarchical references cannot include scopes of generate or array of
-// instances." Whether a scope is a generate block is a fact about the design,
-// so `top.g.GW` is refused because top declares a generate block named g.
+// No hierarchical reference may pass through a generate scope or an array of
+// instances. Whether a scope is a generate block is a fact about the design, so
+// `top.g.GW` is refused because top declares a generate block named g.
 TEST(ConfigParamOverride, HierRefThroughGenerateScopeRejected) {
   ElabFixture f;
   ElaborateSrc(

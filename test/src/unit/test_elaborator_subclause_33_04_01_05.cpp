@@ -217,16 +217,16 @@ TEST(ConfigLiblistClause, DefaultSelectedListSearchedInOrder) {
 }
 
 // §33.6.4: a liblist clause on an instance clause governs that instance's own
-// cell binding and is inherited by its whole subhierarchy ("all of the
-// descendants ... inherit its liblist from the instance selection clause"),
-// while a sibling instance with no such clause falls back to the default
-// liblist. Here `top` instantiates two `mid` cells and `mid`/`leaf` each exist
-// in both libB and libR. With `default liblist libR` and `instance top.m1
-// liblist libB`, the m1 subtree (mid and its leaf) binds entirely from libB and
-// the m2 subtree binds entirely from libR. The earlier form of this test forced
-// `instance top.m liblist libB` while placing `mid` only in a third library, so
-// the instance's own cell could not bind at all -- which is correct behavior,
-// not the inheritance the test meant to check.
+// cell binding and is inherited by its whole subhierarchy, every descendant
+// taking its liblist from the instance selection clause, while a sibling
+// instance with no such clause falls back to the default liblist. Here `top`
+// instantiates two `mid` cells and `mid`/`leaf` each exist in both libB and
+// libR. With `default liblist libR` and `instance top.m1 liblist libB`, the m1
+// subtree (mid and its leaf) binds entirely from libB and the m2 subtree binds
+// entirely from libR. The earlier form of this test forced `instance top.m
+// liblist libB` while placing `mid` only in a third library, so the instance's
+// own cell could not bind at all -- which is correct behavior, not the
+// inheritance the test meant to check.
 TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   SourceManager mgr;
   Arena arena;
@@ -277,11 +277,10 @@ TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   EXPECT_EQ(leaf2->library, "libR");
 }
 
-// §33.4.1.5 (printed page 939): "the specified library list is searched in the
-// specified order" for the instance a liblist clause selects. A list holding no
-// cell of the instantiated name leaves the instance unbound because of the
-// clause, and the report names the list rather than only the module, which
-// work holds.
+// §33.4.1.5 (printed page 939): the libraries listed are searched in the order
+// listed for the instance a liblist clause selects. A list holding no cell of
+// the instantiated name leaves the instance unbound because of the clause, and
+// the report names the list rather than only the module, which work holds.
 TEST(ConfigLiblistClause, ListHoldingNoCellReportsTheList) {
   auto diags = ConfigElaborationReports(
       "module adder; endmodule\n"

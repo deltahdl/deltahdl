@@ -43,18 +43,17 @@ namespace {
 //
 // A command line names the configuration to be used as well as the source
 // descriptions. §33.5.4 puts that name beside the top-level cell's: the tool
-// that actually does the binding "only needs to be given the lib.cell
-// specification for the top-level cell(s) and/or the config to be used". The
-// cases below that name one are given a compilation unit holding two
-// configurations that each name a design, and each case gets back the design
-// the configuration it named describes. Naming neither of the two leaves
-// nothing on the command line saying which design was meant, so the command
-// line is reported. Naming a configuration the command line did not put in
-// force is reported as well, both where the unit holds no configuration of
-// that name and where it holds one that is not in force. Issue #3267 is the
-// defect these carry: nothing on the command line named a configuration, so a
-// compilation unit holding two configurations that each name a design could not
-// be elaborated at all.
+// that does the binding needs only the lib.cell of the top-level cell or cells,
+// or of the config to use, or both. The cases below that name one are given a
+// compilation unit holding two configurations that each name a design, and each
+// case gets back the design the configuration it named describes. Naming
+// neither of the two leaves nothing on the command line saying which design was
+// meant, so the command line is reported. Naming a configuration the command
+// line did not put in force is reported as well, both where the unit holds no
+// configuration of that name and where it holds one that is not in force. Issue
+// #3267 is the defect these carry: nothing on the command line named a
+// configuration, so a compilation unit holding two configurations that each
+// name a design could not be elaborated at all.
 
 // The infrastructure one command line is compiled and elaborated against.
 struct CommandLineHarness {

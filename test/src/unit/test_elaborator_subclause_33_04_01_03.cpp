@@ -127,10 +127,10 @@ std::string_view ModuleBoundInBlock(const ConfigElaboration& run,
   return {};
 }
 
-// §33.4.1.3 (printed page 939): "The instance name associated with the instance
-// clause is a SystemVerilog hierarchical name, starting at the top-level module
-// of the config", and §23.6 makes a generate block a level of such a name, so
-// `top.g.u` names the instance u inside the block g and the clause rebinds it.
+// §33.4.1.3 (printed page 939): an instance clause names its instance by a
+// SystemVerilog hierarchical name that begins at the config's top-level module,
+// and §23.6 makes a generate block a level of such a name, so `top.g.u` names
+// the instance u inside the block g and the clause rebinds it.
 TEST(ConfigInstanceClause, InstancePathThroughAGenerateBlockIsApplied) {
   ConfigElaboration run;
   ElaborateUnderConfig(

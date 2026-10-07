@@ -13,9 +13,9 @@ TEST(ConfigDefaultClause, DefaultUseClauseRejected) {
       "  design work.top;\n"
       "  default use work.alt;\n"
       "endconfig\n");
-  // "The use expansion clause (see 33.4.1.6) cannot be used with a default
-  // selection clause", so the pairing is reported under §33.4.1.2, at the
-  // 'use' written where only a liblist may stand.
+  // A default selection clause cannot take a use expansion clause (§33.4.1.6),
+  // so the pairing is reported under §33.4.1.2, at the 'use' written where only
+  // a liblist may stand.
   EXPECT_TRUE(ReportedError(r.diags, "use expansion clause cannot be used", 3,
                             "33.4.1.2"));
 }

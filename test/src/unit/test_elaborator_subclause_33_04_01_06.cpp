@@ -282,11 +282,11 @@ TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
   EXPECT_EQ(bound->library, "libP");
 }
 
-// §33.4.1.6 (printed page 939): a use clause "specifies the exact library and
-// cell to which a selected cell or instance is bound". Where that library holds
-// no such cell the binding fails because of the clause, and the report names
-// the clause's library and cell rather than only the module the instantiation
-// was written with, which work holds.
+// §33.4.1.6 (printed page 939): a use clause names the very library and cell a
+// selected cell or instance is bound to. Where that library holds no such cell
+// the binding fails because of the clause, and the report names the clause's
+// library and cell rather than only the module the instantiation was written
+// with, which work holds.
 TEST(ConfigUseClause, UseNamingNoCellReportsTheClausesTarget) {
   auto diags = ConfigElaborationReports(
       "module adder; endmodule\n"

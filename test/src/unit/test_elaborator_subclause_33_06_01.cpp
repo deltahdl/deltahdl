@@ -179,7 +179,8 @@ RtlirDesign* ElaborateUnderMapOrder(LibraryDesign& d,
 // instance of adder binds aLib.adder. rtlLib is declared ahead of aLib and is
 // searched first, but holds no cell named adder, so the search passes it by;
 // gateLib holds one and is searched after aLib, so it is passed over. Both
-// instances answer alike, which is what "all instances" claims.
+// instances answer alike, which is what the rule's reach over every instance
+// claims.
 TEST(DefaultLibraryBinding, EveryAdderInstanceBindsFirstDeclaredLibraryWithIt) {
   ScratchDir tmp;
   LibraryDesign d;
