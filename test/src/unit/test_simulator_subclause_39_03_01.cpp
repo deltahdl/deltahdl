@@ -216,7 +216,7 @@ TEST(ObtainAssertionHandles, UnnamedAssertionCannotBeFoundByName) {
 // Step b, all of them: an assertion is written wherever an instance body admits
 // one, and the concurrent assertions of a design sit inside its procedures and
 // generate scopes as readily as directly in the module body. The walk of an
-// instance reaches those too - "all assertions in an instance" is what the step
+// instance reaches those too - every assertion of the instance is what the step
 // asks for, and a walk that read off the instance's immediate children reported
 // only the ones written at the top of it.
 TEST(ObtainAssertionHandles, InstanceWalkReachesAssertionsInsideItsBlocks) {

@@ -24,7 +24,7 @@ namespace {
 
 // The event trace a dumping tool keeps: what happened, to which assertion,
 // when, and which attempt of it. §39.4.2 makes the attempt's start time what
-// "uniquely identifies it among the attempts of an assertion", which is what
+// tells it apart from every other attempt of the same assertion, which is what
 // lets a dump keep two overlapping attempts apart.
 struct DumpedEvent {
   int reason = 0;
@@ -64,10 +64,10 @@ class AssertionCapabilities : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.2, first capability: "a user's C code to react to assertion events". The
-// C code is a routine of the application's own, the event is one the assertion
-// raised, and reacting to it is the routine running with the event in hand -
-// which assertion, which reason, and at what time.
+// §39.2, first capability: letting an application's C code respond to the
+// events of an assertion. The C code is a routine of the application's own, the
+// event is one the assertion raised, and reacting to it is the routine running
+// with the event in hand - which assertion, which reason, and at what time.
 TEST_F(AssertionCapabilities, UserCCodeReactsToAnAssertionEvent) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
   ASSERT_NE(

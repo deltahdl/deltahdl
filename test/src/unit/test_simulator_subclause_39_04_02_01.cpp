@@ -67,8 +67,8 @@ TEST(GlobalClockingFutureCallback, DefersToNextTickButReportsEventTime) {
   EXPECT_EQ(fired, 0);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
 
-  // Reaching the tick that coincides with the event (11) is not "strictly
-  // following" — still nothing fires and the callback stays queued.
+  // Reaching the tick that coincides with the event (11) is not a tick after it
+  // — still nothing fires and the callback stays queued.
   EXPECT_EQ(api.AdvanceGlobalClockTick(11), 0u);
   EXPECT_EQ(fired, 0);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
@@ -168,7 +168,7 @@ TEST(GlobalClockingFutureCallback, EachDeferredEventKeepsItsOwnTickAndTime) {
 // the nearest global clock tick strictly following the event. When the event
 // has no tick after it, there is no instant at which the deferred callback may
 // run. The delivery machinery queues the callback but never matures it, however
-// far the clock is advanced — "strictly following" admits no tick here, so none
+// far the clock is advanced — no tick comes after the event here, so none
 // fires. This observes the no-tick sentinel propagating through the integrated
 // deferral path, not just the standalone NearestGlobalClockTickAfter helper.
 TEST(GlobalClockingFutureCallback, NoTickAfterEventNeverFires) {
@@ -202,9 +202,9 @@ TEST(GlobalClockingFutureCallback, NoTickAfterEventNeverFires) {
 
 // -----------------------------------------------------------------------------
 // §39.4.2.1 through the routine an application places: cb_time is the second
-// argument of the callback function of §39.4.2, so "cb_time contains the time
-// of the callback event" is a statement about what that routine is handed when
-// the deferred callback finally executes.
+// argument of the callback function of §39.4.2, so the rule that cb_time holds
+// the time of the callback event is a statement about what that routine is
+// handed when the deferred callback finally executes.
 // -----------------------------------------------------------------------------
 
 struct DeferredCall {
@@ -247,8 +247,8 @@ class GlobalClockingFutureCallbackEntry : public ::testing::Test {
 // clocking future sampled value function, $assertkill is issued at time 11, and
 // the callback executes at time 12 - the nearest tick of the global clock
 // strictly following the event - rather than at 11. The routine the application
-// placed is handed 11 for cb_time, "the time of the callback event", which is
-// the time the application would otherwise have no way of learning once the
+// placed is handed 11 for cb_time, the time of the callback event, which is the
+// time the application would otherwise have no way of learning once the
 // execution had moved on to a later tick.
 TEST_F(GlobalClockingFutureCallbackEntry, TheRoutineIsHandedTheEventTime) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);

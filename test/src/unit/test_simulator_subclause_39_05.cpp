@@ -10,14 +10,14 @@
 namespace delta {
 namespace {
 
-// §39.5 "Control functions" says what the subclause is for in one sentence:
-// "This subclause defines how to obtain assertion system control and assertion
-// control information." Two controls and one routine: §39.5.1 controls the
-// assertion system through vpi_control() with a scope handle, and §39.5.2
-// controls one assertion through vpi_control() with that assertion's handle,
-// with an attempt start time where the control names an attempt and a step
-// control constant on top of it for the stepping one. These tests ask for each
-// through vpi_control() and read back what the control did.
+// §39.5 "Control functions" says what the subclause is for in one sentence: it
+// shows how to control the assertion system and single assertions. Two controls
+// and one routine: §39.5.1 controls the assertion system through vpi_control()
+// with a scope handle, and §39.5.2 controls one assertion through vpi_control()
+// with that assertion's handle, with an attempt start time where the control
+// names an attempt and a step control constant on top of it for the stepping
+// one. These tests ask for each through vpi_control() and read back what the
+// control did.
 
 class AssertionControlFunctions : public ::testing::Test {
  protected:
@@ -34,11 +34,11 @@ class AssertionControlFunctions : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.5.1: "To control the assertion system, use vpi_control() with one of the
-// following constants and a second handle argument that is a vpiHandle for a
-// scope. A NULL handle signifies that the control applies to all assertions
-// regardless of scope." Turning the system off through the routine stops
-// assertions starting, and the handle is what says how far the control reaches.
+// §39.5.1: the assertion system is controlled by vpi_control() with one of the
+// listed constants and, as its second argument, the vpiHandle of a scope; a
+// NULL handle makes the control reach every assertion, whatever its scope.
+// Turning the system off through the routine stops assertions starting, and the
+// handle is what says how far the control reaches.
 TEST_F(AssertionControlFunctions, TheSystemIsControlledThroughVpiControl) {
   VpiHandle scope = vpi_ctx_.CreateModule("dut", "dut");
 
@@ -52,7 +52,7 @@ TEST_F(AssertionControlFunctions, TheSystemIsControlledThroughVpiControl) {
   EXPECT_FALSE(api_.LastControlGlobal());
 }
 
-// §39.5.2: the second argument "shall be a valid assertion handle", and the
+// §39.5.2: the second argument must be a handle to an assertion, and the
 // control reaches that assertion. Disabling one leaves the other enabled: the
 // handle is what the control is aimed by.
 TEST_F(AssertionControlFunctions, AnAssertionIsControlledThroughVpiControl) {
@@ -67,9 +67,10 @@ TEST_F(AssertionControlFunctions, AnAssertionIsControlledThroughVpiControl) {
   EXPECT_FALSE(api_.AssertionFailActionEnabled("handshake_p"));
 }
 
-// §39.5.2: "Only assertion statement handles are valid here, not sequence or
-// property instances." A handle that is neither an assertion statement nor a
-// handle at all controls nothing, and the routine reports that it did not.
+// §39.5.2: the handle must be one of an assertion statement; a sequence or
+// property instance's handle will not do. A handle that is neither an assertion
+// statement nor a handle at all controls nothing, and the routine reports that
+// it did not.
 TEST_F(AssertionControlFunctions, OnlyAnAssertionStatementHandleIsValid) {
   VpiHandle sequence = vpi_ctx_.CreateAssertion("handshake_s", vpiSequenceInst);
   VpiHandle property = vpi_ctx_.CreateAssertion("handshake_q", vpiPropertyInst);
@@ -83,9 +84,9 @@ TEST_F(AssertionControlFunctions, OnlyAnAssertionStatementHandleIsValid) {
   EXPECT_TRUE(api_.AssertionEnabled("handshake_q"));
 }
 
-// §39.5.2: for the controls that name an attempt, "the third argument shall be
-// an attempt start time (as a pointer to a correctly initialized s_vpi_time
-// structure)". vpiAssertionKill discards the attempt that started at that time,
+// §39.5.2: for the controls that name an attempt, the third argument is the
+// attempt's start time, passed as a pointer to a properly filled-in s_vpi_time
+// structure. vpiAssertionKill discards the attempt that started at that time,
 // and the attempt is named by the time rather than by the assertion alone.
 TEST_F(AssertionControlFunctions, AnAttemptIsNamedByItsStartTime) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
@@ -103,16 +104,15 @@ TEST_F(AssertionControlFunctions, AnAttemptIsNamedByItsStartTime) {
   EXPECT_EQ(api_.AssertionAttemptsInProgress("handshake_p"), 1u);
 }
 
-// §39.5.2: "the fourth argument shall be a step control constant" -
-// vpiAssertionEnableStep enables step callbacks "for this assertion attempt",
-// which is the attempt the third argument names, and vpiAssertionClockSteps is
-// the constant that says on what basis they occur.
+// §39.5.2: the fourth argument is a step control constant -
+// vpiAssertionEnableStep enables step callbacks for the attempt named, which is
+// the attempt the third argument names, and vpiAssertionClockSteps is the
+// constant that says on what basis they occur.
 TEST_F(AssertionControlFunctions, SteppingIsEnabledForTheNamedAttempt) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
 
-  // §39.5.2: "The stepping mode of any particular attempt cannot be modified
-  // after the assertion attempt in question has started", so the attempt this
-  // names is one that has not started yet.
+  // §39.5.2: an attempt's stepping mode is fixed once that attempt has started,
+  // so the attempt this names is one that has not started yet.
   s_vpi_time attempt = {};
   attempt.type = vpiSimTime;
   attempt.low = 10;

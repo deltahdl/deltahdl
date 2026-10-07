@@ -122,7 +122,7 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryCarriesReasonAndUserData) {
   EXPECT_EQ(g_seen_user_data, &payload);
 }
 
-// §39.4.1: "any user data" spans the case where none is supplied. A system
+// §39.4.1: the user data a callback carries may be none at all. A system
 // callback registered without a user_data pointer is still delivered, and the
 // s_cb_data its routine receives carries a null user_data beside the reason.
 TEST_F(AssertionSysCallbackPlacement,

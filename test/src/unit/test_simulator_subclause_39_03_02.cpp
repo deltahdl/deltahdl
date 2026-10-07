@@ -16,12 +16,12 @@ namespace {
 // an assertion, and the list is the whole of the subclause: the assertion name;
 // the instance in which the assertion occurs; the module definition containing
 // it; the assertion type, of which it names nine kinds; the assertion source
-// information, "the file, line, and column where the assertion is defined"; and
-// the assertion clocking block/expression. Each is reached through machinery
-// §37.49 and §37.52 draw - the assertion's location and name properties, its
-// edges to the instance and to the clocking block, and the property
-// specification's vpiClockingEvent edge - so these tests ask for the six items
-// the way an application would and read what comes back.
+// information, which is the file, line and column the assertion is written at;
+// and the assertion clocking block/expression. Each is reached through
+// machinery §37.49 and §37.52 draw - the assertion's location and name
+// properties, its edges to the instance and to the clocking block, and the
+// property specification's vpiClockingEvent edge - so these tests ask for the
+// six items the way an application would and read what comes back.
 
 // The nine kinds §39.3.2 lists under "assertion type".
 struct AssertionKind {
@@ -65,12 +65,12 @@ TEST_F(AssertionStaticInformationItems, EveryListedAssertionTypeReportsItself) {
   }
 }
 
-// §39.3.2, "assertion name", "instance in which the assertion occurs", and
-// "module definition containing the assertion": the name is the assertion's
-// own, the instance is the one it is written in, and the definition that
-// instance is an instance of is what names the module the assertion was written
-// in - the same assertion in a second instance of that module reports the other
-// instance and the same definition.
+// §39.3.2, the items for the assertion's name, the instance it occurs in and
+// the module definition that holds it: the name is the assertion's own, the
+// instance is the one it is written in, and the definition that instance is an
+// instance of is what names the module the assertion was written in - the same
+// assertion in a second instance of that module reports the other instance and
+// the same definition.
 TEST_F(AssertionStaticInformationItems, NameInstanceAndModuleDefinition) {
   VpiObject first_instance;
   first_instance.type = vpiModule;
@@ -105,9 +105,9 @@ TEST_F(AssertionStaticInformationItems, NameInstanceAndModuleDefinition) {
       "handshake");
 }
 
-// §39.3.2, "assertion source information: the file, line, and column where the
-// assertion is defined": §37.49 draws all three on the assertion's location,
-// and the column is what separates two assertions written on one line.
+// §39.3.2, the source information item, the file, line and column the assertion
+// is written at: §37.49 draws all three on the assertion's location, and the
+// column is what separates two assertions written on one line.
 TEST_F(AssertionStaticInformationItems, SourceInformationIsFileLineAndColumn) {
   VpiObject first;
   first.type = vpiAssert;

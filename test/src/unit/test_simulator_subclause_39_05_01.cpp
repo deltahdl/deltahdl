@@ -106,10 +106,10 @@ TEST(AssertionSysControl, SysResetRemovesOnlyStepCallbacks) {
   EXPECT_TRUE(api.PassActionEnabled());
 }
 
-// §39.5.1 C3 (input form): "restores the entire assertion system to its initial
-// state" must re-enable a pass action that was disabled before the reset, not
-// just the fail action. Disabling the pass action clears both the vacuous and
-// nonvacuous components; the reset restores all of them to enabled.
+// §39.5.1 C3 (input form): putting the whole assertion system back in its
+// initial state must re-enable a pass action that was disabled before the
+// reset, not just the fail action. Disabling the pass action clears both the
+// vacuous and nonvacuous components; the reset restores all of them to enabled.
 TEST(AssertionSysControl, SysResetRestoresDisabledPassAction) {
   AssertionApi api;
   api.SysControl(vpiAssertionSysDisablePassAction, {});

@@ -152,7 +152,7 @@ TEST(DeferredAssertionQueue, RejectedDiscardControlDoesNotFlush) {
 }
 
 // -----------------------------------------------------------------------------
-// §39.5.3 speaks of "any VPI function", which is what an application calls
+// §39.5.3 speaks of every VPI function, which is what an application calls
 // rather than what the model does underneath: the controls reach the queues
 // through vpi_control(), and the rule about which of them flush is a rule about
 // that routine's operations.
@@ -173,11 +173,10 @@ class DeferredAssertionQueueThroughVpiControl : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.5.3: "if it discards current evaluation attempts in progress, that also
-// means it flushes any pending instances that have not yet matured from these
-// queues", and vpiAssertionReset is the clause's own example of one that does.
-// Called on the assertion's handle, it takes the attempt and the queued reports
-// together.
+// §39.5.3: a function that throws away the attempts being evaluated also
+// empties these queues of every pending instance not yet matured, and
+// vpiAssertionReset is the clause's own example of one that does. Called on the
+// assertion's handle, it takes the attempt and the queued reports together.
 TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);
@@ -190,10 +189,10 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
   EXPECT_EQ(api_.PendingAssertionReportCount(kA), 0u);
 }
 
-// §39.5.3: "If a VPI function does not interfere with current attempts, that
-// also means it does not affect or flush these queues" - vpiAssertionDisable
-// stops new attempts starting and leaves the ones in progress, so the reports
-// already queued "may still mature and be reported".
+// §39.5.3: a function that leaves the current attempts alone leaves these
+// queues alone too - vpiAssertionDisable stops new attempts starting and leaves
+// the ones in progress, so the reports already queued can still mature and be
+// reported.
 TEST_F(DeferredAssertionQueueThroughVpiControl, DisableLeavesTheQueueStanding) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);

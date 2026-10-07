@@ -13,8 +13,8 @@ namespace delta {
 namespace {
 
 // §39.4 "Dynamic information" says what the subclause is for in one sentence:
-// "This subclause defines how to place assertion system and assertion
-// callbacks." Two kinds of callback, two ways of placing them - §39.4.1 places
+// it shows how to place callbacks on the assertion system and on single
+// assertions. Two kinds of callback, two ways of placing them - §39.4.1 places
 // a system callback with vpi_register_cb() and a reason naming something the
 // assertion system as a whole did, §39.4.2 places an assertion callback with
 // vpi_register_assertion_cb() on one assertion - and the information they carry

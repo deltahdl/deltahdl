@@ -13,10 +13,10 @@
 namespace delta {
 namespace {
 
-// §39.3 "Static information" says what the subclause is for in one sentence:
-// "This subclause defines how to obtain assertion handles and other static
-// assertion information." The two halves are written out below it - §39.3.1 for
-// the handle and §39.3.2 for the information reached through it - so what §39.3
+// §39.3 "Static information" says what the subclause is for in one sentence: it
+// shows how to get an assertion's handle and the rest of what is static about
+// the assertion. The two halves are written out below it - §39.3.1 for the
+// handle and §39.3.2 for the information reached through it - so what §39.3
 // itself says is that the two go together, and that the second kind of thing is
 // static. Static is the word that separates this subclause from §39.4's dynamic
 // information: what is read here is a property of the assertion as it was
