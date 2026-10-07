@@ -181,25 +181,26 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
   int64_t count = 1;
   if (member.range_end) {
     auto m = ConstEvalInt(member.range_end).value_or(0);
-    // Table 6-10: for the name[N:M] form, both bounds shall be
-    // non-negative integral numbers.
+    // Table 6-10: in the name[N:M] form, both bounds are integers and neither
+    // is negative.
     if (n < 0 || m < 0) {
-      diag.Error(loc,
-                 std::format("enum range bounds of '{}' shall be "
-                             "non-negative integral numbers",
-                             member.name),
-                 Subclause("6.19.2"));
+      diag.Error(
+          loc,
+          std::format(
+              "enum range bounds of '{}' have to be integers of zero or more",
+              member.name),
+          Subclause("6.19.2"));
     }
     count = (m >= n) ? (m - n + 1) : (n - m + 1);
   } else {
-    // Table 6-10: for the name[N] form, N shall be a positive integral
-    // number.
+    // Table 6-10: in the name[N] form, N is an integer of one or more.
     if (n < 1) {
-      diag.Error(loc,
-                 std::format("enum range count of '{}' shall be a "
-                             "positive integral number",
-                             member.name),
-                 Subclause("6.19.2"));
+      diag.Error(
+          loc,
+          std::format(
+              "enum range count of '{}' has to be an integer of one or more",
+              member.name),
+          Subclause("6.19.2"));
     }
     count = n;
   }

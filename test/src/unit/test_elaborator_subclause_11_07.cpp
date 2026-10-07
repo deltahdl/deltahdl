@@ -146,9 +146,9 @@ TEST(SignedExprElaboration, RealVarInSignedSystemFunctionRejected) {
       "  initial r = $signed(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside $signed shall be an integral value", 4, "11.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$signed works only on an integral value", 4,
+                            "11.7"));
 }
 
 // §11.7 defines `$unsigned` by the same sentence it defines `$signed` by, the
@@ -163,9 +163,9 @@ TEST(SignedExprElaboration, RealVarInUnsignedSystemFunctionRejected) {
       "  initial r = $unsigned(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside $unsigned shall be an integral value", 4, "11.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$unsigned works only on an integral value", 4,
+                            "11.7"));
 }
 
 // §11.7 puts the requirement on the input expression rather than on how the
@@ -181,9 +181,9 @@ TEST(SignedExprElaboration, RealLiteralArgumentToSignedSystemFunctionRejected) {
       "  initial r = $signed(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside $signed shall be an integral value", 3, "11.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$signed works only on an integral value", 3,
+                            "11.7"));
 }
 
 // §11.7's requirement is that the input expression have packed-array bits, and
@@ -198,9 +198,9 @@ TEST(SignedExprElaboration, ShortrealVarInUnsignedSystemFunctionRejected) {
       "  initial r = $unsigned(s);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside $unsigned shall be an integral value", 4, "11.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$unsigned works only on an integral value", 4,
+                            "11.7"));
 }
 
 // §11.7: `$signed` evaluates the input expression and returns a one-dimensional
@@ -219,9 +219,9 @@ TEST(SignedExprElaboration, TimeLiteralArgumentToSignedSystemFunctionRejected) {
       "  initial r = $signed(2.1ns);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside $signed shall be an integral value", 4, "11.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$signed works only on an integral value", 4,
+                            "11.7"));
 }
 
 }  // namespace

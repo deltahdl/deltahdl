@@ -798,12 +798,13 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ValidateNetDeclDataType(item, nettype_names_, typedefs_, diag_);
 
-  // §6.7.1: an interconnect net shall specify at most one delay value. A single
+  // §6.7.1: one delay value is the limit for an interconnect net. A single
   // delay (net_delay) is permitted; a second or third delay term is not.
   if (item->data_type.is_interconnect &&
       (item->net_delay_fall != nullptr || item->net_delay_decay != nullptr)) {
     diag_.Error(item->loc,
-                "interconnect net shall specify at most one delay value",
+                "an interconnect net accepts one delay value, and this "
+                "declaration gives more",
                 Subclause("6.7.1"));
   }
 

@@ -636,11 +636,13 @@ static std::string NettypeResolutionRuleMessage(
              "than a fixed-size array";
     case NettypeResolutionRule::kArgumentElementType:
       return prefix + std::format(
-                          "shall take an argument that is a dynamic array of "
-                          "elements of type '{}'",
+                          "needs a dynamic array argument whose elements are "
+                          "of type '{}'",
                           data_type_name);
     case NettypeResolutionRule::kAutomaticLifetime:
-      return prefix + "shall be automatic or preserve no state information";
+      return prefix +
+             "has to be automatic, or else keep no state from one call to the "
+             "next";
     default:
       return prefix + "shall be a static class method";
   }

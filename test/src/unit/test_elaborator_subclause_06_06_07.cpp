@@ -452,8 +452,8 @@ TEST(NettypeElaboration, ResolutionFunctionRefArgumentRejected) {
 
 // §6.6.7 requires the argument to be a dynamic array of T elements, and Tsum
 // here takes a dynamic array of U against a nettype whose data type is T. The
-// case fails unless the run reports "dynamic array of elements of type 'T'" at
-// line 8, the `nettype` declaration, under §6.6.7.
+// case fails unless the run reports "dynamic array argument whose elements are
+// of type 'T'" at line 8, the `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionArgumentElementTypeMismatchRejected) {
   ElabFixture f;
@@ -468,9 +468,9 @@ TEST(NettypeElaboration,
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "dynamic array of elements of type 'T'", 8,
-                            "6.6.7"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "dynamic array argument whose elements are of type 'T'", 8, "6.6.7"));
 }
 
 // §6.6.7's own example declares `function automatic T Tsum (input T driver[]);`

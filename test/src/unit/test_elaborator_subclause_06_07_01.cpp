@@ -363,7 +363,7 @@ TEST(InterconnectNet, PlainInterconnectIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.7.1: an interconnect net shall specify at most one delay value. A single
+// §6.7.1: one delay value is the limit for an interconnect net. A single
 // delay value is accepted.
 TEST(InterconnectNet, SingleDelayIsAccepted) {
   ElabFixture f;
@@ -376,9 +376,10 @@ TEST(InterconnectNet, SingleDelayIsAccepted) {
 TEST(InterconnectNet, MultipleDelayValuesRejected) {
   ElabFixture f;
   ElaborateSrc("module m; interconnect #(1, 2) w; endmodule\n", f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "interconnect net shall specify at most one delay value", 1, "6.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an interconnect net accepts one delay value, and "
+                            "this declaration gives more",
+                            1, "6.7.1"));
 }
 
 // §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure

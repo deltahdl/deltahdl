@@ -155,10 +155,11 @@ TEST(TypeOperatorElab, HierarchicalRefInTypeArgRejected) {
       "  var type(s.q) v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type operator argument shall not contain a hierarchical reference", 6,
-      "6.23"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type operator argument uses a hierarchical reference, "
+                    "which the type operator does not accept",
+                    6, "6.23"));
 }
 
 // §6.23 — even when wrapped in a larger expression, a member-access
@@ -174,10 +175,11 @@ TEST(TypeOperatorElab, HierarchicalRefInBinaryArgRejected) {
       "  var type(s.q + 1) v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type operator argument shall not contain a hierarchical reference", 6,
-      "6.23"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type operator argument uses a hierarchical reference, "
+                    "which the type operator does not accept",
+                    6, "6.23"));
 }
 
 // §6.23 — the inner expression of type(...) shall not reference an
@@ -603,10 +605,11 @@ TEST(TypeOperatorElab, InstanceMemberInTypeArgStillRejected) {
       "  var type(s.q) v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type operator argument shall not contain a hierarchical reference", 6,
-      "6.23"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type operator argument uses a hierarchical reference, "
+                    "which the type operator does not accept",
+                    6, "6.23"));
 }
 
 // §6.23 — the exemption §8.23 grants applies to the scope resolution node
@@ -623,10 +626,11 @@ TEST(TypeOperatorElab, MemberAccessOverScopeResolutionRejected) {
       "  var type(C::x.y) v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type operator argument shall not contain a hierarchical reference", 5,
-      "6.23"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type operator argument uses a hierarchical reference, "
+                    "which the type operator does not accept",
+                    5, "6.23"));
 }
 
 // §8.23 — the type-parameter-default form of the operator carries the class

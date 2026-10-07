@@ -444,8 +444,8 @@ void ElaboratorOperationRules::CheckTypeRefArgInner(const Expr* inner,
   if (!inner) return;
   if (TypeRefArgHasMemberAccess(inner)) {
     diag_.Error(loc,
-                "type operator argument shall not contain a hierarchical "
-                "reference",
+                "type operator argument uses a hierarchical reference, which "
+                "the type operator does not accept",
                 Subclause("6.23"));
     return;
   }
@@ -873,8 +873,7 @@ void ElaboratorOperationRules::CheckSigningSystemCallExpr(const Expr* expr) {
   if (!expr || !IsSigningSystemCall(expr) || expr->args.empty()) return;
   if (!CastOperandIsReal(expr->args.front())) return;
   diag_.Error(expr->range.start,
-              std::format("expression inside {} shall be an integral value",
-                          expr->callee),
+              std::format("{} works only on an integral value", expr->callee),
               Subclause("11.7"));
 }
 
@@ -893,23 +892,23 @@ void ElaboratorOperationRules::CheckCastExpr(const Expr* expr) {
     // unresolved parameter, so no size rule is applied.
     auto size = ConstEvalInt(expr->rhs);
     if (size) {
-      // §6.24.1: the size specified by a constant-expression casting type shall
-      // be positive; a zero or negative size is an error.
+      // §6.24.1: a size written as a constant expression has to come out
+      // positive, so zero or a negative size is an error.
       if (*size <= 0) {
         diag_.Error(expr->range.start,
                     "size cast target width must be a positive constant",
                     Subclause("6.24.1"));
       } else if (CastOperandIsReal(expr->lhs)) {
-        // §6.24.1: the expression inside a size cast shall be integral.
+        // §6.24.1: a size cast takes an integral operand only.
         diag_.Error(expr->range.start,
-                    "expression inside a size cast shall be an integral value",
+                    "a size cast works only on an integral value",
                     Subclause("6.24.1"));
       }
     }
   } else if (IsSigningCast(expr) && CastOperandIsReal(expr->lhs)) {
-    // §6.24.1: the expression inside a signing cast shall be integral.
+    // §6.24.1: a signing cast takes an integral operand only.
     diag_.Error(expr->range.start,
-                "expression inside a signing cast shall be an integral value",
+                "a signing cast works only on an integral value",
                 Subclause("6.24.1"));
   }
 }

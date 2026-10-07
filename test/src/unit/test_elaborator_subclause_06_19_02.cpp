@@ -162,10 +162,10 @@ TEST(Elaboration, EnumRangeNZeroIsError) {
       "  typedef enum {sub[0]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "enum range count of 'sub' shall be a positive "
-                            "integral number",
-                            2, "6.19.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "enum range count of 'sub' has to be an integer of one or more", 2,
+      "6.19.2"));
 }
 
 // Syntax 6-5 (printed page 119) takes an integral_number for each bound, so

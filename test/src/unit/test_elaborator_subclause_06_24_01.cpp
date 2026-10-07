@@ -217,11 +217,9 @@ TEST(CastOperatorElaboration, RealVarInSignedCastError) {
       "  initial r = signed'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule applies to unsigned'() as well as
@@ -235,11 +233,9 @@ TEST(CastOperatorElaboration, RealVarInUnsignedCastError) {
       "  initial r = unsigned'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // 6.24.1: a real literal operand is likewise non-integral, so signed'(2.5) is
@@ -252,11 +248,9 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastError) {
       "  initial r = signed'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    3, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 3,
+                            "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule also governs the size cast (changing the
@@ -271,9 +265,9 @@ TEST(CastOperatorElaboration, RealVarInSizeCastError) {
       "  initial r = 8'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside a size cast shall be an integral value", 4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a size cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule for a size cast rejects a real *literal*
@@ -287,9 +281,9 @@ TEST(CastOperatorElaboration, RealLiteralInSizeCastError) {
       "  initial r = 8'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside a size cast shall be an integral value", 3, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a size cast works only on an integral value", 3,
+                            "6.24.1"));
 }
 
 // 6.24.1: shortreal is a distinct non-integral operand type; a shortreal
@@ -304,11 +298,9 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
       "  initial r = signed'(s);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // §5.8: a time literal reads as a realtime value scaled to the current time
@@ -326,11 +318,9 @@ TEST(CastOperatorElaboration, TimeLiteralInSignedCastError) {
       "  initial r = signed'(2.1ns);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // §6.24.1 puts the same integral-operand rule on the size cast, and §5.8 makes
@@ -349,9 +339,9 @@ TEST(CastOperatorElaboration, TimeLiteralInSizeCastError) {
       "  initial r = 8'(2.1ns);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "expression inside a size cast shall be an integral value", 4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a size cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 TEST(CastOperatorSim, CastByteTruncate) {
@@ -439,11 +429,9 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForkArmError) {
       "  join\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
@@ -461,11 +449,9 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForInitializerError) {
       "      i = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    5, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 5,
+                            "6.24.1"));
 }
 
 // A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
@@ -483,11 +469,9 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForStepError) {
       "      i = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    5, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 5,
+                            "6.24.1"));
 }
 
 // A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
@@ -504,11 +488,9 @@ TEST(CastOperatorElaboration,
       "  initial assert (ok) r = signed'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
@@ -523,11 +505,9 @@ TEST(CastOperatorElaboration,
       "  initial assert (armed) else r = signed'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    4, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 4,
+                            "6.24.1"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -542,11 +522,9 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInRandcaseItemError) {
       "  initial randcase 1: r = signed'(2.5); endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    3, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 3,
+                            "6.24.1"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -566,11 +544,9 @@ TEST(CastOperatorElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "expression inside a signing cast shall be an integral "
-                    "value",
-                    5, "6.24.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a signing cast works only on an integral value", 5,
+                            "6.24.1"));
 }
 
 }  // namespace
