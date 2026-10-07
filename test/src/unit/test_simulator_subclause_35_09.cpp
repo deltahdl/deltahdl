@@ -298,7 +298,7 @@ TEST(DpiDisableProtocol, DisabledNoncontextImportCannotCallExport) {
   ResetDisableState();
 }
 
-// §35.9 item b): an imported task that returns due to a disable shall return 1.
+// §35.9 item b): once a disable ends an imported task, it gives back 1.
 // Any other value — not only 0 — is a protocol violation. A task returning 2
 // while a disable is in effect fails the simulator's check.
 TEST(DpiDisableProtocol,
@@ -406,7 +406,7 @@ TEST(DpiDisableProtocol, ACallAfterADisabledChainPropagatesItsOutputArgument) {
   EXPECT_EQ(result.AsInt(), 444);
 }
 
-// §35.9 item b): an imported task returning due to a disable shall return 1.
+// §35.9 item b): once a disable ends an imported task, it gives back 1.
 // Returning 0 is the violation the clause has a simulator check, and breaking
 // any item of the protocol ends the simulation with a fatal error.
 TEST(DpiDisableProtocol, ImportedTaskReturningZeroUnderADisableIsFatal) {

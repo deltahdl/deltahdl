@@ -751,7 +751,7 @@ bool DpiRuntime::CheckImportedSubroutineDisableReturn(
   // disable is in effect. With no disable there is nothing to check.
   if (!DpiCurrentDisabledState()) return true;
   if (is_task) {
-    // item b): an imported task returning due to a disable shall return 1.
+    // item b): once a disable ends an imported task, it gives back 1.
     return task_return_value == 1;
   }
   // item c): an imported function returning due to a disable shall have
@@ -768,8 +768,8 @@ bool DpiRuntime::VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
   IssueDisableProtocolFatalError(
       "35.9 item b): imported task '" + std::string(sv_name) + "' returned " +
       std::to_string(task_return_value) +
-      " while a disable was in effect; a task returning due to a disable shall "
-      "return 1");
+      " while a disable was in effect; under a disable, 1 is the only value an "
+      "imported task may give back");
   return false;
 }
 

@@ -465,10 +465,10 @@ class DpiRuntime {
   // imported subroutines that return while a disable is in effect. Returns true
   // when the protocol was followed and false when it was violated; on a false
   // result the caller issues the fatal simulation error §35.9 mandates. An
-  // imported task (item b) shall return 1 when it returns due to a disable; an
-  // imported function (item c) shall have called svAckDisabledState() before
-  // returning due to a disable. When no disable is in effect there is nothing
-  // to verify and the result is true.
+  // imported task (item b) gives back 1 once a disable ends it; an imported
+  // function (item c) acknowledges the disable through svAckDisabledState()
+  // before it returns. When no disable is in effect there is nothing to verify
+  // and the result is true.
   bool CheckImportedSubroutineDisableReturn(bool is_task,
                                             int task_return_value) const;
 
@@ -540,7 +540,7 @@ class DpiRuntime {
       void* actual_data, SvActualDimension actual, uint32_t elem_width);
 
  private:
-  // §35.9 item b): an imported task returning due to a disable shall return 1.
+  // §35.9 item b): once a disable ends an imported task, it gives back 1.
   // Issues the fatal simulation error and returns false when it returned
   // anything else.
   bool VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
