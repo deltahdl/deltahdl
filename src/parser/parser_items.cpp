@@ -381,9 +381,9 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
   ParseVarDeclList(items, dtype);
 }
 
-// C.4.2 has two forms of assignment by where they are placed, "continuous
-// assignments, placed outside any procedures" and "procedural continuous
-// assignments, placed within a procedure", and A.6.2 has deassign, force and
+// C.4.2 tells two forms of assignment apart by where they are placed: a
+// continuous assignment stands outside every procedure, and a procedural
+// continuous assignment inside one, and A.6.2 has deassign, force and
 // release in the procedural_continuous_assignment alone, a statement_item. One
 // of the three written where a module item stands is that statement outside
 // any procedure; it is reported as such at its keyword and read to its ';' so
