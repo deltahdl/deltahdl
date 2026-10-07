@@ -157,8 +157,8 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
         loc,
-        "kill() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block",
+        "kill() acts only on a process begun by an initial or always "
+        "procedure or by a fork block within one",
         Subclause("9.7"));
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
@@ -185,8 +185,8 @@ static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
         loc,
-        "suspend() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block",
+        "suspend() acts only on a process begun by an initial or always "
+        "procedure or by a fork block within one",
         Subclause("9.7"));
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
@@ -233,8 +233,8 @@ static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
         loc,
-        "resume() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block",
+        "resume() acts only on a process begun by an initial or always "
+        "procedure or by a fork block within one",
         Subclause("9.7"));
     out = MakeLogic4VecVal(arena, 1, 0);
     return;

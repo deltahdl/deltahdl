@@ -49,8 +49,8 @@ static Process* ResolveProcessAwaitTarget(const Expr* expr, Process* proc,
       proc->kind == ProcessKind::kContAssign) {
     ctx.GetDiag().Error(
         expr->range.start,
-        "await() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block",
+        "await() acts only on a process begun by an initial or always "
+        "procedure or by a fork block within one",
         Subclause("9.7"));
     return nullptr;
   }

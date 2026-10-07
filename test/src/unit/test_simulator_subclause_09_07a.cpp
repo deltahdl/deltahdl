@@ -468,7 +468,7 @@ TEST(FineGrainProcessControlSimulation, KillOnFinalProcessIsError) {
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "kill() shall only target a process", 5, "9.7"));
+                            "kill() acts only on a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessIsError) {
@@ -488,7 +488,7 @@ TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessIsError) {
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "suspend() shall only target a process", 5, "9.7"));
+                            "suspend() acts only on a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
@@ -508,11 +508,11 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resume() shall only target a process", 5, "9.7"));
+                            "resume() acts only on a process", 5, "9.7"));
 }
 
-// §9.7: await(), like kill()/suspend()/resume(), is restricted to a process
-// created by an initial procedure, always procedure, or fork block. A process
+// §9.7: await(), like kill()/suspend()/resume(), acts only on a process begun
+// by an initial or always procedure or by a fork block within one. A process
 // obtained inside a final procedure is not one of those, so awaiting it is an
 // error. (This exercises await()'s own restricted-target check, a code path
 // distinct from the kill/suspend/resume forms above.)
@@ -533,11 +533,11 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessIsError) {
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "await() shall only target a process", 5, "9.7"));
+                            "await() acts only on a process", 5, "9.7"));
 }
 
-// §9.7: kill() may only target a process created by an initial procedure, an
-// always procedure or a fork block, and the call is what the report is about.
+// §9.7: kill() acts only on a process begun by an initial or always procedure
+// or by a fork block within one, and the call is what the report is about.
 // The design makes two kill() calls and only the one in the final block is
 // illegal, so a report carrying no location fails this and so does one that
 // names the legal call.
@@ -564,11 +564,11 @@ TEST(FineGrainProcessControlSimulation,
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "kill() shall only target a process", 10, "9.7"));
+                            "kill() acts only on a process", 10, "9.7"));
 }
 
-// §9.7: kill(), await(), suspend() and resume() shall be restricted to a
-// process created by an initial procedure, always procedure, or fork block.
+// §9.7: kill(), await(), suspend() and resume() act only on a process begun by
+// an initial or always procedure or by a fork block within one.
 // Each of the four raises its own report, and each report names §9.7.
 TEST(FineGrainProcessControlSimulation, KillOnFinalProcessNames9_7) {
   SimFixture f;
@@ -585,7 +585,7 @@ TEST(FineGrainProcessControlSimulation, KillOnFinalProcessNames9_7) {
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "kill() shall only target a process", 5, "9.7"));
+                            "kill() acts only on a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessNames9_7) {
@@ -603,7 +603,7 @@ TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessNames9_7) {
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "suspend() shall only target a process", 5, "9.7"));
+                            "suspend() acts only on a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessNames9_7) {
@@ -621,7 +621,7 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessNames9_7) {
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resume() shall only target a process", 5, "9.7"));
+                            "resume() acts only on a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
@@ -639,7 +639,7 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
   LowerAndRun(design, f);
   f.ctx.RunFinalBlocks();
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "await() shall only target a process", 5, "9.7"));
+                            "await() acts only on a process", 5, "9.7"));
 }
 
 // §9.7: it shall be an error to call await() on the current process, i.e. a
