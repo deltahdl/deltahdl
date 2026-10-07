@@ -374,8 +374,7 @@ TEST(DataTypeParsing, TriRegDirectlyIsError) {
       "  tri reg r;\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "net type keyword shall not be followed directly by 'reg'", 2,
-      "6.7.1"));
+      r.diags, "'reg' cannot come right after a net type keyword", 2, "6.7.1"));
 }
 
 TEST(DataTypeParsing, WireRegDirectlyIsError) {
@@ -384,8 +383,7 @@ TEST(DataTypeParsing, WireRegDirectlyIsError) {
       "  wire reg p;\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "net type keyword shall not be followed directly by 'reg'", 2,
-      "6.7.1"));
+      r.diags, "'reg' cannot come right after a net type keyword", 2, "6.7.1"));
 }
 
 TEST(DataTypeParsing, WireDriveStrengthRegOk) {
@@ -413,8 +411,7 @@ TEST(DataTypeParsing, IdentifierStartingWithRegOk) {
 TEST(DataTypeParsing, PortNetTypeFollowedByRegIsError) {
   auto r = Parse("module m(inout wire reg p); endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "net type keyword shall not be followed directly by 'reg'", 1,
-      "6.7.1"));
+      r.diags, "'reg' cannot come right after a net type keyword", 1, "6.7.1"));
 }
 
 TEST(StrengthParsing, DriveStrengthSupply0Weak1) {

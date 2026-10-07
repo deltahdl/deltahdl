@@ -359,7 +359,7 @@ static void ApplyNetInfo(DataType& inner, const DataType& net) {
 bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   if (!has_intervening && CurrentToken().kind == TokenKind::kKwReg) {
     diag_.Error(CurrentLoc(),
-                "net type keyword shall not be followed directly by 'reg'",
+                "'reg' cannot come right after a net type keyword",
                 Subclause("6.7.1"));
     Consume();
     return false;
