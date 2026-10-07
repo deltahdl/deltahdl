@@ -250,20 +250,21 @@ static void CheckEventExprSingular(
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier && !expr->text.empty()) {
     if (non_singular_vars.count(expr->text) != 0) {
-      diag.Error(expr->range.start,
-                 std::format("event expression references non-singular "
-                             "variable '{}'; event expressions shall return "
-                             "singular values",
-                             expr->text),
-                 Subclause("9.4.2"));
+      diag.Error(
+          expr->range.start,
+          std::format(
+              "event expression references non-singular "
+              "variable '{}'; an event can only be watched on a singular value",
+              expr->text),
+          Subclause("9.4.2"));
     }
   }
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     if (non_singular_funcs.count(expr->callee) != 0) {
       diag.Error(expr->range.start,
                  std::format("event expression calls function '{}' whose "
-                             "return type is non-singular; event expressions "
-                             "shall return singular values",
+                             "return type is non-singular; an event can only "
+                             "be watched on a singular value",
                              expr->callee),
                  Subclause("9.4.2"));
     }
@@ -292,7 +293,7 @@ static void CheckEventExprSingular(
     CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
 }
 
-// §9.4.2 requires an event expression to return a singular value and puts no
+// §9.4.2 holds every event expression to a singular value and puts no
 // condition on where the statement carrying the event control stands; A.6.4
 // makes a procedural_timing_control_statement a statement_item, and the
 // clause's own example writes three event controls inside a fork-join. Every

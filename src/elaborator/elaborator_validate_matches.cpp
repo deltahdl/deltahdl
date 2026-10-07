@@ -547,7 +547,7 @@ static void CheckDisableTargets(
       s->expr->kind == ExprKind::kIdentifier) {
     if (func_decls.count(s->expr->text) != 0) {
       diag.Error(s->range.start,
-                 "disable statement shall not be used to disable a function",
+                 "a function cannot be the target of a disable statement",
                  Subclause("9.6.2"));
     }
   }

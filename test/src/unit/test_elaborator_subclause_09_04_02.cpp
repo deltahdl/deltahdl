@@ -126,11 +126,11 @@ TEST(EventControlElaboration, UnpackedArrayEventExpressionRejected) {
       "  initial @(arr) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "event expression references non-singular variable "
-                            "'arr'; event expressions shall return singular "
-                            "values",
-                            3, "9.4.2"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "event expression references non-singular variable "
+                    "'arr'; an event can only be watched on a singular value",
+                    3, "9.4.2"));
 }
 
 TEST(EventControlElaboration, UnpackedStructEventExpressionRejected) {
@@ -141,11 +141,11 @@ TEST(EventControlElaboration, UnpackedStructEventExpressionRejected) {
       "  initial @(s) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "event expression references non-singular variable "
-                            "'s'; event expressions shall return singular "
-                            "values",
-                            3, "9.4.2"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "event expression references non-singular variable "
+                    "'s'; an event can only be watched on a singular value",
+                    3, "9.4.2"));
 }
 
 TEST(EventControlElaboration, PackedStructEventExpressionAccepted) {
@@ -199,14 +199,14 @@ TEST(EventControlElaboration,
       "  initial @(f()) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "event expression calls function 'f' whose return "
-                            "type is non-singular; event expressions shall "
-                            "return singular values",
-                            5, "9.4.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "event expression calls function 'f' whose return "
+      "type is non-singular; an event can only be watched on a singular value",
+      5, "9.4.2"));
 }
 
-// §9.4.2 requires an event expression to return a singular value and puts no
+// §9.4.2 holds every event expression to a singular value and puts no
 // condition on where the statement the event control precedes stands. A.6.4
 // makes a procedural_timing_control_statement a statement_item, so an event
 // control may be written in every position a statement holds a statement in,

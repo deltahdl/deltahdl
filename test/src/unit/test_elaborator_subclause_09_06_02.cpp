@@ -72,7 +72,7 @@ TEST(DisableStatementElaboration, DisableFunctionRejectsWithError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "disable statement shall not be used to disable a function", 6, "9.6.2"));
+      "a function cannot be the target of a disable statement", 6, "9.6.2"));
 }
 
 TEST(DisableStatementElaboration, DisableNamedBlockInFunctionElaborates) {
@@ -193,7 +193,7 @@ TEST(DisableStatementElaboration,
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "disable statement shall not be used to disable a function", 6, "9.6.2"));
+      "a function cannot be the target of a disable statement", 6, "9.6.2"));
 }
 
 TEST(DisableStatementElaboration,
@@ -210,7 +210,7 @@ TEST(DisableStatementElaboration,
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "disable statement shall not be used to disable a function", 6, "9.6.2"));
+      "a function cannot be the target of a disable statement", 6, "9.6.2"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -234,7 +234,7 @@ TEST(DisableStatementElaboration,
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "disable statement shall not be used to disable a function", 7, "9.6.2"));
+      "a function cannot be the target of a disable statement", 7, "9.6.2"));
 }
 
 // §18.17.1 lets a weight specification be followed by a code block of its own,
@@ -260,7 +260,7 @@ TEST(DisableStatementElaboration,
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "disable statement shall not be used to disable a function", 8, "9.6.2"));
+      "a function cannot be the target of a disable statement", 8, "9.6.2"));
 }
 
 }  // namespace
