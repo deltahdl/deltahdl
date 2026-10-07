@@ -52,10 +52,10 @@ TEST(StringFormatTaskElaboration, SwriteUnpackedByteArrayOutputVarAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §21.3.3 negative form: the output variable "shall be a variable of integral,
-// unpacked array of byte, or string data types" -- a real destination has no
-// character representation and is the closest illegal form. $swrite into a real
-// variable shall be rejected.
+// §21.3.3 negative form: the output variable must be a variable of an integral,
+// unpacked byte array or string type -- a real destination has no character
+// representation and is the closest illegal form. $swrite into a real variable
+// shall be rejected.
 TEST(StringFormatTaskElaboration, SwriteRealOutputVarRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,16 +104,16 @@ TEST(StringFormatTaskElaboration, SformatfHasNoOutputVarCheck) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §21.3.3 states its rule over the first argument of $swrite and $sformat --
-// it "shall be a variable of integral, unpacked array of byte, or string data
-// types" -- and names no position the call may stand in. Each of the four
-// cases below writes the call in one such position, and each is a position
+// §21.3.3 states its rule over the first argument of $swrite and $sformat -- it
+// must be a variable of an integral, unpacked byte array or string type -- and
+// names no position the call may stand in. Each of the four cases below writes
+// the call in one such position, and each is a position
 // CheckStringOutputTargetsStmt in
 // src/elaborator/elaborator_validate_queries.cpp reached only once it took its
 // list of nested statements from ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, with a real variable left as the destination of a
-// formatted string.
+// clean beforehand, with a real variable left as the destination of a formatted
+// string.
 //
 // Stmt::for_steps is the fifth position that list added and it carries no case
 // here. Both tasks return no value, so neither stands in the

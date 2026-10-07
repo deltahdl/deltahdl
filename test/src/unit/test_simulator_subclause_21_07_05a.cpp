@@ -271,11 +271,11 @@ TEST_F(VcdTypeMappingSim, ShortrealMasqueradesAsReal) {
   EXPECT_NE(sr[1], "wire");
 }
 
-// §21.7.2.2: "Value changes for real variables are specified by real numbers",
-// and "A real number is dumped using a %.16g printf() format". §6.12 makes a
-// shortreal a C float, so the 32 bits Table 21-11 gives its declaration hold
-// the IEEE Std 754 single-precision pattern of the assigned value, and the two
-// records shall carry the numbers 1.5 and 3.5 themselves.
+// §21.7.2.2: a real variable's value changes are given as real numbers, dumped
+// with a %.16g printf() format. §6.12 makes a shortreal a C float, so the 32
+// bits Table 21-11 gives its declaration hold the IEEE Std 754 single-precision
+// pattern of the assigned value, and the two records shall carry the numbers
+// 1.5 and 3.5 themselves.
 //
 // ShortrealMasqueradesAsReal above runs this very source and reads only the
 // $var declaration line. The two r records this case reads are already in the
@@ -354,13 +354,12 @@ const char kStringBesideIntTop[] =
 
 // §21.7.5: a `string` variable contributes no $var declaration. Table 21-11
 // has eight rows -- bit, logic, int, shortint, longint, byte, enum and
-// shortreal -- and no string row, and §21.7.5 states only that "Some
-// SystemVerilog types can be dumped into a standard VCD file by masquerading
-// as an IEEE Std 1364-2005 type", so no masquerade exists for a string. §6.16
-// ("Variables of type string are dynamic as their length may vary during
-// simulation") is why the table can give it none: §21.7.2.3 defines the size
-// field as "how many bits are in the variable", and a dynamically sized object
-// has no such number.
+// shortreal -- and no string row, and §21.7.5 states only that some
+// SystemVerilog types can go into a standard VCD file disguised as an IEEE Std
+// 1364-2005 type, so no masquerade exists for a string. §6.16 ("Variables of
+// type string are dynamic as their length may vary during simulation") is why
+// the table can give it none: §21.7.2.3 defines the size field as the
+// variable's number of bits, and a dynamically sized object has no such number.
 //
 // Every other case in this file asserts a keyword and a size for a type
 // Table 21-11 lists, or an absence for a type the §21.7.5 prose excludes
@@ -396,13 +395,12 @@ bool IsBaselessValueChange(const std::string& line) {
          std::isspace(static_cast<unsigned char>(line[1])) != 0;
 }
 
-// §21.7.2.2: "Dumps of value changes to vectors shall not have any white space
-// between the base letter and the value digits, but they shall have one white
-// space between the value digits and the identifier code." A signal registered
-// at width 0 -- which is what a string is registered at, since §6.16 makes its
-// length dynamic and the elaborator evaluates its width as 0 -- has no digits
-// to write, so its record is the base letter, a space and the identifier code,
-// which breaks that sentence outright.
+// §21.7.2.2: a vector's value change puts no white space between the base
+// letter and the digits and exactly one between the digits and the identifier
+// code. A signal registered at width 0 -- which is what a string is registered
+// at, since §6.16 makes its length dynamic and the elaborator evaluates its
+// width as 0 -- has no digits to write, so its record is the base letter, a
+// space and the identifier code, which breaks that sentence outright.
 //
 // This is the value-change half of StringVariableIsNotDumped above, and it is
 // asserted separately because the two halves are written by different calls:

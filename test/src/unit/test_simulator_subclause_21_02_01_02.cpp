@@ -290,7 +290,7 @@ TEST(SizeOfDisplayedData, AutoSizedOtherRadicesKeepLeadingZeros) {
   EXPECT_EQ(out, ":0a: :012: :00001010:\n");
 }
 
-// §21.2.1.2 (C1): a bare expression argument is also "sized automatically" --
+// §21.2.1.2 (C1): a bare expression argument is sized automatically as well --
 // the default decimal rendering of §21.2.1.1 takes the same fixed-width field
 // an explicit %d would, so an 8-bit value prints in three columns.
 TEST(SizeOfDisplayedData, BareArgumentDefaultDecimalIsAutoSized) {

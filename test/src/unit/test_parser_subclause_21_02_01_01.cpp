@@ -9,11 +9,10 @@ using namespace delta;
 
 namespace {
 
-// §21.2.1.1 (printed page 656): "It shall be an error if an undefined format
-// specifier appears in a string literal argument." The literal is in the
-// source, so the misuse is reported where the call is parsed, citing the
-// subclause. `%q` printed a note on stderr and then itself, and the run went
-// on.
+// §21.2.1.1 (printed page 656): a string literal argument holding an undefined
+// format specifier is an error. The literal is in the source, so the misuse is
+// reported where the call is parsed, citing the subclause. `%q` printed a note
+// on stderr and then itself, and the run went on.
 TEST(FormatSpecifications, UndefinedSpecifierInADisplayLiteralIsAnError) {
   auto r = Parse(
       "module t;\n"

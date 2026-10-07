@@ -11,8 +11,8 @@
 // array, queue — §21.4.1's forms). These tests therefore declare each source
 // memory with real syntax and drive the module through the full pipeline
 // (parse -> elaborate -> lower -> run), observing the dumped file text and the
-// round trip through the matching read task — the two faces of "identical
-// treatment" — rather than hand-building array state on a bare context.
+// round trip through the matching read task — the two faces of treating them
+// the same way — rather than hand-building array state on a bare context.
 #include <gtest/gtest.h>
 
 #include <cstdio>

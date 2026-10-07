@@ -81,7 +81,7 @@ TEST_F(DumpallSysTask, DumpallCheckpointIncludesUnchangedVariables) {
   EXPECT_LT(moved, end);
 }
 
-// "Current value" means the value at the moment the task executes: an
+// The present value means the value at the moment the task executes: an
 // assignment earlier in the same simulation time unit is what the checkpoint
 // records.
 TEST_F(DumpallSysTask, DumpallRecordsValueAssignedInSameTimeUnit) {
@@ -333,12 +333,12 @@ TEST_F(DumpallSysTask, WithoutDumpFileDumpallIsHarmless) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §21.7.1.4: the checkpoint "shows the current value of all selected
-// variables". Selected is what §21.7.1.2's $dumpvars listed, so a variable
-// outside the scope list has no record here however its value stands -- a
-// checkpoint of everything would report a variable the dump does not cover.
-// Both variables hold a value when the task runs, so the omission is of the
-// unlisted one rather than of an object with nothing to report.
+// §21.7.1.4: the checkpoint gives every selected variable's present value.
+// Selected is what §21.7.1.2's $dumpvars listed, so a variable outside the
+// scope list has no record here however its value stands -- a checkpoint of
+// everything would report a variable the dump does not cover. Both variables
+// hold a value when the task runs, so the omission is of the unlisted one
+// rather than of an object with nothing to report.
 TEST_F(DumpallSysTask, DumpallRecordsOnlyTheVariablesDumpvarsListed) {
   auto content = RunVcd(
       "module t;\n"

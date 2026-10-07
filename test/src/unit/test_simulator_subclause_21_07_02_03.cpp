@@ -488,12 +488,12 @@ TEST_F(VcdKeywordCommandsE2E, DumpvarsSectionCoversOnlySelectedVariables) {
   EXPECT_EQ(dumpvars.find('"'), std::string::npos) << dumpvars;
 }
 
-// §21.7.2.3: "The $timescale keyword specifies what timescale was used for the
-// simulation", and Syntax 21-20 spells the command as a time_number of 1, 10
-// or 100 followed by a time_unit of s, ms, us, ns, ps or fs. What the section
-// names is the unit the simulation_time commands under it are counted in, so
-// it has to follow the precision the design elaborated to; a fixed unit puts
-// every time in the file out by whatever factor separates the two.
+// §21.7.2.3: the $timescale keyword gives the timescale the simulation ran
+// under, and Syntax 21-20 spells the command as a time_number of 1, 10 or 100
+// followed by a time_unit of s, ms, us, ns, ps or fs. What the section names is
+// the unit the simulation_time commands under it are counted in, so it has to
+// follow the precision the design elaborated to; a fixed unit puts every time
+// in the file out by whatever factor separates the two.
 //
 // These cases run the source's own $dumpfile and $dumpvars, because the unit
 // is read off the design's precision at the moment the dump is opened. A

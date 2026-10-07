@@ -112,18 +112,17 @@ TEST(StrengthFormat, MediumCapacitorZeroIsMe0) {
             "Me0");
 }
 
-// §21.2.1.4: "For the unknown value, a mnemonic is used when both the 0 and 1
-// strength components are at the same strength level." §28.12.2 says which
-// level each component is, reading the 35X of Figure 28-9 as a first digit for
-// the result's highest strength0 level and a second for its highest strength1
-// level. The two sides here are ranges, which is the shape §28.12.2 gives an
-// equal-strength conflict: the result carries both signals' strength levels and
-// every weaker level, drawn in Figure 28-5 as reaching down through high
-// impedance on both sides. Their highest levels are both strong, so the
-// rendering is StX. Collapsing the two sides to points instead would make the
-// two components sharing a level and neither side having a range one condition
-// for this input, and the case could not tell the clause's rule from that
-// narrower one.
+// §21.2.1.4: an unknown value is shown with a mnemonic when its 0 and 1
+// strength components share one level. §28.12.2 says which level each component
+// is, reading the 35X of Figure 28-9 as a first digit for the result's highest
+// strength0 level and a second for its highest strength1 level. The two sides
+// here are ranges, which is the shape §28.12.2 gives an equal-strength
+// conflict: the result carries both signals' strength levels and every weaker
+// level, drawn in Figure 28-5 as reaching down through high impedance on both
+// sides. Their highest levels are both strong, so the rendering is StX.
+// Collapsing the two sides to points instead would make the two components
+// sharing a level and neither side having a range one condition for this input,
+// and the case could not tell the clause's rule from that narrower one.
 TEST(StrengthFormat, StrongUnknownSameLevelIsStX) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kHighz,
                                   Strength::kStrong, Strength::kHighz)),
@@ -215,7 +214,7 @@ TEST(StrengthFormat, OneAcrossRangeIsDigitsThenValue) {
             "651");
 }
 
-// Table 21-3: the L logic value means "logic 0 or high impedance". A 0 side
+// Table 21-3: the L logic value stands for a 0 or a high impedance. A 0 side
 // whose strength reaches down to highz is ambiguous between driving 0 and
 // floating, and L always uses a mnemonic for the strength level -> StL.
 TEST(StrengthFormat, ZeroOrHighZIsMnemonicL) {
@@ -453,8 +452,8 @@ TEST(StrengthFormat, DisplayPercentVOnWeakConflictShowsWeX) {
 // strength components are at the strong level and §21.2.1.4 gives the result
 // the St mnemonic: StX. §28.12.2 adds every weaker strength level to that
 // result, so both lower bounds sit at high impedance, and the digit form is
-// still not what the clause asks for. Table 21-5 reads StX as "A strong driving
-// unknown value".
+// still not what the clause asks for. Table 21-5 reads StX as an unknown value
+// driven at strong strength.
 TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -470,8 +469,7 @@ TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
 // strength levels drawn from both the strength1 and the strength0 halves of the
 // strength scale, so a strong driver of 1'bx puts strong on both sides -- the
 // value is unknown, the strength is not. §21.2.1.4 renders that with a
-// mnemonic, "when both the 0 and 1 strength components are at the same strength
-// level": StX.
+// mnemonic, its 0 and 1 strength components sharing one level: StX.
 //
 // This is a different source from the equal-and-opposite conflict above, which
 // arrives at x by combining two known values. A net driven x by one driver
@@ -563,10 +561,10 @@ TEST(StrengthFormat, NonNetOperandToPercentVRendersEmpty) {
   EXPECT_NE(out.find("[]"), std::string::npos);
 }
 
-// §21.2.1.4 admits a scalar reference alone: "a corresponding scalar reference
-// shall follow the string literal in the argument list". A four-bit net is a
-// vector (§6.9), and one three-character group cannot stand for its four bits,
-// so the operand is reported rather than rendered.
+// §21.2.1.4 admits a scalar reference alone, which follows the string literal
+// in the argument list. A four-bit net is a vector (§6.9), and one
+// three-character group cannot stand for its four bits, so the operand is
+// reported rather than rendered.
 TEST(StrengthFormat, VectorNetOperandToPercentVIsReported) {
   ExpectPercentVOperandReported("wire [3:0] w;");
 }
@@ -608,7 +606,7 @@ TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
   EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
 }
 
-// §21.2.1.4 asks a %v for "a corresponding scalar reference", and §11.5.1 has a
+// §21.2.1.4 asks a %v for a matching scalar reference, and §11.5.1 has a
 // bit-select "specif[y] the single bit of vector acc that is addressed by the
 // operand index". One bit of a net is the scalar whose strength the clause
 // reports, so a bit-select of a vector net is the operand form that asks about

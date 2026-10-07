@@ -92,16 +92,16 @@ TEST_F(DumpfileSysTask, OmittedArgumentDefaultsToDumpVcd) {
             "dump.vcd");
 }
 
-// §21.7.1.1: "The filename is optional and defaults to the string literal
-// "dump.vcd" if not specified." The cases above read the name back out of the
-// run; this one reads the file the name produced, which is the only place the
-// default can be observed to have been used for anything. §21.7.1.2 makes
-// $dumpvars dump into the file specified by $dumpfile, so a source that calls
-// $dumpvars and never calls $dumpfile at all specifies no name and dumps into
-// the default one. $enddefinitions says the file went through the header and
-// variable definitions of §21.7.2.1 rather than being an empty file the run
-// touched, and the directory holding nothing else says the default name is
-// the one that was used.
+// §21.7.1.1: the filename may be left out, and then defaults to the string
+// literal "dump.vcd". The cases above read the name back out of the run; this
+// one reads the file the name produced, which is the only place the default can
+// be observed to have been used for anything. §21.7.1.2 makes $dumpvars dump
+// into the file specified by $dumpfile, so a source that calls $dumpvars and
+// never calls $dumpfile at all specifies no name and dumps into the default
+// one. $enddefinitions says the file went through the header and variable
+// definitions of §21.7.2.1 rather than being an empty file the run touched, and
+// the directory holding nothing else says the default name is the one that was
+// used.
 TEST_F(DumpfileSysTask, UnspecifiedFileNameWritesTheDefaultDumpVcd) {
   RunSource(
       "module t;\n"

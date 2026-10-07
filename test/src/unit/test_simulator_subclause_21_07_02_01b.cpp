@@ -12,14 +12,13 @@ using namespace delta;
 
 namespace {
 
-// §21.7.2.1, the prose under Syntax 21-20: "Next, the file contains definitions
-// of the scope and type of variables being dumped, followed by the actual value
-// changes at each simulation time increment. Only the variables that change
-// value during a time increment are listed." The second sentence bounds the
-// listing to the variables that changed; the first requires the changes
-// themselves to be there. A variable that did change during an increment and is
-// listed under no increment satisfies neither, and the dump reads as a waveform
-// the object never took.
+// §21.7.2.1, the prose under Syntax 21-20: the file goes on to define the scope
+// and type of the dumped variables and then gives their value changes at each
+// simulation time increment, listing only the variables that changed in it. The
+// second sentence bounds the listing to the variables that changed; the first
+// requires the changes themselves to be there. A variable that did change
+// during an increment and is listed under no increment satisfies neither, and
+// the dump reads as a waveform the object never took.
 //
 // The cases below all put a dumped variable under an event control, because
 // that is what the dumper's change detection shares state with. The detection
@@ -140,15 +139,14 @@ class VcdChangeDetectionFromSource : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.2.1: "Only the variables that change value during a time increment are
-// listed" -- so a clock that changes under each of four increments is listed
-// under each of them, and the file reads 0 (the $dumpvars checkpoint), then 1,
-// 0, 1, 0. The clock is driven from one process and waited on from another,
-// which is the arrangement the dumper's change detection shares
-// Variable::prev_value with: awaiters.h:205 restores the watcher's own
-// baseline into that field and awaiters.h:262 resyncs it whenever the change
-// was not a posedge, and either write lands between the assignment and the
-// end-of-increment recording pass.
+// §21.7.2.1: only variables that change during a time increment are listed --
+// so a clock that changes under each of four increments is listed under each of
+// them, and the file reads 0 (the $dumpvars checkpoint), then 1, 0, 1, 0. The
+// clock is driven from one process and waited on from another, which is the
+// arrangement the dumper's change detection shares Variable::prev_value with:
+// awaiters.h:205 restores the watcher's own baseline into that field and
+// awaiters.h:262 resyncs it whenever the change was not a posedge, and either
+// write lands between the assignment and the end-of-increment recording pass.
 TEST_F(VcdChangeDetectionFromSource, ClockWaitedOnByPosedgeRecordsEveryEdge) {
   std::string values = ValuesRecordedFor(
       ClockSource("  always @(posedge clk) n = n + 1;\n"), "clk");

@@ -253,13 +253,12 @@ TEST_F(DumpvarsSysTask, MayBeInvokedRepeatedly) {
 // scope arguments there are all written relative to the top module instead.
 class DumpvarsTopModuleScope : public VcdDumpFromSourceTestBase {
  protected:
-  // §21.7.2.3: "the general information in the VCD file is presented as a
-  // series of sections surrounded by keywords", so what a $dumpvars call
-  // selected is what stands between its keyword and the $end closing it.
-  // Reading the section rather than the file is what makes an omission
-  // observable: DumpChangedValues records a variable the checkpoint left out
-  // when it next changes, so the value of an unselected variable is in the
-  // file either way.
+  // §21.7.2.3: the VCD file's general information comes as a run of sections,
+  // each bounded by keywords, so what a $dumpvars call selected is what stands
+  // between its keyword and the $end closing it. Reading the section rather
+  // than the file is what makes an omission observable: DumpChangedValues
+  // records a variable the checkpoint left out when it next changes, so the
+  // value of an unselected variable is in the file either way.
   std::string CheckpointSection(const std::string& content) const {
     auto begin = content.find("$dumpvars\n");
     if (begin == std::string::npos) return "<no-checkpoint>";
@@ -291,12 +290,12 @@ class DumpvarsTopModuleScope : public VcdDumpFromSourceTestBase {
   }
 };
 
-// Example 2: "$dumpvars (0, top);" -- "the $dumpvars task shall dump all
-// variables in the module top and in all module instances below module top in
-// the hierarchy". The top module's own variables are registered under their
-// bare names and a child instance's under a path that does not carry the top
-// module either, so a scope naming the top module matched no signal at all and
-// the checkpoint came out empty.
+// Example 2: "$dumpvars (0, top);" -- the call dumps every variable of module
+// top and of every module instance beneath it in the hierarchy. The top
+// module's own variables are registered under their bare names and a child
+// instance's under a path that does not carry the top module either, so a scope
+// naming the top module matched no signal at all and the checkpoint came out
+// empty.
 TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelZeroDumpsItsOwnAndThoseBelow) {
   RunSource(Design("0, t"));
   auto section = CheckpointSection(DumpFile("dump.vcd"));
@@ -304,10 +303,10 @@ TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelZeroDumpsItsOwnAndThoseBelow) {
   EXPECT_NE(section.find("b111100"), std::string::npos) << section;    // c1.val
 }
 
-// Example 1: "$dumpvars (1, top);" -- "this invocation dumps all variables
-// within the module top; it does not dump variables in any of the modules
-// instantiated by module top". The level counts hierarchy below the named
-// scope, so the top module's own variables are the one level it admits.
+// Example 1: "$dumpvars (1, top);" -- the call dumps the variables of module
+// top itself and none of those in the modules top instantiates. The level
+// counts hierarchy below the named scope, so the top module's own variables are
+// the one level it admits.
 TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelOneStopsAtItsOwnVariables) {
   RunSource(Design("1, t"));
   auto section = CheckpointSection(DumpFile("dump.vcd"));
@@ -326,11 +325,11 @@ TEST_F(DumpvarsTopModuleScope, AChildNamedThroughTheTopModuleSelectsThatChild) {
   EXPECT_EQ(section.find("b10100101"), std::string::npos) << section;  // own
 }
 
-// §21.7.1.2 lists "which variables to dump", and §21.7.2.3 has the $var
-// section print "the names and identifier codes of the variables being
-// dumped". Example 1's call dumps nothing of the instances below the top
-// module, so the child's variable is not declared, and the $scope that would
-// hold it holds nothing and is not written either.
+// §21.7.1.2 lists which variables are dumped, and §21.7.2.3 has the $var
+// section print the names and identifier codes of those variables. Example 1's
+// call dumps nothing of the instances below the top module, so the child's
+// variable is not declared, and the $scope that would hold it holds nothing and
+// is not written either.
 TEST_F(DumpvarsTopModuleScope, TopModuleAtLevelOneDeclaresOnlyItsOwnVariables) {
   RunSource(Design("1, t"));
   auto content = DumpFile("dump.vcd");
@@ -371,13 +370,13 @@ TEST_F(DumpvarsTopModuleScope, TwoCallsInOneTimeUnitDeclareBothSelections) {
       << content;
 }
 
-// §21.7.1.2: "The $dumpvars task shall be used to list which variables to dump
-// into the file specified by $dumpfile." What a call listed therefore governs
-// the whole recording rather than the one checkpoint the call writes, so these
-// cases run the driver's per-timestep change pass -- which DumpvarsSysTask
-// above installs no callback for -- and read what reaches the file after the
-// checkpoint has been written. Registration is by name order, so the
-// alphabetically first variable carries the identifier code '!'.
+// §21.7.1.2: $dumpvars is the task that lists which variables go into the file
+// $dumpfile names. What a call listed therefore governs the whole recording
+// rather than the one checkpoint the call writes, so these cases run the
+// driver's per-timestep change pass -- which DumpvarsSysTask above installs no
+// callback for -- and read what reaches the file after the checkpoint has been
+// written. Registration is by name order, so the alphabetically first variable
+// carries the identifier code '!'.
 class DumpvarsSelectsWhatIsRecorded : public VcdDumpRunTestBase {
  protected:
   std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
@@ -408,18 +407,18 @@ TEST_F(DumpvarsSelectsWhatIsRecorded, AnUnlistedVariablesChangeIsNotRecorded) {
   EXPECT_EQ(content.find("b111100"), std::string::npos) << content;    // beta
 }
 
-// §21.7.1.2: "When invoked with no arguments, $dumpvars dumps all the
-// variables in the model to the VCD file", so both changes are recorded.
+// §21.7.1.2: $dumpvars called with no arguments dumps every variable of the
+// model to the VCD file, so both changes are recorded.
 TEST_F(DumpvarsSelectsWhatIsRecorded, NoArgumentsRecordsEveryVariablesChange) {
   auto content = RunVcd(Design("    $dumpvars;\n"));
   EXPECT_NE(content.find("b10100101"), std::string::npos) << content;  // alpha
   EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
 }
 
-// §21.7.1.2: the task "can be invoked as often as desired throughout the
-// model", and each invocation lists variables to dump rather than replacing
-// what an earlier one listed, so two calls naming one variable each leave both
-// in the dump.
+// §21.7.1.2: the task may be called as many times, and in as many places in the
+// model, as wanted, and each invocation lists variables to dump rather than
+// replacing what an earlier one listed, so two calls naming one variable each
+// leave both in the dump.
 TEST_F(DumpvarsSelectsWhatIsRecorded, ASecondCallAddsToWhatIsRecorded) {
   auto content =
       RunVcd(Design("    $dumpvars(0, alpha);\n"
@@ -441,11 +440,10 @@ TEST_F(DumpvarsSelectsWhatIsRecorded,
   EXPECT_NE(content.find("b111100"), std::string::npos) << content;    // beta
 }
 
-// §21.7.1.2: "The $dumpvars task can be invoked as often as desired throughout
-// the model (for example, within various blocks), but the execution of all the
-// $dumpvars tasks shall be at the same simulation time." The rule is over the
-// times the calls run at rather than over the calls, so a case has to hold the
-// fixture to read what the run reported.
+// §21.7.1.2: $dumpvars may be called as many times and in as many places,
+// different blocks among them, as wanted, but every call must run at one
+// simulation time. The rule is over the times the calls run at rather than over
+// the calls, so a case has to hold the fixture to read what the run reported.
 class DumpvarsCallTimes : public VcdDumpRunTestBase {
  protected:
   std::string RunVcd(SimFixture& f, const std::string& src) {
@@ -474,9 +472,9 @@ TEST_F(DumpvarsCallTimes, ACallInAnotherTimeUnitIsReported) {
       "21.7.1.2"));
 }
 
-// "As often as desired throughout the model (for example, within various
-// blocks)" is the permission the rule bounds, so two calls from two blocks in
-// one time unit are what the subclause allows rather than what it forbids.
+// Calling it as many times and in as many places as wanted is the permission
+// the rule bounds, so two calls from two blocks in one time unit are what the
+// subclause allows rather than what it forbids.
 TEST_F(DumpvarsCallTimes, TwoCallsInOneTimeUnitFromTwoBlocksAreAccepted) {
   SimFixture f;
   RunVcd(f,
@@ -497,7 +495,7 @@ TEST_F(DumpvarsCallTimes, TwoCallsInOneTimeUnitFromTwoBlocksAreAccepted) {
 
 // The rule names one time and does not say which: the first call settles it.
 // A lone call in a later time unit is therefore accepted, where a rule read as
-// "at time zero" would reject it.
+// requiring time zero would reject it.
 TEST_F(DumpvarsCallTimes, AloneCallAfterADelayIsAccepted) {
   SimFixture f;
   RunVcd(f,

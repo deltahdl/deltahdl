@@ -186,8 +186,8 @@ TEST(ReadmemMultiDimSim, IncompleteFileLeavesRemainderUnchanged) {
   std::remove(path.c_str());
 }
 
-// §21.4.3: "left unchanged" observed through a 4-state element type — the
-// subwords the incomplete file never reaches keep their declaration-time x
+// §21.4.3: words left as they were, observed through a 4-state element type —
+// the subwords the incomplete file never reaches keep their declaration-time x
 // rather than being zero-filled.
 TEST(ReadmemMultiDimSim, IncompleteFileFourStateRemainderKeepsX) {
   SimFixture f;

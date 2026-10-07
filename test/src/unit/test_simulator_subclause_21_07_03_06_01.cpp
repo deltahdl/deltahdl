@@ -68,9 +68,9 @@ TEST_F(VcdcloseKeyword, ClosedFileEndsWithKeywordTimeEnd) {
 
 // The recorded time is the end simulation time, not the last value-change
 // time: the run's last timestep only rewrites a's existing value, so no
-// change is recorded there, yet the close still stamps that later time. This
-// is the "regardless of the state of signal changes" semantics -- a parser
-// relying on value changes alone would misread the end time as #10.
+// change is recorded there, yet the close still stamps that later time. This is
+// the stamp being written whatever the signals did -- a parser relying on value
+// changes alone would misread the end time as #10.
 TEST_F(VcdcloseKeyword, RecordsEndTimeBeyondLastValueChange) {
   auto content = RunVcd(
       "module t;\n"
@@ -343,9 +343,9 @@ class VcdcloseFromSource : public VcdDumpFromSourceTestBase {
   // own close, so the only difference between the cases below is which tasks
   // they insert. The close stands at a simulation time of its own: the dump is
   // opened at time 0 and the run goes on to time 15, while §21.7.3.6.1 records
-  // "the final simulation time at the time the extended VCD file is closed",
-  // which is neither of those. A command carrying 0 or 15 would therefore be
-  // recording something other than what the clause asks for.
+  // the simulation time at which the extended VCD file is closed, which is
+  // neither of those. A command carrying 0 or 15 would therefore be recording
+  // something other than what the clause asks for.
   static std::string DesignCalling(const std::string& open_task,
                                    const std::string& close_task) {
     return "module t;\n"
@@ -359,12 +359,12 @@ class VcdcloseFromSource : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.3.6.1: "The $vcdclose keyword indicates the final simulation time at
-// the time the extended VCD file is closed." A source calling the task gets
-// that command written into the extended file its $dumpports opened, carrying
-// the time the call executed at. The keyword terminates the file, so it stands
-// last and stands once: the value change the run makes at time 15 is not
-// recorded after it, and no second close is stamped with a later time.
+// §21.7.3.6.1: the $vcdclose keyword gives the simulation time at which the
+// extended VCD file is closed. A source calling the task gets that command
+// written into the extended file its $dumpports opened, carrying the time the
+// call executed at. The keyword terminates the file, so it stands last and
+// stands once: the value change the run makes at time 15 is not recorded after
+// it, and no second close is stamped with a later time.
 TEST_F(VcdcloseFromSource, SourceCallTerminatesTheExtendedFileAtItsOwnTime) {
   RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n",
                           "    $vcdclose;\n"),
@@ -402,14 +402,13 @@ TEST_F(VcdcloseFromSource, ExtendedDumpWithoutTheCallIsNotTerminated) {
   EXPECT_EQ(content.find("$vcdclose"), std::string::npos);
 }
 
-// §21.7.3.6: "Extended VCD provides one additional keyword command to that of
-// the 4-state VCD." The keyword is what the extended format adds, so a 4-state
-// file has no place for it however its source asks. §21.7.3.7 settles what the
-// call does instead of leaving it unspecified: an extended VCD system task
-// naming a file no $dumpports call opened "shall be ignored", and its
-// no-argument form runs its default action over the files $dumpports opened,
-// of which this run opened none. So the command is not written and the 4-state
-// dump goes on recording.
+// §21.7.3.6: extended VCD adds one keyword command to those of 4-state VCD. The
+// keyword is what the extended format adds, so a 4-state file has no place for
+// it however its source asks. §21.7.3.7 settles what the call does instead of
+// leaving it unspecified: an extended VCD system task naming a file no
+// $dumpports call opened is ignored, and its no-argument form runs its default
+// action over the files $dumpports opened, of which this run opened none. So
+// the command is not written and the 4-state dump goes on recording.
 TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
   RunSource(DesignCalling("    $dumpfile(\"vardump.vcd\");\n    $dumpvars;\n",
                           "    $vcdclose;\n"),
@@ -425,10 +424,10 @@ TEST_F(VcdcloseFromSource, FourStateDumpIgnoresTheSourceCall) {
   EXPECT_TRUE(HasLine(Lines(content), "#15"));
 }
 
-// §21.7: a VCD file "contains information about value changes on selected
-// variables in the design", and the change these designs make to `a` is one of
-// them. Whether it reaches the file turns on which time unit the close falls
-// in, so the cases below differ only in that and in which unit they read.
+// §21.7: a VCD file records the value changes of variables selected in the
+// design, and the change these designs make to `a` is one of them. Whether it
+// reaches the file turns on which time unit the close falls in, so the cases
+// below differ only in that and in which unit they read.
 //
 // The record is looked for under the identifier code §21.7.4.2's node
 // information gives `a`, rather than under a spelling of the value these tests
@@ -492,12 +491,12 @@ TEST_F(VcdcloseClosingUnit, ChangeBeforeTheClosingTimeUnitIsStillRecorded) {
 }
 
 // The closing unit of that same run, which the design changed nothing in.
-// §21.7.2.1 has a time increment list "the variables that change value" during
-// it, so recording the unit a close falls in must not invent a record for a
-// unit that changed none -- which is what a step dumping every selected object
-// rather than the changed ones would produce. The simulation_time command
-// itself is not such a record: §21.7.4.1 admits one standing on its own, and a
-// dump that stays open writes one for every time unit the run reaches.
+// §21.7.2.1 has a time increment list the variables that change during it, so
+// recording the unit a close falls in must not invent a record for a unit that
+// changed none -- which is what a step dumping every selected object rather
+// than the changed ones would produce. The simulation_time command itself is
+// not such a record: §21.7.4.1 admits one standing on its own, and a dump that
+// stays open writes one for every time unit the run reaches.
 TEST_F(VcdcloseClosingUnit, ClosingUnitWithNoChangeListsNoValueChange) {
   std::string unit = UnitBeforeClose("    #1 $vcdclose;\n", "\n#11\n");
   ASSERT_TRUE(found_) << whole_;

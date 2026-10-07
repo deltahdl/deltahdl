@@ -227,8 +227,8 @@ TEST(AssignmentPatternFormat, UnpackedStructPrintsNamedMembers) {
 }
 
 // §21.2.1.6 (C7a): a member that is itself a packed structure shall print as a
-// nested assignment pattern with named elements -- "each element shall be
-// printed under one of these rules" -- not as a flat number.
+// nested assignment pattern with named elements -- every element printed by one
+// of the listed rules -- not as a flat number.
 TEST(AssignmentPatternFormat, NestedStructMemberPrintsNestedPattern) {
   auto out = RunSim(
       "module t;\n"

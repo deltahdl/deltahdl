@@ -91,8 +91,8 @@ TEST(FlushingOutput, McdArgumentPublishesSelectedChannel) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: the mcd argument names "the file(s)" it selects -- an mcd built by
-// ORing two §21.3.1 channels selects both, and one flush must publish the
+// §21.3.6: the mcd argument names the file or files it selects -- an mcd built
+// by ORing two §21.3.1 channels selects both, and one flush must publish the
 // buffered output of each. The ORed value also exercises the argument as a
 // computed expression rather than a plain variable.
 TEST(FlushingOutput, OredMcdFlushesEverySelectedFile) {

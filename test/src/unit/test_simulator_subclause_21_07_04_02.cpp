@@ -57,7 +57,7 @@ Logic4Vec MakeBits(Arena& arena, uint32_t width, uint64_t val) {
 // dumped with $dumpports produces one $var port entry per port. This single
 // observation covers several of the clause's rules at once:
 //   - var_type is the keyword port for every entry, never a 4-state keyword
-//     such as wire (the "no other keyword is allowed" rule);
+//     such as wire (the rule admitting no other keyword);
 //   - the size is 1 for the single-bit ports and the declared index range
 //     [0:3] for the bus, not a plain bit count;
 //   - the identifier codes are integers preceded by < that ascend 0,1,2,3 in

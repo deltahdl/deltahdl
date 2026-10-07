@@ -14,11 +14,11 @@
 // real scratch files written before each run.
 //
 // Several tests read back an address the load never wrote, either because it
-// falls outside the window or because the file ran out of words. §21.4 says
-// those "are not modified by the operation", so what they hold is the memory's
-// default initial value -- and every memory here is declared `reg`, which
-// Table 6-7 gives 'x. Such an address therefore displays as x, and an
-// expectation of zero would be asserting that the load had touched it.
+// falls outside the window or because the file ran out of words. §21.4 says the
+// operation leaves those untouched, so what they hold is the memory's default
+// initial value -- and every memory here is declared `reg`, which Table 6-7
+// gives 'x. Such an address therefore displays as x, and an expectation of zero
+// would be asserting that the load had touched it.
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -142,11 +142,11 @@ TEST(ReadmemFileLoadSim, BinaryNumberAcceptsUnknownAndUnderscore) {
           "  end\n"
           "endmodule\n",
       f);
-  // §21.4: x, z and the underscore "can be used in specifying a number as in a
-  // SystemVerilog source description", so each line reads as the binary literal
-  // it spells and lands right-justified in the 8-bit word. "10x1" is 4'b10x1 --
-  // most significant digit first, so the unknown is bit 1, not bit 2 -- and
-  // "1_0_1" drops its underscores to leave 0b101.
+  // §21.4: x, z and the underscore may be used in a number as in SystemVerilog
+  // source, so each line reads as the binary literal it spells and lands
+  // right-justified in the 8-bit word. "10x1" is 4'b10x1 -- most significant
+  // digit first, so the unknown is bit 1, not bit 2 -- and "1_0_1" drops its
+  // underscores to leave 0b101.
   EXPECT_EQ(out, "000010x1 00000101\n");
   std::remove(path.c_str());
 }

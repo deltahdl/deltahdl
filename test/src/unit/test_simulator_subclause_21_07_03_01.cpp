@@ -702,12 +702,12 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
                             14, "21.7.3.1"));
 }
 
-// §21.7.3.1: "The $dumpports task can be used in source code that also
-// contains the $dumpvars task." The two tasks write two files -- §21.7.1.1
-// defaults $dumpfile's to dump.vcd and §21.7.3.1 defaults $dumpports' to
-// dumpports.vcd -- and the two are of the two different types §21.7 defines,
-// so neither can stand in for the other: §21.7.4.2 declares an extended file's
-// objects as $var port, which a 4-state reader has no rule for.
+// §21.7.3.1: one source may call both $dumpports and $dumpvars. The two tasks
+// write two files -- §21.7.1.1 defaults $dumpfile's to dump.vcd and §21.7.3.1
+// defaults $dumpports' to dumpports.vcd -- and the two are of the two different
+// types §21.7 defines, so neither can stand in for the other: §21.7.4.2
+// declares an extended file's objects as $var port, which a 4-state reader has
+// no rule for.
 //
 // Every case runs the source's own dump tasks and reads back what the run left
 // in the directory it stood in, because a fixture that installs one writer of
@@ -762,10 +762,10 @@ TEST_F(DumpvarsAndDumpportsFromSource, DumpportsThenDumpvarsWritesBothFiles) {
       << DumpFile("dumpports.vcd");
 }
 
-// §21.7.3.1: "If no filename is provided, the file shall be written to the
-// current working directory with the name dumpports.vcd." That default is
-// $dumpports' own; §21.7.1.1's dump.vcd belongs to $dumpfile, and a source
-// calling no 4-state task writes no 4-state file for it to name.
+// §21.7.3.1: with no filename given, the file goes to the current working
+// directory as dumpports.vcd. That default is $dumpports' own; §21.7.1.1's
+// dump.vcd belongs to $dumpfile, and a source calling no 4-state task writes no
+// 4-state file for it to name.
 TEST_F(DumpvarsAndDumpportsFromSource, DumpportsAloneWritesOnlyItsOwnDefault) {
   RunSource(SourceCalling("    $dumpports;\n"));
   EXPECT_EQ(NamesWritten(), "dumpports.vcd");

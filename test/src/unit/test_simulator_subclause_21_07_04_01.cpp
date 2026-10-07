@@ -513,13 +513,13 @@ TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
   EXPECT_TRUE(HasLine(lines, "1\""));
 }
 
-// "A 4-state VCD construct name that matches an extended VCD construct shall
-// be considered equivalent, except if preceded by an *." The same design
-// dumped through the 4-state tasks ($dumpfile/$dumpvars -- the §21.7.2.1
-// dependency's real syntax) and through $dumpports renders every shared
-// declaration construct identically: matching names carry the same meaning in
-// both files. And since no emitted construct name is *-prefixed, the
-// equivalence holds for every construct either file contains.
+// A 4-state VCD construct name that matches an extended VCD construct counts as
+// the same construct unless an * precedes it. The same design dumped through
+// the 4-state tasks ($dumpfile/$dumpvars -- the §21.7.2.1 dependency's real
+// syntax) and through $dumpports renders every shared declaration construct
+// identically: matching names carry the same meaning in both files. And since
+// no emitted construct name is *-prefixed, the equivalence holds for every
+// construct either file contains.
 TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
   const char* body =
       "  logic a = 1'b0;\n"

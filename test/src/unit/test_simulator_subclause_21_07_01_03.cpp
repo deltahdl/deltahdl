@@ -136,18 +136,17 @@ TEST_F(DumpOffOnSysTask, DumpoffCheckpointRecordsEveryVariableAsX) {
   EXPECT_LT(xv, end);
 }
 
-// §21.7.1.3: "When the $dumpoff task is executed, a checkpoint is made in which
-// every selected variable is dumped as an x value." §6.17: "The event data type
-// provides a handle to a synchronization object" -- a handle has no x state to
-// record, and the writer says so elsewhere by emitting nothing for an
-// untriggered event, so the two must agree.
-// DumpoffCheckpointRecordsEveryVariableAsX above reads the x records of a
-// scalar and a vector and DumpoffRecordsRealVariableAsRealZero the one type
-// excused from the x form; no case in this file declares an event, so the bx
-// record the checkpoint wrote for one -- an event's zero-width storage falling
-// to the vector arm -- went unasserted. This half of the defect is independent
-// of the $var keyword, so a fix that corrects only the declaration cannot pass
-// this case.
+// §21.7.1.3: executing $dumpoff makes a checkpoint that dumps every selected
+// variable as x. §6.17: "The event data type provides a handle to a
+// synchronization object" -- a handle has no x state to record, and the writer
+// says so elsewhere by emitting nothing for an untriggered event, so the two
+// must agree. DumpoffCheckpointRecordsEveryVariableAsX above reads the x
+// records of a scalar and a vector and DumpoffRecordsRealVariableAsRealZero the
+// one type excused from the x form; no case in this file declares an event, so
+// the bx record the checkpoint wrote for one -- an event's zero-width storage
+// falling to the vector arm -- went unasserted. This half of the defect is
+// independent of the $var keyword, so a fix that corrects only the declaration
+// cannot pass this case.
 //
 // The registration is the driver's own, SimContext::RegisterVcdSignals, rather
 // than the sorted registration this file's RunVcd uses: that is the step which
@@ -449,12 +448,12 @@ TEST_F(DumpOffOnSysTask, WithoutDumpFileTasksAreHarmless) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §21.7.1.3: "When the $dumpoff task is executed, a checkpoint is made in
-// which every selected variable is dumped as an x value." Selected is what
-// §21.7.1.2's $dumpvars listed, so a variable outside the scope list is
-// outside this checkpoint too -- the suspend covers the dump rather than the
-// model. The identifier codes are read out of the $var declarations so each
-// record in the section is attributed to the object that owns it.
+// §21.7.1.3: executing $dumpoff makes a checkpoint that dumps every selected
+// variable as x. Selected is what §21.7.1.2's $dumpvars listed, so a variable
+// outside the scope list is outside this checkpoint too -- the suspend covers
+// the dump rather than the model. The identifier codes are read out of the $var
+// declarations so each record in the section is attributed to the object that
+// owns it.
 TEST_F(DumpOffOnSysTask, DumpoffRecordsOnlyTheVariablesDumpvarsListed) {
   auto content = RunVcd(
       "module t;\n"

@@ -264,8 +264,8 @@ TEST(IoSystemTaskTest, FopenReturnValueIsThirtyTwoBits) {
 
 // §21.3.1: STDOUT is pre-opened for output. Writing to the reserved STDOUT fd
 // must succeed (the descriptor is mapped to a non-null FILE*); this directly
-// observes the "STDOUT/STDERR are pre-opened for append" guarantee at the
-// simulator layer that produces the mapping.
+// observes the guarantee that STDOUT and STDERR come already open for append at
+// the simulator layer that produces the mapping.
 TEST(IoSystemTaskTest, StdoutFdIsWritable) {
   SimFixture f;
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdoutFd), nullptr);
@@ -433,9 +433,9 @@ TEST(IoSystemTaskTest, FreshMcdHasExactlyOneChannelBitSet) {
 //
 // Written with %0d rather than %d because what is under test is which writes
 // reach the file, not how the value is rendered. §21.2.1.2 pads %d to the
-// width of the largest value the expression can hold; %0d is the "minimum
-// width, with no leading spaces or zeros" form, which keeps the expected
-// string independent of that width.
+// width of the largest value the expression can hold; %0d is the minimum-width
+// form, with no leading spaces or zeros, which keeps the expected string
+// independent of that width.
 TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_cancel_on_close.txt";

@@ -126,10 +126,10 @@ TEST_F(CreatingFourStateVcd, ValueChangesForAllSpecifiedVariables) {
   EXPECT_NE(content.find("b1010 \"", p_defs_end), std::string::npos);
 }
 
-// "All variables specified" includes one that never changes after the
-// specifying call: the checkpoint the specification produces records its
-// value, so the variable is represented in the file's value-change section
-// even without a later edge.
+// Every variable specified includes one that never changes after the specifying
+// call: the checkpoint the specification produces records its value, so the
+// variable is represented in the file's value-change section even without a
+// later edge.
 TEST_F(CreatingFourStateVcd, SpecifiedButUnchangingVariableStillRepresented) {
   auto content = RunVcd(
       "module t;\n"

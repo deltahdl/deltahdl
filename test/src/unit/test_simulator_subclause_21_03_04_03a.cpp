@@ -644,7 +644,7 @@ TEST(ReadingFormattedData, WideDestinationTakesWholeField) {
 // C6 + C14: a single white-space character in the control string matches a
 // whole run of mixed input white space (blank, tab, newline); and when a
 // trailing white-space directive is present, the trailing input white space
-// IS consumed -- the "unless matched by a directive" arm -- so the next read
+// IS consumed -- the arm where a directive matches it -- so the next read
 // starts at the character after it.
 TEST(ReadingFormattedData, WhitespaceDirectiveMatchesRunAndConsumesTrailing) {
   SysTaskFixture f;
@@ -851,20 +851,21 @@ TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
                               "21.3.4.3"));
 }
 
-// C11 (Table 21-7, v row): Table 21-3 gives L "for a logic 0 or high-impedance
-// value", so L is one of the logic values a %v field may carry and the reader
-// takes it. What it assigns is the "4-value equivalent" the same row asks for:
-// L names two of the four values without saying which of them holds, and x is
-// the value an integral variable has for that.
+// C11 (Table 21-7, v row): Table 21-3 gives L for a value that is either 0 or
+// high impedance, so L is one of the logic values a %v field may carry and the
+// reader takes it. What it assigns is the 4-value equivalent the same row asks
+// for: L names two of the four values without saying which of them holds, and x
+// is the value an integral variable has for that.
 TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousZeroOrHighZ) {
   SysTaskFixture f;
   std::string out = ScanStrengthInto("StL", f);
   EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, v row): H is Table 21-3's "logic 1 or high-impedance value",
-// the other ambiguous logic value, and reaches the reader as a different
-// character from the L above. Its 4-value equivalent is x for the same reason.
+// C11 (Table 21-7, v row): H is Table 21-3's value that is either 1 or high
+// impedance, the other ambiguous logic value, and reaches the reader as a
+// different character from the L above. Its 4-value equivalent is x for the
+// same reason.
 TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousOneOrHighZ) {
   SysTaskFixture f;
   std::string out = ScanStrengthInto("PuH", f);

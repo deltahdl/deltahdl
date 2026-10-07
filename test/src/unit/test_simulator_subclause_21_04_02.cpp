@@ -398,13 +398,12 @@ TEST(Readmem2StateSim, OutOfRangeEnumValueErrorsAndStopsReading) {
   std::remove(path.c_str());
 }
 
-// §21.4.2 (shall, edge): "out of range" means the number matches no element,
-// not merely that it exceeds the largest one. With elements valued {1, 4},
-// the value 2 lies inside the numeric span yet names no element, so it is
-// rejected the same way — pinning the check to element membership rather
-// than a bounds comparison. (EnumExplicitValuesLoadNumerically is the
-// counterfactual: the member value 4 at this same first position loads with
-// no error.)
+// §21.4.2 (shall, edge): being out of range means the number matches no
+// element, not merely that it exceeds the largest one. With elements valued {1,
+// 4}, the value 2 lies inside the numeric span yet names no element, so it is
+// rejected the same way — pinning the check to element membership rather than a
+// bounds comparison. (EnumExplicitValuesLoadNumerically is the counterfactual:
+// the member value 4 at this same first position loads with no error.)
 TEST(Readmem2StateSim, SparseGapValueIsOutOfRange) {
   SimFixture f;
   std::string path = WriteData("gap", "2\n");

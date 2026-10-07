@@ -409,12 +409,12 @@ TEST_F(ExtendedVcdFileFormat, WithoutWriterNoFileContentToFormat) {
 // Every case above hands the run a writer the fixture built, marked and filled
 // with definitions before the source executed, so those cases observe what the
 // extended form holds and cannot observe what selects it. §21.7.4.2 says the
-// node information section "is affected by the $dumpports task as Syntax 21-28
-// shows" and §21.7.4.3 says "the value change section of the VCD file is also
-// affected by $dumpports", so the task the source calls is what selects the
-// form. These cases supply the source and nothing else -- no writer is
-// installed and no fixture flag is set -- so the form of the file left on disk
-// is the form the run's own $dumpports or $dumpvars asked for.
+// node information section changes under $dumpports as Syntax 21-28 shows and
+// §21.7.4.3 says the VCD file's value change section changes under $dumpports
+// too, so the task the source calls is what selects the form. These cases
+// supply the source and nothing else -- no writer is installed and no fixture
+// flag is set -- so the form of the file left on disk is the form the run's own
+// $dumpports or $dumpvars asked for.
 class ExtendedVcdFormatChosenByTheSource : public VcdDumpFromSourceTestBase {
  protected:
   // One design under either VCD task family, so the only difference between
@@ -439,12 +439,12 @@ class ExtendedVcdFormatChosenByTheSource : public VcdDumpFromSourceTestBase {
 
 // One line of a dump file reduced to the two parts of Syntax 21-29 (§21.7.4.3)
 // these cases read: the p key character with the port_value written straight
-// after it -- "there is no space between the p and the port_value" -- and the
-// identifier_code, "the integer preceded by the < character as defined in the
-// $var construct for the port". The two strength components standing between
-// them are dropped, so no claim below rests on what strength a port record
-// reports (deltahdl/deltahdl#3252). A line that is not a port value change
-// reduces to the empty string.
+// after it, with no space between the p and the port_value, and the
+// identifier_code, the integer after the < that the port's $var construct
+// defines. The two strength components standing between them are dropped, so no
+// claim below rests on what strength a port record reports
+// (deltahdl/deltahdl#3252). A line that is not a port value change reduces to
+// the empty string.
 std::string PortValueChangeRecord(const std::string& line) {
   if (line.empty() || line[0] != 'p') return "";
   auto space = line.find(' ');
@@ -469,23 +469,21 @@ std::string PortValueChanges(const std::string& content) {
   return joined;
 }
 
-// §21.7.4.2: "The node information section (also referred to as the variable
-// definitions section) is affected by the $dumpports task as Syntax 21-28
-// shows"; §21.7.4.3: "The value change section of the VCD file is also
-// affected by $dumpports". A run whose source calls $dumpports and nothing
-// else therefore leaves both sections in the extended form -- each object
-// declared "$var var_type size < identifier_code reference $end" with the
-// var_type keyword port, and each value change written as the Syntax 21-29 p
-// record naming that port's identifier code.
+// §21.7.4.2: the node information section, also called the variable definitions
+// section, changes under $dumpports as Syntax 21-28 shows; §21.7.4.3: the VCD
+// file's value change section changes under $dumpports too. A run whose source
+// calls $dumpports and nothing else therefore leaves both sections in the
+// extended form -- each object declared "$var var_type size < identifier_code
+// reference $end" with the var_type keyword port, and each value change written
+// as the Syntax 21-29 p record naming that port's identifier code.
 TEST_F(ExtendedVcdFormatChosenByTheSource,
        DumpportsWritesPortNodesAndPortValues) {
   RunSource(DesignCalling("    $dumpports(, \"portdump.vcd\");\n"));
 
   auto content = DumpFile("portdump.vcd");
-  // §21.7.4.2 on size: "A decimal number indicating the number of bits in the
-  // port. If the port is a single bit, the value shall be 1. If the port is a
-  // bus, the actual index is printed." bus is declared [3:0] and clk is a
-  // single bit, so the two objects take the two size forms. Their identifier
+  // §21.7.4.2 on size: a decimal count of the port's bits, 1 for a single-bit
+  // port, while a bus prints its actual index. bus is declared [3:0] and clk is
+  // a single bit, so the two objects take the two size forms. Their identifier
   // codes are the integers ascending from zero that the clause requires.
   EXPECT_NE(content.find("$var port [3:0] <0 bus $end"), std::string::npos);
   EXPECT_NE(content.find("$var port 1 <1 clk $end"), std::string::npos);

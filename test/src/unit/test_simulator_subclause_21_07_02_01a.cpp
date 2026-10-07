@@ -180,9 +180,9 @@ TEST_F(VcdFileSyntaxSim, WholeFileConformsToDumpFileGrammar) {
 // realtime | reg | supply0 | supply1 | time | tri | triand | trior | trireg |
 // tri0 | tri1 | wand | wire | wor", so a named event is declared under the
 // event keyword the grammar lists for it rather than under a net keyword.
-// §21.7.2.3: "The size specifies how many bits are in the variable", and §6.17:
-// "The event data type provides a handle to a synchronization object" -- a
-// handle is no number of bits, so the size is 0.
+// §21.7.2.3: the size is the variable's number of bits, and §6.17: "The event
+// data type provides a handle to a synchronization object" -- a handle is no
+// number of bits, so the size is 0.
 //
 // What no other case catches: WholeFileConformsToDumpFileGrammar validates
 // every $var body through CheckVarSection, which accepts any keyword
@@ -221,10 +221,10 @@ TEST_F(VcdFileSyntaxSim, NamedEventDeclaresEventVarType) {
 // var_type keyword of its own in the list above. §21.7.2.3 gives wire to a net
 // and Table 6-8 makes all three variables, so none of them is a wire.
 //
-// §21.7.2.3 settles the size: "The size specifies how many bits are in the
-// variable". Table 6-8 gives reg a user-defined vector size, so a reg [7:0]
-// declares 8 -- a width chosen to differ from every size the other rows fix,
-// so a keyword answered with the wrong row's size is visible here.
+// §21.7.2.3 settles the size: it is the variable's number of bits. Table 6-8
+// gives reg a user-defined vector size, so a reg [7:0] declares 8 -- a width
+// chosen to differ from every size the other rows fix, so a keyword answered
+// with the wrong row's size is visible here.
 TEST_F(VcdFileSyntaxSim, RegVariableDeclaresRegVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -282,9 +282,9 @@ TEST_F(VcdFileSyntaxSim, TimeVariableDeclaresTimeVarType) {
 // The three cases above are each satisfied by declaring every dumped object
 // under the keyword its own declaration names, and that would take wire from
 // the objects §21.7.2.3 gives it to. A net declared beside them holds the
-// keyword still: "In the $var section, a net of net type uwire shall have a
-// var_type of wire", and §21.7.2.3's net mapping is what the wire keyword is
-// for. VcdLogicTypeMapping.ANetKeepsTheWireVarType in
+// keyword still: the $var section gives a uwire net the var_type wire, and
+// §21.7.2.3's net mapping is what the wire keyword is for.
+// VcdLogicTypeMapping.ANetKeepsTheWireVarType in
 // test/src/unit/test_simulator_subclause_21_07_05b.cpp makes the same claim
 // against the Table 21-11 rows; this one makes it against the Syntax 21-20
 // keywords, which are the ones a net now stands among.

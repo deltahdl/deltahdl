@@ -73,10 +73,9 @@ TEST(StrengthResolution, HighzDriverIgnored) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §21.2.1.4: "The high-impedance strength cannot have a known logic value; the
-// only logic value allowed for this level is z." Every driver of this net sits
-// at that level, so the net is held at high impedance and nothing decides a
-// value for it.
+// §21.2.1.4: the high-impedance level can hold no known logic value, z being
+// the only one it allows. Every driver of this net sits at that level, so the
+// net is held at high impedance and nothing decides a value for it.
 //
 // The assertion used to read aval=1 and bval=1, which is x rather than the z
 // the name claims -- the two drivers were being folded into a conflict against

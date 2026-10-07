@@ -409,9 +409,9 @@ TEST(FormatArg, UnformattedUppercaseMatchesLowercase) {
 }
 
 // §21.2.1.1 end-to-end: a 4-bit value carrying x and z bits, written with %u,
-// drives the "unknown/high-Z become zero" rule through the full pipeline. The
-// literal 4'b01xz has bit2 == 1 as its only known set bit, so the single raw
-// byte written to the output stream is 0x04.
+// drives the rule that unknown and high-impedance bits become zero through the
+// full pipeline. The literal 4'b01xz has bit2 == 1 as its only known set bit,
+// so the single raw byte written to the output stream is 0x04.
 TEST(SysTask, UnformattedTwoValueZeroesXZFromSource) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -470,12 +470,12 @@ TEST(SysTask, RealFormatPrecisionFromSource) {
   EXPECT_NE(out.find("3.14"), std::string::npos);
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
-// formatting capabilities available in the C language", so C's flags apply as
-// C applies them -- `-` left-justifies in the field, `+` and a space sign a
-// non-negative value, `#` keeps the decimal point, a leading 0 on the width
-// pads with zeros after the sign -- in $display and $sformatf alike. Each
-// flag was read as the specifier and printed as `%-`, `%+` and so on.
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers format as fully as
+// C's own conversions do, so C's flags apply as C applies them -- `-`
+// left-justifies in the field, `+` and a space sign a non-negative value, `#`
+// keeps the decimal point, a leading 0 on the width pads with zeros after the
+// sign -- in $display and $sformatf alike. Each flag was read as the specifier
+// and printed as `%-`, `%+` and so on.
 TEST(SysTask, RealFormatTakesCFlags) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -495,11 +495,11 @@ TEST(SysTask, RealFormatTakesCFlags) {
             "[-2.50   ][-2.5][ 3.1]\n");
 }
 
-// §21.2.1.1 Table 21-2 (printed page 658): "%e or %E" and the rest, with "the
-// full formatting capabilities available in the C language", so the uppercase
-// forms write C's uppercase exponent letter -- the issue's shortreal 2.5 under
-// %E is 2.500000E+00 -- under a width and precision too, and in $sformatf.
-// Each printed its exponent in lowercase.
+// §21.2.1.1 Table 21-2 (printed page 658): "%e or %E" and the rest, formatting
+// as fully as C's own conversions do, so the uppercase forms write C's
+// uppercase exponent letter -- the issue's shortreal 2.5 under %E is
+// 2.500000E+00 -- under a width and precision too, and in $sformatf. Each
+// printed its exponent in lowercase.
 TEST(SysTask, UppercaseRealSpecifiersWriteUppercaseLetters) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -824,10 +824,10 @@ TEST(SysTask, ScopeAndPercentSpecsTakeNoArgument) {
   EXPECT_EQ(out, "t%  7\n");
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's specifiers "are used with real
-// numbers", so an integral operand is shown by its value as a real, signed
-// where the operand is and with its x and z bits as zero (§6.12.1). Read as
-// a double's bit pattern, every integral operand printed 0.000000.
+// §21.2.1.1 (printed page 658): Table 21-2's specifiers are for real numbers,
+// so an integral operand is shown by its value as a real, signed where the
+// operand is and with its x and z bits as zero (§6.12.1). Read as a double's
+// bit pattern, every integral operand printed 0.000000.
 TEST(SysTask, RealSpecifierShowsAnIntegralOperandsValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

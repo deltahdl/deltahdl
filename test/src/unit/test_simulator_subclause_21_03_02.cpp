@@ -19,11 +19,11 @@ namespace {
 // monitor is cancelled -- and not about how a value is rendered. They therefore
 // write %0d rather than %d.
 //
-// The distinction is not cosmetic. §21.2.1.2 sizes %d automatically, to "the
-// largest possible value for the expression", padding with leading spaces: its
-// table gives `%d` on `32'd10` as `:        10:`. Only `%0d` yields "the
-// minimum width, with no leading spaces or zeros". Asserting an unpadded string
-// against %d makes each of these tests depend on the width deltahdl assigns the
+// The distinction is not cosmetic. §21.2.1.2 sizes %d automatically, to the
+// widest value the expression can hold, padding with leading spaces: its table
+// gives `%d` on `32'd10` as `:        10:`. Only `%0d` yields the minimum
+// width, with no leading spaces or zeros. Asserting an unpadded string against
+// %d makes each of these tests depend on the width deltahdl assigns the
 // expression, which is a separate question from the one being asked here.
 
 static std::string ReadAll(const std::string& path) {
@@ -536,12 +536,12 @@ TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2 (printed page 667): $fmonitor works "just like" $monitor (§21.2.3),
-// writing its list when called and again at the end of each time step in
-// which an argument changed, and "any number of $fmonitor tasks can be set up
-// to be simultaneously active": two on one descriptor each write on the
-// change, a third set up later writes beside them, and an $fclose cancels
-// all three (§21.3.1) before a later change could write again.
+// §21.3.2 (printed page 667): $fmonitor works as $monitor does (§21.2.3),
+// writing its list when called and again at the end of each time step in which
+// an argument changed, and any number of $fmonitor tasks may be active at once:
+// two on one descriptor each write on the change, a third set up later writes
+// beside them, and an $fclose cancels all three (§21.3.1) before a later change
+// could write again.
 TEST(IoSystemTaskTest, FmonitorsWriteOnEveryChangeUntilClosed) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fmon_changes.txt";
@@ -661,11 +661,11 @@ TEST(IoSystemTaskTest, FstrobeWritesAtTheEndOfTheTimeStep) {
   std::remove(cancelled.c_str());
 }
 
-// §21.3.2 (printed page 667): the file output tasks "accept the same type of
-// arguments as the tasks upon which they are based" once the descriptor is
-// taken off -- every argument written in order, a literal after an expression
-// included, an expression under the task's radix where no template takes it,
-// an omitted argument as a space, and %p formatting an aggregate.
+// §21.3.2 (printed page 667): the file output tasks take the same kinds of
+// argument as the tasks they are built on once the descriptor is taken off --
+// every argument written in order, a literal after an expression included, an
+// expression under the task's radix where no template takes it, an omitted
+// argument as a space, and %p formatting an aggregate.
 TEST(IoSystemTaskTest, FileTasksTakeTheDisplayArgumentList) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_file_arg_list.txt";

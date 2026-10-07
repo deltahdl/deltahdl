@@ -58,7 +58,7 @@ TEST_F(DumpportslimitSysTask, LimitReachedStopsPortDumpAndInsertsComment) {
   EXPECT_EQ(content.find("#400\n"), std::string::npos);  // late dumps stopped
 }
 
-// §21.7.3.4: "the dumping stops" means the limit comment is the file's final
+// §21.7.3.4: dumping having stopped means the limit comment is the file's final
 // section -- no timestamp or port value change is recorded after it.
 TEST_F(DumpportslimitSysTask, NothingFollowsTheLimitComment) {
   SimFixture f;

@@ -19,11 +19,11 @@ namespace {
 // observable is the file's on-disk contents WHILE the simulation still runs,
 // so each test drives real source through parse, elaboration, lowering, and
 // the scheduler with the driver's per-timestep recording loop installed, and
-// plays the role of the LRM's "application program": procedural code in the
+// plays the role of the LRM's application program: procedural code in the
 // design opens the dump file mid-run, echoes its current bytes to stdout
-// between markers, and closes it again. The captured echo is the
-// mid-simulation snapshot the assertions inspect alongside the final file --
-// nothing is hand-driven on the writer and no previous values are seeded.
+// between markers, and closes it again. The captured echo is the mid-simulation
+// snapshot the assertions inspect alongside the final file -- nothing is
+// hand-driven on the writer and no previous values are seeded.
 class DumpflushSysTask : public VcdMidRunReaderTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
@@ -174,9 +174,9 @@ TEST_F(DumpflushSysTask, DumpingContinuesAfterFlushAndNoCommandIsEmitted) {
   EXPECT_EQ(content.find("$dumpflush"), std::string::npos);
 }
 
-// "Resumed as before" holds symmetrically for a suspended dump: with the dump
-// suspended by §21.7.1.3's $dumpoff, $dumpflush still stores the buffered
-// data (including the suspension checkpoint) in the file, yet leaves the dump
+// Resuming as before holds symmetrically for a suspended dump: with the dump
+// suspended by §21.7.1.3's $dumpoff, $dumpflush still stores the buffered data
+// (including the suspension checkpoint) in the file, yet leaves the dump
 // suspended -- a change in the suspended window is not recorded as its own
 // value change, and its value first surfaces in the $dumpon checkpoint.
 TEST_F(DumpflushSysTask, FlushWhileSuspendedLeavesDumpSuspended) {

@@ -41,10 +41,10 @@ TEST(DetectingEof, FeofZeroBeforeAnyRead) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8: nonzero is reported only after end-of-file "has previously been
-// detected reading" -- consuming the last byte leaves the position at the end
-// but no read has yet come up short, so $feof still yields zero; only the
-// following failed $fgetc flips it to nonzero.
+// §21.3.8: nonzero is reported only once an earlier read has met end-of-file --
+// consuming the last byte leaves the position at the end but no read has yet
+// come up short, so $feof still yields zero; only the following failed $fgetc
+// flips it to nonzero.
 TEST(DetectingEof, FeofZeroAtEndUntilAReadFails) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_lastbyte.txt";

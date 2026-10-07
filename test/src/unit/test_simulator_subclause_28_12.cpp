@@ -295,13 +295,12 @@ TEST(NetStrengthDisjunction, NetWithNoDriverRecordsNoLevels) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
 }
 
-// §21.2.1.4: "The high-impedance strength cannot have a known logic value; the
-// only logic value allowed for this level is z." So a net whose one driver
-// sits at that level is held at high impedance whatever value the driver
-// carries, and the value it carries is not a value the net has. A driver at any
-// stronger level beside it would set the running maximum above high impedance
-// and the driver would never be compared against nothing, which is why this
-// case has one driver and no more.
+// §21.2.1.4: the high-impedance level can hold no known logic value, z being
+// the only one it allows. So a net whose one driver sits at that level is held
+// at high impedance whatever value the driver carries, and the value it carries
+// is not a value the net has. A driver at any stronger level beside it would
+// set the running maximum above high impedance and the driver would never be
+// compared against nothing, which is why this case has one driver and no more.
 TEST(HighZStrengthResolution, LoneZeroDriverAtHighZResolvesToZ) {
   Arena arena;
   StrengthNet sn = MakeStrengthNet(arena, 1);

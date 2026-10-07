@@ -392,14 +392,14 @@ TEST(StrengthResolution, SameValueWeakerDriversAtOneLevelCombineIdempotently) {
                               Strength::kStrong, Strength::kHighz);
 }
 
-// A weaker driver at the high-impedance level. §21.2.1.4 says that level
-// "cannot have a known logic value" and that the only logic value allowed for
-// it is z, so it is not the signal of known value and unambiguous strength
-// §28.12.3 combines with, and §28.12.1 has the conflict dominate it. The
-// conflict range §28.12.2 gave -- strong down to high impedance on both sides
-// -- therefore stands. Running the rules with the level itself, as though a
-// high-impedance driver were a signal at strength 0, would instead take the
-// 1-side lower bound up to small.
+// A weaker driver at the high-impedance level. §21.2.1.4 says that level can
+// hold no known logic value and that the only logic value allowed for it is z,
+// so it is not the signal of known value and unambiguous strength §28.12.3
+// combines with, and §28.12.1 has the conflict dominate it. The conflict range
+// §28.12.2 gave -- strong down to high impedance on both sides -- therefore
+// stands. Running the rules with the level itself, as though a high-impedance
+// driver were a signal at strength 0, would instead take the 1-side lower bound
+// up to small.
 TEST(StrengthResolution, HighzWeakerDriverLeavesTheConflictRangeWhole) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(
@@ -588,9 +588,9 @@ TEST(NetStrengthAmbigUnambig, DominatingAmbiguousSignalKeepsItsOwnRange) {
 //
 // Only the opposite-value shape is read back through %v, and its four bounds
 // are asserted beside the rendering. §21.2.1.4 names the strength characters
-// of an unknown value from one level per side -- Table 21-5 reads "65X" as "an
-// unknown value with a strong driving 0 component and a pull driving 1
-// component" -- and §28.12.3 rule a keeps the strongest level of each side
+// of an unknown value from one level per side -- Table 21-5 reads "65X" as an
+// unknown value whose 0 component drives at strong and whose 1 component drives
+// at pull -- and §28.12.3 rule a keeps the strongest level of each side
 // whatever the weaker drivers do, so the levels that clause names never move
 // here. The rendering therefore does not separate a folded result from an
 // unfolded one at all: FormatStrength reaches for the mnemonic when the two

@@ -57,7 +57,7 @@ TEST_F(DumplimitSysTask, LimitReachedStopsDumpAndInsertsComment) {
   EXPECT_EQ(content.find("#400\n"), std::string::npos);  // late dumps stopped
 }
 
-// "The dumping stops" means the comment is the file's final section: no
+// Dumping having stopped means the comment is the file's final section: no
 // timestamp or value change is recorded after the limit marker.
 TEST_F(DumplimitSysTask, NothingFollowsTheLimitComment) {
   auto content = RunVcd(

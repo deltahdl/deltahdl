@@ -192,12 +192,12 @@ TEST_F(ExtendedVcdValueChangeSim, PortIdentifierCodeIsMultiDigitInteger) {
 
 // §21.7.4.3 again, on the two strength components rather than on the p
 // prefix, the port_value or the identifier code the cases above read. The
-// clause defines 0_strength_component as "one of the eight SystemVerilog
-// strengths that indicates the strength0 specification for the port" and
-// 1_strength_component as the strength1 one, and numbers the eight 0 highz,
-// 1 small, 2 medium, 3 weak, 4 large, 5 pull, 6 strong, 7 supply. §21.7 gives
-// the extended file the job of representing variable changes "in all states
-// and strength information", so those two digits are the whole of what the
+// clause defines 0_strength_component as the one of SystemVerilog's eight
+// strengths that gives the port's strength0 specification and
+// 1_strength_component as the strength1 one, and numbers the eight 0 highz, 1
+// small, 2 medium, 3 weak, 4 large, 5 pull, 6 strong, 7 supply. §21.7 gives the
+// extended file the job of representing variable changes with every state and
+// all strength information, so those two digits are the whole of what the
 // extended file adds over the 4-state one.
 //
 // Every source below drives its net at a strength other than strong, because
@@ -215,8 +215,8 @@ class ExtendedVcdStrengthFromSource : public VcdDumpFromSourceTestBase {
  protected:
   // Runs a module t holding `body` under a $dumpports that names its own file,
   // and returns what the run left in that file. The #1 puts a second time step
-  // after the task: §21.7.3.1 starts the dumping "at the end of the current
-  // simulation time unit", so the opening checkpoint the cases read is emitted
+  // after the task: §21.7.3.1 starts the dumping at the end of the current
+  // simulation time unit, so the opening checkpoint the cases read is emitted
   // by the recording pass that follows time 0.
   std::string RunPortDump(const std::string& body) {
     RunSource("module t;\n" + body +
@@ -285,14 +285,14 @@ TEST_F(ExtendedVcdStrengthFromSource, PullDrivenNetReportsThePullDigit) {
   EXPECT_EQ(PortRecord(content, "w"), "1|05") << content;
 }
 
-// §21.7.4.3: the components report the strength specification "for the port",
-// so two ports of one design driven at two strengths carry two different
-// records. Both nets here are assigned 1, one at pull (digit 5) and one at
-// weak (digit 3), which leaves the strength components as the only thing
-// separating the two records. The case fails on a writer that reports every
-// port at one strength, which makes the two records identical apart from their
-// identifier codes. The case above alone cannot say whether a writer does
-// that, because one port is one record.
+// §21.7.4.3: the components report the port's own strength specification, so
+// two ports of one design driven at two strengths carry two different records.
+// Both nets here are assigned 1, one at pull (digit 5) and one at weak (digit
+// 3), which leaves the strength components as the only thing separating the two
+// records. The case fails on a writer that reports every port at one strength,
+// which makes the two records identical apart from their identifier codes. The
+// case above alone cannot say whether a writer does that, because one port is
+// one record.
 TEST_F(ExtendedVcdStrengthFromSource,
        TwoNetsAtDifferentStrengthsGetDifferentRecords) {
   auto content = RunPortDump(
@@ -336,17 +336,17 @@ TEST_F(ExtendedVcdStrengthFromSource,
 
 // §21.7.4.3 gives each component one digit while §28.12.3 lets a resolved
 // strength span a range of levels, so a range has to be reduced to one digit.
-// §21.7.4.3.2's only rule reducing two strengths to one takes "the stronger of
-// the two", which makes the stronger bound of the range what a component
+// §21.7.4.3.2's only rule reducing two strengths to one takes the stronger of
+// the two, which makes the stronger bound of the range what a component
 // reports. Two equal weak drivers of opposite value resolve to x with both
 // sides spanning weak down to highz, so both components report weak, the digit
 // 3. Nothing else in this file reaches an ambiguous strength: every other case
 // resolves to a single level, where the two bounds coincide and the reduction
 // cannot be observed. The case fails on a writer that reports a driven port at
-// strong, which writes ?|66.
-// §21.7.4.3: the record carries one 0_strength_component and one
-// 1_strength_component for the whole port_value, so a vector port reports one
-// pair however many bits it has -- and the pair has to describe the port.
+// strong, which writes ?|66. §21.7.4.3: the record carries one
+// 0_strength_component and one 1_strength_component for the whole port_value,
+// so a vector port reports one pair however many bits it has -- and the pair
+// has to describe the port.
 //
 // The two bits are told apart by their values rather than by a strength
 // specification, which §10.3.4 gives to scalar nets and to supply0/supply1
