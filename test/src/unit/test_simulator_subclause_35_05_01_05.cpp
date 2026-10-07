@@ -215,17 +215,18 @@ TEST(DpiReentrancy, ImportedTaskCallWithoutTimingControlDoesNotSuspend) {
     // calendar still holds the current in-progress slot (Run() erases it only
     // after the slot finishes executing), so HasEvents() is trivially true
     // inside any callback. NextEventTime() reports only future work
-    // (upper_bound(current_time_), scheduler.h), which is what "deferred to a
-    // future slot" means and what the suspending sibling test observes advance.
+    // (upper_bound(current_time_), scheduler.h), which is what putting work off
+    // to a later slot means and what the suspending sibling test observes
+    // advance.
     pending_after = sched.NextEventTime().ticks > sched.CurrentTime().ticks;
   };
   sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
   sched.Run();
 
   EXPECT_EQ(computed, 42);
-  // §35.8: "The return value of an exported task is an int value that indicates
-  // if a disable is active or not on the current execution thread." No disable
-  // is active here, so the call yields 0 whatever the body computed.
+  // §35.8: an exported task returns an int telling whether a disable is in
+  // force on the thread running it. No disable is active here, so the call
+  // yields 0 whatever the body computed.
   EXPECT_EQ(result_val, 0);
   EXPECT_EQ(time_before, kCallTime);
   EXPECT_EQ(time_after, kCallTime);

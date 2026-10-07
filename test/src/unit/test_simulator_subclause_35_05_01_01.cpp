@@ -83,8 +83,8 @@ TEST(DpiInstantCompletion, ImportedFunctionCallLeavesSimulationTimeUnchanged) {
 // scheduler's evaluation-event count is unchanged across the call, the
 // next-event horizon stays at the current time, and nothing remains on the
 // calendar once the time slot finishes. Scheduling zero future work is what
-// "zero simulation time" means for a function — unlike a task, the call cannot
-// defer any part of its effect to a later time slot.
+// taking no simulation time means for a function — unlike a task, the call
+// cannot defer any part of its effect to a later time slot.
 TEST(DpiInstantCompletion,
      ImportedFunctionCallSchedulesNoFutureSimulationWork) {
   Arena arena;

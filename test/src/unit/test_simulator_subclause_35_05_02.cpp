@@ -238,10 +238,10 @@ struct CallingASquaringImportTwice {
   }
 };
 
-// §35.5.2: a call to a pure function "can be ... replaced with the value
-// previously computed for the same values of the input arguments". The two call
-// sites present the same input value, so the foreign function is entered once
-// and the second call is answered from what the first computed.
+// §35.5.2: a call to a pure function may be answered with the value an earlier
+// call computed from the same input values. The two call sites present the same
+// input value, so the foreign function is entered once and the second call is
+// answered from what the first computed.
 TEST(DpiPureCallInADesign, ASecondCallOnEqualInputsReusesTheFirstResult) {
   CallingASquaringImportTwice run(/*is_pure=*/true, 6);
   EXPECT_EQ(run.entries, 1);

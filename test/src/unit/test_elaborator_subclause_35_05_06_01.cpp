@@ -7,14 +7,13 @@ using namespace delta;
 
 namespace {
 
-// §35.5.6.1: "Exported SystemVerilog functions cannot have formal arguments
-// specified as open arrays." The open-array relaxation -- an unsized "[]"
-// dimension -- is reserved for imports; exporting a SystemVerilog function
-// whose formal carries one is an error. On the exported function the same
-// formal is an ordinary SystemVerilog dynamic array, which §35.5.6 forbids in
-// the terms the elaborator checks: "In exported DPI subroutines, it is
-// erroneous to declare formal arguments of dynamic array types." The report
-// carries §35.5.6.
+// §35.5.6.1: an exported SystemVerilog function may not declare a formal as an
+// open array. The open-array relaxation -- an unsized "[]" dimension -- is
+// reserved for imports; exporting a SystemVerilog function whose formal carries
+// one is an error. On the exported function the same formal is an ordinary
+// SystemVerilog dynamic array, which §35.5.6 forbids in the terms the
+// elaborator checks: an exported DPI subroutine may not declare a formal of a
+// dynamic array type. The report carries §35.5.6.
 TEST(DpiExportOpenArray, ExportedFunctionWithOpenArrayArgIsError) {
   ElabFixture f;
   Elaborate(R"(

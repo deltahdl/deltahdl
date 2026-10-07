@@ -404,9 +404,8 @@ TEST(FunctionDeclParsing, DpiSpecStringInvalidIsError) {
       "DPI specification string must be \"DPI-C\" or \"DPI\"", 2, "35.5.4"));
 }
 
-// §35.5.4: "Use of the string "DPI" shall generate a compile-time warning or
-// error. The tool-generated message shall contain the following information",
-// and it then lists two items: that "DPI" is deprecated and should be replaced
+// §35.5.4: writing the string "DPI" draws a compile-time warning or error whose
+// message carries two items: that "DPI" is deprecated and should be replaced
 // with "DPI-C", and that use of the "DPI-C" string may require changes in the
 // DPI application's C code. Both items are the requirement, so the report is
 // named by its whole sentence. A warning count is satisfied by any warning the
@@ -524,13 +523,13 @@ TEST(FunctionDeclParsing, DpiExportDeprecatedStringWarns) {
       2, "35.5.4"));
 }
 
-// §35.5.4: "If not provided, this defaults to the same identifier as the
-// SystemVerilog subroutine name. In either case, this linkage name shall
-// conform to C identifier syntax. An error shall occur if the c_identifier,
-// either directly or indirectly, does not conform to these rules." §5.6 admits
-// '$' after the first character of a simple identifier, so `foo$bar` is one
-// SystemVerilog identifier; standing in for an absent c_identifier it is the
-// linkage name, and it is the indirect breach the clause names.
+// §35.5.4: an absent c_identifier takes the SystemVerilog subroutine's name,
+// the linkage name must be a well-formed C identifier either way, and a
+// c_identifier that breaks that rule, written or so defaulted, is an error.
+// §5.6 admits '$' after the first character of a simple identifier, so
+// `foo$bar` is one SystemVerilog identifier; standing in for an absent
+// c_identifier it is the linkage name, and it is the indirect breach the clause
+// names.
 TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameWithDollarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -559,12 +558,11 @@ TEST(FunctionDeclParsing, DpiExportDefaultedLinkageNameWithDollarIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4: "An error shall occur if the c_identifier, either directly or
-// indirectly, does not conform to these rules." An escaped identifier is the
-// other way a subroutine name reaches characters C forbids: §5.6.1 has
-// LexEscapedIdentifier in src/lexer/lexer.cpp drop the leading backslash and
-// the terminating white space, so the name recorded here is `my-task`, and the
-// hyphen in it is what the rule rejects.
+// §35.5.4: a c_identifier that breaks the C rule, written or defaulted, is an
+// error. An escaped identifier is the other way a subroutine name reaches
+// characters C forbids: §5.6.1 has LexEscapedIdentifier in src/lexer/lexer.cpp
+// drop the leading backslash and the terminating white space, so the name
+// recorded here is `my-task`, and the hyphen in it is what the rule rejects.
 TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameFromEscapedNameIsError) {
   auto r = Parse(
       "module m;\n"
@@ -577,8 +575,8 @@ TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameFromEscapedNameIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4: "The c_identifier provides the linkage name for this subroutine in
-// the foreign language." The rule is about that linkage name and not about the
+// §35.5.4: the c_identifier is the name the foreign language links the
+// subroutine by. The rule is about that linkage name and not about the
 // SystemVerilog subroutine name, so a c_identifier written out conforms on its
 // own and the SystemVerilog name beside it is free to hold a '$' §5.6 allows.
 TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
@@ -593,10 +591,10 @@ TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
   EXPECT_EQ(item->name, "foo$bar");
 }
 
-// Footnote 25 of Syntax 35-1 in §35.5.4: "The dynamic_override_specifiers
-// shall only be legal on method declarations inside a non-interface class
-// scope." An import declaration declares no class method, so `:initial` on one
-// is illegal wherever the import is written.
+// Footnote 25 of Syntax 35-1 in §35.5.4: dynamic_override_specifiers are legal
+// only on a method declaration in a class scope that is not an interface class.
+// An import declaration declares no class method, so `:initial` on one is
+// illegal wherever the import is written.
 TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
   auto r = Parse(
       "module m;\n"
@@ -627,9 +625,9 @@ TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4: "Formal argument names are optional unless argument binding by name
-// is needed." Neither formal below is named, and the import is still a
-// complete declaration of two arguments.
+// §35.5.4: a formal needs no name unless a call binds arguments by name.
+// Neither formal below is named, and the import is still a complete declaration
+// of two arguments.
 TEST(FunctionDeclParsing, DpiImportUnnamedFormalsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -643,8 +641,8 @@ TEST(FunctionDeclParsing, DpiImportUnnamedFormalsAccepted) {
   EXPECT_TRUE(item->func_args[1].name.empty());
 }
 
-// §35.5.4: "A formal argument name is required to separate the packed and the
-// unpacked dimensions of an array." The name `a` stands between the two
+// §35.5.4: an array formal must be named, since the name is what divides its
+// packed dimensions from its unpacked ones. The name `a` stands between the two
 // bracket groups, so `[7:0]` closes the packed part of the type and `[0:3]`
 // opens the unpacked part. The two ranges differ, so a formal that took both
 // groups into one part could not report one packed and one unpacked dimension.
@@ -686,9 +684,9 @@ TEST(FunctionDeclParsing, DpiImportUnnamedFormalKeepsBothGroupsPacked) {
 }
 
 // §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`, one
-// alternative of two, and §35.5.1.3 says the same in prose -- "Special
-// properties can be specified for an imported subroutine as pure or as
-// context." A declaration writing both is one no legal source can produce, and
+// alternative of two, and §35.5.1.3 says the same in prose -- an imported
+// subroutine may be given the special property pure or the special property
+// context. A declaration writing both is one no legal source can produce, and
 // §35.5.1.3 gives it no meaning, so the second property is reported where it
 // stands.
 //

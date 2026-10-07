@@ -36,9 +36,9 @@ TEST_F(AnnexHParseTest, DpiImportFunctionStringResultAccepted) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
 }
 
-// §35.5.5: "An imported function declaration shall explicitly specify a data
-// type or void for the type of the function's return result." An omitted
-// (implicit) return type -- legal for a native function -- is rejected here.
+// §35.5.5: an imported function's declaration must write out its result type, a
+// data type or void. An omitted (implicit) return type -- legal for a native
+// function -- is rejected here.
 TEST(FunctionDeclParsing, DpiImportFunctionImplicitReturnTypeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -64,7 +64,7 @@ TEST(FunctionDeclParsing, DpiImportFunctionChandleResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
 }
 
-// §35.5.5: "Scalar values of type bit and logic" are permitted results. A bare
+// §35.5.5: a scalar bit or logic value is a permitted result. A bare
 // (single-bit, unpacked) bit return type is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionScalarBitResultAccepted) {
   auto r = Parse(
@@ -77,9 +77,8 @@ TEST(FunctionDeclParsing, DpiImportFunctionScalarBitResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kBit);
 }
 
-// §35.5.5: "Scalar values of type bit and logic" are permitted results. The
-// logic half of that pair is accepted in its scalar (single-bit) form, just as
-// scalar bit is.
+// §35.5.5: a scalar bit or logic value is a permitted result. The logic half of
+// that pair is accepted in its scalar (single-bit) form, just as scalar bit is.
 TEST(FunctionDeclParsing, DpiImportFunctionScalarLogicResultAccepted) {
   auto r = Parse(
       "module m;\n"

@@ -79,11 +79,11 @@ TEST(DpiImportLowering, AnImportedFunctionCarriesItsFormalsDirections) {
   EXPECT_EQ(import->args[1].type, DataTypeKind::kInt);
 }
 
-// §35.5.6 admits "Packed arrays, structs, and unions composed of types bit and
-// logic" as formal types and names no width limit, and DataTypeKind says only
-// `bit` for `bit [127:0]`. So the width the declaration wrote has to travel
-// with the formal: without it the crossing sizes that formal by its kind and
-// hands the foreign side one bit of the design's 128.
+// §35.5.6 admits packed arrays, structs and unions built of bit and logic as
+// formal types and names no width limit, and DataTypeKind says only `bit` for
+// `bit [127:0]`. So the width the declaration wrote has to travel with the
+// formal: without it the crossing sizes that formal by its kind and hands the
+// foreign side one bit of the design's 128.
 TEST(DpiImportLowering, AnImportedFunctionCarriesItsPackedFormalsWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(

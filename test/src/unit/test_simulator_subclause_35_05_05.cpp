@@ -17,20 +17,18 @@ using namespace delta;
 
 namespace {
 
-// §35.5.5 — Function result. "An imported function declaration shall explicitly
-// specify a data type or void for the type of the function's return result.
-// Function result types are restricted to small values. The following
-// SystemVerilog data types are allowed for imported function results: void,
-// byte, shortint, int, longint, real, shortreal, chandle, and string; Scalar
-// values of type bit and logic."
+// §35.5.5 — Function result. An imported function's declaration must write out
+// its result type, a data type or void, and that type is limited to small
+// values: void, byte, shortint, int, longint, real, shortreal, chandle, string,
+// and scalar bit and logic.
 //
 // The declared type decides what the value a call site receives can hold, and
 // these cases ask that of the value a design is actually left with. EvalDpiCall
 // in src/simulator/eval_function_dpi.cpp builds it, and §35.2.2.1 rules that
-// "The implementation (representation and layout) of 4-state values,
-// structures, and arrays is irrelevant for SystemVerilog semantics and can only
-// impact the foreign side of the interface", so a result the declared type
-// admits has to arrive whatever the carrier between the two sides looks like.
+// how 4-state values, structures and arrays are represented and laid out
+// matters to the foreign side alone and not to SystemVerilog's meaning, so a
+// result the declared type admits has to arrive whatever the carrier between
+// the two sides looks like.
 
 // An import `sv_result()` declared with `kind` as its result type, whose
 // foreign body returns `value`. `result` is what the call site `sv_result()` is
@@ -55,12 +53,12 @@ struct ImportResultOfType {
   }
 };
 
-// §35.5.5 admits "Scalar values of type bit and logic" as a result type, and a
-// logic has four values, so a body returning x gives the call site x. §35.2.2.1
-// leaves the foreign side's representation to the interface, and sv_x is the
-// spelling svdpi.h gives x there; an x is aval 1 with bval 1 on this side, and
-// a result carried as one word per bit has nowhere to put the bval and gives
-// the call site 1.
+// §35.5.5 admits scalar bit and logic values as a result type, and a logic has
+// four values, so a body returning x gives the call site x. §35.2.2.1 leaves
+// the foreign side's representation to the interface, and sv_x is the spelling
+// svdpi.h gives x there; an x is aval 1 with bval 1 on this side, and a result
+// carried as one word per bit has nowhere to put the bval and gives the call
+// site 1.
 TEST(DpiFunctionResultInADesign, AScalarLogicResultCarriesAnUnknownBit) {
   ImportResultOfType run(DataTypeKind::kLogic, DpiArgValue::FromLogic(sv_x));
 
@@ -97,7 +95,7 @@ TEST(DpiFunctionResultInADesign, AnIntResultIsThirtyTwoBitsWide) {
 
 // §35.5.5's list of permitted result types -- void, byte, shortint, int,
 // longint, real, shortreal, chandle and string, and scalar bit and logic -- is
-// what it calls "small values", and every one of them is 64 bits or fewer. So a
+// what it calls small values, and every one of them is 64 bits or fewer. So a
 // result stays in one word however wide a formal may be: §35.5.6's packed
 // formals travel in Annex H.10.1.2's canonical array, and a carrier that put
 // every value there would give a byte result more words than a byte has.

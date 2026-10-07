@@ -12,20 +12,18 @@
 using namespace delta;
 
 // §35.3.2 "DPI foreign language layer". The foreign language layer is
-// transparent to SystemVerilog and is what specifies how actual arguments are
-// passed, how they can be accessed from the foreign code, how SystemVerilog
-// types are represented, and how they translate to and from C-like types
-// (S1) — but that specification is the foreign side's (Annex H), not something
-// any SystemVerilog pipeline stage carries. The clause has no BNF.
+// invisible to SystemVerilog, and it is where the passing of actual arguments,
+// the foreign code's access to them, the representation of SystemVerilog types
+// and their translation to and from C-like types are specified (S1) — but that
+// specification is the foreign side's (Annex H), not something any
+// SystemVerilog pipeline stage carries. The clause has no BNF.
 //
 // Two of its "shall"s do face the SystemVerilog tool, and both land at the
 // simulator stage in DpiRuntime:
-//   S2  the SystemVerilog compiler or simulator shall generate and/or use the
-//       function call protocol and argument-passing mechanisms required for the
-//       intended foreign language layer; and
-//   S3  the same SystemVerilog code (compiled accordingly) shall be usable with
-//       different foreign language layers, regardless of the data access method
-//       assumed in a specific layer.
+//   S2  the compiler or simulator produces, or uses, whatever call protocol and
+//       argument passing the chosen foreign language layer needs; and
+//   S3  one SystemVerilog source, compiled to suit, works with any foreign
+//       language layer, whichever way that layer accesses data.
 //
 // DpiRuntime already realizes both: it carries out the argument-passing
 // mechanism the foreign side relies on to read and write its formals
@@ -47,8 +45,8 @@ namespace {
 // the foreign layer needs to access an inout formal in both directions. The
 // runtime seeds the inout formal with the caller's actual so the foreign code
 // can read it, then copies the foreign-written value back out to the actual.
-// Both halves of "how actual arguments are passed, how they can be accessed
-// from the foreign code" are carried out by CallImportWithArgs here.
+// Both halves of the passing of actual arguments and the foreign code's access
+// to them are carried out by CallImportWithArgs here.
 TEST(DpiForeignLayer, RuntimeProvidesArgPassingForInoutFormalAccess) {
   DpiRuntime rt;
   DpiRtFunction func;

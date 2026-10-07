@@ -207,10 +207,9 @@ TEST(DpiArgumentPassing, OutputRealRoundedToIntegerActualOnCopyOut) {
 // The cases above call the foreign function through DpiRuntime directly.
 // EvalDpiCall in src/simulator/eval_function_dpi.cpp evaluates the call site's
 // actuals and calls the import through the DpiRuntime the run holds. §35.2.2.1
-// rules that "The implementation (representation and layout) of 4-state values,
-// structures, and arrays is irrelevant for SystemVerilog semantics and can only
-// impact the foreign side of the interface", so an x or a z the design wrote
-// has to survive that crossing in both directions.
+// rules that how 4-state values, structures and arrays are represented and laid
+// out matters to the foreign side alone and not to SystemVerilog's meaning, so
+// an x or a z the design wrote has to survive that crossing in both directions.
 // ---------------------------------------------------------------------------
 
 // A design holding one four-bit variable `a` set to `actual`, handed to an
@@ -305,11 +304,11 @@ struct WideActual {
   const Logic4Vec& Actual() { return f.ctx.FindVariable("k")->value; }
 };
 
-// §35.5.6 lists "Packed arrays, structs, and unions composed of types bit and
-// logic" among a formal's permitted types and puts no width limit on one, so
-// `bit [127:0]` is a formal a declaration may write. The actual's four 32-bit
-// quarters differ from one another, so a crossing that keeps the first word
-// alone hands the foreign body the low two and nothing above them.
+// §35.5.6 lists packed arrays, structs and unions built of bit and logic among
+// a formal's permitted types and puts no width limit on one, so `bit [127:0]`
+// is a formal a declaration may write. The actual's four 32-bit quarters differ
+// from one another, so a crossing that keeps the first word alone hands the
+// foreign body the low two and nothing above them.
 TEST(DpiArgumentPassingInADesign, AFormalWiderThanOneWordArrivesWhole) {
   WideActual run(PackedFormal{}, Logic4Word{0x1234567855667788ULL, 0},
                  Logic4Word{0x99AABBCCDDEEFF00ULL, 0}, {});
@@ -322,8 +321,8 @@ TEST(DpiArgumentPassingInADesign, AFormalWiderThanOneWordArrivesWhole) {
   EXPECT_EQ(run.seen[3].aval, 0x99AABBCCU);
 }
 
-// §35.2.2.1 has the representation of a four-state value be "irrelevant for
-// SystemVerilog semantics", so an unknown bit crosses wherever it stands in the
+// §35.2.2.1 makes the representation of a four-state value no part of
+// SystemVerilog's meaning, so an unknown bit crosses wherever it stands in the
 // value. Bit 96 is x here -- aval and bval both set in the top quarter -- and
 // bit 0 is 1, so a carrier that widened the aval and left the bval one word
 // wide delivers bit 96 as a known one.
@@ -338,10 +337,10 @@ TEST(DpiArgumentPassingInADesign, AnUnknownBitAboveTheFirstWordSurvives) {
   EXPECT_EQ(run.seen[3].bval, 1U);
 }
 
-// §35.6.1: "For output or inout arguments, the value of the temporary variable
-// is assigned to the actual argument with the appropriate conversion." The
-// foreign body leaves all four quarters set to different values, so the
-// variable the call site named holds every one of them afterwards.
+// §35.6.1: for an output or inout argument, the temporary's value is assigned,
+// suitably converted, to the actual. The foreign body leaves all four quarters
+// set to different values, so the variable the call site named holds every one
+// of them afterwards.
 TEST(DpiArgumentPassingInADesign, AWideOutputFormalIsWrittenBackWhole) {
   WideActual run(
       PackedFormal{DataTypeKind::kBit, 128, Direction::kOutput}, Logic4Word{},
@@ -372,11 +371,11 @@ TEST(DpiArgumentPassingInADesign,
   EXPECT_EQ(run.seen[0].aval, 0xA5U);
 }
 
-// The four-state half of the same: §35.5.6's packed types are "composed of
-// types bit and logic", and a logic holds four values, so an unknown bit of a
-// `logic [7:0]` formal crosses wherever it stands. Bit 4 is x here -- aval and
-// bval both set -- and the SvLogic member the kind would otherwise land in
-// carries one bit of each half.
+// The four-state half of the same: §35.5.6's packed types are built of bit and
+// logic, and a logic holds four values, so an unknown bit of a `logic [7:0]`
+// formal crosses wherever it stands. Bit 4 is x here -- aval and bval both set
+// -- and the SvLogic member the kind would otherwise land in carries one bit of
+// each half.
 TEST(DpiArgumentPassingInADesign, AnUnknownBitOfAPackedLogicFormalSurvives) {
   WideActual run(PackedFormal{DataTypeKind::kLogic, 8, Direction::kInput},
                  Logic4Word{0x13, 0x10}, Logic4Word{}, {});
@@ -400,10 +399,10 @@ TEST(DpiArgumentPassingInADesign,
   EXPECT_EQ(got.words[0].aval, 0x3CU);
 }
 
-// §35.6.1: "For input and inout arguments, the temporary variable is
-// initialized with the value of the actual argument with the appropriate
-// coercion." The actual is 4'b10x1, so the foreign body is handed a 1, a 0 and
-// an x; an x is aval 1 with bval 1, which one word per bit cannot record.
+// §35.6.1: for an input or inout argument, the temporary starts out holding the
+// actual's value, suitably coerced. The actual is 4'b10x1, so the foreign body
+// is handed a 1, a 0 and an x; an x is aval 1 with bval 1, which one word per
+// bit cannot record.
 TEST(DpiArgumentPassingInADesign, AnInputActualsUnknownBitReachesTheImport) {
   FourStateActual run(Direction::kInput, SvLogicVecVal{0b1011, 0b0010},
                       SvLogicVecVal{});
@@ -415,9 +414,9 @@ TEST(DpiArgumentPassingInADesign, AnInputActualsUnknownBitReachesTheImport) {
   EXPECT_EQ(run.seen.bval, 0b0010U);
 }
 
-// §35.2.2.1 has the representation of a 4-state value be "irrelevant for
-// SystemVerilog semantics", so §35.6.1's copy-in delivers a z as a z rather
-// than as "not known". The actual is 4'b10z1, a z being aval 0 with bval 1.
+// §35.2.2.1 makes the representation of a 4-state value no part of
+// SystemVerilog's meaning, so §35.6.1's copy-in delivers a z as a z rather than
+// as "not known". The actual is 4'b10z1, a z being aval 0 with bval 1.
 TEST(DpiArgumentPassingInADesign, AnInputActualsHighImpedanceBitIsNotAnX) {
   FourStateActual run(Direction::kInput, SvLogicVecVal{0b1001, 0b0010},
                       SvLogicVecVal{});
@@ -430,10 +429,10 @@ TEST(DpiArgumentPassingInADesign, AnInputActualsHighImpedanceBitIsNotAnX) {
   EXPECT_EQ(run.seen.aval, 0b1001U);
 }
 
-// §35.6.1: "For output or inout arguments, the value of the temporary variable
-// is assigned to the actual argument with the appropriate conversion." The
-// foreign body leaves 4'b0x10 in the formal, so that is what the variable the
-// call site named holds once the call has returned.
+// §35.6.1: for an output or inout argument, the temporary's value is assigned,
+// suitably converted, to the actual. The foreign body leaves 4'b0x10 in the
+// formal, so that is what the variable the call site named holds once the call
+// has returned.
 TEST(DpiArgumentPassingInADesign, AnOutputFormalsUnknownBitReachesTheActual) {
   FourStateActual run(Direction::kOutput, SvLogicVecVal{},
                       SvLogicVecVal{0b0110, 0b0100});
@@ -474,13 +473,13 @@ struct TwoStateFormal {
   }
 };
 
-// §35.6.1 has the temporary a value crosses in "initialized with the value of
-// the actual argument with the appropriate coercion", and "the assignments
-// between a temporary and the actual argument follow general SystemVerilog
-// rules for assignments and automatic coercion". §6.11.2 is what those rules
-// say where the type on the other side holds no unknown bit: the assignment
-// converts "any unknown or high-impedance bits in the value ... to zeros". The
-// actual is 4'b10x1 and the formal is int, so the body is handed 4'b1001.
+// §35.6.1 has the temporary a value crosses in start out holding the actual's
+// value, suitably coerced, and has the assignments between the temporary and
+// the actual follow SystemVerilog's ordinary rules for assignment and automatic
+// coercion. §6.11.2 is what those rules say where the type on the other side
+// holds no unknown bit: the assignment converts "any unknown or high-impedance
+// bits in the value ... to zeros". The actual is 4'b10x1 and the formal is int,
+// so the body is handed 4'b1001.
 TEST(DpiArgumentPassingInADesign, AnUnknownBitOfATwoStateFormalArrivesAsZero) {
   TwoStateFormal run(DataTypeKind::kInt, SvLogicVecVal{0b1011, 0b0010});
 

@@ -348,21 +348,21 @@ TEST(DpiValueChangeInADesign, ThePropagatedValueIsWhatTheImportWrote) {
   EXPECT_EQ(run.Actual(), 99U);
 }
 
-// §35.6.2 has the propagation happen "as if the actual argument was assigned
-// the formal output value immediately after the return", and an assignment of
-// the value a variable already holds is not a value change. The foreign body
-// writes back the 50 the actual came in with, so the design sees nothing.
+// §35.6.2 has the propagation happen as though the formal's output value were
+// assigned to the actual just after the return, and an assignment of the value
+// a variable already holds is not a value change. The foreign body writes back
+// the 50 the actual came in with, so the design sees nothing.
 TEST(DpiValueChangeInADesign, AnUnalteredOutputActualRaisesNoEvent) {
   AnOutputActualInADesign run(AnOutputActual{}, /*actual=*/50, /*wrote=*/50);
   EXPECT_EQ(run.events, 0);
 }
 
 // §35.6.2 measures the propagation by the assignment and not by the formal:
-// "the value propagation (i.e., value change events) happens as if an actual
-// argument was assigned a formal argument immediately after control returns".
-// The foreign body moves its `int` formal from an undetermined value to 21, but
-// the actual is four bits wide and 21 assigned to it leaves the 4'b0101 it came
-// in with, so the assignment changes nothing and the design sees nothing.
+// value change events come about as though the formal were assigned to the
+// actual just after control comes back. The foreign body moves its `int` formal
+// from an undetermined value to 21, but the actual is four bits wide and 21
+// assigned to it leaves the 4'b0101 it came in with, so the assignment changes
+// nothing and the design sees nothing.
 TEST(DpiValueChangeInADesign, ATruncatedWritebackOfTheSameValueRaisesNoEvent) {
   AnOutputActualInADesign run(AnOutputActual{4, false, "a"}, /*actual=*/5,
                               /*wrote=*/21);

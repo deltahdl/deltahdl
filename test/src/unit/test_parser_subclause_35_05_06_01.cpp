@@ -29,7 +29,7 @@ TEST_F(DpiParseTest, DpiImportOpenArrayFormalAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6.1: "The number of unpacked dimensions is not restricted." A formal
+// §35.5.6.1: an open array may have any number of unpacked dimensions. A formal
 // can be an open array in several unpacked dimensions at once -- each unsized
 // dimension is a separate unbounded entry -- and the import still parses
 // cleanly, matching the LRM's two-dimensional open-array example shape.

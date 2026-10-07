@@ -10,11 +10,10 @@
 
 using namespace delta;
 
-// §35.5.1.6 "C++ exceptions". "It is possible to implement DPI imported tasks
-// and functions using C++, as long as C linkage conventions are observed at the
-// language boundary. If C++ is used, exceptions shall not propagate out of any
-// imported subroutine. Undefined behavior can result if an exception crosses
-// the language boundary from C++ into SystemVerilog."
+// §35.5.1.6 "C++ exceptions". DPI imported tasks and functions may be written
+// in C++ provided the boundary keeps to C linkage; no exception may then escape
+// an imported subroutine, and one that crosses from C++ into SystemVerilog may
+// leave the behavior undefined.
 //
 // Two of those three sentences ask nothing of a simulator. The second binds
 // whoever writes the C++, and no SystemVerilog tool can verify that a foreign

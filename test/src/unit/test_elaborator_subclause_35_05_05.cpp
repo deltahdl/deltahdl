@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// §35.5.5: "The same restrictions apply for the result types of exported
-// functions." A function whose result is a permitted small value (int) can be
-// exported without error -- the export's result-type restriction is satisfied.
+// §35.5.5: an exported function's result type is held to the same limits. A
+// function whose result is a permitted small value (int) can be exported
+// without error -- the export's result-type restriction is satisfied.
 TEST(DpiExportResult, ExportedFunctionWithSmallValueResultIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -119,9 +119,9 @@ TEST(DpiExportResult, ExportedTaskIsNotSubjectToResultRestriction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: "Function result types are restricted to small values", and a
-// typedef name is not a type of its own. Parser::ParseDpiImport holds a result
-// written as a name as a kNamed type and ValidateDpiResultType in
+// §35.5.5: a function's result type is limited to small values, and a typedef
+// name is not a type of its own. Parser::ParseDpiImport holds a result written
+// as a name as a kNamed type and ValidateDpiResultType in
 // src/parser/parser_dpi_validate.cpp passes every one of them, having no
 // typedef table to look the name up in, so the restriction reaches a typedef
 // only in the elaborator.
@@ -175,9 +175,9 @@ TEST(DpiImportResult, ATypedefChainReachingAPackedVectorAsResultIsError) {
                             5, "35.5.5"));
 }
 
-// §35.5.5: "The same restrictions apply for the result types of exported
-// functions." A name reaches the export path the same way it reaches the
-// import path, so the type behind it decides there too.
+// §35.5.5: an exported function's result type is held to the same limits. A
+// name reaches the export path the same way it reaches the import path, so the
+// type behind it decides there too.
 TEST(DpiExportResult, ExportedFunctionWithTypedefOfPackedVectorResultIsError) {
   ElabFixture f;
   Elaborate(R"(

@@ -130,7 +130,7 @@ TEST_F(DpiParseTest, DpiImportNonPermittedArgAmongPermittedRejected) {
                             2, "35.5.6"));
 }
 
-// §35.5.6: "Scalar values of type bit and logic" are listed among the permitted
+// §35.5.6: scalar bit and logic values are listed among the permitted
 // formal-argument types in their own right -- not only in packed-vector form.
 // Single-bit bit and logic formals are therefore accepted.
 TEST_F(DpiParseTest, DpiImportScalarBitLogicArgsAccepted) {
@@ -212,9 +212,9 @@ TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
 }
 
 // §35.5.6: a struct is permitted as a formal argument only where it is
-// "constructed from the supported types", and an event is not one of them. The
-// argument is rejected for the type of a member even though struct is itself a
-// permitted type-constructing form.
+// built from the supported types, and an event is not one of them. The argument
+// is rejected for the type of a member even though struct is itself a permitted
+// type-constructing form.
 TEST_F(DpiParseTest, DpiImportStructWithEventMemberRejected) {
   Parse(
       "module m;\n"

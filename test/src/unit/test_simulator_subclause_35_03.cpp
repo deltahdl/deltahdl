@@ -13,9 +13,9 @@ using namespace delta;
 
 // §35.3 "Two layers of DPI". DPI is split into a SystemVerilog layer and a
 // foreign language layer. The SystemVerilog layer does not depend on which
-// programming language sits behind the boundary: SystemVerilog code shall look
-// identical and its semantics shall be unchanged for any foreign language
-// layer, and the implementation need only support C protocols and linkage.
+// programming language sits behind the boundary: whatever the foreign language
+// layer, the SystemVerilog code reads the same and means the same, and the
+// implementation need only support C protocols and linkage.
 //
 // At the simulator stage that two-layer split is realized by DpiRuntime: the
 // SystemVerilog side reaches an import purely through its SystemVerilog name
@@ -131,15 +131,15 @@ TEST(DpiTwoLayers, ForeignInternalStateIsOpaqueToSvLayer) {
   EXPECT_EQ(rt.CallImport("sv_next", {}).AsInt(), 3);
 }
 
-// §35.3 / S4: "SystemVerilog code shall look identical and its semantics shall
-// be unchanged for any foreign language layer." The four cases above ask that
-// of the direction where SystemVerilog calls out. It is one sentence about the
-// interface and not about one direction of it, so it holds where foreign code
-// calls in: an exported SystemVerilog function is written once and behaves the
-// same however the foreign layer reaches it. DpiRuntime offers two ways in --
-// CallExport, and CallExportFromImport, which is the entry a foreign body
-// running inside an import call takes -- and they are two foreign call
-// protocols reaching one SystemVerilog body.
+// §35.3 / S4: whatever the foreign language layer, the SystemVerilog code reads
+// the same and means the same. The four cases above ask that of the direction
+// where SystemVerilog calls out. It is one sentence about the interface and not
+// about one direction of it, so it holds where foreign code calls in: an
+// exported SystemVerilog function is written once and behaves the same however
+// the foreign layer reaches it. DpiRuntime offers two ways in -- CallExport,
+// and CallExportFromImport, which is the entry a foreign body running inside an
+// import call takes -- and they are two foreign call protocols reaching one
+// SystemVerilog body.
 TEST(DpiTwoLayers, ExportedSvBodyIsUnchangedByWhichForeignEntryCallsIt) {
   DpiRuntime rt;
   DpiRtExport exp;

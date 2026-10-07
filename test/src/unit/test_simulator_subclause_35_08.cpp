@@ -156,11 +156,10 @@ TEST(DpiExportedTask, InnermostTaskFrameInChainRootedAtFunctionIsAllowed) {
   EXPECT_TRUE(ran);
 }
 
-// §35.8: "SystemVerilog tasks do not have return value types. The return value
-// of an exported task is an int value that indicates if a disable is active or
-// not on the current execution thread." With no disable active the call yields
-// 0, whatever the registered body handed back — the body's value stands for no
-// result the clause gives a task.
+// §35.8: a SystemVerilog task has no return type, and an exported task returns
+// an int telling whether a disable is in force on the thread running it. With
+// no disable active the call yields 0, whatever the registered body handed back
+// — the body's value stands for no result the clause gives a task.
 TEST(DpiExportedTask, AnExportedTaskYieldsZeroWithNoDisableActive) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;
@@ -234,11 +233,11 @@ TEST(DpiExportedTask, AnExportedFunctionYieldsWhatItsBodyReturned) {
   EXPECT_EQ(result.AsInt(), 77);
 }
 
-// §35.8: "It is legal for an imported task to call an exported task only if the
-// imported task is declared with the context property." The permitted case is
-// covered above; this is the other half, where the task import is noncontext
-// and the call is refused. The refusal is the §35.5.3 one, since the context
-// property is what §35.8 defers to.
+// §35.8: an imported task may call an exported task only when the import is
+// declared context. The permitted case is covered above; this is the other
+// half, where the task import is noncontext and the call is refused. The
+// refusal is the §35.5.3 one, since the context property is what §35.8 defers
+// to.
 TEST(DpiExportedTask, NoncontextTaskImportCallingExportedTaskIsRejected) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;

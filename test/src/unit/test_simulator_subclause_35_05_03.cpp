@@ -447,11 +447,10 @@ TEST(DpiExportInstances, AnExportUnderNoScopeIsReachedFromAnyScope) {
 // What a noncontext import call leaves behind, and what it cannot become.
 // ---------------------------------------------------------------------------
 //
-// §35.5.3: "An imported subroutine not specified as context shall not access
-// any data objects from SystemVerilog other than its actual arguments. Only the
-// actual arguments can be affected (read or written) by its call." A scope such
-// a call sets is therefore not something whatever runs after it can read: the
-// call ends with the scope its caller had.
+// §35.5.3: an imported subroutine not declared context may reach no
+// SystemVerilog data but its actual arguments, and its call may read or write
+// nothing else. A scope such a call sets is therefore not something whatever
+// runs after it can read: the call ends with the scope its caller had.
 
 // A scope a noncontext import sets does not outlive the call that set it.
 TEST(DpiContextChain, ANoncontextCallsScopeChangeDoesNotOutliveIt) {
@@ -508,10 +507,10 @@ TEST(DpiContextChain, ANoncontextCallLeavesTheCallersScopeAfterANestedScope) {
   EXPECT_EQ(rt.CurrentScope()->name, "top.caller");
 }
 
-// §35.5.3: "The context characteristic of a DPI import call cannot be
-// dynamically changed after the initial call to the import subroutine in the
-// DPI supported language." Naming the export's own scope is what would let a
-// context call reach it, and it does not make this call a context one.
+// §35.5.3: whether a DPI import call is a context one is fixed once the import
+// subroutine has first been called and cannot change at run time. Naming the
+// export's own scope is what would let a context call reach it, and it does not
+// make this call a context one.
 TEST(DpiContextChain, SvSetScopeDoesNotMakeANoncontextCallContext) {
   DpiRuntime rt;
   DpiRtExport exp;
@@ -532,7 +531,7 @@ TEST(DpiContextChain, SvSetScopeDoesNotMakeANoncontextCallContext) {
   EXPECT_EQ(status, DpiExportCallStatus::kNoncontextChain);
 }
 
-// §35.5.3 makes "the current scope" decide which instance of an exported
+// §35.5.3 makes the current scope decide which instance of an exported
 // subroutine a call reaches, and §H.9.3 gives foreign code svGetScope and
 // svSetScope to read and move it. src/simulator/svdpi.cpp kept a scope of its
 // own beside the registry's, so a foreign routine that moved the scope and a

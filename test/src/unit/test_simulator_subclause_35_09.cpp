@@ -344,10 +344,10 @@ TEST(DpiDisableProtocol, UndeterminedResultIsReturnTypeCorrectWhenDisabled) {
 }
 
 // §35.9: an imported subroutine is in the disabled state while a disable
-// "somewhere in the design targets either it or a parent". Once the chain the
-// disable was propagating through has unwound, nothing targets anything, so the
-// episode is over and svIsDisabledState() reports 0 to foreign code running
-// outside any import call.
+// anywhere in the design is aimed at it or at one of its parents. Once the
+// chain the disable was propagating through has unwound, nothing targets
+// anything, so the episode is over and svIsDisabledState() reports 0 to foreign
+// code running outside any import call.
 TEST(DpiDisableProtocol, DisabledStateEndsWhenTheImportChainUnwinds) {
   ResetDisableState();
   DpiRuntime rt;
@@ -377,10 +377,10 @@ TEST(DpiDisableProtocol, DisabledStateSurvivesAnInnerFrameLeavingTheChain) {
   ResetDisableState();
 }
 
-// §35.9 licenses a simulator to drop an output or inout argument only "if a
-// disable is in effect". A call made after the disabled chain unwound has none
-// in effect, so its arguments are propagated as any undisabled call's are. This
-// is what the leaked state cost: the licence was taken where it did not apply.
+// §35.9 licenses a simulator to drop an output or inout argument only while a
+// disable is in force. A call made after the disabled chain unwound has none in
+// effect, so its arguments are propagated as any undisabled call's are. This is
+// what the leaked state cost: the licence was taken where it did not apply.
 TEST(DpiDisableProtocol, ACallAfterADisabledChainPropagatesItsOutputArgument) {
   ResetDisableState();
   DpiRuntime rt;
@@ -407,8 +407,8 @@ TEST(DpiDisableProtocol, ACallAfterADisabledChainPropagatesItsOutputArgument) {
 }
 
 // §35.9 item b): an imported task returning due to a disable shall return 1.
-// Returning 0 is the violation the clause has a simulator check, and "if any
-// protocol item is not correctly followed, a fatal simulation error is issued".
+// Returning 0 is the violation the clause has a simulator check, and breaking
+// any item of the protocol ends the simulation with a fatal error.
 TEST(DpiDisableProtocol, ImportedTaskReturningZeroUnderADisableIsFatal) {
   ResetDisableState();
   DpiRuntime rt;
@@ -576,9 +576,8 @@ TEST(DpiDisableProtocol, TheFirstDisableProtocolViolationIsTheRecordedError) {
 //
 // The cases above open and leave the import frame themselves. A call written in
 // SystemVerilog opens one through EvalDpiCall in
-// src/simulator/eval_function_dpi.cpp, which is where §35.9's "a fatal
-// simulation error is issued" has to be reached from if a design's imports are
-// checked at all.
+// src/simulator/eval_function_dpi.cpp, which is where §35.9's fatal simulation
+// error has to be reached from if a design's imports are checked at all.
 // ---------------------------------------------------------------------------
 
 // A design calling an imported function whose foreign body enters the disabled
@@ -609,11 +608,10 @@ struct AnImportDisabledInADesign {
   }
 };
 
-// §35.9 item c): "An imported function that returns while a disable is in
-// effect shall call svAckDisabledState() before returning", and "if any
-// protocol item is not correctly followed, a fatal simulation error is issued".
-// The body returns without acknowledging, and the design's call site is where
-// the check has to happen.
+// §35.9 item c): an imported function returning while a disable is in force
+// must call svAckDisabledState() first, and breaking any item of the protocol
+// ends the simulation with a fatal error. The body returns without
+// acknowledging, and the design's call site is where the check has to happen.
 TEST(DpiDisableInADesign,
      AnImportReturningWithoutAcknowledgingADisableIsFatal) {
   AnImportDisabledInADesign run(/*acknowledge=*/false);

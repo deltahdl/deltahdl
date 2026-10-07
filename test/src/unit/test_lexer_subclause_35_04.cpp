@@ -9,10 +9,9 @@ using namespace delta;
 
 namespace {
 
-// §35.4: "The leading backslash ( \ ) character and the trailing white space
-// shall be stripped off by the SystemVerilog tool to create the linkage
-// identifier." The lexer carries out the strip, and the resulting token text
-// is what later passes use as the DPI linkage name.
+// §35.4: the tool removes the leading backslash and the trailing white space to
+// form the linkage identifier. The lexer carries out the strip, and the
+// resulting token text is what later passes use as the DPI linkage name.
 
 TEST(DpiLinkageNameLexing, EscapedFormStripsBackslashAndTrailingSpace) {
   auto r = LexOne("\\foo ");

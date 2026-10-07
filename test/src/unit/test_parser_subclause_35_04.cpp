@@ -13,10 +13,10 @@ using namespace delta;
 
 namespace {
 
-// §35.4: an explicit global name "in addition to its declared name" is given
-// before the '=' in an import or export declaration. The parser records the
-// global name on dpi_c_name and the local SystemVerilog name on name, which
-// keeps the two name spaces distinct as the clause requires.
+// §35.4: an explicit global name, besides the declared name, is given before
+// the '=' in an import or export declaration. The parser records the global
+// name on dpi_c_name and the local SystemVerilog name on name, which keeps the
+// two name spaces distinct as the clause requires.
 
 TEST(DpiGlobalNameParsing, ImportExplicitGlobalNameDistinctFromSvName) {
   auto r = Parse(R"(
@@ -76,10 +76,10 @@ TEST(DpiGlobalNameParsing, ExportWithoutGlobalNameLeavesDpiCNameEmpty) {
   EXPECT_EQ(item->name, "plain");
 }
 
-// §35.4: "Should a global name clash with a SystemVerilog keyword or a
-// reserved name, it shall take the form of an escaped identifier." The lexer
-// strips the leading '\' and the trailing whitespace; the linkage identifier
-// the parser records is the bare keyword text.
+// §35.4: a global name that collides with a SystemVerilog keyword or reserved
+// name has to be written as an escaped identifier. The lexer strips the leading
+// '\' and the trailing whitespace; the linkage identifier the parser records is
+// the bare keyword text.
 TEST(DpiGlobalNameParsing, ImportEscapedGlobalNameOfKeywordIsRecorded) {
   auto r = Parse(R"(
     module m;
@@ -139,10 +139,9 @@ TEST(DpiGlobalNameParsing, ImportGlobalNameWithDollarRejected) {
       "35.5.4"));
 }
 
-// §35.4: "After this stripping, the linkage identifier so formed shall comply
-// with the normal rules for C identifier construction." A name whose first
-// character is a digit fails the C rule even though escaping made it lexable
-// as a SystemVerilog identifier.
+// §35.4: once stripped, the linkage identifier must be a well-formed C
+// identifier. A name whose first character is a digit fails the C rule even
+// though escaping made it lexable as a SystemVerilog identifier.
 TEST(DpiGlobalNameParsing, EscapedNameStartingWithDigitIsRejected) {
   SourceManager mgr;
   Arena arena;

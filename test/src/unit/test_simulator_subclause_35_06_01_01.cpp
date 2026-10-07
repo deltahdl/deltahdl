@@ -17,10 +17,10 @@ namespace {
 // the actual presented at each call, each by the rule the clause gives its own
 // kind of unsized dimension.
 
-// §35.6.1.1: "The unsized ranges of open arrays are determined at a call site."
-// The same open-array formal, given actuals of different sizes at two call
-// sites, reports each actual's size -- the formal's range follows the actual,
-// not a fixed declaration.
+// §35.6.1.1: an open array's unsized ranges are settled at each call site. The
+// same open-array formal, given actuals of different sizes at two call sites,
+// reports each actual's size -- the formal's range follows the actual, not a
+// fixed declaration.
 TEST(DpiWysiwygOpenArray, CallSiteDeterminesOpenArrayFormalSize) {
   SvOpenArrayHandle small =
       DpiRuntime::MakeOpenArrayFromPackedActual(nullptr, 10, 32);
@@ -34,10 +34,10 @@ TEST(DpiWysiwygOpenArray, CallSiteDeterminesOpenArrayFormalSize) {
   EXPECT_EQ(DpiRuntime::SvHigh(large), 63);
 }
 
-// §35.6.1.1: "A solitary, unsized, packed dimension assumes the linearized,
-// normalized range of the actual's packed dimensions." The handle's range is
-// reported in normalized form -- low fixed at 0 and high at size-1 -- whatever
-// the actual's size.
+// §35.6.1.1: a formal whose one packed dimension is unsized takes the range of
+// the actual's packed dimensions, linearized and normalized. The handle's range
+// is reported in normalized form -- low fixed at 0 and high at size-1 --
+// whatever the actual's size.
 TEST(DpiWysiwygOpenArray, SolitaryUnsizedDimUsesNormalizedRange) {
   SvOpenArrayHandle h =
       DpiRuntime::MakeOpenArrayFromPackedActual(nullptr, 8, 16);
@@ -47,10 +47,10 @@ TEST(DpiWysiwygOpenArray, SolitaryUnsizedDimUsesNormalizedRange) {
   EXPECT_EQ(DpiRuntime::SvSize(h), 8u);
 }
 
-// §35.6.1.1: "the rest of the type information is specified at the import
-// declaration." Only the unsized range varies with the actual; the element
-// width carried from the import declaration is preserved across call sites,
-// even as the size differs between them.
+// §35.6.1.1: everything else about the type comes from the import declaration.
+// Only the unsized range varies with the actual; the element width carried from
+// the import declaration is preserved across call sites, even as the size
+// differs between them.
 TEST(DpiWysiwygOpenArray, DeclaredTypeInfoSurvivesAcrossCallSites) {
   SvOpenArrayHandle a =
       DpiRuntime::MakeOpenArrayFromPackedActual(nullptr, 4, 32);
@@ -88,8 +88,8 @@ TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
   EXPECT_EQ(result.AsInt(), 7);
 }
 
-// §35.6.1.1: "A formal's unsized, unpacked dimensions take on the ranges of the
-// corresponding actual dimension." §35.5.6.1 declares `MyType a_10x5
+// §35.6.1.1: each unsized unpacked dimension of a formal takes the range of the
+// matching dimension of the actual. §35.5.6.1 declares `MyType a_10x5
 // [11:20][6:2]` and binds it to `MyType i [][]`, so the formal's first
 // dimension runs 11 to 20 -- the actual's own bounds, not a range built from
 // its size.

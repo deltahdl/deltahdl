@@ -70,12 +70,11 @@ TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
   EXPECT_TRUE(stored->is_context);
 }
 
-// §35.7: "Declaring a SystemVerilog function to be exported does not change its
-// semantics or behavior from the SystemVerilog perspective; there is no effect
-// on SystemVerilog usage other than making it possible for foreign language
-// tasks and functions in a DPI call-chain to call the exported function." So a
-// SystemVerilog call to an exported function returns what the function returns,
-// exactly as it would without the export declaration.
+// §35.7: exporting a SystemVerilog function leaves its meaning and behavior on
+// the SystemVerilog side as they were; the only change is that foreign tasks
+// and functions in a DPI call chain can now call it. So a SystemVerilog call to
+// an exported function returns what the function returns, exactly as it would
+// without the export declaration.
 TEST(DpiExportedFunctionInADesign, ACallToAnExportedFunctionReturnsItsResult) {
   SimFixture f;
   auto* var = RunAndFindVar(

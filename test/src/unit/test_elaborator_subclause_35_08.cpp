@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// §35.8: "SystemVerilog allows tasks to be called from a foreign language,
-// similar to functions. Such tasks are termed exported tasks." A.2.6 writes the
+// §35.8: a foreign language may call SystemVerilog tasks as it calls functions,
+// and such tasks are what the clause calls exported tasks. A.2.6 writes the
 // exported-task form with the `task` keyword and its own task_identifier, so an
 // export declaration's keyword says which kind of subroutine it names, and the
 // cases below hold a declaration to that.
@@ -59,10 +59,10 @@ TEST(DpiExportedTaskElab, ExportOfATaskWrittenWithTheFunctionKeywordIsError) {
                             5, "35.8"));
 }
 
-// §35.8: "All aspects of exported functions described above in 35.7 apply to
-// exported tasks." §35.7 permits only one export declaration per subroutine in
-// a scope, and the report a user who wrote `task` reads says task, so that it
-// does not send them looking for a function they never declared.
+// §35.8: everything §35.7 says of exported functions holds for exported tasks
+// too. §35.7 permits only one export declaration per subroutine in a scope, and
+// the report a user who wrote `task` reads says task, so that it does not send
+// them looking for a function they never declared.
 TEST(DpiExportedTaskElab, TwoExportsOfOneTaskSayTask) {
   ElabFixture f;
   Elaborate(R"(

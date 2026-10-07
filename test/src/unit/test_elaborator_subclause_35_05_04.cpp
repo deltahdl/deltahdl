@@ -112,10 +112,10 @@ TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
 TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
   // The two declarations agree in every component the signature holds, and
   // they differ in the one thing outside it: the name of the formal, 'x' in
-  // one and 'y' in the other. §35.5.4 licenses exactly that difference: "It is
-  // permitted to have multiple declarations of the same imported or exported
-  // subroutine in different scopes; therefore, argument names and default
-  // values can vary, provided the type compatibility constraints are met."
+  // one and 'y' in the other. §35.5.4 licenses exactly that difference: one
+  // imported or exported subroutine may be declared in several scopes, so its
+  // argument names and default values may differ between them as long as the
+  // types stay compatible.
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -129,11 +129,11 @@ TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.4: "It is permitted to have multiple declarations of the same imported
-// or exported subroutine in different scopes; therefore, argument names and
-// default values can vary, provided the type compatibility constraints are
-// met." A default value is no part of the type signature the clause
-// enumerates, so two declarations differing in nothing else are both accepted.
+// §35.5.4: one imported or exported subroutine may be declared in several
+// scopes, so its argument names and default values may differ between them as
+// long as the types stay compatible. A default value is no part of the type
+// signature the clause enumerates, so two declarations differing in nothing
+// else are both accepted.
 TEST(DpiDeclElab, DifferingDefaultValuesUnderSameLinkageOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -203,10 +203,10 @@ TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: "The type includes dimensions and bounds of any arrays or array
-// dimensions." Two packed dimensions of different widths are two types, and
-// the declarations below agree in every other component of the signature, so
-// the packed bounds are what this rejection rests on.
+// §35.5.4: the dimensions and bounds of every array are part of the type. Two
+// packed dimensions of different widths are two types, and the declarations
+// below agree in every other component of the signature, so the packed bounds
+// are what this rejection rests on.
 TEST(DpiDeclElab, SignaturePackedBoundsMismatchUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -224,9 +224,9 @@ TEST(DpiDeclElab, SignaturePackedBoundsMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: "The type includes dimensions and bounds of any arrays or array
-// dimensions." The sentence names the bounds and not the width, so [0:7] and
-// [7:0] are two types although each is eight bits wide.
+// §35.5.4: the dimensions and bounds of every array are part of the type. The
+// sentence names the bounds and not the width, so [0:7] and [7:0] are two types
+// although each is eight bits wide.
 TEST(DpiDeclElab, SignaturePackedBoundsReversedUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -244,10 +244,9 @@ TEST(DpiDeclElab, SignaturePackedBoundsReversedUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: "The type includes dimensions and bounds of any arrays or array
-// dimensions", which says the same of an unpacked dimension as of a packed
-// one. The two formals below are both arrays of int and differ in the bounds
-// alone.
+// §35.5.4: the dimensions and bounds of every array are part of the type, which
+// says the same of an unpacked dimension as of a packed one. The two formals
+// below are both arrays of int and differ in the bounds alone.
 TEST(DpiDeclElab, SignatureUnpackedBoundsMismatchUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -285,10 +284,10 @@ TEST(DpiDeclElab, SignaturePackedBoundsAgreeingAfterFoldingUnderSameLinkageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.4: "The signature includes the return type and the number, order,
-// direction, and types of each and every argument." The two declarations below
-// give the same two arguments in opposite order, and the arguments differ in
-// their direction and in their type, which are what the signature records of
+// §35.5.4: a signature is the return type together with how many arguments
+// there are and each one's position, direction and type. The two declarations
+// below give the same two arguments in opposite order, and the arguments differ
+// in their direction and in their type, which are what the signature records of
 // an argument. The order is therefore the only thing left between them.
 TEST(DpiDeclElab, SignatureArgOrderMismatchUnderSameLinkageIsError) {
   ElabFixture f;
@@ -307,11 +306,11 @@ TEST(DpiDeclElab, SignatureArgOrderMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: "For any given c_identifier ..., all declarations, regardless of
-// scope, shall have exactly the same type signature." A package body is one
-// such scope — A.1.11 makes dpi_import_export a package_item — so an import
-// declared there is compared against the declarations of its linkage name in
-// every other scope.
+// §35.5.4: every declaration of one c_identifier, whatever its scope, must
+// carry exactly the same type signature. A package body is one such scope —
+// A.1.11 makes dpi_import_export a package_item — so an import declared there
+// is compared against the declarations of its linkage name in every other
+// scope.
 TEST(DpiDeclElab, APackageImportJoinsTheSignatureAgreementForItsLinkageName) {
   ElabFixture f;
   Elaborate(R"(
@@ -329,8 +328,8 @@ TEST(DpiDeclElab, APackageImportJoinsTheSignatureAgreementForItsLinkageName) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: "multiple imports of the same subroutine name into the same scope
-// are forbidden." The scope a package body makes is one scope for that rule.
+// §35.5.4: one scope may not import the same subroutine name twice. The scope a
+// package body makes is one scope for that rule.
 TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -348,10 +347,10 @@ TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
                             4, "35.5.4"));
 }
 
-// §35.5.4, footnote 27 of Syntax 35-1: "Formals of dpi_function_proto and
-// dpi_task_proto cannot use pass by reference mode and class types cannot be
-// passed at all." A class handle has no representation in the DPI's C layer, so
-// the prohibition is absolute rather than a type the permitted list happens to
+// §35.5.4, footnote 27 of Syntax 35-1: the formals of a dpi_function_proto or
+// dpi_task_proto cannot be passed by reference, and no class type can be passed
+// at all. A class handle has no representation in the DPI's C layer, so the
+// prohibition is absolute rather than a type the permitted list happens to
 // omit, and the report names it as such.
 //
 // The class stands at compilation-unit scope and the import inside a module,

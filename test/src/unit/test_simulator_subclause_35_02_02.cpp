@@ -8,15 +8,14 @@
 
 using namespace delta;
 
-// §35.2.2 "Data types": "SystemVerilog data types are the sole data types that
-// can cross the boundary between SystemVerilog and a foreign language in either
-// direction (i.e., when an imported function is called from SystemVerilog code
-// or an exported SystemVerilog function is called from a foreign code)."
+// §35.2.2 "Data types": only SystemVerilog data types cross between
+// SystemVerilog and a foreign language, both when SystemVerilog calls an
+// imported function and when foreign code calls an exported one.
 //
-// The claim these tests rest on is "in either direction". A value arriving on
-// the far side of the boundary is the SystemVerilog type the declaration names
-// for it — a formal's type for an argument, the declared result type for a
-// result — whichever side made the call. Every test below presents a value
+// The claim these tests rest on is that this holds both ways. A value arriving
+// on the far side of the boundary is the SystemVerilog type the declaration
+// names for it — a formal's type for an argument, the declared result type for
+// a result — whichever side made the call. Every test below presents a value
 // whose type differs from the declared one and whose value the conversion
 // visibly changes, so it fails if the value crossed as the caller built it.
 //
@@ -43,13 +42,13 @@ DpiRtExport ReportingExport(const std::vector<DpiArg>& formals,
   return exp;
 }
 
-// §35.2.2: the first of the two directions, "when an imported function is
-// called from SystemVerilog code". The actual a SystemVerilog caller supplies
-// reaches the foreign code as the SystemVerilog type the import's formal
-// declares. §35.6.1 owns the copy-in rule that performs the conversion and
-// DpiArgumentPassing in test_simulator_subclause_35_06_01.cpp asserts it as
-// such; this case is here because §35.2.2 states the two directions as one
-// claim, and the export cases below say nothing about symmetry on their own.
+// §35.2.2: the first of the two directions, SystemVerilog calling an imported
+// function. The actual a SystemVerilog caller supplies reaches the foreign code
+// as the SystemVerilog type the import's formal declares. §35.6.1 owns the
+// copy-in rule that performs the conversion and DpiArgumentPassing in
+// test_simulator_subclause_35_06_01.cpp asserts it as such; this case is here
+// because §35.2.2 states the two directions as one claim, and the export cases
+// below say nothing about symmetry on their own.
 TEST(DpiBoundaryDataTypes, ImportActualReachesForeignCodeAsItsFormalsType) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -70,9 +69,9 @@ TEST(DpiBoundaryDataTypes, ImportActualReachesForeignCodeAsItsFormalsType) {
   EXPECT_EQ(result.AsInt(), 44);
 }
 
-// §35.2.2: the second direction, "when ... an exported SystemVerilog function
-// is called from a foreign code". The actual the foreign caller supplies
-// reaches the SystemVerilog body as the type the export's formal declares.
+// §35.2.2: the second direction, foreign code calling an exported SystemVerilog
+// function. The actual the foreign caller supplies reaches the SystemVerilog
+// body as the type the export's formal declares.
 TEST(DpiBoundaryDataTypes, ExportActualReachesSvBodyAsItsFormalsType) {
   DpiRuntime rt;
   DpiArgValue observed;

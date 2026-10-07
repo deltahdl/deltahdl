@@ -11,11 +11,10 @@ namespace {
 // from the compilation-unit scope. The rules tested here govern how that name
 // space is policed across modules and across the import/export boundary.
 
-// §35.4: "Multiple export declarations with the same c_identifier in the
-// same scope are forbidden." The linkage identifier defaults to the
-// SystemVerilog subroutine name when no c_identifier is given, so two
-// export declarations of the same function in one scope collide under that
-// defaulted name.
+// §35.4: one scope may not hold two export declarations of the same
+// c_identifier. The linkage identifier defaults to the SystemVerilog subroutine
+// name when no c_identifier is given, so two export declarations of the same
+// function in one scope collide under that defaulted name.
 TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -31,12 +30,12 @@ TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
                             4, "35.4"));
 }
 
-// §35.4: "Multiple export declarations are allowed with the same
-// c_identifier, explicit or implicit, as long as they are in different
-// scopes ..." — exporting the same name from two distinct modules is OK,
-// provided the routines have equivalent type signatures. §35.7 additionally
-// requires each export to occur in the scope where the function is defined, so
-// both functions are defined here (with matching signatures).
+// §35.4: export declarations may share a c_identifier, written or defaulted,
+// when they stand in different scopes — exporting the same name from two
+// distinct modules is OK, provided the routines have equivalent type
+// signatures. §35.7 additionally requires each export to occur in the scope
+// where the function is defined, so both functions are defined here (with
+// matching signatures).
 TEST(DpiGlobalNameElab, SameExportLinkageAcrossDifferentScopesIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -169,10 +168,10 @@ TEST(DpiGlobalNameElab, DuplicateExportLinkageInOnePackageIsError) {
                             8, "35.4"));
 }
 
-// §35.4: "Multiple export declarations are allowed with the same c_identifier
-// ... as long as they are in different scopes and have the equivalent type
-// signature." A package and a module are two scopes, so one export in each
-// under one linkage name is the permitted case and not the forbidden one.
+// §35.4: export declarations may share a c_identifier when they stand in
+// different scopes and their type signatures are equivalent. A package and a
+// module are two scopes, so one export in each under one linkage name is the
+// permitted case and not the forbidden one.
 TEST(DpiGlobalNameElab, PackageAndModuleExportsOfOneLinkageAreDifferentScopes) {
   ElabFixture f;
   Elaborate(R"(
@@ -191,11 +190,10 @@ TEST(DpiGlobalNameElab, PackageAndModuleExportsOfOneLinkageAreDifferentScopes) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.4: "all declarations using the same c_identifier shall be declared with
-// the same DPI version string syntax." The rule is stated over declarations
-// rather than over modules, so a package declaration is compared against the
-// module declarations sharing its linkage name rather than validated on its
-// own.
+// §35.4: every declaration of one c_identifier must use the same DPI version
+// string syntax. The rule is stated over declarations rather than over modules,
+// so a package declaration is compared against the module declarations sharing
+// its linkage name rather than validated on its own.
 TEST(DpiGlobalNameElab, APackageDeclarationJoinsTheVersionStringAgreement) {
   ElabFixture f;
   Elaborate(R"(
@@ -233,13 +231,13 @@ TEST(DpiGlobalNameElab,
                             2, "35.4"));
 }
 
-// §27.6 makes a generate block a scope, so §35.4's "same scope" is the generate
-// block for a declaration written in one. The parser holds a generate block's
-// items in ModuleItem::gen_body on the item enclosing them, which was in none
-// of the lists the DPI walk collected, so a declaration written there was held
-// to none of §35.4's, §35.5.4's or §35.7's rules. The same pair written
-// directly in the module body is reported today, which is why this case puts it
-// in the block.
+// §27.6 makes a generate block a scope, so §35.4's rule about one scope reads
+// the generate block as that scope for a declaration written in one. The parser
+// holds a generate block's items in ModuleItem::gen_body on the item enclosing
+// them, which was in none of the lists the DPI walk collected, so a declaration
+// written there was held to none of §35.4's, §35.5.4's or §35.7's rules. The
+// same pair written directly in the module body is reported today, which is why
+// this case puts it in the block.
 TEST(DpiGlobalNameElab, DuplicateExportLinkageInAGenerateBlockIsError) {
   ElabFixture f;
   Elaborate(R"(

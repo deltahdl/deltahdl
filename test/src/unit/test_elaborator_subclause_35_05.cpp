@@ -9,12 +9,12 @@ using namespace delta;
 
 namespace {
 
-// §35.5: "The usage of imported functions is similar as for native
-// SystemVerilog functions." An imported task is used where a native task is
-// used, so §13.4's "a function shall not enable a task" reaches a call to one.
-// §35.5.1.1's note is what makes the rule matter here rather than being a
-// formality: an imported task can consume time, which is the whole reason a
-// function may not enable one.
+// §35.5: an imported function is used much as a native SystemVerilog function
+// is. An imported task is used where a native task is used, so §13.4's "a
+// function shall not enable a task" reaches a call to one. §35.5.1.1's note is
+// what makes the rule matter here rather than being a formality: an imported
+// task can consume time, which is the whole reason a function may not enable
+// one.
 TEST(DpiImportedSubroutineUsage, FunctionCannotEnableAnImportedTask) {
   ElabFixture f;
   Elaborate(R"(
@@ -68,10 +68,10 @@ TEST(DpiImportedSubroutineUsage, TaskCanEnableAnImportedTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5: "The usage of imported functions is similar as for native
-// SystemVerilog functions." §13.5 counts a call's actuals against the formal
-// list §35.5.4 gave the import, so passing more than the declaration has is
-// reported for an imported subroutine exactly as for a native one.
+// §35.5: an imported function is used much as a native SystemVerilog function
+// is. §13.5 counts a call's actuals against the formal list §35.5.4 gave the
+// import, so passing more than the declaration has is reported for an imported
+// subroutine exactly as for a native one.
 TEST(DpiImportCallArgs, TooManyActualsToAnImportedFunctionIsReported) {
   ElabFixture f;
   Elaborate(R"(

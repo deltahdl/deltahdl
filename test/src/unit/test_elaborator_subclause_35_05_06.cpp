@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// §35.5.6: "In exported DPI subroutines, it is erroneous to declare formal
-// arguments of dynamic array types." A function whose formal argument is a
-// dynamic array (the unsized "[]" form) cannot be exported for DPI.
+// §35.5.6: an exported DPI subroutine may not declare a formal of a dynamic
+// array type. A function whose formal argument is a dynamic array (the unsized
+// "[]" form) cannot be exported for DPI.
 TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -98,9 +98,9 @@ TEST(DpiExportFormalType,
                             4, "35.5.6"));
 }
 
-// §35.5.6: "The following SystemVerilog types are the only permitted types for
-// formal arguments of import and export subroutines". An event is not among
-// them, so an export whose subroutine takes one is rejected.
+// §35.5.6: the formals of an imported or exported subroutine may have only the
+// types the subclause lists. An event is not among them, so an export whose
+// subroutine takes one is rejected.
 TEST(DpiExportFormalType, ExportedFunctionWithEventArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -173,11 +173,11 @@ TEST(DpiExportFormalType, ExportedFunctionWithPackedUnionArgIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6 permits "Types constructed from the supported types with the help of
-// the following constructs: struct, union (packed forms only), unpacked array,
-// typedef", so a typedef is permitted exactly where the type behind the name
-// is. The export path follows the name too: an event named through a typedef is
-// the event §35.5.6 leaves out of its permitted set.
+// §35.5.6 also permits types built from the supported ones by struct, union
+// (packed forms only), unpacked array and typedef, so a typedef is permitted
+// exactly where the type behind the name is. The export path follows the name
+// too: an event named through a typedef is the event §35.5.6 leaves out of its
+// permitted set.
 TEST(DpiExportFormalType, ExportedFunctionWithTypedefOfEventIsError) {
   ElabFixture f;
   Elaborate(R"(

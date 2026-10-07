@@ -9,26 +9,24 @@
 
 using namespace delta;
 
-// §35.5.1.4 "Memory management". "The memory spaces owned and allocated by the
-// foreign code and SystemVerilog code are disjoined. Each side is responsible
-// for its own allocated memory. Specifically, an imported function shall not
-// free the memory allocated by SystemVerilog code (or the SystemVerilog
-// compiler) nor expect SystemVerilog code to free the memory allocated by the
-// foreign code (or the foreign compiler)."
+// §35.5.1.4 "Memory management". The foreign code and the SystemVerilog code
+// own and allocate separate memory, and each side looks after its own: an
+// imported function must not free memory SystemVerilog or its compiler
+// allocated, nor count on SystemVerilog freeing memory the foreign code or its
+// compiler allocated.
 //
 // Those two sentences bind the author of the foreign code, not the tool: a
 // simulator cannot stop a C function calling free on a pointer it was not
 // given. What the clause asks of the tool is in the sentence after them, which
-// describes the one arrangement by which a block does cross: "This does not
-// exclude scenarios where foreign code allocates a block of memory and then
-// passes a handle (i.e., a pointer) to that block to SystemVerilog code, which
-// in turn calls an imported function (e.g., C standard function free) that
-// directly or indirectly frees that block." SystemVerilog holds the handle and
-// never the block, so the handle has to reach the freeing import as the
-// address the allocating one returned. A boundary that altered it would have
-// the second import free something the first never allocated, which the NOTE
-// rules out by saying that in this scenario "a block of memory is allocated and
-// freed in the foreign code" whatever SystemVerilog did in between.
+// describes the one arrangement by which a block does cross: foreign code may
+// allocate a block, hand SystemVerilog a pointer to it, and have SystemVerilog
+// later call an imported function, C's free for one, that frees the block,
+// directly or not. SystemVerilog holds the handle and never the block, so the
+// handle has to reach the freeing import as the address the allocating one
+// returned. A boundary that altered it would have the second import free
+// something the first never allocated, which the NOTE rules out by saying that
+// in this scenario the block is both allocated and freed on the foreign side
+// whatever SystemVerilog did in between.
 //
 // §35.5.6 admits chandle as a formal argument type and §35.5.5 as a result
 // type, so the handle is a chandle at both ends.
