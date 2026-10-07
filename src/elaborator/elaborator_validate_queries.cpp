@@ -131,10 +131,10 @@ bool IsStringOutputTask(std::string_view callee) {
          callee == "$swriteo" || callee == "$sformat";
 }
 
-// §21.3.3: $swrite's first argument is a variable of integral type, an unpacked
-// array of byte, or a string. (The same output-variable rule governs $sformat's
-// first argument.) A real-valued destination has no character representation,
-// so it is the closest illegal form of that requirement and is rejected here.
+// §21.3.3 limits the variable that receives $swrite's text, and $sformat's, to
+// three kinds: integral, string, or an unpacked array whose elements are bytes.
+// A real-valued destination has no character representation, so it is the
+// closest illegal form of that requirement and is rejected here.
 // Other declared kinds (vectors, byte, enum, string, packed structs) are left
 // alone to avoid false positives.
 void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
@@ -145,8 +145,9 @@ void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
   auto it = types.find(base);
   if (it != types.end() && IsRealType(it->second)) {
     diag.Error(e->range.start,
-               "the output variable of $swrite/$sformat shall be of an "
-               "integral, unpacked array of byte, or string type, not real",
+               "$swrite/$sformat cannot write its text into a real "
+               "variable; give it an integral, string or unpacked byte "
+               "array target",
                Subclause("21.3.3"));
   }
 }

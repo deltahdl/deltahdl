@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// §21.3.3: the first argument to $swrite (and the output variable of $sformat)
-// shall be a variable of an integral, unpacked-array-of-byte, or string type.
+// §21.3.3 limits the variable that receives $swrite's text, and $sformat's, to
+// three kinds: integral, string, or an unpacked array whose elements are bytes.
 // A string-typed destination is the canonical accepting form and elaborates.
 TEST(StringFormatTaskElaboration, SwriteStringOutputVarAccepted) {
   ElabFixture f;
@@ -52,10 +52,9 @@ TEST(StringFormatTaskElaboration, SwriteUnpackedByteArrayOutputVarAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §21.3.3 negative form: the output variable must be a variable of an integral,
-// unpacked byte array or string type -- a real destination has no character
-// representation and is the closest illegal form. $swrite into a real variable
-// shall be rejected.
+// §21.3.3 negative form: a real destination is none of the three kinds the
+// clause allows and has no character representation, so it is the closest
+// illegal form, and $swrite into a real variable is rejected.
 TEST(StringFormatTaskElaboration, SwriteRealOutputVarRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,11 +63,12 @@ TEST(StringFormatTaskElaboration, SwriteRealOutputVarRejected) {
       "  initial $swrite(r, \"x=%0d\", 7);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be "
-                            "of an integral, unpacked array of byte, or string "
-                            "type, not real",
-                            3, "21.3.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "$swrite/$sformat cannot write its text into a real "
+                    "variable; give it an integral, string or "
+                    "unpacked byte array target",
+                    3, "21.3.3"));
 }
 
 // §21.3.3 negative form for $sformat: its output variable is subject to the
@@ -81,11 +81,12 @@ TEST(StringFormatTaskElaboration, SformatRealOutputVarRejected) {
       "  initial $sformat(r, \"v=%0d\", 3);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be "
-                            "of an integral, unpacked array of byte, or string "
-                            "type, not real",
-                            3, "21.3.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "$swrite/$sformat cannot write its text into a real "
+                    "variable; give it an integral, string or "
+                    "unpacked byte array target",
+                    3, "21.3.3"));
 }
 
 // §21.3.3: $sformatf takes no output variable -- its first argument is the
@@ -137,9 +138,9 @@ TEST(StringFormatTaskElaboration,
       "  initial assert (ready) $swrite(acc, \"n=%0d\", 1);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be",
-                            4, "21.3.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$swrite/$sformat cannot write its text into a real", 4, "21.3.3"));
 }
 
 // §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
@@ -155,9 +156,9 @@ TEST(StringFormatTaskElaboration,
       "  initial assert (done) else $sformat(tally, \"t=%0d\", 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be",
-                            4, "21.3.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$swrite/$sformat cannot write its text into a real", 4, "21.3.3"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -172,9 +173,9 @@ TEST(StringFormatTaskElaboration, SwritebRealOutputVarInARandcaseItemRejected) {
       "  initial randcase 3: $swriteb(gauge, \"%b\", 4'b1010); endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be",
-                            3, "21.3.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$swrite/$sformat cannot write its text into a real", 3, "21.3.3"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -195,9 +196,9 @@ TEST(StringFormatTaskElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the output variable of $swrite/$sformat shall be",
-                            5, "21.3.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$swrite/$sformat cannot write its text into a real", 5, "21.3.3"));
 }
 
 }  // namespace
