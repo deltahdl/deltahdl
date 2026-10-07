@@ -600,7 +600,7 @@ TEST(GenerateElaboration, CaseAlternativeLabelPrefixesItsDeclaration) {
 
 // §27.5 selects a conditional generate block by constant expressions evaluated
 // during elaboration, and §26.3 makes a wildcard-imported name locally visible
-// only "prior to that point within the current scope". The scope holding the
+// only after an earlier import in the current scope. The scope holding the
 // import here is module a, so W names nothing in module b and the condition is
 // not a constant expression there: Elaborator::ElaborateGenerateIf in
 // src/elaborator/elaborator_generate.cpp warns and instantiates neither branch.
@@ -705,10 +705,10 @@ TEST(GenerateElaboration, ImportedParameterReachesItsOwnModulesGenerateIf) {
 }
 
 // §26.3 covers the type identifier an import carries as well as the parameter,
-// and a generate block "comprises a separate scope and a new level of
-// hierarchy" (§27.4) inside the module that wrote it, so a declaration in
-// module b's generate block is sized by what module b can see. word_t is
-// imported by module a alone, so b's y has to be left unsized.
+// and a generate block forms a scope of its own and a further level of
+// hierarchy (§27.4) inside the module that wrote it, so a declaration in module
+// b's generate block is sized by what module b can see. word_t is imported by
+// module a alone, so b's y has to be left unsized.
 //
 // The localparam gating the block is declared by module b, which is what
 // separates this from the two cases above: the condition folds either way, so

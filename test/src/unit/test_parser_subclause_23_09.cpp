@@ -222,12 +222,12 @@ TEST(ModuleScopeParse, TaskTypedefIsStillATypeInsideItsOwnTask) {
 
 // The two remaining scopes of §23.9's eleven, a package and a class, differ
 // from the nine above in that the standard hands their type names to another
-// scope by name. §26.3 gives an importing scope a package's "without a package
-// name qualifier", and §8.13 gives a subclass "the members of the base class".
-// So each is stated twice below: the name is gone where nothing brought it in,
-// and present where something did. A guard that only takes names away turns
-// every legal import into a parse failure, which is what the first pair of
-// cases would not notice on its own.
+// scope by name. §26.3 gives an importing scope a package's identifiers without
+// the package name in front, and §8.13 gives a subclass "the members of the
+// base class". So each is stated twice below: the name is gone where nothing
+// brought it in, and present where something did. A guard that only takes names
+// away turns every legal import into a parse failure, which is what the first
+// pair of cases would not notice on its own.
 //
 // The taking-away cases reuse the `localparam T = 1;` arrangement of the five
 // above, for the reason given there.
@@ -292,10 +292,9 @@ TEST(ModuleScopeParse, PackageImportDoesNotReachAModuleThatDidNotImport) {
   EXPECT_EQ(t->data_type.kind, DataTypeKind::kImplicit);
 }
 
-// §26.3's explicit form: "An explicit import only imports the symbols
-// specifically referenced by the import." The package declares two typedefs and
-// the module names one, so U has to stay an ordinary identifier in a module
-// that took T.
+// §26.3's explicit form: an explicit import brings in only the symbols it
+// names. The package declares two typedefs and the module names one, so U has
+// to stay an ordinary identifier in a module that took T.
 TEST(ModuleScopeParse, ExplicitPackageImportTakesOnlyTheNameItWrites) {
   auto r = Parse(
       "package p;\n"
@@ -320,10 +319,10 @@ TEST(ModuleScopeParse, ExplicitPackageImportTakesOnlyTheNameItWrites) {
   EXPECT_EQ(u->data_type.kind, DataTypeKind::kImplicit);
 }
 
-// §26.4: "Package items that are imported as part of a module, interface, or
-// program header are visible throughout the module, interface, or program,
-// including in parameter and port declarations." The port list is read before
-// the body, so this fails whenever the import is applied later than the header.
+// §26.4: package items imported in a module, interface or program header are
+// visible through the whole of it, its parameter and port declarations
+// included. The port list is read before the body, so this fails whenever the
+// import is applied later than the header.
 TEST(ModuleScopeParse, PackageImportInAModuleHeaderIsATypeInThePortList) {
   auto r = Parse(
       "package p;\n"

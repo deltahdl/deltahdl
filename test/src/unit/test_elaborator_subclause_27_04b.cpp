@@ -338,10 +338,9 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
 
 // §27.4 requires the genvar initialization assignment to be a constant
 // expression, and §26.3 makes a wildcard-imported name locally visible only
-// "prior to that point within the current scope". The scope holding the import
-// is module a, so W names nothing in module b and
-// Elaborator::OpenGenerateForLoop in src/elaborator/elaborator_generate.cpp
-// warns instead of opening the loop.
+// after an earlier import in the current scope. The scope holding the import is
+// module a, so W names nothing in module b and Elaborator::OpenGenerateForLoop
+// in src/elaborator/elaborator_generate.cpp warns instead of opening the loop.
 //
 // What this fails on is W folding in module b anyway, which it does when the
 // scope the loop header is evaluated against is assembled after every module

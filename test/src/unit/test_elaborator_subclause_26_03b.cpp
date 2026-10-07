@@ -8,15 +8,14 @@
 
 namespace {
 
-// §26.3 rules on printed page 809 that the import declaration "provides direct
-// visibility of identifiers within packages" and "allows identifiers declared
-// within packages to be visible within the current scope without a package name
-// qualifier", and puts no condition on the statement the reference stands in. A
-// bare read that neither the module nor an imported package supplies therefore
-// names nothing, which Elaborator::ValidateUnresolvedReferences reports through
-// ReportUnresolvedRefs in src/elaborator/elaborator_scope_rules.cpp as
-// "reference to unresolved identifier" under §23.9 --
-// PackageImport.UnresolvedReferenceIsError in
+// §26.3 rules on printed page 809 that the import declaration makes a package's
+// identifiers directly visible, seen in the current scope without the package
+// name in front, and puts no condition on the statement the reference stands
+// in. A bare read that neither the module nor an imported package supplies
+// therefore names nothing, which Elaborator::ValidateUnresolvedReferences
+// reports through ReportUnresolvedRefs in
+// src/elaborator/elaborator_scope_rules.cpp as "reference to unresolved
+// identifier" under §23.9 -- PackageImport.UnresolvedReferenceIsError in
 // test/src/unit/test_elaborator_subclause_26_03a.cpp is that report for a read
 // written directly in an initial procedure.
 //
@@ -543,10 +542,10 @@ TEST(PackageImport, ExplicitImportInATaskBodyResolvesItsRead) {
              f));
 }
 
-// §26.3 makes the import's names visible "within the current scope", the body
-// that holds it, so a second function of the module without an import of its
-// own still reads nothing of p: its K is reported under §23.9, on its own
-// line, while the importing body before it passes.
+// §26.3 makes the import's names visible in the current scope, the body that
+// holds it, so a second function of the module without an import of its own
+// still reads nothing of p: its K is reported under §23.9, on its own line,
+// while the importing body before it passes.
 TEST(PackageImport, AnImportInOneFunctionBodyReachesNoOtherBody) {
   ElabFixture f;
   EXPECT_FALSE(

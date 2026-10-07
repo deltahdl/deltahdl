@@ -144,9 +144,8 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
 
 // §35.4's rules hold in every scope a DPI declaration can be written in. A.1.11
 // makes dpi_import_export a package_or_generate_item_declaration and so a
-// package_item, and §26.2 calls packages "explicitly named scopes", so a
-// package body is one scope for "in the same scope" exactly as a module
-// declaration is.
+// package_item, and §26.2 makes packages explicitly named scopes, so a package
+// body is one scope for the same-scope rule exactly as a module declaration is.
 TEST(DpiGlobalNameElab, DuplicateExportLinkageInOnePackageIsError) {
   ElabFixture f;
   Elaborate(R"(

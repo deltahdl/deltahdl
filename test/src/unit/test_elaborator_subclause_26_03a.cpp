@@ -256,12 +256,11 @@ TEST(PackageImport, ExplicitImportOfEnumTypeDoesNotImportLiterals) {
                             "23.9"));
 }
 
-// §26.3 (companion to the rule above): "A wildcard import allows all
-// identifiers declared within a package to be imported provided the identifier
-// is not otherwise defined in the importing scope." The clause's own example
-// writes this module as the legal counterpart to the explicit import above,
-// commenting `myteeth = FALSE;` as "OK: Direct reference to FALSE refers to the
-// FALSE enumeration literal imported from q".
+// §26.3 (companion to the rule above): a wildcard import brings in every
+// identifier a package declares that the importing scope does not already
+// define. The clause's own example writes this module as the legal counterpart
+// to the explicit import above, commenting `myteeth = FALSE;` as legal, the
+// bare FALSE naming the enumeration literal imported from q.
 //
 // The assertion reads the elaborated design instead of asserting that
 // elaboration succeeded. ModuleSkipsUnresolvedCheck in
@@ -398,12 +397,12 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
 }
 
 // §26.3 rules that a wildcard import makes an identifier potentially locally
-// visible "at some point within a scope if there is a wildcard import of a
-// package before that point within the current scope", and the clause's own
-// example on printed page 809 writes both import forms in a module body and
-// then declares `teeth_t myteeth;` with the type they made visible. So an
-// import in the body carries a package's typedefs and parameters into the
-// module, exactly as one in the header does under §26.4.
+// visible at a point of a scope when a wildcard import of the package stands
+// earlier in that same scope, and the clause's own example on printed page 809
+// writes both import forms in a module body and then declares `teeth_t
+// myteeth;` with the type they made visible. So an import in the body carries a
+// package's typedefs and parameters into the module, exactly as one in the
+// header does under §26.4.
 //
 // The four cases below read the elaborated declaration back rather than
 // asserting that elaboration succeeded, because nothing reports an unresolved
@@ -432,11 +431,10 @@ TEST(PackageImport, BodyImportedTypedefSizesTheVariable) {
   EXPECT_EQ(data->width, 8u);
 }
 
-// The explicit form of the same claim. §26.3 states it separately -- "an
-// explicit import only imports the symbols specifically referenced by the
-// import" -- and the elaborator reaches it through a different branch of
-// ApplyImport in src/elaborator/elaborator_module.cpp, so it is asserted
-// separately.
+// The explicit form of the same claim. §26.3 states it separately -- an
+// explicit import brings in only the symbols it names -- and the elaborator
+// reaches it through a different branch of ApplyImport in
+// src/elaborator/elaborator_module.cpp, so it is asserted separately.
 TEST(PackageImport, ExplicitBodyImportOfTypedefSizesTheVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -506,10 +504,10 @@ TEST(PackageImport, BodyImportedEnumTypedefNamesTheEnumType) {
   EXPECT_EQ(myteeth->enum_type_name, "teeth_t");
 }
 
-// §26.3 makes an identifier potentially locally visible only where "there is a
-// wildcard import of a package before that point within the current scope", and
-// module 'b' is a scope with no import in it. word_t is declared nowhere 'b'
-// can see, so 'b' has to be told nothing about q whatever 'a' imported.
+// §26.3 makes an identifier potentially locally visible only where a wildcard
+// import of the package stands earlier in the current scope, and module 'b' is
+// a scope with no import in it. word_t is declared nowhere 'b' can see, so 'b'
+// has to be told nothing about q whatever 'a' imported.
 //
 // Both claims are needed. 16 on a's x says the import still reaches the module
 // that wrote it, so the test cannot pass by importing nothing anywhere. A
@@ -584,12 +582,12 @@ TEST(PackageImport, ImportedParameterDoesNotReachAnotherModule) {
   EXPECT_EQ(y->width, 1u);
 }
 
-// §26.3 (printed page 808): "One way to use declarations made in a package is
-// to reference them using the package scope resolution operator ::", written in
-// the clause as `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);` -- a
-// declaration through a package-qualified type name, with no import in sight.
-// The cases above all reach a package typedef through an import, which enters
-// it under its bare name, so none of them exercises the prefix itself.
+// §26.3 (printed page 808): a package's declarations can be used by naming them
+// through the package scope resolution operator ::, written in the clause as
+// `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);` -- a declaration through
+// a package-qualified type name, with no import in sight. The cases above all
+// reach a package typedef through an import, which enters it under its bare
+// name, so none of them exercises the prefix itself.
 //
 // 16 is the width to assert: shortint is the only type in the source, so a
 // prefix that resolved to nothing leaves v at 0 and one that resolved to some
@@ -611,16 +609,16 @@ TEST(PackageReference, ScopedTypedefSizesTheVariableWithoutImport) {
   EXPECT_EQ(v->width, 16u);
 }
 
-// §26.3 rules that an imported identifier "shall not be visible outside that
-// importing scope by hierarchical reference into that scope", and puts no
-// condition on where that hierarchical reference stands. Every position a
-// statement holds a statement in is therefore one the rule reaches.
-// CollectMemberAccessInStmt in src/elaborator/elaborator_scope_rules_hier.cpp,
-// which gathers the accesses this check reads, had written out twelve of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
-// missing link was Stmt::rs_productions; the two cases below cover the two
-// statement lists a randsequence production holds.
+// §26.3 rules that an imported identifier cannot be reached from outside the
+// importing scope by a hierarchical reference into it, and puts no condition on
+// where that hierarchical reference stands. Every position a statement holds a
+// statement in is therefore one the rule reaches. CollectMemberAccessInStmt in
+// src/elaborator/elaborator_scope_rules_hier.cpp, which gathers the accesses
+// this check reads, had written out twelve of the thirteen child-statement
+// links Stmt declares and now takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The missing link was
+// Stmt::rs_productions; the two cases below cover the two statement lists a
+// randsequence production holds.
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
 // }`, so a randsequence production's code block holds ordinary procedural

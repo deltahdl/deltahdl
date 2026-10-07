@@ -409,10 +409,9 @@ constexpr const char* kInverterPrimitive =
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      PackageImportedInOneFileResolvesATypeDeclaredInAnother) {
-  // §26.3: an import declaration "allows identifiers declared within packages
-  // to be visible within the current scope without a package name qualifier",
-  // and §26.3 requires only that "The compilation of a package shall precede
-  // the compilation of scopes in which the package is imported", which a
+  // §26.3: an import declaration lets a package's identifiers be seen in the
+  // current scope without the package name in front, and §26.3 requires only
+  // that a package be compiled before any scope that imports it, which a
   // command line naming the package's file first satisfies. The import put
   // nothing back while the package's own entry stayed with the parse that read
   // it, so `byte_t b;` was read as an instantiation of a module called byte_t.

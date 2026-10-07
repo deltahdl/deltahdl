@@ -111,8 +111,8 @@ TEST(PackageImportSim, ExplicitImportFunctionCalledUnqualified) {
 // scope that writes the import, and this case holds that the scope may be a
 // module reached through an instance. §26.3 (printed page 809 of IEEE
 // 1800-2023) states the visibility the read rests on: the import
-// declaration "allows identifiers declared within packages to be visible within
-// the current scope without a package name qualifier".
+// declaration lets a package's identifiers be seen in the current scope without
+// the package name in front.
 //
 // The case is a guard rail rather than a defect-catcher. It passes today, and
 // it must keep passing after the fix for #3054 narrows SimContext::FindVariable
@@ -147,11 +147,11 @@ TEST(PackageImportSim, InstantiatedModuleReadsImportedParameter) {
   EXPECT_EQ(y->value.ToUint64(), 77u);
 }
 
-// §26.3: the import declaration "allows identifiers declared within packages to
-// be visible within the current scope without a package name qualifier"
-// (printed page 809 of IEEE 1800-2023). The current scope here is
-// `child`, and `top` imports nothing, so the child's own import is the only
-// thing that can make VAL visible to `initial y = VAL;`.
+// §26.3: the import declaration lets a package's identifiers be seen in the
+// current scope without the package name in front (printed page 809 of IEEE
+// 1800-2023). The current scope here is `child`, and `top` imports nothing, so
+// the child's own import is the only thing that can make VAL visible to
+// `initial y = VAL;`.
 //
 // This catches an import written inside an instantiated module binding nothing.
 // Lowerer::LowerImports runs for the top module only until #3056 is fixed, so

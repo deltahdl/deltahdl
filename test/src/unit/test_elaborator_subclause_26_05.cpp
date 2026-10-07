@@ -7,11 +7,10 @@
 namespace {
 
 // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing a
-// local declaration of c", reads "ERROR / It is illegal to import an identifier
-// defined in the importing scope". §26.3 states that same rule as prose -- "An
-// explicit import shall be illegal if the imported identifier is declared in
-// the same scope" -- so the report is filed under §26.3 and this case asserts
-// it there.
+// local declaration of c", reads ERROR, importing an identifier the importing
+// scope defines being illegal. §26.3 states that same rule as prose -- an
+// explicit import of an identifier the same scope declares is illegal -- so the
+// report is filed under §26.3 and this case asserts it there.
 TEST(PackageImport, ExplicitImportCollidesWithLocalDecl) {
   ElabFixture f;
   ElabOk(
@@ -31,11 +30,11 @@ TEST(PackageImport, ExplicitImportCollidesWithLocalDecl) {
 }
 
 // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing an
-// explicit import of c (import q::c)", reads "ERROR / It is illegal to import
-// the same identifier from different packages". §26.3 states that same rule as
-// prose -- an explicit import is illegal if the identifier is "explicitly
-// imported from another package" -- so the report is filed under §26.3 and this
-// case asserts it there.
+// explicit import of c (import q::c)", reads ERROR, importing one identifier
+// from two different packages being illegal. §26.3 states that same rule as
+// prose -- an explicit import is illegal when the identifier is already
+// imported by name from another package -- so the report is filed under §26.3
+// and this case asserts it there.
 TEST(PackageImport, ExplicitImportCollidesWithOtherExplicitImport) {
   ElabFixture f;
   ElabOk(
@@ -79,10 +78,10 @@ TEST(PackageImport, LocalDeclShadowsWildcardImport) {
 }
 
 // The prose under Table 26-1 of §26.5 says an error results when a
-// wildcard-imported identifier "is later declared ... in the same scope", and
-// §26.3 states that rule normatively: "If a wildcard imported symbol is made
-// locally visible in a scope, any later locally visible declaration of the same
-// name in that scope shall be illegal." The report is filed under §26.3.
+// wildcard-imported identifier is declared later in the same scope, and §26.3
+// states that rule normatively: once a wildcard-imported symbol is locally
+// visible in a scope, any later locally visible declaration of that name in the
+// scope is illegal. The report is filed under §26.3.
 TEST(PackageImport, LocalDeclAfterWildcardReferenceIsIllegal) {
   ElabFixture f;
   ElabOk(
@@ -103,12 +102,11 @@ TEST(PackageImport, LocalDeclAfterWildcardReferenceIsIllegal) {
 }
 
 // Table 26-1 of §26.5, row `import p::*;`, column "In a scope containing a
-// wildcard import of c", reads "c is undefined in the importing scope. Thus, a
-// direct reference to c is illegal and results in an error." §26.3 states that
-// rule normatively: "It shall be illegal if the wildcard import of more than
-// one package within the same scope defines the same potentially locally
-// visible identifier and a search for a reference matches that identifier." The
-// report is filed under §26.3.
+// wildcard import of c", reads that c is undefined in the importing scope, so a
+// direct reference to it is an error. §26.3 states that rule normatively: two
+// or more wildcard imports in one scope supplying the same potentially locally
+// visible identifier make a reference that the search matches to it illegal.
+// The report is filed under §26.3.
 TEST(PackageImport, AmbiguousWildcardImportIsIllegal) {
   ElabFixture f;
   ElabOk(
@@ -170,10 +168,10 @@ TEST(PackageImport, ExplicitImportWithWildcardFromOtherPackageAllowed) {
 }
 
 // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing a
-// wildcard import of c": "The import of p::c makes any prior reference to c
-// illegal." The reference to c binds through `import q::*`, so the later
-// `import p::c` is the illegal one. The report names §26.5 because §26.3 states
-// the other import-legality rules but not this one.
+// wildcard import of c": the import of p::c makes every earlier reference to c
+// illegal. The reference to c binds through `import q::*`, so the later `import
+// p::c` is the illegal one. The report names §26.5 because §26.3 states the
+// other import-legality rules but not this one.
 TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
   ElabFixture f;
   ElabOk(
