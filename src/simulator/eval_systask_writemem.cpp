@@ -165,11 +165,6 @@ static void WriteMemMultiDim(const WritememEval& eval,
       });
 }
 
-// §21.5/§21.4.1: write the words of whatever container `mem_name` denotes -- a
-// queue, a fixed or dynamic unpacked array, or a plain variable naming a single
-// memory word. §21.4.3: a multidimensional unpacked array's elements are named
-// with one subscript per dimension, so it takes the row-major walk rather than
-// the single-subscript address loop.
 // §21.5 with §8.5: the words of an unpacked array property of a class
 // object, named bare inside one of its methods or through a handle or `this`,
 // in the address window the task's arguments give.
@@ -187,6 +182,11 @@ static void WriteMemClassArray(const WritememEval& eval,
       });
 }
 
+// §21.5: write the words of the queue or the fixed or dynamic unpacked array
+// `mem_name` names; EvalWritemem has already found it to be one. §21.4.3: a
+// multidimensional unpacked array's elements are named with one subscript per
+// dimension, so it takes the row-major walk rather than the single-subscript
+// address loop.
 template <class EmitFn>
 static void WriteMemContainer(const WritememEval& eval,
                               const std::string& mem_name, EmitFn emit) {
@@ -195,34 +195,50 @@ static void WriteMemContainer(const WritememEval& eval,
     WriteMemQueue(eval, q, emit);
     return;
   }
-  if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
-    if (ai->dim_sizes.size() >= 2) {
-      WriteMemMultiDim(eval, mem_name, ai, emit);
-    } else {
-      WriteMemArray(eval, mem_name, ai, emit);
-    }
-    return;
+  const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
+  if (ai->dim_sizes.size() >= 2) {
+    WriteMemMultiDim(eval, mem_name, ai, emit);
+  } else {
+    WriteMemArray(eval, mem_name, ai, emit);
   }
-  if (auto* target = ctx.FindVariable(mem_name)) emit(target->value);
 }
 
-// §21.5: the memory is named by an identifier, bare or hierarchical (§23.6);
-// false for any other form of `mem`.
+// §21.5: the memory is named by an identifier, bare, hierarchical (§23.6) or
+// qualified by the package declaring it (§26.3); false for any other form of
+// `mem`. A package's data is held under "pkg.name", the path FlattenHierPath
+// gives `pkg::name`.
 static bool MemoryName(const Expr* mem, std::string& name) {
   if (mem->kind == ExprKind::kIdentifier) {
     name = std::string(mem->text);
     return true;
   }
-  if (mem->kind == ExprKind::kMemberAccess && !mem->is_scope_resolution) {
+  if (mem->kind == ExprKind::kMemberAccess) {
     name = FlattenHierPath(mem);
     return true;
   }
   return false;
 }
 
+// §21.5 with §7.4: whether `name` names an unpacked array the task can dump --
+// an associative array, a queue or dynamic array, or a fixed-size array.
+static bool NamesUnpackedArray(SimContext& ctx, const std::string& name) {
+  return ctx.FindAssocArray(name) != nullptr ||
+         ctx.FindQueue(name) != nullptr || ctx.FindArrayInfo(name) != nullptr;
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
-  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
+  // §21.5's syntax: a filename and a memory_name, each required. A call short
+  // of both names no memory to dump, or no file to dump it to, and is reported
+  // rather than left doing nothing.
+  if (expr->args.size() < 2) {
+    ctx.GetDiag().Error(expr->range.start,
+                        std::string(is_hex ? "$writememh" : "$writememb") +
+                            " takes a file name and a memory name, and this "
+                            "call has fewer",
+                        Subclause("21.5"));
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   // §21.5: the filename operand takes the same forms as the §21.4 read side —
   // a string literal, a string-typed value, or an integral value whose packed
   // bytes spell the name; EvalStringArg covers all three.
@@ -231,8 +247,18 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   ClassArrayRef class_array;
   bool is_class_array =
       ResolveClassArray(expr->args[1], ctx, arena, class_array);
+  // §21.5: the tasks dump a memory array (§7.4.3), so a memory_name naming
+  // anything else -- a plain variable, a literal -- is reported. Like the
+  // index check below, this runs before the file is opened, so the illegal
+  // call leaves any existing file as it was.
   std::string mem_name;
-  if (!is_class_array && !MemoryName(expr->args[1], mem_name)) {
+  bool names_memory = is_class_array || (MemoryName(expr->args[1], mem_name) &&
+                                         NamesUnpackedArray(ctx, mem_name));
+  if (!names_memory) {
+    ctx.GetDiag().Error(expr->args[1]->range.start,
+                        "$writemem" + std::string(is_hex ? "h" : "b") +
+                            ": memory_name is not an unpacked array",
+                        Subclause("21.5"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

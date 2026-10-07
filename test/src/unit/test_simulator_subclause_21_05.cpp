@@ -16,6 +16,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -363,9 +364,9 @@ TEST(WritememSim, UnopenablePathLeavesRunAlive) {
   EXPECT_FALSE(std::ifstream(path).good());
 }
 
-// Negative form: the second operand must name a memory; a plain literal in the
-// memory_name position dumps nothing — no file is created — and the run
-// continues.
+// §21.5: the second operand must name a memory array; a plain literal in the
+// memory_name position is reported under 21.5 and dumps nothing -- no file is
+// created -- and the run continues.
 TEST(WritememSim, NonMemoryNameOperandWritesNothing) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_notmem.mem";
@@ -382,6 +383,9 @@ TEST(WritememSim, NonMemoryNameOperandWritesNothing) {
       f);
   EXPECT_EQ(out, "alive\n");
   EXPECT_FALSE(std::ifstream(path).good());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh: memory_name is not an unpacked array",
+                            3, "21.5"));
 }
 
 // §21.5 with §8.5: the memory is any unpacked array, a class object's array
@@ -626,6 +630,79 @@ TEST(WritememSim, UnopenablePathWarningNamesWritememb) {
   EXPECT_NE(err.find("$writememb: cannot open file: " + path),
             std::string::npos);
   EXPECT_FALSE(std::ifstream(path).good());
+}
+
+// §21.5 (Syntax 21-13): both tasks require a filename and a memory_name. A
+// call giving only the filename is reported under 21.5 at the call, naming
+// the task the source wrote, and the run continues past it.
+TEST(WritememSim, ACallShortOfAMemoryNameIsReportedUnderEachTaskName) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    $writememh(\"/tmp/deltahdl_t2105_short_h.mem\");\n"
+      "    $writememb(\"/tmp/deltahdl_t2105_short_b.mem\");\n"
+      "    $display(\"alive\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh takes a file name and a memory name, "
+                            "and this call has fewer",
+                            3, "21.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememb takes a file name and a memory name, "
+                            "and this call has fewer",
+                            4, "21.5"));
+}
+
+// §21.5 with §26.3: a package's memory array, named through the package that
+// declares it, is dumped like a module's.
+TEST(WritememSim, PackageQualifiedArrayIsDumped) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_pkg.mem";
+  RunCapture(
+      "package p;\n"
+      "  logic [7:0] mem [0:1];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    p::mem[0] = 8'h12; p::mem[1] = 8'h34;\n"
+      "    $writememh(\"" +
+          path +
+          "\", p::mem);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "12\n34\n");
+  std::remove(path.c_str());
+}
+
+// §21.5: a plain variable is not a memory array, so naming one as the
+// memory_name is reported under 21.5 at the operand, and a file already at
+// the path keeps the contents it had.
+TEST(WritememSim, PlainVariableMemoryNameIsReportedAndFileKept) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_plain.mem";
+  SeedFile(path, "kept\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] r = 8'h5a;\n"
+      "  initial begin\n"
+      "    $writememb(\"" +
+          path +
+          "\", r);\n"
+          "    $display(\"alive\");\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_EQ(SlurpFile(path), "kept\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememb: memory_name is not an unpacked array",
+                            4, "21.5"));
+  std::remove(path.c_str());
 }
 
 }  // namespace
