@@ -309,7 +309,6 @@ class VcdWriter {
   // §21.7.2.4: the $dumpon section for time T sits after the #T command.
   void DumpOn(uint64_t time);
 
-  void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
 
   // §21.7.1.3: value change dumping starts at the end of the simulation time
