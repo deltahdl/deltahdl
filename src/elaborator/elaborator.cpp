@@ -87,11 +87,11 @@ void CollectItemInstantiations(const ModuleItem* item,
 // unit->interfaces, unit->programs and unit->checkers. A design element that is
 // never instantiated contributes nothing to the elaborated design, so the
 // asymmetry is deliberate rather than an omission here.
-// §23.11 (printed page 771): "The bind_instantiation is effectively a complete
-// module, interface, program, or checker instantiation statement", so the
-// module a bind directive names appears in an instantiation and is no
-// top-level module (§23.3.1); run as a top as well, a module bound into
-// another ran once more with none of its ports connected.
+// §23.11 (printed page 771): a bind_instantiation amounts to a complete module,
+// interface, program or checker instantiation statement, so the module a bind
+// directive names appears in an instantiation and is no top-level module
+// (§23.3.1); run as a top as well, a module bound into another ran once more
+// with none of its ports connected.
 void CollectBoundNames(const std::vector<BindDirective*>& binds,
                        std::unordered_set<std::string_view>& names) {
   for (const auto* bd : binds) {
@@ -519,10 +519,10 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
   // FinalizeDesignTail computes a width for every typedef in the design, so
   // both read the union of what the modules registered rather than the scope
   // the last one happened to leave behind. ProcessPendingGenerate does not:
-  // §26.3 makes an imported name locally visible only "prior to that point
-  // within the current scope", so it installs the maps
-  // Elaborator::ElaborateBehavioralItem captured onto each
-  // ElaboratorData::PendingGenerate instead of reading these two.
+  // §26.3 makes an imported name locally visible only before that point in the
+  // current scope, so it installs the maps Elaborator::ElaborateBehavioralItem
+  // captured onto each ElaboratorData::PendingGenerate instead of reading these
+  // two.
   typedefs_ = all_typedefs_;
   cu_param_scope_ = all_cu_param_scope_;
   return true;
@@ -715,10 +715,10 @@ void Elaborator::SetMaxGenerateIterations(int64_t max_iterations) {
 
 // §33.4.3: record the parameter overrides each instance clause carries so they
 // can be applied as the matching instance is elaborated.
-// §33.4.3 (printed page 940): "A localparam declared in a configuration shall
-// be assigned a value and shall only be set to a literal value", so an override
-// naming one carries that literal itself, as wide as it was written -- a string
-// of any length rather than the 64 bits the folded localparam holds.
+// §33.4.3 (printed page 940): a localparam declared in a configuration has to
+// be given a value, and only a literal one, so an override naming one carries
+// that literal itself, as wide as it was written -- a string of any length
+// rather than the 64 bits the folded localparam holds.
 static std::vector<std::pair<std::string_view, Expr*>>
 OverridesWithLocalparamLiterals(
     const ConfigDecl* cfg,
@@ -831,12 +831,11 @@ static DelegatedBinding DelegatedBindingOf(const ConfigRule* irule,
 // config instead is expanded by CollectConfigDelegationOverrides and so is
 // skipped here; §33.2.1 settles which of the two a given name is.
 //
-// §33.4.2 (printed page 939): an instance bound to a configuration is "replaced
-// with the design hierarchy specified by the configuration", and "the rules
-// specified in the config shall determine the configuration of all other
-// subinstances". A binding clause of that configuration names its instances
-// from its own design cell down, so each is rewritten onto the instance the
-// outer clause delegated and recorded here as well.
+// §33.4.2 (printed page 939): an instance bound to a configuration gives way to
+// the design hierarchy the configuration specifies, and the configuration's
+// rules settle every other subinstance. A binding clause of that configuration
+// names its instances from its own design cell down, so each is rewritten onto
+// the instance the outer clause delegated and recorded here as well.
 void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance || rule->use_cell.empty()) {

@@ -97,15 +97,15 @@ void Elaborator::WalkExprForDpiCalls(const Expr* e) {
 // here. It hands the visitor the field itself, so a walker that only reads the
 // tree takes a `Stmt* const&`.
 //
-// §7.7 reads "A dynamic array or queue shall not be passed as an actual
-// argument if the DPI formal argument has unsized dimensions and an output
-// direction mode", and A.8.4 makes a function_subroutine_call a primary, so the
-// prohibited call may be written in every position a statement holds an
-// expression in and the check is owed at each of those too. ForEachChildExpr in
-// the same header states them, and this walk hands every one of them to
-// WalkExprForDpiCalls. It had read Stmt::rhs, Stmt::expr and Stmt::condition
-// alone, which left the call in `for (i = 0; f(dyn) < 1; i = i + 1)` and in
-// `assert (f(dyn) == 0);` unreported.
+// §7.7 bars passing a dynamic array or queue as the actual of a DPI formal that
+// has unsized dimensions and an output direction mode, and A.8.4 makes a
+// function_subroutine_call a primary, so the prohibited call may be written in
+// every position a statement holds an expression in and the check is owed at
+// each of those too. ForEachChildExpr in the same header states them, and this
+// walk hands every one of them to WalkExprForDpiCalls. It had read Stmt::rhs,
+// Stmt::expr and Stmt::condition alone, which left the call in
+// `for (i = 0; f(dyn) < 1; i = i + 1)` and in `assert (f(dyn) == 0);`
+// unreported.
 //
 // A.6.5 gives `wait_order ( hierarchical_identifier { , hierarchical_identifier
 // } ) action_block`, so Stmt::wait_order_events holds no expression a call can
@@ -200,10 +200,10 @@ static bool StmtSpawnsBackgroundProcess(const Stmt* s);
 // `found` and calling StmtSpawnsBackgroundProcess only while `found` is false.
 //
 // Stmt::fork_stmts is walked deliberately rather than skipped. §13.4.4 says a
-// fork-join_none inside a function "may contain any statements that are legal
-// within a task", so a nonblocking assignment written inside one schedules an
-// event that cannot become active until after the function returns exactly as
-// one written beside it does.
+// fork-join_none inside a function may hold whatever statements a task may, so
+// a nonblocking assignment written inside one schedules an event that cannot
+// become active until after the function returns exactly as one written beside
+// it does.
 //
 // Stmt::for_inits and Stmt::for_steps are walked because the shared list is
 // walked whole, and no source can make either of them answer true: A.6.8 admits

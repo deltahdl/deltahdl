@@ -90,8 +90,8 @@ bool NonVacuouslyEvaluatesSEventuallyRange(const Word& word,
 bool NonVacuouslyEvaluatesRejectOn(const Word& word, const BooleanExpr& b,
                                    const PropertyExpr& p);
 
-// §F.5.3.3: "A word w satisfies property P nonvacuously iff w |= P and
-// w |=^non P." Combines §F.5.3.1's neutral satisfaction with non-vacuity.
+// §F.5.3.3: w satisfies property P nonvacuously iff w |= P and w |=^non P.
+// Combines §F.5.3.1's neutral satisfaction with non-vacuity.
 bool SatisfiesNonVacuously(const Word& word, const PropertyExpr& property);
 
 // §F.5.3.3: the same nonvacuous-satisfaction test for a top-level property,

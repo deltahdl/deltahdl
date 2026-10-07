@@ -187,14 +187,14 @@ static void CheckOneBlockLocals(const std::vector<Stmt*>& block_stmts,
 void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kBlock) CheckOneBlockLocals(s->stmts, diag);
-  // §23.9 lists "fork-join blocks (named or unnamed)" among the elements that
-  // define a new scope, beside "begin-end blocks (named or unnamed)". A
-  // declaration written directly inside a fork lands in Stmt::fork_stmts on a
-  // node whose kind is StmtKind::kFork, so that list is the fork-join block's
-  // own scope and two declarations of one name in it are a redeclaration. The
-  // list is checked on its own rather than merged into the enclosing block's,
-  // because the fork-join block is a separate scope and a name reused there is
-  // legal shadowing.
+  // §23.9 lists fork-join blocks, named or not, among the elements that define
+  // a new scope, beside begin-end blocks, named or not. A declaration written
+  // directly inside a fork lands in Stmt::fork_stmts on a node whose kind is
+  // StmtKind::kFork, so that list is the fork-join block's own scope and two
+  // declarations of one name in it are a redeclaration. The list is checked on
+  // its own rather than merged into the enclosing block's, because the
+  // fork-join block is a separate scope and a name reused there is legal
+  // shadowing.
   if (s->kind == StmtKind::kFork) CheckOneBlockLocals(s->fork_stmts, diag);
   // §23.9 puts no condition on where the block whose declarations it governs
   // is written, so every position a statement holds a statement in is a
@@ -526,17 +526,17 @@ std::vector<ModuleItem*> SubroutineBodyImports(const ModuleItem* item) {
 
 // §23.9: rejects an unresolved bare identifier read in a task or function body.
 // §23.9 lists a task and a function among the scopes an identifier is searched
-// upward from, and rules that the search "shall stop at a module boundary" when
-// the item is a variable, so a subroutine body is held to the boundary exactly
-// as a procedural block of the same module is. An out-of-block method body
-// (§8.24), the item whose `method_class` names its class, is not held to it:
-// §8.24 has the body read every declaration of its class, the properties it
-// inherits under §8.13 included, none of which the module declares, so it is
-// left to the class rules as a body of the compilation unit's class is.
+// upward from, and rules that the search stops at a module boundary when the
+// item is a variable, so a subroutine body is held to the boundary exactly as a
+// procedural block of the same module is. An out-of-block method body (§8.24),
+// the item whose `method_class` names its class, is not held to it: §8.24 has
+// the body read every declaration of its class, the properties it inherits
+// under §8.13 included, none of which the module declares, so it is left to the
+// class rules as a body of the compilation unit's class is.
 //
-// §26.3 makes an import declaration provide its names "within the current
-// scope", and the body is a scope of its own, so an import the body opens
-// with (SubroutineBodyImports) is honoured for the body's reads alone: `K` in
+// §26.3 makes an import declaration provide its names in the current scope, and
+// the body is a scope of its own, so an import the body opens with
+// (SubroutineBodyImports) is honoured for the body's reads alone: `K` in
 // `function int calc(); import p::*; return K * five(); endfunction` is p's
 // parameter, which the module the function stands in never imported.
 //

@@ -95,13 +95,13 @@ static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
 // connection expression to the resolved port. The referenced declarations live
 // in the module body, so this runs after the items have been elaborated.
 //
-// §23.2.2.2 (printed page 734): "ANSI style port declarations can be
-// explicitly named, allowing elements of arrays and structures, concatenations
-// of elements, and assignment pattern expressions of elements declared in a
-// module ... to be specified on the port list". The port stands for its
-// expression, so the expression is recorded on it for the connection to be
-// joined to (LowerPortBindings); without it `output .P1(r[3:0])` was storage
-// of its own that nothing inside the module reached.
+// §23.2.2.2 (printed page 734): an ANSI style port declaration may be
+// explicitly named, putting array and structure elements, concatenations of
+// elements and assignment patterns of elements the module declares on the port
+// list. The port stands for its expression, so the expression is recorded on it
+// for the connection to be joined to (LowerPortBindings); without it
+// `output .P1(r[3:0])` was storage of its own that nothing inside the module
+// reached.
 static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
                                      const ScopeMap& scope) {
   for (const auto& src : decl->ports) {

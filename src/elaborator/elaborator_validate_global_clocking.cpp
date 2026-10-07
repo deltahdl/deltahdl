@@ -89,12 +89,12 @@ const Expr* FindGlobalClockRefInSubStmts(const Stmt* s) {
 }
 
 // Search the expressions `s` holds itself, as against those its nested
-// statements hold; returns the first hit, or nullptr. §14.14 requires
-// $global_clock to be used "to explicitly refer to the event expression in the
-// effective global clocking declaration" and resolves the declaration for "a
-// specific reference" by a hierarchical lookup over the design, which reads
-// nothing about where in a statement the reference stands. So every position a
-// statement holds an expression in is one the rule reaches.
+// statements hold; returns the first hit, or nullptr. §14.14 has $global_clock
+// refer explicitly to the event expression of the effective global clocking
+// declaration and resolves that declaration for each reference by a
+// hierarchical lookup over the design, which reads nothing about where in a
+// statement the reference stands. So every position a statement holds an
+// expression in is one the rule reaches.
 //
 // ForEachChildExpr in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -202,10 +202,10 @@ const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match,
                                       bool include_property_slot);
 
 // Recurse into every nested statement of `s`; returns the first descendant
-// call whose kind satisfies `match`, or nullptr. §16.9.4 says the global
-// clocking sampled value functions "may be used only if global clocking is
-// defined" and puts no condition on where the call stands, so every position a
-// statement holds a statement in is one such a call may be written in.
+// call whose kind satisfies `match`, or nullptr. §16.9.4 makes the global
+// clocking sampled value functions usable only where global clocking is defined
+// and puts no condition on where the call stands, so every position a statement
+// holds a statement in is one such a call may be written in.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -228,10 +228,10 @@ const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
 
 // Search the expressions `s` holds itself, as against those its nested
 // statements hold; returns the first call whose kind satisfies `match`, or
-// nullptr. §16.9.4 says the global clocking sampled value functions "may be
-// used only if global clocking is defined (see 14.14)" and states no condition
-// on where the call stands, so every position a statement holds an expression
-// in is one the rule reaches.
+// nullptr. §16.9.4 makes the global clocking sampled value functions usable
+// only where global clocking is defined (§14.14) and states no condition on
+// where the call stands, so every position a statement holds an expression in
+// is one the rule reaches.
 //
 // ForEachChildExpr in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -255,7 +255,7 @@ const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
 // is the property slot; a caller searching the procedural positions alone
 // passes over it and searches everything else the statement holds, which
 // includes the action block, where the clause bars these functions outright:
-// they "shall not be used in assertion action blocks".
+// they may not appear in assertion action blocks.
 const Expr* PropertySlotOfStmt(const Stmt* s) {
   return s->is_concurrent_clocked ? s->assert_expr : nullptr;
 }

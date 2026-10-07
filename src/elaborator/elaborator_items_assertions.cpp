@@ -30,15 +30,15 @@ namespace delta {
 namespace {
 
 // §16.14.3: a cover statement may have an optional pass statement
-// (statement_or_null), and that pass statement "shall not include any
-// concurrent assert, assume, or cover statement". A procedural concurrent
-// assertion is parsed as an assert/assume/cover-immediate Stmt that carries
-// is_procedural_concurrent; ordinary immediate assertions leave that flag clear
-// and remain permitted. Returns the first offending statement, or nullptr when
-// the pass statement contains none.
+// (statement_or_null), and that pass statement may hold no concurrent assert,
+// assume or cover statement. A procedural concurrent assertion is parsed as an
+// assert/assume/cover-immediate Stmt that carries is_procedural_concurrent;
+// ordinary immediate assertions leave that flag clear and remain permitted.
+// Returns the first offending statement, or nullptr when the pass statement
+// contains none.
 //
-// §16.14.3 says "include" and names no statement the prohibition is lifted in,
-// so this descends every link ForEachChildStmt in
+// §16.14.3 says the pass statement holds none and names no statement the
+// prohibition is lifted in, so this descends every link ForEachChildStmt in
 // elaborator_validate_internal.h names. It wrote out nine of the thirteen, so a
 // concurrent assertion written in a randcase arm or a randsequence code block
 // was not found and the cover statement holding it elaborated clean. Two of the
@@ -825,15 +825,14 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     // assertion body is stays in the parser.
     mod->processes.back().is_concurrent_clocked =
         item->body->is_concurrent_clocked;
-    // §16.9.4: the five future sampled value functions read a value "sampled at
-    // the next global clock tick", so an attempt of a property naming one
-    // cannot be answered at the assertion clock's own tick. The clause says
-    // where it is answered instead -- "Execution of the action block of an
-    // assertion containing global clocking future sampled value functions shall
-    // be delayed until the global clocking tick that follows the last tick of
-    // the assertion clock for the attempt" -- so the process carries that event
-    // and waits for it before it evaluates. A property naming none carries
-    // nothing and is evaluated where it always was.
+    // §16.9.4: the five future sampled value functions read a value sampled at
+    // the next global clock tick, so an attempt of a property naming one cannot
+    // be answered at the assertion clock's own tick. The clause says where it
+    // is answered instead -- the action block of an assertion with global
+    // clocking future sampled value functions runs only at the global clocking
+    // tick after the attempt's last assertion clock tick -- so the process
+    // carries that event and waits for it before it evaluates. A property
+    // naming none carries nothing and is evaluated where it always was.
     //
     // §16.9.4 also requires a global clocking declaration for any of the ten
     // functions, and ValidateGclkRequiresGlobalClocking reports a text that

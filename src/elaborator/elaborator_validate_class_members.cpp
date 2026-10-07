@@ -113,12 +113,12 @@ static bool StmtSubtreeHasSuperNew(const Stmt* s) {
   return found;
 }
 
-// §8.17 states "To use this approach, super.new(...) shall be the first
-// executable statement in the function new." This returns whether a
-// super.new() call stands somewhere that sentence rules out, meaning a
-// position it can never be the first executable statement from however the
-// source is written. A non-first sequential call is handled instead by the
-// index check in ReportSequentialSuperNew.
+// §8.17 requires super.new(...) to be the first executable statement of the
+// function new for this approach. This returns whether a super.new() call
+// stands somewhere that sentence rules out, meaning a position it can never be
+// the first executable statement from however the source is written. A
+// non-first sequential call is handled instead by the index check in
+// ReportSequentialSuperNew.
 //
 // The list of child links descended is the one ForEachChildStmt in
 // elaborator_validate_internal.h states, and this walk names no link itself.
@@ -528,8 +528,8 @@ static const ClassDecl* BaseOf(const ClassDecl* cls,
 
 // §8.15: names the kind of parameter `name` is in the base class chain of
 // `cls`, or an empty view when no base class declares it as a value parameter
-// or a local value parameter. §8.15 places the declaration "a level up or ...
-// inherited by the class one level up", so the search follows the base classes
+// or a local value parameter. §8.15 places the declaration one level up, or
+// inherited by the class one level up, so the search follows the base classes
 // upward and stops on a chain that closes on itself.
 static std::string_view SuperParamKind(const ClassDecl* cls,
                                        std::string_view name,
@@ -543,8 +543,8 @@ static std::string_view SuperParamKind(const ClassDecl* cls,
   return {};
 }
 
-// §8.15: "An expression using super to access the value parameter or local
-// value parameter is not a constant expression." Reports every `super.name`
+// §8.15: an expression reaching a value parameter or local value parameter
+// through super is not a constant expression. Reports every `super.name`
 // anywhere inside an expression the standard requires to be constant, where
 // `name` is a value parameter or a local value parameter of a base class. A
 // `super.name` naming anything else — an ordinary data member, a method — is

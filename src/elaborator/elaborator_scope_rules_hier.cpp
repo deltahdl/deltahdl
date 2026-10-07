@@ -201,8 +201,8 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
   auto ptr_name = [](const auto* d) {
     return d ? d->name : std::string_view{};
   };
-  // §23.6 forms a hierarchical name "by concatenating the names of the modules,
-  // module instance names, generate blocks ... that contain it", so a parameter
+  // §23.6 forms a hierarchical name by joining the names of the modules, module
+  // instances, generate blocks and so on that contain the item, so a parameter
   // a generate block of `m` declares is named through that block and not by
   // `inst.name`. This is asked of the parameters and of nothing else in the
   // chain below because RtlirNet::name and RtlirVariable::name carry the prefix

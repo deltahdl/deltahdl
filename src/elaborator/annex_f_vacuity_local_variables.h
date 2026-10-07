@@ -101,9 +101,9 @@ bool NonVacuouslyEvaluatesRejectOnWithLocals(const Word& word,
                                              const LvProperty& p,
                                              const LocalContext& context);
 
-// §F.5.6.3 inherits §F.5.3.3's "w satisfies P nonvacuously iff w |= P and
-// w |=^non P," realized with local variables: §F.5.6.1's neutral satisfaction
-// with locals together with this subclause's non-vacuity.
+// §F.5.6.3 inherits §F.5.3.3's definition, w satisfies P nonvacuously iff w |=
+// P and w |=^non P, realized with local variables: §F.5.6.1's neutral
+// satisfaction with locals together with this subclause's non-vacuity.
 bool SatisfiesNonVacuouslyWithLocals(const Word& word,
                                      const LvProperty& property,
                                      const LocalContext& context);

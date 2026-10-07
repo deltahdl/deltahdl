@@ -30,12 +30,11 @@ bool IsQueueDim(const Expr* dim);
 uint32_t QueueLevelsFrom(const std::vector<Expr*>& dims, size_t first);
 
 // §7.10: N in `[$:N]` is the highest index the queue may hold, and Syntax 7-4
-// requires it to "evaluate to a positive integer value". Returns the number of
-// elements that allows, which is one more than N, and returns nothing for a
-// value the subclause rules out. The caller evaluates N itself, because a
-// declaration among a module's items folds it against the parameter scope
-// while one inside a procedural block evaluates it against the running
-// process.
+// requires it to evaluate to a positive integer. Returns the number of elements
+// that allows, which is one more than N, and returns nothing for a value the
+// subclause rules out. The caller evaluates N itself, because a declaration
+// among a module's items folds it against the parameter scope while one inside
+// a procedural block evaluates it against the running process.
 std::optional<int32_t> QueueBoundMaxSize(int64_t bound);
 
 // §7.10: reports every queue bound written on a declaration inside the

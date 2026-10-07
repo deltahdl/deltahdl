@@ -84,19 +84,18 @@ bool FoldedOutside(const ConstVal& v, FoldContext ctx) {
   return v.width < ctx.width || (v.is_signed && ctx.read_unsigned);
 }
 
-// The width a size or a type cast pads or truncates its operand to. §6.24.1:
-// "If the casting type is a constant expression with a positive integral
-// value, the expression in parentheses shall be padded or truncated to the
-// size specified." The parser gives such a cast its size as an expression on
-// rhs rather than as a name on text -- MakeNodeCast in
-// src/parser/expr_parser.cpp builds `4'(x)` and `(W)'(x)` alike -- so the
-// size is folded here in the same scope the operand is; empty for a size
-// that does not fold or is not positive. A cast to a user-defined type takes
-// its width from the typedef map, which ConstEvalFull is not given: a
+// The width a size or a type cast pads or truncates its operand to. §6.24.1: a
+// casting type that is a constant expression of positive integral value pads or
+// truncates the parenthesized expression to that size. The parser gives such a
+// cast its size as an expression on rhs rather than as a name on text --
+// MakeNodeCast in src/parser/expr_parser.cpp builds `4'(x)` and `(W)'(x)` alike
+// -- so the size is folded here in the same scope the operand is; empty for a
+// size that does not fold or is not positive. A cast to a user-defined type
+// takes its width from the typedef map, which ConstEvalFull is not given: a
 // ScopeMap is its only other argument. CastTargetWidth answers 0 for such a
-// name and for `string`, and the operand's own width and signedness then
-// stand in, as InferCastWidth in src/elaborator/type_eval.cpp falls back to
-// the operand's width for the same reason.
+// name and for `string`, and the operand's own width and signedness then stand
+// in, as InferCastWidth in src/elaborator/type_eval.cpp falls back to the
+// operand's width for the same reason.
 std::optional<uint32_t> CastWidth(const Expr* expr, const ScopeMap& scope) {
   if (expr->rhs == nullptr) return CastTargetWidth(expr->text);
   auto size = ConstEvalFull(expr->rhs, scope);
@@ -143,12 +142,11 @@ std::optional<BinaryOperands> FoldBinaryOperands(const Expr* expr,
 // signedness the operand's bits are read by, which is what CastConstVal
 // applies, keeping the words above bit 63 of an operand or a size past 64
 // bits, which the NormalizeConstVal of 64b2dfbe0 dropped: a signing cast keeps
-// "the number of bits in the expression to be cast" and sets "the signedness
-// specified by the cast type"; a size cast takes "the cast size" and leaves
-// "the self-determined signedness of the expression inside the cast" alone; a
-// const cast lets "the type of the expression to be cast pass through
-// unchanged"; a cast to a predefined type takes both from that type; and a
-// void cast has no value to return.
+// the operand's bit count and takes the cast type's signedness; a size cast
+// takes the cast size and leaves the operand's self-determined signedness
+// alone; a const cast passes the operand's type through unchanged; a cast to a
+// predefined type takes both from that type; and a void cast has no value to
+// return.
 std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
                                           const ScopeMap& scope) {
   if (expr->text == "void") return std::nullopt;

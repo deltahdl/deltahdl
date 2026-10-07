@@ -3,9 +3,10 @@
 namespace delta {
 
 bool PropertyFormalInheritsSequenceRule(PropertyFormalRuleAspect aspect) {
-  // §16.12.18: "apply ... except as described next." The substitution of
-  // actual arguments follows §16.8.1 verbatim; the allowed-type list and the
-  // typed-reference placement rules are the carve-outs spelled out here.
+  // §16.12.18 applies those rules with the exceptions it then lists. The
+  // substitution of actual arguments follows §16.8.1 verbatim; the allowed-type
+  // list and the typed-reference placement rules are the carve-outs spelled out
+  // here.
   switch (aspect) {
     case PropertyFormalRuleAspect::kActualArgumentSubstitution:
       return true;

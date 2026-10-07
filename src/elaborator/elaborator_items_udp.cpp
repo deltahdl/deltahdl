@@ -173,14 +173,13 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   }
 }
 
-// §29.8: "The terminal connection order is as specified in the UDP
-// definition", and A.5.4 writes that connection as `( output_terminal ,
-// input_terminal { , input_terminal } )` -- one terminal for the output port
-// §29.3.1 makes the first of the port list, and one for each input port the
-// same list names. The count is therefore the header's and not the
-// instantiation's to choose: an instantiation carrying some other number of
-// terminals leaves an input port with nothing driving it or names a terminal no
-// port receives.
+// §29.8: the terminals connect in the order the UDP definition gives, and A.5.4
+// writes that connection as `( output_terminal , input_terminal { ,
+// input_terminal } )` -- one terminal for the output port §29.3.1 makes the
+// first of the port list, and one for each input port the same list names. The
+// count is therefore the header's and not the instantiation's to choose: an
+// instantiation carrying some other number of terminals leaves an input port
+// with nothing driving it or names a terminal no port receives.
 //
 // Nothing downstream says so. Elaborator::ElaborateOneUdpInst below splits the
 // list at index 1 whatever its length, and UdpRowMatchesLevels
@@ -206,12 +205,11 @@ static void CheckUdpInstTerminalCount(const ModuleItem* item,
 
 // §29.8: records on `mod` every instance of a user-defined primitive that one
 // instantiation writes, so that the primitive drives the nets its output
-// terminals name. "Instances of UDPs are specified inside modules in the same
-// manner as gates (see 28.3)", and a gate instance reaches simulation as the
-// RtlirContAssign ElaborateGateInst (src/elaborator/elaborator_gates.cpp)
-// appends; a primitive instance reaches it as the RtlirUdpInst
-// Elaborator::ElaborateOneUdpInst appends. Append nothing and no instance's
-// output terminal has a driver.
+// terminals name. A UDP is instantiated inside a module the way a gate is
+// (§28.3), and a gate instance reaches simulation as the RtlirContAssign
+// ElaborateGateInst (src/elaborator/elaborator_gates.cpp) appends; a primitive
+// instance reaches it as the RtlirUdpInst Elaborator::ElaborateOneUdpInst
+// appends. Append nothing and no instance's output terminal has a driver.
 void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
   // §29.8 reads the terminal count off the primitive's own port list, so it is
   // answered once for the instantiation rather than once per element of an
@@ -221,14 +219,14 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
     CheckUdpInstTerminalCount(item, decl, diag_);
   }
 
-  // §29.8: "An optional range may be specified for an array of UDP instances",
-  // and "The terminal connection rules remain the same as outlined in 28.3.6",
-  // so such a range is expanded here into one instance per array element the
-  // way ElaborateGateInst (src/elaborator/elaborator_gates.cpp) expands the
-  // range on an array of gates. ExpandInstanceArray
-  // (src/elaborator/elaborator_helpers.h) is that one expansion, and it answers
-  // false where the range declares one instance or names a bound it cannot
-  // fold, leaving the range to record the one instance it describes.
+  // §29.8: an array of UDP instances may carry an optional range, and the
+  // terminal connection rules of §28.3.6 still apply, so such a range is
+  // expanded here into one instance per array element the way ElaborateGateInst
+  // (src/elaborator/elaborator_gates.cpp) expands the range on an array of
+  // gates. ExpandInstanceArray (src/elaborator/elaborator_helpers.h) is that
+  // one expansion, and it answers false where the range declares one instance
+  // or names a bound it cannot fold, leaving the range to record the one
+  // instance it describes.
   if (ExpandInstanceArray(item, mod, arena_, BuildParamScope(mod),
                           [this, mod](ModuleItem* element) {
                             ElaborateOneUdpInst(element, mod);
@@ -256,10 +254,9 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
 // is not consulted, because Parser::ParseOneUdpInstance
 // (src/parser/parser_udp.cpp:6) never writes it for a primitive instance.
 //
-// §29.8 admits two delays and no more: "Only two delays may be specified
-// because z is not supported for UDPs". ModuleItem::gate_delay and
-// ModuleItem::gate_delay_fall are therefore carried and
-// ModuleItem::gate_delay_decay is not.
+// §29.8 admits two delays and no more, since a UDP does not support z.
+// ModuleItem::gate_delay and ModuleItem::gate_delay_fall are therefore carried
+// and ModuleItem::gate_delay_decay is not.
 //
 // RtlirUdpInst::gen_block_consts and RtlirUdpInst::gen_block_prefixes are left
 // at their defaults, which is what the gate path leaves on the RtlirContAssign
@@ -453,11 +450,11 @@ void CollectNestedModulesAndCheckVif(
 
 // Records task names and indexes function declarations by name.
 //
-// §35.5: "The usage of imported functions is similar as for native
-// SystemVerilog functions", so a subroutine §35.5.4 declared with the `task`
-// keyword is a task of this scope and is recorded as one. §13.4's rule that a
-// function shall not enable a task reads this set, and §35.5.1.1's note that an
-// imported task can consume time is why that rule has to reach one.
+// §35.5: an imported function is used much as a native SystemVerilog function
+// is, so a subroutine §35.5.4 declared with the `task` keyword is a task of
+// this scope and is recorded as one. §13.4's rule that a function shall not
+// enable a task reads this set, and §35.5.1.1's note that an imported task can
+// consume time is why that rule has to reach one.
 void RecordTaskFuncNames(
     const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
     std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {

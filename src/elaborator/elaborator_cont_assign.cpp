@@ -140,10 +140,10 @@ RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
 }
 
 // §11.5.1: the width of a select written as an element of a concatenation
-// left-hand side, which the clause makes "always constant": the span its two
-// indices name for `[msb:lsb]`, the width expression for the two indexed forms,
-// and one bit for a bit-select. Zero where a bound does not fold, which is the
-// answer for an element this cannot size at all.
+// left-hand side, which the clause keeps constant: the span its two indices
+// name for `[msb:lsb]`, the width expression for the two indexed forms, and one
+// bit for a bit-select. Zero where a bound does not fold, which is the answer
+// for an element this cannot size at all.
 uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope) {
   if (e->index == nullptr) return 0;
   if (e->index_end == nullptr) return 1;
@@ -229,14 +229,14 @@ PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
 // `assign {carry_out, sum_out} = ina + inb + carry_in;` has to add at five bits
 // for the carry to exist at all.
 //
-// The width is put back the way §11.6.2 puts it back -- "adding an integer
-// value of 0 to the expression will cause the evaluation to be performed using
-// the bit size of integers" -- with a zero of the target's width rather than an
-// integer's, so the addition is performed at the width the concatenation gives
-// it and at no other. The zero is signed so that the widening does not change
-// the type of what it widens: §11.8.1 makes a result unsigned "if any operand
-// is unsigned", so an unsigned right-hand side stays unsigned and zero-extends
-// into the new bits, and a signed one stays signed and sign-extends.
+// The width is put back the way §11.6.2 puts it back -- adding an integer 0 to
+// an expression makes it evaluate at an integer's bit size -- with a zero of
+// the target's width rather than an integer's, so the addition is performed at
+// the width the concatenation gives it and at no other. The zero is signed so
+// that the widening does not change the type of what it widens: §11.8.1 makes a
+// result unsigned when any operand is unsigned, so an unsigned right-hand side
+// stays unsigned and zero-extends into the new bits, and a signed one stays
+// signed and sign-extends.
 Expr* MakeWidenedRhs(Expr* rhs, uint32_t width, Arena& arena) {
   std::string text = std::format("{}'sd0", width);
   auto* zero = arena.Create<Expr>();

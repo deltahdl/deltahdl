@@ -34,26 +34,26 @@ bool IsForHeaderStmt(const Stmt* s, const Stmt* sub) {
 }
 
 // §17.5: walks a procedural statement tree looking for a blocking assignment.
-// The clause lists what a checker always procedure may contain and writes
-// "Blocking assignments (see 10.4.1; always_comb and always_latch procedures
-// only)" on that list, naming no statement the restriction is lifted in, so
-// this descends the links ForEachChildStmt in elaborator_validate_internal.h
-// names rather than a list written out here. The list written here held six of
-// the thirteen, so a blocking assignment in either arm of an immediate
-// assertion's action block was never looked at: §17.5 puts immediate assertions
-// on the same list, A.6.10 writes `simple_immediate_assert_statement ::= assert
-// ( expression ) action_block`, and §16.3 writes `action_block ::=
+// The clause lists what a checker always procedure may contain and puts
+// blocking assignments (§10.4.1), in always_comb and always_latch procedures
+// only, on that list, naming no statement the restriction is lifted in, so this
+// descends the links ForEachChildStmt in elaborator_validate_internal.h names
+// rather than a list written out here. The list written here held six of the
+// thirteen, so a blocking assignment in either arm of an immediate assertion's
+// action block was never looked at: §17.5 puts immediate assertions on the same
+// list, A.6.10 writes `simple_immediate_assert_statement ::= assert (
+// expression ) action_block`, and §16.3 writes `action_block ::=
 // statement_or_null | [ statement ] else statement_or_null`, so both arms hold
 // a statement. A randcase (§18.16) and a randsequence (A.6.12) are on §17.5's
 // list of neither, so no conforming checker always procedure holds one; the
-// walk descends them anyway, since what a checker procedure may hold is
-// §17.5's own rule to report rather than a reason to keep a shorter list here.
+// walk descends them anyway, since what a checker procedure may hold is §17.5's
+// own rule to report rather than a reason to keep a shorter list here.
 //
 // The visitor skips the two for-header links, which is the one position this
-// rule does not reach. §17.5 admits "Loop statements (see 12.7)" in a checker
-// always procedure with none of the always_comb/always_latch restriction it
-// writes beside blocking assignments, and A.6.2 makes an operator_assignment
-// and an inc_or_dec_expression -- two of the three forms A.6.8 gives a
+// rule does not reach. §17.5 admits loop statements (§12.7) in a checker always
+// procedure with none of the always_comb/always_latch restriction it writes
+// beside blocking assignments, and A.6.2 makes an operator_assignment and an
+// inc_or_dec_expression -- two of the three forms A.6.8 gives a
 // for_step_assignment, and the form it gives a for_initialization's
 // variable_assignment -- alternatives of blocking_assignment. Reporting the
 // header would therefore leave an always_ff no for loop that initializes or
@@ -80,17 +80,17 @@ bool StmtContainsBlockingAssignment(const Stmt* stmt) {
 // controlled statement is still inspected in case a non-event control is nested
 // inside.
 //
-// §17.5 says an initial procedure in a checker body "may contain let
-// declarations, immediate, deferred, and concurrent assertions, and a
-// procedural timing control statement using an event control only", and names
-// no statement the rule is suspended in, so this descends the links
-// ForEachChildStmt in elaborator_validate_internal.h names rather than a list
-// written out here. The list written here held six of the thirteen, so a delay,
-// a cycle delay or a wait in either arm of an immediate assertion's action
-// block was never looked at: §17.5 puts immediate assertions on the same list,
-// A.6.10 writes `simple_immediate_assert_statement ::= assert ( expression )
-// action_block`, and §16.3 writes `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so both arms hold a statement.
+// §17.5 says an initial procedure in a checker body may hold let declarations,
+// immediate, deferred and concurrent assertions, and a procedural timing
+// control statement that uses an event control alone, and names no statement
+// the rule is suspended in, so this descends the links ForEachChildStmt in
+// elaborator_validate_internal.h names rather than a list written out here. The
+// list written here held six of the thirteen, so a delay, a cycle delay or a
+// wait in either arm of an immediate assertion's action block was never looked
+// at: §17.5 puts immediate assertions on the same list, A.6.10 writes
+// `simple_immediate_assert_statement ::= assert ( expression )
+// action_block`, and §16.3 writes `action_block ::= statement_or_null | [
+// statement ] else statement_or_null`, so both arms hold a statement.
 //
 // The other four links hold no such control in conforming source, and the walk
 // descends them all the same. A.6.8 gives a for_initialization only a
@@ -139,13 +139,13 @@ bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
 void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                                bool parent_is_checker, DiagEngine& diag) {
   if (!parent_is_checker) return;
-  // A.10 item 6: "It shall be illegal for a checker_generate_item to include
-  // any item that would be illegal in a checker_declaration outside a
-  // checker_generate_item", so the items a generate construct holds -- in its
-  // body, in its else body and in each of its case arms, the shape
-  // CollectGenerateRoots in src/elaborator/elaborator_validate_clocking.cpp
-  // walks -- are read by these same rules. The construct itself is none of
-  // the items the rules below name, so it falls through them unreported.
+  // A.10 item 6: a checker_generate_item may hold no item that would be illegal
+  // in a checker_declaration outside one, so the items a generate construct
+  // holds -- in its body, in its else body and in each of its case arms, the
+  // shape CollectGenerateRoots in
+  // src/elaborator/elaborator_validate_clocking.cpp walks -- are read by these
+  // same rules. The construct itself is none of the items the rules below name,
+  // so it falls through them unreported.
   for (const auto* sub : item->gen_body) {
     CheckCheckerBodyItemRules(sub, decl, parent_is_checker, diag);
   }
@@ -190,10 +190,10 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            decl->name),
                Subclause("17.7.1"));
   }
-  // §17.5: an initial procedure in a checker body "may contain let
-  // declarations, immediate, deferred, and concurrent assertions, and a
-  // procedural timing control statement using an event control only". A.6.5
-  // gives procedural_timing_control three alternatives -- delay_control,
+  // §17.5: an initial procedure in a checker body may hold let declarations,
+  // immediate, deferred and concurrent assertions, and a procedural timing
+  // control statement that uses an event control alone. A.6.5 gives
+  // procedural_timing_control three alternatives -- delay_control,
   // event_control and cycle_delay -- so the other two are both excluded, as is
   // a wait. The message names all three rather than only the delay forms,
   // because a cycle delay is the one most easily mistaken for an event control:

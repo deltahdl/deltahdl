@@ -51,14 +51,14 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
   }
 }
 
-// §23.3.3.1 (printed page 747): "A port that is declared as input (output)
-// but used as an output (input) or inout may be coerced to inout. If not
-// coerced to inout, a warning shall be issued." An input port the module
-// drives, `module m(input wire a); assign a = 1'b1;`, is coerced where both
-// sides are nets -- §23.3.3.3 lets an inout connect to a net and never to a
-// variable -- so the connection becomes the one net an inout's is and the
-// module's driver reaches the parent's w. CheckPortCoercion has warned by
-// then; the warning is kept, being what reports the port's use.
+// §23.3.3.1 (printed page 747): a port declared input (output) but used as an
+// output (input) or inout may be coerced to inout, and a warning is due where
+// it is not. An input port the module drives,
+// `module m(input wire a); assign a = 1'b1;`, is coerced where both sides are
+// nets -- §23.3.3.3 lets an inout connect to a net and never to a variable --
+// so the connection becomes the one net an inout's is and the module's driver
+// reaches the parent's w. CheckPortCoercion has warned by then; the warning is
+// kept, being what reports the port's use.
 void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent) {
   if (inst.resolved == nullptr || parent == nullptr) return;
   std::unordered_set<std::string_view> driven;
@@ -252,9 +252,10 @@ static void CheckUnpackedArrayPortBinding(
   }
 }
 
-// §7.4.2 (printed page 154): "Net arrays are useful for connecting to ports
-// of module instances", so the array an unpacked array port's connection names
-// is a net array as readily as a variable one, and each is recorded apart.
+// §7.4.2 (printed page 154) gives connecting to the ports of module instances
+// as what a net array is for, so the array an unpacked array port's connection
+// names is a net array as readily as a variable one, and each is recorded
+// apart.
 using ArrayInfoMap =
     std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
 static const Elaborator::VarArrayInfo* ConnectedArrayInfo(

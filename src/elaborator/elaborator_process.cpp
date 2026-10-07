@@ -174,20 +174,20 @@ static bool IsDeclaredLocal(std::string_view prefix,
 // Collects the longest static prefix (§11.5.3) of every assignment target
 // written in `stmt` or in any statement nested inside it.
 //
-// §9.2.2.2 states its rule of "the variables assigned on the left-hand side of
-// assignments" and §10.3.2 of "any procedural assignment"; neither puts a
-// condition on which statement the assignment stands in, so every position a
-// statement holds a statement in is a position this collection reaches.
+// §9.2.2.2 states its rule of the variables assignments write and §10.3.2 of
+// every procedural assignment; neither puts a condition on which statement the
+// assignment stands in, so every position a statement holds a statement in is a
+// position this collection reaches.
 //
 // This is a collector, so a position it does not reach costs a name rather than
 // a report. The callers below compare the names gathered here against each
 // other and against the continuous-assignment targets, and a name that was
 // never gathered overlaps nothing: a variable assigned only in the unreached
-// position stays absent from every set, so §9.2.2.2's "shall not be assigned by
-// any other process" and §10.3.2's "It shall be an error for a variable driven
-// by a continuous assignment or output to have ... any procedural assignment"
-// both pass it in silence, however many drivers it has. The unreached position
-// is an exemption from the single-driver rule rather than a missing diagnostic.
+// position stays absent from every set, so §9.2.2.2's bar on any other process
+// assigning the variable and §10.3.2's error for a variable driven by a
+// continuous assignment or output that also takes a procedural assignment both
+// pass it in silence, however many drivers it has. The unreached position is an
+// exemption from the single-driver rule rather than a missing diagnostic.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions
 // once for the whole elaborator, which is why the list is not written out again
@@ -252,13 +252,11 @@ static void CollectCallNamesExpr(const Expr* expr,
 }
 
 // Collects the name of every subroutine called from `stmt` or from any
-// statement nested inside it. §9.2.2.2 says of an always_comb procedure that
-// "The variables assigned on the left-hand side of assignments shall not be
-// assigned by any other process. This includes variables assigned within
-// functions called by the procedure but not those assigned within tasks called
-// by the procedure." It states no condition on where in the procedure the call
-// is written, so every position a statement holds an expression in is a
-// position a call reaches the rule from.
+// statement nested inside it. §9.2.2.2 says of an always_comb procedure that no
+// other process may assign the variables it assigns, counting those assigned in
+// functions it calls but not those assigned in tasks it calls. It states no
+// condition on where in the procedure the call is written, so every position a
+// statement holds an expression in is a position a call reaches the rule from.
 //
 // This is a collector, so a position it does not reach costs a name rather than
 // a report. CollectFuncLhsPrefixes below takes the names gathered here, and no
@@ -373,11 +371,11 @@ static void CollectProcessLhsInfo(const ModuleDecl* decl,
       std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
       if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
-    // §9.2.2.2: the variables an always_comb assigns "shall not be assigned by
-    // any other process". §9.2 makes the general purpose always procedure, the
-    // initial procedure and the final procedure each a process, so all three
-    // are gathered here; their assignment targets are kept apart from `procs`
-    // so an overlap with an always_comb prefix can be flagged. always_comb,
+    // §9.2.2.2: no other process may assign the variables an always_comb
+    // assigns. §9.2 makes the general purpose always procedure, the initial
+    // procedure and the final procedure each a process, so all three are
+    // gathered here; their assignment targets are kept apart from `procs` so an
+    // overlap with an always_comb prefix can be flagged. always_comb,
     // always_latch and always_ff are the ones that go into `procs` instead,
     // because a process is also compared against the other two of its own three
     // kinds rather than only against an always_comb.
@@ -510,11 +508,11 @@ struct ContTarget {
 // granularity. The initial, always and final procedures §9.2 defines have no
 // such second pass, so all three are gathered here.
 //
-// §6.5 (printed page 90) makes the rule one of variables alone: "A net can be
-// written by one or more continuous assignments", whose values its net type
-// resolves, so a target rooted at one of the module's nets, `nets`, is not
-// gathered -- `assign a[0] = 1; assign a[0] = 0;` on `wire [3:0] a` is two
-// drivers of one bit, and on `wor r[2]` two drivers of r[0].
+// §6.5 (printed page 90) makes the rule one of variables alone: any number of
+// continuous assignments may write a net, whose values its net type resolves,
+// so a target rooted at one of the module's nets, `nets`, is not gathered --
+// `assign a[0] = 1; assign a[0] = 0;` on `wire [3:0] a` is two drivers of one
+// bit, and on `wor r[2]` two drivers of r[0].
 static void CollectAggregateDriverTargets(
     const ModuleDecl* decl, const ScopeMap& scope,
     const std::unordered_set<std::string>& nets, std::vector<ContTarget>& conts,

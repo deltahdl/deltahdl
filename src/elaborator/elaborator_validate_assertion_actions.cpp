@@ -284,14 +284,14 @@ static void CheckDeferredActionStmt(
       s->kind != StmtKind::kCoverImmediate) {
     return;
   }
-  // §16.4: "The pass and fail statements in a deferred assertion's
-  // action_block, if present, shall each consist of a single subroutine call."
-  // §1.5 defines shall as a mandatory requirement "from which no deviation is
-  // permitted", so an action block of any other shape is not legal source. It
-  // is reported as an error rather than a warning because there is no behaviour
-  // left to fall back on: §16.4.1 defers a report by remembering "the
-  // associated subroutine call" and executing it in a later region, and a
-  // statement that is not a call gives that machinery nothing to remember.
+  // §16.4: a deferred assertion's pass and fail statements, where present, are
+  // each a single subroutine call. §1.5 defines shall as a mandatory
+  // requirement admitting no deviation, so an action block of any other shape
+  // is not legal source. It is reported as an error rather than a warning
+  // because there is no behaviour left to fall back on: §16.4.1 defers a report
+  // by remembering the subroutine call involved and executing it in a later
+  // region, and a statement that is not a call gives that machinery nothing to
+  // remember.
   if (s->assert_pass_stmt && !IsSingleSubroutineCall(s->assert_pass_stmt)) {
     diag.Error(s->assert_pass_stmt->range.start,
                "deferred assertion pass action shall be a single "

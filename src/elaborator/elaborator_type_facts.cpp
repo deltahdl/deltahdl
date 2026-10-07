@@ -13,10 +13,10 @@
 
 namespace delta {
 
-// §6.18's "type the name stands for", following a chain of typedefs to the kind
-// at its end. The walk is bounded by the table's own size so a table that names
-// itself -- which the elaborator reports elsewhere rather than resolving --
-// cannot spin here.
+// the type a name stands for under §6.18, following a chain of typedefs to the
+// kind at its end. The walk is bounded by the table's own size so a table that
+// names itself -- which the elaborator reports elsewhere rather than resolving
+// -- cannot spin here.
 static const DataType& ResolvedType(const DataType& dtype,
                                     const TypedefMap& typedefs) {
   const DataType* cur = &dtype;

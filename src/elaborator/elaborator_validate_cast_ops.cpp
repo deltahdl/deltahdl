@@ -124,13 +124,13 @@ void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
     WalkExprForAssignInExpr(ev.signal, true);
     WalkExprForAssignInExpr(ev.iff_condition, true);
   }
-  // §11.3.6 says "It shall be illegal to include an assignment operator in an
-  // event expression, in an expression within a procedural continuous
-  // assignment, or in an expression that is not within a procedural
-  // statement", and names no statement the procedural continuous assignment
-  // may stand in to escape that, so this descends every link ForEachChildStmt
-  // in elaborator_validate_internal.h names and names none itself. It wrote
-  // out six of the thirteen, so `fork assign c = (a = b); join` and
+  // §11.3.6 bars an assignment operator from an event expression, from an
+  // expression in a procedural continuous assignment and from any expression
+  // outside a procedural statement, and names no statement the procedural
+  // continuous assignment may stand in to escape that, so this descends every
+  // link ForEachChildStmt in elaborator_validate_internal.h names and names
+  // none itself. It wrote out six of the thirteen, so
+  // `fork assign c = (a = b); join` and
   // `randcase 1: assign c = (a = b); endcase` each held an embedded assignment
   // operator that was never looked at.
   ForEachChildStmt(s,
@@ -459,10 +459,10 @@ void CheckAliasStructuredWidthCompat(const ModuleItem* item, DiagEngine& diag,
   }
 }
 
-// §10.11: "it is not allowed to ... specify a given alias more than once." When
-// an alias statement uses selects or concatenations, expand it to bit-level
-// correspondences and flag a correspondence that was already established by an
-// earlier alias statement. Whole-net identifier pairs are handled by
+// §10.11: no alias may be specified more than once. When an alias statement
+// uses selects or concatenations, expand it to bit-level correspondences and
+// flag a correspondence that was already established by an earlier alias
+// statement. Whole-net identifier pairs are handled by
 // CheckAliasDuplicatePairs, so this only engages structured operands.
 template <typename ScopeFn>
 void CheckAliasBitDuplicates(
@@ -540,13 +540,13 @@ void ElaboratorOperationRules::WalkStmtsForAssocConcatTarget(const Stmt* s) {
   }
   // §10.10 requires the target of an unpacked array concatenation to be an
   // array whose slowest-varying dimension is unpacked fixed-size, queue or
-  // dynamic, and says "A target of any other type (including associative
-  // array) shall be illegal". It names no statement the assignment may be
-  // written in to escape that, so this descends every link ForEachChildStmt in
+  // dynamic, and makes a target of any other type, an associative array
+  // included, illegal. It names no statement the assignment may be written in
+  // to escape that, so this descends every link ForEachChildStmt in
   // elaborator_validate_internal.h names and names none itself. It wrote out
   // six of the thirteen, so `fork aa = {1, 2, 3}; join` and
-  // `for (aa = {1, 2, 3}; i < 1; i = i + 1)` each targeted an associative
-  // array with a concatenation that CheckAssocConcatTargetInAssign never saw.
+  // `for (aa = {1, 2, 3}; i < 1; i = i + 1)` each targeted an associative array
+  // with a concatenation that CheckAssocConcatTargetInAssign never saw.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForAssocConcatTarget(sub); });
 }

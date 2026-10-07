@@ -41,11 +41,11 @@ static void CheckStmtQueueBound(const Stmt* s, const ScopeMap& scope,
              Subclause("7.10"));
 }
 
-// §7.10, Syntax 7-4 says the constant_expression of a queue_dimension "shall
-// evaluate to a positive integer value" and names no position, so the rule is
-// owed wherever a declaration carrying a queue dimension can be written. A.6.3
-// gives `seq_block ::= begin [ : block_identifier ] { block_item_declaration }
-// { statement_or_null } end` and A.6.12 gives `rs_code_block ::= { {
+// §7.10, Syntax 7-4 says the constant_expression of a queue_dimension has to
+// evaluate to a positive integer and names no position, so the rule is owed
+// wherever a declaration carrying a queue dimension can be written. A.6.3 gives
+// `seq_block ::= begin [ : block_identifier ] { block_item_declaration } {
+// statement_or_null } end` and A.6.12 gives `rs_code_block ::= { {
 // data_declaration } { statement_or_null } }`, so that is every position a
 // statement holds a statement in.
 //

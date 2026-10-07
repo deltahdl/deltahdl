@@ -25,9 +25,9 @@ static void CollectSelectReads(const Expr* expr,
     }
     cur = cur->base;
   }
-  // §9.2.2.2.1 asks for "the expansions of the longest static prefix of each
-  // net or variable identifier or select expression that is read", and the
-  // prefix itself is not always one of those expansions. Where the index folds,
+  // §9.2.2.2.1 asks for the expansion of the longest static prefix of every net
+  // or variable identifier or select expression read, and the prefix itself is
+  // not always one of those expansions. Where the index folds,
   // BuildSelectPrefix returns the text `b[3]`, which names a position within a
   // vector and no object: SimContext::FindVariable resolves a declared name
   // against variables_, and `logic [3:0] b` is one Variable named `b`. So the
@@ -135,19 +135,18 @@ static void ForEachLhsIndexRead(const Expr* lhs,
 }
 
 // True when `sub` is one of the two statements of `owner`'s assertion action
-// block. §9.2.2.2.1 (printed page 223) says "Expressions used in assertion
-// action blocks do not contribute to the implicit sensitivity list of an
-// always_comb", and its example has the always_comb trigger on b, c and e while
-// `disable_error`, read in the else branch of `A1:assert (a != e) else if
-// (!disable_error) $error("failed");`, stays out. So the two walks that collect
-// reads stop at these, and the two that collect writes and block-local
-// declarations do not: exception (b) is about where a name is written and
-// exception (a) about where one is declared, and neither is a rule about what
-// contributes.
+// block. §9.2.2.2.1 (printed page 223) says an expression in an assertion
+// action block adds nothing to an always_comb's implicit sensitivity list, and
+// its example has the always_comb trigger on b, c and e while `disable_error`,
+// read in the else branch of `A1:assert (a != e) else if (!disable_error)
+// $error("failed");`, stays out. So the two walks that collect reads stop at
+// these, and the two that collect writes and block-local declarations do not:
+// exception (b) is about where a name is written and exception (a) about where
+// one is declared, and neither is a rule about what contributes.
 //
-// The sentence before it puts the asserted expression itself in the list, "as
-// if that expression were used as a condition of an if statement", which is
-// Stmt::assert_expr and is read directly rather than through this descent.
+// The sentence before it puts the asserted expression itself in the list, as
+// though it were an if statement's condition, which is Stmt::assert_expr and is
+// read directly rather than through this descent.
 bool IsAssertionActionBlock(const Stmt* owner, const Stmt* sub) {
   return sub != nullptr &&
          (sub == owner->assert_pass_stmt || sub == owner->assert_fail_stmt);
@@ -196,11 +195,11 @@ void ForEachStmtReadExpr(const Stmt* stmt,
   // reads.
   fn(stmt->var_init);
   // §18.16 makes a randcase weight an expression the statement evaluates:
-  // "The randcase weights can be arbitrary expressions, not just constants",
-  // and its example weighs branches by `a + b` over two byte variables, each
-  // weight expression being "evaluated at most once" per execution. A variable
-  // named there is therefore read within the block, and no exception of
-  // §9.2.2.2.1 removes it. That is the same answer WalkStmtCaseIdents in
+  // the randcase weights may be any expressions, not constants alone, and its
+  // example weighs branches by `a + b` over two byte variables, each weight
+  // expression being evaluated at most once per execution. A variable named
+  // there is therefore read within the block, and no exception of §9.2.2.2.1
+  // removes it. That is the same answer WalkStmtCaseIdents in
   // elaborator_scope_rules.cpp gives the position for §26.3.
   for (const auto& rc : stmt->randcase_items) fn(rc.first);
   // The case-item bodies are statements the descent below reaches; the patterns
@@ -284,10 +283,10 @@ static void CollectCallNamesFromExpr(
   for (auto* elem : expr->elements) CollectCallNamesFromExpr(elem, out);
 }
 
-// §9.2.2.2.1 counts a read "within any function called within the block", and
-// puts no condition on where in the block the call stands, so a call counts
-// wherever a statement holds a statement. A call this walk does not reach
-// contributes none of the called function's reads.
+// §9.2.2.2.1 counts a read inside any function the block calls, and puts no
+// condition on where in the block the call stands, so a call counts wherever a
+// statement holds a statement. A call this walk does not reach contributes none
+// of the called function's reads.
 //
 // The positions come from ForEachChildStmt in
 // elaborator_validate_internal.h, and the expressions are read one by one for
@@ -451,13 +450,13 @@ static std::vector<EventExpr> BuildSensitivityEvents(
     // never changes, so it cannot be part of a sensitivity list.
     if (const_names && const_names->count(base)) continue;
     EmitSignalEvent(base, emitted, events, arena);
-    // §9.2.2.2.1 asks for "the expansions of the longest static prefix of each
-    // net or variable identifier or select expression that is read", and the
-    // prefix is the other expansion. The base name alone is enough for a
-    // packed vector, whose bits all live in the one Variable it names, and is
-    // not enough for an unpacked array, whose elements are Variables of their
-    // own: `always_comb b = mem[2];` watched `mem`, whose value models one
-    // element and never moves, while every element writer -- WriteVar through
+    // §9.2.2.2.1 asks for the expansion of the longest static prefix of every
+    // net or variable identifier or select expression read, and the prefix is
+    // the other expansion. The base name alone is enough for a packed vector,
+    // whose bits all live in the one Variable it names, and is not enough for
+    // an unpacked array, whose elements are Variables of their own:
+    // `always_comb b = mem[2];` watched `mem`, whose value models one element
+    // and never moves, while every element writer -- WriteVar through
     // TryResolveArrayElement, the pattern writers, the §21.4 loaders --
     // notifies `mem[2]`, so the block never re-ran. Emitting both is what
     // CollectSelectReads already does for the `wait` route, which is why that

@@ -23,21 +23,19 @@
 
 namespace delta {
 
-// §27.5: "a conditional generate construct" is the if generate construct and
-// the case generate construct, and the clause rules on page 825 that direct
-// nesting "applies only to conditional generate constructs nested in
-// conditional generate constructs. It does not apply in any way to loop
-// generate constructs."
+// §27.5: a conditional generate construct is an if or a case generate
+// construct, and the clause rules on page 825 that direct nesting concerns
+// conditional generate constructs nested in conditional ones alone and never
+// loop generate constructs.
 bool IsConditionalGenerateConstruct(ModuleItemKind k) {
   return k == ModuleItemKind::kGenerateIf || k == ModuleItemKind::kGenerateCase;
 }
 
-// §27.5: "If a generate block in a conditional generate construct consists of
-// only one item that is itself a conditional generate construct and if that
-// item is not surrounded by begin-end keywords, then this generate block is not
+// §27.5: a generate block of a conditional generate construct whose only item
+// is itself a conditional generate construct, written without begin-end, is not
 // treated as a separate scope. The generate construct within this block is said
-// to be directly nested. The generate blocks of the directly nested construct
-// are treated as if they belong to the outer construct."
+// to be directly nested, and the directly nested construct's generate blocks
+// count as the outer construct's.
 bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
                            bool has_begin_end) {
   return !has_begin_end && body.size() == 1 &&
@@ -45,17 +43,15 @@ bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
 }
 
 // §27.5: elaborate the generate block a conditional generate construct
-// selected. A directly nested block "is not treated as a separate scope", so
-// its items are elaborated under the prefix already in force and no scope is
-// opened for it. Otherwise the block creates a scope, named or not -- "If the
-// generate block selected for instantiation is named, then this name declares a
-// generate block instance and is the name for the scope it creates. If the
-// generate block selected for instantiation is not named, it still creates a
-// scope", and AssignGenerateBlockNames has already given the unnamed one the
-// name §27.6 assigns it. The block's own name is the whole of the scope name:
-// §27.4 gives an index only to a loop generate block, whose name "is a
-// declaration of an array of generate block instances", so a conditional
-// generate block contributes its name alone.
+// selected. A directly nested block is no scope of its own, so its items are
+// elaborated under the prefix already in force and no scope is opened for it.
+// Otherwise the block creates a scope, named or not -- a named block's name
+// declares a generate block instance and names the scope it creates, and an
+// unnamed one creates a scope all the same, and AssignGenerateBlockNames has
+// already given the unnamed one the name §27.6 assigns it. The block's own name
+// is the whole of the scope name: §27.4 gives an index only to a loop generate
+// block, whose name declares an array of generate block instances, so a
+// conditional generate block contributes its name alone.
 void Elaborator::ElaborateConditionalGenerateBlock(
     const ConditionalGenerateBlock& block, RtlirModule* mod,
     const ScopeMap& scope) {
@@ -96,15 +92,15 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   }
   if (item->gen_else == nullptr) return;
 
-  // §27.5: a conditional generate construct selects "at most one generate
-  // block from a set of alternative generate blocks based on constant
-  // expressions evaluated during elaboration", and an `else if` puts one of
-  // those expressions on the else branch. Annex A.4.2 gives
-  // if_generate_construct ::= if ( constant_expression ) generate_block
-  // [ else generate_block ], so an `else if` is the else branch taking the
-  // bare generate_item alternative of generate_block, and what stands there is
-  // a nested if_generate_construct selecting among the alternatives that
-  // remain. Elaborate it as one, so that its condition is read.
+  // §27.5: a conditional generate construct picks at most one of its
+  // alternative generate blocks by constant expressions evaluated during
+  // elaboration, and an `else if` puts one of those expressions on the else
+  // branch. Annex A.4.2 gives if_generate_construct ::= if (
+  // constant_expression ) generate_block [ else generate_block ], so an
+  // `else if` is the else branch taking the bare generate_item alternative of
+  // generate_block, and what stands there is a nested if_generate_construct
+  // selecting among the alternatives that remain. Elaborate it as one, so that
+  // its condition is read.
   //
   // Parser::ParseGenerateIf tells the two forms apart already:
   // src/parser/parser_generate.cpp:181-182 makes gen_else the nested
@@ -118,8 +114,8 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   // Recursing opens no scope for the else branch itself, which is what §27.5
   // requires of it: the branch holds one item that is itself a conditional
   // generate construct and no begin-end keywords surround it, so it is directly
-  // nested, and "the generate blocks of the directly nested construct are
-  // treated as if they belong to the outer construct".
+  // nested, and the directly nested construct's generate blocks count as the
+  // outer construct's.
   if (item->gen_else->gen_cond != nullptr) {
     ElaborateGenerateIf(item->gen_else, mod, scope);
     return;

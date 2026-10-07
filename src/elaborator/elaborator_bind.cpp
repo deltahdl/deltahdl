@@ -309,10 +309,10 @@ static void BuildBoundPortBindings(const ModuleItem* item,
   }
 }
 
-// §23.11 (printed page 773): "All identifiers in the bind instantiation are
-// referenced from the bind target's point of view", `.*` among them, so a port
-// the wildcard reaches connects to the target's signal of its name
-// (§23.3.2.4), or else takes its default value.
+// §23.11 (printed page 773): every identifier of a bind instantiation is
+// resolved from the bind target's point of view, `.*` among them, so a port the
+// wildcard reaches connects to the target's signal of its name (§23.3.2.4), or
+// else takes its default value.
 static void BuildBoundWildcardBindings(const ModuleItem* item,
                                        const RtlirModule* resolved,
                                        const RtlirModule* target, Arena& arena,
@@ -592,7 +592,7 @@ void CollectModportExportSites(const ModportDecl* mp, const BoundChild& bound,
       // itself define that subroutine; a connected module that supplies no
       // definition is an elaboration error. Enforced only for an explicitly
       // named modport connection (ref.modport set), matching the standard's
-      // "connected to a modport containing an exported subroutine" wording; a
+      // wording of a connection to a modport holding an exported subroutine; a
       // whole-interface connection selects no single modport to bind against.
       if (!ref.modport.empty()) {
         scan.diag.Error(

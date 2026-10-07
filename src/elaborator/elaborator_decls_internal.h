@@ -20,8 +20,8 @@ namespace delta {
 
 // §11.5.1/§11.5.2: how many addresses a name admits before a select reaches a
 // bit, and what that bit sits in. Shared by the variable and net declaration
-// paths, because §11.5.2 delegates a select of an array element to §11.5.1 "in
-// the same manner as net and variable bit-selects and part-selects".
+// paths, because §11.5.2 delegates a select of an array element to §11.5.1, to
+// be addressed as a net's or a variable's select is.
 void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes);
@@ -100,11 +100,11 @@ void CheckDeclRedeclaration(const ModuleItem* item,
                             std::string_view kind_word, DiagEngine& diag);
 
 // §28.16: give every driver of a net the net delay the net was declared with,
-// since a net delay "refer[s] to the time it takes from any driver on the net
-// changing value to the time when the net value is updated and propagated
-// further" and so belongs to the net rather than to any one driver of it. Runs
-// over a module whose items have all been elaborated, because §10.3.2 lets a
-// continuous assignment stand before the declaration of the net it drives.
+// since a net delay is the time from any driver of the net changing value to
+// the net's value being updated and passed on, and so belongs to the net rather
+// than to any one driver of it. Runs over a module whose items have all been
+// elaborated, because §10.3.2 lets a continuous assignment stand before the
+// declaration of the net it drives.
 void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod);
 
 }  // namespace delta

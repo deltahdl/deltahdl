@@ -181,22 +181,21 @@ bool DisablesTopLevelClockedWithLocals(const Word& word,
 bool PassesTopLevelClockedWithLocals(const Word& word,
                                      const LvClockedTopLevelProperty& top,
                                      const LocalContext& context) {
-  // §F.5.6.1: "T is said to pass on w, L_0 if w, L_0 |= T", U alike.
+  // §F.5.6.1: T passes on w, L_0 when w, L_0 |= T, and U likewise.
   return NeutrallySatisfiesTopLevelClockedWithLocals(word, top, context);
 }
 
 bool IsDisabledTopLevelClockedWithLocals(const Word& word,
                                          const LvClockedTopLevelProperty& top,
                                          const LocalContext& context) {
-  // §F.5.6.1: "T is said to be disabled on w, L_0 if w, L_0 |=^d T".
+  // §F.5.6.1: T is disabled on w, L_0 when w, L_0 |=^d T.
   return DisablesTopLevelClockedWithLocals(word, top, context);
 }
 
 bool FailsTopLevelClockedWithLocals(const Word& word,
                                     const LvClockedTopLevelProperty& top,
                                     const LocalContext& context) {
-  // §F.5.6.1: "T is said to fail on w, L_0 if T neither passes nor is
-  // disabled on w, L_0."
+  // §F.5.6.1: T fails on w, L_0 when it neither passes nor is disabled there.
   return !PassesTopLevelClockedWithLocals(word, top, context) &&
          !IsDisabledTopLevelClockedWithLocals(word, top, context);
 }

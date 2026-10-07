@@ -78,10 +78,10 @@ Expr* MakeHighZExprIn(Arena& arena) {
   return expr;
 }
 
-// §23.3.3.3: an unconnected net input "shall have the value 'z", and a port
-// is a net where §23.2.2.3 makes it one -- `input logic a`, which names a data
-// type and no port kind, among them -- which RtlirPort::net_type records
-// whatever the data type keyword.
+// §23.3.3.3: an unconnected net input has the value 'z, and a port is a net
+// where §23.2.2.3 makes it one -- `input logic a`, which names a data type and
+// no port kind, among them -- which RtlirPort::net_type records whatever the
+// data type keyword.
 bool IsNetPort(const RtlirPort& port) {
   return !port.is_var && !port.is_interface_port &&
          port.net_type != NetType::kNone;
@@ -697,11 +697,10 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   // (multiple drivers are permitted on a net, §23.3.3.3), and an interface-port
   // by-reference connection is not a driver at all (§25.3), so neither is
   // recorded.
-  // §23.3.3.2 (printed page 747): a ref port drives nothing either --
-  // "References to the port variable shall be treated as hierarchical
-  // references to the variable to which it is connected in its instantiation"
-  // -- so the variable keeps its initializer and may be assigned on both
-  // sides, and is not recorded.
+  // §23.3.3.2 (printed page 747): a ref port drives nothing either -- a
+  // reference to the port variable is a hierarchical reference to the variable
+  // its instantiation connects -- so the variable keeps its initializer and may
+  // be assigned on both sides, and is not recorded.
   if (conn_expr && binding.direction != Direction::kInput &&
       binding.direction != Direction::kRef &&
       (!port || !port->is_interface_port)) {
@@ -794,13 +793,13 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
     NetType snet = FindSignalNetType(port.name, parent_mod);
-    // §23.3.3.7.1: "any port connection with an interconnect net shall merge
-    // the dominating and dominated nets into a single net", so no connection to
-    // one is a dissimilar-type conflict. The merge runs as each connection is
-    // bound and leaves the net holding the type merged so far, which means the
-    // second and later connections no longer see kInterconnect here -- asking
-    // the net what it is now would exempt only the first of them. The set of
-    // names declared interconnect is the question that stays answerable.
+    // §23.3.3.7.1: a port connection with an interconnect net merges the
+    // dominating and dominated nets into one, so no connection to one is a
+    // dissimilar-type conflict. The merge runs as each connection is bound and
+    // leaves the net holding the type merged so far, which means the second and
+    // later connections no longer see kInterconnect here -- asking the net what
+    // it is now would exempt only the first of them. The set of names declared
+    // interconnect is the question that stays answerable.
     bool declared_interconnect =
         interconnect_names_.count(port.name) != 0 || port.is_interconnect;
     if (snet != NetType::kNone && snet != pnet &&
@@ -844,9 +843,8 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
 
   if (port.is_interface_port) {
     if (port.interface_type_name.empty()) {
-      // §25.3.3: "An implicit port cannot be used to reference a generic
-      // interface. A named port shall be used to reference a generic
-      // interface." An empty interface_type_name is what makes the port
+      // §25.3.3: only a named port, never an implicit one, may reference a
+      // generic interface. An empty interface_type_name is what makes the port
       // generic, declared with the bare `interface` keyword. §23.3.2.4 states
       // the rules for .* connections in general and says nothing about a
       // generic interface port.

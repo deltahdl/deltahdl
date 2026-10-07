@@ -275,10 +275,10 @@ void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
   }
 }
 
-// Records each class's typedefs under their qualified key. §8.23 states that
-// "type declarations nested inside a class scope are public and can be accessed
-// outside the class", through the class name. The reach over unit->classes is
-// the one RegisterClassParams already has for the same clause's parameters.
+// Records each class's typedefs under their qualified key. §8.23 makes a type
+// declared inside a class scope public and reachable from outside the class,
+// through the class name. The reach over unit->classes is the one
+// RegisterClassParams already has for the same clause's parameters.
 void RegisterClassTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
                            Arena& arena) {
   for (auto* cls : unit->classes) {
@@ -377,10 +377,10 @@ void RegisterCuClasses(
 }
 
 // §24.6: every name an anonymous program declares, whichever scope the program
-// stands in. "Anonymous programs can be used inside packages (see Clause 26) or
-// compilation-unit scopes (see 3.12.1) to declare items that are part of the
-// program-wide space without declaring a new scope", and that space is one
-// space however a declaration entered it, so the two lists fill one set.
+// stands in. An anonymous program in a package (Clause 26) or a
+// compilation-unit scope (§3.12.1) declares items of the program-wide space
+// without opening a new scope, and that space is one space however a
+// declaration entered it, so the two lists fill one set.
 void RegisterAnonymousProgramNames(
     CompilationUnit* unit, std::unordered_set<std::string_view>& names) {
   for (const auto* item : unit->cu_items) {

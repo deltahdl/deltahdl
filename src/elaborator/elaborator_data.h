@@ -54,10 +54,10 @@ struct RtlirParamDecl;
 // elaboration that never returns. The genvar-repeats check catches a scheme
 // that revisits a value, which is the shape that can be proven
 // non-terminating. What reaches this bound has a distinct genvar value every
-// time round, which §27.4 permits outright -- "This can be a sparse array
-// because the genvar values do not have to form a contiguous range of
-// integers" -- so it cannot be told apart from a scheme that would have
-// stopped one iteration later.
+// time round, which §27.4 permits outright -- the instances may form a sparse
+// array, since genvar values need not form a contiguous range of integers -- so
+// it cannot be told apart from a scheme that would have stopped one iteration
+// later.
 //
 // 262144 is measured rather than chosen, and the measurement is recorded here
 // so that questioning the number does not mean retaking it. A scheme reaching
@@ -340,13 +340,13 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> scalar_var_names_;
-  // §11.5.1: the real variables the sentence "A bit-select or part-select of a
-  // scalar, or of a real variable or real parameter, shall be illegal" names in
-  // its second alternative. A variable is here only when it was declared with
-  // no unpacked dimension, because §11.5.2 makes indexing an unpacked array an
-  // array element select rather than a bit-select: `real arr[4]; v = arr[i];`
-  // selects an element whose type is real and is legal, so `arr` is not in this
-  // set even though its element type is real.
+  // §11.5.1: the real variables the rule barring a bit-select or part-select of
+  // a scalar, a real variable or a real parameter names in its second
+  // alternative. A variable is here only when it was declared with no unpacked
+  // dimension, because §11.5.2 makes indexing an unpacked array an array
+  // element select rather than a bit-select: `real arr[4]; v = arr[i];` selects
+  // an element whose type is real and is legal, so `arr` is not in this set
+  // even though its element type is real.
   std::unordered_set<std::string_view> real_var_names_;
   // §11.5.1: the real parameters the same sentence names beside the real
   // variables. The two are kept apart because the report names the noun the
@@ -438,12 +438,12 @@ class ElaboratorData {
 
   // §14.14: the global clocking declarations in scope along the instance path,
   // one entry per declaring instance, outermost first. The clause's lookup
-  // rules "iteratively check the design hierarchy to find the global clocking
-  // declaration closest to the point of reference", which is back(). Pushed
-  // and popped around each Elaborator::ElaborateModule call, so the stack
-  // holds the declarations of the current cell and of its ancestor instances.
+  // rules search the design hierarchy step by step for the global clocking
+  // declaration nearest the point of reference, which is back(). Pushed and
+  // popped around each Elaborator::ElaborateModule call, so the stack holds the
+  // declarations of the current cell and of its ancestor instances.
   struct GlobalClockingScope {
-    // §14.14's "event expression of that global clocking declaration".
+    // §14.14's event expression of that global clocking declaration.
     const std::vector<EventExpr>* events = nullptr;
     // current_inst_path_ of the declaring instance. The event expression names
     // signals of the scope that declares it, so a reference in a descendant
@@ -462,21 +462,21 @@ class ElaboratorData {
   // entry of global_clocking_scopes_ above.
   const std::vector<EventExpr>* module_global_clocking_event_ = nullptr;
 
-  // §27.5 selects a conditional generate's block "based on constant
-  // expressions evaluated during elaboration", and this elaborator evaluates
-  // that expression in Elaborator::ResolveDefparamsAndGenerates, after
+  // §27.5 selects a conditional generate's block by constant expressions
+  // evaluated during elaboration, and this elaborator evaluates that expression
+  // in Elaborator::ResolveDefparamsAndGenerates, after
   // Elaborator::ElaborateModule has returned for every module. §26.3 makes an
-  // imported name locally visible only "prior to that point within the current
-  // scope", so the condition has to fold against the scope of the module the
-  // generate was written in and not against the union of every module's
-  // imports. typedefs and cu_param_scope carry that scope:
+  // imported name locally visible only before that point in the current scope,
+  // so the condition has to fold against the scope of the module the generate
+  // was written in and not against the union of every module's imports.
+  // typedefs and cu_param_scope carry that scope:
   // Elaborator::ElaborateBehavioralItem copies typedefs_ and cu_param_scope_
   // into them as it queues the item, and Elaborator::ProcessPendingGenerate
   // installs them again around the fold and the elaboration of the selected
   // body, whose own declarations read typedefs_ as well.
   //
   // func_decls carries the same scope for §13.4.3, which has a constant
-  // function call "evaluated at elaboration time". Elaborator::ElaborateItems
+  // function call evaluated during elaboration. Elaborator::ElaborateItems
   // fills func_decls_ from the ModuleDecl it is elaborating and
   // ItemElaborationStateSaver puts it back to what it held before that module,
   // so the module's own functions are gone by the time
@@ -510,10 +510,10 @@ class ElaboratorData {
   // generate block instance's Elaborator::ScopedName prefix and loop-index
   // bindings for one written inside a block. §23.10.1 needs both: the prefix
   // decides which hierarchy the statement is allowed to reach, since the clause
-  // rules that a defparam "in or under a generate block instance ... shall not
-  // change a parameter value outside that hierarchy", and the bindings are what
-  // its right-hand side reads when it names a genvar, as the clause's own
-  // example does with `defparam somename[i+1].my_flop.xyz = i`.
+  // rules that a defparam in or under a generate block instance may not change
+  // a parameter outside that hierarchy, and the bindings are what its
+  // right-hand side reads when it names a genvar, as the clause's own example
+  // does with `defparam somename[i+1].my_flop.xyz = i`.
   struct DefparamSite {
     const ModuleItem* item;
     std::string_view prefix;
@@ -569,13 +569,13 @@ class ElaboratorData {
   std::string gen_prefix_;
   // §23.9: every generate block prefix in force, outermost first, with
   // gen_prefix_ itself last. A reference written in a nested block is resolved
-  // against each enclosing block in turn -- "the search shall continue upward
-  // until an item by that name is found or until a module, interface, program,
-  // or checker boundary is encountered" -- and gen_prefix_ alone cannot answer
-  // that, being the innermost prefix flattened into a string no reader can
-  // split back into steps. Each entry is interned in arena_ and is the whole of
-  // gen_prefix_ at that depth, so an entry and a simple name concatenate to the
-  // key Elaborator::ScopedName produced for a declaration in that block.
+  // against each enclosing block in turn -- the search climbs until it finds an
+  // item of that name or meets a module, interface, program or checker boundary
+  // -- and gen_prefix_ alone cannot answer that, being the innermost prefix
+  // flattened into a string no reader can split back into steps. Each entry is
+  // interned in arena_ and is the whole of gen_prefix_ at that depth, so an
+  // entry and a simple name concatenate to the key Elaborator::ScopedName
+  // produced for a declaration in that block.
   std::vector<std::string_view> gen_prefix_scopes_;
   // §23.6: the generate block instances currently being elaborated into,
   // outermost first. Maintained beside gen_prefix_, which flattens the same
@@ -694,14 +694,13 @@ class ElaboratorData {
   ScopeMap config_localparam_scope_;
 
   std::string current_inst_path_;
-  // §33.4.1.3 (printed page 939): "The instance name associated with the
-  // instance clause is a SystemVerilog hierarchical name, starting at the
-  // top-level module of the config". This is the instance being elaborated
-  // named that way, §23.6's path with each generate block instance it sits in
-  // a level of its own (`top.g.u`, `top.g[1].u`), which is what a
-  // configuration rule's path is matched against. current_inst_path_ runs a
-  // generate block's name into the instance's (`top.g_u`), the flattened key
-  // the simulator stores the instance under.
+  // §33.4.1.3 (printed page 939): the instance clause's instance name is a
+  // hierarchical name starting at the config's top-level module. This is the
+  // instance being elaborated named that way, §23.6's path with each generate
+  // block instance it sits in a level of its own (`top.g.u`, `top.g[1].u`),
+  // which is what a configuration rule's path is matched against.
+  // current_inst_path_ runs a generate block's name into the instance's
+  // (`top.g_u`), the flattened key the simulator stores the instance under.
   std::string config_inst_path_;
   // Library of the cell currently being elaborated; the parent cell's library
   // while its child instances are resolved (§33.4.1.5, §33.4.1.6).
@@ -741,7 +740,7 @@ class ElaboratorData {
   std::unordered_set<std::string_view> cu_scope_names_;
   // §24.6: the names anonymous programs declare into the program-wide space,
   // gathered from the compilation-unit scope and from every package. The space
-  // "is accessible only to programs", so a scope that is not a program block
+  // is reachable from programs alone, so a scope that is not a program block
   // may reference none of these names.
   std::unordered_set<std::string_view> anonymous_program_names_;
   ScopeMap cu_param_scope_;

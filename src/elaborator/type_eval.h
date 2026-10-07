@@ -50,14 +50,14 @@ uint32_t EvalTypeWidth(const DataType& dtype);
 // §10.9.1's `type:value` key. IsTypeKeyword answers whether a key names a type
 // at all -- the alternative being an index key -- and TypeKeyMatchesKind
 // whether that type is the one an element is declared with, which is what
-// decides whether the key covers the element: "The type:value specifies an
-// explicit value for each field in the structure whose type matches the type",
-// and §10.9.1 applies the same rule to an array's elements. They live here
-// rather than beside either user because both the elaborator, which reports a
-// pattern that covers no element, and the simulator, which fills the ones a key
-// does cover, have to answer the same question the same way; two copies of the
-// keyword list had already drifted apart on the second predicate, the
-// elaborator's copy having only the first.
+// decides whether the key covers the element: a type:value gives an explicit
+// value to each structure field whose type matches, and §10.9.1 applies the
+// same rule to an array's elements. They live here rather than beside either
+// user because both the elaborator, which reports a pattern that covers no
+// element, and the simulator, which fills the ones a key does cover, have to
+// answer the same question the same way; two copies of the keyword list had
+// already drifted apart on the second predicate, the elaborator's copy having
+// only the first.
 // §6.16/§6.18: whether the declared type is a string, whether written as the
 // keyword or reached through a typedef name. Is4stateType beside it resolves a
 // name the same way and for the same reason.

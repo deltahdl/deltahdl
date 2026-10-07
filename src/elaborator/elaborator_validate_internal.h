@@ -446,7 +446,7 @@ void CheckForceLhs(
 using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 // What §11.5.1 needs to judge the operand of a select. Its second alternative
-// names two operands, "a real variable or real parameter", carried in separate
+// names two operands, a real variable or a real parameter, carried in separate
 // sets because the report names the noun the clause gives the one it found and
 // a parameter is not a variable. Each set holds only the names declared with no
 // unpacked dimension, since §11.5.2 makes one address written after such a name

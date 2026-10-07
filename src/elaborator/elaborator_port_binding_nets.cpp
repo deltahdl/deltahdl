@@ -300,11 +300,10 @@ static void CollapseInterconnectNetTypes(
                                    interconnect_names);
 }
 
-// §23.3.2.2 (printed page 744): "Multiple module instance port connections
-// are not allowed", the clause's `A ia (.i (a), .i (b), ...)` connecting
-// input, output and inout ports twice each being "illegal". Both connections
-// were applied, the input reading the two drivers' x. Each port named twice
-// is reported once.
+// §23.3.2.2 (printed page 744): a module instance may not connect one port more
+// than once, the clause's `A ia (.i (a), .i (b), ...)` connecting input, output
+// and inout ports twice each being illegal. Both connections were applied, the
+// input reading the two drivers' x. Each port named twice is reported once.
 static void ReportRepeatedPortConnections(const ModuleItem* item,
                                           DiagEngine& diag) {
   std::unordered_set<std::string_view> seen;

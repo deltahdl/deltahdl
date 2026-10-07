@@ -70,9 +70,9 @@ static bool IsDollarValue(const Expr* e) {
 
 // §6.20.2 (printed pages 126-127): whether a class value parameter declared
 // with `type` takes a real value -- declared with a real type, or declared
-// with neither type nor range and given a real expression, where "if the
-// expression is real, the parameter is real". Null for a declaration
-// recording no type.
+// with neither type nor range and given a real expression, where a real
+// expression makes the parameter real. Null for a declaration recording no
+// type.
 static bool TakesRealClassParamValue(const Expr* pexpr, const DataType* type) {
   if (type != nullptr && IsRealType(type->kind)) return true;
   bool untyped =
@@ -180,16 +180,16 @@ void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
-// §8.26: "A class declaration may appear ... within a module", and §6.20.1 says
-// the same thing of every class body wherever it stands: "All param_assignments
-// appearing within a class body shall become localparam declarations regardless
-// of the presence or absence of a parameter_port_list", whose value Syntax 6-6
-// makes a constant_param_expression. The walk below reaches the compilation
-// unit's classes alone, so a class written inside a module had its defaults
-// folded and checked nowhere and `class C #(parameter int W = n);` over a
-// variable n elaborated in silence -- and the default was then evaluated at
-// each construction against the simulation context, a per-object value where
-// §6.20 has one constant.
+// §8.26: a class declaration may appear within a module, and §6.20.1 says the
+// same thing of every class body wherever it stands: every param_assignment in
+// a class body becomes a localparam declaration whether or not there is a
+// parameter_port_list, whose value Syntax 6-6 makes a
+// constant_param_expression. The walk below reaches the compilation unit's
+// classes alone, so a class written inside a module had its defaults folded and
+// checked nowhere and `class C #(parameter int W = n);` over a variable n
+// elaborated in silence -- and the default was then evaluated at each
+// construction against the simulation context, a per-object value where §6.20
+// has one constant.
 //
 // `module_scope` is what the class layers its own names over, so a default
 // naming one of the module's parameters folds against it, and the qualified

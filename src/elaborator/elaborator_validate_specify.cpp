@@ -172,11 +172,11 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
 bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            SourceLoc loc, const TerminalRole& tr,
                            DiagEngine& diag) {
-  // §25.6 is where "A ref port cannot be used as a terminal in a specify
-  // block" is written, and it states it once for both roles the block has:
-  // the same paragraph names the module paths and the timing checks together.
-  // §30.4.1 is the two module path restrictions, which name no ref port and
-  // are what the direction and net reports below enforce.
+  // §25.6 is where the bar on a ref port as a specify block terminal is
+  // written, and it states it once for both roles the block has: the same
+  // paragraph names the module paths and the timing checks together. §30.4.1 is
+  // the two module path restrictions, which name no ref port and are what the
+  // direction and net reports below enforce.
   if (p->direction == Direction::kRef) {
     diag.Error(loc,
                std::format("ref port '{}' cannot be used as a "
@@ -196,13 +196,13 @@ bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
   return false;
 }
 
-// §23.2.2.3 (printed page 735): "An implicit data type declaration implies a
-// net unless the var keyword is used", so a non-ANSI `input a;` is a net -- the
-// standard's own specify examples declare their ports that way -- unless the
-// body declares it again as a variable (§23.2.2.1) or it was written with
-// `var`. The ANSI header marks its implicit ports as nets; a non-ANSI
-// declaration leaves its data type implicit instead, which read as a variable
-// refused `(a => q)` as a path from no net.
+// §23.2.2.3 (printed page 735): an implicit data type declaration means a net
+// unless var is written, so a non-ANSI `input a;` is a net -- the standard's
+// own specify examples declare their ports that way -- unless the body declares
+// it again as a variable (§23.2.2.1) or it was written with `var`. The ANSI
+// header marks its implicit ports as nets; a non-ANSI declaration leaves its
+// data type implicit instead, which read as a variable refused `(a => q)` as a
+// path from no net.
 bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
   if (p.data_type.is_net || p.data_type.is_interconnect) return false;
   if (p.data_type.kind == DataTypeKind::kImplicit && !p.has_explicit_var) {
@@ -314,8 +314,8 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
   }
 }
 
-// §31.6 (printed page 915): "The notifier is a variable, declared in the
-// module where timing check tasks are invoked", and Syntax 31-2 makes it a
+// §31.6 (printed page 915): the notifier is a variable declared in the module
+// invoking the timing check tasks, and Syntax 31-2 makes it a
 // variable_identifier, so a net of the module, or a port that is a net, is
 // refused as one.
 void CheckTimingCheckNotifier(const SpecifyItem* si, const SignalScope& scope,
@@ -774,10 +774,10 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// §31.2: "Like expressions for module path delays, timing check limit values
-// are constant expressions that can include specparams." Every operand of a
-// timing_check_limit must therefore be a literal or a specparam declared in
-// the same specify block; a net or variable reference is not constant and is
+// §31.2: timing check limit values, like module path delays, are constant
+// expressions that may include specparams. Every operand of a
+// timing_check_limit must therefore be a literal or a specparam declared in the
+// same specify block; a net or variable reference is not constant and is
 // rejected, exactly as for module-path delays.
 // program, in their original order.
 void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,

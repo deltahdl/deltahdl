@@ -388,22 +388,22 @@ bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
 
 bool PassesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                               const LocalContext& context) {
-  // §F.5.6.1: "T is said to pass on w, L_0 if w, L_0 |= T."
+  // §F.5.6.1: T passes on w, L_0 when w, L_0 |= T.
   return NeutrallySatisfiesTopLevelWithLocals(word, top, context);
 }
 
 bool IsDisabledTopLevelWithLocals(const Word& word,
                                   const LvTopLevelProperty& top,
                                   const LocalContext& context) {
-  // §F.5.6.1: "T is said to be disabled on w, L_0 if w, L_0 |=^d T."
+  // §F.5.6.1: T is disabled on w, L_0 when w, L_0 |=^d T.
   return DisablesTopLevelWithLocals(word, top, context);
 }
 
 bool FailsTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                              const LocalContext& context) {
-  // §F.5.6.1: "T is said to fail on w, L_0 if T neither passes nor is disabled
-  // on w, L_0." Pass and disabled are mutually exclusive, so failure is their
-  // joint negation.
+  // §F.5.6.1: T fails on w, L_0 when it neither passes nor is disabled there.
+  // Pass and disabled are mutually exclusive, so failure is their joint
+  // negation.
   return !PassesTopLevelWithLocals(word, top, context) &&
          !IsDisabledTopLevelWithLocals(word, top, context);
 }

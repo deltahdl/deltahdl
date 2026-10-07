@@ -60,17 +60,16 @@ static std::vector<DataType> OverrideSpecializationArgs(
 // Gives an override list written as `Buf#()` the class's own default
 // arguments, so that the specialization it names survives the substitution.
 //
-// §8.25.1 (printed page 205) states that "the default specialization of a
-// parameterized class is the specialization of the parameterized class with an
-// empty parameter override list", so `Buf#()::elem_t` names elem_t with every
-// parameter of Buf at the default its declaration gives. DataType carries no
-// flag recording that `#(...)` was written, only the arguments themselves, so
-// an empty list reaching ResolveParameterizedType is indistinguishable there
-// from the unspecialized `Buf::elem_t` that function rejects. Filling the
-// defaults here is what tells the two apart. A list that is not empty needs
-// nothing, because ResolveParameterizedType supplies the default of every
-// formal the list leaves unmentioned, whether the list binds by name or by
-// position.
+// §8.25.1 (printed page 205) makes a parameterized class's default
+// specialization the one written with an empty parameter override list, so
+// `Buf#()::elem_t` names elem_t with every parameter of Buf at the default its
+// declaration gives. DataType carries no flag recording that `#(...)` was
+// written, only the arguments themselves, so an empty list reaching
+// ResolveParameterizedType is indistinguishable there from the unspecialized
+// `Buf::elem_t` that function rejects. Filling the defaults here is what tells
+// the two apart. A list that is not empty needs nothing, because
+// ResolveParameterizedType supplies the default of every formal the list leaves
+// unmentioned, whether the list binds by name or by position.
 static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
                                           const ClassDecl* cls) {
   if (!args.empty()) return;
@@ -94,13 +93,13 @@ static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
 // not a scope resolution over two identifiers.
 //
 // A prefix written with `#(...)` is a specialization instead of a plain class
-// name. §8.25 (printed page 204) states that "a generic class is not a type;
-// only a concrete specialization represents a type", and that two
-// specializations are the same type only when all their parameters are the
-// same, so `Buf#(byte)::elem_t` and `Buf#(shortint)::elem_t` are different
-// types and neither is what the unspecialized `Buf` would give. Such a prefix
-// therefore builds the named type ResolveParameterizedType substitutes into
-// rather than reading the member's declared type as it stands.
+// name. §8.25 (printed page 204) states that a generic class is not itself a
+// type, only a concrete specialization is, and that two specializations are the
+// same type only when all their parameters are the same, so
+// `Buf#(byte)::elem_t` and `Buf#(shortint)::elem_t` are different types and
+// neither is what the unspecialized `Buf` would give. Such a prefix therefore
+// builds the named type ResolveParameterizedType substitutes into rather than
+// reading the member's declared type as it stands.
 static DataType ClassScopedOverrideToDataType(const Expr* expr,
                                               const CompilationUnit* unit,
                                               DiagEngine& diag, SourceLoc loc) {
@@ -206,10 +205,10 @@ static DataType OverrideHeadToDataType(const Expr* head,
   if (head->kind == ExprKind::kIdentifier) {
     DataType dt = TypeNameToDataType(head->text);
     // §8.25 (printed page 204): a specialization is the generic class combined
-    // with its arguments, and "a generic class is not a type; only a concrete
-    // specialization represents a type". So `D#(4)` names a type where the bare
-    // `D` names none when D leaves a parameter without a default, and the
-    // arguments are what the declaration the override reaches is judged on.
+    // with its arguments, and a generic class is not itself a type, only a
+    // concrete specialization is. So `D#(4)` names a type where the bare `D`
+    // names none when D leaves a parameter without a default, and the arguments
+    // are what the declaration the override reaches is judged on.
     if (head->has_param_spec) {
       dt.type_params = OverrideSpecializationArgs(head, unit, diag, loc);
     }
@@ -444,14 +443,14 @@ static std::vector<std::string_view> MemberAccessNames(const Expr* e) {
   return names;
 }
 
-// §33.4.3 (printed page 940): "Parameters identifiers shall be resolved
-// starting in the parent scope of the instance", so a hierarchical reference
-// in a configuration's override that names the configured instance's parent,
-// `top.WIDTH` for `instance top.a1`, is that parent's parameter. It is folded
-// here, where the parent's values are known: a scalar parameter becomes its
-// value and a parameter array its name in the parent's scope, which an index
-// -- a literal or a config localparam -- then selects in. A reference naming
-// any other scope is left as it was written.
+// §33.4.3 (printed page 940): parameter identifiers resolve starting in the
+// instance's parent scope, so a hierarchical reference in a configuration's
+// override that names the configured instance's parent, `top.WIDTH` for
+// `instance top.a1`, is that parent's parameter. It is folded here, where the
+// parent's values are known: a scalar parameter becomes its value and a
+// parameter array its name in the parent's scope, which an index -- a literal
+// or a config localparam -- then selects in. A reference naming any other scope
+// is left as it was written.
 static Expr* ResolveParentReference(Expr* e, std::string_view parent_path,
                                     const ScopeMap& parent_scope,
                                     Arena& arena) {
@@ -602,13 +601,13 @@ bool ConcatElementsUniform(const Expr* conn, uint32_t total,
 }
 
 // §23.3.3.5 (printed page 748): an unpacked array connection is split across
-// an array of instances, "each element of the port connection shall be matched
-// to the port left index to left index, right index to right index", so the
-// instance `position` places from the right stands `total - 1 - position`
-// places from the left and takes the element that far from the array's left
-// bound. A variable's bounds are its declared ones; a net array is read as
-// written `[size]`, from 0. Empty where the name is no unpacked array, a
-// variable's or a net's.
+// an array of instances, each element of the connection matched to the port
+// left index to left index and right index to right index, so the instance
+// `position` places from the right stands `total - 1 - position` places from
+// the left and takes the element that far from the array's left bound. A
+// variable's bounds are its declared ones; a net array is read as written
+// `[size]`, from 0. Empty where the name is no unpacked array, a variable's or
+// a net's.
 std::optional<int64_t> UnpackedElementForInstance(
     const InstArrayDistribCtx& ctx, std::string_view name, uint32_t position,
     uint32_t total) {
@@ -773,23 +772,24 @@ void Elaborator::ApplyConfigParamOverrides(
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
-  // §27.4: a loop generate block, "even if the begin-end keywords are absent
-  // ... is still a generate block, which, like all generate blocks, comprises a
-  // separate scope and a new level of hierarchy when it is instantiated". One
-  // instantiation written in a loop body is therefore elaborated once per
-  // iteration into a different scope each time, and declares its name afresh
-  // rather than again. The name is registered under the generate prefix that
-  // tells those scopes apart; outside a generate block ScopedName hands the
-  // name back unchanged, so a repeat at module level is still a redeclaration.
+  // §27.4: a loop generate block stays a generate block even without begin-end,
+  // and like every generate block forms a scope of its own and a further level
+  // of hierarchy once instantiated. One instantiation written in a loop body is
+  // therefore elaborated once per iteration into a different scope each time,
+  // and declares its name afresh rather than again. The name is registered
+  // under the generate prefix that tells those scopes apart; outside a generate
+  // block ScopedName hands the name back unchanged, so a repeat at module level
+  // is still a redeclaration.
   //
-  // The same subclause makes each instance of the block "a separate scope and a
-  // new level of hierarchy", so the record of the instantiation has to carry
-  // the scoped name as well as the redeclaration check does. Taking the raw
-  // name for RtlirModuleInst::inst_name and for current_inst_path_ gave every
-  // iteration one name and one instance path, which Lowerer::LowerChildModules
-  // keys an instance's declarations on. ScopedName is asked once and answers
-  // all three; ScopedName("") returns the generate prefix itself, which would
-  // name an unnamed instantiation after the block holding it.
+  // The same subclause makes each instance of the block a scope of its own and
+  // a further level of hierarchy, so the record of the instantiation has to
+  // carry the scoped name as well as the redeclaration check does. Taking the
+  // raw name for RtlirModuleInst::inst_name and for current_inst_path_ gave
+  // every iteration one name and one instance path, which
+  // Lowerer::LowerChildModules keys an instance's declarations on. ScopedName
+  // is asked once and answers all three; ScopedName("") returns the generate
+  // prefix itself, which would name an unnamed instantiation after the block
+  // holding it.
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   if (!item->inst_name.empty() &&

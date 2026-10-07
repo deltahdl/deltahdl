@@ -139,10 +139,11 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   ValidateInterconnectContAssign(item);
   ValidateClassHandleContAssign(item);
 
-  // §6.3.2.2's "a drive strength requires an assignment in the same statement"
-  // is not checked here. This walk reaches the module's own items and stops, so
-  // a net declared inside a generate block escaped it; the rule now sits in
-  // ElaborateNetDecl, which every elaborated net declaration passes through.
+  // §6.3.2.2's rule that a drive strength needs an assignment in the same
+  // statement is not checked here. This walk reaches the module's own items and
+  // stops, so a net declared inside a generate block escaped it; the rule now
+  // sits in ElaborateNetDecl, which every elaborated net declaration passes
+  // through.
 
   if ((item->kind == ModuleItemKind::kNetDecl ||
        item->kind == ModuleItemKind::kContAssign ||
@@ -169,8 +170,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   }
 }
 
-// §12.6: "A constant expression pattern shall be of integral type." Real and
-// string literals are the constant expressions that are not integral.
+// §12.6 admits only an integral type for a constant expression pattern. Real
+// and string literals are the constant expressions that are not integral.
 static bool IsNonIntegralConstantPattern(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kRealLiteral) return true;
@@ -398,15 +399,15 @@ void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
   }
 }
 
-// §10.6.2 (printed page 257): "A force or release statement shall not be
-// applied to a variable that is being assigned by a mixture of continuous and
-// procedural assignments." This is a second rule over a source §6.5 already
-// rejects, and it names the statement the author has to change rather than the
-// assignment, so both reports are emitted and neither suppresses the other.
-// A force can never itself create the mixture it may not be applied over: §6.5
-// (printed page 91) rules that "A force statement is neither a continuous nor a
-// procedural assignment", which is why CollectProcTargets counts only
-// StmtKind::kBlockingAssign and StmtKind::kNonblockingAssign.
+// §10.6.2 (printed page 257): force and release may not be applied to a
+// variable assigned by a mixture of continuous and procedural assignments. This
+// is a second rule over a source §6.5 already rejects, and it names the
+// statement the author has to change rather than the assignment, so both
+// reports are emitted and neither suppresses the other. A force can never
+// itself create the mixture it may not be applied over: §6.5 (printed page 91)
+// makes a force statement neither a continuous nor a procedural assignment,
+// which is why CollectProcTargets counts only StmtKind::kBlockingAssign and
+// StmtKind::kNonblockingAssign.
 static void ReportForceOverMixedAssignments(
     const std::unordered_map<std::string_view, SourceLoc>& force_targets,
     const std::unordered_map<std::string_view, SourceLoc>& cont_targets,
@@ -467,10 +468,10 @@ void Elaborator::ValidateMixedAssignments() {
 // net_port_type list_of_port_identifiers` and `input variable_port_type
 // list_of_variable_identifiers`, and a declaration that names no type at all
 // matches the net one -- a net_port_type admits an implicit data type where a
-// variable_port_type does not. §23.2.2.1 then allows such a port to "be again
-// declared in a net or variable declaration", and it is that second
-// declaration, in the module body, that can make the port a variable. So the
-// port is a variable exactly when the body says so.
+// variable_port_type does not. §23.2.2.1 then allows such a port to be declared
+// again in a net or variable declaration, and it is that second declaration, in
+// the module body, that can make the port a variable. So the port is a variable
+// exactly when the body says so.
 static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
                                   std::string_view name) {
   for (const auto* item : decl->items) {
@@ -594,7 +595,7 @@ static bool IsAssocIndexTypeName(std::string_view name) {
          name == "longint";
 }
 
-// §6.21's "dynamically sized array variables" are the three §7.4 admits whose
+// §6.21's dynamically sized array variables are the three §7.4 admits whose
 // size the declaration does not fix, and the first unpacked dimension is what
 // says which: `[]` reaches the parser as no dimension expression at all, `[$]`
 // and `[$:N]` are §7.10's queue, and an index type is §7.8's associative array.

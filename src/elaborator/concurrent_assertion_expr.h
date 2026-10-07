@@ -74,8 +74,7 @@ enum class FunctionArgKind : uint8_t {
 bool FunctionArgKindAllowedInAssertionExpr(FunctionArgKind kind);
 
 // §16.6: a function used in a concurrent-assertion expression must be
-// automatic (or stateless: "preserve no state information") and have no side
-// effects.
+// automatic (or keep no state) and have no side effects.
 bool FunctionEligibleInAssertionExpr(bool is_automatic, bool preserves_no_state,
                                      bool has_no_side_effects);
 

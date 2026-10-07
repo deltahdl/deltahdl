@@ -32,16 +32,16 @@ bool SubstituteGlobalClockLeadingEvent(
     std::vector<EventExpr>& sensitivity,
     const std::vector<EventExpr>& global_event);
 
-// §14.14: "The $global_clock system function shall be used to explicitly
-// refer to the event expression in the effective global clocking
-// declaration", and an event control naming it waits on that event expression
-// wherever it is written -- a procedure's own sensitivity list, an event
-// control standing as a statement, an intra-assignment event control, a wait.
-// Walk the statement tree rooted at `stmt` and rewrite every such event
-// control into `global_event`, by the same substitution
+// §14.14: $global_clock refers explicitly to the event expression of the
+// effective global clocking declaration, and an event control naming it waits
+// on that event expression wherever it is written -- a procedure's own
+// sensitivity list, an event control standing as a statement, an
+// intra-assignment event control, a wait.
+// Walk the statement tree rooted at `stmt` and rewrite every such event control
+// into `global_event`, by the same substitution
 // SubstituteGlobalClockLeadingEvent makes on a leading clocking event, so the
-// process suspends on the declared event rather than on a system call naming
-// no signal. A concurrent assertion's leading clock written as $global_clock is
+// process suspends on the declared event rather than on a system call naming no
+// signal. A concurrent assertion's leading clock written as $global_clock is
 // rewritten the same way (§16.5.2).
 //
 // Returns the statement tree to use, which is `stmt` itself where nothing was
@@ -65,10 +65,10 @@ Stmt* SubstituteGlobalClockEventControls(
 
 // §14.14 lookup rule b): a $global_clock reference in a scope that declares no
 // global clocking of its own resolves against the declaration of the nearest
-// enclosing instance, "with the result being the event expression of that
-// global clocking declaration". That event expression names signals of the
-// scope that declares it, so a reference in a descendant waits on the
-// declaring instance's signals and not on names of its own.
+// enclosing instance, the result being that declaration's event expression.
+// That event expression names signals of the scope that declares it, so a
+// reference in a descendant waits on the declaring instance's signals and not
+// on names of its own.
 //
 // Returns the event expression to substitute at a reference in the instance
 // `referencing_inst_path` names, given the nearest declaration's event

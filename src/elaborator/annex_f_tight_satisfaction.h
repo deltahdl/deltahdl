@@ -37,12 +37,12 @@ bool LetterSatisfiesBoolean(const Letter& letter, const BooleanExpr& b);
 
 // §F.5.2: tight satisfaction, w |== R, for an unclocked sequence without local
 // variables. When the sequence is clocked it is first reduced to its unclocked
-// form by the §F.5.1.1 rewrite rules, per "If S is a clocked sequence, then
-// w |== S iff w |== S'".
+// form by the §F.5.1.1 rewrite rules, since for a clocked sequence S, w |== S
+// iff w |== S'.
 bool TightlySatisfies(const Word& word, const SequenceExpr& sequence);
 
-// §F.3.2's strong/weak sequence forms require that the sequence operand "shall
-// not be tightly satisfied by the empty word". This evaluates that predicate.
+// §F.3.2's strong/weak sequence forms require that the empty word not tightly
+// satisfy the sequence operand. This evaluates that predicate.
 bool TightlySatisfiedByEmptyWord(const SequenceExpr& sequence);
 
 // §F.5.2: an unclocked sequence is nondegenerate iff some nonempty finite word

@@ -162,9 +162,9 @@ namespace {
 
 // The addresses already supplied to an array reference: how many index selects
 // sit between a trailing range and the array's name, and that name. §11.5.2
-// writes an array access as the name followed by "an integer expression for
-// each addressed dimension", so this count says how many dimensions the range
-// has left to reach.
+// writes an array access as the name followed by one integer expression per
+// addressed dimension, so this count says how many dimensions the range has
+// left to reach.
 struct AddressedDims {
   uint32_t count = 0;
   std::string_view array_name;
@@ -193,25 +193,24 @@ AddressedDims CountAddressedDims(const Expr* base) {
 //
 // Address every dimension and a single element has been selected, so the range
 // selects contiguous bits of that element: a part-select, which §11.5.2 permits
-// once the addressing is complete — "To express bit-selects or part-selects of
-// array elements, the desired word shall first be selected by supplying an
-// address for each dimension" — and which §11.5.1 governs from there.
+// once the addressing is complete — a bit-select or part-select of an array
+// element first selects the word, one address per dimension — and which §11.5.1
+// governs from there.
 //
 // Leave a dimension unaddressed and the range selects contiguous *elements* of
-// that dimension instead. §7.4.5 calls that a slice, and permits one: "Slices
-// of an array can only apply to one dimension, but other dimensions can have
-// single index values in an expression." So an unaddressed dimension does not
-// make the range illegal.
+// that dimension instead. §7.4.5 calls that a slice, and permits one: a slice
+// covers one dimension only, while the other dimensions may take single indices
+// in the expression. So an unaddressed dimension does not make the range
+// illegal.
 //
 // What a slice may not do is run against the dimension it slices. §11.5.1
-// requires the first index of a range to "address a more significant bit than
-// the second expression", and §11.5.2 sends an array's ranges to that same
-// rule. On a dimension declared [0:7] the more significant element is the one
-// with the smaller index, so [0:3] slices the first four elements and [3:0]
-// addresses them backwards. That is what makes §11.5.2's own
-// threed_array[14][1][3:0] illegal on wire threed_array[0:255][0:255][0:7]: the
-// third dimension counts upward, and threed_array[14][1][0:7] slices that same
-// dimension legally.
+// requires the first index of a range to address a more significant bit than
+// the second, and §11.5.2 sends an array's ranges to that same rule. On a
+// dimension declared [0:7] the more significant element is the one with the
+// smaller index, so [0:3] slices the first four elements and [3:0] addresses
+// them backwards. That is what makes §11.5.2's own threed_array[14][1][3:0]
+// illegal on wire threed_array[0:255][0:255][0:7]: the third dimension counts
+// upward, and threed_array[14][1][0:7] slices that same dimension legally.
 //
 // The indexed forms need no test here. §11.5.1 fixes them to the declared
 // direction whichever way it runs — on logic [0:31] b_vect, b_vect[0 +: 8] is
@@ -439,13 +438,13 @@ void ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckSelectOnConcatLvalue(s->lhs);
   }
-  // §11.4.12 says of a select of a concatenation that "Such a select shall not
-  // be legal as a net_lvalue, variable_lvalue, or in any equivalent use, such
-  // as on the left-hand side of an assignment", which is a rule about the
-  // lvalue and not about the statement holding it, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names, naming none
-  // itself. It wrote out six of the thirteen, so `{a, b}[2] = 1'b1` written in
-  // a fork arm or in a randcase item elaborated clean.
+  // §11.4.12 bars a select of a concatenation as a net_lvalue, a
+  // variable_lvalue or any equivalent use, the left-hand side of an assignment
+  // among them, which is a rule about the lvalue and not about the statement
+  // holding it, so this descends every link ForEachChildStmt in
+  // elaborator_validate_internal.h names, naming none itself. It wrote out six
+  // of the thirteen, so `{a, b}[2] = 1'b1` written in a fork arm or in a
+  // randcase item elaborated clean.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForSelectOnConcatLvalue(sub); });
 }
@@ -491,9 +490,9 @@ void ElaboratorOperationRules::WalkStmtsForReplicateLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckReplicateLvalue(s->lhs);
   }
-  // §11.4.12.1 says a replication "shall not appear on the left-hand side of an
-  // assignment", a rule about the lvalue and not about the statement the
-  // assignment stands in, so this descends every link ForEachChildStmt in
+  // §11.4.12.1 keeps a replication off the left-hand side of an assignment, a
+  // rule about the lvalue and not about the statement the assignment stands in,
+  // so this descends every link ForEachChildStmt in
   // elaborator_validate_internal.h names and names none itself. It wrote out
   // six of the thirteen, so `{2{a}} = b` written in a fork arm or in an
   // assertion action block reached CheckReplicateLvalue in neither.

@@ -22,10 +22,9 @@ static bool IsGenerateConstruct(ModuleItemKind k) {
          k == ModuleItemKind::kGenerateCase;
 }
 
-// §27.6: "All unnamed generate blocks will be given the name genblk<n> where
-// <n> is the number assigned to its enclosing generate construct. If such a
-// name would conflict with an explicitly declared name, then leading zeros are
-// added in front of the number until the name does not conflict."
+// §27.6: an unnamed generate block is named genblk<n>, <n> being its enclosing
+// construct's number, with leading zeros added to the number until the name
+// clashes with no explicitly declared one.
 static std::string_view GenerateBlockName(
     int64_t n, const std::unordered_set<std::string_view>& used, Arena& arena) {
   std::string digits = std::to_string(n);
@@ -44,19 +43,17 @@ static std::string_view GenerateBlockName(
 static void NameConstructBlocks(ModuleItem* it, std::string_view name,
                                 Arena& arena);
 
-// §27.6: "Each generate construct in a given scope is assigned a number. The
-// number will be 1 for the construct that appears textually first in that
-// scope and will increase by 1 for each subsequent generate construct in that
-// scope." A construct that carries a name still takes a number, which is why
-// the standard's own example names the construct written after `begin : g1`
-// genblk4 rather than genblk3.
+// §27.6 numbers the generate constructs of a scope from 1 in textual order, one
+// more for each later construct. A construct that carries a name still takes a
+// number, which is why the standard's own example names the construct written
+// after `begin : g1` genblk4 rather than genblk3.
 //
 // The count restarts in each scope, so this recurses into the body of every
-// construct it numbers. §27.4 rules that a generate block "comprises a
-// separate scope and a new level of hierarchy when it is instantiated", and
-// §27.6 writes the first nested construct of a block named g1 as
-// top.g1[0].genblk1. Each alternative of a conditional construct is walked on
-// its own, since only one of them is ever instantiated.
+// construct it numbers. §27.4 rules that a generate block forms a scope of its
+// own and a further level of hierarchy once instantiated, and §27.6 writes the
+// first nested construct of a block named g1 as top.g1[0].genblk1. Each
+// alternative of a conditional construct is walked on its own, since only one
+// of them is ever instantiated.
 static void NameGenerateBlocksInScope(const std::vector<ModuleItem*>& items,
                                       std::unordered_set<std::string_view> used,
                                       Arena& arena) {
@@ -113,8 +110,8 @@ static void NameGenerateBlock(GenerateBlockNameSlot slot,
 static void NameConstructBlocks(ModuleItem* it, std::string_view name,
                                 Arena& arena) {
   if (!IsConditionalGenerateConstruct(it->kind)) {
-    // §27.5: direct nesting "does not apply in any way to loop generate
-    // constructs", so a loop generate block is a scope whatever it holds.
+    // §27.5: direct nesting has nothing to do with loop generate constructs, so
+    // a loop generate block is a scope whatever it holds.
     if (it->name.empty()) {
       it->name = name;
       it->name_is_generated = true;

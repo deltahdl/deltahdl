@@ -112,13 +112,12 @@ void CheckBitsCallExpr(const Expr* e, const BitsDynamicNames& names,
   for (auto* el : e->elements) CheckBitsCallExpr(el, names, diag);
 }
 
-// §20.6.2 says "It shall be an error to: -- Use the $bits system function
-// directly with a dynamically sized data type identifier. -- Use the $bits
-// system function on an object of an interface class type", and says "It shall
-// be an error to enclose a function that returns a dynamically sized data
-// type". None of the three names a position the call is allowed to stand in, so
-// every position a statement holds a statement in is one such a call may be
-// written in and the check is owed at each of them.
+// §20.6.2 makes it an error to apply $bits directly to a dynamically sized data
+// type identifier or to an object of an interface class type, and an error to
+// enclose a function returning a dynamically sized data type. None of the three
+// names a position the call is allowed to stand in, so every position a
+// statement holds a statement in is one such a call may be written in and the
+// check is owed at each of them.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -297,11 +296,11 @@ bool ExprNamesSignal(const Expr* e,
 
 using PackedDims = std::vector<std::pair<int64_t, int64_t>>;
 
-// §11.5.2: "the desired word shall first be selected by supplying an address
-// for each dimension", and only then does a range select bits of that word. The
-// addresses run through the unpacked dimensions before the packed ones, so what
-// a range has to be judged against is the count of unpacked dimensions together
-// with the packed dimensions themselves, outermost first.
+// §11.5.2: the word is selected first, with one address per dimension, and only
+// then does a range select bits of that word. The addresses run through the
+// unpacked dimensions before the packed ones, so what a range has to be judged
+// against is the count of unpacked dimensions together with the packed
+// dimensions themselves, outermost first.
 struct DeclaredShape {
   size_t unpacked_count = 0;
   PackedDims packed;
@@ -418,12 +417,12 @@ void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   for (const auto* el : e->elements) CheckPartSelectBoundsExpr(el, ctx);
 }
 
-// §11.5.1 says of a non-indexed part-select that "Both msb_expr and lsb_expr
-// shall be constant integer expressions" and that "The first expression shall
-// address a more significant bit than the second expression". It puts no
-// condition on where the select stands, and §11.5 makes a part-select an
-// operand, so every position a statement holds a statement in is one a
-// part-select may be written in and both rules are owed at each of them.
+// §11.5.1 requires of a non-indexed part-select that msb_expr and lsb_expr both
+// be constant integer expressions and that the first address a more significant
+// bit than the second. It puts no condition on where the select stands, and
+// §11.5 makes a part-select an operand, so every position a statement holds a
+// statement in is one a part-select may be written in and both rules are owed
+// at each of them.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -579,14 +578,14 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   if (!e) return false;
   // §6.20.2 rules that a value parameter's expression may hold literals, value
   // parameters or local parameters, genvars, enumerated names, or a constant
-  // function of these, that "Package references are allowed", and that
-  // "Hierarchical names are not allowed". The parser builds one kMemberAccess
-  // node for both spellings and records which was written, so which spelling it
-  // is decides this and what the name reaches does not: a dotted name is a
-  // breach whether it names another module's parameter or one of its variables,
-  // and a `::` name is not a hierarchical name at all. §26.3 gives `::` a
-  // package prefix and §8.23 a class one, and neither is the dotted path §23.6
-  // calls a hierarchical name.
+  // function of these, that package references are permitted, and that
+  // hierarchical names are not. The parser builds one kMemberAccess node for
+  // both spellings and records which was written, so which spelling it is
+  // decides this and what the name reaches does not: a dotted name is a breach
+  // whether it names another module's parameter or one of its variables, and a
+  // `::` name is not a hierarchical name at all. §26.3 gives `::` a package
+  // prefix and §8.23 a class one, and neither is the dotted path §23.6 calls a
+  // hierarchical name.
   //
   // A `::` prefix naming nothing declared is not exempted here so much as not
   // this rule's business: what is wrong with such a source is the name, which
@@ -640,20 +639,18 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
 // value may not contain a hierarchical reference, and a localparam's
 // initializer must be a constant expression in param_scope.
 //
-// §6.20.4 rules that local parameters "can be assigned constant expressions
-// (see 11.2.1)", and §11.2.1 gives the operands a constant expression consists
-// of. Neither rule mentions how the expression is written, so the check below
-// tests the expression rather than its ExprKind. The first guard below keeps
-// §6.20.3's type parameters out, which Syntax 6-6 gives their own production
-// taking a data type where a param_assignment takes a
-// constant_param_expression, so there is no value for IsConstantExpr to answer
-// about.
+// §6.20.4 lets local parameters take constant expressions (§11.2.1), and
+// §11.2.1 gives the operands a constant expression consists of. Neither rule
+// mentions how the expression is written, so the check below tests the
+// expression rather than its ExprKind. The first guard below keeps §6.20.3's
+// type parameters out, which Syntax 6-6 gives their own production taking a
+// data type where a param_assignment takes a constant_param_expression, so
+// there is no value for IsConstantExpr to answer about.
 //
 // `parameter_is_local` is for the scopes §6.20.4 lists after that rule, where
-// it says "the parameter keyword shall be a synonym for the localparam
-// keyword". A declaration in one of them is held to the constant-expression
-// rule whether it was written `parameter` or `localparam`, and only the caller
-// knows which scope the item was declared in.
+// it makes the parameter keyword mean localparam. A declaration in one of them
+// is held to the constant-expression rule whether it was written `parameter` or
+// `localparam`, and only the caller knows which scope the item was declared in.
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                            const CompilationUnit* unit, DiagEngine& diag,
                            bool parameter_is_local = false) {

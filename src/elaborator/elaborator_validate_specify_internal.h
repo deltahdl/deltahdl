@@ -26,10 +26,10 @@ using SignalSet = std::unordered_set<std::string_view>;
 SignalSet CollectSpecparams(const ModuleItem* item);
 
 // §6.20.5: every specparam a delay expression inside `block` may read. A
-// specparam "may be declared inside a specify block or in the module body", and
-// §30.5 lets a module path delay name one without saying which site it came
-// from, so both are collected: CollectSpecparams above reads the block and this
-// adds the ones `mod` declares outside every block.
+// specparam may be declared in a specify block or in the module body, and §30.5
+// lets a module path delay name one without saying which site it came from, so
+// both are collected: CollectSpecparams above reads the block and this adds the
+// ones `mod` declares outside every block.
 SignalSet CollectSpecparamsInScope(const ModuleDecl* mod,
                                    const ModuleItem* block);
 

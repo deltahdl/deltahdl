@@ -169,23 +169,22 @@ bool PortSelectsFrom(const RtlirPort& port, std::string_view name);
 // this one.
 bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name);
 
-// §27.5: "a conditional generate construct" is the if generate construct and
-// the case generate construct. Defined in elaborator_generate.cpp and shared
-// with the generate-block naming translation unit, so that the one sentence
-// deciding which constructs the direct-nesting rules reach is written once.
+// §27.5: a conditional generate construct is an if or a case generate
+// construct. Defined in elaborator_generate.cpp and shared with the
+// generate-block naming translation unit, so that the one sentence deciding
+// which constructs the direct-nesting rules reach is written once.
 bool IsConditionalGenerateConstruct(ModuleItemKind k);
 
-// §27.5: whether a generate block "consists of only one item that is itself a
-// conditional generate construct" and is "not surrounded by begin-end
-// keywords", which makes the construct within it directly nested and the block
-// no separate scope. Defined in elaborator_generate.cpp and shared with the
-// generate-block naming translation unit, which has to skip the same blocks
-// when numbering.
-// §27.6: gives every unnamed generate block of every module, interface,
-// program and checker of `unit`, and of the declarations nested in them, its
-// genblk<n> name, as Elaborator::AssignGenerateBlockNames does for one module.
-// A block already named is left as it is, so naming a scope twice changes
-// nothing. Defined in elaborator_generate_naming.cpp.
+// §27.5: whether a generate block's only item is itself a conditional generate
+// construct written without begin-end, which makes the construct within it
+// directly nested and the block no separate scope. Defined in
+// elaborator_generate.cpp and shared with the generate-block naming translation
+// unit, which has to skip the same blocks when numbering.
+// §27.6: gives every unnamed generate block of every module, interface, program
+// and checker of `unit`, and of the declarations nested in them, its genblk<n>
+// name, as Elaborator::AssignGenerateBlockNames does for one module. A block
+// already named is left as it is, so naming a scope twice changes nothing.
+// Defined in elaborator_generate_naming.cpp.
 void AssignUnitGenerateBlockNames(const CompilationUnit* unit, Arena& arena);
 
 bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
@@ -215,13 +214,13 @@ void RegisterSpecifyBlockSpecparams(
     std::unordered_set<std::string_view>& const_names);
 
 // §6.20.5: how wide a specify parameter is. A range specification gives it that
-// range; without one it "takes the range of its final value", the width of the
+// range; without one it takes the range of its final value, the width of the
 // expression that states the value; and a declaration offering neither is 32
-// bits. A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it
-// "inside a specify block or in the module body", so both declaration sites are
-// sized here rather than each keeping a rule of its own - the specify-block
-// site had none, recording every specparam 32 bits wide whatever its
-// declaration said. Defined in elaborator_items.cpp.
+// bits. A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it in a
+// specify block or in the module body, so both declaration sites are sized here
+// rather than each keeping a rule of its own - the specify-block site had none,
+// recording every specparam 32 bits wide whatever its declaration said. Defined
+// in elaborator_items.cpp.
 uint32_t SpecparamWidth(const DataType& type, const Expr* init,
                         const TypedefMap& typedefs);
 

@@ -1,8 +1,7 @@
 // §6.20: the rule that a constant never changes, enforced over every procedural
 // write that could break it.
-//
-// "Constants are named data objects that never change. SystemVerilog provides
-// three elaboration-time constants: parameter, localparam, and specparam."
+// A constant is a named data object that never changes, and parameter,
+// localparam and specparam are the three elaboration-time constants (§6.20).
 // Elaborator::const_names_ holds all three, so one walk answers for all three,
 // and the two questions asked of a statement are whether an assignment's
 // left-hand side reaches one of those names and whether a call statement writes

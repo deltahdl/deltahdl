@@ -13,12 +13,12 @@ namespace delta {
 namespace {
 
 // §28.16: a delay is a duration between two moments, taken in that order -- a
-// net delay is "the time it takes from any driver on the net changing value to
-// the time when the net value is updated and propagated further", and §28.16.2
-// gives a trireg's charge decay time as "the delay between when the drivers of
-// a trireg net turn off and when its stored charge can no longer be
-// determined". No form the clause gives a delay runs backwards, so a delay that
-// folds to a negative value is a source the standard does not describe.
+// net delay is the time from any driver of the net changing value to the net's
+// value being updated and passed on, and §28.16.2 gives a trireg's charge decay
+// time as the delay from its drivers turning off to its stored charge no longer
+// being determinable. No form the clause gives a delay runs backwards, so a
+// delay that folds to a negative value is a source the standard does not
+// describe.
 //
 // A delay that does not fold is not reported. It may name a parameter this
 // scope cannot see, and what value it will have is not this pass's to settle;
@@ -43,12 +43,12 @@ void CheckOneDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
              Subclause("28.16"));
 }
 
-// §28.16.1: a delay may be written as three expressions -- "The minimum,
-// typical, and maximum values for each delay shall be specified as expressions
-// separated by colons ... These can be any three expressions" -- and which of
-// them is the delay is settled per run rather than per source. Each is the
-// delay in some run, so each is checked; reading only the folded scalar would
-// see whichever member the active mode selects and pass the other two.
+// §28.16.1: a delay may be written as three expressions -- each delay's
+// minimum, typical and maximum values, any three expressions, separated by
+// colons -- and which of them is the delay is settled per run rather than per
+// source. Each is the delay in some run, so each is checked; reading only the
+// folded scalar would see whichever member the active mode selects and pass the
+// other two.
 void CheckDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
   if (delay == nullptr) return;
   if (delay->kind == ExprKind::kMinTypMax) {

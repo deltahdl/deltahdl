@@ -98,11 +98,11 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
   }
 }
 
-// §8.25: the objects of a parameterized class "can then be instantiated like
-// modules or interfaces, using the same parameter override rules (see 23.10)"
-// (printed page 203 of IEEE 1800-2023), and §23.10.2 gives a parameter
-// override a constant expression as its value. Reports a value argument of
-// `C#(...) c;` that is not one.
+// §8.25: the objects of a parameterized class are instantiated as modules and
+// interfaces are, by the parameter override rules of §23.10 (printed page 203
+// of IEEE 1800-2023), and §23.10.2 gives a parameter override a constant
+// expression as its value. Reports a value argument of `C#(...) c;` that is not
+// one.
 //
 // A value argument parses as an implicit-typed slot carrying the expression, so
 // `type_name` is empty and `type_ref_expr` holds it; a type argument names a
@@ -282,12 +282,12 @@ void Elaborator::TrackVarArrayInfo(
   info.unpacked_shape = UnpackedShapeOf(item->data_type, item->unpacked_dims,
                                         aggregate_typedef_names_, scope);
   out[item->name] = info;
-  // §11.5.2 resolves an address against "the address bounds given in the
-  // declaration", so both bounds of every dimension that folded are carried
-  // through as declared, in declaration order. A dimension written the other
-  // way round is a different declaration, which the smaller bound alone cannot
-  // say, and one dimension needs the record as much as two: an address is
-  // resolved the same way whatever the dimension count.
+  // §11.5.2 resolves an address against the bounds the declaration gives, so
+  // both bounds of every dimension that folded are carried through as declared,
+  // in declaration order. A dimension written the other way round is a
+  // different declaration, which the smaller bound alone cannot say, and one
+  // dimension needs the record as much as two: an address is resolved the same
+  // way whatever the dimension count.
   var.num_unpacked_dims = static_cast<uint32_t>(item->unpacked_dims.size());
   var.unpacked_dims.reserve(info.declared_dims.size());
   for (const auto& dim : info.declared_dims) {
@@ -458,10 +458,10 @@ void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
   var.is_4state = Is4stateType(item->data_type, typedefs);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
-  // §6.18: "the type of the object is the type the name stands for", so a
-  // `typedef string s_t` declares a string. The kind alone answers kNamed for
-  // such a name, and the declaration then took the 32-bit carrier and was never
-  // marked a string, so §6.16's methods and formats did not reach it.
+  // §6.18: an object declared with the name has the type the name stands for,
+  // so a `typedef string s_t` declares a string. The kind alone answers kNamed
+  // for such a name, and the declaration then took the 32-bit carrier and was
+  // never marked a string, so §6.16's methods and formats did not reach it.
   var.is_string = IsStringType(item->data_type, typedefs);
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
@@ -602,24 +602,23 @@ static bool IsPackedAggregateVar(const DataType& dtype,
 }
 
 // §6.16: a string is an ordered collection of characters, and the clause makes
-// indexing one the way a single character is reached -- "A single character of
-// a string variable may be selected for reading or writing by indexing the
-// variable." A select on a string variable is therefore that character
-// selection, not the bit-select of a scalar §11.5.1 makes illegal, even though
-// a string carries no packed dimension.
+// indexing one the way a single character is reached -- indexing a string
+// variable selects one character of it to read or write. A select on a string
+// variable is therefore that character selection, not the bit-select of a
+// scalar §11.5.1 makes illegal, even though a string carries no packed
+// dimension.
 static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
   const DataType* d = ResolveNamedType(dtype, typedefs);
   return d != nullptr && d->kind == DataTypeKind::kString;
 }
 
 // §11.5.2 states how many addresses a select written on this declaration may
-// carry: "To express bit-selects or part-selects of array elements, the desired
-// word shall first be selected by supplying an address for each dimension. Once
-// selected, bit-selects and part-selects shall be addressed in the same manner
-// as net and variable bit-selects and part-selects (see 11.5.1)." This records
-// that count, and which alternative of §11.5.1's sentence the operand one
-// address past it falls under. CheckElementSelectNode in
-// src/elaborator/elaborator_validate.cpp reads it.
+// carry: a bit-select or part-select of an array element first selects the
+// word, one address per dimension, and is then addressed as a net's or a
+// variable's select is (§11.5.1). This records that count, and which
+// alternative of §11.5.1's sentence the operand one address past it falls
+// under. CheckElementSelectNode in src/elaborator/elaborator_validate.cpp reads
+// it.
 //
 // Only a declared type whose select behaviour §11.5.1 settles gets an entry:
 // the real types, the scalar types logic, reg and bit, the integer atom types,
@@ -627,10 +626,9 @@ static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
 // keeps drawing no report rather than one naming a rule that does not cover it.
 // A named type is among them because its dimensions live in the typedef and not
 // at the declaration, so a count taken here would put the boundary too early
-// and report a legal element select. A string is another: §6.16 says "A single
-// character of a string variable may be selected for reading or writing by
-// indexing the variable", so the address after a string's own reaches a
-// character, whose own bits are selectable.
+// and report a legal element select. A string is another: §6.16 lets indexing a
+// string variable select one character of it to read or write, so the address
+// after a string's own reaches a character, whose own bits are selectable.
 void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes) {
@@ -689,12 +687,12 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   // variables are classified here, so `real arr[4];` is left out of
   // real_var_names and `arr[i]` reads an element whose type is real.
   if (item->unpacked_dims.empty()) {
-    // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
-    // or real parameter, shall be illegal." The sentence's two alternatives get
-    // one name set each, and the two sets are disjoint: a real variable is the
-    // second alternative and not the first, so it is recorded here and excluded
-    // from scalar_var_names below. Recording it as a scalar as well made one
-    // breach draw two reports. CheckRealSelect and CheckRealSelectStmt read
+    // §11.5.1: a bit-select or part-select of a scalar, a real variable or a
+    // real parameter is illegal. The sentence's two alternatives get one name
+    // set each, and the two sets are disjoint: a real variable is the second
+    // alternative and not the first, so it is recorded here and excluded from
+    // scalar_var_names below. Recording it as a scalar as well made one breach
+    // draw two reports. CheckRealSelect and CheckRealSelectStmt read
     // real_var_names and name the alternative that fits the select written.
     if (IsRealType(item->data_type.kind))
       tables.real_var_names.insert(item->name);
@@ -787,10 +785,10 @@ void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
         Subclause("23.3.2"));
     return;
   }
-  // §6.18: "The declaration of a user-defined data type shall precede any
-  // reference to its type_identifier." A type declared below this reference and
-  // a type declared nowhere at all both breach it, and the sentence draws no
-  // distinction between them: neither declaration precedes the reference.
+  // §6.18: a user-defined data type is declared before any reference to its
+  // type_identifier. A type declared below this reference and a type declared
+  // nowhere at all both breach it, and the sentence draws no distinction
+  // between them: neither declaration precedes the reference.
   diag_.Error(item->loc,
               std::format("declaration of type '{}' does not precede this "
                           "reference to it",
@@ -810,13 +808,13 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
-  // §27.4: "The genvar is used as an integer during elaboration to evaluate the
-  // generate loop and create instances of the generate block, but it does not
-  // exist at simulation time." A genvar is therefore not one of the module's
-  // variables, and elaborating it as one would put a name into the design that
-  // the clause says is not there. The loop generate construct does not read it
-  // from here -- it binds the index value per iteration into its own scope --
-  // so nothing downstream needs the declaration to survive.
+  // §27.4: the genvar serves as an integer during elaboration, to run the
+  // generate loop and create its block instances, and does not exist at
+  // simulation time. A genvar is therefore not one of the module's variables,
+  // and elaborating it as one would put a name into the design that the clause
+  // says is not there. The loop generate construct does not read it from here
+  // -- it binds the index value per iteration into its own scope -- so nothing
+  // downstream needs the declaration to survive.
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);

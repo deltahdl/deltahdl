@@ -13,7 +13,7 @@
 
 namespace delta {
 
-// §F.6.1 defines two "extended Boolean" expressions -- the sequence-instance
+// §F.6.1 defines two extended Boolean expressions -- the sequence-instance
 // methods .triggered and .matched -- whose value at a point w^j of a word is
 // fixed by the §F.5.5 tight-satisfaction-with-local-variables relation applied
 // to subwords ending (or starting) at j. Here T(V) denotes an instance of a

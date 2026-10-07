@@ -143,9 +143,8 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
 bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                                 const LocalContext& context);
 
-// §F.5.6.1: "T is said to pass on w, L_0 if w, L_0 |= T", "T is said to be
-// disabled on w, L_0 if w, L_0 |=^d T", and "T is said to fail on w, L_0 if T
-// neither passes nor is disabled on w, L_0." Pass and disabled are mutually
+// §F.5.6.1: T passes on w, L_0 when w, L_0 |= T, is disabled there when w, L_0
+// |=^d T, and fails there when it does neither. Pass and disabled are mutually
 // exclusive.
 bool PassesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                               const LocalContext& context);

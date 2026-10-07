@@ -132,11 +132,10 @@ static void CheckClassHandleBinary(
     auto rt = class_var_types.find(rhs_name);
     if (lt != class_var_types.end() && rt != class_var_types.end() &&
         !AreClassTypesComparable(lt->second, rt->second, unit)) {
-      // §11.4.5 states the compatibility rule for the comparison: "The logical
-      // equality (or case equality) operator is a legal operation if either
-      // operand is a class handle or the literal null, and one of the operands
-      // is assignment compatible with the other." §8.4 names only == and !=,
-      // while this site accepts ==, !=, ===, !==, ==? and !=?.
+      // §11.4.5 states the compatibility rule for the comparison: logical or
+      // case equality on a class handle or the literal null is legal only when
+      // one operand is assignment compatible with the other. §8.4 names only ==
+      // and !=, while this site accepts ==, !=, ===, !==, ==? and !=?.
       diag.Error(e->range.start,
                  "class handle comparison requires assignment compatible "
                  "types",
@@ -764,12 +763,12 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   // 1;` performed arithmetic on a handle where nothing looked, and a handle
   // declared in one of those seven links never entered class_var_names_ either,
   // which left every later operation on it unchecked as well.
-  // §6.21 says of a declaration in a block that "These variables are visible to
-  // the unnamed block and any nested blocks below it", so the binding a
-  // declaration makes ends where its block does. The two tables are members
-  // written straight into, and nothing unwound them at a block's end: a handle
-  // declared in one procedural block rebound its name for the rest of the
-  // module, and every later check reading the tables read the wrong class.
+  // §6.21 says of a declaration in a block that such variables are visible to
+  // the block and every block nested below it, so the binding a declaration
+  // makes ends where its block does. The two tables are members written
+  // straight into, and nothing unwound them at a block's end: a handle declared
+  // in one procedural block rebound its name for the rest of the module, and
+  // every later check reading the tables read the wrong class.
   //
   // The cost ran both ways. A handle shadowed by a narrower class lost the
   // reports its own class earns -- §8.18's local member reached from outside

@@ -106,17 +106,17 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
     if (key->text == "default") {
       has_default = true;
     } else if (IsTypeKeyword(key->text)) {
-      // §10.9.1's type key covers "each field ... whose type matches the type",
-      // so a key naming a type the element is not declared with covers nothing
-      // and cannot exempt the pattern from the count below: `logic [7:0] arr
-      // [0:2] = '{int: 8'h05};` names no element by index, carries no default
-      // and matches no element by type, which the clause's "Every element shall
-      // be covered by one of these rules" forbids and this accepted. The
-      // element type is asked rather than a subarray's, because the clause
-      // recurses "into each subarray of the array using the rules in this
-      // subclause and the type and default keys" -- a key matching the leaf
-      // type covers a multidimensional array at every level, which is what
-      // CreateMultiDimLeaf already does.
+      // §10.9.1's type key covers each field whose type matches its type, so a
+      // key naming a type the element is not declared with covers nothing and
+      // cannot exempt the pattern from the count below:
+      // `logic [7:0] arr [0:2] = '{int: 8'h05};` names no element by index,
+      // carries no default and matches no element by type, which the clause's
+      // requirement that one of these rules cover every element forbids and
+      // this accepted. The element type is asked rather than a subarray's,
+      // because the clause descends into each subarray, applying the same rules
+      // and the type and default keys -- a key matching the leaf type covers a
+      // multidimensional array at every level, which is what CreateMultiDimLeaf
+      // already does.
       has_type_key =
           has_type_key || TypeKeyMatchesKind(key->text, item->data_type.kind);
     } else if (auto identity = ArrayPatternKeyIdentity(key)) {
@@ -324,8 +324,8 @@ std::string_view ExprIdent(const Expr* e) {
 }
 
 // The data object a left-hand side or an operand ultimately names: §23.7 calls
-// `a.b[2].c` a dotted name and rules that "the first name component of a member
-// select matches a data object or interface port name", and this returns that
+// `a.b[2].c` a dotted name and rules that a member select's first name
+// component matches a data object or interface port name, and this returns that
 // first component. Each node kind is descended by the field the parser actually
 // fills: a select hangs its prefix off `base`, and a member access off `lhs` --
 // Parser::MakeMemberAccess and Parser::ParseForeachArrayId both set `lhs` and
@@ -335,8 +335,8 @@ std::string_view ExprIdent(const Expr* e) {
 //
 // Two spellings end the walk rather than being descended:
 //
-//   A scope resolution wears ExprKind::kMemberAccess too, and §23.7.1 has "a
-//   name with a package or class scope resolution prefix (::)" resolve
+//   A scope resolution wears ExprKind::kMemberAccess too, and §23.7.1 has a
+//   name with a package or class scope resolution prefix (::) resolve
 //   downwards through that prefix, which names a package or a class rather than
 //   a data object. Returning `C` for `C::x = 1` would offer every caller a name
 //   from the wrong namespace to match its variables against.
@@ -364,21 +364,21 @@ std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §6.21 (printed page 134), first sentence: "Automatic variables and elements
-// of dynamically sized array variables shall not be written with nonblocking,
-// continuous, or procedural continuous assignments." §10.4.2 (printed page 253)
-// states the nonblocking half in its own words: "It shall be illegal to make
-// nonblocking assignments to automatic variables or to elements of dynamically
-// sized array variables." Both say elements, not members. `b[2].x` nonetheless
-// falls under them, because the name is a member while the object the write
-// lands in is the element `b[2]`, and writing part of an element is writing it.
-// That gap between what the target names and what it writes is why this check
-// missed the spelling: it read the outermost node, saw a member access, and
-// never reached the element underneath. The rationale is the one the
-// unqualified case already carries -- an element's storage can move as the
-// collection is resized between the schedule and the update, and a member of
-// that element moves with it. One sentence governs all three assignment kinds,
-// so both arms below take the same lvalue reduction.
+// §6.21 (printed page 134), first sentence: no nonblocking, continuous or
+// procedural continuous assignment may write an automatic variable or an
+// element of a dynamically sized array variable. §10.4.2 (printed page 253)
+// states the nonblocking half for itself, forbidding a nonblocking assignment
+// to an automatic variable or to an element of a dynamically sized array
+// variable. Both say elements, not members. `b[2].x` nonetheless falls under
+// them, because the name is a member while the object the write lands in is the
+// element `b[2]`, and writing part of an element is writing it. That gap
+// between what the target names and what it writes is why this check missed the
+// spelling: it read the outermost node, saw a member access, and never reached
+// the element underneath. The rationale is the one the unqualified case already
+// carries -- an element's storage can move as the collection is resized between
+// the schedule and the update, and a member of that element moves with it. One
+// sentence governs all three assignment kinds, so both arms below take the same
+// lvalue reduction.
 //
 // The reach stops at `dynsized_names`, which is what keeps a member of anything
 // else legal. §6.21's second sentence bars a continuous or procedural
@@ -445,12 +445,12 @@ static void CollectLhsBaseNames(
 }
 
 // Records the variable each blocking or nonblocking assignment writes, for
-// §6.5's rule that "it shall be an error to have multiple continuous
-// assignments or a mixture of procedural and continuous assignments writing to
-// any term in the expansion of the longest static prefix of a variable", and
-// for §10.4's rule that a procedural assignment's left-hand side be a variable.
-// Both tests read sets that are complete only after every item has been walked,
-// so this only collects; Elaborator::ValidateMixedAssignments and
+// §6.5's rule making it an error for several continuous assignments, or a
+// mixture of procedural and continuous ones, to write any term of a variable's
+// longest static prefix expansion, and for §10.4's rule that a procedural
+// assignment's left-hand side be a variable. Both tests read sets that are
+// complete only after every item has been walked, so this only collects;
+// Elaborator::ValidateMixedAssignments and
 // Elaborator::ValidateProceduralNetAssign report.
 //
 // The statement position an assignment stands in decides neither rule, so this
@@ -468,15 +468,15 @@ void CollectProcTargets(const Stmt* s,
 }
 
 // Records the variable each force or release statement names, for §10.6.2's
-// rule that neither "shall be applied to a variable that is being assigned by
-// a mixture of continuous and procedural assignments". The rule reads sets that
-// are complete only after every item has been walked, so the test itself is
-// left to Elaborator::ValidateMixedAssignments and this only collects. Uses the
-// same CollectLhsBaseNames as CollectProcTargets, which descends a
-// concatenation, because §10.6.2 admits "a concatenation of these" as a force
-// target and the rule holds of each operand. Recurses through ForEachChildStmt
-// for the reason CollectProcTargets above does: where a force or release is
-// written decides nothing about the rule.
+// rule that neither may be applied to a variable assigned by a mixture of
+// continuous and procedural assignments. The rule reads sets that are complete
+// only after every item has been walked, so the test itself is left to
+// Elaborator::ValidateMixedAssignments and this only collects. Uses the same
+// CollectLhsBaseNames as CollectProcTargets, which descends a concatenation,
+// because §10.6.2 admits a concatenation of those forms as a force target and
+// the rule holds of each operand. Recurses through ForEachChildStmt for the
+// reason CollectProcTargets above does: where a force or release is written
+// decides nothing about the rule.
 void CollectForceReleaseTargets(
     const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
@@ -716,12 +716,11 @@ static SelectChain ResolveSelectChain(const Expr* e) {
 }
 
 // §11.5.1 reached through §11.5.2: report an address written one past the
-// dimensions of the declaration the chain stands on. §11.5.2 says "the desired
-// word shall first be selected by supplying an address for each dimension" and
-// that the select which follows is "addressed in the same manner as net and
-// variable bit-selects and part-selects (see 11.5.1)", so `real arr[4];
-// v = arr[i][0];` is the bit-select of a real that sentence bars, and
-// `logic [7:0] mem[4]; v = mem[i][0];` is the legal case the same sentence
+// dimensions of the declaration the chain stands on. §11.5.2 has the word
+// selected first, one address per dimension, and the select that follows
+// addressed as a net's or a variable's select is (§11.5.1), so
+// `real arr[4]; v = arr[i][0];` is the bit-select of a real that sentence bars,
+// and `logic [7:0] mem[4]; v = mem[i][0];` is the legal case the same sentence
 // exists to permit.
 static void CheckElementSelectNode(const Expr* e, const SelectShapeMap& shapes,
                                    DiagEngine& diag) {
@@ -875,11 +874,10 @@ bool ExprContainsIdent(const Expr* e, std::string_view name) {
 NettypeResolutionRule ValidateNettypeResolutionFunction(
     const NettypeResolutionSig& sig) {
   // The requirements §6.6.7 states, one test each, returned in the order the
-  // clause writes them: "shall be a function with a return type of T and a
-  // single input argument whose type is a dynamic array of elements of type T.
-  // A resolution function shall be automatic (or preserve no state
-  // information)". The first one broken is what the caller reports, so a
-  // signature breaking several names the first rather than all of them.
+  // clause writes them: a function returning T, taking one input argument that
+  // is a dynamic array of T elements, and automatic or keeping no state. The
+  // first one broken is what the caller reports, so a signature breaking
+  // several names the first rather than all of them.
   if (!sig.return_type_matches_nettype)
     return NettypeResolutionRule::kReturnType;
   if (!sig.single_input_argument) return NettypeResolutionRule::kArgumentCount;

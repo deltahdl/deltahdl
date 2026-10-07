@@ -377,8 +377,7 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
 // parameter may prefix the class scope resolution operator `::`, so a
 // kMemberAccess node whose Expr::is_scope_resolution is true is not by itself a
 // hierarchical reference. §6.20.3 draws the same distinction for a data type
-// parameter: "Package references are allowed. Hierarchical names are not
-// allowed."
+// parameter: package references are permitted and hierarchical names are not.
 // The descent into the children of a `::` node still runs, so `type(C::x.y)`
 // and any `::` node holding a `.` node below it remain errors.
 static bool IsHierarchicalMemberAccess(const Expr* e) {

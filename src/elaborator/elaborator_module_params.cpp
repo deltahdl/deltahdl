@@ -67,9 +67,9 @@ struct TypeParamValueCtx {
 // §23.10.3: a value parameter whose declared type is one of this module's type
 // parameters, and which (after the instance override or default) resolved to a
 // class type, cannot be assigned an integral constant value. §23.10.3 states
-// the rule on this very construct -- "if the type parameter T is not overridden
-// to an integral type, the evaluation of the default value for parameter p is
-// illegal" -- while §6.20.2 states only general assignment compatibility.
+// the rule on this very construct -- evaluating the default of p is illegal
+// unless T is overridden to an integral type -- while §6.20.2 states only
+// general assignment compatibility.
 static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                                           const Expr* pval,
                                           const ScopeMap& scope,
@@ -200,18 +200,16 @@ std::optional<double> RealOverrideValue(const Expr* expr,
   return ConstEvalReal(expr, scope);
 }
 
-// §6.12.1 (printed page 110): "Real numbers shall be converted to integers by
-// rounding the real number to the nearest integer, rather than by truncating
-// it", a half rounded away from zero.
+// §6.12.1 (printed page 110): a real converts to an integer by rounding to the
+// nearest integer, never by truncation, a half rounded away from zero.
 int64_t RoundRealToInteger(double value) { return std::llround(value); }
 
-// §23.10 (printed page 764): for "A value parameter with a type
-// specification ... An override value shall be converted to the type of the
-// parameter", so one declared real takes the value as a real and an integral
-// one the real rounded (resolved_value, already written); and of one declared
-// with neither, "when its value is redefined, the parameter type and range
-// take on the type and range of the new value", a real override making it
-// real and an integral one leaving it integral.
+// §23.10 (printed page 764): an override value of a value parameter with a type
+// specification converts to the parameter's type, so one declared real takes
+// the value as a real and an integral one the real rounded (resolved_value,
+// already written); and of one declared with neither, a redefined value brings
+// its own type and range to the parameter, a real override making it real and
+// an integral one leaving it integral.
 void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real) {
   bool untyped = !pd.has_decl_range && !pd.has_decl_type;
   if (real && (pd.decl_is_real || untyped)) {
@@ -457,15 +455,14 @@ static const DataType* PortTypeParamType(const ModuleDecl* decl, size_t i,
 // in `ctx.real_param_names`. Value resolution is handled separately because it
 // requires Elaborator member helpers.
 //
-// The registration is here rather than at the call site because §11.5.1 states
-// "A bit-select or part-select of a scalar, or of a real variable or real
-// parameter, shall be illegal", naming the parameter rather than the position
-// the parameter was written in. PopulateValueParamInfo in
-// src/elaborator/elaborator_items.cpp records a real parameter written in the
-// module body into the same set, and CheckRealSelectNode in
-// src/elaborator/elaborator_validate.cpp reads it for either position. A
-// localparam port is recorded on the same terms, since §6.20.2 makes it a value
-// parameter.
+// The registration is here rather than at the call site because §11.5.1 bars a
+// bit-select or part-select of a scalar, a real variable or a real parameter,
+// naming the parameter rather than the position the parameter was written in.
+// PopulateValueParamInfo in src/elaborator/elaborator_items.cpp records a real
+// parameter written in the module body into the same set, and
+// CheckRealSelectNode in src/elaborator/elaborator_validate.cpp reads it for
+// either position. A localparam port is recorded on the same terms, since
+// §6.20.2 makes it a value parameter.
 static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
                                           const ParamPortCtx& ctx,
                                           bool has_param_type) {

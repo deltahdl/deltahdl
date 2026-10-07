@@ -171,8 +171,8 @@ static void CheckChandleExpr(
 }
 
 // §6.14: whether an expression is a chandle, for the rules that permit only
-// "assignment from another chandle" and forbid assigning a chandle to a
-// variable of any other type.
+// assignment from another chandle and forbid assigning a chandle to a variable
+// of any other type.
 //
 // A chandle need not be named directly. §6.14 says chandles can be inserted
 // into associative arrays, so an element of one is a chandle too, and both
@@ -210,7 +210,8 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
     // §10.10: a concatenation assigned to a chandle array or queue is an
     // unpacked array concatenation, not a scalar chandle assignment; its
     // per-element null legality is checked in CheckNullItemInArrayConcatAssign,
-    // so the scalar "= another chandle or null" rule does not apply here.
+    // so the scalar rule admitting only another chandle or null does not apply
+    // here.
     bool unpacked_concat_target =
         s->lhs->kind == ExprKind::kIdentifier &&
         var_array_info_.count(s->lhs->text) > 0 &&
@@ -290,18 +291,18 @@ static std::string_view ReferenceRootName(const Expr* e) {
   return {};
 }
 
-// §25.9: the components of the underlying interface instance "can only be used
-// in procedural statements; they cannot be used in continuous assignments or
-// sensitivity lists". A call does not carry the read out of the assignment
-// that makes it: `assign x = f(vif.a)` evaluates f, and so reads the
-// component, on the continuous assignment's own re-evaluation and not in a
-// procedural statement, so an argument is as much a use in the assignment as
-// an operand is. Every child expression a node holds is therefore descended.
-// pattern_keys is not one: a key is as often a name in another namespace -- a
-// struct member, a type, `default` -- as an expression, and matching one
-// against a variable would report a use that is not there. inline_constraint
-// is a ClassMember rather than an expression, and its relations are solved
-// inside randomize() rather than evaluated as an operand of the assignment.
+// §25.9: the components of the underlying interface instance may be used only
+// in procedural statements, never in continuous assignments or sensitivity
+// lists. A call does not carry the read out of the assignment that makes it:
+// `assign x = f(vif.a)` evaluates f, and so reads the component, on the
+// continuous assignment's own re-evaluation and not in a procedural statement,
+// so an argument is as much a use in the assignment as an operand is. Every
+// child expression a node holds is therefore descended. pattern_keys is not
+// one: a key is as often a name in another namespace -- a struct member, a
+// type, `default` -- as an expression, and matching one against a variable
+// would report a use that is not there. inline_constraint is a ClassMember
+// rather than an expression, and its relations are solved inside randomize()
+// rather than evaluated as an operand of the assignment.
 static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
   if (!e) return false;
   if (IsVirtualInterfaceVar(e, types)) return true;
@@ -335,14 +336,14 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
 }
 
 // The three procedure kinds whose sensitivity list the elaborator infers rather
-// than reads out of the source: §9.2.2.2 gives an always_comb "an inferred
-// sensitivity list that includes the expressions defined in 9.2.2.2.1",
-// §9.2.2.3 gives always_latch the same one, and §9.2.2.2.2 has `always @*`
-// wait "until a change occurs on a signal in the inferred sensitivity list".
-// item->sensitivity is empty for all three -- an always_comb or always_latch
-// carrying an explicit event control is rejected outright, and `always @*`
-// records is_star_sensitivity with no operands -- so the loop over it above
-// answers for none of them.
+// than reads out of the source: §9.2.2.2 gives an always_comb an inferred
+// sensitivity list holding the expressions §9.2.2.2.1 defines,
+// §9.2.2.3 gives always_latch the same one, and §9.2.2.2.2 has `always @*` wait
+// for a change on a signal of its inferred sensitivity list. item->sensitivity
+// is empty for all three -- an always_comb or always_latch carrying an explicit
+// event control is rejected outright, and `always @*` records
+// is_star_sensitivity with no operands -- so the loop over it above answers for
+// none of them.
 static bool InfersItsSensitivityList(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kAlwaysCombBlock) return true;
   if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return true;
@@ -350,11 +351,11 @@ static bool InfersItsSensitivityList(const ModuleItem* item) {
          item->is_star_sensitivity;
 }
 
-// §25.9: a component of the interface a virtual interface is bound to "can only
-// be used in procedural statements; they cannot be used in continuous
-// assignments or sensitivity lists", and an inferred list is a sensitivity
-// list -- the clause draws no distinction between one the source wrote and one
-// the tool derived from what the block reads.
+// §25.9: a component of the interface a virtual interface is bound to may be
+// used only in procedural statements, never in continuous assignments or
+// sensitivity lists, and an inferred list is a sensitivity list -- the clause
+// draws no distinction between one the source wrote and one the tool derived
+// from what the block reads.
 //
 // Reported once for the procedure, at the procedure's own line, because the
 // list is the procedure's: naming every read would name one fault several
@@ -382,10 +383,10 @@ void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
   ReportVirtualInterfaceInInferredSensitivity(item);
   for (const auto& ev : item->sensitivity) {
     // §25.9 bars a component from a sensitivity list, and §9.4.2.3 puts the
-    // iff operand inside the event expression it qualifies: "The event
-    // expression only triggers if the expression after the iff is true". The
-    // event control reads that operand rather than waits on it, which is
-    // still not the use "in procedural statements" the clause allows.
+    // iff operand inside the event expression it qualifies: the event
+    // expression triggers only when the expression after iff is true. The event
+    // control reads that operand rather than waits on it, which is still not
+    // the procedural-statement use the clause allows.
     if (ExprUsesVirtualInterface(ev.signal, var_types_) ||
         ExprUsesVirtualInterface(ev.iff_condition, var_types_)) {
       diag_.Error(item->loc,

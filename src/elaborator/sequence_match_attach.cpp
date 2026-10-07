@@ -18,7 +18,7 @@ bool IsSequenceMatchItemAttachLegal(SequenceMatchClass seq_class) {
   // §16.12.22's kAdmitsOnlyEmpty is the rejected case, while the
   // nondegenerate class is allowed even though a few of its members may
   // also admit empty matches — §16.11's text scopes the prohibition to
-  // sequences that "admit an empty match" as their characterization, which
+  // sequences that admit an empty match as their characterization, which
   // §16.12.22 ties to the degenerate-only-empty class.
   return seq_class != SequenceMatchClass::kAdmitsOnlyEmpty &&
          seq_class != SequenceMatchClass::kAdmitsNoMatch;
@@ -83,7 +83,7 @@ bool AttachedSubroutineCallsExecuteInListOrder() {
 }
 
 bool IsByValueInputArgumentTypeAllowed(bool type_allowed_in_16_6) {
-  // §16.11: the gating predicate is exactly "is the type allowed in §16.6".
+  // §16.11: the gating predicate is exactly whether §16.6 allows the type.
   return type_allowed_in_16_6;
 }
 

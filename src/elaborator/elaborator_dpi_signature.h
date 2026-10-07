@@ -14,10 +14,10 @@ struct Expr;
 struct ModuleItem;
 
 // One dimension of a DPI formal argument or function result, reduced to the
-// two bounds its declaration gives it. §35.5.4 rules that the type of an
-// argument "includes dimensions and bounds of any arrays or array
-// dimensions", so a signature that recorded a dimension's presence without
-// its bounds would let `bit [7:0]` and `bit [15:0]` share one signature.
+// two bounds its declaration gives it. §35.5.4 rules that an argument's type
+// includes the dimensions and bounds of any arrays in it, so a signature that
+// recorded a dimension's presence without its bounds would let `bit [7:0]` and
+// `bit [15:0]` share one signature.
 //
 // A bound is recorded as the constant it evaluates to, which is what makes
 // [7:0] and [3+4:0] one dimension rather than two. A bound that does not fold

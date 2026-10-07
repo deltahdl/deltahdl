@@ -37,24 +37,24 @@ struct RtlirBidirSwitch {
 // terminal. A gate instance lowers to an RtlirContAssign carrying a synthesized
 // expression, and a primitive instance cannot, for two reasons. §29.3.4 defines
 // the output as a table lookup rather than an operator, and §29.5 gives a
-// sequential primitive a current state which "is considered equivalent to the
-// current output value" and which an expression has nowhere to keep. So the
-// instance carries the declaration it names, and the simulator evaluates that
-// declaration's table against the input terminals, holding one UdpEvalState per
-// instance for the length of the run.
+// sequential primitive a current state counted as equal to the current output
+// value and which an expression has nowhere to keep. So the instance carries
+// the declaration it names, and the simulator evaluates that declaration's
+// table against the input terminals, holding one UdpEvalState per instance for
+// the length of the run.
 //
 // The terminals are split the way §29.8 writes them -- "udp_instance ::= [
 // name_of_instance ] ( output_terminal , input_terminal { , input_terminal } )"
 // -- so `inputs` already stands in the order UdpEvalState indexes a table row
 // by, and nothing downstream has to work out which terminal is the output.
 //
-// Two delays and no third, because §29.8 rules that "Only two delays may be
-// specified because z is not supported for UDPs". RtlirContAssign carries a
-// third for the switches that need one.
+// Two delays and no third, because §29.8 allows two delays, since a UDP does
+// not support z. RtlirContAssign carries a third for the switches that need
+// one.
 struct RtlirUdpInst {
   const UdpDecl* decl = nullptr;
-  // §29.8: "The instance name is optional, just as for gates." Empty where the
-  // source wrote none, which is why it cannot be what identifies the instance.
+  // §29.8: the instance name is optional, as for gates. Empty where the source
+  // wrote none, which is why it cannot be what identifies the instance.
   std::string_view name;
   // Where the primitive's name stands, which is the position a report about
   // this instance carries.

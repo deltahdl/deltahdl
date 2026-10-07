@@ -16,12 +16,12 @@ struct ModuleItem;
 // What a DPI declaration's type names stand for.
 //
 // §35.5.5 and §35.5.6 judge an imported subroutine's result and formals by the
-// type behind the name rather than by the name, and §35.5.4's footnote 27 --
-// "class types cannot be passed at all" -- by whether the name is a class. The
-// parser can do neither: it holds every such type as a DataTypeKind::kNamed and
-// has no table to look one up in. So the names are resolved here, over what the
-// source around a declaration declares, and the clauses are applied to what
-// they resolve to.
+// type behind the name rather than by the name, and §35.5.4's footnote 27 -- no
+// class type may be passed at all -- by whether the name is a class. The parser
+// can do neither: it holds every such type as a DataTypeKind::kNamed and has no
+// table to look one up in. So the names are resolved here, over what the source
+// around a declaration declares, and the clauses are applied to what they
+// resolve to.
 
 // §35.5.4 footnote 27: the class names a DPI check tells apart from a name it
 // simply cannot see. An unresolved name is left alone -- it may be forward

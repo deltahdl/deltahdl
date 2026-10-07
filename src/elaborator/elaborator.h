@@ -42,10 +42,10 @@ struct Expr;
 // from, holds the Clause 11 rules on an expression.
 class Elaborator : public ElaboratorClassRules {
  public:
-  // §23.10.2: a module instance parameter value assignment "supplies values for
-  // particular instances of a module to any parameters that have been specified
-  // in the definition of that module", and this is what one override is worth
-  // between the fold that reads it and the RtlirParamDecl that receives it.
+  // §23.10.2: a module instance parameter value assignment gives particular
+  // instances values for parameters the module's definition specifies, and this
+  // is what one override is worth between the fold that reads it and the
+  // RtlirParamDecl that receives it.
   //
   // The value is carried twice because one form of it cannot express the other.
   // `value` is the §11.10 packed number, which is what every integral parameter
@@ -190,11 +190,11 @@ class Elaborator : public ElaboratorClassRules {
 
   // §6.18: reports a declaration the parser recorded as two bare identifiers
   // and a semicolon whose first name it had not yet seen declared as a type.
-  // The shape is a data declaration whose type_identifier breaches "The
-  // declaration of a user-defined data type shall precede any reference to its
-  // type_identifier" and a module instantiation missing its port connection
-  // list both, and which of the two it is turns on whether the name is a
-  // module, which the parser does not know and this does.
+  // The shape is a data declaration whose type_identifier breaches the rule
+  // that a user-defined data type be declared before any reference to it, and a
+  // module instantiation missing its port connection list both, and which of
+  // the two it is turns on whether the name is a module, which the parser does
+  // not know and this does.
   void ReportUndeclaredTypeName(const ModuleItem* item);
 
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
@@ -287,12 +287,12 @@ class Elaborator : public ElaboratorClassRules {
   // wrong width, under whichever of the two rules the instance is held to.
   // §28.3.6 rules the terminal of an instance array, whose bit-length shall be
   // either one or the instance-array length. §4.9.6 rules the output or inout
-  // terminal of a single instance, which "shall be connected directly to 1-bit
-  // nets or 1-bit structural net expressions". Both kinds of instance ask this
-  // together because §29.8 puts them under one rule: a user-defined primitive
-  // instance connects its terminals by "the terminal connection rules ...
-  // outlined in 28.3.6", the rules a gate instance connects by, and §4.9.6
-  // states its rule of "Primitive terminals, including UDP terminals".
+  // terminal of a single instance, which connects straight to 1-bit nets or
+  // 1-bit structural net expressions. Both kinds of instance ask this together
+  // because §29.8 puts them under one rule: a user-defined primitive instance
+  // connects its terminals by the terminal connection rules of §28.3.6, the
+  // rules a gate instance connects by, and §4.9.6 states its rule of primitive
+  // terminals, UDP terminals among them.
   void CheckInstanceTerminalWidths(const ModuleItem* item,
                                    const RtlirModule* mod);
 
@@ -407,10 +407,10 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                              const ScopeMap& scope);
 
-  // §27.5: one generate block of a conditional generate construct, which the
-  // construct "selects at most one of" and this elaborates. The then-branch,
-  // each case item and the final else are the same entity written three ways,
-  // and ModuleItem and GenerateCaseItem spell its name under different member
+  // §27.5: one generate block of a conditional generate construct, of which the
+  // construct selects at most one and this elaborates. The then-branch, each
+  // case item and the final else are the same entity written three ways, and
+  // ModuleItem and GenerateCaseItem spell its name under different member
   // names, so the four call sites assemble one of these rather than the node.
   //
   // `name_is_generated` says §27.6 assigned `name` rather than the source
@@ -496,10 +496,10 @@ class Elaborator : public ElaboratorClassRules {
   // Resolves a §23.6 hierarchical path, already read into steps, against the
   // instances elaborated under `root`. `writer` is the generate block instance
   // the defparam statement stands in, and the path starts there: §23.10.1
-  // rules that a defparam "in or under a generate block instance shall not
-  // change a parameter value outside that hierarchy", and a path that reaches
-  // outside is one no sequence of steps from `writer` arrives at, so the rule
-  // holds by construction rather than by a check that could be skipped.
+  // rules that a defparam in or under a generate block instance may not change
+  // a parameter outside that hierarchy, and a path that reaches outside is one
+  // no sequence of steps from `writer` arrives at, so the rule holds by
+  // construction rather than by a check that could be skipped.
   RtlirParamDecl* ResolveDefparamSteps(RtlirModule* root, const HierPath& path,
                                        const HierPath& writer,
                                        RtlirModule** out_mod = nullptr);
@@ -702,7 +702,7 @@ class Elaborator : public ElaboratorClassRules {
   // Both walk each module declaration, each package body and the
   // compilation-unit items, because A.1.11 makes a DPI import or export a
   // package_item and each of the three is one scope for the rules stated over
-  // declarations "in the same scope".
+  // declarations in one scope.
   void ValidateDpiGlobalNameSpace();
 
   void ValidateTypenameAsElabConstant(const Expr* init);

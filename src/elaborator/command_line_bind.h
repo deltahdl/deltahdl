@@ -42,11 +42,10 @@ std::vector<const ConfigDecl*> ConfigsInForce(const CompilationUnit& unit);
 // having reported.
 //
 // `config` is the configuration the command line named to be used, which
-// §33.5.4 makes one of the two things a binding tool is given: "the tool that
-// actually does the binding only needs to be given the lib.cell specification
-// for the top-level cell(s) and/or the config to be used". It is empty when
-// none was named, and a name that reaches no configuration in force is
-// reported rather than passed over.
+// §33.5.4 makes one of the two things a binding tool is given: the binding tool
+// needs only the lib.cell specification of the top-level cells, the config to
+// use, or both. It is empty when none was named, and a name that reaches no
+// configuration in force is reported rather than passed over.
 //
 // With a configuration in force the design is the one its design statement
 // names, bound under that configuration's rules. `top` is not consulted there,

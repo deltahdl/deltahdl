@@ -127,10 +127,10 @@ Expr* MakeMemberAccess(Expr* base, std::string_view member, const Expr* at,
 }
 
 // §23.6 gives `$root` as the first component of a name written from the top of
-// the instantiated design: "The instance name $root refers to the top of the
-// instantiated design and is used to unambiguously gain access to the top of
-// the design." A string literal has static storage duration, so unlike a name
-// spelled out of an instance path it needs no copy in the arena.
+// the instantiated design: the instance name $root names the top of the
+// instantiated design and reaches it unambiguously. A string literal has static
+// storage duration, so unlike a name spelled out of an instance path it needs
+// no copy in the arena.
 constexpr std::string_view kRootScope = "$root";
 
 // `signal` re-allocated as a name absolute from the top of the instantiated

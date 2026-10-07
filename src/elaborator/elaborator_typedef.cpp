@@ -300,8 +300,8 @@ void Elaborator::ValidateCuTypedefs() {
   }
 }
 
-// §6.18: "the type of the object is the type the name stands for", and §7.4.4
-// keeps a typedef's unpacked dimensions in the type rather than in the
+// §6.18: an object declared with the name has the type the name stands for, and
+// §7.4.4 keeps a typedef's unpacked dimensions in the type rather than in the
 // declaration that uses the name -- `typedef bsix mem_type [0:3]` and
 // `mem_type ba [0:7]` are the clause's own example of dimensions defined in
 // stages. So `q_t qu;` declares a queue and `arr_t a;` four elements wherever
@@ -440,11 +440,11 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   bool first_dim_assoc = IsAssocFirstDimTypedef(item, typedefs_, class_names_,
                                                 assoc_typedef_names_);
   if (!item->unpacked_dims.empty()) {
-    // §6.18: a typedef "gives a user-defined name to an existing data type",
-    // and the clause has unpacked array types among those -- it notes that a
-    // user-defined name is needed for a type parameter value "when unpacked
-    // array types are used". So the dimensions belong to the type the name
-    // stands for, and a variable declared with that name has them.
+    // §6.18: a typedef names an existing data type, and the clause has unpacked
+    // array types among those -- it notes that a user-defined name is needed
+    // for a type parameter value where unpacked array types are involved. So
+    // the dimensions belong to the type the name stands for, and a variable
+    // declared with that name has them.
     //
     // Recording them is what carries them to such a variable. A queue or
     // dynamic dimension has no fixed width, so gating on one computing left
@@ -482,7 +482,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       });
 }
 
-// §6.19: "An enumerated type declares a set of integral named constants", and
+// §6.19: an enumerated type declares a set of named integral constants, and
 // Syntax 6-5 admits the enum form wherever a data_type may appear -- the
 // clause's own example, `enum {red, yellow, green} light1, light2;`, declares
 // red, yellow and green with no typedef in sight. Emit those constants for a
@@ -584,7 +584,7 @@ static NettypeResolutionSig BuildNettypeResolutionSig(const ModuleItem* item,
   sig.return_type_matches_nettype = nettype_dt.kind != DataTypeKind::kNamed ||
                                     return_dt.kind != DataTypeKind::kNamed ||
                                     nettype_dt.type_name == return_dt.type_name;
-  // §6.6.7's parenthetical "(or preserve no state information)" makes a
+  // §6.6.7's parenthetical allowance for a function that keeps no state makes a
   // `static` lifetime alone no breach, so the lifetime keyword is not consulted
   // and this requirement is stated met.
   sig.is_automatic = true;
@@ -596,7 +596,7 @@ static NettypeResolutionSig BuildNettypeResolutionSig(const ModuleItem* item,
   sig.argument_element_type_matches = true;
   if (!sig.single_input_argument) return sig;
   const FunctionArg& arg = fn->func_args[0];
-  // §6.6.7 admits "a single input argument". Direction::kNone is the bare
+  // §6.6.7 admits exactly one input argument. Direction::kNone is the bare
   // `T driver[]` form, which §13.3 gives the default direction input.
   sig.argument_is_input =
       arg.direction == Direction::kInput || arg.direction == Direction::kNone;
@@ -648,12 +648,11 @@ static std::string NettypeResolutionRuleMessage(
 
 // §6.6.7's Syntax 6-1 writes the with clause as `with [ package_scope |
 // class_scope ] tf_identifier`, so the search for a resolution function ends in
-// one of three places, and which one it was is part of the answer: §6.6.7 rules
-// that "while a class function method may be used for a resolution function,
-// such functions shall be class static methods as the method call occurs in a
-// context where no class object is involved in the call" (printed page 98 of
-// IEEE 1800-2023), so whether the function is a class method decides
-// which requirements it is held to.
+// one of three places, and which one it was is part of the answer: §6.6.7 lets
+// a class function method serve as a resolution function only if it is static,
+// since the call happens with no class object involved (printed page 98 of IEEE
+// 1800-2023), so whether the function is a class method decides which
+// requirements it is held to.
 //
 // `scope_named_nothing` separates a qualifier that reaches neither a package
 // nor a class from one that reaches a scope declaring no such function. They

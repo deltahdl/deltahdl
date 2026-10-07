@@ -358,9 +358,9 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
 }
 
 void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
-  // §7.4.1 states this for "each packed dimension in a packed array
-  // declaration", which covers the first dimension as squarely as the fifth,
-  // so the dimension a range was written on does not change the clause. §6.9.1
+  // §7.4.1 states this for every packed dimension of a packed array
+  // declaration, which covers the first dimension as squarely as the fifth, so
+  // the dimension a range was written on does not change the clause. §6.9.1
   // states the same prohibition over a narrower subject, one range on a reg,
   // logic or bit vector, and §7.4 makes that subject a one-dimensional packed
   // array rather than a second rule. Nothing here reads the type kind or the

@@ -40,7 +40,7 @@ Word FirstLetters(const Word& word, std::size_t i);
 
 // The least index at which a letter of the word satisfies b, or word.size() if
 // no letter does. With b never satisfied this equals |w|, which is exactly the
-// "for every 0 <= i < |w|, w^i |/= b" condition the abort/disable rules use.
+// condition, for every 0 <= i < |w|, w^i |/= b, the abort/disable rules use.
 std::size_t FirstSatisfyingIndex(const Word& word, const BooleanExpr& b);
 
 // A structural bound on how far a sequence can reach into a word, mirroring the

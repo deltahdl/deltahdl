@@ -50,8 +50,8 @@ bool IsPlaSystemTask(std::string_view callee) {
   return ok_type && ok_logic && ok_format;
 }
 
-// §20.16: "the output terms shall only be variables." The output-terms argument
-// may be a single lvalue or a concatenation of them; flag every leaf whose base
+// §20.16: the output terms are variables alone. The output-terms argument may
+// be a single lvalue or a concatenation of them; flag every leaf whose base
 // identifier names a net rather than a variable.
 void CheckPlaOutputOperand(
     const Expr* e, const std::unordered_set<std::string_view>& net_names,
@@ -90,10 +90,10 @@ void CheckPlaOutputTermsExpr(
   for (auto* el : e->elements) CheckPlaOutputTermsExpr(el, net_names, diag);
 }
 
-// §20.16 states its rule over the arguments of a call -- "the input terms can
-// be nets or variables whereas the output terms shall only be variables" -- and
-// names no position the call may stand in, so every position a statement holds
-// a statement in is one this check is owed at.
+// §20.16 states its rule over the arguments of a call -- input terms may be
+// nets or variables, output terms only variables -- and names no position the
+// call may stand in, so every position a statement holds a statement in is one
+// this check is owed at.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -131,12 +131,12 @@ bool IsStringOutputTask(std::string_view callee) {
          callee == "$swriteo" || callee == "$sformat";
 }
 
-// §21.3.3: "The first argument to $swrite shall be a variable of integral,
-// unpacked array of byte, or string data types." (The same output-variable
-// rule governs $sformat's first argument.) A real-valued destination has no
-// character representation, so it is the closest illegal form of that
-// requirement and is rejected here. Other declared kinds (vectors, byte, enum,
-// string, packed structs) are left alone to avoid false positives.
+// §21.3.3: $swrite's first argument is a variable of integral type, an unpacked
+// array of byte, or a string. (The same output-variable rule governs $sformat's
+// first argument.) A real-valued destination has no character representation,
+// so it is the closest illegal form of that requirement and is rejected here.
+// Other declared kinds (vectors, byte, enum, string, packed structs) are left
+// alone to avoid false positives.
 void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
                              DiagEngine& diag) {
   if (e == nullptr || e->args.empty() || e->args[0] == nullptr) return;
@@ -167,10 +167,10 @@ void CheckStringOutputTargetsExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckStringOutputTargetsExpr(el, types, diag);
 }
 
-// §21.3.3 states its rule over the first argument of a call -- it "shall be a
-// variable of integral, unpacked array of byte, or string data types" -- and
-// names no position the call may stand in, so every position a statement holds
-// a statement in is one this check is owed at.
+// §21.3.3 states its rule over the first argument of a call -- a variable of
+// integral type, an unpacked array of byte, or a string -- and names no
+// position the call may stand in, so every position a statement holds a
+// statement in is one this check is owed at.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -359,12 +359,12 @@ struct PlaDeclRanges {
 
 using PlaRangeMap = std::unordered_map<std::string_view, PlaDeclRanges>;
 
-// §20.16.3: "PLA input terms, output terms, and memory shall be specified in
-// ascending order." A declared range is ascending when its left index is no
-// greater than its right index; flag a memory or term whose declaration runs
-// the other way. The check uses only the base identifier's declaration, so a
-// term given as a concatenation of scalars or a range that does not fold to a
-// constant is simply left unchecked.
+// §20.16.3: PLA input terms, output terms and memory are given in ascending
+// order. A declared range is ascending when its left index is no greater than
+// its right index; flag a memory or term whose declaration runs the other way.
+// The check uses only the base identifier's declaration, so a term given as a
+// concatenation of scalars or a range that does not fold to a constant is
+// simply left unchecked.
 void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
                           bool check_unpacked, const char* message,
                           DiagEngine& diag) {
@@ -432,10 +432,10 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
   for (auto* el : e->elements) CheckPlaAscendingExpr(el, ranges, diag);
 }
 
-// §20.16.3 states its rule over the memory and term arguments of a call --
-// "PLA input terms, output terms, and memory shall be specified in ascending
-// order" -- and names no position the call may stand in, so every position a
-// statement holds a statement in is one this check is owed at.
+// §20.16.3 states its rule over the memory and term arguments of a call -- PLA
+// input terms, output terms and memory are given in ascending order -- and
+// names no position the call may stand in, so every position a statement holds
+// a statement in is one this check is owed at.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,
 // once for the whole elaborator, which is why the list is not written out again
@@ -601,10 +601,9 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
     CheckArrayQueryOnVarDimExpr(el, vars, scope, diag);
 }
 
-// §20.7.1 states its rule over the arguments of a call -- "if any of the
-// functions described in 20.7 are called with arguments (v, n) ... it shall be
-// an error if the dimension indicated by n is a variable-sized dimension" --
-// and names no position the call may stand in, so every position a statement
+// §20.7.1 states its rule over the arguments of a call -- calling a §20.7
+// function with arguments (v, n) is an error when dimension n is variable-sized
+// -- and names no position the call may stand in, so every position a statement
 // holds a statement in is one this check is owed at.
 //
 // ForEachChildStmt in elaborator_validate_internal.h states those positions,

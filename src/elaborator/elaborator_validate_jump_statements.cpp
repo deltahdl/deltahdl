@@ -19,29 +19,27 @@ namespace delta {
 
 namespace {
 
-// §18.17.6 says of break and return that "these two statements can appear in
-// any code block; they differ in what they consider the scope from which to
-// exit". This is that scope, as the two clauses that give a jump statement a
-// meaning describe it: what encloses the statement being walked.
+// §18.17.6 lets break and return stand in any code block, the two differing in
+// which scope they leave. This is that scope, as the two clauses that give a
+// jump statement a meaning describe it: what encloses the statement being
+// walked.
 struct JumpScope {
-  // §12.8: "The continue and break statements can only be used in a loop."
-  // Counts the enclosing loops a jump reaches without crossing a fork-join
-  // boundary.
+  // §12.8 confines continue and break to a loop. Counts the enclosing loops a
+  // jump reaches without crossing a fork-join boundary.
   int loop_depth = 0;
-  // §12.8: "The continue and break statements cannot be used inside a
-  // fork-join block to control a loop outside the fork-join block." Counts the
-  // enclosing fork-join blocks.
+  // §12.8: a continue or break inside a fork-join block may not control a loop
+  // outside it. Counts the enclosing fork-join blocks.
   int fork_depth = 0;
-  // §12.8: "The return statement can only be used in a subroutine." True when
-  // the walk started in a function or task body.
+  // §12.8 confines return to a subroutine. True when the walk started in a
+  // function or task body.
   bool in_subroutine = false;
-  // §18.17.6: inside a randsequence production code block, break "forces a
-  // jump out of the randsequence block" and return "aborts the generation of
-  // the current production". Neither needs the enclosing loop or the enclosing
-  // subroutine §12.8 asks for, so this term is what withholds those two
-  // reports. It stays set through a fork-join written inside the code block:
-  // §12.8's fork sentence is about controlling a loop outside the fork-join
-  // block, and the randsequence block a break leaves is not a loop.
+  // §18.17.6: inside a randsequence production code block, break leaves the
+  // randsequence block and return ends the generation of the current
+  // production. Neither needs the enclosing loop or the enclosing subroutine
+  // §12.8 asks for, so this term is what withholds those two reports. It stays
+  // set through a fork-join written inside the code block: §12.8's fork
+  // sentence is about controlling a loop outside the fork-join block, and the
+  // randsequence block a break leaves is not a loop.
   bool in_production_code_block = false;
 };
 
@@ -56,12 +54,12 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag);
 //
 // A break in a production code block whose only enclosing loop stands outside
 // the randsequence block binds to the randsequence block and not to that loop.
-// §18.17.6 states without qualification that "when a break statement is
-// executed from within a production code block, it forces a jump out of the
-// randsequence block", and the "within a loop statement" sentence that defers
-// to §12.8 is about a loop the code block itself writes. Elaboration accepts
-// the source on either reading, one clause finding a production and the other
-// a loop, so what fixes the reading is this comment and
+// §18.17.6 states without qualification that a break executed in a production
+// code block leaves the randsequence block, and the sentence about a loop
+// statement that defers to §12.8 is about a loop the code block itself writes.
+// Elaboration accepts the source on either reading, one clause finding a
+// production and the other a loop, so what fixes the reading is this comment
+// and
 // JumpStatementElaboration.BreakInARandsequenceProductionCodeBlockInsideAnOuterLoopOk
 // in test/src/unit/test_elaborator_subclause_12_08.cpp; the randsequence
 // executor is where the difference is observable.
@@ -144,10 +142,9 @@ bool IsLoopStmtKind(StmtKind k) {
 // of §12.7 other than for fill it and are answered above, but
 // Parser::ParseDelayStmt, Parser::ParseCycleDelayStmt,
 // Parser::ParseEventControlStmt and Parser::ParseWaitStmt fill it too, and
-// none of those four is a loop. §12.8 says "the continue and break statements
-// can only be used in a loop" without qualifying it by what a statement is
-// waiting for, so `initial #5 break;` is a break outside a loop and is
-// reported as one.
+// none of those four is a loop. §12.8 confines continue and break to a loop
+// without qualifying it by what a statement is waiting for, so
+// `initial #5 break;` is a break outside a loop and is reported as one.
 void CheckJumpRulesChildren(const Stmt* s, const JumpScope& scope,
                             DiagEngine& diag) {
   ForEachChildStmt(s,
@@ -258,15 +255,14 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   }
   // §18.17.6 makes a return written in a randsequence production code block
   // abort the generation of the current production rather than return from the
-  // enclosing function: "the return statement aborts the generation of the
-  // current production". It is therefore not the function's return, and
-  // neither §12.8's "in a function returning a value, the return statement
-  // shall have an expression of the correct type" nor §13.4.1's "when the
-  // return statement is used, nonvoid functions shall specify an expression
-  // with the return" is about it. Stopping at the randsequence statement
-  // excludes exactly those statements: Parser::ParseRandsequenceStmt in
-  // src/parser/parser_verify.cpp fills Stmt::rs_productions and no other
-  // child-statement link, so nothing else is left unreached by stopping here.
+  // enclosing function: return ends the generation of the current production.
+  // It is therefore not the function's return, and neither §12.8's demand that
+  // a return in a value-returning function carry an expression of the right
+  // type nor §13.4.1's that a nonvoid function's return carry an expression is
+  // about it. Stopping at the randsequence statement excludes exactly those
+  // statements: Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp
+  // fills Stmt::rs_productions and no other child-statement link, so nothing
+  // else is left unreached by stopping here.
   if (s->kind == StmtKind::kRandsequence) return;
 
   // Every other link comes from ForEachChildStmt in
@@ -282,7 +278,7 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
 void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
-    // §8.7: a class constructor "has no return type", so a `return;` in one is
+    // §8.7: a class constructor has no return type, so a `return;` in one is
     // the whole of what a return there can be. It reaches this walk as an
     // ordinary kFunctionDecl whose return_type was never written, which is not
     // kVoid either, so without this a constructor's return would be reported

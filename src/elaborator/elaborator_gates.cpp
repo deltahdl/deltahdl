@@ -278,13 +278,13 @@ static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
 
 // §29.8's `udp_instance ::= [ name_of_instance ] ( output_terminal ,
 // input_terminal { , input_terminal } )` production puts the output terminal
-// first, and §29.3.1 rules that "UDPs have multiple input ports and exactly one
-// output port; bidirectional inout ports are not permitted on UDPs", so index 0
-// is the whole answer. OutputOrInoutTerminalIndices cannot answer it:
-// Parser::ParseOneUdpInstance (src/parser/parser_udp.cpp) never writes
-// ModuleItem::gate_kind, so a primitive instance carries the GateKind::kAnd its
-// declaration at src/parser/ast_module.h:302 defaults to, and the {0} that
-// enumerator's default arm returns says nothing about a primitive.
+// first, and §29.3.1 gives a UDP several input ports, exactly one output port
+// and no inout port, so index 0 is the whole answer.
+// OutputOrInoutTerminalIndices cannot answer it: Parser::ParseOneUdpInstance
+// (src/parser/parser_udp.cpp) never writes ModuleItem::gate_kind, so a
+// primitive instance carries the GateKind::kAnd its declaration at
+// src/parser/ast_module.h:302 defaults to, and the {0} that enumerator's
+// default arm returns says nothing about a primitive.
 static std::vector<size_t> UdpOutputTerminalIndices(size_t nterms) {
   return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
 }
@@ -293,10 +293,10 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
                                            DiagEngine& diag) {
-  // §4.9.6 states the rule this enforces for both kinds: "Primitive terminals,
-  // including UDP terminals, are different from module ports. Primitive output
-  // and inout terminals shall be connected directly to 1-bit nets or 1-bit
-  // structural net expressions."
+  // §4.9.6 states the rule this enforces for both kinds: primitive terminals,
+  // UDP terminals among them, are not module ports, and a primitive's output
+  // and inout terminals connect straight to 1-bit nets or 1-bit structural net
+  // expressions.
   if (!item || (item->kind != ModuleItemKind::kGateInst &&
                 item->kind != ModuleItemKind::kUdpInst)) {
     return;
@@ -305,12 +305,11 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
 
   // An instance array measures nothing here, for a primitive instance as for a
   // gate instance. §28.3.6 makes a terminal wider than one bit the distributed
-  // connection -- "each instance shall get a part-select of the port
-  // expression, of a bit length equal to the instance port bit length" -- so
-  // the single bit §4.9.6 requires is what one element connects to, and the
-  // whole terminal is not the width to measure. §29.8 rules of an array of
-  // user-defined primitive instances that "The terminal connection rules remain
-  // the same as outlined in 28.3.6", so the same reading holds for a kUdpInst
+  // connection -- each instance gets a part-select of the port expression as
+  // wide as the instance port -- so the single bit §4.9.6 requires is what one
+  // element connects to, and the whole terminal is not the width to measure.
+  // §29.8 keeps the terminal connection rules of §28.3.6 for an array of
+  // user-defined primitive instances, so the same reading holds for a kUdpInst
   // item. CheckGateInstanceArrayTerminalWidths (src/elaborator/
   // elaborator_items.cpp) is what checks these terminals instead.
   if (item->inst_range_left || item->inst_range_right) return;
@@ -326,8 +325,8 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
     if (w == 0 || w == 1) continue;
     // A primitive instance is told about its output terminal alone, because
     // §29.3.1 permits a UDP no inout terminal and exactly one output. A gate
-    // instance is told about both, because §28.3.6 puts "the output or
-    // bidirectional terminals" first together and several gate types connect a
+    // instance is told about both, because §28.3.6 puts the output and
+    // bidirectional terminals first together and several gate types connect a
     // bidirectional one.
     const char* terminal = kIsUdp ? "user-defined primitive output terminal"
                                   : "primitive output or inout terminal";
@@ -702,14 +701,14 @@ bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
     const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element) {
-  // §28.3.5: "the range ... shall define the instance array's size", so how
-  // many primitives the declaration makes is read off the range and not off the
-  // terminals. Taken from the widest terminal it was neither of those things:
-  // an array all of whose terminals were single-bit collapsed to the one
-  // instance, however many the range declared, so every instance but the first
-  // went unbuilt - and one whose terminals were wider than the range made an
-  // instance per terminal bit, building instances the source never declared and
-  // driving the bits of the connection past the array's end from them.
+  // §28.3.5: the range sets the instance array's size, so how many primitives
+  // the declaration makes is read off the range and not off the terminals.
+  // Taken from the widest terminal it was neither of those things: an array all
+  // of whose terminals were single-bit collapsed to the one instance, however
+  // many the range declared, so every instance but the first went unbuilt - and
+  // one whose terminals were wider than the range made an instance per terminal
+  // bit, building instances the source never declared and driving the bits of
+  // the connection past the array's end from them.
   // CheckGateInstanceArrayTerminalWidths (elaborator_items.cpp) reads the
   // length the same way, so the count a terminal was measured against is the
   // count of instances built.

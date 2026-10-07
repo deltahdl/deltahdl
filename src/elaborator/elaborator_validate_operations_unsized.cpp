@@ -191,13 +191,12 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   WalkExprForUnsizedInConcat(s->expr);
   WalkExprForUnsizedInConcat(s->condition);
   WalkExprForUnsizedInConcat(s->assert_expr);
-  // §11.4.12 says "Unsized constant numbers shall not be allowed in
-  // concatenations", a property of the concatenation and not of the statement
-  // holding it, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `a = {x, 1}` written in a fork arm or in an
-  // assertion action block was never looked at rather than looked at and
-  // allowed.
+  // §11.4.12 bars unsized constant numbers from a concatenation, a property of
+  // the concatenation and not of the statement holding it, so this descends
+  // every link ForEachChildStmt in elaborator_validate_internal.h names and
+  // names none itself. It wrote out six of the thirteen, so `a = {x, 1}`
+  // written in a fork arm or in an assertion action block was never looked at
+  // rather than looked at and allowed.
   //
   // §10.10 with §7.10 (printed 264 and 169): a `{...}` assigned to an array a
   // block declares is an unpacked array concatenation as one assigned to a

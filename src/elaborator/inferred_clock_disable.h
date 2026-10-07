@@ -29,9 +29,9 @@ enum class InferredFunction : uint8_t {
 InferredFunction ClassifyInferredFunction(
     std::string_view system_function_name);
 
-// §16.14.7: both inferred functions are resolved during elaboration ("the
-// following elaboration-time system functions"), not at run time. Returns true
-// for either inferred function and false for an unrelated system function.
+// §16.14.7: both inferred functions are resolved during elaboration, as the
+// elaboration-time system functions the clause lists, not at run time. Returns
+// true for either inferred function and false for an unrelated system function.
 bool IsElaborationTimeInferredFunction(InferredFunction function);
 
 // §16.14.7: the outcome of resolving $inferred_clock at its call site. The

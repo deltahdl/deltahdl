@@ -372,11 +372,10 @@ static void CheckParenOmittedCall(
   auto it = func_decls.find(s->expr->text);
   if (it == func_decls.end()) return;
   const auto* func = it->second;
-  // §35.5: "The usage of imported functions is similar as for native
-  // SystemVerilog functions", so §13.5.5 decides an imported subroutine's
-  // paren-omitted call by what §35.5.4 declared it as. A task is a task by its
-  // keyword, and a function is void by the result type §35.5.5 required it to
-  // state.
+  // §35.5: an imported function is used much as a native SystemVerilog function
+  // is, so §13.5.5 decides an imported subroutine's paren-omitted call by what
+  // §35.5.4 declared it as. A task is a task by its keyword, and a function is
+  // void by the result type §35.5.5 required it to state.
   bool is_import = func->kind == ModuleItemKind::kDpiImport;
   bool is_task = func->kind == ModuleItemKind::kTaskDecl ||
                  (is_import && func->dpi_is_task);
@@ -519,11 +518,11 @@ static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
       func_decls;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
-    // §35.5: "The usage of imported functions is similar as for native
-    // SystemVerilog functions", so the §13.5 checks over a call's actuals
-    // apply to a subroutine §35.5.4 declared as an import. Its formal list is
-    // in the same ModuleItem::func_args field, and each check below reads the
-    // declaration's kind where the rule turns on it.
+    // §35.5: an imported function is used much as a native SystemVerilog
+    // function is, so the §13.5 checks over a call's actuals apply to a
+    // subroutine §35.5.4 declared as an import. Its formal list is in the same
+    // ModuleItem::func_args field, and each check below reads the declaration's
+    // kind where the rule turns on it.
     if (item->kind == ModuleItemKind::kDpiImport) all_decls[item->name] = item;
   }
   return all_decls;

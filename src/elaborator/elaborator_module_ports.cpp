@@ -108,14 +108,13 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
 }
 
 // §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a port's
-// identifier, and its footnote 2 says which port each reading belongs to: "It
-// shall be illegal to initialize a port that is not a variable output port or
-// to specify a default value for a port that is not an input port", which A.10
-// item 2 repeats. On a variable output port the expression is the port's
-// initializer and is legal as written; on an output that is a net it is an
-// initialization of a port that is no variable, reported here; on every other
-// port it is the §23.2.2.4 default value ValidatePortDefaultValue holds to
-// the input port.
+// identifier, and its footnote 2 says which port each reading belongs to: only
+// a variable output port may be initialized and only an input port may take a
+// default value, which A.10 item 2 repeats. On a variable output port the
+// expression is the port's initializer and is legal as written; on an output
+// that is a net it is an initialization of a port that is no variable, reported
+// here; on every other port it is the §23.2.2.4 default value
+// ValidatePortDefaultValue holds to the input port.
 static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
                                    bool is_non_ansi, const TypedefMap& typedefs,
                                    DiagEngine& diag) {
@@ -318,8 +317,8 @@ static void LayOutAggregatePort(const ModuleDecl* decl, const PortDecl& port,
   rp.dtype = aggregate;
 }
 
-// §23.2.2.3: a port whose port kind was omitted is "a net of default net type"
-// for input and inout, and for output when the data type was omitted or
+// §23.2.2.3: a port whose port kind was omitted is a net of the default net
+// type for input and inout, and for output when the data type was omitted or
 // written with the implicit_data_type syntax. Such a port is a net, and §6.7.1
 // restricts what data type a net may have, so the rule that governs a net
 // declaration reaches the port spelling too. A port that is a variable is
@@ -392,10 +391,10 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.type_kind = port.data_type.kind;
   rp.width = width;
   // §23.2.2.1 (printed page 732), Example 3: `split_ports (a[7:4], a[3:0])`
-  // has "First port is upper 4 bits of 'a'. Second port is lower 4 bits of
-  // 'a'." Such a port is its select of the declared vector, four bits wide,
-  // and its connection is joined to that select (LowerPortBindings); taken as
-  // the whole of a, with no name to find storage by, it connected nothing.
+  // makes the first port a's upper four bits and the second its lower four.
+  // Such a port is its select of the declared vector, four bits wide, and its
+  // connection is joined to that select (LowerPortBindings); taken as the whole
+  // of a, with no name to find storage by, it connected nothing.
   if (!port.is_explicit_named && port.port_expr != nullptr) {
     rp.port_expr = port.port_expr;
     if (uint32_t w = SelectPortWidth(port.port_expr, scope); w > 0) {
@@ -531,7 +530,7 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
 // §6.6.8: an interconnect port is a typeless/generic net, exactly like a
 // local interconnect declaration. Register its name so the assignment- and
 // expression-use checks -- which reject procedural/continuous/expression uses
-// of an interconnect "net or port" -- also fire for the port inside its own
+// of an interconnect net or port -- also fire for the port inside its own
 // module. A non-ANSI interconnect port already registers via its body net
 // declaration; this covers the ANSI `interconnect p` header form.
 //

@@ -47,10 +47,10 @@ bool IsBuiltinTypeKeyword(std::string_view name) {
 //     `q.sum(x) with (x * 10)` the iterator name `x` through that argument, and
 //     §7.12.4 lets a second argument rename the index method, so both are
 //     declared at the call rather than read from the module.
-//   - randomize(). §18.11 rules that the arguments "designate the complete set
-//     of random variables" of the calling object, so each names a property of
-//     the object's class. Recognized in both the bare and the method-call form,
-//     as Parser::CheckRandomizeArgList recognizes it.
+//   - randomize(). §18.11 makes the arguments the whole set of random variables
+//     of the calling object, so each names a property of the object's class.
+//     Recognized in both the bare and the method-call form, as
+//     Parser::CheckRandomizeArgList recognizes it.
 bool CallArgsNameNoValue(const Expr* e) {
   if (e->kind != ExprKind::kCall) return false;
   if (e->with_expr != nullptr) return true;
@@ -60,20 +60,19 @@ bool CallArgsNameNoValue(const Expr* e) {
 }
 
 // §18.17.7: a production yields a readable value only where it declares a
-// non-void return type. A production written with no return type "shall assume
-// a void return type", so it declares no implicit variable at all and a read of
-// its name resolves against nothing.
+// non-void return type. A production written with no return type takes void as
+// its return type, so it declares no implicit variable at all and a read of its
+// name resolves against nothing.
 bool ProductionDeclaresReturnValue(const RsProduction& production) {
   return production.has_return_type &&
          production.return_type.kind != DataTypeKind::kVoid;
 }
 
 // §18.17.7: the names a randsequence statement declares for its own code blocks
-// to read. "Within a rule, a variable is implicitly declared for each
-// production (of the rule) that returns a value", carrying that production's
-// name; and "a production creates a scope, which encompasses all its rules and
-// code blocks", which is what makes a production's formal arguments readable
-// throughout it.
+// to read. A rule implicitly declares a variable for each of its productions
+// that returns a value, carrying that production's name; and a production opens
+// a scope covering all its rules and code blocks, which is what makes a
+// production's formal arguments readable throughout it.
 //
 // Collected flat over the whole statement, as every other name here is. The
 // clause scopes an implicit variable to the rules that name its production --
@@ -287,9 +286,9 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
 // left out:
 //
 //   - the callee of a call, which Parser::ParseCallExpr writes into lhs. §23.9
-//     rules that the search for "a task, function, named block, or generate
-//     block ... continues to search higher level modules until found", so a
-//     callee is not held to the module boundary a variable read is held to.
+//     has the search for a task, function, named block or generate block go
+//     on into higher-level modules until it succeeds, so a callee is not held
+//     to the module boundary a variable read is held to.
 //   - the slice size or type of a §11.4.14.2 streaming concatenation, which
 //     Parser::ParseStreamingConcat writes into lhs. `{<< 8 {a}}` puts the 8
 //     there as an identifier node, and it names a width rather than a value.
@@ -528,15 +527,14 @@ static void CollectLocalNames(const Stmt* s,
   }
   CollectRandsequenceDeclaredNames(s, names);
   CollectBlockEnumMemberNames(s, names);
-  // §6.5 rules that "Data shall be declared before they are used, apart from
-  // implicit nets", and puts no condition on the statement the declaration
-  // stands in, so every position a statement holds a statement in is a
-  // position this collection reaches. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here. The
-  // visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which is how
-  // ForEachChildStmt lets a walk that only reads the tree share its list with
-  // the walks that rewrite it.
+  // §6.5 rules that data is declared before it is used, implicit nets aside,
+  // and puts no condition on the statement the declaration stands in, so every
+  // position a statement holds a statement in is a position this collection
+  // reaches. ForEachChildStmt in elaborator_validate_internal.h states those
+  // positions once for the whole elaborator, which is why the list is not
+  // written out again here. The visitor takes `Stmt* const&` because `s` is a
+  // `const Stmt*`, which is how ForEachChildStmt lets a walk that only reads
+  // the tree share its list with the walks that rewrite it.
   //
   // The list written out here before was nine of the thirteen links, missing
   // Stmt::assert_pass_stmt, Stmt::assert_fail_stmt, the body of a randcase
@@ -619,12 +617,11 @@ static void CollectProcRhsIdentsIn(
   }
   // §6.5's declared-before-use rule is broken by the assignment wherever the
   // assignment stands, and §26.3 makes an identifier a package supplies
-  // visible "within the current scope without a package name qualifier"
-  // wherever the read of it stands, so every position a statement holds a
-  // statement in is a position one of these reads is written in.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator, which is why the list is not written out
-  // again here.
+  // visible in the current scope with no package name qualifier wherever the
+  // read of it stands, so every position a statement holds a statement in is a
+  // position one of these reads is written in. ForEachChildStmt in
+  // elaborator_validate_internal.h states those positions once for the whole
+  // elaborator, which is why the list is not written out again here.
   //
   // The list written out here before was the same nine links
   // CollectProcLocalNames above wrote out, missing the same four. That

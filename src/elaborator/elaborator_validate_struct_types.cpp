@@ -352,10 +352,10 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 }
 
 // Whether `cls` declares anything at all under `name`. §8.23 puts a nested
-// class declaration and a typedef in one list -- "the class scope resolution
-// operator applies to all static elements of a class: static class properties,
+// class declaration and a typedef in one list -- the class scope resolution
+// operator reaches every static element of a class, its static properties,
 // static methods, typedefs, enumerations, parameters, local parameters,
-// constraints, structures, unions, and nested class declarations" -- so a name
+// constraints, structures, unions and nested class declarations -- so a name
 // this tool does not resolve to a type is still a name the class declared, and
 // `StringList::Node n;` is the case that is.
 static bool ClassDeclaresMember(const ClassDecl* cls, std::string_view name) {
@@ -386,16 +386,15 @@ void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
 // What each parameter of `cls` stands for in the specialization `args` writes,
 // keyed by the parameter's own name.
 //
-// §23.10.2.2 (printed page 767) states that "parameter assignment by name
-// consists of explicitly linking the parameter name and its new value", so a
-// written name selects the formal whatever position the argument holds, and an
-// argument written without one takes the position it holds. The same subclause
-// states that "it is not necessary to assign values to all of the parameters
-// ... Only parameters that are assigned new values need to be specified", so a
+// §23.10.2.2 (printed page 767) makes a parameter assignment by name an
+// explicit pairing of the parameter's name with its new value, so a written
+// name selects the formal whatever position the argument holds, and an argument
+// written without one takes the position it holds. The same subclause requires
+// only the parameters given new values to be named, not all of them, so a
 // formal the list does not mention keeps the default its declaration gave,
 // which ClassDecl::param_types records. §8.25 (printed page 204) instantiates a
-// specialization "using the same parameter override rules (see 23.10)", which
-// is what brings all three to bear on a specialization.
+// specialization by the parameter override rules of §23.10, which is what
+// brings all three to bear on a specialization.
 //
 // A formal declared with no default has a kImplicit entry in param_types and is
 // left out, so a member reaching it fails to resolve rather than resolving to a
@@ -422,15 +421,14 @@ BuildSpecializationSubst(const ClassDecl* cls,
 // Reports a named argument of a specialization carrying a name the class does
 // not declare, and one assigning a name a second argument already assigned.
 //
-// §23.10.2.2 (printed page 767) states that "the name of the parameter shall be
-// the name specified in the instantiated module", and that "once a parameter is
-// assigned a value, there shall not be another assignment to this parameter
-// name". §8.25 (printed page 204) instantiates a specialization "using the same
-// parameter override rules (see 23.10)". Neither report changes what
-// BuildSpecializationSubst goes on to substitute: an unrecognized name binds no
-// parameter, so the one it was written for keeps its declared default, and a
-// repeated name leaves the last argument standing. Both of those are types
-// nobody wrote, which is what the reports stand in place of.
+// §23.10.2.2 (printed page 767) requires the parameter name to be the one the
+// instantiated module specifies, and forbids a second assignment to a parameter
+// name once it has a value. §8.25 (printed page 204) instantiates a
+// specialization by the parameter override rules of §23.10. Neither report
+// changes what BuildSpecializationSubst goes on to substitute: an unrecognized
+// name binds no parameter, so the one it was written for keeps its declared
+// default, and a repeated name leaves the last argument standing. Both of those
+// are types nobody wrote, which is what the reports stand in place of.
 //
 // ResolveNamedInstParams in src/elaborator/elaborator_module_inst.cpp makes
 // the first of these reports for a module instance, and the wording here
@@ -641,10 +639,10 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
 void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (dtype.is_tagged) return;
-  // §7.3.2 carries the obligation this enforces: "Dynamic types and chandle
-  // types shall not be used in untagged unions, but may be used in tagged
-  // unions." §7.3 states the same fact as descriptive prose and states no
-  // obligation, so the report names the subclause that does.
+  // §7.3.2 carries the obligation this enforces: dynamic and chandle types are
+  // allowed in tagged unions and forbidden in untagged ones. §7.3 states the
+  // same fact as descriptive prose and states no obligation, so the report
+  // names the subclause that does.
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kChandle) {
       diag_.Error(loc, "chandle type can only be used in tagged unions",

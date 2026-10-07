@@ -1,10 +1,10 @@
 // §18.17 "Random sequence generation—randsequence" — resolving the production
-// identifiers a randsequence statement writes. The clause makes that a
-// question about the statement alone: "The randsequence statement creates an
-// automatic scope. All production identifiers are local to the scope." So the
-// set a production identifier resolves against is exactly the statement's own
-// rs_productions, nothing an enclosing scope declares can answer one, and a
-// name outside that set names no production at all.
+// identifiers a randsequence statement writes. The clause makes that a question
+// about the statement alone: a randsequence statement opens an automatic scope
+// to which all its production identifiers are local. So the set a production
+// identifier resolves against is exactly the statement's own rs_productions,
+// nothing an enclosing scope declares can answer one, and a name outside that
+// set names no production at all.
 //
 // A translation unit of its own rather than an addition to
 // elaborator_validate_jump_statements.cpp, which keeps §12.8's rules for break,
@@ -73,10 +73,9 @@ void CheckProductionItem(const RsProductionItem& item, const NameSet& declared,
 // Resolves every production identifier one randsequence statement writes.
 void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
   NameSet declared = DeclaredProductions(s);
-  // §18.17: the keyword "can be followed by an optional production name
-  // (inside the parentheses) that designates the name of the top-level
-  // production. If unspecified, the first production becomes the top-level
-  // production." Writing no name is that second case and names nothing, so
+  // §18.17: the keyword may take an optional production name in its parentheses
+  // naming the top-level production, and with none the first production is the
+  // top-level one. Writing no name is that second case and names nothing, so
   // only a name that was written has a production to name.
   if (!s->rs_top_production.empty() &&
       declared.count(s->rs_top_production) == 0) {

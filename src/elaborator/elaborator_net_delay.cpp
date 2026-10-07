@@ -42,16 +42,15 @@ static const RtlirNet* FindDelayedNetDriven(
     const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
   std::string_view base = LhsSignalName(lhs);
   if (base.empty()) return nullptr;
-  // §23.9: "If it is declared locally, then the local item shall be used; if
-  // not, the search shall continue upward until an item by that name is found
-  // or until a module, interface, program, or checker boundary is encountered."
-  // A net declared inside a generate block is named under the block's path by
-  // Elaborator::ScopedName while a driver keeps the bare name the source wrote,
-  // so the two are compared the way SimContext::FindInGenerateBlock compares
-  // them at run time: the driver's own blocks innermost first, then the
-  // enclosing scope. Matching the bare name alone reached a net declared in a
-  // block through nothing, and gave a driver inside a block the delay of a
-  // module-level net of the same name.
+  // §23.9: an item declared locally is the one used, and otherwise the search
+  // climbs until it finds an item of that name or meets a module, interface,
+  // program or checker boundary. A net declared inside a generate block is
+  // named under the block's path by Elaborator::ScopedName while a driver keeps
+  // the bare name the source wrote, so the two are compared the way
+  // SimContext::FindInGenerateBlock compares them at run time: the driver's own
+  // blocks innermost first, then the enclosing scope. Matching the bare name
+  // alone reached a net declared in a block through nothing, and gave a driver
+  // inside a block the delay of a module-level net of the same name.
   for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
     std::string scoped = std::string(*it) + std::string(base);
     auto found = delayed.find(scoped);
@@ -79,10 +78,9 @@ static Expr* MakeBinaryExpr(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return bin;
 }
 
-// §28.16: "The delay when the signal changes to high impedance or to unknown
-// shall be the lesser of the two delay values." No Expr spells a minimum, so it
-// is written as the conditional that computes one, which is what the clause
-// says in the vocabulary the tree has.
+// §28.16: a change to z or to x takes the smaller of the two delays. No Expr
+// spells a minimum, so it is written as the conditional that computes one,
+// which is what the clause states in the vocabulary the tree has.
 static Expr* MakeLesserOf(Arena& arena, Expr* a, Expr* b) {
   auto* cond = MakeBinaryExpr(arena, TokenKind::kLt, a, b);
   auto* tern = arena.Create<Expr>();
@@ -93,13 +91,10 @@ static Expr* MakeLesserOf(Arena& arena, Expr* a, Expr* b) {
   return tern;
 }
 
-// §28.16's defaults written out. "For both gates and nets, the default delay
-// shall be zero when no delay specification is given. When one delay value is
-// given, then this value shall be used for all propagation delays associated
-// with the gate or the net. When two delays are given, the first delay shall
-// specify the rise delay, and the second delay shall specify the fall delay.
-// The delay when the signal changes to high impedance or to unknown shall be
-// the lesser of the two delay values."
+// §28.16's defaults written out. For gates and nets alike, no delay
+// specification means a delay of zero; one value serves every propagation
+// delay of the gate or net; with two, the first is the rise delay and the
+// second the fall delay, and a change to z or to x takes the smaller of them.
 //
 // A specification is expanded before it is added to another, because the slots
 // a source left unwritten are not zero: a `#2` against a `#(5,7)` has a fall
@@ -121,13 +116,13 @@ static DelayTriple ExpandDelaySpec(Arena& arena, Expr* rise, Expr* fall,
 }
 
 // §10.3.3: a net delay is added to the delay of the drivers on the net. The
-// clause states it as the exception a declaration assignment is: "the delay is
-// part of the continuous assignment and is not a net delay. Thus, it shall not
-// be added to the delay of other drivers on the net" -- a "thus" that follows
-// only where a delay that is a net delay is added to them. §28.16 gives the two
-// consecutive segments of one path, the driver's from its inputs to its output
-// and the net's from that output changing to the net updating, so the time from
-// one to the other is their sum.
+// clause states it as the exception a declaration assignment is: its delay
+// belongs to the continuous assignment rather than being a net delay, and so is
+// not added to the delay of the net's other drivers -- a conclusion that
+// follows only where a delay that is a net delay is added to them. §28.16 gives
+// the two consecutive segments of one path, the driver's from its inputs to its
+// output and the net's from that output changing to the net updating, so the
+// time from one to the other is their sum.
 static void AddNetDelayToDriverDelay(Arena& arena, RtlirContAssign& ca,
                                      const RtlirNet& net) {
   DelayTriple driver =
@@ -144,17 +139,17 @@ static void AddNetDelayToDriverDelay(Arena& arena, RtlirContAssign& ca,
 }
 
 // §29.2 makes a primitive instance's output terminal a driver on the net
-// connected to it, and §28.16 gives a net delay to "any driver on the net", so
+// connected to it, and §28.16 gives a net delay to every driver on the net, so
 // an instance drives its net through the same two segments a gate or a
 // continuous assignment does. A gate reaches the walk above because
 // elaborator_gates.cpp lowers it to an RtlirContAssign; §29.8's instances stand
 // in RtlirModule::udp_insts instead and reached it through nothing, so the same
 // net was delayed for one driver and not for the other.
 //
-// §29.8 gives an instance two delay slots and no third -- "Only two delays may
-// be specified because z is not supported for UDPs" -- so the sum is written
-// into those two and the net's turn-off delay has nowhere to go, which is right
-// for a driver that never goes to z.
+// §29.8 gives an instance two delay slots and no third -- a UDP does not
+// support z, so it takes two delays -- so the sum is written into those two and
+// the net's turn-off delay has nowhere to go, which is right for a driver that
+// never goes to z.
 static void ApplyNetDelaysToUdpInstances(
     Arena& arena, RtlirModule* mod,
     const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {

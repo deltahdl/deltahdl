@@ -25,9 +25,9 @@ namespace delta {
 
 // Reads `expr` into the steps of §23.6's Syntax 23-7, folding each instance
 // select against `scope`. Returns false when the expression is not a path at
-// all, or when a select does not fold: §23.6 rules that the select "shall
-// evaluate to one of the legal index values of the array", so one that does not
-// names no instance and the caller reports the path as reaching nothing.
+// all, or when a select does not fold: §23.6 requires the select to evaluate to
+// a legal index of the array, so one that does not names no instance and the
+// caller reports the path as reaching nothing.
 //
 // The select is folded here rather than at the point of comparison because a
 // defparam standing in a loop generate block may write its own genvar --
@@ -137,12 +137,12 @@ struct PathDescent {
 // elaborated.
 //
 // A step names a generate block instance or a module instance, and §23.6 makes
-// it exactly one of the two: "each node in the hierarchical name tree shall be
-// a separate scope with respect to identifiers", and a module holds its blocks
-// and its instances in one scope, so no step can name both. Reading a step as
-// an instance first is therefore a decision rather than a guess, and a step
-// that names no instance is a block: it is remembered and the instance it
-// qualifies is looked for one step further on.
+// it exactly one of the two: each node of the hierarchical name tree is a scope
+// of its own for identifiers, and a module holds its blocks and its instances
+// in one scope, so no step can name both. Reading a step as an instance first
+// is therefore a decision rather than a guess, and a step that names no
+// instance is a block: it is remembered and the instance it qualifies is looked
+// for one step further on.
 //
 // A step carrying an instance select is never read as an instance. §23.6 admits
 // one over an instance array as well as over a loop generate block, but nothing
@@ -218,16 +218,16 @@ static bool EscapesWriterBlock(const DefparamWriterBlocks& blocks,
 }
 
 // §23.8: a hierarchical name whose leading step names no scope of the module
-// writing it is resolved upward, "until the name is found or the root of the
-// hierarchy is reached", and the root is a top-level module: a leading step
+// writing it is resolved upward until the name is found or the root of the
+// hierarchy is reached, and the root is a top-level module: a leading step
 // naming one roots the remaining steps there, which is how §23.10.4.2's own
-// example, `defparam m.n.p = 1;` written in the m1 that m instantiates,
-// reaches m's instance n, and how a defparam Annex C.4.1 has "in a separate
-// file from the instance to be modified" names that instance from a top-level
-// module of its own. The writer's generate block path is the writer's and
-// does not carry into the top the name starts over from. Answers the parameter
-// the name reaches through a top-level module, or null where its leading step
-// names none or the steps behind that step reach none.
+// example, `defparam m.n.p = 1;` written in the m1 that m instantiates, reaches
+// m's instance n, and how a defparam Annex C.4.1 places in a file apart from
+// the instance it modifies names that instance from a top-level module of its
+// own. The writer's generate block path is the writer's and does not carry into
+// the top the name starts over from. Answers the parameter the name reaches
+// through a top-level module, or null where its leading step names none or the
+// steps behind that step reach none.
 //
 // `rooted.root` is read first as the writing module, which both callers put
 // there, and null where the caller asks with no writer: §23.10.1 (printed
@@ -625,12 +625,12 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     DefparamTopRooted rooted{mod, path, mod};
     auto* param =
         ResolveDefparamSteps(mod, path, site.path, &rooted.target_mod);
-    // §23.10.1: a defparam in a generate block "shall not change a parameter
-    // value outside that hierarchy", and a name starting over from a
-    // top-level module leaves the block, so the upward reading is the
-    // module-level statement's alone, and it is confined to the block the
-    // module's own instance stands under (`rooted.root` names the writer);
-    // ReportUnresolvedDefparamSite reports both.
+    // §23.10.1: a defparam in a generate block may not change a parameter
+    // outside that hierarchy, and a name starting over from a top-level module
+    // leaves the block, so the upward reading is the module-level statement's
+    // alone, and it is confined to the block the module's own instance stands
+    // under (`rooted.root` names the writer); ReportUnresolvedDefparamSite
+    // reports both.
     if (param == nullptr && site.path.empty()) {
       param = ResolveDefparamFromTop(path, rooted);
     }
@@ -792,8 +792,8 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
 // Reports every assignment of one defparam statement that was never applied.
 // §23.10.1 gives two reasons for that and they are different diagnoses. A
 // statement inside a generate block whose target exists but lies outside the
-// block breaks the clause's rule that such a statement "shall not change a
-// parameter value outside that hierarchy", and is an error. Anything else named
+// block breaks the clause's rule that such a statement may not change a
+// parameter outside that hierarchy, and is an error. Anything else named
 // nothing at all, and stays the warning it was.
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                                               const DefparamSite& site,

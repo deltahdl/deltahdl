@@ -89,10 +89,10 @@ static void CheckMemberAccessVisibility(
   if (!cls) return;
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
-    // §8.5 states this rule and gives this construct as its example:
-    // "Accessing data types using a class handle is not allowed." §8.23
-    // defines the `::` operator, which is the legal alternative rather than
-    // the rule being broken.
+    // §8.5 states this rule and gives this construct as its example: no data
+    // type may be reached through a class handle. §8.23 defines the `::`
+    // operator, which is the legal alternative rather than the rule being
+    // broken.
     diag.Error(e->rhs->range.start,
                "cannot access type parameter via class handle",
                Subclause("8.5"));
@@ -142,10 +142,9 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
                                             const CompilationUnit* unit,
                                             DiagEngine& diag) {
   if (!arg || arg->kind != ExprKind::kIdentifier) return;
-  // §18.11 states this rule: "The random mode of local class members can only
-  // be changed when the call to randomize() has access to those properties,
-  // that is, within the scope of the class in which the local members are
-  // declared." §8.18 states the general rule that a local or protected member
+  // §18.11 states this rule: the random mode of a local class member changes
+  // only where the randomize() call can reach the member, inside the class that
+  // declares it. §8.18 states the general rule that a local or protected member
   // is unreachable from outside, which CheckMemberAccessVisibility enforces.
   // What is rejected here is a change of random mode rather than a read.
   const auto* m = FindMemberInClass(cls, arg->text, unit);
@@ -670,14 +669,14 @@ void ElaboratorClassRules::ValidateForwardClassTypedefs() {
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
                               item->name),
-                  // §6.18 is the rule: "The actual data type definition of a
-                  // forward typedef declaration shall be resolved within the
-                  // same local scope or generate block." §8.27 restates it for
-                  // a forward class declaration and says so, opening "As with
-                  // other forward typedefs as described in 6.18". This loop
-                  // selects every forward form Parser::ParseTypedef leaves
-                  // implicit, a forward struct and a bare typedef included, so
-                  // §6.18 is the only clause covering what it reports.
+                  // §6.18 is the rule: a forward typedef's actual data type
+                  // definition is resolved within the same local scope or
+                  // generate block. §8.27 restates it for a forward class
+                  // declaration and says so, opening with a pointer to the
+                  // forward typedefs of §6.18. This loop selects every forward
+                  // form Parser::ParseTypedef leaves implicit, a forward struct
+                  // and a bare typedef included, so §6.18 is the only clause
+                  // covering what it reports.
                   Subclause("6.18"));
     }
   }

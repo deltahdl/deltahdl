@@ -336,8 +336,8 @@ bool SequenceOperandSatisfiesNondegeneracyRequirement(const SequenceExpr& seq) {
   // without local variables) and §F.5.5 (the definitions with local variables)
   // for these terms. When the operand carries a local variable, §F.5.2 cannot
   // evaluate it, so the §F.5.5 definitions -- which generalize §F.5.2 -- apply:
-  // nondegeneracy is IsNondegenerateSequenceWithLocals, and "tightly satisfied
-  // by the empty word" is the empty word yielding some output context from the
+  // nondegeneracy is IsNondegenerateSequenceWithLocals, and tight satisfaction
+  // by the empty word is the empty word yielding some output context from the
   // empty input context.
   if (SequenceUsesLocalVariables(seq)) {
     const bool kEmptyWordMatches =

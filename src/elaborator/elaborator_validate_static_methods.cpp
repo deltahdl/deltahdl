@@ -59,12 +59,13 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   return false;
 }
 
-// §8.10 makes an access "to the special this handle within the body of a static
-// method" illegal and names no statement of that body where the handle is
+// §8.10 makes an access to the special this handle inside a static method's
+// body illegal and names no statement of that body where the handle is
 // permitted, so this descends every link ForEachChildStmt in
 // elaborator_validate_internal.h names and names no link itself. It wrote out
-// six of the thirteen, so `fork this.x = 1; join` and `assert (1) else this.x =
-// 1;` in a static method each named `this` where nothing looked.
+// six of the thirteen, so `fork this.x = 1; join` and
+// `assert (1) else this.x = 1;` in a static method each named `this` where
+// nothing looked.
 //
 // That is the list StmtRefsNonStaticMember below already reads, and the two
 // halves of §8.10's one sentence -- the non-static member and the `this` handle
@@ -106,13 +107,12 @@ static void CollectForHeaderNames(const Stmt* s,
 }
 
 // The names `s` brings into scope for its own expressions and its child
-// statements. §6.21 says of a declaration in a block that "These variables are
-// visible to the unnamed block and any nested blocks below it", so a
-// declaration reaches this from one level down and no further: an immediate
-// child that is a declaration, whatever the for header declares, and a
-// foreach's index variables. A declaration deeper than that belongs to a scope
-// `s` is outside of, and StmtRefsNonStaticMember collects it when it gets
-// there.
+// statements. §6.21 says of a declaration in a block that such variables are
+// visible to the block and every block nested below it, so a declaration
+// reaches this from one level down and no further: an immediate child that is a
+// declaration, whatever the for header declares, and a foreach's index
+// variables. A declaration deeper than that belongs to a scope `s` is outside
+// of, and StmtRefsNonStaticMember collects it when it gets there.
 //
 // Stmt::for_steps holds no name to collect: A.6.8 admits in it an
 // operator_assignment, an inc_or_dec_expression or a call and nothing else.
@@ -139,8 +139,8 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
 }
 
 // Whether `e` or any expression nested inside it names one of `non_static`,
-// discounting the names `locals` holds. §8.10 makes the access illegal "within
-// the body of a static method" and names no position in that body where it is
+// discounting the names `locals` holds. §8.10 makes the access illegal inside a
+// static method's body and names no position in that body where it is
 // permitted, so this reaches every child link AnyExprChild in
 // elaborator_validate_internal.h names.
 //
@@ -227,10 +227,10 @@ static bool StmtRefsNonStaticMember(
   const std::unordered_set<std::string_view>& scope =
       declared.empty() ? locals : widened;
 
-  // §8.10 makes the access illegal "within the body of a static method" and
-  // names no position in that body where it is permitted, so this search reads
-  // every expression position ForEachChildExpr names and descends every
-  // statement ForEachChildStmt names, both in elaborator_validate_internal.h.
+  // §8.10 makes the access illegal inside a static method's body and names no
+  // position in that body where it is permitted, so this search reads every
+  // expression position ForEachChildExpr names and descends every statement
+  // ForEachChildStmt names, both in elaborator_validate_internal.h.
   //
   // This read Stmt::lhs, Stmt::rhs, Stmt::expr and Stmt::condition and no other
   // expression position, and the twelve it left out are positions a property
@@ -256,11 +256,11 @@ static bool StmtRefsNonStaticMember(
   return found;
 }
 
-// §8.10: "Access to non-static members or to the special this handle within
-// the body of a static method is illegal and results in a compiler error."
-// Reports the first offending statement in each static method body. §8.11
-// states the separate rule about where the 'this' keyword may be used at all,
-// which Elaborator::ValidateThisInItem reports below.
+// §8.10 makes an access to a non-static member, or to the special this handle,
+// inside a static method's body an illegal compile-time error. Reports the
+// first offending statement in each static method body. §8.11 states the
+// separate rule about where the 'this' keyword may be used at all, which
+// Elaborator::ValidateThisInItem reports below.
 static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
                                            DiagEngine& diag) {
   for (const auto* m : cls->members) {
@@ -456,8 +456,8 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
 
 // §8.24 (printed page 202): the body `function C::f(...)` defines the method
 // `C` declares `extern`, and §8.10 (printed pages 186-187) holds over it as
-// over a body written in the class: "Access ... to the special this handle
-// within the body of a static method is illegal".
+// over a body written in the class: access to the special this handle inside a
+// static method's body is illegal.
 void CheckStaticOutOfBlockBodyThis(const ModuleItem* item, const ClassDecl* cls,
                                    DiagEngine& diag) {
   if (cls == nullptr) return;

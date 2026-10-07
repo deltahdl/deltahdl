@@ -47,18 +47,17 @@ enum class RtlirProcessKind : uint8_t {
 // §7.4.2: one element address range of an unpacked dimension, as the
 // declaration wrote it -- the first bound and the second, in that order.
 //
-// The order is the record. §7.4.2 rules that "the first value may be greater
-// than, equal to, or less than the second value", so `[1:4]` and `[4:1]` are
-// different declarations, and a single low bound cannot tell them apart.
-// §11.5.2 is what reads them: "the address bounds given in the declaration of
-// the memory determine the effect of the address expression. If the address is
-// invalid (it is out of bounds or has one or more x or z bits), then the value
-// of the reference shall be as described in 7.4.5". A dimension written
-// `[size]` is recorded here as `[0:size-1]`, which §7.4.2 makes it mean.
+// The order is the record. §7.4.2 lets the first value be greater than, equal
+// to or less than the second, so `[1:4]` and `[4:1]` are different
+// declarations, and a single low bound cannot tell them apart. §11.5.2 is what
+// reads them: the bounds the memory's declaration gives decide what an address
+// reaches, and an invalid address, out of bounds or holding an x or z bit,
+// reads the value §7.4.5 describes. A dimension written `[size]` is recorded
+// here as `[0:size-1]`, which §7.4.2 makes it mean.
 //
-// The bounds are int64_t because §7.4.2 admits "any integer value -- positive,
-// negative, or zero", and an unsigned field turns `[-3:5]` into a bound no
-// address reaches.
+// The bounds are int64_t because §7.4.2 admits any integer, positive, negative
+// or zero, and an unsigned field turns `[-3:5]` into a bound no address
+// reaches.
 struct RtlirUnpackedDim {
   int64_t left = 0;
   int64_t right = 0;
@@ -81,26 +80,25 @@ struct RtlirPort {
   bool is_signed = false;
 
   // The type the port header declared, carried so a select on the port can be
-  // resolved against the packed dimension as written. §11.5.1: "the actual bit
-  // that is accessed by an address is, in part, determined by the
-  // declaration", and `width` above says how many bits the port has rather
-  // than which bit an index names -- `[15:0]` and `[2:17]` are both sixteen
-  // bits wide, and index 2 reaches a different bit of each. Set when the port
-  // declares a packed dimension. Also set, to the resolved aggregate, for a
-  // port §23.2.2.3 makes a net whose data type is a packed structure or union
-  // (§6.7.1), which declares no variable to carry a layout of its own; the
-  // simulator lays the net's members out from it (§7.2.1). Null otherwise,
-  // which leaves the port addressed as [0:0].
+  // resolved against the packed dimension as written. §11.5.1: the declaration
+  // helps decide which bit an address reaches, and `width` above says how many
+  // bits the port has rather than which bit an index names -- `[15:0]` and
+  // `[2:17]` are both sixteen bits wide, and index 2 reaches a different bit of
+  // each. Set when the port declares a packed dimension. Also set, to the
+  // resolved aggregate, for a port §23.2.2.3 makes a net whose data type is a
+  // packed structure or union (§6.7.1), which declares no variable to carry a
+  // layout of its own; the simulator lays the net's members out from it
+  // (§7.2.1). Null otherwise, which leaves the port addressed as [0:0].
   const DataType* dtype = nullptr;
 
   bool is_var = false;
   // §23.2.2.3: the net type of a port the clause makes a net -- the net type
   // keyword the declaration wrote, or the default net type where it wrote
-  // none, since "an implicit data type declaration implies a net unless the
-  // var keyword is used" and an input or inout with no port kind "shall default
-  // to a net of default net type". kNone for a port the clause makes a
-  // variable, which is the same set is_var names; carried separately because
-  // which net type it is is a second question is_var does not answer.
+  // none, since an implicit data type declaration means a net unless var is
+  // written, and an input or inout with no port kind defaults to a net of the
+  // default net type. kNone for a port the clause makes a variable, which is
+  // the same set is_var names; carried separately because which net type it is
+  // is a second question is_var does not answer.
   NetType net_type = NetType::kNone;
   bool is_interconnect = false;
   bool is_interface_port = false;
@@ -146,15 +144,15 @@ struct RtlirNet {
   NetType net_type = NetType::kWire;
   uint32_t width = 1;
 
-  // §11.5.1: "the actual bit that is accessed by an address is, in part,
-  // determined by the declaration" -- a width alone does not say which bit an
-  // index names, because `[15:0]` and `[2:17]` are both sixteen bits wide and
-  // the same index addresses a different bit of each. Set when the declaration
-  // carries a packed dimension, so a select on this net can be resolved against
-  // the range as written. Also set, to the resolved aggregate, for a net of a
-  // packed structure or union with no dimension of its own (§6.7.1), so a
-  // member select of the net names the run of bits §7.2.1 lays the member out
-  // at. Null for a scalar, which is addressed as [0:0].
+  // §11.5.1: the declaration helps decide which bit an address reaches -- a
+  // width alone does not say which bit an index names, because `[15:0]` and
+  // `[2:17]` are both sixteen bits wide and the same index addresses a
+  // different bit of each. Set when the declaration carries a packed dimension,
+  // so a select on this net can be resolved against the range as written. Also
+  // set, to the resolved aggregate, for a net of a packed structure or union
+  // with no dimension of its own (§6.7.1), so a member select of the net names
+  // the run of bits §7.2.1 lays the member out at. Null for a scalar, which is
+  // addressed as [0:0].
   const DataType* dtype = nullptr;
 
   // §7.4.2 with §20.6.2: the unpacked dimensions the declaration wrote after
@@ -178,11 +176,11 @@ struct RtlirNet {
   uint32_t trireg_capacitance = 0;
 
   // §28.16.2.2: the charge decay time of a trireg net, counted in time units,
-  // which the declaration writes as its third delay: "The third delay in a
-  // trireg net declaration shall specify the charge decay time." Only a trireg
-  // carries one, because §28.16.2 gives the third delay of every other net to
-  // "the delay in a transition to the z logic state" instead. The lowerer
-  // scales the count by the declaring module's time unit (§22.7).
+  // which the declaration writes as its third delay: a trireg net declaration's
+  // third delay is its charge decay time. Only a trireg carries one, because
+  // §28.16.2 gives the third delay of every other net to the delay of a
+  // transition to z instead. The lowerer scales the count by the declaring
+  // module's time unit (§22.7).
   uint64_t decay_ticks = 0;
   // The decay time as written where it has a fractional part, `#(0, 0, 2.5)`,
   // in the same units, for §3.14.1 to round to the module's precision rather
@@ -191,37 +189,35 @@ struct RtlirNet {
   double decay_real = 0.0;
 
   // Whether this net decays at all, which a count of zero cannot say.
-  // §28.16.2.1 makes the decay a process that ends when "the delay specified by
-  // charge decay time elapses, and the trireg net makes a transition from 1 or
-  // 0 to x", so a decay time of zero is that transition happening at once and
-  // not one that never happens; §28.16.2.2 gives the third delay's *absence*
-  // the meaning of never decaying. The two used to share a representation, and
-  // a declaration writing zero got the opposite of what it asked for.
+  // §28.16.2.1 makes the decay a process that ends when the charge decay time
+  // has elapsed and the trireg net goes from 1 or 0 to x, so a decay time of
+  // zero is that transition happening at once and not one that never happens;
+  // §28.16.2.2 gives the third delay's *absence* the meaning of never decaying.
+  // The two used to share a representation, and a declaration writing zero got
+  // the opposite of what it asked for.
   //
   // This is the shape CompilationUnit::default_decay_time_infinite already uses
   // for the `default_decay_time directive, which records an infinite decay
   // separately from a count for the same reason.
   bool decays = false;
 
-  // §28.16: the net delay this net was declared with. "Net delays refer to the
-  // time it takes from any driver on the net changing value to the time when
-  // the net value is updated and propagated further", so the delay belongs to
-  // the net and every driver of it waits the delay out, whatever construct the
-  // driver is written as. §10.3.3 excludes the declaration that also assigns
-  // the net -- "When there is a continuous assignment in a declaration, the
-  // delay is part of the continuous assignment and is not a net delay. Thus, it
-  // shall not be added to the delay of other drivers on the net" -- so these
-  // are null for such a declaration, whose delay stays on the continuous
-  // assignment RtlirModule::assigns holds for it. They are null as well for a
-  // declaration that wrote no delay at all.
+  // §28.16: the net delay this net was declared with. A net delay is the time
+  // from any driver of the net changing value to the net's value being updated
+  // and passed on, so the delay belongs to the net and every driver of it waits
+  // the delay out, whatever construct the driver is written as. §10.3.3
+  // excludes the declaration that also assigns the net -- with a continuous
+  // assignment in a declaration, the delay belongs to the assignment rather
+  // than being a net delay, so it is not added to the delay of the net's other
+  // drivers -- so these are null for such a declaration, whose delay stays on
+  // the continuous assignment RtlirModule::assigns holds for it. They are null
+  // as well for a declaration that wrote no delay at all.
   //
   // The three are §28.16's rise, fall and turn-off delays, chosen between by
   // Table 28-9. §28.16.1 lets any one of them be written as a min:typ:max
   // triple, which is a property of the expression in the slot and not of the
   // slot, so it does not change what the three are. delay_turnoff is null on a
-  // trireg net, whose third delay §28.16.2 makes "the charge decay time instead
-  // of the delay in a transition to the z logic state" -- decay_ticks above
-  // carries that one.
+  // trireg net, whose third delay §28.16.2 makes the charge decay time in place
+  // of the delay of a transition to z -- decay_ticks above carries that one.
   Expr* delay_rise = nullptr;
   Expr* delay_fall = nullptr;
   Expr* delay_turnoff = nullptr;
@@ -369,14 +365,13 @@ struct RtlirContAssign {
 
   // §28.6: the two terminals of a three-state gate, kept because Table 28-5
   // answers by them rather than by the value the gate's own expression yields.
-  // With a control of x or z the gate drives L or H -- "a result that has a
-  // value 0 or z" and "a value 1 or z" -- which is one side of the strength
-  // scale rather than a value, so the strength a drive carries depends on the
-  // control and on the value the gate would transmit. `three_state_pass` is
-  // that value, the data terminal as the gate passes it, so a notif's inversion
-  // is already in it. §28.7's four MOS switches carry them too, Table 28-6
-  // giving an unknown control the same L and H. Null for every other
-  // assignment.
+  // With a control of x or z the gate drives L or H -- a result that is 0 or z,
+  // and one that is 1 or z -- which is one side of the strength scale rather
+  // than a value, so the strength a drive carries depends on the control and on
+  // the value the gate would transmit. `three_state_pass` is that value, the
+  // data terminal as the gate passes it, so a notif's inversion is already in
+  // it. §28.7's four MOS switches carry them too, Table 28-6 giving an unknown
+  // control the same L and H. Null for every other assignment.
   Expr* three_state_ctrl = nullptr;
   Expr* three_state_pass = nullptr;
   // §32.4.4: when this assignment is the §23.3.2 input port connection of a
@@ -437,13 +432,12 @@ struct RtlirProcess {
   // §16.9.4: the global clocking event an attempt of this process's property
   // has to reach before it can be evaluated, empty for every process whose
   // property names none of the five future sampled value functions. Those five
-  // read a value "sampled at the next global clock tick", which no evaluation
+  // read a value sampled at the next global clock tick, which no evaluation
   // standing at the assertion's own tick can read, and the clause says what to
-  // do about it: "Execution of the action block of an assertion containing
-  // global clocking future sampled value functions shall be delayed until the
-  // global clocking tick that follows the last tick of the assertion clock for
-  // the attempt." So the attempt waits for this event and is evaluated there,
-  // where the values it names have been sampled.
+  // do about it: the action block of an assertion with global clocking future
+  // sampled value functions runs only at the global clocking tick after the
+  // attempt's last assertion clock tick. So the attempt waits for this event
+  // and is evaluated there, where the values it names have been sampled.
   //
   // It is the effective global clocking declaration's event, copied per process
   // for the reason the sensitivity substitution above is made per process:
@@ -464,11 +458,11 @@ struct RtlirProcess {
 struct RtlirParamDecl {
   std::string_view name;
   // §23.9: the generate block prefix in force where this parameter was
-  // declared, empty for a parameter of the module itself. §23.9 lists "Generate
-  // blocks" among the elements that "define a new scope", so a parameter
-  // declared in one is not visible to a reference at module level or in a
-  // sibling block, and a reader deciding what a bare identifier names has to be
-  // able to tell the two apart.
+  // declared, empty for a parameter of the module itself. §23.9 lists generate
+  // blocks among the elements that open a new scope, so a parameter declared in
+  // one is not visible to a reference at module level or in a sibling block,
+  // and a reader deciding what a bare identifier names has to be able to tell
+  // the two apart.
   //
   // The scope is recorded here rather than folded into `name` the way
   // Elaborator::ScopedName folds it into RtlirNet::name and RtlirVar::name,
@@ -538,12 +532,12 @@ struct RtlirParamDecl {
   // included.
   bool decl_is_real = false;
   // §6.16: a parameter declared with a string type takes a value of arbitrary
-  // length. §6.16 rules that "strings can be of arbitrary length and no
-  // truncation occurs", and resolved_value is 64 bits, so a value of more than
-  // eight characters cannot be read back from it. resolved_string holds the
-  // characters when is_string_value is set. resolved_value is still written for
-  // such a parameter, because §11.10 packs a string literal into a constant
-  // number and that is the form the rest of the elaborator reads.
+  // length. §6.16 lets a string be any length without truncation, and
+  // resolved_value is 64 bits, so a value of more than eight characters cannot
+  // be read back from it. resolved_string holds the characters when
+  // is_string_value is set. resolved_value is still written for such a
+  // parameter, because §11.10 packs a string literal into a constant number and
+  // that is the form the rest of the elaborator reads.
   std::string_view resolved_string;
   bool is_string_value = false;
   bool is_resolved = false;
@@ -641,8 +635,8 @@ struct RtlirModuleInst {
   bool is_bound = false;
   InstArrayElement array;  // the instance array it belongs to, if any
   // §23.4: this instance's module, program or interface was declared inside
-  // the instantiating module, so "the outer name space is visible to the inner
-  // module"; one merely instantiated here meets the §23.9 module boundary.
+  // the instantiating module, so the outer name space is visible to the inner
+  // module; one merely instantiated here meets the §23.9 module boundary.
   bool is_nested_decl = false;
   // §17.3: a procedural checker instance, instantiated by a statement of a
   // procedure rather than by a module item.
@@ -780,15 +774,15 @@ struct RtlirModule {
   // let_decls would breach: RegisterModuleSubroutines (lowerer_register.cpp)
   // would answer its name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_export_decls;
-  // §30.3's specify blocks, declared in this module: §30.3 states that a
-  // specify block "shall appear inside a module declaration". What one declares
-  // -- the module paths of §30.4, the PATHPULSE$ pulse limits of §30.7.1 and
-  // the §30.7.4 pulse styles -- is timing data about the module rather than a
-  // name a reference resolves to. They are held apart from let_decls for that
-  // reason: RegisterModuleSubroutines in src/simulator/lowerer_register.cpp
-  // registers each let_decls entry under item->name, which a specify block
-  // leaves empty, and RangeHasName in
-  // src/elaborator/elaborator_scope_rules_hier.cpp searches let_decls by name.
+  // §30.3's specify blocks, declared in this module: §30.3 places a specify
+  // block inside a module declaration. What one declares -- the module paths of
+  // §30.4, the PATHPULSE$ pulse limits of §30.7.1 and the §30.7.4 pulse styles
+  // -- is timing data about the module rather than a name a reference resolves
+  // to. They are held apart from let_decls for that reason:
+  // RegisterModuleSubroutines in src/simulator/lowerer_register.cpp registers
+  // each let_decls entry under item->name, which a specify block leaves empty,
+  // and RangeHasName in src/elaborator/elaborator_scope_rules_hier.cpp searches
+  // let_decls by name.
   std::vector<ModuleItem*> specify_blocks;
   // §28.4's gate instantiations, declared in this module, kept after
   // ElaborateGateInst (src/elaborator/elaborator_gates.cpp) has rewritten each
@@ -807,10 +801,10 @@ struct RtlirModule {
   // instance array's elements among them.
   std::vector<RtlirBidirSwitch> bidir_switches;
   // §6.20.5's specparams declared in the module body, outside every specify
-  // block: "A specparam ... may be declared inside a specify block or in the
-  // module body." Each entry is the name the specparam was lowered under, which
-  // is Elaborator::ScopedName of the declared name, so a specparam declared in
-  // a generate block carries that block's prefix. §32.4.3 has an SDF LABEL
+  // block: a specparam may be declared in a specify block or in the module
+  // body. Each entry is the name the specparam was lowered under, which is
+  // Elaborator::ScopedName of the declared name, so a specparam declared in a
+  // generate block carries that block's prefix. §32.4.3 has an SDF LABEL
   // section annotate to specparams and states no exception for either
   // declaration site, so RegisterModuleSpecparams (src/simulator/specify.h)
   // binds these to SpecifyManager beside the in-block ones
@@ -834,11 +828,11 @@ struct RtlirDesign {
   std::unordered_map<std::string_view, RtlirModule*> all_modules;
 
   std::unordered_map<std::string_view, uint32_t> type_widths;
-  // §6.18: "the type of the object is the type the name stands for", and the
-  // width beside this cannot say what that is: EvalTypeWidth answers 0 for a
-  // string, an event, a class handle and a type it could not size alike, so a
-  // simulator asking the width alone cannot tell `typedef string s_t` from a
-  // name it never saw. The resolved kind is recorded here for every name the
+  // §6.18: an object declared with the name has the type the name stands for,
+  // and the width beside this cannot say what that is: EvalTypeWidth answers 0
+  // for a string, an event, a class handle and a type it could not size alike,
+  // so a simulator asking the width alone cannot tell `typedef string s_t` from
+  // a name it never saw. The resolved kind is recorded here for every name the
   // typedef table holds, chased through a chain of names to the kind at its
   // end, so the three declaration paths can ask what a name stands for rather
   // than reading DataType::kind and finding kNamed.

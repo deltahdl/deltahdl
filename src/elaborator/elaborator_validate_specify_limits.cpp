@@ -77,9 +77,9 @@ static void CheckTimingCheckFlag(const Expr* flag, std::string_view name,
 
 // A.7.5.2 gives `event_based_flag ::= constant_expression` and
 // `remain_active_flag ::= constant_mintypmax_expression`, and Table 31-8 and
-// Table 31-9 describe each of $timeskew's and $fullskew's two flags as a
-// "Constant expression". A net or variable there is reported at the check
-// under the check's own subclause, the one whose table describes the flag.
+// Table 31-9 describe each of $timeskew's and $fullskew's two flags as constant
+// expressions. A net or variable there is reported at the check under the
+// check's own subclause, the one whose table describes the flag.
 void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -301,9 +301,9 @@ static std::string DottedName(const Expr* e) {
   return DottedName(e->lhs) + "." + DottedName(e->rhs);
 }
 
-// §30.4.4.1 (printed page 876): a condition's operands are "Scalar or vector
-// module input ports or inout ports", "Locally defined variables or nets" and
-// "Compile-time constants" and their selects, so a hierarchical name reaching
+// §30.4.4.1 (printed page 876): a condition's operands are scalar or vector
+// module input or inout ports, locally defined variables or nets, and
+// compile-time constants, with their selects, so a hierarchical name reaching
 // into another scope, `if (top.b)`, is none of them. A dotted name starting at
 // one of the module's own ports is the member of an interface port, and one
 // written with `::` names a package's constant, and neither is refused here.

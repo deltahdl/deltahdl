@@ -35,15 +35,14 @@ void AddImportedTypedefs(const ImportItem& import_item,
   }
 }
 
-// §35.5.6 permits a type "constructed from the supported types with the help of
-// the following constructs: struct, union (packed forms only), unpacked array,
-// typedef", so a typedef name is permitted exactly where the type behind the
-// name is. Deciding that needs the typedefs visible to the declaration, and a
-// scope-local one is not in the elaborator's compilation-unit table, so this
-// copies the outer table, adds every typedef the scope declares, and adds every
-// typedef the scope's import declarations name. One map then answers for a
-// scope-local, an imported, a compilation-unit and a scope-qualified name
-// alike.
+// §35.5.6 permits a type built from the supported types with struct, packed
+// union, unpacked array and typedef, so a typedef name is permitted exactly
+// where the type behind the name is. Deciding that needs the typedefs visible
+// to the declaration, and a scope-local one is not in the elaborator's
+// compilation-unit table, so this copies the outer table, adds every typedef
+// the scope declares, and adds every typedef the scope's import declarations
+// name. One map then answers for a scope-local, an imported, a compilation-unit
+// and a scope-qualified name alike.
 TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
                             const CompilationUnit* unit,
                             const TypedefMap& outer) {
@@ -60,10 +59,10 @@ TypedefMap DpiScopeTypedefs(const std::vector<ModuleItem*>& items,
   return typedefs;
 }
 
-// §35.5.4, footnote 27 of Syntax 35-1: "Formals of dpi_function_proto and
-// dpi_task_proto cannot use pass by reference mode and class types cannot be
-// passed at all." A class name is in neither the built-in type keywords nor the
-// typedef table, so a formal declared with one resolves to nothing and the
+// §35.5.4, footnote 27 of Syntax 35-1: the formals of dpi_function_proto and
+// dpi_task_proto may not pass by reference, and no class type may be passed at
+// all. A class name is in neither the built-in type keywords nor the typedef
+// table, so a formal declared with one resolves to nothing and the
 // permitted-type checks below pass over it along with every other name they
 // cannot see -- which is right for a name the elaborator does not know and
 // wrong for this one. The class names are collected so the prohibition can be

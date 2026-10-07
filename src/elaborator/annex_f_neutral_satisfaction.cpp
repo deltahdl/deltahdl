@@ -584,19 +584,18 @@ bool DisablesTopLevel(const Word& word, const TopLevelProperty& top) {
 }
 
 bool PassesTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: "T is said to pass on w if w |= T."
+  // §F.5.3.1: T passes on w when w |= T.
   return NeutrallySatisfiesTopLevel(word, top);
 }
 
 bool IsDisabledTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: "T is said to be disabled on w if w |=^d T."
+  // §F.5.3.1: T is disabled on w when w |=^d T.
   return DisablesTopLevel(word, top);
 }
 
 bool FailsTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: "T is said to fail on w if T neither passes nor is disabled on
-  // w." Pass and disabled are mutually exclusive, so failure is their joint
-  // negation.
+  // §F.5.3.1: T fails on w when it neither passes nor is disabled on w. Pass
+  // and disabled are mutually exclusive, so failure is their joint negation.
   return !PassesTopLevel(word, top) && !IsDisabledTopLevel(word, top);
 }
 
@@ -621,19 +620,19 @@ bool DisablesTopLevelClocked(const Word& word,
 
 bool PassesTopLevelClocked(const Word& word,
                            const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: "pass on w if w |= U".
+  // §F.5.3.1: U passes on w when w |= U.
   return NeutrallySatisfiesTopLevelClocked(word, top);
 }
 
 bool IsDisabledTopLevelClocked(const Word& word,
                                const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: "disabled on w if w |=^d U".
+  // §F.5.3.1: U is disabled on w when w |=^d U.
   return DisablesTopLevelClocked(word, top);
 }
 
 bool FailsTopLevelClocked(const Word& word,
                           const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: "fail on w if U neither passes nor is disabled on w".
+  // §F.5.3.1: U fails on w when it neither passes nor is disabled on w.
   return !PassesTopLevelClocked(word, top) &&
          !IsDisabledTopLevelClocked(word, top);
 }

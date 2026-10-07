@@ -143,20 +143,20 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
 // caller then elaborates `item` as the one instance it already is.
 //
 // Shared because §29.8 makes this one rule for two kinds of instance -- an
-// array of user-defined primitive instances connects its terminals by "the
-// terminal connection rules ... outlined in 28.3.6", the rules an array of
-// gates connects by.
+// array of user-defined primitive instances connects its terminals by the
+// terminal connection rules of §28.3.6, the rules an array of gates connects
+// by.
 bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
     const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element);
 
 // §28.3.5: how many instances the range written on an instance name declares -
-// "the range ... shall define the instance array's size" - which is the count
-// of values its two bounds span, in either order. A.3.1 admits the range on
-// every primitive through `[ name_of_instance ]`, and §29.8 admits it on a
-// user-defined primitive on the same terms, so this is what says how many
-// instances any of those declarations makes.
+// the range sets the instance array's size - which is the count of values its
+// two bounds span, in either order. A.3.1 admits the range on every primitive
+// through `[ name_of_instance ]`, and §29.8 admits it on a user-defined
+// primitive on the same terms, so this is what says how many instances any of
+// those declarations makes.
 //
 // Absent where `item` carries no range, and where a bound is not a constant
 // this pass can fold against `scope`: such a range is not one §28.3.5 admits,
@@ -165,14 +165,12 @@ bool ExpandInstanceArray(
 std::optional<uint32_t> InstanceArrayLength(const ModuleItem* item,
                                             const ScopeMap& scope);
 
-// §6.7.1: "Certain restrictions apply to the data type of a net. A valid data
-// type for a net shall be one of the following: a) A 4-state integral type ...
-// b) A fixed-size unpacked array or unpacked structure or union, where each
-// element has a valid data type for a net." Reports `dtype` at `loc` when it is
-// not one of those. Shared because a net is not only what a net declaration
-// produces: §23.2.2.3 makes a port with the port kind omitted a net too, and
-// the rule that decides what such a thing may carry is one rule wherever the
-// net came from.
+// §6.7.1 restricts a net's data type to a) a 4-state integral type or b) a
+// fixed-size unpacked array, structure or union each of whose elements has a
+// valid net data type. Reports `dtype` at `loc` when it is not one of those.
+// Shared because a net is not only what a net declaration produces: §23.2.2.3
+// makes a port with the port kind omitted a net too, and the rule that decides
+// what such a thing may carry is one rule wherever the net came from.
 void ValidateNetDataTypeIs4State(const DataType& dtype,
                                  const TypedefMap& typedefs, DiagEngine& diag,
                                  SourceLoc loc);
@@ -361,22 +359,22 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                               TypedefMap& typedefs, Arena& arena);
 
-// §8.23: "When a type name is used, the name shall resolve to a type after
-// elaboration." Reports a declared type whose class scope prefix names a
-// visible class that declares nothing under that name, which otherwise sizes
-// the declared object at zero bits and says nothing at all. `loc` is where the
-// declaration stands. Defined in elaborator_validate_struct_types.cpp.
+// §8.23: a type name in use has to resolve to a type once elaboration is done.
+// Reports a declared type whose class scope prefix names a visible class that
+// declares nothing under that name, which otherwise sizes the declared object
+// at zero bits and says nothing at all. `loc` is where the declaration stands.
+// Defined in elaborator_validate_struct_types.cpp.
 //
 // Only that one shape is reported, and the guards are what keep the report off
-// the other prefixes the same clause admits: the left operand may be "a class
-// type name, package name (see 26.2), covergroup type name, coverpoint name,
-// cross name (see 19.5, 19.6), typedef name, or type parameter name", and
-// FindClassDecl answering a class is what separates the first from the rest. A
-// prefix this tool resolves by no route stays as silent as it was rather than
-// becoming a report about a legal declaration. A class that extends another is
-// left alone for the same reason, since the members walked are the class's own
-// and not the ones it inherits, and a prefix carrying specialization arguments
-// is ResolveParameterizedType's to resolve.
+// the other prefixes the same clause admits: the left operand may be a class
+// type name, package name (§26.2), covergroup type name, coverpoint name, cross
+// name (§19.5, §19.6), typedef name or type parameter name, and FindClassDecl
+// answering a class is what separates the first from the rest. A prefix this
+// tool resolves by no route stays as silent as it was rather than becoming a
+// report about a legal declaration. A class that extends another is left alone
+// for the same reason, since the members walked are the class's own and not the
+// ones it inherits, and a prefix carrying specialization arguments is
+// ResolveParameterizedType's to resolve.
 void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
                                      const TypedefMap& typedefs,
                                      const CompilationUnit* unit,
@@ -420,22 +418,19 @@ bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
 bool IsRealType(DataTypeKind k);
 
 // §11.5.2 fixes how many addresses a select may carry before §11.5.1 judges it:
-// "To express bit-selects or part-selects of array elements, the desired word
-// shall first be selected by supplying an address for each dimension. Once
-// selected, bit-selects and part-selects shall be addressed in the same manner
-// as net and variable bit-selects and part-selects (see 11.5.1)." So a select
-// chain written on a declaration is measured against the dimensions that
-// declaration has, and the address after the last of them is the one §11.5.1
-// rules on.
+// a bit-select or part-select of an array element first selects the word, one
+// address per dimension, and is then addressed as a net's or a variable's
+// select is (§11.5.1). So a select chain written on a declaration is measured
+// against the dimensions that declaration has, and the address after the last
+// of them is the one §11.5.1 rules on.
 //
 // `addressable_dims` counts the unpacked dimensions and the vector dimensions
 // together, because an address spends one of either. A packed dimension
 // contributes one, and an integer atom type or a packed aggregate contributes
 // one for the implicit vector it presents. The two flags say which alternative
-// of §11.5.1's sentence -- "A bit-select or part-select of a scalar, or of a
-// real variable or real parameter, shall be illegal" -- the operand at that
-// depth falls under, and a declaration whose operand falls under neither gets
-// no entry.
+// of §11.5.1's rule barring a bit-select or part-select of a scalar, a real
+// variable or a real parameter the operand at that depth falls under, and a
+// declaration whose operand falls under neither gets no entry.
 struct VarSelectShape {
   size_t addressable_dims = 0;
   bool element_is_real = false;

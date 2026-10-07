@@ -148,8 +148,8 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kTimeLiteral:
       return true;
     case ExprKind::kIdentifier:
-      // §6.20.7 lists "as the value assigned to a parameter" among the contexts
-      // $ may appear in and gives `parameter r2 = $;` as its example, so $ is a
+      // §6.20.7 lists the value assigned to a parameter among the contexts $
+      // may appear in and gives `parameter r2 = $;` as its example, so $ is a
       // constant that names no declaration. Asking `scope` about it would
       // answer no, because nothing puts $ in a ScopeMap and nothing should.
       if (expr->text == "$") return true;

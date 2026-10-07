@@ -76,8 +76,8 @@ static std::string MakeSpecKey(std::string_view name,
     } else if (dt.type_ref_expr != nullptr) {
       // A value parameter argument (e.g. `#(2)`) folds no type name and parses
       // as an implicit-typed slot carrying the value expression. §8.26.6.3
-      // rules that "Each unique parameterization of a parameterized interface
-      // class is an interface class specialization", and that different
+      // makes every distinct parameterization of a parameterized interface
+      // class an interface class specialization of its own, and that different
       // specializations are not a diamond, so two different constant values
       // must yield different keys; otherwise a value-parameterized base reached
       // through two paths with different arguments would be mistaken for a
@@ -415,8 +415,8 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
     if (!iface_has) continue;
     // Fold each default against the compilation-unit parameter scope so a
     // named-constant default (a parameter or localparam per 11.2.1), not just a
-    // bare literal, is compared by value for the "same for all implementors"
-    // rule.
+    // bare literal, is compared by value for the rule that the value be the
+    // same for every implementor.
     auto iface_val = ConstEvalInt(iface_args[i].default_value, param_scope);
     auto impl_val = ConstEvalInt(impl_args[i].default_value, param_scope);
     if (iface_val && impl_val && *iface_val != *impl_val) {
@@ -473,11 +473,10 @@ void ElaboratorClassRules::ValidateImplementsInterfaceMethods(
     if (!seen.insert(iface_key).second) continue;
     const auto* iface = FindClassDecl(iref.name, unit_);
     // §8.26 poses the obligation to implement a pure virtual method only for an
-    // interface class: "the Fifo class is also implementing the PutImp and
-    // GetImp interface classes so it shall provide implementations for the put
-    // and get methods" (printed page 209 of IEEE 1800-2023). A name that
-    // resolves to anything else is already rejected under §8.26.2 by
-    // ValidateRegularClassInheritance in
+    // interface class: its Fifo example implements the PutImp and GetImp
+    // interface classes and so has to implement put and get (printed page 209
+    // of IEEE 1800-2023). A name that resolves to anything else is already
+    // rejected under §8.26.2 by ValidateRegularClassInheritance in
     // src/elaborator/elaborator_validate_class_overrides.cpp, so reporting it
     // here as well would call a virtual class an interface class.
     if (!iface || !iface->is_interface) continue;
@@ -852,13 +851,13 @@ static ScopeMap ScopeParamValues(const ClassScope& scope,
   return values;
 }
 
-// §8.25 rules that instances of a parameterized class are instantiated "using
-// the same parameter override rules (see 23.10)" (printed page 203 of IEEE
-// 1800-2023), and §23.10.2 gives a parameter override a constant expression as
-// its value. Reports a value argument of an extends or implements clause that
-// is not one, with the message and subclause
-// Elaborator::ValidateSpecializationArgsConstant already gives the same rule
-// for the declaration form, so one rule reads one way wherever it is broken.
+// §8.25 has a parameterized class instantiated by the parameter override rules
+// of §23.10 (printed page 203 of IEEE 1800-2023), and §23.10.2 gives a
+// parameter override a constant expression as its value. Reports a value
+// argument of an extends or implements clause that is not one, with the message
+// and subclause Elaborator::ValidateSpecializationArgsConstant already gives
+// the same rule for the declaration form, so one rule reads one way wherever it
+// is broken.
 //
 // An argument mentioning one of `cls`'s own parameter names is left alone. Such
 // a value is computable only once `cls` is itself specialized, so it is not a

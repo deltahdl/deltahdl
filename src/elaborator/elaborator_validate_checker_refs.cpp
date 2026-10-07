@@ -36,20 +36,18 @@ static bool ExprRefersToChecker(
   return false;
 }
 
-// §23.6 ends "Hierarchical references into checkers (see Clause 17) shall not
-// be permitted", and §23.7 decides which dotted names are hierarchical at all:
-// "the first component of the name matches a scope name while the first name
-// component of a member select matches a data object or interface port name",
-// settled by resolving that first component, after which "The name resolves to
-// a data object or interface port. The dotted name shall be considered to be a
-// select of that data object or interface port." §23.9 says which declaration
-// the first component reaches -- "If it is declared locally, then the local
-// item shall be used" -- and it lists a begin-end block among the scopes a
-// declaration can be local to. So a name that merely spells a checker
-// instance's identifier is a member select of the local, not a hierarchical
-// reference into the checker, and this rule, which resolves nothing, reported
-// one: a block-local `chk_inst` was refused for `chk_inst.a` wherever the
-// module held a checker instance named `chk_inst`.
+// §23.6 ends by forbidding hierarchical references into checkers (Clause 17),
+// and §23.7 decides which dotted names are hierarchical at all: a hierarchical
+// name's first component matches a scope name and a member select's matches a
+// data object or interface port name, settled by resolving that first
+// component, after which a name resolving to a data object or interface port is
+// a select of it. §23.9 says which declaration the first component reaches -- a
+// locally declared item is the one used -- and it lists a begin-end block among
+// the scopes a declaration can be local to. So a name that merely spells a
+// checker instance's identifier is a member select of the local, not a
+// hierarchical reference into the checker, and this rule, which resolves
+// nothing, reported one: a block-local `chk_inst` was refused for `chk_inst.a`
+// wherever the module held a checker instance named `chk_inst`.
 //
 // The set is therefore taken by value and narrowed as the walk enters a scope,
 // never widened on the way out -- the shape WalkStmtsForProgramRef below
@@ -79,12 +77,12 @@ static void WalkStmtsForCheckerRef(
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted",
                Subclause("23.6"));
-  // §23.6 ends "Hierarchical references into checkers (see Clause 17) shall
-  // not be permitted" and puts no condition on where the reference is written,
-  // so every position a statement holds a statement in is one this report
-  // reaches. ForEachChildStmt in elaborator_validate_internal.h states those
-  // positions once for the whole elaborator, which is why the list is not
-  // written out again here. The visitor takes `Stmt* const&` because `s` is a
+  // §23.6 ends by forbidding hierarchical references into checkers (Clause 17)
+  // and puts no condition on where the reference is written, so every position
+  // a statement holds a statement in is one this report reaches.
+  // ForEachChildStmt in elaborator_validate_internal.h states those positions
+  // once for the whole elaborator, which is why the list is not written out
+  // again here. The visitor takes `Stmt* const&` because `s` is a
   // `const Stmt*`.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForCheckerRef(sub, checker_names, diag);
@@ -145,23 +143,21 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
 // descends them anyway: what a checker procedure may hold is §17.5's rule to
 // report, not a reason to keep a shorter list here.
 //
-// §23.9 decides which declaration the assignment target reaches -- "If it is
-// declared locally, then the local item shall be used" -- and it lists a
-// begin-end block among the scopes a declaration can be local to. So a
-// block-local named after a free variable is what an assignment to that name
-// updates, the free variable is not written at all, and this rule, which
-// resolves nothing, refused one. The set is therefore taken by value and
-// narrowed as the walk enters a scope, never widened on the way out, and the
-// erase is keyed on the free variable's own name, because that is what
-// HierRefLeftmost reduces the assignment target to.
+// §23.9 decides which declaration the assignment target reaches -- a locally
+// declared item is the one used -- and it lists a begin-end block among the
+// scopes a declaration can be local to. So a block-local named after a free
+// variable is what an assignment to that name updates, the free variable is not
+// written at all, and this rule, which resolves nothing, refused one. The set
+// is therefore taken by value and narrowed as the walk enters a scope, never
+// widened on the way out, and the erase is keyed on the free variable's own
+// name, because that is what HierRefLeftmost reduces the assignment target to.
 //
 // The narrowing runs below the checker body rather than at it.
 // ValidateFreeCheckerVariableAssignments builds the set from the checker's own
 // declarations, so a second declaration of one of those names in the checker
-// body is the collision §23.9 forbids -- "An identifier shall be used to
-// declare only one item within a scope" -- rather than a different variable an
-// assignment could reach. Only a scope below the body can hold that other
-// variable.
+// body is the collision §23.9 forbids -- one identifier declares one item in a
+// scope -- rather than a different variable an assignment could reach. Only a
+// scope below the body can hold that other variable.
 static void WalkStmtsForFreeBlockingAssign(
     const Stmt* s, std::unordered_set<std::string_view> free_vars,
     DiagEngine& diag) {
@@ -234,17 +230,17 @@ void Elaborator::ValidateFreeCheckerVariableAssignments(
 // not checker variables and so are not in `checker_vars`.
 //
 // §17.5 decides which statement positions hold an assignment in conforming
-// source: "An initial procedure in a checker body may contain let
-// declarations, immediate, deferred, and concurrent assertions, and a
-// procedural timing control statement using an event control only." A.6.10's
-// `simple_immediate_assert_statement ::= assert ( expression ) action_block`
-// and §16.3's `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null` put an assignment in either arm of an assertion on that
-// list. A randcase (§18.16) and a randsequence (A.6.12) are on neither list,
-// so no conforming checker initial procedure holds one and no test covers
+// source: an initial procedure in a checker body may hold let declarations,
+// immediate, deferred and concurrent assertions, and a procedural timing
+// control statement that uses an event control alone. A.6.10's
+// `simple_immediate_assert_statement ::= assert ( expression )
+// action_block` and §16.3's `action_block ::= statement_or_null | [ statement ]
+// else statement_or_null` put an assignment in either arm of an assertion on
+// that list. A randcase (§18.16) and a randsequence (A.6.12) are on neither
+// list, so no conforming checker initial procedure holds one and no test covers
 // either position. The walk descends them anyway: what a checker initial
-// procedure may hold is §17.5's rule to report, not a reason to keep a
-// shorter list here.
+// procedure may hold is §17.5's rule to report, not a reason to keep a shorter
+// list here.
 static void WalkStmtsForCheckerVarAssignInInitial(
     const Stmt* s, const std::unordered_set<std::string_view>& checker_vars,
     DiagEngine& diag) {

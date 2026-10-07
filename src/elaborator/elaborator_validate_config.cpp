@@ -98,9 +98,9 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
   // §3.13(a) states the prohibition for a module, a primitive, a program and
   // an interface, and names no config. §33.2 is what puts a config into the
-  // same name space: "the config is a design element, similar to a module,
-  // which exists in the SystemVerilog name space." A collision involving a
-  // config therefore enforces §33.2, and is reported below.
+  // same name space: a config is a design element, much like a module, of the
+  // SystemVerilog name space. A collision involving a config therefore enforces
+  // §33.2, and is reported below.
   DefinitionNames def_names;
   CheckDefinitionNames(unit->modules, def_names, diag);
   CheckDefinitionNames(unit->programs, def_names, diag);
@@ -108,12 +108,12 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   CheckDefinitionNames(unit->udps, def_names, diag);
 
   // A config shares its name with a module or primitive lawfully. §33.2.1
-  // (printed page 935): "The optional :config extension shall be used
-  // explicitly to refer to a config in the case where a config has the same
-  // name as a module/primitive", and §33.4.1.6 adds the suffix to a use
-  // clause's lib.cell for that case. A config is otherwise in the name space
-  // §33.2 puts it in, so one of an interface's or a program's name, or a second
-  // config of its own, is still a name defined twice.
+  // (printed page 935): the optional :config extension names a config
+  // explicitly where a config shares its name with a module or primitive, and
+  // §33.4.1.6 adds the suffix to a use clause's lib.cell for that case. A
+  // config is otherwise in the name space §33.2 puts it in, so one of an
+  // interface's or a program's name, or a second config of its own, is still a
+  // name defined twice.
   DefinitionNames config_names;
   for (auto* p : unit->programs)
     config_names.try_emplace({p->library, p->name}, p->range);
@@ -652,11 +652,11 @@ std::vector<std::string_view> SplitDots(std::string_view path) {
   return parts;
 }
 
-// §33.4.3 (printed page 940): "Hierarchical references cannot include scopes
-// of generate or array of instances." A reference is resolved "starting in the
-// parent scope of the instance", or from the design's top-level cell where it
-// is written from there, and whether a scope it passes through is a generate
-// block is a fact about the design rather than about the text.
+// §33.4.3 (printed page 940): a hierarchical reference may pass through no
+// generate scope and no array of instances. A reference is resolved from the
+// instance's parent scope, or from the design's top-level cell where it is
+// written from there, and whether a scope it passes through is a generate block
+// is a fact about the design rather than about the text.
 bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
                                       const ConfigRule* rule, const Expr* expr,
                                       const CompilationUnit* unit) {

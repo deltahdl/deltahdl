@@ -49,7 +49,7 @@ ScopeMap Elaborator::BuildParamScope(
   for (const auto& entry : mod->enum_types) {
     for (const auto& member : entry.second) scope[member.name] = member.value;
   }
-  // §23.9 makes a generate block "a new scope", so a parameter one declares is
+  // §23.9 makes a generate block a new scope, so a parameter one declares is
   // read only by an expression written in that block or in one nested inside
   // it. Entering it under its bare name for every expression in the module
   // would fold it into expressions that cannot name it at all.

@@ -50,14 +50,14 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
 
 namespace {
 
-// §35.5.5: "The same restrictions apply for the result types of exported
-// functions." An exported function's result is therefore limited to the same
-// small-value set imposed on imported function results: void, the C-compatible
-// scalar integer/real types, chandle, string, and scalar bit/logic. A native
-// function whose return type is omitted carries an implicit single-bit logic
-// result, which is itself a small value, so the implicit kind is permitted
-// here. Named/typedef results are deferred. Wide vector types (integer, time,
-// packed bit/logic) and aggregates are rejected.
+// §35.5.5 holds exported function result types to the same restrictions. An
+// exported function's result is therefore limited to the same small-value set
+// imposed on imported function results: void, the C-compatible scalar
+// integer/real types, chandle, string, and scalar bit/logic. A native function
+// whose return type is omitted carries an implicit single-bit logic result,
+// which is itself a small value, so the implicit kind is permitted here.
+// Named/typedef results are deferred. Wide vector types (integer, time, packed
+// bit/logic) and aggregates are rejected.
 bool IsPermittedDpiResultType(const DataType& type) {
   switch (type.kind) {
     case DataTypeKind::kImplicit:
@@ -82,10 +82,10 @@ bool IsPermittedDpiResultType(const DataType& type) {
   }
 }
 
-// §35.5.4: "multiple imports of the same subroutine name into the same scope
-// are forbidden." This scans the items of one scope for repeated DPI import
-// subroutine names. A module declaration, a package body and the compilation
-// unit are each one such scope.
+// §35.5.4 forbids importing one subroutine name into one scope more than once.
+// This scans the items of one scope for repeated DPI import subroutine names. A
+// module declaration, a package body and the compilation unit are each one such
+// scope.
 void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
                                       DiagEngine& diag) {
   std::unordered_set<std::string_view> sv_names_in_scope;
@@ -103,14 +103,12 @@ void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The word for what the source exported. §35.8 states that "SystemVerilog
-// allows tasks to be called from a foreign language, similar to functions. Such
-// tasks are termed exported tasks" and forwards the whole of §35.7 to them:
-// "all aspects of exported functions described above in 35.7 apply to exported
-// tasks" (printed page 983 of IEEE 1800-2023). So the two checks below
-// are reached for an exported task as readily as for an exported function, and
-// a report that spells the word as a literal tells a user who wrote `task` to
-// go looking for a function they never declared.
+// The word for what the source exported. §35.8 lets a foreign language call
+// tasks as it calls functions, names them exported tasks, and applies the whole
+// of §35.7 to them (printed page 983 of IEEE 1800-2023). So the two checks
+// below are reached for an exported task as readily as for an exported
+// function, and a report that spells the word as a literal tells a user who
+// wrote `task` to go looking for a function they never declared.
 std::string_view ExportedSubroutineKind(const ModuleItem* callable) {
   return callable->kind == ModuleItemKind::kTaskDecl ? "task" : "function";
 }
@@ -200,14 +198,14 @@ void CheckImportResultTypedefType(const ModuleItem* item,
       Subclause("35.5.5"));
 }
 
-// §35.5.6: "The following SystemVerilog types are the only permitted types for
-// formal arguments of import and export subroutines". The clause names imports
-// and exports together, so the permitted set an exported subroutine's formals
-// are held to is the same one the import path applies, and both consult
-// ClassifyDpiFormalType for it. A formal written as a typedef name is followed
-// to the type behind the name first, since the clause permits the name only
-// where that type is permitted. The dynamic array formal is a separate rule of
-// the same clause, checked by CheckExportDynamicArrayArguments.
+// §35.5.6 lists the only types permitted for the formal arguments of import and
+// export subroutines. The clause names imports and exports together, so the
+// permitted set an exported subroutine's formals are held to is the same one
+// the import path applies, and both consult ClassifyDpiFormalType for it. A
+// formal written as a typedef name is followed to the type behind the name
+// first, since the clause permits the name only where that type is permitted.
+// The dynamic array formal is a separate rule of the same clause, checked by
+// CheckExportDynamicArrayArguments.
 void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
                             const TypedefMap& typedefs,
                             const DpiClassNames& classes, DiagEngine& diag) {
@@ -245,10 +243,9 @@ void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
 }
 
 // §35.5.5: an exported function's result type is subject to the same
-// small-value restriction as an imported function's result. §35.8 states that
-// "SystemVerilog tasks do not have return value types", so the check applies
-// only when the exported routine is a function and its message needs no word
-// taken from the declaration.
+// small-value restriction as an imported function's result. §35.8 gives tasks
+// no return value type, so the check applies only when the exported routine is
+// a function and its message needs no word taken from the declaration.
 void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
                            const TypedefMap& typedefs, DiagEngine& diag) {
   if (callable->kind == ModuleItemKind::kFunctionDecl &&
@@ -309,9 +306,9 @@ void CheckExportDuplicateSvFunc(
     DiagEngine& diag) {
   auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
   if (!func_inserted) {
-    // §35.8: "All aspects of exported functions described above in 35.7 apply
-    // to exported tasks." The word comes from the export declaration's own
-    // keyword, which the check below holds to what the declaration names.
+    // §35.8 applies everything §35.7 says of exported functions to exported
+    // tasks. The word comes from the export declaration's own keyword, which
+    // the check below holds to what the declaration names.
     std::string_view kind = item->dpi_is_task ? "task" : "function";
     diag.Error(item->loc,
                std::format("SystemVerilog {} '{}' is already exported in this "
@@ -369,11 +366,11 @@ void ValidateExportDeclaration(
 
   const ModuleItem* callable = callable_it->second;
   if (!callable->method_class.empty()) {
-    // §35.7: "Class member functions cannot be exported, but all other
-    // SystemVerilog functions can be exported." An out-of-block method
-    // definition is written in the scope its class is declared in and carries
-    // the bare method name, so it is indexed among the scope's callables and an
-    // export naming it would otherwise attach to it.
+    // §35.7: every SystemVerilog function but a class member function may be
+    // exported. An out-of-block method definition is written in the scope its
+    // class is declared in and carries the bare method name, so it is indexed
+    // among the scope's callables and an export naming it would otherwise
+    // attach to it.
     diag.Error(
         item->loc,
         std::format("SystemVerilog {} '{}' is a member of class '{}' and class "
@@ -409,8 +406,8 @@ void ValidateExportDeclaration(
                                   diag);
 }
 
-// §35.5.4: "all declarations, regardless of scope, shall have exactly the same
-// type signature." Compares one import's signature against the first one seen
+// §35.5.4: every declaration, in whatever scope, has to carry exactly the same
+// type signature. Compares one import's signature against the first one seen
 // under the same linkage name, recording it the first time. Argument names and
 // defaults may differ.
 void CheckImportSignatureAgreement(
@@ -515,9 +512,9 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
 // §35.5.4: check one scope's import declarations, both against each other and
 // against every declaration of the same linkage name seen so far. The duplicate
 // subroutine names the clause forbids are a within-scope rule and the signature
-// agreement it requires holds "regardless of scope", so signatures and
-// first_decl_loc are threaded through every scope while the duplicate check
-// starts afresh in each.
+// agreement it requires holds across scopes, so signatures and first_decl_loc
+// are threaded through every scope while the duplicate check starts afresh in
+// each.
 void CheckDpiScopeImportDeclarations(
     const std::vector<ModuleItem*>& items,
     std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
@@ -585,11 +582,11 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   // §35.4: multiple export declarations with the same c_identifier in the same
   // scope are forbidden, so this tracks the export linkage names seen here.
   //
-  // §35.7: "Only one export declaration is permitted per SystemVerilog
-  // function." Linkage-name deduplication catches the explicit/implicit
-  // c_identifier overlap from §35.4, but two exports of the same SV function
-  // with distinct c_identifiers would slip past that check. Tracking SV
-  // function names per scope catches that case directly.
+  // §35.7 allows each SystemVerilog function one export declaration.
+  // Linkage-name deduplication catches the explicit/implicit c_identifier
+  // overlap from §35.4, but two exports of the same SV function with distinct
+  // c_identifiers would slip past that check. Tracking SV function names per
+  // scope catches that case directly.
   std::unordered_set<std::string_view> export_link_in_scope;
   std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
@@ -606,19 +603,19 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
 // a package_item, and A.1.4's module_common_item carries the same production
 // into a module, an interface, a program and a checker; the parser fills all
 // four through Parser::ParseModuleItem and a package body through it as well.
-// §3.12.1's compilation-unit scope holds "all declarations that lie outside any
-// other scope" and comes last, since a declaration reaches it only by being in
-// none of the others.
+// §3.12.1's compilation-unit scope holds every declaration outside any other
+// scope and comes last, since a declaration reaches it only by being in none of
+// the others.
 // §27.6 makes a generate block a scope, so the items of one are a scope of
-// their own for every rule §35.4, §35.5.4 and §35.7 state over declarations "in
-// the same scope", and they belong in the tables those clauses state across
-// scopes -- the version-string agreement, the export signature equivalence and
-// the import signature agreement. The parser holds them in ModuleItem::gen_body
-// on the kGenerateIf, kGenerateFor or kGenerateBlock item enclosing them, which
-// is in none of the lists the walk below collects, so a declaration written
-// there was held to none of those rules and contributed to none of those
-// tables. A generate block inside a generate block is a scope again, so the
-// descent is recursive.
+// their own for every rule §35.4, §35.5.4 and §35.7 state over declarations in
+// one scope, and they belong in the tables those clauses state across scopes --
+// the version-string agreement, the export signature equivalence and the import
+// signature agreement. The parser holds them in ModuleItem::gen_body on the
+// kGenerateIf, kGenerateFor or kGenerateBlock item enclosing them, which is in
+// none of the lists the walk below collects, so a declaration written there was
+// held to none of those rules and contributed to none of those tables. A
+// generate block inside a generate block is a scope again, so the descent is
+// recursive.
 void AddGenerateScopes(const std::vector<ModuleItem*>& items,
                        std::vector<const std::vector<ModuleItem*>*>& scopes) {
   for (const auto* item : items) {

@@ -23,12 +23,12 @@ namespace delta {
 // call a bare identifier unresolved, and the reads it has to find.
 //
 // §23.9 rules that an identifier referenced without a hierarchical path is
-// searched for upward and that the search "shall stop at a module boundary"
-// when the item is a variable, so a name no scope the reference can reach
-// declares is an error. What makes the check hard is not the rule but the names
-// a module declares elsewhere than in its own symbol table: §23.9 lists a
-// generate block among the elements that define a scope, §26.3 makes every name
-// a wildcard-imported package declares directly visible, and §13.3 makes a
+// searched for upward and that the search stops at a module boundary when the
+// item is a variable, so a name no scope the reference can reach declares is an
+// error. What makes the check hard is not the rule but the names a module
+// declares elsewhere than in its own symbol table: §23.9 lists a generate block
+// among the elements that define a scope, §26.3 makes every name a
+// wildcard-imported package declares directly visible, and §13.3 makes a
 // subroutine's formal arguments declarations of the subroutine. Each collector
 // here answers one of those, so the check consults a set of names rather than
 // giving up on the module that holds one.

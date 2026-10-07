@@ -90,8 +90,8 @@ static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
       return !IsClassDerivedFromScoped(vt->second, index_class, ctx);
     }
     // Not a class-typed variable. A declared variable of a concrete non-class
-    // type (an integral, string, real, etc. value, kind != kNamed) is "any
-    // other type" and is therefore an illegal class index.
+    // type (an integral, string, real, etc. value, kind != kNamed) is of any
+    // other type and is therefore an illegal class index.
     auto gt = ctx.var_types.find(idx->text);
     if (gt != ctx.var_types.end() && gt->second != DataTypeKind::kNamed) {
       return true;

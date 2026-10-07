@@ -125,12 +125,11 @@ const DataType* ResolveNamedTypeChain(const DataType* dtype,
   return dtype;
 }
 
-// §6.20.3: "it shall be an error if the type parameter is assigned a type
-// definition that does not conform to the specified basic data type" (printed
-// page 128 of IEEE 1800-2023). `class` and `interface class` are two of
-// the five basic data types that clause lists, and §8.26 makes them different
-// kinds of declaration, so a type conforming to one does not conform to the
-// other.
+// §6.20.3: assigning a type parameter a type definition that does not conform
+// to its stated basic data type is an error (printed page 128 of IEEE
+// 1800-2023). `class` and `interface class` are two of the five basic data
+// types that clause lists, and §8.26 makes them different kinds of declaration,
+// so a type conforming to one does not conform to the other.
 //
 // Four answers, and the declaration decides them. A class (or interface class)
 // type is always referenced by name, so a resolved concrete type -- a built-in
@@ -247,11 +246,11 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
 // Fills the value-parameter type information on `pd` and records a real-typed
 // parameter in `real_param_names`, which is the set CheckRealSelectNode in
 // src/elaborator/elaborator_validate.cpp reads to reject a later bit-select or
-// part-select of it. §11.5.1 states one sentence -- "A bit-select or
-// part-select of a scalar, or of a real variable or real parameter, shall be
-// illegal" -- whose second alternative names a real parameter, so the name goes
-// in the set standing for that alternative rather than in scalar_var_names_,
-// which stands for the first.
+// part-select of it. §11.5.1 states one rule -- a bit-select or part-select of
+// a scalar, a real variable or a real parameter is illegal -- whose second
+// alternative names a real parameter, so the name goes in the set standing for
+// that alternative rather than in scalar_var_names_, which stands for the
+// first.
 //
 // A parameter carrying an unpacked dimension stays out, because §11.5.2 makes
 // an address written after such a name an array element select: `parameter real
@@ -463,9 +462,9 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   RtlirParamDecl pd;
   pd.name = item->name;
-  // §27.4: a generate block "comprises a separate scope and a new level of
-  // hierarchy when it is instantiated", and this site elaborates a parameter
-  // written in one as readily as one written among a module's own items.
+  // §27.4: a generate block forms a scope of its own and a further level of
+  // hierarchy once instantiated, and this site elaborates a parameter written
+  // in one as readily as one written among a module's own items.
   pd.gen_block_prefix = InternedGenPrefix();
   pd.is_type_param = is_type;
 

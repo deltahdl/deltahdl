@@ -272,16 +272,16 @@ void Elaborator::CheckForeachLoopsIn(
   });
 }
 
-// §13.4.3 says a constant function "shall not contain a statement that
-// directly schedules an event to execute after the function has returned" and
-// "shall not contain any fork constructs". Neither says where the offending
-// statement may stand, so every position a statement holds a statement in is
-// one the search has to look at, and BodyContainsStmt takes those positions
-// from ForEachChildStmt in elaborator_validate_internal.h rather than listing
-// them again. ForEachChildStmt hands the visitor the field itself, so a walk
-// that only reads takes a `Stmt* const&`, and it visits every link with no way
-// to stop, so the first hit is kept in `found` and the recursion runs only
-// while `found` is false.
+// §13.4.3 bars a constant function from holding a statement that directly
+// schedules an event to run once it has returned, and from holding any fork
+// construct. Neither says where the offending statement may stand, so every
+// position a statement holds a statement in is one the search has to look at,
+// and BodyContainsStmt takes those positions from ForEachChildStmt in
+// elaborator_validate_internal.h rather than listing them again.
+// ForEachChildStmt hands the visitor the field itself, so a walk that only
+// reads takes a `Stmt* const&`, and it visits every link with no way to stop,
+// so the first hit is kept in `found` and the recursion runs only while `found`
+// is false.
 //
 // Stmt::rs_productions is descended with the rest: §18.17.6 gives break and
 // return a meaning in a randsequence production code block that they have
@@ -338,12 +338,12 @@ static bool BodyContainsEventScheduling(const Stmt* s) {
   return BodyContainsStmt(s, SchedulesPostReturnEvent);
 }
 
-// §13.4.3 lets a constant function reference a name "declared locally to the
-// current function", and a declaration is local wherever in the body it is
-// written, so the collection takes every position a statement holds a statement
-// in from ForEachChildStmt in elaborator_validate_internal.h. A position it
-// misses is one a name declared there goes uncollected from, and
-// CheckConstFuncIdentifier below then reports a reference to that name.
+// §13.4.3 lets a constant function reference a name declared locally in the
+// function, and a declaration is local wherever in the body it is written, so
+// the collection takes every position a statement holds a statement in from
+// ForEachChildStmt in elaborator_validate_internal.h. A position it misses is
+// one a name declared there goes uncollected from, and CheckConstFuncIdentifier
+// below then reports a reference to that name.
 // §18.17.6 is about break and return, which declare nothing, so descending
 // Stmt::rs_productions is what §13.4.3 asks for: A.6.12 puts a data_declaration
 // at the head of an rs_code_block. Stmt::for_steps holds no declaration, A.6.8
@@ -564,16 +564,16 @@ static const Expr* StatementFormSystemCall(const Stmt* s) {
 // is one list. A.6.5 gives `wait_statement ::= wait_order ( hierarchical_
 // identifier { , hierarchical_identifier } ) action_block`, and
 // Stmt::wait_order_events is filled for that statement alone, which §13.4.3's
-// "shall not contain a statement that directly schedules an event to execute
-// after the function has returned" has ValidateConstFuncBodyContent reject
-// before this runs. Stmt::cycle_delay is the same: A.6.5 admits a cycle_delay
-// in a procedural_timing_control, rejected there as well, and A.6.11 admits
-// one in a clocking_drive, which is written with `<=` and so is rejected as a
+// ban on a statement that directly schedules an event to run once the function
+// has returned has ValidateConstFuncBodyContent reject before this runs.
+// Stmt::cycle_delay is the same: A.6.5 admits a cycle_delay in a
+// procedural_timing_control, rejected there as well, and A.6.11 admits one in a
+// clocking_drive, which is written with `<=` and so is rejected as a
 // nonblocking assignment. A.6.2's blocking_assignment takes a
 // delay_or_event_control, which A.6.5 gives no cycle_delay alternative:
 // src/parser/parser_stmt.cpp builds that statement anyway, from the intra-
-// assignment timing shared with the nonblocking form, and §14.11's "cycle
-// delay (##) is not a legal intra-assignment delay" is what answers it.
+// assignment timing shared with the nonblocking form, and §14.11's "cycle delay
+// (##) is not a legal intra-assignment delay" is what answers it.
 static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   if (!s || chk.failed) return;
   const Expr* sys_call = StatementFormSystemCall(s);

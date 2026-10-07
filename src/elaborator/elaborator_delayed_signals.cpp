@@ -1,10 +1,10 @@
 // §31.9.1 and §31.9.4 (printed pages 920-923): the delayed_reference and
 // delayed_data a $setuphold or $recrem names are signals of the module, which
-// "can be declared within the timing check so they can be used in the model's
-// functional implementation". A name the module declares nowhere else is
-// declared here as a net, of its original's type -- or, where the check writes
-// `name[index]`, as a vector wide enough for every index written -- so that the
-// module's own items can read it. What drives it is the simulator's
+// may be declared within the timing check for use in the model's functional
+// implementation. A name the module declares nowhere else is declared here as a
+// net, of its original's type -- or, where the check writes `name[index]`, as a
+// vector wide enough for every index written -- so that the module's own items
+// can read it. What drives it is the simulator's
 // (simulator/timing_check_delayed_signals.cpp): a copy of the original that
 // §31.9.1 delays under the option enabling negative timing checks.
 

@@ -1,12 +1,11 @@
-// Annex D.3: "Use of this function is limited, however, it may only be used in
-// a continuous assignment statement where the left-hand side is a
-// concatenation of scalar nets and the argument to the system function is a
-// memory element reference." The function reads one word of a memory and
-// drives it onto the scalar nets the concatenation names, one bit each, so
-// the three limits are what make the call mean anything: a procedural
-// statement has no nets to drive, an expression around the call would take
-// the word for a number, and an argument that is no memory element names no
-// pattern. Each breach is reported under D.3 at the call.
+// Annex D.3: the function may appear only in a continuous assignment whose
+// left-hand side is a concatenation of scalar nets and whose argument is a
+// memory element reference. The function reads one word of a memory and drives
+// it onto the scalar nets the concatenation names, one bit each, so the three
+// limits are what make the call mean anything: a procedural statement has no
+// nets to drive, an expression around the call would take the word for a
+// number, and an argument that is no memory element names no pattern. Each
+// breach is reported under D.3 at the call.
 
 #include <format>
 #include <string_view>

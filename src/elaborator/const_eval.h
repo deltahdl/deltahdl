@@ -41,11 +41,11 @@ class ConstFuncRegistryGuard {
 };
 
 // The function table a live ConstFuncRegistryGuard installed, or null when none
-// is live. §23.9 has the search for a directly referenced identifier "continue
-// upward until an item by that name is found or until a module, interface,
-// program, or checker boundary is encountered", so a scope nested inside
-// another has to install what it found plus its own declarations rather than
-// its own alone. This is what such a site reads to find what it found.
+// is live. §23.9 has the search for a directly referenced identifier climb
+// until it finds an item of that name or meets a module, interface, program or
+// checker boundary, so a scope nested inside another has to install what it
+// found plus its own declarations rather than its own alone. This is what such
+// a site reads to find what it found.
 const std::unordered_map<std::string_view, const ModuleItem*>*
 RegisteredConstFuncs();
 
@@ -70,8 +70,8 @@ class ParamClassRegistryGuard {
   const std::unordered_map<std::string_view, const ClassDecl*>* prev_;
 };
 
-// §11.5.1 puts a parameter among the operands a bit-select addresses -- "a
-// vector, packed array, packed structure, parameter, or concatenation" -- and
+// §11.5.1 puts a parameter among the operands a bit-select addresses -- a
+// vector, packed array, packed structure, parameter or concatenation -- and
 // §11.5 does the same for part-selects, so a parameter declared with a packed
 // range is addressed over that range. A folded constant carries no declaration
 // with it and a ScopeMap holds a value and nothing else, so the folder cannot
@@ -120,13 +120,13 @@ class TypedefRegistryGuard {
   const std::unordered_set<std::string_view>* prev_aggregate_names_;
 };
 
-// §23.9 lists "Generate blocks" among the elements that "define a new scope",
-// so which of the registered module's parameters an expression may name depends
-// on where in that module it stands. ParamRangeRegistryGuard installs the
-// module and nothing more, which is not enough: matching by name alone lets a
+// §23.9 lists generate blocks among the elements that open a new scope, so
+// which of the registered module's parameters an expression may name depends on
+// where in that module it stands. ParamRangeRegistryGuard installs the module
+// and nothing more, which is not enough: matching by name alone lets a
 // parameter one block declares answer an expression written anywhere in the
 // module, and refusing every block-local parameter denies a block its own,
-// which §23.9 grants by ruling that an identifier "declared locally" names the
+// which §23.9 grants by ruling that an identifier declared locally names the
 // local item.
 //
 // This guard installs the generate block prefixes in force where the expression
@@ -147,13 +147,13 @@ class RegisteredGenScopeGuard {
 
 // Installs the min:typ:max member the constant folder selects, so that a
 // parameter folded at elaboration and a delay waited out during the run cannot
-// disagree. §11.11 gives a min:typ:max expression three values and says "The
-// three values allow a design to be tested with minimum, typical, or maximum
-// delay values", so the choice is one setting for a whole run. The folder is a
-// free function reached from about fifty sites that hand it a const Expr* and a
-// const ScopeMap& and nothing else, so the mode is installed for the duration
-// of an elaboration exactly as ConstFuncRegistryGuard installs a function
-// table. The guard restores the previously active mode on destruction.
+// disagree. §11.11 gives a min:typ:max expression three values and says the
+// three let a design be tested with its minimum, typical or maximum delays, so
+// the choice is one setting for a whole run. The folder is a free function
+// reached from about fifty sites that hand it a const Expr* and a const
+// ScopeMap& and nothing else, so the mode is installed for the duration of an
+// elaboration exactly as ConstFuncRegistryGuard installs a function table. The
+// guard restores the previously active mode on destruction.
 class DelayModeGuard {
  public:
   explicit DelayModeGuard(DelayMode mode);
@@ -170,13 +170,12 @@ class DelayModeGuard {
 DelayMode ActiveDelayMode();
 
 // §11.11: the one of a min:typ:max expression's three members that stands for
-// it in this run. "Values expressed in min:typ:max format can be used in
-// expressions. The min:typ:max format can be used wherever expressions can
-// appear", and Example 1 reads `(a:b:c) + (d:e:f)` member by member -- "The
-// minimum value is the sum of a+d; the typical value is b+e; the maximum value
-// is c+f" -- so the form is the member the run selects rather than a value
-// composed of the three. What it folds to and how wide it is are the same
-// question asked twice, and both are answered from here.
+// it in this run. A min:typ:max value may stand in an expression, anywhere an
+// expression may, and Example 1 reads `(a:b:c) + (d:e:f)` member by member --
+// its minimum is a+d, its typical b+e and its maximum c+f -- so the form is the
+// member the run selects rather than a value composed of the three. What it
+// folds to and how wide it is are the same question asked twice, and both are
+// answered from here.
 const Expr* SelectMinTypMaxMember(const Expr* expr);
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);
@@ -233,16 +232,16 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 // with its quotes removed and each escape replaced by the one character it
 // stands for, a parameter of the module a live ParamRangeRegistryGuard
 // registered, or a concatenation or replication of those, which Table 6-9
-// defines over string operands. §6.16 rules that "strings can be of arbitrary
-// length and no truncation occurs", which is why the characters are answered
-// separately from the §11.10 packed number ConstEvalStringLiteral computes:
-// that keeps only the low 64 bits, so a value of more than eight characters is
-// no longer recoverable from it.
+// defines over string operands. §6.16 lets a string be any length without
+// truncation, which is why the characters are answered separately from the
+// §11.10 packed number ConstEvalStringLiteral computes: that keeps only the low
+// 64 bits, so a value of more than eight characters is no longer recoverable
+// from it.
 //
 // A string literal of no characters answers an empty string rather than
-// std::nullopt, which is what lets §6.16.1 -- "if str is "", then str.len()
-// returns 0" -- be answered. Empty for every other expression, and for a name
-// the registered module declares no string parameter under.
+// std::nullopt, which is what lets §6.16.1 -- str.len() of "" is 0 -- be
+// answered. Empty for every other expression, and for a name the registered
+// module declares no string parameter under.
 std::optional<std::string> ConstEvalString(const Expr* expr);
 
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);

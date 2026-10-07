@@ -121,9 +121,9 @@ bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top);
 // property is true under a T^omega completion but not under a _|_^omega one.
 bool DisablesTopLevel(const Word& word, const TopLevelProperty& top);
 
-// §F.5.3.1: "T is said to pass on w if w |= T", "T is said to be disabled on w
-// if w |=^d T", and "T is said to fail on w if T neither passes nor is disabled
-// on w." The standard notes pass and disabled are mutually exclusive.
+// §F.5.3.1: T passes on w when w |= T, is disabled on w when w |=^d T, and
+// fails on w when it does neither. The standard notes pass and disabled are
+// mutually exclusive.
 bool PassesTopLevel(const Word& word, const TopLevelProperty& top);
 bool IsDisabledTopLevel(const Word& word, const TopLevelProperty& top);
 bool FailsTopLevel(const Word& word, const TopLevelProperty& top);
@@ -265,28 +265,25 @@ struct EnabledAssertion {
   std::shared_ptr<const BooleanExpr> enabling;
 };
 
-// §F.5.3.1: "A word in the set of words is feasible if every assumption in the
-// set of assumptions is satisfied on the word."
+// §F.5.3.1: a word of the set is feasible when it satisfies every assumption of
+// the set.
 bool WordIsFeasible(const Word& word,
                     const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: "An assert property statement is satisfied on a set of words
-// predicated on the set of assumptions if it is satisfied on each feasible
-// word."
+// §F.5.3.1: an assert property statement is satisfied on a set of words, given
+// the assumptions, when every feasible word satisfies it.
 bool AssertSatisfiedOnWordSet(const EnabledAssertion& assertion,
                               const std::vector<Word>& words,
                               const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: "A cover property statement is satisfied on a set of words
-// predicated on the set of assumptions if it is satisfied on at least one
-// feasible word."
+// §F.5.3.1: a cover property statement is satisfied on a set of words, given
+// the assumptions, when some feasible word satisfies it.
 bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
                              const std::vector<Word>& words,
                              const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: "An assertion statement holds globally on the set of words
-// predicated on the set of assumptions if it is satisfied on every feasible
-// word."
+// §F.5.3.1: an assertion statement holds globally on the set of words, given
+// the assumptions, when every feasible word satisfies it.
 bool HoldsGloballyOnWordSet(const EnabledAssertion& assertion,
                             const std::vector<Word>& words,
                             const std::vector<EnabledAssertion>& assumptions);

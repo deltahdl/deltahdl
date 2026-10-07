@@ -454,13 +454,13 @@ static std::string_view StringLiteralBody(std::string_view text) {
 
 // The characters one string literal denotes, with the quotes removed and each
 // escape replaced by the one character it stands for, except that a zero byte
-// contributes no character at all. §6.16 rules that "A string variable shall
-// not contain the special character "\0". Assigning the value 0 to a string
-// character shall be ignored" (printed page 112 of IEEE 1800-2023), so the
-// value of "a\0b" is the two characters "ab" and its length is 2. Dropping the
-// character rather than reporting it is what the second sentence says to do,
-// and src/simulator/eval_string.cpp does the same thing to the run-time value
-// in StripStringZeros and in StringWriteByte.
+// contributes no character at all. §6.16 keeps the special character "\0" out
+// of a string variable and ignores an assignment of 0 to a string character
+// (printed page 112 of IEEE 1800-2023), so the value of "a\0b" is the two
+// characters "ab" and its length is 2. Dropping the character rather than
+// reporting it is what the second sentence says to do, and
+// src/simulator/eval_string.cpp does the same thing to the run-time value in
+// StripStringZeros and in StringWriteByte.
 static std::string StringLiteralChars(const Expr* expr) {
   std::string_view text = StringLiteralBody(expr->text);
   std::string chars;
@@ -517,10 +517,9 @@ ScopeMap RegisteredModuleScope() {
 }
 
 // §6.16's Table 6-9 (printed page 114) gives concatenation over string
-// operands: "Each operand can be a string literal or an expression of string
-// type ... the result of the concatenation shall be of string type." Empty
-// where any operand does not fold, since a concatenation missing an operand has
-// no characters.
+// operands, each a string literal or a string-typed expression, with a
+// string-typed result. Empty where any operand does not fold, since a
+// concatenation missing an operand has no characters.
 static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
   std::string chars;
   for (const Expr* element : expr->elements) {
@@ -531,10 +530,9 @@ static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
   return chars;
 }
 
-// §6.16's Table 6-9 on the same page gives replication: "the result of the
-// replication shall be M concatenated copies of the inner concatenation (where
-// M is the value of multiplier)". A multiplier of zero gives the empty string,
-// which the table states outright.
+// §6.16's Table 6-9 on the same page gives replication: M concatenated copies
+// of the inner concatenation, M being the multiplier's value. A multiplier of
+// zero gives the empty string, which the table states outright.
 static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
   auto count = ConstEvalInt(expr->repeat_count, RegisteredModuleScope());
   if (!count || *count < 0) return std::nullopt;
@@ -736,27 +734,25 @@ static int64_t SelectOffset(const std::optional<PackedRange>& range,
   return range ? range->OffsetOf(index) : index;
 }
 
-// §11.5.1: "If the bit-select address is invalid (it is out of bounds or has
-// one or more x or z bits), then the value returned by the reference shall be x
-// for 4-state and 0 for 2-state values." A folded constant carries no x, so a
-// bit outside the value reads as 0 whichever it is. A bit at or above 64 is
-// read through ConstVal::high_words, so `P[95]` of a 96-bit parameter is the
-// bit its digits wrote and not a bit the int64 never held.
+// §11.5.1: an invalid bit-select address, out of bounds or holding an x or z
+// bit, reads as x for a 4-state value and 0 for a 2-state one. A folded
+// constant carries no x, so a bit outside the value reads as 0 whichever it is.
+// A bit at or above 64 is read through ConstVal::high_words, so `P[95]` of a
+// 96-bit parameter is the bit its digits wrote and not a bit the int64 never
+// held.
 static ConstVal SelectOneBit(const ConstVal& value, int64_t offset) {
   return ConstVal{ConstValBit(value, offset) ? 1 : 0, 1, false};
 }
 
-// §11.5.1: "A part-select that addresses a range of bits that are completely
-// out of the address bounds of the vector ... shall yield the value x when
-// read. Part-selects that are partially out of range shall, when read, return x
-// for the bits that are out of range." Those bits read as 0 here for the reason
-// a single out-of-bounds bit does, and the bits that are in range keep the
-// places they occupy in the selected field.
-// The field is read as the 64-bit window of the value that starts at its low
-// end, ConstValWindow, which reaches the words above bit 63 for a range at or
-// above 64 (`P[95:64]`) and shifts the value up for one running off the
-// bottom, where the bits below it are out of range and left at zero; the
-// mask then cuts the window to the field's own width.
+// §11.5.1: a part-select wholly outside the vector's address bounds reads as x,
+// and one partly outside reads x for its out-of-range bits. Those bits read as
+// 0 here for the reason a single out-of-bounds bit does, and the bits that are
+// in range keep the places they occupy in the selected field. The field is read
+// as the 64-bit window of the value that starts at its low end, ConstValWindow,
+// which reaches the words above bit 63 for a range at or above 64 (`P[95:64]`)
+// and shifts the value up for one running off the bottom, where the bits below
+// it are out of range and left at zero; the mask then cuts the window to the
+// field's own width.
 static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
                                               int64_t off_a, int64_t off_b) {
   int64_t hi = std::max(off_a, off_b);

@@ -16,14 +16,14 @@ namespace delta {
 
 namespace {
 
-// §9.2.2.2.2 rules that statements in an always_comb "shall not include ...
-// fork-join statements", §9.2.2.3 applies that to always_latch, §9.2.2.4 states
-// it of always_ff and §9.2.3 of a final procedure. None of the four names a
-// statement the bar is lifted inside, so this descends every link
-// ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six of
-// the thirteen, so a fork nested in another fork's arm, in a for initialization
-// or step, in a randcase item, in either arm of an assertion action block or in
-// a randsequence production was never looked at.
+// §9.2.2.2.2 rules that statements in an always_comb exclude fork-join
+// statements, §9.2.2.3 applies that to always_latch, §9.2.2.4 states it of
+// always_ff and §9.2.3 of a final procedure. None of the four names a statement
+// the bar is lifted inside, so this descends every link ForEachChildStmt in
+// elaborator_validate_internal.h names. It wrote out six of the thirteen, so a
+// fork nested in another fork's arm, in a for initialization or step, in a
+// randcase item, in either arm of an assertion action block or in a
+// randsequence production was never looked at.
 //
 // ForEachChildStmt gives the visitor no way to stop, so the first fork found is
 // kept in `found` and the recursion runs only while `found` is false.
@@ -105,14 +105,12 @@ void KeepBoth(AssignedNames& acc, const AssignedNames& other) {
 AssignedNames AssignedOnEveryPath(const Stmt* stmt);
 
 // §9.3.2's Table 9-1 gives the three join keywords their meanings. Under `join`
-// "the parent process blocks until all the processes spawned by this fork
-// terminate", so control leaves the block only once every arm has run and the
-// arms contribute everything each of them contributes. Under `join_any` the
-// parent blocks "until any one of the processes spawned by this fork
-// terminates" and under `join_none` it "continues to execute concurrently with
-// all the processes spawned by the fork", so under either one an arm's
-// assignment need not have been made when control passes on, and the fork
-// establishes nothing.
+// the parent process blocks until every process the fork spawned terminates, so
+// control leaves the block only once every arm has run and the arms contribute
+// everything each of them contributes. Under `join_any` the parent blocks until
+// any one of the spawned processes terminates and under `join_none` it runs on
+// alongside all of them, so under either one an arm's assignment need not have
+// been made when control passes on, and the fork establishes nothing.
 AssignedNames AssignedOnEveryForkPath(const Stmt* stmt) {
   AssignedNames out;
   if (stmt->join_kind != TokenKind::kKwJoin) return out;
@@ -120,12 +118,12 @@ AssignedNames AssignedOnEveryForkPath(const Stmt* stmt) {
   return out;
 }
 
-// §12.7.1 controls the for-loop "by a three-step process": step a) "executes
-// one or more for_initialization assignments", once and under no condition;
-// step b) tests the expression and executes the body; step c) "executes one or
-// more for_step assignments ... then repeats step b)". So an initialization
-// assignment is made on every path through the statement, and a step assignment
-// is made once the body has run, which the note below counts as taken.
+// §12.7.1 runs the for-loop in three steps: step a) makes the
+// for_initialization assignments, once and under no condition; step b) tests
+// the expression and executes the body; step c) makes the for_step assignments
+// and goes back to step b). So an initialization assignment is made on every
+// path through the statement, and a step assignment is made once the body has
+// run, which the note below counts as taken.
 AssignedNames AssignedOnEveryForPath(const Stmt* stmt) {
   AssignedNames out;
   for (const auto* s : stmt->for_inits) KeepBoth(out, AssignedOnEveryPath(s));
@@ -176,19 +174,18 @@ AssignedNames AssignedOnEveryCasePath(const Stmt* stmt) {
 // an expression stood in. So the links are written out with the clause that
 // decides each, and three of them contribute nothing on purpose:
 //
-//  - Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §16.3 has the pass
-//    statement "executed if the expression evaluates to true" and the fail
-//    statement "executed if the expression evaluates to false", which between
-//    them would cover the expression's whole domain, but §20.11 gives
-//    $assertcontrol "the capability to enable/disable action block execution of
-//    assertions and expect statements". So there is a way through the statement
+//  - Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §16.3 runs the pass
+//    statement when the expression is true and the fail statement when it is
+//    false, which between them would cover the expression's whole domain, but
+//    §20.11 lets $assertcontrol enable or disable action block execution for
+//    assertions and expect statements. So there is a way through the statement
 //    that runs neither arm, exactly as there is through a case with no default.
-//  - Stmt::randcase_items. §18.16 rules that "if all randcase_items specify
-//    zero weights, then no branch is taken", and the weights "can be arbitrary
-//    expressions", read while the design runs.
-//  - Stmt::rs_productions. §18.17 rules that production lists separated by a
-//    "|" "imply a set of choices, which the generator will make at random", so
-//    no code block of a randsequence is reached on every path through it.
+//  - Stmt::randcase_items. §18.16 takes no branch when every randcase_item has
+//    weight zero, and the weights may be any expressions, read while the
+//    design runs.
+//  - Stmt::rs_productions. §18.17 makes production lists separated by a "|"
+//    choices the generator makes at random, so no code block of a randsequence
+//    is reached on every path through it.
 AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
   AssignedNames out;
   if (!stmt) return out;
@@ -224,11 +221,11 @@ AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
   }
 }
 
-// §9.2.2.2 asks a tool to "warn if the behavior within an always_comb procedure
-// does not represent combinational logic, such as if latched behavior can be
-// inferred", and §9.2.2.3 asks the mirror question of always_latch. Both are
-// questions about the behavior, which is to say about the values the procedure
-// leaves behind rather than about the shape its control flow happens to take.
+// §9.2.2.2 asks a tool to warn when an always_comb procedure's behavior is not
+// combinational, for instance when a latch can be inferred, and §9.2.2.3 asks
+// the mirror question of always_latch. Both are questions about the behavior,
+// which is to say about the values the procedure leaves behind rather than
+// about the shape its control flow happens to take.
 //
 // A variable the procedure assigns somewhere but not on every path keeps its
 // previous value on the paths that skip it, and holding a value across an
@@ -253,9 +250,9 @@ bool InfersLatch(const Stmt* body) {
 // Detects a statement that suspends the process executing it, whether through a
 // statement-level timing control (delay, cycle delay, event control, wait, wait
 // fork) or on its own (wait_order, expect). §9.2.2.2.2 rules that statements in
-// an always_comb "shall not include those that block, have blocking timing or
-// event controls", so blocking is the property the callers ask about and a
-// timing control is one way of having it.
+// an always_comb may not block or carry a blocking timing or event control, so
+// blocking is the property the callers ask about and a timing control is one
+// way of having it.
 //
 // When `include_intra_assign` is set, an assignment carrying an
 // intra-assignment timing control (`x = #5 y;`, `x <= @(clk) y;`, `x = ##2 y;`,
@@ -265,7 +262,7 @@ bool InfersLatch(const Stmt* body) {
 // function.
 bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
 
-// §9.2.2.2.2 states its rule of "statements in an always_comb", §9.2.2.4 of the
+// §9.2.2.2.2 states its rule of an always_comb's statements, §9.2.2.4 of the
 // statements of an always_ff and §9.2.3 of those a final procedure holds; none
 // of the three names a statement the rule is suspended inside, so this descends
 // every link ForEachChildStmt in elaborator_validate_internal.h names. It wrote
@@ -281,15 +278,15 @@ bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
 bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
   if (!stmt) return false;
   switch (stmt->kind) {
-    // §14.11 makes a cycle delay a procedural timing control that "shall wait
-    // for the specified number of clocking block events", §15.5.4 has
-    // wait_order "suspend the calling process" until its events trigger, and
-    // §16.17 calls expect "a procedural blocking statement".
+    // §14.11 makes a cycle delay a procedural timing control that waits for the
+    // given number of clocking block events, §15.5.4 has wait_order suspend the
+    // calling process until its events trigger, and §16.17 calls expect a
+    // procedural blocking statement.
     //
     // kNbEventTrigger is absent by decision rather than by oversight: §15.5.1
-    // rules that with the `->>` operator "the statement executes without
-    // blocking", so a nonblocking event trigger does not suspend the process
-    // and none of the callers' rules reach it.
+    // rules that with the `->>` operator the statement does not block, so a
+    // nonblocking event trigger does not suspend the process and none of the
+    // callers' rules reach it.
     case StmtKind::kTimingControl:
     case StmtKind::kDelay:
     case StmtKind::kCycleDelay:
@@ -327,14 +324,13 @@ void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   // construct and send the reader to the other's rules.
   //
   // §9.2.2.2.2 "always_comb compared to always @*" states these three rules --
-  // "Statements in an always_comb shall not include those that block, have
-  // blocking timing or event controls, or fork-join statements" -- and every
-  // sentence in it is about always_comb. It never mentions always_latch. What
-  // binds them to always_latch is one sentence in §9.2.2.3 "Latched logic
-  // always_latch procedure": "All statements in 9.2.2.2 shall apply to
-  // always_latch." So §9.2.2.3 is the subclause a reader of an always_latch
-  // report has to open, and §9.2.2.2.2 the one a reader of an always_comb
-  // report has to.
+  // an always_comb holds no statement that blocks, no blocking timing or event
+  // control and no fork-join -- and every sentence in it is about always_comb.
+  // It never mentions always_latch. What binds them to always_latch is one
+  // sentence in §9.2.2.3 "Latched logic always_latch procedure", which applies
+  // everything §9.2.2.2 states to always_latch. So §9.2.2.3 is the subclause a
+  // reader of an always_latch report has to open, and §9.2.2.2.2 the one a
+  // reader of an always_comb report has to.
   const Subclause kRule =
       kIsComb ? Subclause("9.2.2.2.2") : Subclause("9.2.2.3");
   // An always_comb or always_latch infers its own sensitivity and shall not

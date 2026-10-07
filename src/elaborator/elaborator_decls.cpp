@@ -346,13 +346,12 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
     ValidateAggregateNetDataType(dtype, diag, loc);
     return;
   }
-  // §6.19: an enumeration written with no base names no data type, and "in the
-  // absence of a data type declaration, the default data type shall be int",
-  // which is 2-state. An absent base leaves the base kind implicit, and the
-  // one-argument Is4stateType reads an implicit kind as 4-state -- right for a
-  // net that named no data type of its own, wrong for an enum's missing base.
-  // So the question goes to the resolved data type, which reads the base kind
-  // and a named base through the typedefs.
+  // §6.19: an enumeration written with no base names no data type, and then
+  // takes int, which is 2-state. An absent base leaves the base kind implicit,
+  // and the one-argument Is4stateType reads an implicit kind as 4-state --
+  // right for a net that named no data type of its own, wrong for an enum's
+  // missing base. So the question goes to the resolved data type, which reads
+  // the base kind and a named base through the typedefs.
   if (k == DataTypeKind::kEnum) {
     if (!Is4stateType(dtype, typedefs))
       diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
@@ -364,10 +363,9 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
   }
 }
 
-// §6.9.2: vectored and scalared "shall be optional advisory keywords to be used
-// in vector net declarations", so a net declared with either keyword and no
-// packed dimension is not a vector net and the keyword has no declaration to
-// advise about.
+// §6.9.2: vectored and scalared are optional advisory keywords for vector net
+// declarations, so a net declared with either keyword and no packed dimension
+// is not a vector net and the keyword has no declaration to advise about.
 static void ValidateVectoredScalaredNet(const DataType& dtype,
                                         const RtlirNet& net, DiagEngine& diag,
                                         SourceLoc loc) {
@@ -393,26 +391,25 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
   }
 }
 
-// §6.3.2.2: a drive strength "allows a continuous assignment to be placed on a
-// net in the same statement that declares that net", which §6.3.2 states as the
-// restriction it is -- drive strength "shall only be used when placing a
-// continuous assignment on a net in the same statement that declares the net".
-// The check is applied to the declaration as elaborated rather than to a
-// module's own item list, so that a net declared inside a generate block is
-// held to the rule the same as one declared beside it. §27.5 leaves an
-// unselected generate block unelaborated, so a declaration there is never
-// reached, which is the right answer: it declares no net for the rule to speak
-// about.
+// §6.3.2.2: a drive strength lets the statement that declares a net also place
+// a continuous assignment on it, which §6.3.2 states as the restriction it is
+// -- drive strength is used only where the net's declaring statement also
+// places a continuous assignment on it. The check is applied to the declaration
+// as elaborated rather than to a module's own item list, so that a net declared
+// inside a generate block is held to the rule the same as one declared beside
+// it. §27.5 leaves an unselected generate block unelaborated, so a declaration
+// there is never reached, which is the right answer: it declares no net for the
+// rule to speak about.
 static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
                                                DiagEngine& diag) {
   if ((item->data_type.drive_strength0 != 0 ||
        item->data_type.drive_strength1 != 0) &&
       item->init_expr == nullptr) {
-    // §6.3.2 states this restriction: "Drive strength shall only be used when
-    // placing a continuous assignment on a net in the same statement that
-    // declares the net." §10.3.4 says only where a drive strength may be
-    // written and that it applies to scalar nets, and never requires a
-    // declaration carrying one to carry an assignment.
+    // §6.3.2 states this restriction: drive strength is used only where a net's
+    // declaring statement also places a continuous assignment on it. §10.3.4
+    // says only where a drive strength may be written and that it applies to
+    // scalar nets, and never requires a declaration carrying one to carry an
+    // assignment.
     diag.Error(item->loc,
                "drive strength on net declaration requires an assignment",
                Subclause("6.3.2"));
@@ -423,10 +420,10 @@ static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
 // assignment — an identifier LHS naming the net driven by the initializer, with
 // the net's width and the declaration's drive strengths and delays.
 //
-// §10.3.3 puts the declaration's delay here rather than on the net: "When there
-// is a continuous assignment in a declaration, the delay is part of the
-// continuous assignment and is not a net delay. Thus, it shall not be added to
-// the delay of other drivers on the net."
+// §10.3.3 puts the declaration's delay here rather than on the net: with a
+// continuous assignment in a declaration, the delay belongs to the assignment
+// rather than being a net delay, so it is not added to the delay of the net's
+// other drivers.
 static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
                                               const RtlirNet& net,
                                               Arena& arena) {
@@ -482,11 +479,10 @@ struct TriregDefaults {
 };
 
 // §28.16.2.2: give the net the charge decay time its declaration writes as the
-// third delay -- "The third delay in a trireg net declaration shall specify the
-// charge decay time" -- or, where the declaration writes no third delay, the
-// module's default decay time. The third delay is evaluated in the module's
-// parameter scope, so a parameter or localparam decay time resolves and not
-// just a bare literal.
+// third delay -- a trireg net declaration's third delay is its charge decay
+// time -- or, where the declaration writes no third delay, the module's default
+// decay time. The third delay is evaluated in the module's parameter scope, so
+// a parameter or localparam decay time resolves and not just a bare literal.
 static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
                                  const TriregDefaults& defaults,
                                  const ScopeMap& scope, DiagEngine& diag) {
@@ -503,14 +499,13 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
     // A.2.2.3 writes delay_value over "unsigned_number | real_number |
     // ps_identifier | time_literal | 1step", so a decay time with a decimal
     // point is a form the grammar admits and ConstEvalInt does not fold.
-    // §3.14.1 says what it becomes: "the time precision specifies how delay
-    // values are rounded before being used in simulation", and "if the
-    // precision is the same as the time units, then delay values are rounded
-    // off to whole numbers (integers)". decay_ticks holds it rounded to the
-    // nearest whole count with ties away from zero -- the same std::llround
-    // §6.12.1 already gives an integer parameter set from a real -- and the
-    // value itself is kept beside it for the lowerer to round to the module's
-    // precision when it scales the time into the design's ticks.
+    // §3.14.1 says what it becomes: the time precision fixes how a delay value
+    // is rounded before simulation uses it, and with the precision equal to the
+    // time unit, delay values round to whole numbers. decay_ticks holds it
+    // rounded to the nearest whole count with ties away from zero -- the same
+    // std::llround §6.12.1 already gives an integer parameter set from a real
+    // -- and the value itself is kept beside it for the lowerer to round to the
+    // module's precision when it scales the time into the design's ticks.
     //
     // The fold is reached from here rather than from ConstEvalFull. A
     // kRealLiteral case there would answer every ConstEvalInt caller in the
@@ -536,30 +531,30 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
                  Subclause("28.16.2.2"));
     return;
   }
-  // §28.16.2: the charge decay time is "the delay between when the drivers of a
-  // trireg net turn off and when its stored charge can no longer be
-  // determined", which has no negative value.
-  // ValidateItemDelaysNonNegative reports one; the store is skipped here so the
-  // cast cannot turn it into the enormous positive tick count an unsigned
-  // reading of it makes (#3378).
+  // §28.16.2: the charge decay time is the delay from a trireg net's drivers
+  // turning off to its stored charge no longer being determinable, which has no
+  // negative value. ValidateItemDelaysNonNegative reports one; the store is
+  // skipped here so the cast cannot turn it into the enormous positive tick
+  // count an unsigned reading of it makes (#3378).
   if (*decay_ticks < 0) return;
   net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
   if (decay_real) {
     net.decay_is_real = true;
     net.decay_real = *decay_real;
   }
-  // §28.16.2.2 gives the meaning "never decays" to a declaration with no third
-  // delay, so a declaration that wrote one decays whatever it wrote -- zero
-  // included, which §28.16.2.1 makes the transition to x happening at once.
+  // §28.16.2.2 gives the meaning of never decaying to a declaration with no
+  // third delay, so a declaration that wrote one decays whatever it wrote --
+  // zero included, which §28.16.2.1 makes the transition to x happening at
+  // once.
   net.decays = true;
 }
 
 // §10.3.1 / §28.16.2: apply the compilation unit's default trireg charge
 // strength and the declaration's charge decay time to a freshly built net.
 // Neither reaches a net that is not a trireg, because §28.16.2 gives the third
-// delay of a trireg declaration to the charge decay time "instead of the delay
-// in a transition to the z logic state" -- on every other net that delay is the
-// turn-off delay RecordNetDeclDelay below records.
+// delay of a trireg declaration to the charge decay time in place of the delay
+// of a transition to z -- on every other net that delay is the turn-off delay
+// RecordNetDeclDelay below records.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
                                    const TriregDefaults& defaults,
                                    const ScopeMap& scope, DiagEngine& diag) {
@@ -571,19 +566,18 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
 }
 
 // §28.16: record on the net the delay its declaration wrote, which is what
-// §10.3.3 calls a net delay: "any value change that is to be applied to wireA
-// by some other statement shall be delayed for ten time units before it takes
-// effect." A declaration that also assigns the net writes no net delay, because
-// the same subclause rules that "when there is a continuous assignment in a
-// declaration, the delay is part of the continuous assignment and is not a net
-// delay"; BuildNetDeclContAssign puts that one on the assignment instead.
+// §10.3.3 calls a net delay, under which every value change another statement
+// applies to wireA waits ten time units before taking effect. A declaration
+// that also assigns the net writes no net delay, because the same subclause
+// rules that a delay in a declaration carrying a continuous assignment belongs
+// to that assignment and is not a net delay; BuildNetDeclContAssign puts that
+// one on the assignment instead.
 //
-// The third delay is left off a trireg, for which §28.16.2 rules that "the
-// first two delays shall specify the delay for transition to the 1 and 0 logic
-// states when the trireg net is driven to these states by a driver. The third
-// delay shall specify the charge decay time instead of the delay in a
-// transition to the z logic state" -- ApplyTriregNetDefaults above reads that
-// third delay into RtlirNet::decay_ticks, and it is not a turn-off delay.
+// The third delay is left off a trireg, for which §28.16.2 rules that the first
+// two delays are those of a driver taking the trireg net to 1 and to 0, and
+// that the third is the charge decay time rather than the delay of a transition
+// to z -- ApplyTriregNetDefaults above reads that third delay into
+// RtlirNet::decay_ticks, and it is not a turn-off delay.
 static void RecordNetDeclDelay(const ModuleItem* item, RtlirNet& net) {
   if (item->init_expr != nullptr) return;
   net.delay_rise = item->net_delay;
@@ -626,8 +620,9 @@ int64_t RangeSpan(int64_t left, int64_t right) {
 }
 
 // The product of every packed dimension inside the outermost one, so §7.4.1's
-// "the outermost range indexes elements rather than bits" can be detected. Nil
-// when a bound does not fold, which is not a stride of one but an unknown.
+// rule that the outermost range indexes elements rather than bits can be
+// detected. Nil when a bound does not fold, which is not a stride of one but an
+// unknown.
 std::optional<int64_t> InnerPackedStride(const DataType& dt,
                                          const ScopeMap& scope) {
   int64_t stride = 1;
@@ -660,15 +655,15 @@ PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
   return {*left, *right};
 }
 
-// §6.7.1 opens by saying which declarations it describes: "Net declarations
-// without assignments and whose net type is not a user-defined nettype". A net
-// whose net type is a user-defined nettype belongs to §6.7.2 instead, and that
-// subclause puts no restriction on the data type -- "a net declared with a
-// nettype uses the data type and any associated resolution function for that
-// nettype", whatever that data type is. Its own examples declare a nettype over
-// an array of reals and a net from it: `typedef real TR[5]; nettype TR wTR; wTR
-// w5;`. So the list of data types §6.7.1 admits is asked only of a net whose
-// net type is one of the built-in ones.
+// §6.7.1 opens by saying which declarations it describes: net declarations
+// without assignments whose net type is no user-defined nettype. A net whose
+// net type is a user-defined nettype belongs to §6.7.2 instead, and that
+// subclause puts no restriction on the data type -- a net declared with a
+// nettype takes that nettype's data type and resolution function, if any,
+// whatever that data type is. Its own examples declare a nettype over an array
+// of reals and a net from it: `typedef real TR[5]; nettype TR wTR; wTR w5;`. So
+// the list of data types §6.7.1 admits is asked only of a net whose net type is
+// one of the built-in ones.
 static void ValidateNetDeclDataType(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& nettype_names,
@@ -682,15 +677,15 @@ static void ValidateNetDeclDataType(
 
 // Records what a select written on this net may reach. §11.5.2 draws no
 // distinction between a net and a variable -- a select of an array element is
-// "addressed in the same manner as net and variable bit-selects and
-// part-selects" -- so the net gets the same VarSelectShape a variable gets, and
-// its dimensions go to net_array_info_ for the one slice rule that reads them.
-// They are kept out of var_array_info_ deliberately: that map is read by rules
-// written about variables, and §7.6's array assignment comparison reports a
-// mismatch between `logic [7:0] v[4]` and `wire [7:0] w[4]` when it sees one,
-// because VarArrayInfo::elem_type holds the net kind for a wire while §6.7.1
-// makes a net's default data type logic. What elem_type should mean for a net
-// is unread, so no rule that consults it is given one.
+// addressed as a net's or a variable's select is -- so the net gets the same
+// VarSelectShape a variable gets, and its dimensions go to net_array_info_ for
+// the one slice rule that reads them. They are kept out of var_array_info_
+// deliberately: that map is read by rules written about variables, and §7.6's
+// array assignment comparison reports a mismatch between `logic [7:0] v[4]` and
+// `wire [7:0] w[4]` when it sees one, because VarArrayInfo::elem_type holds the
+// net kind for a wire while §6.7.1 makes a net's default data type logic. What
+// elem_type should mean for a net is unread, so no rule that consults it is
+// given one.
 void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
                                      RtlirModule* mod) {
   RecordVarSelectShape(item, typedefs_, var_select_shapes_);
@@ -765,13 +760,13 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
-  // §7.4.2: "Unpacked arrays can be made of any data type", and "Elements of
-  // net arrays can be used in the same fashion as a scalar or vector net". A
-  // net carrying an unpacked dimension is therefore neither a scalar nor a
-  // packed array for select legality, exactly as RegisterVarDeclNames already
-  // decides for a variable, because §11.5.2 makes an index on one an array
-  // element select rather than a bit-select. Testing only the packed dimension
-  // made `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report.
+  // §7.4.2: an unpacked array may have any element data type, and an element of
+  // a net array is used as a scalar or vector net is. A net carrying an
+  // unpacked dimension is therefore neither a scalar nor a packed array for
+  // select legality, exactly as RegisterVarDeclNames already decides for a
+  // variable, because §11.5.2 makes an index on one an array element select
+  // rather than a bit-select. Testing only the packed dimension made
+  // `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report.
   if (item->unpacked_dims.empty()) {
     if (!item->data_type.packed_dim_left)
       scalar_var_names_.insert(item->name);
@@ -813,9 +808,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
-    // §6.3.2.1 states the rule as prose: "The charge strength specification
-    // shall be used only with trireg nets." §10.3 carries it only as footnote
-    // 16 annotating the net_declaration production of Syntax 10-1. This site
+    // §6.3.2.1 states the rule as prose, keeping the charge strength
+    // specification to trireg nets. §10.3 carries it only as footnote 16
+    // annotating the net_declaration production of Syntax 10-1. This site
     // catches the declaration the parser cannot, where the strength is written
     // on a trireg and a named type follows, so ApplyNetInfo copies the strength
     // onto a type whose kind is no longer trireg.
@@ -908,10 +903,10 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
 // (e.g. `logic [1:0][7:0]`) needs the inner dimensions so the lowerer can
 // compute the outermost-element stride and a single-index select slices a whole
 // element rather than one bit. §11.5.1: a single packed dimension is equally
-// needed, because "the actual bit that is accessed by an address is, in part,
-// determined by the declaration" — `logic [15:0] acc` and `logic [2:17] acc`
-// are both sixteen bits wide and the same index names a different bit of each,
-// so the bounds as written have to reach the lowerer.
+// needed, because the declaration helps decide which bit an address reaches —
+// `logic [15:0] acc` and `logic [2:17] acc` are both sixteen bits wide and the
+// same index names a different bit of each, so the bounds as written have to
+// reach the lowerer.
 void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
                                      RtlirVariable& var) {
   SetStructTypeInfo(item, var, typedefs_, arena_);

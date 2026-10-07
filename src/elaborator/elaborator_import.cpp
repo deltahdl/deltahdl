@@ -149,10 +149,9 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
   }
 }
 
-// §26.3: an identifier is potentially locally visible "at some point within a
-// scope if there is a wildcard import of a package before that point within the
-// current scope", and an explicit import makes one locally visible "prior to
-// that point within the current scope". Both rules are about the import's
+// §26.3: a wildcard import earlier in a scope makes an identifier potentially
+// locally visible from there on, and an explicit import makes one locally
+// visible only before the point in question. Both rules are about the import's
 // position in the scope, which is why this registers one import as the item
 // walk in Elaborator::ElaborateItems reaches it rather than hoisting every body
 // import ahead of the walk: a declaration written above the import does not see

@@ -131,8 +131,8 @@ static void CheckOutOfBlockReturnType(const ModuleItem* proto,
 
 // §8.24 for a class out-of-block declaration and §25.7 for a subroutine defined
 // for an interface by a hierarchical name state one rule in the same words.
-// §25.7 (printed page 793): "The number and types of arguments in a prototype
-// shall match the argument types in the subroutine declaration."
+// §25.7 (printed page 793): a prototype's arguments match the subroutine
+// declaration's in number and type.
 static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         const ModuleItem* impl,
                                         const OutOfBlockScope& scope,

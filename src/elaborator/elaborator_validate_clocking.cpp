@@ -432,14 +432,14 @@ void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
 static bool HasCycleDelay(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kCycleDelay) return true;
-  // §14.11 says "If no default clocking has been specified for the current
-  // module, interface, checker, or program, then the compiler shall issue an
-  // error." It conditions that on the module and not on the statement the delay
-  // is written in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names. It wrote out six of the thirteen,
-  // which is what let `initial begin fork ##1; join end` elaborate clean in a
-  // module with no default clocking while the same `##1;` written one level up
-  // was reported: the walk never read Stmt::fork_stmts, so
+  // §14.11 makes a cycle delay with no default clocking in the enclosing
+  // module, interface, checker or program a compile-time error. It conditions
+  // that on the module and not on the statement the delay is written in, so
+  // this descends every link ForEachChildStmt in elaborator_validate_internal.h
+  // names. It wrote out six of the thirteen, which is what let
+  // `initial begin fork ##1; join end` elaborate clean in a module with no
+  // default clocking while the same `##1;` written one level up was reported:
+  // the walk never read Stmt::fork_stmts, so
   // Elaborator::ValidateCycleDelayDefaultClocking concluded the module wrote no
   // cycle delay.
   //
@@ -464,17 +464,15 @@ struct ProceduralRoot {
 // Every statement tree of `items`, including those a generate construct or a
 // subroutine holds rather than a process.
 //
-// §14.11 (printed page 361) states that "if no default clocking has been
-// specified for the current module, interface, checker, or program, then the
-// compiler shall issue an error", and §14.12 (printed page 361) makes one
-// clocking block the default "for all cycle delay operations within a given
-// module, interface, program, or checker". Neither rule is stated against a
-// process, and neither is the sentence that "cycle delay timing controls shall
-// not be legal for use in intra-assignment delays". So a ## written in a
-// generate block or in a task or function body of a module is judged by the
-// same default clocking as one written in an always block beside it, and a walk
-// that reads ModuleItem::body off the items of the module reaches only the
-// last of those.
+// §14.11 (printed page 361) makes a cycle delay with no default clocking in the
+// enclosing module, interface, checker or program a compile-time error, and
+// §14.12 (printed page 361) makes one clocking block the default for every
+// cycle delay in a module, interface, program or checker. Neither rule is
+// stated against a process, and neither is the rule keeping cycle delays out of
+// intra-assignment delays. So a ## written in a generate block or in a task or
+// function body of a module is judged by the same default clocking as one
+// written in an always block beside it, and a walk that reads ModuleItem::body
+// off the items of the module reaches only the last of those.
 //
 // A generate construct holds its items in gen_body, in gen_else->gen_body and
 // in the body of each entry of gen_case_items, which is the shape
@@ -573,11 +571,11 @@ static void CollectClassMethodRoots(const ClassDecl* cls,
   }
 }
 
-// §14.11 (printed page 361): a ## with no default clocking "for the current
-// module, interface, checker, or program" is an error. A package is none of
-// these and cannot declare a clocking block, so a ## in one of its tasks or in
-// a method of one of its classes has no default clocking to count, whatever
-// clocking the module that calls it declares as its default.
+// §14.11 (printed page 361): a ## with no default clocking in its module,
+// interface, checker or program is an error. A package is none of these and
+// cannot declare a clocking block, so a ## in one of its tasks or in a method
+// of one of its classes has no default clocking to count, whatever clocking the
+// module that calls it declares as its default.
 void ValidatePackageCycleDelays(const CompilationUnit* unit, DiagEngine& diag) {
   for (const auto* pkg : unit->packages) {
     std::vector<ProceduralRoot> roots;

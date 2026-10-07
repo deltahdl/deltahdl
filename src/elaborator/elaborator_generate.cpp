@@ -28,19 +28,18 @@
 
 namespace delta {
 
-// §27.5 evaluates a conditional generate's expression "during elaboration",
-// which here is after Elaborator::ElaborateModule has returned for every
-// module. Install the typedefs_ and cu_param_scope_ that
+// §27.5 evaluates a conditional generate's expression during elaboration, which
+// here is after Elaborator::ElaborateModule has returned for every module.
+// Install the typedefs_ and cu_param_scope_ that
 // Elaborator::ElaborateBehavioralItem captured when it queued this generate, so
 // that the condition and the declarations in the selected body read the scope
 // of the module the generate was written in. §26.3 makes an imported name
-// locally visible only "prior to that point within the current scope", so a
-// name some other module imported must not fold here. Restore the two maps
-// before returning, because the caller,
-// Elaborator::ResolveDefparamsAndGenerates, shares them with
-// Elaborator::ApplyDefparamsRecursively and with the type-width table
-// FinalizeDesignTail builds, both of which read the design-wide union that
-// Elaborator::ElaborateTopModules installed.
+// locally visible only before that point in the current scope, so a name some
+// other module imported must not fold here. Restore the two maps before
+// returning, because the caller, Elaborator::ResolveDefparamsAndGenerates,
+// shares them with Elaborator::ApplyDefparamsRecursively and with the
+// type-width table FinalizeDesignTail builds, both of which read the
+// design-wide union that Elaborator::ElaborateTopModules installed.
 void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   TypedefMap saved_typedefs = std::move(typedefs_);
   ScopeMap saved_cu_param_scope = std::move(cu_param_scope_);
@@ -63,11 +62,11 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // was declared with, and §6.16 gives a string parameter characters a
   // concatenation and §6.16.1's len() read back. Both answer from the module
   // installed here, which Elaborator::ElaborateItems installs for the duration
-  // of a module's own items. §27.4 makes a generate block "a separate scope
-  // and a new level of hierarchy when it is instantiated" and says nothing
-  // that would stop either rule at that boundary, so install the same module
-  // for the block's items. Without this the folder sees no module at all here:
-  // a select is addressed over [width-1:0] and a string operation recovers no
+  // of a module's own items. §27.4 makes a generate block a scope of its own
+  // and a further level of hierarchy once instantiated and says nothing that
+  // would stop either rule at that boundary, so install the same module for the
+  // block's items. Without this the folder sees no module at all here: a select
+  // is addressed over [width-1:0] and a string operation recovers no
   // characters.
   ParamRangeRegistryGuard param_range_guard(pg.mod);
   // §20.6.2 with §27.5: `$bits` of a type is a constant expression, and a
@@ -86,9 +85,9 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   std::unordered_map<std::string_view, const ClassDecl*> param_class_registry =
       BuildParamClassRegistry(unit_);
   ParamClassRegistryGuard param_class_guard(&param_class_registry);
-  // §13.4.3 has a constant function call "evaluated at elaboration time", and
-  // the two guards above do not answer it: the folder reads the function table
-  // a ConstFuncRegistryGuard installs. The table is PendingGenerate::func_decls
+  // §13.4.3 has a constant function call evaluated during elaboration, and the
+  // two guards above do not answer it: the folder reads the function table a
+  // ConstFuncRegistryGuard installs. The table is PendingGenerate::func_decls
   // rather than ElaboratorData::func_decls_, because that member is per-module
   // state this site no longer holds. Elaborator::ElaborateItems fills it from
   // the ModuleDecl it is elaborating and ItemElaborationStateSaver puts it back
@@ -210,14 +209,13 @@ static void StampGenBlockScope(std::vector<Scoped>& items, size_t first,
 // instance's loop-index values onto whatever the item produced, which is the
 // only place the instances can still be told apart. A process, a continuous
 // assignment and a user-defined primitive instance each reach simulation as
-// their own thread, and the clause admits the parameter "anywhere within the
-// generate block that a normal parameter with an integer value can be used", so
-// all three carry it, as does a module instance for its port connections.
-// Lowerer::LowerUdpInst in src/simulator/lowerer_udp.cpp
-// gives an RtlirUdpInst a Process of its own for the reason
-// Lowerer::LowerContAssign in src/simulator/lowerer_contassign.cpp gives one to
-// an RtlirContAssign, which is why RtlirUdpInst carries the same two members as
-// RtlirContAssign.
+// their own thread, and the clause admits the parameter anywhere in the
+// generate block an ordinary integer parameter may stand, so all three carry
+// it, as does a module instance for its port connections. Lowerer::LowerUdpInst
+// in src/simulator/lowerer_udp.cpp gives an RtlirUdpInst a Process of its own
+// for the reason Lowerer::LowerContAssign in
+// src/simulator/lowerer_contassign.cpp gives one to an RtlirContAssign, which
+// is why RtlirUdpInst carries the same two members as RtlirContAssign.
 //
 // The block's own declarations are named under the generate prefix while the
 // shared body still calls them by their simple names, so the prefix rides along
@@ -268,29 +266,28 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
 }
 
 // §27.5 (printed page 824) makes a generate block a scope of its own, §23.9
-// (printed 761) has a name the block declares locally stand over the
-// enclosing scope's, and §6.18 (printed 118) introduces a forward typedef's
-// name in the scope it stands in, with the definition to follow in that same
-// scope and its basic type conforming to the forward typedef's. The block's
-// items are walked with the enclosing scope's tables, so a name the block
-// declares as a typedef met the enclosing scope's entry there: the block's
-// `typedef struct pair_t;` kept a module pair_t already in the table,
-// HandleForwardTypedef in src/elaborator/elaborator_typedef.cpp admitting a
-// forward typedef repeated after its own definition, and a function of the
-// block between that forward typedef and the definition was resolved at its
-// item to the module's one-member pair_t and kept, `g.f(tagged A '{3, 4})`
-// reading 30 for §7.2.1's 34; and a nested block's definition stayed in the
-// table after the nested block's items, so a function of g written below h
-// resolved pair_t to h's three-member one -- both ccc8d1f7f's remainders,
-// found by a2d48456a's agent. The enclosing entry of every name a typedef
-// item of the block declares, above or below any subroutine, is taken out
-// ahead of the walk and handed back for RestoreEnclosingTypedefs to put in
-// place once the block's items are done, so the forward typedef installs its
-// placeholder over nothing, the definition writes over that, and the
-// enclosing scope sees its own entry again below the block. A name the
-// enclosing scope has no entry for stays as the block leaves it, since
-// Elaborator::ProcessPendingGenerate folds the block's typedefs into the
-// design-wide table for §20.6.2's $bits and would find nothing otherwise.
+// (printed 761) has a name the block declares locally stand over the enclosing
+// scope's, and §6.18 (printed 118) introduces a forward typedef's name in the
+// scope it stands in, with the definition to follow in that same scope and its
+// basic type conforming to the forward typedef's. The block's items are walked
+// with the enclosing scope's tables, so a name the block declares as a typedef
+// met the enclosing scope's entry there: the block's `typedef struct pair_t;`
+// kept a module pair_t already in the table, HandleForwardTypedef in
+// src/elaborator/elaborator_typedef.cpp admitting a forward typedef repeated
+// after its own definition, and a function of the block between that forward
+// typedef and the definition was resolved at its item to the module's
+// one-member pair_t and kept, `g.f(tagged A '{3, 4})` reading 30 for §7.2.1's
+// 34; and a nested block's definition stayed in the table after the nested
+// block's items, so a function of g written below h resolved pair_t to h's
+// three-member one -- both ccc8d1f7f's remainders, found by a2d48456a's agent.
+// The enclosing entry of every name a typedef item of the block declares, above
+// or below any subroutine, is taken out ahead of the walk and handed back for
+// RestoreEnclosingTypedefs to put in place once the block's items are done, so
+// the forward typedef installs its placeholder over nothing, the definition
+// writes over that, and the enclosing scope sees its own entry again below the
+// block. A name the enclosing scope has no entry for stays as the block leaves
+// it, since Elaborator::ProcessPendingGenerate folds the block's typedefs into
+// the design-wide table for §20.6.2's $bits and would find nothing otherwise.
 //
 // The forward kinds Elaborator::ElaborateTypedef checks a definition against
 // take the same trip, and the block's own are erased on the way back: the
@@ -350,24 +347,24 @@ static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
   }
 }
 
-// §27.2 rules that "all other module items, including other generate
-// constructs, are allowed in a generate block" once port declarations,
-// specify blocks and specparam declarations are excluded, so a function may
-// be declared among these items. §13.4.3 has a constant function call
-// "evaluated at elaboration time", and the folder answers such a call from
-// the table a ConstFuncRegistryGuard installs. RecordTaskFuncNames in
-// src/elaborator/elaborator_items_udp.cpp fills the module's table by walking
-// ModuleDecl::items and does not descend into a generate construct, so a
-// function declared here is in no table until this site puts it in one.
+// §27.2 allows every other module item, other generate constructs included, in
+// a generate block once port declarations, specify blocks and specparam
+// declarations are excluded, so a function may be declared among these items.
+// §13.4.3 has a constant function call evaluated during elaboration, and the
+// folder answers such a call from the table a ConstFuncRegistryGuard installs.
+// RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the
+// module's table by walking ModuleDecl::items and does not descend into a
+// generate construct, so a function declared here is in no table until this
+// site puts it in one.
 //
 // The table installed here is the one already registered, copied and added
-// to. §23.9 has the search for a directly referenced identifier "continue
-// upward until an item by that name is found or until a module, interface,
-// program, or checker boundary is encountered", and a generate block is not
-// one of those boundaries, so a call written in a nested block names a
-// function of the block enclosing it and a call written in any block names a
-// function of the module. A name these items declare overwrites the entry
-// they inherited, which is §23.9's identifier "declared locally".
+// to. §23.9 has the search for a directly referenced identifier climb until it
+// finds an item of that name or meets a module, interface, program or checker
+// boundary, and a generate block is not one of those boundaries, so a call
+// written in a nested block names a function of the block enclosing it and a
+// call written in any block names a function of the module. A name these items
+// declare overwrites the entry they inherited, which is §23.9's identifier
+// declared locally.
 //
 // A sibling block names none of them, because the guard puts back what it
 // found when these items are done and each block's items are one call to this
@@ -420,13 +417,13 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // overlay is empty again once we leave the generate scope.
   ScopeMap saved_gen_const_scope = gen_const_scope_;
   gen_const_scope_ = scope;
-  // §23.9 lists "Generate blocks" among the elements that "define a new
-  // scope", so which of the module Elaborator::ProcessPendingGenerate
-  // registered the folder may name from here depends on the blocks these items
-  // stand in. Every caller sets ElaboratorData::gen_prefix_scopes_ to that
-  // before calling, so this is the one site covering the conditional block, the
-  // directly nested block that opens no scope of its own, and each iteration of
-  // a loop generate block.
+  // §23.9 lists generate blocks among the elements that open a new scope, so
+  // which of the module Elaborator::ProcessPendingGenerate registered the
+  // folder may name from here depends on the blocks these items stand in. Every
+  // caller sets ElaboratorData::gen_prefix_scopes_ to that before calling, so
+  // this is the one site covering the conditional block, the directly nested
+  // block that opens no scope of its own, and each iteration of a loop generate
+  // block.
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
   // §26.3: an import these items write is a candidate for the items after it
   // alone, which Elaborator::ElaborateGenerateBlockImport records by adding a
@@ -686,11 +683,11 @@ static std::optional<int64_t> ComputeGenerateForNextValue(
 // the diagnostic) when the array name conflicts; true otherwise.
 //
 // `scoped_name` is the array name qualified by the generate prefix in force
-// where the loop is written, because a generate block "comprises a separate
-// scope and a new level of hierarchy when it is instantiated" (§27.4): two
-// arrays named alike under different instances of an enclosing loop are
-// declared in different scopes and do not conflict, while two written side by
-// side under the same instance share a prefix and still do.
+// where the loop is written, because a generate block forms a scope of its own
+// and a further level of hierarchy once instantiated (§27.4): two arrays named
+// alike under different instances of an enclosing loop are declared in
+// different scopes and do not conflict, while two written side by side under
+// the same instance share a prefix and still do.
 static bool RegisterGenerateForArrayName(
     DiagEngine& diag, const ModuleItem* item, std::string_view scoped_name,
     const RtlirModule* mod,
@@ -874,17 +871,16 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       return;
     }
 
-    // §27.4: a named generate block "is a declaration of an array of generate
-    // block instances", and "the index values in this array are the values
-    // assumed by the genvar during elaboration". What tells one instance from
-    // another is therefore the block and the index, and not the genvar: two
-    // sibling blocks written over one genvar are two distinct arrays, and
-    // §27.4 rules that each comprises "a separate scope", so a declaration in
-    // one is a different object from the same-named declaration in the other.
-    // Spelling the prefix from genvar_name gave both of them one name.
-    // AssignGenerateBlockNames has already given an unnamed block the name
-    // §27.6 assigns it, so item->name is set whether or not the source wrote
-    // one.
+    // §27.4: a named generate block declares an array of generate block
+    // instances indexed by the values the genvar takes during elaboration. What
+    // tells one instance from another is therefore the block and the index, and
+    // not the genvar: two sibling blocks written over one genvar are two
+    // distinct arrays, and §27.4 rules that each forms a scope of its own, so a
+    // declaration in one is a different object from the same-named declaration
+    // in the other. Spelling the prefix from genvar_name gave both of them one
+    // name. AssignGenerateBlockNames has already given an unnamed block the
+    // name §27.6 assigns it, so item->name is set whether or not the source
+    // wrote one.
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, item->name,
                               loop_scope[genvar_name]);
     gen_prefix_scopes_.back() = InternedGenPrefix();
@@ -903,13 +899,13 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     }
   }
 
-  // §27.4 states the rule at stake -- "It shall be an error if the loop
-  // generate scheme does not terminate" -- so the report names it, and a
-  // reader who hit this has somewhere to go. What the report does not say is
-  // that the scheme does not terminate, because reaching the bound does not
-  // establish that: a scheme that would have stopped at one iteration past it
-  // arrives here too. The message names the bound so the two are told apart by
-  // the reader the elaborator cannot tell them apart for.
+  // §27.4 states the rule at stake -- a loop generate scheme that does not
+  // terminate is an error -- so the report names it, and a reader who hit this
+  // has somewhere to go. What the report does not say is that the scheme does
+  // not terminate, because reaching the bound does not establish that: a scheme
+  // that would have stopped at one iteration past it arrives here too. The
+  // message names the bound so the two are told apart by the reader the
+  // elaborator cannot tell them apart for.
   if (iter == max_generate_iterations_) {
     diag_.Error(item->loc,
                 std::format("loop generate scheme did not terminate within {} "

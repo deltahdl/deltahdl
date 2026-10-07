@@ -318,9 +318,9 @@ static bool IsTraversalMethod(std::string_view name) {
 
 // The subclause of IEEE 1800-2023 stating the wildcard restriction for one
 // associative array traversal method. §7.9.4 First(), §7.9.5 Last(), §7.9.6
-// Next() and §7.9.7 Prev() each state it of their own method: "Associative
-// arrays that specify a wildcard index type shall not be allowed." The caller
-// has already answered IsTraversalMethod, so `name` is one of the four.
+// Next() and §7.9.7 Prev() each bar their own method from an associative array
+// with a wildcard index type. The caller has already answered
+// IsTraversalMethod, so `name` is one of the four.
 static std::string_view TraversalMethodSubclause(std::string_view name) {
   if (name == "first") return "7.9.4";
   if (name == "last") return "7.9.5";
@@ -529,10 +529,10 @@ static void CheckTraversalCallSite(
   auto method = access->rhs->text;
   auto it = assoc_keys.find(array_name);
   if (it == assoc_keys.end()) return;
-  // §7.9.4 First(), §7.9.5 Last(), §7.9.6 Next() and §7.9.7 Prev() each state
-  // of their own method that "Associative arrays that specify a wildcard index
-  // type shall not be allowed", so the report names the subclause belonging to
-  // the method it rejected rather than the clause the four sit under.
+  // §7.9.4 First(), §7.9.5 Last(), §7.9.6 Next() and §7.9.7 Prev() each bar
+  // their own method from an associative array with a wildcard index type, so
+  // the report names the subclause belonging to the method it rejected rather
+  // than the clause the four sit under.
   if (it->second == AssocKeyCategory::kWildcard) {
     diag.Error(e->range.start,
                std::format("traversal method '{}' shall not be used on the "

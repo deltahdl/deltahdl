@@ -105,11 +105,11 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   var.init_expr = item->init_expr;
   mod->variables.push_back(var);
   // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits
-  // this declaration site as much as the one inside a specify block: "A
-  // specparam ... may be declared inside a specify block or in the module
-  // body." RegisterModuleSpecparams (src/simulator/specify.h) binds these names
-  // to SpecifyManager, and it is the lowered name -- var.name, already scoped
-  // by ScopedName -- that a LABEL has to reach, because
+  // this declaration site as much as the one inside a specify block: a
+  // specparam may be declared in a specify block or in the module body.
+  // RegisterModuleSpecparams (src/simulator/specify.h) binds these names to
+  // SpecifyManager, and it is the lowered name -- var.name, already scoped by
+  // ScopedName -- that a LABEL has to reach, because
   // SpecifyManager::ApplyAnnotatedSpecparam looks the storage up as the
   // instance prefix followed by this name.
   mod->specparam_names.push_back(var.name);
@@ -156,8 +156,8 @@ bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name) {
 // rule has to ask about it separately.
 //
 // RtlirParamDecl::name is bare whatever scope the parameter was declared in, so
-// the name alone does not answer: §23.9 lists "Generate blocks" among the
-// elements that "define a new scope", and a parameter one block declares is not
+// the name alone does not answer: §23.9 lists generate blocks among the
+// elements that open a new scope, and a parameter one block declares is not
 // visible to a reference at module level or in a sibling block. Match
 // RtlirParamDecl::gen_block_prefix against the prefixes in force instead. A
 // parameter of the module itself has none and is visible throughout, which is
@@ -175,16 +175,14 @@ static bool IsParamDeclared(std::string_view name, const RtlirModule* mod,
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
   // Ask IsNameDeclared about one key per enclosing scope, innermost first.
-  // §6.10 assumes an implicit net for an identifier that "has not been declared
-  // previously in the scope where the continuous assignment statement appears
-  // or in any scope whose declarations can be directly referenced from" that
-  // scope, and §23.9 lists the scopes and fixes the order: an identifier
-  // "referenced directly (without a hierarchical path) within a ... generate
-  // block ... shall be declared either within the ... generate block locally or
-  // within a module, interface, program, checker, task, function, named block,
-  // or generate block that is higher in the same branch of the name tree", and
-  // "the search shall continue upward until an item by that name is found or
-  // until a module, interface, program, or checker boundary is encountered".
+  // §6.10 assumes an implicit net for an identifier declared neither in the
+  // scope of the continuous assignment nor in any scope directly referenceable
+  // from it, and §23.9 lists the scopes and fixes the order: an identifier
+  // referenced without a hierarchical path in a generate block is declared in
+  // that block or in a module, interface, program, checker, task, function,
+  // named block or generate block higher in the same branch of the name tree,
+  // and the search climbs until it finds an item of that name or meets a
+  // module, interface, program or checker boundary.
   //
   // RtlirModule::nets, RtlirModule::variables and RtlirModule::ports hold the
   // string Elaborator::ScopedName produced, so the key for each scope is that
@@ -236,11 +234,10 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // The redeclaration key carries the generate prefix and net_names_ does not,
   // which is what Elaborator::ElaborateNetDecl does for an explicit net at
   // src/elaborator/elaborator_decls.cpp:598 and :600. §6.10 settles the first:
-  // "if the implicit net is declared by a reference in a generate block, then
-  // the net is implicitly declared only in that generate block". The name this
-  // reference declares therefore belongs to the block, and a declaration of it
-  // in another block or in the module is a different scope rather than a
-  // redeclaration of this one.
+  // an implicit net declared by a reference in a generate block is declared in
+  // that block alone. The name this reference declares therefore belongs to the
+  // block, and a declaration of it in another block or in the module is a
+  // different scope rather than a redeclaration of this one.
   //
   // net_names_ answers a different question -- whether a simple name written
   // in this module names a net rather than a variable -- and every one of its
@@ -295,9 +292,9 @@ namespace {
 // the range bounds. An interconnect terminal must match the instance-array
 // length exactly; an ordinary terminal must be either scalar-width (broadcast)
 // or equal to the array length. §29.8 puts an array of primitive instances
-// under the same rule -- "The terminal connection rules remain the same as
-// outlined in 28.3.6" -- so the reports name a primitive as well as a gate,
-// and cite 28.3.6, which is where the rule is stated.
+// under the same rule -- the terminal connection rules of §28.3.6 still apply
+// -- so the reports name a primitive as well as a gate, and cite 28.3.6, which
+// is where the rule is stated.
 void CheckGateInstanceArrayTerminalWidths(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -544,11 +541,11 @@ void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
 
 // The instance range is what makes §28.3.6's widths a question at all, so an
 // item carrying none is left alone by CheckGateInstanceArrayTerminalWidths: its
-// rule is about "the bit length of each single-instance port or terminal in the
-// instantiated module or primitive" against the length of an array, and there
-// is no array here to measure against.
-// ValidatePrimitiveOutputTerminalWidths asks the complementary question, so it
-// is asked of every item, and one ScopeMap answers both.
+// rule is about the bit length of each single-instance port or terminal of the
+// instantiated module or primitive against the length of an array, and there is
+// no array here to measure against. ValidatePrimitiveOutputTerminalWidths asks
+// the complementary question, so it is asked of every item, and one ScopeMap
+// answers both.
 void Elaborator::CheckInstanceTerminalWidths(const ModuleItem* item,
                                              const RtlirModule* mod) {
   ScopeMap scope = BuildParamScope(mod);
@@ -636,11 +633,11 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNettypeDecl(item, mod);
       return true;
     case ModuleItemKind::kGateInst:
-      // §27.4: a generate block "comprises a separate scope and a new level of
-      // hierarchy when it is instantiated", so a gate instance written in a
-      // loop generate body declares its name afresh in each iteration rather
-      // than again, and is keyed by the generate prefix that tells those
-      // scopes apart. Outside a generate block ScopedName hands the name back
+      // §27.4: a generate block forms a scope of its own and a further level of
+      // hierarchy once instantiated, so a gate instance written in a loop
+      // generate body declares its name afresh in each iteration rather than
+      // again, and is keyed by the generate prefix that tells those scopes
+      // apart. Outside a generate block ScopedName hands the name back
       // unchanged, so a repeat at module level is still a redeclaration. The
       // empty check guards it: ScopedName("") returns the prefix itself, which
       // would key an unnamed gate instance under the block's own name.
@@ -772,12 +769,12 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGenerateIf:
     case ModuleItemKind::kGenerateCase:
     case ModuleItemKind::kGenerateFor:
-      // §26.3: an imported name is locally visible only "prior to that point
-      // within the current scope", so copy typedefs_ and cu_param_scope_ onto
-      // the pending entry here, where they hold the scope this generate was
-      // written in. Elaborator::ResolveDefparamsAndGenerates folds the
-      // condition after every module has been elaborated, and without the copy
-      // it would fold against the union of every module's imports.
+      // §26.3: an imported name is locally visible only before that point in
+      // the current scope, so copy typedefs_ and cu_param_scope_ onto the
+      // pending entry here, where they hold the scope this generate was written
+      // in. Elaborator::ResolveDefparamsAndGenerates folds the condition after
+      // every module has been elaborated, and without the copy it would fold
+      // against the union of every module's imports.
       //
       // func_decls_ is copied for the same reason and reaches §13.4.3 rather
       // than §26.3: Elaborator::ElaborateItems filled it from this module's

@@ -88,13 +88,13 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
   }
 
   // Table 6-8 fixes a width for each integer data type that has one, and
-  // §6.11.1 calls those "simple bit vector types with predefined widths". The
-  // cases below are that table, and after it §6.12's real types: a real is a
-  // C double, a shortreal a C float, and realtime is real (printed page 110),
-  // so a member of one of those holds 64 or 32 bits. Only bit, logic and reg
-  // are left out, because Table 6-8 gives them a user-defined vector size
-  // instead -- a member declared with no packed dimension is the one-bit
-  // vector, which is what the default answers.
+  // §6.11.1 calls those the simple bit vector types of predefined width. The
+  // cases below are that table, and after it §6.12's real types: a real is a C
+  // double, a shortreal a C float, and realtime is real (printed page 110), so
+  // a member of one of those holds 64 or 32 bits. Only bit, logic and reg are
+  // left out, because Table 6-8 gives them a user-defined vector size instead
+  // -- a member declared with no packed dimension is the one-bit vector, which
+  // is what the default answers.
   switch (m.type_kind) {
     case DataTypeKind::kByte:
       return 8;
@@ -255,16 +255,16 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype) {
-  // §7.4.4: "Multiple packed dimensions can also be defined in stages with
-  // typedef", and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50
-  // bits: a packed dimension written where a typedef name is used is a
-  // dimension *of* that name and multiplies the width the name stands for.
-  // This overload has no typedef map to resolve the name with, so it cannot
-  // answer, and answering from the range alone discarded the name entirely --
-  // `nib [1:0] x` on a `typedef bit [3:0] nib` came out 2 bits, the width of
-  // the index rather than of what is indexed. 0 is what a name already answers
-  // here without a dimension, what every caller's fallback is written to
-  // handle, and what lets a typedef-aware caller take over.
+  // §7.4.4: packed dimensions may also be built up in stages through typedef,
+  // and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits: a
+  // packed dimension written where a typedef name is used is a dimension *of*
+  // that name and multiplies the width the name stands for. This overload has
+  // no typedef map to resolve the name with, so it cannot answer, and answering
+  // from the range alone discarded the name entirely -- `nib [1:0] x` on a
+  // `typedef bit [3:0] nib` came out 2 bits, the width of the index rather than
+  // of what is indexed. 0 is what a name already answers here without a
+  // dimension, what every caller's fallback is written to handle, and what lets
+  // a typedef-aware caller take over.
   if (dtype.kind == DataTypeKind::kNamed) return 0;
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
@@ -776,16 +776,16 @@ static uint32_t InferCastWidth(const Expr* expr, const TypedefMap& typedefs) {
   return InferExprWidth(expr->lhs, typedefs);
 }
 
-// §11.7: `$signed` and `$unsigned` "shall evaluate the input expression and
-// return a one-dimensional packed array with the same number of bits and value
-// of the input expression and the signedness defined by the function". A
-// signing conversion is therefore as wide as its operand, so `$signed(4'b1100)`
-// is four bits and not thirty-two. Every other system function returns a 32-bit
-// integer, which makes the 32 below their own width rather than a fallback
-// these two escape. The 32 stands for a signing conversion as well when the
-// operand's width is unknown: InferExprWidth answers 0 for
-// ExprKind::kIdentifier, whose declared width it does not read, and returning
-// that 0 would take a width away from callers that read one today.
+// §11.7: `$signed` and `$unsigned` evaluate the input expression and return a
+// one-dimensional packed array of its width and value, with the signedness the
+// function names. A signing conversion is therefore as wide as its operand, so
+// `$signed(4'b1100)` is four bits and not thirty-two. Every other system
+// function returns a 32-bit integer, which makes the 32 below their own width
+// rather than a fallback these two escape. The 32 stands for a signing
+// conversion as well when the operand's width is unknown: InferExprWidth
+// answers 0 for ExprKind::kIdentifier, whose declared width it does not read,
+// and returning that 0 would take a width away from callers that read one
+// today.
 static uint32_t InferSystemCallWidth(const Expr* expr,
                                      const TypedefMap& typedefs) {
   if (expr->callee == "$signed" || expr->callee == "$unsigned") {
@@ -841,16 +841,15 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kInside:
     case ExprKind::kTagged:
       return 0;
-    // §11.11: "The min:typ:max format can be used wherever expressions can
-    // appear", so the form stands as an operand and an operand is sized. What
-    // it is worth is the member the run selects -- Example 1 reads
-    // `(a:b:c) + (d:e:f)` member by member, "the minimum value is the sum of
-    // a+d; the typical value is b+e; the maximum value is c+f" -- so what it is
-    // worth and how wide it is are the same member's, and the width follows the
-    // fold rather than composing the three. §11.11 requires no relation between
-    // them, so they may differ in width and the selected one decides; a width
-    // of 0 sized the form as nothing wherever a context read it, and a
-    // concatenation holding one contributed no bits for it.
+    // §11.11 lets the min:typ:max form stand wherever an expression may, so the
+    // form stands as an operand and an operand is sized. What it is worth is
+    // the member the run selects -- Example 1 reads `(a:b:c) + (d:e:f)` member
+    // by member, its minimum a+d, its typical b+e and its maximum c+f -- so
+    // what it is worth and how wide it is are the same member's, and the width
+    // follows the fold rather than composing the three. §11.11 requires no
+    // relation between them, so they may differ in width and the selected one
+    // decides; a width of 0 sized the form as nothing wherever a context read
+    // it, and a concatenation holding one contributed no bits for it.
     case ExprKind::kMinTypMax:
       return InferExprWidth(SelectMinTypMaxMember(expr), typedefs);
   }

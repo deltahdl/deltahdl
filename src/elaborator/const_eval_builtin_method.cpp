@@ -1,13 +1,12 @@
 // §11.2.1 constant built-in method calls: the one place that decides whether a
 // call to a §5.13 built-in method is a constant expression, and the one place
 // that evaluates it. Both answers live here because they are the same answer.
-// §11.2.1 states of such a call that "when used in constant expressions, these
-// function calls shall be evaluated at elaboration time" (printed page 270 of
-// IEEE 1800-2023), so a call this file cannot evaluate is not one a
-// constant expression may hold. Splitting the two apart is what let an
-// expression be admitted wherever a constant expression is required and then
-// fold to no value, leaving the declaration silently unresolved rather than
-// either folded or reported.
+// §11.2.1 has such a call, in a constant expression, evaluated during
+// elaboration (printed page 270 of IEEE 1800-2023), so a call this file cannot
+// evaluate is not one a constant expression may hold. Splitting the two apart
+// is what let an expression be admitted wherever a constant expression is
+// required and then fold to no value, leaving the declaration silently
+// unresolved rather than either folded or reported.
 
 #include <cstdint>
 #include <optional>
@@ -22,16 +21,15 @@
 namespace delta {
 namespace {
 
-// The built-in methods §5.13 defines that return an integer: "dynamic_array.
-// size, associative_array.num, and string.len" (printed page 87). §6.19.5.5
-// adds num() on an enumeration, and §7.9 adds num() and size() on an
+// The built-in methods §5.13 defines that return an integer:
+// dynamic_array.size, associative_array.num and string.len (printed page 87).
+// §6.19.5.5 adds num() on an enumeration, and §7.9 adds num() and size() on an
 // associative array, so the three names cover every one of them.
 //
 // The names an earlier revision of this list also carried -- bits, dimensions,
 // unpacked_dimensions, left, right, low, high and increment -- name no built-in
-// method. §7.11 rules them system functions: "SystemVerilog provides system
-// functions to return information about an array. These are $left, $right,
-// $low, $high, $increment, $size, $dimensions, and $unpacked_dimensions"
+// method. §7.11 rules them system functions, the array query functions $left,
+// $right, $low, $high, $increment, $size, $dimensions and $unpacked_dimensions
 // (printed page 173), and §20.6.2 gives $bits the same form. A name written
 // without its $ is not one of them, so an expression spelling one is an
 // ordinary member access and is decided as one.
@@ -46,11 +44,10 @@ bool IsBuiltinMethodName(std::string_view method) {
 
 // The member access a built-in method call is written through. `q.size()`
 // parses as a call whose left operand is the access, and §5.13 makes the
-// parentheses optional -- "when a subroutine built-in method call specifies no
-// arguments, the empty parentheses, (), following the subroutine name are
-// optional" -- so `q.size` parses as the access itself. Null when the
-// expression is neither shape, or when the member it names is not a built-in
-// method.
+// parentheses optional -- a built-in method call with no arguments may leave
+// out the empty () after the subroutine name -- so `q.size` parses as the
+// access itself. Null when the expression is neither shape, or when the member
+// it names is not a built-in method.
 const Expr* BuiltinMethodMember(const Expr* expr) {
   if (!expr) return nullptr;
   const Expr* member = nullptr;
@@ -81,12 +78,11 @@ const RtlirVariable* RegisteredVariable(std::string_view name) {
   return nullptr;
 }
 
-// §6.19.5.5: "The num() method returns the number of elements in the given
-// enumeration" (printed page 124). The count is a property of the enumeration
-// the variable was declared with rather than of the value the variable holds,
-// which is exactly what §11.2.1 asks of a call admitted with a non-constant
-// identifier: a method "whose value does not depend on the current value of the
-// identifier".
+// §6.19.5.5: num() returns how many elements the enumeration has (printed page
+// 124). The count is a property of the enumeration the variable was declared
+// with rather than of the value the variable holds, which is exactly what
+// §11.2.1 asks of a call admitted with a non-constant identifier: a method
+// whose result never depends on what the identifier currently holds.
 //
 // Empty for an operand that is not a bare identifier, for a variable of no
 // enumerated type, and for a name the installed module does not declare. A
@@ -104,19 +100,18 @@ std::optional<int64_t> EnumMemberCount(const Expr* operand) {
   return static_cast<int64_t>(it->second.size());
 }
 
-// §6.16.1: "str.len() returns the length of the string, i.e., the number of
-// characters in the string" (printed page 114). The count is taken from
-// RtlirParamDecl::resolved_string rather than from
-// RtlirParamDecl::resolved_value, because §6.16 rules that "strings can be of
-// arbitrary length and no truncation occurs" while resolved_value is 64 bits.
-// §11.10 packs a string literal one byte per character, so a value of more
-// than eight characters has already lost bytes, and a length computed from it
-// would be wrong for exactly the strings §6.16 admits.
+// §6.16.1: str.len() gives the string's length, its count of characters
+// (printed page 114). The count is taken from RtlirParamDecl::resolved_string
+// rather than from RtlirParamDecl::resolved_value, because §6.16 lets a string
+// be any length without truncation while resolved_value is 64 bits. §11.10
+// packs a string literal one byte per character, so a value of more than eight
+// characters has already lost bytes, and a length computed from it would be
+// wrong for exactly the strings §6.16 admits.
 //
 // Empty for an operand that is not a bare identifier, for a name the installed
 // module declares no parameter under, and for a parameter that took a value of
-// some other type. §5.13 rules that "a built-in method can only be associated
-// with a particular data type", and it associates len() with string alone.
+// some other type. §5.13 ties each built-in method to a particular data type,
+// and it associates len() with string alone.
 //
 // Unlike num() on an enumeration, this value depends on the current value of
 // the identifier, so §11.2.1 admits it only under its first rule, which
@@ -179,23 +174,23 @@ std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
   // §11.2.1 requires the input arguments to be constant expressions whichever
   // of its two rules admits the call, so this is tested before the operand.
   if (!AllElementsConstant(expr->args, scope)) return false;
-  // §11.2.1: "when used in constant expressions, these function calls shall be
-  // evaluated at elaboration time". The answer is therefore whether
-  // ConstEvalBuiltinMethodFull evaluates it, which keeps this predicate and
-  // that folder from disagreeing about one expression.
+  // §11.2.1: such a call in a constant expression is evaluated during
+  // elaboration. The answer is therefore whether ConstEvalBuiltinMethodFull
+  // evaluates it, which keeps this predicate and that folder from disagreeing
+  // about one expression.
   //
   // This is stricter than §11.2.1's first rule, which admits a call whose
-  // "identifier and input arguments are constant expressions", and deliberately
-  // so. That rule governs calls "to built-in methods (see 5.13)", and a
+  // identifier and input arguments are constant expressions, and deliberately
+  // so. That rule governs calls to the built-in methods of §5.13, and a
   // ScopeMap says a name has an integer value without saying what it was
-  // declared as. §5.13 rules that "a built-in method can only be associated
-  // with a particular data type", and it associates none with an integer, so a
-  // ScopeMap-constant identifier carries no built-in method for the rule to
-  // admit. The folder answers `len()` on a string parameter from the characters
-  // recorded on its declaration rather than from a ScopeMap, so that call is
-  // admitted here. What remains unfolded is a built-in method whose operand's
-  // declaration carries no value the folder can read; reporting it is what
-  // tells its author the value was not computed.
+  // declared as. §5.13 ties each built-in method to a particular data type, and
+  // it associates none with an integer, so a ScopeMap-constant identifier
+  // carries no built-in method for the rule to admit. The folder answers
+  // `len()` on a string parameter from the characters recorded on its
+  // declaration rather than from a ScopeMap, so that call is admitted here.
+  // What remains unfolded is a built-in method whose operand's declaration
+  // carries no value the folder can read; reporting it is what tells its author
+  // the value was not computed.
   return ConstEvalBuiltinMethodFull(expr).has_value();
 }
 
