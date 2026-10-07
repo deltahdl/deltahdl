@@ -183,7 +183,8 @@ TEST(UdpDeclGrammar, UdpVectorOutputInAnsiHeaderRejected) {
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP port shall be scalar; vector range not permitted", 1,
+      r.diags,
+      "a UDP port carries a single bit, so it cannot take a vector range", 1,
       "29.3.1"));
 }
 
@@ -193,7 +194,8 @@ TEST(UdpDeclGrammar, UdpVectorInputInAnsiHeaderRejected) {
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP port shall be scalar; vector range not permitted", 1,
+      r.diags,
+      "a UDP port carries a single bit, so it cannot take a vector range", 1,
       "29.3.1"));
 }
 
@@ -205,7 +207,8 @@ TEST(UdpDeclGrammar, UdpVectorOutputInNonAnsiDeclRejected) {
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP port shall be scalar; vector range not permitted", 2,
+      r.diags,
+      "a UDP port carries a single bit, so it cannot take a vector range", 2,
       "29.3.1"));
 }
 
@@ -217,7 +220,8 @@ TEST(UdpDeclGrammar, UdpVectorInputInNonAnsiDeclRejected) {
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP port shall be scalar; vector range not permitted", 3,
+      r.diags,
+      "a UDP port carries a single bit, so it cannot take a vector range", 3,
       "29.3.1"));
 }
 
@@ -230,8 +234,8 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "endprimitive\n");
   // The report stands on the offending port-list entry, which is on line 1.
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output port shall be the first port in the port list", 1,
-      "29.3.1"));
+      r.diags, "a UDP's output has to lead its port list, ahead of every input",
+      1, "29.3.1"));
 }
 
 // §29.3.1: the output port comes first in the port list. A header beginning
@@ -247,8 +251,8 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output port shall be the first port in the port list", 1,
-      "29.3.1"));
+      r.diags, "a UDP's output has to lead its port list, ahead of every input",
+      1, "29.3.1"));
 }
 
 // The same header read for what it leaves behind. Reading it as A.5.2's
@@ -289,8 +293,8 @@ TEST(UdpDeclGrammar, ExternUdpOutputNotFirstRejected) {
       "extern primitive p(input a,\n"
       "                   output o);\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "UDP output port shall be the first port in the port list", 1,
-      "29.3.1"));
+      r.diags, "a UDP's output has to lead its port list, ahead of every input",
+      1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {

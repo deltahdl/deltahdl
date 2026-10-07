@@ -84,9 +84,10 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
 
 void Parser::RejectUdpPortDimension() {
   if (!Check(TokenKind::kLBracket)) return;
-  diag_.Error(CurrentLoc(),
-              "UDP port shall be scalar; vector range not permitted",
-              Subclause("29.3.1"));
+  diag_.Error(
+      CurrentLoc(),
+      "a UDP port carries a single bit, so it cannot take a vector range",
+      Subclause("29.3.1"));
   int depth = 0;
   do {
     if (Check(TokenKind::kLBracket))
@@ -607,7 +608,7 @@ static void ReconcileUdpNonAnsiPortList(
   if (!udp->output_name.empty() && !first_name.empty() &&
       first_name != udp->output_name) {
     diag.Error(first_loc,
-               "UDP output port shall be the first port in the port list",
+               "a UDP's output has to lead its port list, ahead of every input",
                Subclause("29.3.1"));
   }
 
@@ -763,9 +764,10 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
   // ValidateUdpHeader's report about the missing output and not a second one
   // about where it should have stood.
   if (have_first_port && !first_port_is_output && !udp->output_name.empty()) {
-    diag_.Error(first_port_loc,
-                "UDP output port shall be the first port in the port list",
-                Subclause("29.3.1"));
+    diag_.Error(
+        first_port_loc,
+        "a UDP's output has to lead its port list, ahead of every input",
+        Subclause("29.3.1"));
   }
 
   Expect(TokenKind::kRParen, Subclause("29.3.1"));
